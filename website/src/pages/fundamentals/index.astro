@@ -1,0 +1,151 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const modules = [
+  {
+    title: "Git Basics",
+    description: "Understanding version control fundamentals",
+    slug: "git-basics",
+    order: 1,
+    tags: ["git", "version-control", "basics"]
+  },
+  {
+    title: "CI/CD Introduction", 
+    description: "Continuous Integration and Deployment concepts",
+    slug: "cicd-intro",
+    order: 2,
+    tags: ["ci-cd", "automation", "deployment"]
+  },
+  {
+    title: "Testing Fundamentals",
+    description: "Unit, integration, and e2e testing concepts", 
+    slug: "testing-fundamentals",
+    order: 3,
+    tags: ["testing", "unit-tests", "integration", "e2e"]
+  },
+  {
+    title: "Code Quality & Review",
+    description: "Code review processes, linting, and documentation standards",
+    slug: "code-quality", 
+    order: 4,
+    tags: ["code-quality", "review", "linting", "documentation"]
+  }
+];
+---
+
+<Layout>
+  <div class="min-h-screen bg-gray-50 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Header -->
+      <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">
+          Software Engineering Fundamentals
+        </h1>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+          Master the core concepts that every developer should know before leveraging AI coding agents. 
+          Build a solid foundation in version control, testing, CI/CD, and code quality practices.
+        </p>
+      </div>
+
+      <!-- Learning Path -->
+      <div class="mb-12">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Learning Path</h2>
+        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+          {modules.map((module) => (
+            <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+              <div class="p-6">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                      <span class="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mr-3">
+                        {module.order}
+                      </span>
+                      <h3 class="text-xl font-semibold text-gray-900">
+                        <a href={`/fundamentals/${module.slug}`} class="hover:text-blue-600 transition-colors">
+                          {module.title}
+                        </a>
+                      </h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">{module.description}</p>
+                    <div class="flex flex-wrap gap-2">
+                      {module.tags.map(tag => (
+                        <span class="inline-block px-3 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div class="ml-4">
+                    <a 
+                      href={`/fundamentals/${module.slug}`}
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                    >
+                      Start Learning
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Why These Fundamentals Matter -->
+      <div class="bg-white rounded-lg shadow-md p-8 mb-12">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Why These Fundamentals Matter</h2>
+        <div class="grid md:grid-cols-2 gap-8">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Foundation for AI Collaboration</h3>
+            <p class="text-gray-600">
+              Understanding these fundamentals enables you to effectively guide AI coding agents, 
+              review their output, and maintain high code quality when using AI assistance.
+            </p>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Industry Best Practices</h3>
+            <p class="text-gray-600">
+              These practices are standard across the software industry. Mastering them makes you 
+              a more effective developer regardless of the tools you use.
+            </p>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Quality Assurance</h3>
+            <p class="text-gray-600">
+              Proper testing, code review, and CI/CD practices ensure that your code is reliable, 
+              maintainable, and deployable with confidence.
+            </p>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Team Collaboration</h3>
+            <p class="text-gray-600">
+              Version control and code quality practices are essential for working effectively 
+              in teams and contributing to open source projects.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Next Steps -->
+      <div class="text-center">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Ready for the Next Level?</h2>
+        <p class="text-gray-600 mb-6">
+          Once you've mastered these fundamentals, explore how to leverage AI tools effectively in your development workflow.
+        </p>
+        <div class="space-x-4">
+          <a 
+            href="/ai-development" 
+            class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
+          >
+            AI-Assisted Development
+          </a>
+          <a 
+            href="/coding-agents" 
+            class="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          >
+            Coding Agents
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

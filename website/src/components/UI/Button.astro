@@ -1,0 +1,120 @@
+---
+export interface Props {
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  loading?: boolean;
+  href?: string; // For link-style buttons
+  type?: 'button' | 'submit' | 'reset';
+  class?: string;
+}
+
+const {
+  variant = 'primary',
+  size = 'md',
+  disabled = false,
+  loading = false,
+  href,
+  type = 'button',
+  class: className = '',
+  ...rest
+} = Astro.props;
+
+// Base styles that apply to all buttons
+const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+
+// Size variants
+const sizeStyles = {
+  sm: 'px-3 py-2 text-sm',
+  md: 'px-4 py-2 text-base',
+  lg: 'px-6 py-3 text-lg'
+};
+
+// Variant styles
+const variantStyles = {
+  primary: 'text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:ring-blue-500 shadow-lg hover:shadow-xl transform hover:scale-105',
+  secondary: 'text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-gray-500',
+  outline: 'text-gray-700 bg-white border-2 border-gray-300 hover:border-gray-400 hover:shadow-md focus:ring-gray-500',
+  ghost: 'text-gray-600 bg-transparent hover:bg-gray-100 focus:ring-gray-500'
+};
+
+// Loading state styles
+const loadingVariantStyles = {
+  primary: 'text-white bg-gradient-to-r from-blue-600 to-purple-600',
+  secondary: 'text-gray-900 bg-gray-200',
+  outline: 'text-gray-700 bg-white border-2 border-gray-300',
+  ghost: 'text-gray-600 bg-transparent'
+};
+
+// Combine all styles
+const buttonStyles = [
+  baseStyles,
+  sizeStyles[size],
+  loading ? loadingVariantStyles[variant] : variantStyles[variant],
+  className
+].join(' ');
+
+// Determine if we should render as a link or button
+const Tag = href ? 'a' : 'button';
+const additionalProps = href 
+  ? { href } 
+  : { type, disabled: disabled || loading };
+---
+
+<Tag 
+  class={buttonStyles}
+  aria-disabled={disabled || loading}
+  {...additionalProps}
+  {...rest}
+>
+  {loading && (
+    <svg 
+      class="animate-spin -ml-1 mr-3 h-5 w-5" 
+      xmlns="http://www.w3.org/2000/svg" 
+      fill="none" 
+      viewBox="0 0 24 24"
+    >
+      <circle 
+        class="opacity-25" 
+        cx="12" 
+        cy="12" 
+        r="10" 
+        stroke="currentColor" 
+        stroke-width="4"
+      ></circle>
+      <path 
+        class="opacity-75" 
+        fill="currentColor" 
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      ></path>
+    </svg>
+  )}
+  <slot />
+</Tag>
+
+<style>
+  /* Custom focus styles for accessibility */
+  button:focus-visible,
+  a[role="button"]:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  
+  /* Ensure proper cursor for disabled buttons */
+  button:disabled,
+  a[aria-disabled="true"] {
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  
+  /* Loading state animation */
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+</style>

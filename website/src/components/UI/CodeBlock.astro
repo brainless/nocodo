@@ -1,0 +1,258 @@
+---
+export interface Props {
+  code: string;
+  language: string;
+  filename?: string;
+  showLineNumbers?: boolean;
+  copyable?: boolean;
+  theme?: 'light' | 'dark';
+  class?: string;
+}
+
+const {
+  code,
+  language,
+  filename,
+  showLineNumbers = false,
+  copyable = true,
+  theme = 'light',
+  class: className = '',
+  ...rest
+} = Astro.props;
+
+// Base styles for the code block container
+const containerStyles = [
+  'relative',
+  'rounded-lg',
+  'overflow-hidden',
+  'border',
+  'border-gray-200',
+  'bg-gray-50',
+  className
+].join(' ');
+
+// Theme-specific styles
+const themeStyles = {
+  light: {
+    background: 'bg-gray-50',
+    border: 'border-gray-200',
+    text: 'text-gray-900',
+    headerBg: 'bg-gray-100',
+    headerText: 'text-gray-700'
+  },
+  dark: {
+    background: 'bg-gray-900',
+    border: 'border-gray-700',
+    text: 'text-gray-100',
+    headerBg: 'bg-gray-800',
+    headerText: 'text-gray-300'
+  }
+};
+
+const currentTheme = themeStyles[theme];
+
+// Generate unique ID for this code block
+const codeBlockId = `code-${Math.random().toString(36).substring(2, 11)}`;
+---
+
+<div class={containerStyles} {...rest}>
+  <!-- Header with filename and copy button -->
+  {(filename || copyable) && (
+    <div class={`flex items-center justify-between px-4 py-2 ${currentTheme.headerBg} ${currentTheme.headerText} border-b ${currentTheme.border}`}>
+      <!-- Filename -->
+      {filename && (
+        <div class="flex items-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <span class="text-sm font-mono">{filename}</span>
+        </div>
+      )}
+      
+      <!-- Language indicator -->
+      <div class="flex items-center space-x-2">
+        <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 font-mono">{language}</span>
+        
+        <!-- Copy button -->
+        {copyable && (
+          <button 
+            type="button"
+            class="copy-button p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            data-code-id={codeBlockId}
+            aria-label="Copy code to clipboard"
+            title="Copy to clipboard"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  )}
+  
+  <!-- Code content -->
+  <div class={`relative ${currentTheme.background}`}>
+    <pre 
+      class={`p-4 overflow-x-auto ${currentTheme.text} font-mono text-sm leading-relaxed`}
+      id={codeBlockId}
+    ><code class={`language-${language}`}>{code}</code></pre>
+    
+    <!-- Line numbers overlay (if enabled) -->
+    {showLineNumbers && (
+      <div class="absolute left-0 top-0 p-4 select-none pointer-events-none">
+        <div class="text-gray-400 text-sm font-mono leading-relaxed">
+          {code.split('\n').map((_, index) => (
+            <div class="text-right pr-4 min-w-[2rem]">{index + 1}</div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+  
+  <!-- Success message for copy feedback -->
+  <div 
+    id={`copy-success-${codeBlockId}`} 
+    class="absolute top-2 right-2 px-3 py-1 bg-green-500 text-white text-sm rounded opacity-0 transition-opacity duration-300 pointer-events-none"
+  >
+    Copied!
+  </div>
+</div>
+
+<style>
+  /* Syntax highlighting base styles */
+  code {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+  }
+  
+  /* Basic syntax highlighting (fallback) */
+  .language-javascript .token.keyword,
+  .language-js .token.keyword,
+  .language-typescript .token.keyword,
+  .language-ts .token.keyword {
+    color: #d73a49;
+    font-weight: bold;
+  }
+  
+  .language-javascript .token.string,
+  .language-js .token.string,
+  .language-typescript .token.string,
+  .language-ts .token.string {
+    color: #032f62;
+  }
+  
+  .language-javascript .token.function,
+  .language-js .token.function,
+  .language-typescript .token.function,
+  .language-ts .token.function {
+    color: #6f42c1;
+  }
+  
+  .language-javascript .token.comment,
+  .language-js .token.comment,
+  .language-typescript .token.comment,
+  .language-ts .token.comment {
+    color: #6a737d;
+    font-style: italic;
+  }
+  
+  .language-bash .token.command {
+    color: #005cc5;
+    font-weight: bold;
+  }
+  
+  .language-bash .token.parameter {
+    color: #d73a49;
+  }
+  
+  /* Line numbers styling */
+  .line-numbers {
+    padding-left: 3.5rem;
+  }
+  
+  /* Copy button hover effects */
+  .copy-button:hover svg {
+    transform: scale(1.1);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    pre {
+      font-size: 0.75rem;
+    }
+  }
+</style>
+
+<script>
+  // Copy to clipboard functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const copyButtons = document.querySelectorAll('.copy-button');
+    
+    copyButtons.forEach((button) => {
+      button.addEventListener('click', async function(this: HTMLButtonElement) {
+        const codeId = this.getAttribute('data-code-id');
+        const codeElement = document.getElementById(codeId!);
+        const successElement = document.getElementById(`copy-success-${codeId}`);
+        
+        if (codeElement) {
+          const code = codeElement.textContent || codeElement.innerText;
+          
+          try {
+            await navigator.clipboard.writeText(code);
+            
+            // Show success message
+            if (successElement) {
+              successElement.style.opacity = '1';
+              setTimeout(() => {
+                successElement.style.opacity = '0';
+              }, 2000);
+            }
+            
+            // Change button icon temporarily
+            const icon = this.querySelector('svg');
+            if (icon) {
+              const originalIcon = icon.innerHTML;
+              icon.innerHTML = `
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              `;
+              
+              setTimeout(() => {
+                icon.innerHTML = originalIcon;
+              }, 2000);
+            }
+            
+          } catch (err) {
+            console.error('Failed to copy code: ', err);
+            
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = code;
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            // Use newer API if available, fallback to deprecated execCommand
+            if (navigator.clipboard) {
+              try {
+                await navigator.clipboard.writeText(code);
+              } catch {
+                document.execCommand('copy');
+              }
+            } else {
+              document.execCommand('copy');
+            }
+            
+            document.body.removeChild(textArea);
+            
+            if (successElement) {
+              successElement.textContent = 'Copied!';
+              successElement.style.opacity = '1';
+              setTimeout(() => {
+                successElement.style.opacity = '0';
+              }, 2000);
+            }
+          }
+        }
+      });
+    });
+  });
+</script>

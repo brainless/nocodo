@@ -1,0 +1,227 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+import type { ContentFrontmatter } from '../../types/content';
+
+export async function getStaticPaths() {
+  const contentFiles = [
+    'git-basics',
+    'cicd-intro', 
+    'testing-fundamentals',
+    'code-quality'
+  ];
+  
+  return contentFiles.map(slug => ({
+    params: { slug }
+  }));
+}
+
+const { slug } = Astro.params;
+
+// Read markdown content
+let content = '';
+let frontmatter: ContentFrontmatter = {};
+
+try {
+  const filePath = join(process.cwd(), 'src', 'content', 'fundamentals', `${slug}.md`);
+  const fileContent = await readFile(filePath, 'utf-8');
+  
+  // Simple frontmatter parsing
+  if (fileContent.startsWith('---')) {
+    const endOfFrontmatter = fileContent.indexOf('---', 3);
+    const frontmatterText = fileContent.slice(3, endOfFrontmatter);
+    content = fileContent.slice(endOfFrontmatter + 3).trim();
+    
+    // Parse YAML-like frontmatter (basic implementation)
+    frontmatterText.split('\n').forEach(line => {
+      const [key, ...valueParts] = line.split(':');
+      if (key && valueParts.length) {
+        const value = valueParts.join(':').trim().replace(/^["']|["']$/g, '');
+        frontmatter[key.trim()] = value;
+      }
+    });
+  } else {
+    content = fileContent;
+  }
+} catch (error) {
+  console.error('Error reading content file:', error);
+  content = 'Content not found.';
+}
+
+const title = frontmatter.title || 'Fundamentals';
+const description = frontmatter.description || '';
+---
+
+<Layout>
+  <div class="min-h-screen bg-gray-50 py-12">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Breadcrumb -->
+      <nav class="mb-8">
+        <ol class="flex items-center space-x-2 text-sm text-gray-500">
+          <li><a href="/" class="hover:text-gray-700">Home</a></li>
+          <li>/</li>
+          <li><a href="/fundamentals" class="hover:text-gray-700">Fundamentals</a></li>
+          <li>/</li>
+          <li class="text-gray-900">{title}</li>
+        </ol>
+      </nav>
+
+      <!-- Article Header -->
+      <header class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">{title}</h1>
+        {description && (
+          <p class="text-xl text-gray-600">{description}</p>
+        )}
+        
+        <!-- Tags -->
+        {frontmatter.tags && (
+          <div class="mt-4 flex flex-wrap gap-2">
+            {frontmatter.tags!.replace(/[\[\]"]/g, '').split(',').map((tag: string) => (
+              <span class="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                {tag.trim()}
+              </span>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <!-- Article Content -->
+      <article class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="prose prose-lg prose-blue max-w-none p-8">
+          <!-- Simple markdown-to-HTML conversion for basic content -->
+          <div set:html={content
+            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+            .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/```([^`]+)```/gs, '<pre><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/^\- (.*$)/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+            .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/^(.+)$/gm, '<p>$1</p>')
+            .replace(/<p><h/g, '<h')
+            .replace(/<\/h(\d)><\/p>/g, '</h$1>')
+            .replace(/<p><ul>/g, '<ul>')
+            .replace(/<\/ul><\/p>/g, '</ul>')
+            .replace(/<p><pre>/g, '<pre>')
+            .replace(/<\/pre><\/p>/g, '</pre>')
+          }>
+          </div>
+        </div>
+      </article>
+
+      <!-- Navigation -->
+      <nav class="mt-12 flex justify-between">
+        <a 
+          href="/fundamentals"
+          class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+        >
+          ← Back to Fundamentals
+        </a>
+        
+        <a 
+          href="/ai-development"
+          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+        >
+          Next: AI Development →
+        </a>
+      </nav>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .prose {
+    color: #374151;
+    line-height: 1.75;
+  }
+  
+  .prose h1 {
+    color: #111827;
+    font-weight: 800;
+    font-size: 2.25rem;
+    margin-top: 0;
+    margin-bottom: 2rem;
+    line-height: 1.1;
+  }
+  
+  .prose h2 {
+    color: #111827;
+    font-weight: 700;
+    font-size: 1.875rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    line-height: 1.2;
+  }
+  
+  .prose h3 {
+    color: #111827;
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+  }
+  
+  .prose h4 {
+    color: #111827;
+    font-weight: 600;
+    font-size: 1.25rem;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+  }
+  
+  .prose p {
+    margin-bottom: 1.25rem;
+  }
+  
+  .prose ul {
+    margin: 1.25rem 0;
+    padding-left: 1.5rem;
+  }
+  
+  .prose li {
+    margin-bottom: 0.5rem;
+    list-style-type: disc;
+  }
+  
+  .prose code {
+    color: #dc2626;
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875rem;
+  }
+  
+  .prose pre {
+    background-color: #1f2937;
+    color: #f9fafb;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin: 1.5rem 0;
+  }
+  
+  .prose pre code {
+    color: inherit;
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+  }
+  
+  .prose strong {
+    font-weight: 600;
+    color: #111827;
+  }
+  
+  .prose em {
+    font-style: italic;
+  }
+</style>

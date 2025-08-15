@@ -1,0 +1,149 @@
+---
+export interface Props {
+  title?: string;
+  description?: string;
+  href?: string; // Makes entire card clickable
+  image?: string;
+  imageAlt?: string;
+  hover?: boolean; // Enable hover effects
+  class?: string;
+}
+
+const {
+  title,
+  description,
+  href,
+  image,
+  imageAlt,
+  hover = false,
+  class: className = '',
+  ...rest
+} = Astro.props;
+
+// Base card styles
+const baseStyles = 'relative group bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-300';
+
+// Hover effect styles
+const hoverStyles = hover 
+  ? 'hover:shadow-2xl transform hover:-translate-y-2 cursor-pointer' 
+  : '';
+
+// Clickable card styles
+const clickableStyles = href 
+  ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2' 
+  : '';
+
+// Combine all styles
+const cardStyles = [
+  baseStyles,
+  hoverStyles,
+  clickableStyles,
+  className
+].join(' ');
+
+// Determine if we should render as a link or div
+const Tag = href ? 'a' : 'div';
+const additionalProps = href 
+  ? { href } 
+  : {};
+---
+
+<Tag 
+  class={cardStyles}
+  {...additionalProps}
+  {...rest}
+>
+  {image && (
+    <div class="relative h-48 w-full overflow-hidden">
+      <img 
+        src={image} 
+        alt={imageAlt || title || 'Card image'} 
+        class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        loading="lazy"
+      />
+    </div>
+  )}
+  
+  <div class="p-6">
+    <!-- Header Section -->
+    {title && (
+      <div class="mb-4">
+        <h3 class={`text-xl font-bold text-gray-900 transition-colors duration-300 ${href ? 'group-hover:text-blue-600' : ''}`}>
+          {title}
+        </h3>
+      </div>
+    )}
+    
+    <!-- Description Section -->
+    {description && (
+      <div class="mb-4">
+        <p class="text-gray-600 leading-relaxed">
+          {description}
+        </p>
+      </div>
+    )}
+    
+    <!-- Slot for custom content -->
+    <div class="space-y-4">
+      <slot />
+    </div>
+    
+    <!-- Footer Section -->
+    <slot name="footer">
+      <!-- Default link indicator for clickable cards when no footer slot provided -->
+      {href && (
+        <div class="mt-4 flex items-center text-blue-600 font-medium transition-transform duration-300 group-hover:translate-x-1">
+          <span class="text-sm">Learn more</span>
+          <svg 
+            class="ml-2 w-4 h-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              stroke-linecap="round" 
+              stroke-linejoin="round" 
+              stroke-width="2" 
+              d="M9 5l7 7-7 7"
+            ></path>
+          </svg>
+        </div>
+      )}
+    </slot>
+  </div>
+</Tag>
+
+<style>
+  /* Enhanced focus styles for accessibility */
+  a[role="article"]:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  
+  /* Smooth hover transitions */
+  .group:hover .group-hover\:scale-105 {
+    transform: scale(1.05);
+  }
+  
+  .group:hover .group-hover\:text-blue-600 {
+    color: #2563eb;
+  }
+  
+  .group:hover .group-hover\:translate-x-1 {
+    transform: translateX(0.25rem);
+  }
+  
+  /* Card shadow effects */
+  .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .hover\:shadow-2xl:hover {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+  
+  /* Responsive image handling */
+  img {
+    transition: transform 0.3s ease-in-out;
+  }
+</style>
