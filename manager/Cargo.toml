@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 description = "nocodo Manager daemon for orchestrating AI-assisted development"
 
+[lib]
+name = "nocodo_manager"
+path = "src/lib.rs"
+
 [[bin]]
 name = "nocodo-manager"
 path = "src/main.rs"
@@ -18,3 +22,17 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+actix-web = "4.4"
+actix-files = "0.6"
+rusqlite = { version = "0.30", features = ["bundled"] }
+config = "0.13"
+thiserror = "1.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+ts-rs = "7.1"
+home = "0.5"
+
+[dev-dependencies]
+actix-rt = "2.9"
+tempfile = "3.12"
+tokio-test = "0.4"
