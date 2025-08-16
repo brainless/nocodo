@@ -1,0 +1,395 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection, getEntry } from 'astro:content';
+
+export async function getStaticPaths() {
+  const playbookEntries = await getCollection('playbook');
+  return playbookEntries.map(entry => ({
+    params: { slug: entry.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+const entry = await getEntry('playbook', slug);
+
+if (!entry) {
+  throw new Error(`Entry not found: ${slug}`);
+}
+
+const { Content, headings } = await entry.render();
+const { data } = entry;
+
+const title = data.title || 'Vibe Coding Playbook';
+const description = data.description || '';
+---
+
+<Layout title={title} description={description}>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Table of Contents Overlay -->
+    <div id="toc-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden">
+      <div class="fixed right-0 top-0 h-full w-80 bg-white shadow-xl transform translate-x-full transition-transform duration-300 ease-in-out" id="toc-panel">
+        <div class="p-6 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Table of Contents</h3>
+            <button id="toc-close" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-6 overflow-y-auto h-full pb-20">
+          <nav class="space-y-2">
+            {headings.map((heading) => (
+              <a 
+                href={`#${heading.slug}`}
+                class={`block text-sm hover:text-green-600 transition-colors toc-link ${
+                  heading.depth === 1 ? 'font-semibold text-gray-900' :
+                  heading.depth === 2 ? 'pl-4 text-gray-700' :
+                  heading.depth === 3 ? 'pl-8 text-gray-600' :
+                  'pl-12 text-gray-500'
+                }`}
+                data-heading-id={heading.slug}
+              >
+                {heading.text}
+              </a>
+            ))}
+          </nav>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fixed Reading Progress Bar -->
+    <div class="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm" id="progress-container">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div class="flex items-center justify-between text-sm text-gray-600 mb-2">
+          <span class="font-medium">Reading Progress</span>
+          <span id="reading-progress-text" class="font-medium text-green-600">0%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5">
+          <div id="reading-progress-bar" class="bg-green-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating TOC Button -->
+    <button 
+      id="toc-toggle"
+      class="fixed bottom-6 right-6 w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg transition-all duration-200 z-30 flex items-center justify-center group"
+      title="Table of Contents"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+      </svg>
+    </button>
+
+    <!-- Main Content -->
+    <div class="py-12 pt-32">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-8">
+          <ol class="flex items-center space-x-2 text-sm text-gray-500">
+            <li><a href="/" class="hover:text-gray-700">Home</a></li>
+            <li>/</li>
+            <li><a href="/playbook" class="hover:text-gray-700">Playbook</a></li>
+            <li>/</li>
+            <li class="text-gray-900">{title}</li>
+          </ol>
+        </nav>
+
+        <!-- Article Header -->
+        <header class="mb-8">
+          <div class="flex items-center space-x-3 mb-4">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="text-sm text-green-600 font-medium">Vibe Coding Playbook</div>
+              <h1 class="text-4xl font-bold text-gray-900">{title}</h1>
+            </div>
+          </div>
+          
+          {description && (
+            <p class="text-xl text-gray-600">{description}</p>
+          )}
+          
+          <!-- Tags -->
+          {data.tags && (
+            <div class="mt-4 flex flex-wrap gap-2">
+              {data.tags.map((tag) => (
+                <span class="inline-block px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          
+        </header>
+
+        <!-- Article Content -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200" id="article-content">
+          <div class="content-prose p-8">
+            <Content />
+          </div>
+        </article>
+
+        <!-- Navigation -->
+        <nav class="mt-12 flex justify-between">
+          <a 
+            href="/playbook"
+            class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          >
+            ← Back to Playbook
+          </a>
+          
+          <a 
+            href="/fundamentals"
+            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
+          >
+            Start Learning Fundamentals →
+          </a>
+        </nav>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Table of Contents functionality
+  const tocToggle = document.getElementById('toc-toggle');
+  const tocOverlay = document.getElementById('toc-overlay');
+  const tocPanel = document.getElementById('toc-panel');
+  const tocClose = document.getElementById('toc-close');
+  const tocLinks = document.querySelectorAll('.toc-link');
+
+  function openTOC() {
+    tocOverlay.classList.remove('hidden');
+    setTimeout(() => {
+      tocPanel.classList.remove('translate-x-full');
+    }, 10);
+  }
+
+  function closeTOC() {
+    tocPanel.classList.add('translate-x-full');
+    setTimeout(() => {
+      tocOverlay.classList.add('hidden');
+    }, 300);
+  }
+
+  tocToggle.addEventListener('click', openTOC);
+  tocClose.addEventListener('click', closeTOC);
+  tocOverlay.addEventListener('click', (e) => {
+    if (e.target === tocOverlay) {
+      closeTOC();
+    }
+  });
+
+  // Smooth scroll for TOC links
+  tocLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = link.getAttribute('href').substring(1);
+      const targetElement = document.getElementById(targetId);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth' });
+        closeTOC();
+      }
+    });
+  });
+
+  // Reading progress
+  const progressBar = document.getElementById('reading-progress-bar');
+  const progressText = document.getElementById('reading-progress-text');
+  const articleContent = document.getElementById('article-content');
+
+  function updateReadingProgress() {
+    const articleRect = articleContent.getBoundingClientRect();
+    const articleHeight = articleContent.offsetHeight;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate how much of the article has been scrolled past
+    const scrolled = Math.max(0, -articleRect.top);
+    const totalScrollable = articleHeight - viewportHeight;
+    
+    if (totalScrollable <= 0) {
+      // Article is shorter than viewport
+      const progress = articleRect.top <= 0 ? 100 : 0;
+      progressBar.style.width = progress + '%';
+      progressText.textContent = Math.round(progress) + '%';
+    } else {
+      const progress = Math.min(100, Math.max(0, (scrolled / totalScrollable) * 100));
+      progressBar.style.width = progress + '%';
+      progressText.textContent = Math.round(progress) + '%';
+    }
+  }
+
+  // Update reading progress on scroll
+  window.addEventListener('scroll', updateReadingProgress);
+  window.addEventListener('resize', updateReadingProgress);
+  updateReadingProgress(); // Initial calculation
+
+  // Highlight current section in TOC
+  function highlightCurrentSection() {
+    const headings = document.querySelectorAll('h1[id], h2[id], h3[id], h4[id]');
+    let currentHeading = null;
+
+    headings.forEach(heading => {
+      const rect = heading.getBoundingClientRect();
+      if (rect.top <= 100) {
+        currentHeading = heading;
+      }
+    });
+
+    // Remove all active states
+    tocLinks.forEach(link => {
+      link.classList.remove('text-green-600', 'font-medium');
+    });
+
+    // Add active state to current section
+    if (currentHeading) {
+      const currentLink = document.querySelector(`[data-heading-id="${currentHeading.id}"]`);
+      if (currentLink) {
+        currentLink.classList.add('text-green-600', 'font-medium');
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightCurrentSection);
+  highlightCurrentSection(); // Initial check
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Toggle TOC with 't' key
+    if (e.key === 't' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const isOpen = !tocOverlay.classList.contains('hidden');
+      if (isOpen) {
+        closeTOC();
+      } else {
+        openTOC();
+      }
+    }
+    // Close TOC with Escape key
+    if (e.key === 'Escape') {
+      closeTOC();
+    }
+  });
+</script>
+
+<style is:global>
+  /* Reset and style content prose - Override Tailwind's CSS reset */
+  .content-prose {
+    color: #374151;
+    line-height: 1.75;
+    max-width: none;
+  }
+  
+  .content-prose h1 {
+    color: #111827 !important;
+    font-weight: 800 !important;
+    font-size: 2.25rem !important;
+    margin-top: 0 !important;
+    margin-bottom: 2rem !important;
+    line-height: 1.1 !important;
+    scroll-margin-top: 6rem !important;
+  }
+  
+  .content-prose h2 {
+    color: #111827 !important;
+    font-weight: 700 !important;
+    font-size: 1.875rem !important;
+    margin-top: 3rem !important;
+    margin-bottom: 1rem !important;
+    line-height: 1.2 !important;
+    scroll-margin-top: 6rem !important;
+  }
+  
+  .content-prose h3 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-top: 2rem !important;
+    margin-bottom: 0.75rem !important;
+    line-height: 1.3 !important;
+    scroll-margin-top: 6rem !important;
+  }
+  
+  .content-prose h4 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.25rem !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 0.5rem !important;
+    line-height: 1.4 !important;
+    scroll-margin-top: 6rem !important;
+  }
+  
+  .content-prose p {
+    margin-bottom: 1.25rem !important;
+    color: #374151 !important;
+  }
+  
+  .content-prose ul {
+    margin: 1.25rem 0 !important;
+    padding-left: 1.5rem !important;
+  }
+  
+  .content-prose li {
+    margin-bottom: 0.5rem !important;
+    list-style-type: disc !important;
+    color: #374151 !important;
+  }
+  
+  .content-prose code {
+    color: #dc2626 !important;
+    background-color: #f3f4f6 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace !important;
+    font-size: 0.875rem !important;
+  }
+  
+  .content-prose pre {
+    background-color: #1f2937 !important;
+    color: #f9fafb !important;
+    padding: 1rem !important;
+    border-radius: 0.5rem !important;
+    overflow-x: auto !important;
+    margin: 1.5rem 0 !important;
+  }
+  
+  .content-prose pre code {
+    color: inherit !important;
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  .content-prose strong {
+    font-weight: 600 !important;
+    color: #111827 !important;
+  }
+  
+  .content-prose em {
+    font-style: italic !important;
+  }
+
+  .content-prose blockquote {
+    border-left: 4px solid #16a34a;
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    font-style: italic;
+    color: #4b5563;
+  }
+
+  #toc-toggle {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+
+  #toc-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+  }
+</style>
