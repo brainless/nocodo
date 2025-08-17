@@ -7,6 +7,314 @@ use serde::{Deserialize, Serialize};
 use ignore::WalkBuilder;
 use crate::{cli::OutputFormat, error::CliError};
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use std::collections::HashMap;
+    
+    /// Helper to create synthetic project structures for testing
+    pub struct TestProjectBuilder {
+        temp_dir: TempDir,
+    }
+    
+    impl TestProjectBuilder {
+        pub fn new() -> Self {
+            Self {
+                temp_dir: TempDir::new().expect("Failed to create temp directory"),
+            }
+        }
+    
+        pub fn path(&self) -> &std::path::Path {
+            self.temp_dir.path()
+        }
+    
+        /// Create a Rust application project
+        pub fn create_rust_app(&self, name: &str, dependencies: &[&str]) -> &std::path::Path {
+            self.create_cargo_toml(name, "bin", dependencies, &[]);
+            self.create_file("src/main.rs", r#"fn main() {
+    println!("Hello, world!");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}"#);
+            self.path()
+        }
+    
+        /// Create a Rust library project
+        pub fn create_rust_lib(&self, name: &str, dependencies: &[&str]) -> &std::path::Path {
+            self.create_cargo_toml(name, "lib", dependencies, &[]);
+            self.create_file("src/lib.rs", r#"//! A sample library
+
+pub fn add(left: usize, right: usize) -> usize {
+    left + right
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let result = add(2, 2);
+        assert_eq!(result, 4);
+    }
+}"#);
+            self.path()
+        }
+    
+        /// Create a Rust workspace
+        pub fn create_rust_workspace(&self, members: &[&str]) -> &std::path::Path {
+            let workspace_cargo_toml = format!(
+                r#"[workspace]
+resolver = "2"
+members = [
+{}
+]
+exclude = []
+
+[workspace.dependencies]
+serde = {{ version = "1.0", features = ["derive"] }}
+tokio = {{ version = "1.0", features = ["full"] }}
+"#,
+                members.iter().map(|m| format!("    \"{}\"", m)).collect::<Vec<_>>().join(",\n")
+            );
+            
+            self.create_file("Cargo.toml", &workspace_cargo_toml);
+            
+            // Create each member
+            for member in members {
+                self.create_member(member);
+            }
+            
+            self.path()
+        }
+    
+        /// Create a Node.js application with npm
+        pub fn create_node_app_npm(&self, name: &str, dependencies: &[&str], scripts: &[(&str, &str)]) -> &std::path::Path {
+            self.create_package_json(name, "1.0.0", Some("index.js"), dependencies, &[], scripts);
+            self.create_file("package-lock.json", r#"{
+  "name": "test-app",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "packages": {}
+}"#);
+            self.create_file("index.js", r#"const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+    res.send('Hello World!');
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
+"#);
+            self.path()
+        }
+        
+        fn create_cargo_toml(&self, name: &str, project_type: &str, dependencies: &[&str], dev_dependencies: &[&str]) {
+            let deps = if dependencies.is_empty() {
+                String::new()
+            } else {
+                format!("\n[dependencies]\n{}", 
+                    dependencies.iter().map(|d| format!("{} = \"1.0\"", d)).collect::<Vec<_>>().join("\n"))
+            };
+    
+            let dev_deps = if dev_dependencies.is_empty() {
+                String::new()
+            } else {
+                format!("\n[dev-dependencies]\n{}", 
+                    dev_dependencies.iter().map(|d| format!("{} = \"1.0\"", d)).collect::<Vec<_>>().join("\n"))
+            };
+    
+            let lib_section = if project_type == "lib" {
+                "\n[lib]\nname = \"test_lib\"\n"
+            } else {
+                ""
+            };
+    
+            let content = format!(
+                r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"{}{}{}"#,
+                name, lib_section, deps, dev_deps
+            );
+    
+            self.create_file("Cargo.toml", &content);
+        }
+    
+        fn create_package_json(&self, name: &str, version: &str, main: Option<&str>, dependencies: &[&str], dev_dependencies: &[&str], scripts: &[(&str, &str)]) {
+            let mut json = serde_json::json!({
+                "name": name,
+                "version": version,
+            });
+    
+            if let Some(main_file) = main {
+                json["main"] = serde_json::Value::String(main_file.to_string());
+            }
+    
+            if !dependencies.is_empty() {
+                let deps: HashMap<&str, &str> = dependencies.iter().map(|&d| (d, "^1.0.0")).collect();
+                json["dependencies"] = serde_json::to_value(deps).unwrap();
+            }
+    
+            if !dev_dependencies.is_empty() {
+                let dev_deps: HashMap<&str, &str> = dev_dependencies.iter().map(|&d| (d, "^1.0.0")).collect();
+                json["devDependencies"] = serde_json::to_value(dev_deps).unwrap();
+            }
+    
+            if !scripts.is_empty() {
+                let script_map: HashMap<&str, &str> = scripts.iter().copied().collect();
+                json["scripts"] = serde_json::to_value(script_map).unwrap();
+            }
+    
+            self.create_file("package.json", &serde_json::to_string_pretty(&json).unwrap());
+        }
+    
+        fn create_member(&self, name: &str) {
+            let member_dir = self.path().join(name);
+            std::fs::create_dir_all(&member_dir.join("src")).unwrap();
+            
+            let cargo_toml = format!(
+                r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = {{ workspace = true }}
+"#,
+                name
+            );
+    
+            std::fs::write(member_dir.join("Cargo.toml"), cargo_toml).unwrap();
+            std::fs::write(member_dir.join("src/lib.rs"), "pub fn hello() { println!(\"Hello from {}!\"); }").unwrap();
+        }
+    
+        fn create_file(&self, path: &str, content: &str) {
+            let file_path = self.path().join(path);
+            if let Some(parent) = file_path.parent() {
+                std::fs::create_dir_all(parent).unwrap();
+            }
+            std::fs::write(file_path, content).unwrap();
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_rust_application_analysis() {
+        let builder = TestProjectBuilder::new();
+        let project_path = builder.create_rust_app("test-app", &["serde", "tokio", "clap"]);
+        
+        let analyzer = ProjectAnalyzer::new();
+        let analysis = analyzer.analyze(project_path).await.unwrap();
+        
+        assert_eq!(analysis.project_type, ProjectType::RustApplication);
+        assert!(analysis.rust_info.is_some());
+        assert!(analysis.node_info.is_none());
+        assert_eq!(analysis.primary_language, "rust");
+        
+        let rust_info = analysis.rust_info.as_ref().unwrap();
+        assert_eq!(rust_info.package_name, Some("test-app".to_string()));
+        assert!(!rust_info.is_workspace);
+        assert!(rust_info.lib_target == false);
+        assert!(rust_info.bin_targets.contains(&"test-app".to_string()));
+        // Dependencies order may vary due to HashMap
+        assert_eq!(rust_info.dependencies.len(), 3);
+        assert!(rust_info.dependencies.contains(&"serde".to_string()));
+        assert!(rust_info.dependencies.contains(&"tokio".to_string()));
+        assert!(rust_info.dependencies.contains(&"clap".to_string()));
+    }
+    
+    #[tokio::test]
+    async fn test_rust_library_analysis() {
+        let builder = TestProjectBuilder::new();
+        let project_path = builder.create_rust_lib("test-lib", &["serde"]);
+        
+        let analyzer = ProjectAnalyzer::new();
+        let analysis = analyzer.analyze(project_path).await.unwrap();
+        
+        assert_eq!(analysis.project_type, ProjectType::RustLibrary);
+        
+        let rust_info = analysis.rust_info.as_ref().unwrap();
+        assert_eq!(rust_info.package_name, Some("test-lib".to_string()));
+        assert!(!rust_info.is_workspace);
+        assert!(rust_info.lib_target);
+        assert_eq!(rust_info.dependencies.len(), 1);
+        assert!(rust_info.dependencies.contains(&"serde".to_string()));
+    }
+    
+    #[tokio::test]
+    async fn test_rust_workspace_analysis() {
+        let builder = TestProjectBuilder::new();
+        let project_path = builder.create_rust_workspace(&["api", "web", "shared"]);
+        
+        let analyzer = ProjectAnalyzer::new();
+        let analysis = analyzer.analyze(project_path).await.unwrap();
+        
+        assert_eq!(analysis.project_type, ProjectType::RustWorkspace);
+        
+        let rust_info = analysis.rust_info.as_ref().unwrap();
+        assert!(rust_info.is_workspace);
+        assert_eq!(rust_info.workspace_members, vec!["api", "web", "shared"]);
+        assert!(rust_info.package_name.is_none()); // Workspace root has no package
+    }
+    
+    #[tokio::test]
+    async fn test_node_app_npm_analysis() {
+        let builder = TestProjectBuilder::new();
+        let project_path = builder.create_node_app_npm(
+            "test-node-app", 
+            &["express", "dotenv"], 
+            &[("start", "node index.js"), ("test", "npm test")]
+        );
+        
+        let analyzer = ProjectAnalyzer::new();
+        let analysis = analyzer.analyze(project_path).await.unwrap();
+        
+        assert_eq!(analysis.project_type, ProjectType::NodeApplication);
+        assert!(analysis.node_info.is_some());
+        assert!(analysis.rust_info.is_none());
+        
+        let node_info = analysis.node_info.as_ref().unwrap();
+        assert_eq!(node_info.package_name, Some("test-node-app".to_string()));
+        assert_eq!(node_info.package_manager, PackageManager::Npm);
+        assert_eq!(node_info.main_entry, Some("index.js".to_string()));
+        // Dependencies order may vary due to HashMap
+        assert_eq!(node_info.dependencies.len(), 2);
+        assert!(node_info.dependencies.contains(&"express".to_string()));
+        assert!(node_info.dependencies.contains(&"dotenv".to_string()));
+        assert_eq!(node_info.scripts.get("start"), Some(&"node index.js".to_string()));
+        assert!(!node_info.has_typescript);
+    }
+    
+    #[tokio::test]
+    async fn test_unknown_project_analysis() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_path = temp_dir.path();
+        
+        // Create a directory with no recognizable project files
+        std::fs::write(project_path.join("README.md"), "# Test Project").unwrap();
+        std::fs::write(project_path.join("random.txt"), "Some content").unwrap();
+        
+        let analyzer = ProjectAnalyzer::new();
+        let analysis = analyzer.analyze(project_path).await.unwrap();
+        
+        assert_eq!(analysis.project_type, ProjectType::Unknown);
+        assert!(analysis.rust_info.is_none());
+        assert!(analysis.node_info.is_none());
+        assert!(analysis.primary_language.is_empty());
+    }
+}
+
 /// Project type enumeration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ProjectType {
