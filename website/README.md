@@ -153,7 +153,7 @@ website/
 ## Key Features
 
 ### Learning Experience
-- **Progressive Learning Path**: Structured modules building on each other
+- **Progressive Module Structure**: Structured fundamentals building on each other
 - **Interactive Code Examples**: Embedded code snippets with syntax highlighting
 - **Practical Exercises**: Hands-on tasks for each module
 - **Progress Tracking**: Visual indicators of completion
