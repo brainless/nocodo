@@ -66,5 +66,17 @@ impl From<anyhow::Error> for CliError {
     }
 }
 
+impl From<serde_json::Error> for CliError {
+    fn from(err: serde_json::Error) -> Self {
+        CliError::Other(err.into())
+    }
+}
+
+impl From<serde_yaml::Error> for CliError {
+    fn from(err: serde_yaml::Error) -> Self {
+        CliError::Other(err.into())
+    }
+}
+
 /// Result type alias for CLI operations
 pub type CliResult<T> = Result<T, CliError>;
