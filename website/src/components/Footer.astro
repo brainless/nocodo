@@ -1,0 +1,139 @@
+---
+// Footer component with comprehensive navigation links
+import Button from './UI/Button.astro';
+---
+
+<footer class="bg-gray-50 border-t border-gray-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      
+      <!-- Navigation Links -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 tracking-wider uppercase mb-4">
+          Navigation
+        </h3>
+        <ul class="space-y-3">
+          <li>
+            <a href="/" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Home
+            </a>
+          </li>
+          <li>
+            <a href="/about" class="text-gray-600 hover:text-gray-900 transition-colors">
+              About
+            </a>
+          </li>
+          <li class="mt-4">
+            <Button 
+              href="/events" 
+              variant="primary" 
+              size="sm"
+            >
+              🚀 Join my next session
+            </Button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Fundamentals Section -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 tracking-wider uppercase mb-4">
+          Fundamentals
+        </h3>
+        <ul class="space-y-3">
+          <li>
+            <a href="/fundamentals/git-basics" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Git Basics
+            </a>
+          </li>
+          <li>
+            <a href="/fundamentals/cicd-intro" class="text-gray-600 hover:text-gray-900 transition-colors">
+              CI/CD Introduction
+            </a>
+          </li>
+          <li>
+            <a href="/fundamentals/testing-fundamentals" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Testing Fundamentals
+            </a>
+          </li>
+          <li>
+            <a href="/fundamentals/code-quality" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Code Quality & Review
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- AI Development Section -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 tracking-wider uppercase mb-4">
+          AI Development
+        </h3>
+        <ul class="space-y-3">
+          <li>
+            <a href="/ai-development/ai-agents-overview" class="text-gray-600 hover:text-gray-900 transition-colors">
+              AI Agents Overview
+            </a>
+          </li>
+          <li>
+            <a href="/ai-development/idea-to-docs" class="text-gray-600 hover:text-gray-900 transition-colors">
+              From Idea to Documentation
+            </a>
+          </li>
+          <li>
+            <a href="/ai-development/docs-to-tickets" class="text-gray-600 hover:text-gray-900 transition-colors">
+              From Docs to Tickets
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Coding Agents & Playbook Section -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 tracking-wider uppercase mb-4">
+          Playbook & Tools
+        </h3>
+        <ul class="space-y-3">
+          <li>
+            <a href="/playbook" class="text-gray-600 hover:text-gray-900 transition-colors">
+              nocodo Playbook
+            </a>
+          </li>
+          <li>
+            <a href="/coding-agents/claude-code" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Claude Code Integration
+            </a>
+          </li>
+          <li>
+            <a href="/coding-agents/other-agents" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Other Coding Agents
+            </a>
+          </li>
+          <li>
+            <a href="/coding-agents/workflow-optimization" class="text-gray-600 hover:text-gray-900 transition-colors">
+              Workflow Optimization
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Bottom section with copyright -->
+    <div class="mt-12 pt-8 border-t border-gray-300">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <a href="/" class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
+            nocodo
+          </a>
+          <span class="text-gray-500 text-sm">
+            Learn software engineering fundamentals with AI coding agents
+          </span>
+        </div>
+        
+        <div class="mt-4 md:mt-0 text-sm text-gray-500">
+          © {new Date().getFullYear()} nocodo. All rights reserved.
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

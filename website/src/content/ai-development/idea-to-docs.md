@@ -179,17 +179,15 @@ Include:
 ```
 
 ### Example Technical Spec
-```markdown
-# Time Tracking Technical Specification
 
-## System Architecture
+#### System Architecture
 - Frontend: React with TypeScript
 - State Management: Redux Toolkit
 - Backend: Node.js with Express
 - Database: PostgreSQL
 - Real-time: WebSocket connection
 
-## API Endpoints
+#### API Endpoints
 ```http
 POST /api/timers/start
 POST /api/timers/stop
@@ -198,7 +196,7 @@ PUT /api/timers/sessions/:id
 DELETE /api/timers/sessions/:id
 ```
 
-## Database Schema
+#### Database Schema
 ```sql
 CREATE TABLE projects (
   id SERIAL PRIMARY KEY,
@@ -214,7 +212,6 @@ CREATE TABLE time_sessions (
   description TEXT,
   user_id INTEGER REFERENCES users(id)
 );
-```
 ```
 
 ## Step 5: Documentation Refinement
