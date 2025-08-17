@@ -4,6 +4,7 @@ mod error;
 mod handlers;
 mod models;
 mod socket;
+mod templates;
 
 use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
@@ -64,6 +65,7 @@ async fn main() -> AppResult<()> {
                         .route("/projects", web::post().to(handlers::create_project))
                         .route("/projects/{id}", web::get().to(handlers::get_project))
                         .route("/projects/{id}", web::delete().to(handlers::delete_project))
+                        .route("/templates", web::get().to(handlers::get_templates))
                 )
                 // Serve static files from ./web/dist if it exists
                 .service(
