@@ -92,16 +92,16 @@ const description = frontmatter.description || '';
           <!-- Simple markdown-to-HTML conversion for basic content -->
           <div set:html={(() => {
             // Step 1: Extract and protect code blocks
-            const codeBlocks = [];
-            let processedContent = content.replace(/```([\s\S]*?)```/g, (match, code) => {
+            const codeBlocks: string[] = [];
+            let processedContent = content.replace(/```([\s\S]*?)```/g, (_match, code) => {
               const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
               codeBlocks.push(code.trim());
               return placeholder;
             });
 
             // Step 2: Extract and protect inline code
-            const inlineCodes = [];
-            processedContent = processedContent.replace(/`([^`]+)`/g, (match, code) => {
+            const inlineCodes: string[] = [];
+            processedContent = processedContent.replace(/`([^`]+)`/g, (_match, code) => {
               const placeholder = `__INLINECODE_${inlineCodes.length}__`;
               inlineCodes.push(code);
               return placeholder;
@@ -118,26 +118,26 @@ const description = frontmatter.description || '';
               // Check if it's a valid table (separator line contains dashes)
               if (!separatorLine.includes('-')) return match;
               
-              const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
-              const rows = lines.slice(2).map(line => 
-                line.split('|').map(cell => cell.trim()).filter(cell => cell)
+              const headers = headerLine.split('|').map((h: string) => h.trim()).filter((h: string) => h);
+              const rows = lines.slice(2).map((line: string) => 
+                line.split('|').map((cell: string) => cell.trim()).filter((cell: string) => cell)
               );
               
               let tableHtml = '<div class="overflow-x-auto my-6"><table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">';
               
               // Headers
               tableHtml += '<thead class="bg-gray-50"><tr>';
-              headers.forEach(header => {
+              headers.forEach((header: string) => {
                 tableHtml += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">${header}</th>`;
               });
               tableHtml += '</tr></thead>';
               
               // Body
               tableHtml += '<tbody class="divide-y divide-gray-200">';
-              rows.forEach((row, index) => {
+              rows.forEach((row: string[], index: number) => {
                 const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
                 tableHtml += `<tr class="${bgClass}">`;
-                row.forEach(cell => {
+                row.forEach((cell: string) => {
                   tableHtml += `<td class="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">${cell}</td>`;
                 });
                 tableHtml += '</tr>';
@@ -169,7 +169,7 @@ const description = frontmatter.description || '';
               .replace(/<\/div><\/p>/g, '</div>');
 
             // Step 5: Restore inline code
-            inlineCodes.forEach((code, index) => {
+            inlineCodes.forEach((code: string, index: number) => {
               processedContent = processedContent.replace(
                 `__INLINECODE_${index}__`,
                 `<code>${code}</code>`
@@ -177,7 +177,7 @@ const description = frontmatter.description || '';
             });
 
             // Step 6: Restore code blocks
-            codeBlocks.forEach((code, index) => {
+            codeBlocks.forEach((code: string, index: number) => {
               processedContent = processedContent.replace(
                 `__CODEBLOCK_${index}__`,
                 `<pre><code>${code}</code></pre>`
