@@ -88,7 +88,7 @@ const description = frontmatter.description || '';
 
       <!-- Article Content -->
       <article class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="prose prose-lg prose-blue max-w-none p-8">
+        <div class="content-prose p-8">
           <!-- Simple markdown-to-HTML conversion for basic content -->
           <div set:html={content
             .replace(/^# (.*$)/gm, '<h1>$1</h1>')
@@ -135,93 +135,109 @@ const description = frontmatter.description || '';
   </div>
 </Layout>
 
-<style>
-  .prose {
-    color: #374151;
-    line-height: 1.75;
+<style is:global>
+  /* Reset and style content prose - Override Tailwind's CSS reset */
+  .content-prose {
+    color: #374151 !important;
+    line-height: 1.75 !important;
+    max-width: none !important;
   }
   
-  .prose h1 {
-    color: #111827;
-    font-weight: 800;
-    font-size: 2.25rem;
-    margin-top: 0;
-    margin-bottom: 2rem;
-    line-height: 1.1;
+  .content-prose h1 {
+    color: #111827 !important;
+    font-weight: 800 !important;
+    font-size: 2.25rem !important;
+    margin-top: 0 !important;
+    margin-bottom: 2rem !important;
+    line-height: 1.1 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose h2 {
-    color: #111827;
-    font-weight: 700;
-    font-size: 1.875rem;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    line-height: 1.2;
+  .content-prose h2 {
+    color: #111827 !important;
+    font-weight: 700 !important;
+    font-size: 1.875rem !important;
+    margin-top: 3rem !important;
+    margin-bottom: 1rem !important;
+    line-height: 1.2 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose h3 {
-    color: #111827;
-    font-weight: 600;
-    font-size: 1.5rem;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    line-height: 1.3;
+  .content-prose h3 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-top: 2rem !important;
+    margin-bottom: 0.75rem !important;
+    line-height: 1.3 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose h4 {
-    color: #111827;
-    font-weight: 600;
-    font-size: 1.25rem;
-    margin-top: 1.25rem;
-    margin-bottom: 0.5rem;
-    line-height: 1.4;
+  .content-prose h4 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.25rem !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 0.5rem !important;
+    line-height: 1.4 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose p {
-    margin-bottom: 1.25rem;
+  .content-prose p {
+    margin-bottom: 1.25rem !important;
+    color: #374151 !important;
   }
   
-  .prose ul {
-    margin: 1.25rem 0;
-    padding-left: 1.5rem;
+  .content-prose ul {
+    margin: 1.25rem 0 !important;
+    padding-left: 1.5rem !important;
   }
   
-  .prose li {
-    margin-bottom: 0.5rem;
-    list-style-type: disc;
+  .content-prose li {
+    margin-bottom: 0.5rem !important;
+    list-style-type: disc !important;
+    color: #374151 !important;
   }
   
-  .prose code {
-    color: #dc2626;
-    background-color: #f3f4f6;
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-    font-size: 0.875rem;
+  .content-prose code {
+    color: #dc2626 !important;
+    background-color: #f3f4f6 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace !important;
+    font-size: 0.875rem !important;
   }
   
-  .prose pre {
-    background-color: #1f2937;
-    color: #f9fafb;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    overflow-x: auto;
-    margin: 1.5rem 0;
+  .content-prose pre {
+    background-color: #1f2937 !important;
+    color: #f9fafb !important;
+    padding: 1rem !important;
+    border-radius: 0.5rem !important;
+    overflow-x: auto !important;
+    margin: 1.5rem 0 !important;
   }
   
-  .prose pre code {
-    color: inherit;
-    background-color: transparent;
-    padding: 0;
-    border-radius: 0;
+  .content-prose pre code {
+    color: inherit !important;
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
   }
   
-  .prose strong {
-    font-weight: 600;
-    color: #111827;
+  .content-prose strong {
+    font-weight: 600 !important;
+    color: #111827 !important;
   }
   
-  .prose em {
-    font-style: italic;
+  .content-prose em {
+    font-style: italic !important;
+  }
+
+  .content-prose blockquote {
+    border-left: 4px solid #3b82f6 !important;
+    padding-left: 1rem !important;
+    margin: 1.5rem 0 !important;
+    font-style: italic !important;
+    color: #4b5563 !important;
   }
 </style>
