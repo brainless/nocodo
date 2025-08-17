@@ -45,8 +45,8 @@ impl SocketServer {
         Ok(SocketServer { listener, database })
     }
 
-    pub async fn run(&self) -> AppResult<()> {
-        let mut listener_stream = UnixListenerStream::new(&self.listener);
+    pub async fn run(self) -> AppResult<()> {
+        let mut listener_stream = UnixListenerStream::new(self.listener);
         
         info!("Socket server started, waiting for connections...");
         
@@ -70,8 +70,8 @@ impl SocketServer {
     }
 
     async fn handle_connection(stream: UnixStream, database: Arc<Database>) -> AppResult<()> {
-        let mut reader = BufReader::new(&stream);
-        let mut writer = stream;
+        let (reader, mut writer) = stream.into_split();
+        let mut reader = BufReader::new(reader);
         
         let mut line = String::new();
         match reader.read_line(&mut line).await {
