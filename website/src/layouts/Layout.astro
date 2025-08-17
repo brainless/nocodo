@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Header from '../components/Header.astro';
 
 export interface Props {
 	title?: string;
@@ -38,6 +39,7 @@ const { title = "Vibe Coding", description = "Learn software engineering fundame
 		<meta name="keywords" content="software engineering, AI coding, development fundamentals, vibe coding, programming" />
 	</head>
 	<body>
+		<Header />
 		<slot />
 	</body>
 </html>
