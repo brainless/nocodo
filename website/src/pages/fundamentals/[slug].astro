@@ -93,7 +93,7 @@ const description = frontmatter.description || '';
           <div set:html={(() => {
             // Step 1: Extract and protect code blocks
             const codeBlocks = [];
-            let processedContent = content.replace(/```([^`]*?)```/gs, (match, code) => {
+            let processedContent = content.replace(/```([\s\S]*?)```/g, (match, code) => {
               const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
               codeBlocks.push(code.trim());
               return placeholder;
