@@ -313,6 +313,91 @@ serde = {{ workspace = true }}
         assert!(analysis.node_info.is_none());
         assert!(analysis.primary_language.is_empty());
     }
+    
+    #[tokio::test]
+    async fn test_polyglot_rust_workspace_with_node_projects() {
+        let builder = TestProjectBuilder::new();
+        let project_path = builder.create_rust_workspace(&["api", "core"]);
+        
+        // Add Node.js projects in subdirectories
+        builder.create_file("web/package.json", r#"{
+  "name": "web-frontend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.18.0",
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "build": "tsc",
+    "test": "jest"
+  }
+}"#);
+        
+        builder.create_file("mobile/package.json", r#"{
+  "name": "mobile-app",
+  "version": "0.2.0",
+  "dependencies": {
+    "react-native": "^0.72.0"
+  },
+  "scripts": {
+    "start": "react-native start"
+  }
+}"#);
+        
+        // Add lock files
+        builder.create_file("web/package-lock.json", "{}");
+        builder.create_file("mobile/yarn.lock", "");
+        
+        let analyzer = ProjectAnalyzer::new();
+        let analysis = analyzer.analyze(project_path).await.unwrap();
+        
+        // Should be detected as Rust workspace (primary)
+        assert_eq!(analysis.project_type, ProjectType::RustWorkspace);
+        assert_eq!(analysis.primary_language, "rust");
+        
+        // Should have Rust info
+        assert!(analysis.rust_info.is_some());
+        let rust_info = analysis.rust_info.as_ref().unwrap();
+        assert!(rust_info.is_workspace);
+        assert_eq!(rust_info.workspace_members, vec!["api", "core"]);
+        
+        // Should detect multiple Node.js projects
+        assert_eq!(analysis.node_projects.len(), 2);
+        
+        // Find web project
+        let web_project = analysis.node_projects.iter()
+            .find(|p| p.package_name.as_deref() == Some("web-frontend"))
+            .expect("Should find web project");
+        assert_eq!(web_project.version, Some("1.0.0".to_string()));
+        assert_eq!(web_project.package_manager, PackageManager::Npm);
+        assert_eq!(web_project.dependencies.len(), 2);
+        assert!(web_project.dependencies.contains(&"express".to_string()));
+        assert!(web_project.dependencies.contains(&"react".to_string()));
+        assert!(web_project.has_typescript);
+        assert_eq!(web_project.scripts.len(), 3);
+        
+        // Find mobile project
+        let mobile_project = analysis.node_projects.iter()
+            .find(|p| p.package_name.as_deref() == Some("mobile-app"))
+            .expect("Should find mobile project");
+        assert_eq!(mobile_project.version, Some("0.2.0".to_string()));
+        assert_eq!(mobile_project.package_manager, PackageManager::Yarn);
+        assert_eq!(mobile_project.dependencies.len(), 1);
+        assert!(mobile_project.dependencies.contains(&"react-native".to_string()));
+        assert!(!mobile_project.has_typescript);
+        assert_eq!(mobile_project.scripts.len(), 1);
+        
+        // Should have backward compatibility
+        assert!(analysis.node_info.is_some());
+        assert_eq!(analysis.node_info.as_ref().unwrap().package_name, 
+                   analysis.node_projects.first().unwrap().package_name);
+    }
 }
 
 /// Project type enumeration
@@ -368,7 +453,8 @@ pub struct ProjectAnalysis {
     pub project_path: PathBuf,
     pub project_type: ProjectType,
     pub rust_info: Option<RustProjectInfo>,
-    pub node_info: Option<NodeProjectInfo>,
+    pub node_info: Option<NodeProjectInfo>, // For backward compatibility when there's only one
+    pub node_projects: Vec<NodeProjectInfo>, // Support for multiple Node.js projects
     pub file_count: usize,
     pub total_lines: usize,
     pub primary_language: String,
@@ -450,26 +536,62 @@ fn print_text_analysis(analysis: &ProjectAnalysis) {
     }
     
     // Node.js-specific information
-    if let Some(node_info) = &analysis.node_info {
-        println!("\n🟢 Node.js Project Information:");
-        if let Some(name) = &node_info.package_name {
-            println!("   Package: {}", name);
-        }
-        if let Some(version) = &node_info.version {
-            println!("   Version: {}", version);
-        }
-        println!("   Package Manager: {:?}", node_info.package_manager);
-        
-        if !node_info.dependencies.is_empty() {
-            println!("   Dependencies: {}", node_info.dependencies.len());
-        }
-        
-        if node_info.has_typescript {
-            println!("   TypeScript: Yes");
-        }
-        
-        if !node_info.scripts.is_empty() {
-            println!("   Scripts: {}", node_info.scripts.len());
+    if !analysis.node_projects.is_empty() {
+        if analysis.node_projects.len() == 1 {
+            // Single Node.js project - use the compact format
+            if let Some(node_info) = analysis.node_projects.first() {
+                println!("\n🟢 Node.js Project Information:");
+                if let Some(name) = &node_info.package_name {
+                    println!("   Package: {}", name);
+                }
+                if let Some(version) = &node_info.version {
+                    println!("   Version: {}", version);
+                }
+                println!("   Package Manager: {:?}", node_info.package_manager);
+                
+                if !node_info.dependencies.is_empty() {
+                    println!("   Dependencies: {}", node_info.dependencies.len());
+                }
+                
+                if node_info.has_typescript {
+                    println!("   TypeScript: Yes");
+                }
+                
+                if !node_info.scripts.is_empty() {
+                    println!("   Scripts: {}", node_info.scripts.len());
+                }
+            }
+        } else {
+            // Multiple Node.js projects - show all of them
+            println!("\n🟢 Node.js Projects ({}):", analysis.node_projects.len());
+            for (i, node_info) in analysis.node_projects.iter().enumerate() {
+                let project_path = node_info.package_json_path.parent()
+                    .and_then(|p| p.strip_prefix(&analysis.project_path).ok())
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| ".".to_string());
+                
+                println!("   {}. {} ({})", i + 1, 
+                    node_info.package_name.as_deref().unwrap_or("<unnamed>"), 
+                    project_path);
+                
+                if let Some(version) = &node_info.version {
+                    println!("      Version: {}", version);
+                }
+                
+                println!("      Package Manager: {:?}", node_info.package_manager);
+                
+                if !node_info.dependencies.is_empty() {
+                    println!("      Dependencies: {}", node_info.dependencies.len());
+                }
+                
+                if node_info.has_typescript {
+                    println!("      TypeScript: Yes");
+                }
+                
+                if !node_info.scripts.is_empty() {
+                    println!("      Scripts: {}", node_info.scripts.len());
+                }
+            }
         }
     }
     
@@ -508,6 +630,7 @@ impl ProjectAnalyzer {
             project_type: ProjectType::Unknown,
             rust_info: None,
             node_info: None,
+            node_projects: Vec::new(),
             file_count: 0,
             total_lines: 0,
             primary_language: String::new(),
@@ -528,17 +651,24 @@ impl ProjectAnalyzer {
             analysis.primary_language = "rust".to_string();
         }
         
-        if let Some(node_info) = self.analyze_node_project(path).await? {
+        // Scan for all Node.js projects in the directory tree
+        let node_projects = self.find_all_node_projects(path).await?;
+        if !node_projects.is_empty() {
+            // Set the primary node_info to the first one found (for backward compatibility)
+            analysis.node_info = node_projects.first().cloned();
+            analysis.node_projects = node_projects;
+            
             // If we already detected Rust, this is a polyglot project
             if analysis.project_type == ProjectType::Unknown {
-                analysis.project_type = if node_info.main_entry.is_some() {
-                    ProjectType::NodeApplication
-                } else {
-                    ProjectType::NodeLibrary
-                };
-                analysis.primary_language = "javascript".to_string();
+                if let Some(first_node) = analysis.node_info.as_ref() {
+                    analysis.project_type = if first_node.main_entry.is_some() {
+                        ProjectType::NodeApplication
+                    } else {
+                        ProjectType::NodeLibrary
+                    };
+                    analysis.primary_language = "javascript".to_string();
+                }
             }
-            analysis.node_info = Some(node_info);
         }
         
         // Count files and lines
@@ -586,6 +716,21 @@ impl ProjectAnalyzer {
                         .collect();
                 }
             }
+            
+            // For workspaces, analyze member packages for binaries and libraries
+            for member in &rust_info.workspace_members {
+                if let Ok(member_info) = self.analyze_workspace_member(path, member).await {
+                    rust_info.bin_targets.extend(member_info.bin_targets);
+                    rust_info.dependencies.extend(member_info.dependencies);
+                    rust_info.dev_dependencies.extend(member_info.dev_dependencies);
+                    if member_info.lib_target {
+                        rust_info.lib_target = true;
+                    }
+                }
+            }
+            
+            // For workspaces, we've already analyzed members, so return early
+            return Ok(Some(rust_info));
         }
         
         // Extract package information
@@ -637,6 +782,58 @@ impl ProjectAnalyzer {
     }
     
     async fn analyze_node_project(&self, path: &Path) -> Result<Option<NodeProjectInfo>, CliError> {
+        let package_json_path = path.join("package.json");
+        
+        if !package_json_path.exists() {
+            return Ok(None);
+        }
+        
+        self.analyze_node_project_at_path(path).await
+    }
+    
+    async fn find_all_node_projects(&self, root_path: &Path) -> Result<Vec<NodeProjectInfo>, CliError> {
+        let mut node_projects = Vec::new();
+        let walker = WalkBuilder::new(root_path)
+            .max_depth(Some(3)) // Limit depth to avoid deep recursion
+            .hidden(false)
+            .git_ignore(true)
+            .build();
+        
+        for entry in walker {
+            let entry = entry.map_err(|e| CliError::Analysis(format!("Error walking directory: {}", e)))?;
+            
+            if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+                continue;
+            }
+            
+            let file_path = entry.path();
+            
+            // Skip if not package.json
+            if file_path.file_name().and_then(|n| n.to_str()) != Some("package.json") {
+                continue;
+            }
+            
+            // Skip if inside node_modules or other build directories
+            let path_string = file_path.to_string_lossy();
+            if path_string.contains("/node_modules/") || 
+               path_string.contains("/dist/") ||
+               path_string.contains("/build/") ||
+               path_string.contains("/.git/") {
+                continue;
+            }
+            
+            // Get the directory containing the package.json
+            if let Some(project_dir) = file_path.parent() {
+                if let Ok(Some(node_info)) = self.analyze_node_project_at_path(project_dir).await {
+                    node_projects.push(node_info);
+                }
+            }
+        }
+        
+        Ok(node_projects)
+    }
+    
+    async fn analyze_node_project_at_path(&self, path: &Path) -> Result<Option<NodeProjectInfo>, CliError> {
         let package_json_path = path.join("package.json");
         
         if !package_json_path.exists() {
@@ -715,6 +912,79 @@ impl ProjectAnalyzer {
         } else {
             PackageManager::Unknown
         }
+    }
+    
+    async fn analyze_workspace_member(&self, workspace_path: &Path, member_name: &str) -> Result<RustProjectInfo, CliError> {
+        let member_path = workspace_path.join(member_name);
+        let member_cargo_toml = member_path.join("Cargo.toml");
+        
+        if !member_cargo_toml.exists() {
+            return Err(CliError::Analysis(format!("Member {} has no Cargo.toml", member_name)));
+        }
+        
+        let cargo_content = fs::read_to_string(&member_cargo_toml)
+            .map_err(|e| CliError::Analysis(format!("Failed to read {}/Cargo.toml: {}", member_name, e)))?;
+        
+        let cargo_toml: toml::Value = cargo_content.parse()
+            .map_err(|e| CliError::Analysis(format!("Failed to parse {}/Cargo.toml: {}", member_name, e)))?;
+        
+        let mut member_info = RustProjectInfo {
+            cargo_toml_path: member_cargo_toml,
+            is_workspace: false, // Members are not workspaces themselves
+            workspace_members: Vec::new(),
+            package_name: None,
+            dependencies: Vec::new(),
+            dev_dependencies: Vec::new(),
+            bin_targets: Vec::new(),
+            lib_target: false,
+        };
+        
+        // Extract package information
+        if let Some(package) = cargo_toml.get("package") {
+            if let Some(name) = package.get("name") {
+                member_info.package_name = name.as_str().map(|s| s.to_string());
+            }
+        }
+        
+        // Extract dependencies
+        if let Some(deps) = cargo_toml.get("dependencies") {
+            if let Some(deps_table) = deps.as_table() {
+                member_info.dependencies = deps_table.keys().map(|k| k.clone()).collect();
+            }
+        }
+        
+        // Extract dev dependencies
+        if let Some(dev_deps) = cargo_toml.get("dev-dependencies") {
+            if let Some(dev_deps_table) = dev_deps.as_table() {
+                member_info.dev_dependencies = dev_deps_table.keys().map(|k| k.clone()).collect();
+            }
+        }
+        
+        // Check for binary targets
+        if let Some(bins) = cargo_toml.get("bin") {
+            if let Some(bins_array) = bins.as_array() {
+                for bin in bins_array {
+                    if let Some(name) = bin.get("name").and_then(|v| v.as_str()) {
+                        member_info.bin_targets.push(name.to_string());
+                    }
+                }
+            }
+        }
+        
+        // Check for library target
+        member_info.lib_target = member_path.join("src").join("lib.rs").exists() ||
+                                 cargo_toml.get("lib").is_some();
+        
+        // If no explicit binary targets but has main.rs, add it
+        if member_info.bin_targets.is_empty() && member_path.join("src").join("main.rs").exists() {
+            if let Some(name) = &member_info.package_name {
+                member_info.bin_targets.push(name.clone());
+            } else {
+                member_info.bin_targets.push("main".to_string());
+            }
+        }
+        
+        Ok(member_info)
     }
     
     async fn count_files_and_lines(&self, path: &Path, analysis: &mut ProjectAnalysis) -> Result<(), CliError> {
