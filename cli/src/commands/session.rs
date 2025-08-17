@@ -33,9 +33,22 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
             warn!("Failed to create AI session with Manager: {}", e);
             warn!("Proceeding without Manager integration");
             
-            // We could still execute the AI tool without Manager integration
-            // For now, let's return the error to inform the user
-            return Err(e);
+            // For now, continue without Manager integration during development
+            // Create a mock session for logging purposes
+            use crate::client::AiSession;
+            AiSession {
+                id: format!("mock-session-{}", std::process::id()),
+                project_id: None,
+                tool_name: tool.to_string(),
+                status: "running".to_string(),
+                prompt: prompt.to_string(),
+                project_context: None,
+                started_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64,
+                ended_at: None,
+            }
         }
     };
 
@@ -132,8 +145,9 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
     
     match tool.to_lowercase().as_str() {
         "claude" | "claude-code" => {
-            // Claude Code typically supports file input
-            cmd.arg("--file").arg(&prompt_file);
+            // Claude CLI accepts prompts directly as arguments
+            // Use --print flag for non-interactive output
+            cmd.arg("--print").arg(prompt);
         }
         "gemini" | "gemini-cli" => {
             // Gemini CLI might support different arguments
