@@ -1,5 +1,6 @@
 ---
 // Footer component with comprehensive navigation links
+import Button from './UI/Button.astro';
 ---
 
 <footer class="bg-gray-50 border-t border-gray-200">
@@ -22,10 +23,14 @@
               About
             </a>
           </li>
-          <li>
-            <a href="/events" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors">
+          <li class="mt-4">
+            <Button 
+              href="/events" 
+              variant="primary" 
+              size="sm"
+            >
               🚀 Join my next session
-            </a>
+            </Button>
           </li>
         </ul>
       </div>
