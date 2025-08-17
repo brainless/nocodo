@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
+    pub socket: SocketConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -19,6 +20,11 @@ pub struct DatabaseConfig {
     pub path: PathBuf,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct SocketConfig {
+    pub path: String,
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -28,6 +34,9 @@ impl Default for AppConfig {
             },
             database: DatabaseConfig {
                 path: get_default_db_path(),
+            },
+            socket: SocketConfig {
+                path: "/tmp/nocodo-manager.sock".to_string(),
             },
         }
     }
@@ -53,6 +62,9 @@ port = 8081
 
 [database]
 path = "~/.local/share/nocodo/manager.db"
+
+[socket]
+path = "/tmp/nocodo-manager.sock"
 "#;
             std::fs::write(&config_path, default_config).map_err(|e| {
                 ConfigError::Message(format!("Failed to write default config: {}", e))

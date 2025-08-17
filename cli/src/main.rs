@@ -3,6 +3,7 @@ use tracing::{info, debug};
 use anyhow::Result;
 
 mod cli;
+mod client;
 mod commands;
 mod error;
 mod logging;
