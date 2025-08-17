@@ -7,6 +7,7 @@ pub mod analyze;
 pub mod config;
 pub mod init;
 pub mod prompt;
+pub mod session;
 pub mod structure;
 pub mod validate;
 
@@ -15,5 +16,6 @@ pub use analyze::*;
 pub use config::*;
 pub use init::*;
 pub use prompt::*;
+pub use session::*;
 pub use structure::*;
 pub use validate::*;

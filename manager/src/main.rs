@@ -3,6 +3,7 @@ mod database;
 mod error;
 mod handlers;
 mod models;
+mod socket;
 
 use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
@@ -10,6 +11,7 @@ use config::AppConfig;
 use database::Database;
 use error::AppResult;
 use handlers::AppState;
+use socket::SocketServer;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -32,6 +34,14 @@ async fn main() -> AppResult<()> {
     let database = Arc::new(Database::new(&config.database.path)?);
     tracing::info!("Database initialized at {:?}", config.database.path);
     
+    // Start Unix socket server
+    let socket_server = SocketServer::new(&config.socket.path, Arc::clone(&database)).await?;
+    let socket_task = tokio::spawn(async move {
+        if let Err(e) = socket_server.run().await {
+            tracing::error!("Socket server error: {}", e);
+        }
+    });
+    
     // Create application state
     let app_state = web::Data::new(AppState {
         database,
@@ -42,28 +52,39 @@ async fn main() -> AppResult<()> {
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
     
-    HttpServer::new(move || {
-        App::new()
-            .app_data(app_state.clone())
-            .wrap(Logger::default())
-            .service(
-                web::scope("/api")
-                    .route("/health", web::get().to(handlers::health_check))
-                    .route("/projects", web::get().to(handlers::get_projects))
-                    .route("/projects", web::post().to(handlers::create_project))
-                    .route("/projects/{id}", web::get().to(handlers::get_project))
-                    .route("/projects/{id}", web::delete().to(handlers::delete_project))
-            )
-            // Serve static files from ./web/dist if it exists
-            .service(
-                fs::Files::new("/", "./web/dist")
-                    .index_file("index.html")
-                    .use_etag(true)
-                    .use_last_modified(true)
-            )
-    })
-    .bind(&server_addr)?
-    .run()
-    .await
-    .map_err(|e| e.into())
+    let http_task = tokio::spawn(async move {
+        HttpServer::new(move || {
+            App::new()
+                .app_data(app_state.clone())
+                .wrap(Logger::default())
+                .service(
+                    web::scope("/api")
+                        .route("/health", web::get().to(handlers::health_check))
+                        .route("/projects", web::get().to(handlers::get_projects))
+                        .route("/projects", web::post().to(handlers::create_project))
+                        .route("/projects/{id}", web::get().to(handlers::get_project))
+                        .route("/projects/{id}", web::delete().to(handlers::delete_project))
+                )
+                // Serve static files from ./web/dist if it exists
+                .service(
+                    fs::Files::new("/", "./web/dist")
+                        .index_file("index.html")
+                        .use_etag(true)
+                        .use_last_modified(true)
+                )
+        })
+        .bind(&server_addr)
+        .expect("Failed to bind HTTP server")
+        .run()
+        .await
+        .expect("HTTP server failed")
+    });
+    
+    // Wait for either server to complete (they should run indefinitely)
+    tokio::select! {
+        _ = socket_task => tracing::info!("Socket server completed"),
+        _ = http_task => tracing::info!("HTTP server completed"),
+    }
+    
+    Ok(())
 }
