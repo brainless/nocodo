@@ -106,7 +106,47 @@ const description = frontmatter.description || '';
               return placeholder;
             });
 
-            // Step 3: Process other markdown elements
+            // Step 3: Process tables first (before paragraph conversion)
+            processedContent = processedContent.replace(/(?:^|\n)((?:\|.*\|\n?)+)/gm, (match, tableContent) => {
+              const lines = tableContent.trim().split('\n');
+              if (lines.length < 2) return match;
+              
+              const headerLine = lines[0];
+              const separatorLine = lines[1];
+              
+              // Check if it's a valid table (separator line contains dashes)
+              if (!separatorLine.includes('-')) return match;
+              
+              const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+              const rows = lines.slice(2).map(line => 
+                line.split('|').map(cell => cell.trim()).filter(cell => cell)
+              );
+              
+              let tableHtml = '<div class="overflow-x-auto my-6"><table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">';
+              
+              // Headers
+              tableHtml += '<thead class="bg-gray-50"><tr>';
+              headers.forEach(header => {
+                tableHtml += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">${header}</th>`;
+              });
+              tableHtml += '</tr></thead>';
+              
+              // Body
+              tableHtml += '<tbody class="divide-y divide-gray-200">';
+              rows.forEach((row, index) => {
+                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                tableHtml += `<tr class="${bgClass}">`;
+                row.forEach(cell => {
+                  tableHtml += `<td class="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">${cell}</td>`;
+                });
+                tableHtml += '</tr>';
+              });
+              tableHtml += '</tbody></table></div>';
+              
+              return tableHtml;
+            });
+
+            // Step 4: Process other markdown elements
             processedContent = processedContent
               .replace(/^# (.*$)/gm, '<h1>$1</h1>')
               .replace(/^## (.*$)/gm, '<h2>$1</h2>')
@@ -123,9 +163,11 @@ const description = frontmatter.description || '';
               .replace(/<p><h/g, '<h')
               .replace(/<\/h(\d)><\/p>/g, '</h$1>')
               .replace(/<p><ul>/g, '<ul>')
-              .replace(/<\/ul><\/p>/g, '</ul>');
+              .replace(/<\/ul><\/p>/g, '</ul>')
+              .replace(/<p><div class="overflow-x-auto/g, '<div class="overflow-x-auto')
+              .replace(/<\/div><\/p>/g, '</div>');
 
-            // Step 4: Restore inline code
+            // Step 5: Restore inline code
             inlineCodes.forEach((code, index) => {
               processedContent = processedContent.replace(
                 `__INLINECODE_${index}__`,
@@ -133,7 +175,7 @@ const description = frontmatter.description || '';
               );
             });
 
-            // Step 5: Restore code blocks
+            // Step 6: Restore code blocks
             codeBlocks.forEach((code, index) => {
               processedContent = processedContent.replace(
                 `__CODEBLOCK_${index}__`,
