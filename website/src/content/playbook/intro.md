@@ -1,7 +1,7 @@
 ---
-title: "Vibe Coding: A Complete Introduction"
-description: "Learn the fundamentals of vibe coding - a structured approach to AI-assisted development that focuses on user flows and business logic."
-tags: ["vibe coding", "AI development", "methodology"]
+title: "nocodo: A Complete Introduction"
+description: "Learn the fundamentals of nocodo - a structured approach to AI-assisted development that focuses on user flows and business logic."
+tags: ["nocodo", "AI development", "methodology"]
 ---
 
 I've been vibe coding for the last two to three months now. On a daily basis, I've been using Claude Code, Gemini CLI, a little bit of Repl.it, Bolt, Lovable, and many other tools in between. I use primarily Claude Code and I've been quite happy with the results.
@@ -32,7 +32,7 @@ Like, for the most part I use a Claude Pro account—so that's Anthropic Claude�
 
 At twenty dollars a month, which is becoming more and more standard, I think we can get enough value to run a small business, and that's a huge benefit, because that allows me to do order management, inventory management, all these custom software, team management, and stuff like that—my custom, maybe HR. So a small business—whatever software we may need, we will be able to create that.
 
-## What is Vibe Coding?
+## What is nocodo?
 
 So vibe coding is basically, as Andrej Karpathy has mentioned—he's this person from, you know, the original OpenAI team, brilliant fellow, he has a lot of instructional videos on YouTube, please go follow him, absolutely fantastic person—so according to him, vibe code—like from how I understand, loosely—is like, you depend, you really depend, you go all in and depend on the AI models to structure your code and you take a step back.
 
