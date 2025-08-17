@@ -87,6 +87,15 @@ pub enum Commands {
         action: ConfigCommands,
     },
     
+    /// Execute AI coding session with enhanced context
+    Session {
+        /// AI tool to use (e.g., claude, gemini, openai)
+        tool: String,
+        
+        /// Prompt for the AI tool
+        prompt: String,
+    },
+    
     /// Show version information
     Version,
 }
@@ -160,6 +169,9 @@ impl Cli {
             Some(Commands::Config { action }) => {
                 self.handle_config(action).await
             }
+            Some(Commands::Session { tool, prompt }) => {
+                self.handle_session(tool, prompt).await
+            }
             Some(Commands::Version) => {
                 self.handle_version().await
             }
@@ -194,6 +206,10 @@ impl Cli {
     
     async fn handle_config(&self, action: &ConfigCommands) -> Result<(), CliError> {
         handle_config_command(action).await
+    }
+    
+    async fn handle_session(&self, tool: &str, prompt: &str) -> Result<(), CliError> {
+        execute_ai_session(tool, prompt).await
     }
     
     async fn handle_version(&self) -> Result<(), CliError> {
