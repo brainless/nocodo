@@ -19,3 +19,7 @@ clap = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+toml = "0.8"
+walkdir = "2.4"
+ignore = "0.4"
+serde_yaml = "0.9"
