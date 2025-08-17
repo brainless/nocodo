@@ -70,8 +70,12 @@ nocodo-manager --config ~/.config/nocodo/manager.toml
 # Analyze a project
 nocodo analyze
 
-# Start AI session
+# Start AI session with Claude Code
 nocodo session claude "add authentication to this project"
+
+# Start AI session with other tools
+nocodo session gemini "refactor the user service"
+nocodo session openai "add unit tests for the API"
 
 # Access web interface
 # Navigate to http://localhost:8081
