@@ -112,6 +112,7 @@ const description = frontmatter.description || '';
               .replace(/^## (.*$)/gm, '<h2>$1</h2>')
               .replace(/^### (.*$)/gm, '<h3>$1</h3>')
               .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
+              .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-indigo-600 hover:text-indigo-800 underline" target="_blank" rel="noopener noreferrer">$1</a>')
               .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
               .replace(/\*(.*?)\*/g, '<em>$1</em>')
               .replace(/^\- (.*$)/gm, '<li>$1</li>')
