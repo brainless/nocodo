@@ -1,112 +1,89 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from "../layouts/Layout.astro";
+import Button from "../components/UI/Button.astro";
 ---
 
-<Layout title="Events - Vibe Coding" description="Join upcoming Vibe Coding sessions and workshops">
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- Page Header -->
-      <header class="text-center mb-12">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">
-          Upcoming Events
-        </h1>
-        <p class="text-xl text-gray-600 max-w-2xl mx-auto">
-          Join me for live sessions on vibe coding, AI-assisted development, and software engineering fundamentals. 
-          Learn from real-world examples and get your questions answered in interactive workshops.
-        </p>
-      </header>
+<Layout
+    title="Events - Vibe Coding"
+    description="Join upcoming Vibe Coding sessions and workshops"
+>
+    <div
+        class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12"
+    >
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Page Header -->
+            <header class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-gray-900 mb-4">
+                    Upcoming Events
+                </h1>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Join me for live sessions on vibe coding, AI-assisted
+                    development, and software engineering fundamentals. Learn
+                    from real-world examples and get your questions answered in
+                    interactive workshops.
+                </p>
+            </header>
 
-      <!-- Events Section -->
-      <section class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-6">
-          Live Sessions & Workshops
-        </h2>
-        
-        <div class="space-y-6">
-          <p class="text-gray-600">
-            I regularly host live coding sessions, workshops, and Q&A sessions covering vibe coding techniques, 
-            AI tool integration, and software development best practices.
-          </p>
-          
-          <!-- Lu.ma Embed Section -->
-          <div class="bg-gray-50 rounded-lg p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">
-              Event Calendar
-            </h3>
-            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <p class="text-gray-500 mb-4">
-                📅 Lu.ma event embed will be added here
-              </p>
-              <p class="text-sm text-gray-400">
-                This section is ready for your Lu.ma iframe embed code
-              </p>
-              <!-- 
-                Replace this placeholder with your Lu.ma iframe embed:
-                <iframe src="your-luma-embed-url" width="100%" height="400" frameborder="0"></iframe>
-              -->
-            </div>
-          </div>
+            <!-- Events Section -->
+            <section
+                class="bg-white rounded-lg shadow-sm border border-gray-200 p-8"
+            >
+                <h2 class="text-2xl font-semibold text-gray-900 mb-6">
+                    Live Sessions & Workshops
+                </h2>
 
-          <!-- Event Types -->
-          <div class="grid md:grid-cols-2 gap-6 mt-8">
-            <div class="border border-gray-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-3">
-                🚀 Live Coding Sessions
-              </h3>
-              <p class="text-gray-600 text-sm">
-                Watch me build real projects using vibe coding techniques with Claude Code and other AI tools. 
-                See the complete workflow from idea to deployment.
-              </p>
+                <div class="space-y-6">
+                    <p class="text-gray-600">
+                        I regularly host live coding sessions, workshops, and
+                        Q&A sessions covering vibe coding techniques, AI tool
+                        integration, and software development best practices.
+                    </p>
+
+                    <!-- Lu.ma Embed Section -->
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            Event Calendar
+                        </h3>
+                        <iframe
+                            src="https://lu.ma/embed/event/evt-D9EAn7lc57KVIUC/simple"
+                            width="600"
+                            height="450"
+                            frameborder="0"
+                            style="border: 1px solid #bfcbda88; border-radius: 4px;"
+                            allow="fullscreen; payment"
+                            aria-hidden="false"
+                            tabindex="0"></iframe>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Call to Action -->
+            <div class="mt-12 text-center">
+                <div
+                    class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-white"
+                >
+                    <h2 class="text-2xl font-bold mb-4">Never Miss an Event</h2>
+                    <p class="text-blue-100 mb-6 max-w-2xl mx-auto">
+                        Subscribe to get notified about upcoming sessions,
+                        workshops, and special events. Join a community of
+                        developers learning to leverage AI in their development
+                        workflow.
+                    </p>
+                    <div class="mb-6">
+                        <Button 
+                            href="https://lu.ma/user/brainless" 
+                            variant="secondary" 
+                            size="md"
+                        >
+                            Follow me on Luma
+                        </Button>
+                    </div>
+                    <div class="text-sm text-blue-100">
+                        Events are scheduled regularly - check the calendar
+                        above for the latest sessions!
+                    </div>
+                </div>
             </div>
-            
-            <div class="border border-gray-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-3">
-                🧠 AI Development Workshops
-              </h3>
-              <p class="text-gray-600 text-sm">
-                Interactive workshops on prompt engineering, AI tool integration, and building effective 
-                development workflows with artificial intelligence.
-              </p>
-            </div>
-            
-            <div class="border border-gray-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-3">
-                💬 Q&A Sessions
-              </h3>
-              <p class="text-gray-600 text-sm">
-                Bring your questions about vibe coding, AI-assisted development, software architecture, 
-                or any challenges you're facing in your projects.
-              </p>
-            </div>
-            
-            <div class="border border-gray-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-3">
-                🎯 Project Reviews
-              </h3>
-              <p class="text-gray-600 text-sm">
-                Share your projects for live code review and feedback. Learn from others' work and 
-                get suggestions for improvements and optimizations.
-              </p>
-            </div>
-          </div>
         </div>
-      </section>
-
-      <!-- Call to Action -->
-      <div class="mt-12 text-center">
-        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-white">
-          <h2 class="text-2xl font-bold mb-4">
-            Never Miss an Event
-          </h2>
-          <p class="text-blue-100 mb-6 max-w-2xl mx-auto">
-            Subscribe to get notified about upcoming sessions, workshops, and special events. 
-            Join a community of developers learning to leverage AI in their development workflow.
-          </p>
-          <div class="text-sm text-blue-100">
-            Events are scheduled regularly - check the calendar above for the latest sessions!
-          </div>
-        </div>
-      </div>
     </div>
-  </div>
 </Layout>
