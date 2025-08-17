@@ -1,53 +1,107 @@
 # nocodo
-nocodo is an end to end solution that makes it easy to generate software with guardrails and good software engineering practices and go live. It works with CLI based coding software like Claude Code, Gemini CLI, OpenCode, Qwen Code, etc. It manages development, deployment, backups, logging, error handling and other aspects of software development lifecycle.
+
+nocodo is a local AI-assisted development environment that provides guardrails and good software engineering practices for code generation. It works with CLI-based coding software like Claude Code, Gemini CLI, OpenCode, Qwen Code, etc. The system runs entirely on your Linux machine, providing a complete development workflow without cloud dependencies.
+
+> **MVP Focus**: Currently implementing a minimal viable product that runs locally on Linux laptops, focusing on the three core components: Manager daemon, Manager Web app, and nocodo CLI.
 
 > [!NOTE]
 > All paths are relative from the root of the project.
 
-## Technical overview
+## MVP Architecture (Current Focus)
 
-nocodo has these parts
-- Bootstrap app (desktop and potentially mobile app) for users to share API keys and start Linux server
-- Bootstrap Web app for user to interact with Bootstrap app (this only connects to localhost, where Bootstrap is running)
-- The user's own computer (desktop for now) is referred as the `ClientSide`
-- (Linux based) Manager app that orchestrates idea to software generation and go live
-- (Linux based) nocodo CLI for Claude Code, Gemini CLI, OpenAI Codex CLI or others to call
-- The Linux server where the Manager and nocodo CLI runs is called `Operator`
-- Manager Web app for user to interact with the Manager, hosted on the `Operator`
+The nocodo MVP consists of three core components running locally on your Linux laptop:
 
-## Bootstrap app
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Linux Laptop (Local)                    │
+├─────────────────┬─────────────────┬────────────────────┤
+│   nocodo CLI    │  Manager Daemon │   Manager Web      │
+│   (Rust)        │  (Rust + Actix) │   (SolidJS)        │
+├─────────────────┼─────────────────┼────────────────────┤
+│                 │                 │                    │
+│   AI Tools      │   Unix Socket   │   HTTP Server      │
+│   Claude Code   │   Server        │   localhost:8081   │
+│   Gemini CLI    │   SQLite DB     │   Static Files     │
+│   etc.          │   File System   │   WebSocket        │
+│                 │                 │                    │
+└─────────────────┴─────────────────┴────────────────────┘
+```
 
-The Bootstrap app allows user to share API access to any of the supported cloud compute providers. Written in Rust, Actix Web, SQLite. We will start with Scaleway and use its API to boot Linux servers. We will quickly add support for DigitalOcean, Vultr and Linode so the Bootstrap app should be written with this in mind.
+### Core Components:
 
-Features:
+- **Manager Daemon**: Local orchestration service that manages projects, provides APIs, and coordinates between CLI and Web app
+- **Manager Web App**: Chat-based interface for AI interaction and project management (runs at localhost:8081)
+- **nocodo CLI**: Command-line companion for AI coding tools, focused on repository-level operations
 
-- Manage email/password based authentication, login happens through nocodo.com (Authencation data in our servers)
-- API to describe all cloud providers supported, keys/screts currently needed
-- API to manage API keys to cloud providers, currently only Scaleway
-- All API types interfaces to be generated as TypeScript type using `ts-rs`
-- Save all sensitive data with encryption at rest (using a separate password, can be same as auth password but not related)
-- Start an Ubuntu server for the Manager app, scripts to setup and harden server, install Manager into it (uses Scaleway APIs)
-- Save the server as an Image (Scaleway APIs)
-- Checks existing saved Image everytime and uses this intead of creating from scratch
-- Can shutdown Manager server when not in need
+### Separation of Concerns:
 
-See [BOOTSTRAP.md](specs/BOOTSTRAP.md) for detailed technical specifications.
+- **nocodo CLI**: Focuses within a single repository/project, provides guardrails and analysis
+- **Manager**: Provides higher-level context, project switching, and external integrations (GitHub API, CI/CD monitoring, etc.)
+- **Communication**: CLI ↔ Manager via Unix socket, Web app ↔ Manager via HTTP/WebSocket
 
-## Web app for Bootstrap
+## MVP Quick Start
 
-This app will consume the API from Bootstrap app, allow user to share and save API keys or secrets. Written in TypeScript with SolidJS, Tailwind CSS, and Solid UI. Connects to Bootstrap app running locally only.
+### Prerequisites
+- Linux laptop (tested on CachyOS Linux)
+- Rust toolchain
+- Node.js and npm
+- AI coding tools (Claude Code, Gemini CLI, etc.)
 
-Features:
+### Installation
+```bash
+# Build Manager daemon
+cargo build --release --bin nocodo-manager
+sudo cp target/release/nocodo-manager /usr/local/bin/
 
-- Authentication interface for nocodo.com login
-- Cloud provider API key management interface
-- Server creation and management dashboard
-- Real-time server status monitoring
-- Encrypted local storage management
-- Server image creation and reuse controls
-- Server shutdown/startup controls
+# Build CLI
+cargo build --release --bin nocodo-cli
+sudo cp target/release/nocodo-cli /usr/local/bin/nocodo
 
-See [BOOTSTRAP_WEB.md](specs/BOOTSTRAP_WEB.md) for detailed technical specifications.
+# Build Web app
+cd manager-web
+npm install && npm run build
+
+# Start Manager daemon
+nocodo-manager --config ~/.config/nocodo/manager.toml
+```
+
+### Usage
+```bash
+# Analyze a project
+nocodo analyze
+
+# Start AI session
+nocodo session claude "add authentication to this project"
+
+# Access web interface
+# Navigate to http://localhost:8081
+```
+
+---
+
+## Future Features (Post-MVP)
+
+> The following sections describe planned features that will be implemented after the MVP is complete.
+
+### Bootstrap app (Future)
+
+The Bootstrap app will allow users to deploy nocodo to cloud servers. Written in Rust, Actix Web, SQLite.
+
+**Planned Features:**
+- Cloud provider integration (Scaleway, DigitalOcean, Vultr, Linode)
+- Server provisioning and management
+- Authentication with nocodo.com
+- Encrypted API key storage
+- Server image creation and reuse
+
+### Bootstrap Web app (Future)
+
+Web interface for Bootstrap app management.
+
+**Planned Features:**
+- Cloud provider API key management
+- Server dashboard and monitoring
+- Remote server controls
 
 ## Manager app
 
@@ -115,18 +169,33 @@ See [MANAGER_WEB.md](specs/MANAGER_WEB.md) for detailed technical specifications
 - Migration management should exist from the start
 - Vite, SolidJS, TailwindCSS and Solid UI components for all Web interfaces
 
-## High level flow of control
+## MVP Workflow (Current)
 
-- User downloads or starts (if already installed) Bootstrap app
-- Bootstrap app (Web app through the installed binary on `ClientSide`) needs authentication with `nocodo.com`
-- Bootstrap asks user for needed API keys (currently Scaleway) if they don't exist
-- Bootstrap launches `Operator`, either fresh Linux virual machine or existing
-- Manager loads up. If starting up, it runs all initial setup for Developer environment (this environment should be able to compile code generated by Coding agents like Claude Code, but all generated code should also adhere to `Overall technical stack preferences`)
-- Manager Web app is as quickly available as possible, showing status of entire `Operator` (logs)
-- User creates new Project - sets a name
-- Project details are stored in Manager daemon's SQLite
-- Project's generated Web app will be visible at temporary sub-domain using `random-slug.nocodo.dev` (different than `nocodo.com`)
-- The `random-slug` needs to be saved for this user to `nocodo.com` (our Mothership in a way)
-- `nocodo.com` has separate code to use CloudFlare API to add DNS record for `random-slug` to point to `Operator`
-- `Operator` has nginx, which is made aware of handling `random-slug.nocodo.dev` through config update (Manager daemon does this)
-- Each Project gets a new working directory, Git, a "Hello World" Web app and a backend following our `Overall technical stack preferences`
+1. **Startup**: User starts Manager daemon on their Linux laptop
+2. **Web Interface**: Manager serves the Web app at localhost:8081
+3. **Project Creation**: User creates a new project via Web interface or CLI
+4. **Project Setup**: Each project gets its own directory, Git repo, and basic scaffolding
+5. **AI Integration**: User interacts with AI tools through:
+   - CLI commands: `nocodo analyze`, `nocodo session claude "..."`
+   - Web chat interface for longer conversations
+6. **Development**: AI tools use nocodo CLI to get context and apply guardrails
+7. **Project Management**: Manager coordinates between projects, handles higher-level concerns
+
+### Key Interactions:
+- **User ↔ Web App**: Chat interface, project management
+- **AI Tools ↔ nocodo CLI**: Context-aware prompts, validation
+- **nocodo CLI ↔ Manager**: Unix socket communication for project data
+- **Web App ↔ Manager**: HTTP/WebSocket for real-time updates
+
+---
+
+## Future Workflow (Post-MVP)
+
+> This describes the planned cloud-based workflow for post-MVP versions:
+
+- User downloads or starts Bootstrap app
+- Bootstrap handles authentication with nocodo.com
+- Bootstrap provisions cloud server ("Operator")
+- Manager loads on cloud server with full development environment
+- Projects get public URLs at `random-slug.nocodo.dev`
+- Full deployment pipeline and cloud integrations

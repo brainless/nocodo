@@ -1,0 +1,17 @@
+Hey, I'm just recording my thoughts around the MVP of nocodo so that we can improve the documentation that we have in the specs folder, as well as the existing GitHub tickets that we have. Okay, so I am already on a Linux machine - my laptop is running Linux and I already have the entire developer setup that we want for users when running this on the server. So basically, I'm replicating what a typical server environment will be, already on my laptop.
+
+Now what I want is the manager, the manager web application, and the nocodo CLI to all be running on my laptop. The manager application is like a daemon, so we could also add daemon scripts so that it stays running in the background. The manager is used to interact between the nocodo CLI and the web application (the manager web application).
+
+So we already have some of these built. The nocodo CLI is what is going to be used by me from the terminal. I will be able to analyze a project, but also if the nocodo CLI is being used by Cloud Code, then Cloud Code can also use it to analyze a project.
+
+The whole idea of the CLI is that it builds a set of guardrails to only do project management. It's focused only within a project and project management. The Manager, on the other hand, is the higher-level overview which allows a user to shift between projects, etc.
+
+In the future, the manager app will also provide utilities for task management and things like that - higher-level epics, issues, etc. Maybe we will integrate to the GitHub API or other such project management or cloud-based code hosting, deployment hosting, etc. APIs so that we can get this information.
+
+So let's say if a CI/CD fails - that's the manager that will fetch this information. The nocodo CLI will be able to access it through the manager, but the nocodo CLI does not do all of this by itself. So there is the separation of concerns.
+
+The nocodo CLI is primarily used for Cloud Code, Gemini CLI, or any such CLI-based coding agents to interact with the environment - both the local code environment and what code is right now in this project. Like, what is the code in this project? What are the Rust projects, Node.js projects, or maybe in the future Python projects or anything else that I'm currently looking at? What are those and what does the user want? So the code, of course, directly comes from the files that are there, so the nocodo CLI can access those and build a summary or whatever details that Cloud Code or other agents want and generate prompts for that. We are not doing exactly prompt shaping at this moment, but yeah, that's the idea. And the nocodo CLI will be able to access, like I said, these higher-level project management features - the project management features coming from the manager, not directly from the nocodo CLI.
+
+So the nocodo CLI is always working hand in hand with the manager, but the manager has the higher-level context. The nocodo CLI focuses within a repository - so that's the boundary, and we should keep track of that because that helps in building the project. Of course, this is a complicated project, so the separation of those concerns is really important. So that's the high level.
+
+(Transcribed by TurboScribe.ai. Go Unlimited to remove this message.)
