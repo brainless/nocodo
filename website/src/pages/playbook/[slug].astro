@@ -165,22 +165,22 @@ const description = data.description || '';
   const tocLinks = document.querySelectorAll('.toc-link');
 
   function openTOC() {
-    tocOverlay.classList.remove('hidden');
+    tocOverlay?.classList.remove('hidden');
     setTimeout(() => {
-      tocPanel.classList.remove('translate-x-full');
+      tocPanel?.classList.remove('translate-x-full');
     }, 10);
   }
 
   function closeTOC() {
-    tocPanel.classList.add('translate-x-full');
+    tocPanel?.classList.add('translate-x-full');
     setTimeout(() => {
-      tocOverlay.classList.add('hidden');
+      tocOverlay?.classList.add('hidden');
     }, 300);
   }
 
-  tocToggle.addEventListener('click', openTOC);
-  tocClose.addEventListener('click', closeTOC);
-  tocOverlay.addEventListener('click', (e) => {
+  tocToggle?.addEventListener('click', openTOC);
+  tocClose?.addEventListener('click', closeTOC);
+  tocOverlay?.addEventListener('click', (e) => {
     if (e.target === tocOverlay) {
       closeTOC();
     }
@@ -190,8 +190,8 @@ const description = data.description || '';
   tocLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      const targetId = link.getAttribute('href').substring(1);
-      const targetElement = document.getElementById(targetId);
+      const targetId = link.getAttribute('href')?.substring(1);
+      const targetElement = targetId ? document.getElementById(targetId) : null;
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: 'smooth' });
         closeTOC();
@@ -205,6 +205,7 @@ const description = data.description || '';
   const articleContent = document.getElementById('article-content');
 
   function updateReadingProgress() {
+    if (!articleContent) return;
     const articleRect = articleContent.getBoundingClientRect();
     const articleHeight = articleContent.offsetHeight;
     const viewportHeight = window.innerHeight;
@@ -216,12 +217,12 @@ const description = data.description || '';
     if (totalScrollable <= 0) {
       // Article is shorter than viewport
       const progress = articleRect.top <= 0 ? 100 : 0;
-      progressBar.style.width = progress + '%';
-      progressText.textContent = Math.round(progress) + '%';
+      if (progressBar) progressBar.style.width = progress + '%';
+      if (progressText) progressText.textContent = Math.round(progress) + '%';
     } else {
       const progress = Math.min(100, Math.max(0, (scrolled / totalScrollable) * 100));
-      progressBar.style.width = progress + '%';
-      progressText.textContent = Math.round(progress) + '%';
+      if (progressBar) progressBar.style.width = progress + '%';
+      if (progressText) progressText.textContent = Math.round(progress) + '%';
     }
   }
 
@@ -233,7 +234,7 @@ const description = data.description || '';
   // Highlight current section in TOC
   function highlightCurrentSection() {
     const headings = document.querySelectorAll('h1[id], h2[id], h3[id], h4[id]');
-    let currentHeading = null;
+    let currentHeading: Element | null = null;
 
     headings.forEach(heading => {
       const rect = heading.getBoundingClientRect();
@@ -248,8 +249,8 @@ const description = data.description || '';
     });
 
     // Add active state to current section
-    if (currentHeading) {
-      const currentLink = document.querySelector(`[data-heading-id="${currentHeading.id}"]`);
+    if (currentHeading && (currentHeading as HTMLElement).id) {
+      const currentLink = document.querySelector(`[data-heading-id="${(currentHeading as HTMLElement).id}"]`);
       if (currentLink) {
         currentLink.classList.add('text-green-600', 'font-medium');
       }
@@ -264,7 +265,7 @@ const description = data.description || '';
     // Toggle TOC with 't' key
     if (e.key === 't' && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
-      const isOpen = !tocOverlay.classList.contains('hidden');
+      const isOpen = !tocOverlay?.classList.contains('hidden');
       if (isOpen) {
         closeTOC();
       } else {
