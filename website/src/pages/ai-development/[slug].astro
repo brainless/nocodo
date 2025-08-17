@@ -87,29 +87,105 @@ const description = frontmatter.description || '';
 
       <!-- Article Content -->
       <article class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="prose prose-lg prose-purple max-w-none p-8">
+        <div class="content-prose p-8">
           <!-- Simple markdown-to-HTML conversion for basic content -->
-          <div set:html={content
-            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-            .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/```([^`]+)```/gs, '<pre><code>$1</code></pre>')
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/^\- (.*$)/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-            .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/^(.+)$/gm, '<p>$1</p>')
-            .replace(/<p><h/g, '<h')
-            .replace(/<\/h(\d)><\/p>/g, '</h$1>')
-            .replace(/<p><ul>/g, '<ul>')
-            .replace(/<\/ul><\/p>/g, '</ul>')
-            .replace(/<p><pre>/g, '<pre>')
-            .replace(/<\/pre><\/p>/g, '</pre>')
-          }>
+          <div set:html={(() => {
+            // Step 1: Extract and protect code blocks
+            const codeBlocks: string[] = [];
+            let processedContent = content.replace(/```([\s\S]*?)```/g, (_match, code) => {
+              const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
+              codeBlocks.push(code.trim());
+              return placeholder;
+            });
+
+            // Step 2: Extract and protect inline code
+            const inlineCodes: string[] = [];
+            processedContent = processedContent.replace(/`([^`]+)`/g, (_match, code) => {
+              const placeholder = `__INLINECODE_${inlineCodes.length}__`;
+              inlineCodes.push(code);
+              return placeholder;
+            });
+
+            // Step 3: Process tables first (before paragraph conversion)
+            processedContent = processedContent.replace(/(?:^|\n)((?:\|.*\|\n?)+)/gm, (match, tableContent) => {
+              const lines = tableContent.trim().split('\n');
+              if (lines.length < 2) return match;
+              
+              const headerLine = lines[0];
+              const separatorLine = lines[1];
+              
+              // Check if it's a valid table (separator line contains dashes)
+              if (!separatorLine.includes('-')) return match;
+              
+              const headers = headerLine.split('|').map((h: string) => h.trim()).filter((h: string) => h);
+              const rows = lines.slice(2).map((line: string) => 
+                line.split('|').map((cell: string) => cell.trim()).filter((cell: string) => cell)
+              );
+              
+              let tableHtml = '<div class="overflow-x-auto my-6"><table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">';
+              
+              // Headers
+              tableHtml += '<thead class="bg-gray-50"><tr>';
+              headers.forEach((header: string) => {
+                tableHtml += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">${header}</th>`;
+              });
+              tableHtml += '</tr></thead>';
+              
+              // Body
+              tableHtml += '<tbody class="divide-y divide-gray-200">';
+              rows.forEach((row: string[], index: number) => {
+                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                tableHtml += `<tr class="${bgClass}">`;
+                row.forEach((cell: string) => {
+                  tableHtml += `<td class="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">${cell}</td>`;
+                });
+                tableHtml += '</tr>';
+              });
+              tableHtml += '</tbody></table></div>';
+              
+              return tableHtml;
+            });
+
+            // Step 4: Process other markdown elements
+            processedContent = processedContent
+              .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+              .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+              .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+              .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
+              .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-purple-600 hover:text-purple-800 underline" target="_blank" rel="noopener noreferrer">$1</a>')
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+              .replace(/^\- (.*$)/gm, '<li>$1</li>')
+              .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+              .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
+              .replace(/\n\n/g, '</p><p>')
+              .replace(/^(.+)$/gm, '<p>$1</p>')
+              .replace(/<p><h/g, '<h')
+              .replace(/<\/h(\d)><\/p>/g, '</h$1>')
+              .replace(/<p><ul>/g, '<ul>')
+              .replace(/<\/ul><\/p>/g, '</ul>')
+              .replace(/<p><div class="overflow-x-auto/g, '<div class="overflow-x-auto')
+              .replace(/<\/div><\/p>/g, '</div>');
+
+            // Step 5: Restore inline code
+            inlineCodes.forEach((code: string, index: number) => {
+              processedContent = processedContent.replace(
+                `__INLINECODE_${index}__`,
+                `<code>${code}</code>`
+              );
+            });
+
+            // Step 6: Restore code blocks
+            codeBlocks.forEach((code: string, index: number) => {
+              processedContent = processedContent.replace(
+                `__CODEBLOCK_${index}__`,
+                `<pre><code>${code}</code></pre>`
+              );
+            });
+
+            return processedContent;
+          })()}>
+          </div>
           </div>
         </div>
       </article>
@@ -134,93 +210,115 @@ const description = frontmatter.description || '';
   </div>
 </Layout>
 
-<style>
-  .prose {
-    color: #374151;
-    line-height: 1.75;
+<style is:global>
+  /* Reset and style content prose - Override Tailwind's CSS reset */
+  .content-prose {
+    color: #374151 !important;
+    line-height: 1.75 !important;
+    max-width: none !important;
   }
   
-  .prose h1 {
-    color: #111827;
-    font-weight: 800;
-    font-size: 2.25rem;
-    margin-top: 0;
-    margin-bottom: 2rem;
-    line-height: 1.1;
+  .content-prose h1 {
+    color: #111827 !important;
+    font-weight: 800 !important;
+    font-size: 2.25rem !important;
+    margin-top: 0 !important;
+    margin-bottom: 2rem !important;
+    line-height: 1.1 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose h2 {
-    color: #111827;
-    font-weight: 700;
-    font-size: 1.875rem;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    line-height: 1.2;
+  .content-prose h2 {
+    color: #111827 !important;
+    font-weight: 700 !important;
+    font-size: 1.875rem !important;
+    margin-top: 3rem !important;
+    margin-bottom: 1rem !important;
+    line-height: 1.2 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose h3 {
-    color: #111827;
-    font-weight: 600;
-    font-size: 1.5rem;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    line-height: 1.3;
+  .content-prose h3 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-top: 2rem !important;
+    margin-bottom: 0.75rem !important;
+    line-height: 1.3 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose h4 {
-    color: #111827;
-    font-weight: 600;
-    font-size: 1.25rem;
-    margin-top: 1.25rem;
-    margin-bottom: 0.5rem;
-    line-height: 1.4;
+  .content-prose h4 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.25rem !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 0.5rem !important;
+    line-height: 1.4 !important;
+    scroll-margin-top: 6rem !important;
   }
   
-  .prose p {
-    margin-bottom: 1.25rem;
+  .content-prose p {
+    margin-bottom: 1.25rem !important;
+    color: #374151 !important;
   }
   
-  .prose ul {
-    margin: 1.25rem 0;
-    padding-left: 1.5rem;
+  .content-prose ul {
+    margin: 1.25rem 0 !important;
+    padding-left: 1.5rem !important;
   }
   
-  .prose li {
-    margin-bottom: 0.5rem;
-    list-style-type: disc;
+  .content-prose li {
+    margin-bottom: 0.5rem !important;
+    list-style-type: disc !important;
+    color: #374151 !important;
   }
   
-  .prose code {
-    color: #dc2626;
-    background-color: #f3f4f6;
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-    font-size: 0.875rem;
+  .content-prose code {
+    color: #dc2626 !important;
+    background-color: #f3f4f6 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace !important;
+    font-size: 0.875rem !important;
   }
   
-  .prose pre {
-    background-color: #1f2937;
-    color: #f9fafb;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    overflow-x: auto;
-    margin: 1.5rem 0;
+  .content-prose pre {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+    padding: 1.25rem !important;
+    border-radius: 0.75rem !important;
+    overflow-x: auto !important;
+    margin: 2rem 0 !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace !important;
+    font-size: 0.875rem !important;
+    line-height: 1.7 !important;
   }
   
-  .prose pre code {
-    color: inherit;
-    background-color: transparent;
-    padding: 0;
-    border-radius: 0;
+  .content-prose pre code {
+    color: inherit !important;
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-size: inherit !important;
   }
   
-  .prose strong {
-    font-weight: 600;
-    color: #111827;
+  .content-prose strong {
+    font-weight: 600 !important;
+    color: #111827 !important;
   }
   
-  .prose em {
-    font-style: italic;
+  .content-prose em {
+    font-style: italic !important;
+  }
+
+  .content-prose blockquote {
+    border-left: 4px solid #a855f7 !important;
+    padding-left: 1rem !important;
+    margin: 1.5rem 0 !important;
+    font-style: italic !important;
+    color: #4b5563 !important;
   }
 </style>
