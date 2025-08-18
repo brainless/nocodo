@@ -5,7 +5,9 @@ mod handlers;
 mod models;
 mod socket;
 mod templates;
+mod websocket;
 
+use actix::Actor;
 use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use config::AppConfig;
@@ -16,6 +18,7 @@ use socket::SocketServer;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use websocket::{WebSocketBroadcaster, WebSocketServer};
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
@@ -24,17 +27,23 @@ async fn main() -> AppResult<()> {
         .with(fmt::layer())
         .with(EnvFilter::from_default_env().add_directive("nocodo_manager=info".parse().unwrap()))
         .init();
-    
+
     tracing::info!("Starting nocodo Manager daemon");
-    
+
     // Load configuration
     let config = AppConfig::load()?;
     tracing::info!("Loaded configuration from ~/.config/nocodo/manager.toml");
-    
+
     // Initialize database
     let database = Arc::new(Database::new(&config.database.path)?);
     tracing::info!("Database initialized at {:?}", config.database.path);
-    
+
+    // Start WebSocket server
+    let ws_server = WebSocketServer::default().start();
+    let ws_server_data = web::Data::new(ws_server.clone());
+    let broadcaster = Arc::new(WebSocketBroadcaster::new(ws_server));
+    tracing::info!("WebSocket server started");
+
     // Start Unix socket server
     let socket_server = SocketServer::new(&config.socket.path, Arc::clone(&database)).await?;
     let socket_task = tokio::spawn(async move {
@@ -42,21 +51,23 @@ async fn main() -> AppResult<()> {
             tracing::error!("Socket server error: {}", e);
         }
     });
-    
-    // Create application state
+
+    // Create application state with WebSocket broadcaster
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: broadcaster,
     });
-    
+
     // Start HTTP server
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
-    
+
     let http_task = tokio::spawn(async move {
         HttpServer::new(move || {
             App::new()
                 .app_data(app_state.clone())
+                .app_data(ws_server_data.clone())
                 .wrap(Logger::default())
                 .service(
                     web::scope("/api")
@@ -65,14 +76,16 @@ async fn main() -> AppResult<()> {
                         .route("/projects", web::post().to(handlers::create_project))
                         .route("/projects/{id}", web::get().to(handlers::get_project))
                         .route("/projects/{id}", web::delete().to(handlers::delete_project))
-                        .route("/templates", web::get().to(handlers::get_templates))
+                        .route("/templates", web::get().to(handlers::get_templates)),
                 )
+                // WebSocket endpoint
+                .route("/ws", web::get().to(websocket::websocket_handler))
                 // Serve static files from ./web/dist if it exists
                 .service(
                     fs::Files::new("/", "./web/dist")
                         .index_file("index.html")
                         .use_etag(true)
-                        .use_last_modified(true)
+                        .use_last_modified(true),
                 )
         })
         .bind(&server_addr)
@@ -81,12 +94,12 @@ async fn main() -> AppResult<()> {
         .await
         .expect("HTTP server failed")
     });
-    
+
     // Wait for either server to complete (they should run indefinitely)
     tokio::select! {
         _ = socket_task => tracing::info!("Socket server completed"),
         _ = http_task => tracing::info!("HTTP server completed"),
     }
-    
+
     Ok(())
 }

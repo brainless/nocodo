@@ -1,6 +1,7 @@
-import { Component, createSignal, onMount } from 'solid-js';
-import { Project } from '../types';
+import { Component, createSignal, onMount, createEffect } from 'solid-js';
+import { Project, WebSocketMessage } from '../types';
 import { apiClient } from '../api';
+import { useWebSocket } from '../WebSocketProvider';
 
 interface ProjectListProps {
   onRefresh?: () => void;
@@ -10,6 +11,9 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+  
+  // Get WebSocket context
+  const { store: wsStore } = useWebSocket();
 
   const loadProjects = async () => {
     try {
@@ -39,6 +43,50 @@ const ProjectList: Component<ProjectListProps> = (props) => {
   };
 
   onMount(loadProjects);
+  
+  // Handle WebSocket messages for real-time updates
+  createEffect(() => {
+    const message = wsStore.lastMessage;
+    if (!message) return;
+    
+    switch (message.type) {
+      case 'ProjectCreated':
+        console.log('Project created via WebSocket:', message.payload.project);
+        // Add the new project to the list
+        setProjects(prev => [...prev, message.payload.project]);
+        break;
+        
+      case 'ProjectUpdated':
+        console.log('Project updated via WebSocket:', message.payload.project);
+        // Update the existing project in the list
+        setProjects(prev => 
+          prev.map(p => 
+            p.id === message.payload.project.id ? message.payload.project : p
+          )
+        );
+        break;
+        
+      case 'ProjectDeleted':
+        console.log('Project deleted via WebSocket:', message.payload.project_id);
+        // Remove the project from the list
+        setProjects(prev => 
+          prev.filter(p => p.id !== message.payload.project_id)
+        );
+        break;
+        
+      case 'ProjectStatusChanged':
+        console.log('Project status changed via WebSocket:', message.payload);
+        // Update the project status
+        setProjects(prev => 
+          prev.map(p => 
+            p.id === message.payload.project_id 
+              ? { ...p, status: message.payload.status }
+              : p
+          )
+        );
+        break;
+    }
+  });
 
   return (
     <div class="w-full">

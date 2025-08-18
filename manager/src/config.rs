@@ -45,14 +45,14 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn load() -> Result<Self, ConfigError> {
         let config_path = get_config_path();
-        
+
         // Create config directory if it doesn't exist
         if let Some(parent) = config_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 ConfigError::Message(format!("Failed to create config directory: {}", e))
             })?;
         }
-        
+
         // Create default config file if it doesn't exist
         if !config_path.exists() {
             let default_config = r#"
@@ -70,13 +70,13 @@ path = "/tmp/nocodo-manager.sock"
                 ConfigError::Message(format!("Failed to write default config: {}", e))
             })?;
         }
-        
+
         let builder = Config::builder()
             .add_source(File::from(config_path))
             .build()?;
-        
+
         let mut config: AppConfig = builder.try_deserialize()?;
-        
+
         // Expand tilde in database path
         if config.database.path.starts_with("~") {
             if let Some(home) = home::home_dir() {
@@ -85,7 +85,7 @@ path = "/tmp/nocodo-manager.sock"
                 config.database.path = PathBuf::from(expanded);
             }
         }
-        
+
         Ok(config)
     }
 }
