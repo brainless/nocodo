@@ -20,9 +20,12 @@ const ProjectList: Component<ProjectListProps> = (props) => {
       setLoading(true);
       setError(null);
       const projectList = await apiClient.fetchProjects();
-      setProjects(projectList);
+      // Ensure we always have an array
+      const projects = Array.isArray(projectList) ? projectList : [];
+      setProjects(projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
+      setProjects([]); // Set empty array on error to prevent map error
     } finally {
       setLoading(false);
     }
@@ -44,49 +47,49 @@ const ProjectList: Component<ProjectListProps> = (props) => {
 
   onMount(loadProjects);
   
-  // Handle WebSocket messages for real-time updates
-  createEffect(() => {
-    const message = wsStore.lastMessage;
-    if (!message) return;
-    
-    switch (message.type) {
-      case 'ProjectCreated':
-        console.log('Project created via WebSocket:', message.payload.project);
-        // Add the new project to the list
-        setProjects(prev => [...prev, message.payload.project]);
-        break;
-        
-      case 'ProjectUpdated':
-        console.log('Project updated via WebSocket:', message.payload.project);
-        // Update the existing project in the list
-        setProjects(prev => 
-          prev.map(p => 
-            p.id === message.payload.project.id ? message.payload.project : p
-          )
-        );
-        break;
-        
-      case 'ProjectDeleted':
-        console.log('Project deleted via WebSocket:', message.payload.project_id);
-        // Remove the project from the list
-        setProjects(prev => 
-          prev.filter(p => p.id !== message.payload.project_id)
-        );
-        break;
-        
-      case 'ProjectStatusChanged':
-        console.log('Project status changed via WebSocket:', message.payload);
-        // Update the project status
-        setProjects(prev => 
-          prev.map(p => 
-            p.id === message.payload.project_id 
-              ? { ...p, status: message.payload.status }
-              : p
-          )
-        );
-        break;
-    }
-  });
+  // Handle WebSocket messages for real-time updates - temporarily disabled for debugging
+  // createEffect(() => {
+  //   const message = wsStore.lastMessage;
+  //   if (!message) return;
+  //   
+  //   switch (message.type) {
+  //     case 'ProjectCreated':
+  //       console.log('Project created via WebSocket:', message.payload.project);
+  //       // Add the new project to the list
+  //       setProjects(prev => [...prev, message.payload.project]);
+  //       break;
+  //       
+  //     case 'ProjectUpdated':
+  //       console.log('Project updated via WebSocket:', message.payload.project);
+  //       // Update the existing project in the list
+  //       setProjects(prev => 
+  //         prev.map(p => 
+  //           p.id === message.payload.project.id ? message.payload.project : p
+  //         )
+  //       );
+  //       break;
+  //       
+  //     case 'ProjectDeleted':
+  //       console.log('Project deleted via WebSocket:', message.payload.project_id);
+  //       // Remove the project from the list
+  //       setProjects(prev => 
+  //         prev.filter(p => p.id !== message.payload.project_id)
+  //       );
+  //       break;
+  //       
+  //     case 'ProjectStatusChanged':
+  //       console.log('Project status changed via WebSocket:', message.payload);
+  //       // Update the project status
+  //       setProjects(prev => 
+  //         prev.map(p => 
+  //           p.id === message.payload.project_id 
+  //             ? { ...p, status: message.payload.status }
+  //             : p
+  //         )
+  //       );
+  //       break;
+  //   }
+  // });
 
   return (
     <div class="w-full">
