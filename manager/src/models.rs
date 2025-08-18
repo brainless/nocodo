@@ -130,3 +130,12 @@ pub struct AiSessionResponse {
 pub struct AiSessionListResponse {
     pub sessions: Vec<AiSession>,
 }
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AddExistingProjectRequest {
+    pub name: String,
+    pub path: String, // Required - must be existing directory
+    pub language: Option<String>,
+    pub framework: Option<String>,
+}

@@ -74,6 +74,7 @@ async fn main() -> AppResult<()> {
                         .route("/health", web::get().to(handlers::health_check))
                         .route("/projects", web::get().to(handlers::get_projects))
                         .route("/projects", web::post().to(handlers::create_project))
+                        .route("/projects/add-existing", web::post().to(handlers::add_existing_project))
                         .route("/projects/{id}", web::get().to(handlers::get_project))
                         .route("/projects/{id}", web::delete().to(handlers::delete_project))
                         .route("/templates", web::get().to(handlers::get_templates)),
