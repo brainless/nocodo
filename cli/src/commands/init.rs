@@ -1,40 +1,36 @@
 //! Project initialization command implementation
 
-use std::path::PathBuf;
+use crate::client::{CreateProjectRequest, ManagerClient};
 use crate::error::CliError;
-use crate::client::{ManagerClient, CreateProjectRequest};
-use tracing::{info, warn, error};
+use std::path::PathBuf;
+use tracing::{error, info, warn};
 
 /// Initialize a new project with nocodo support
-pub async fn init_project(
-    template: &Option<String>,
-    path: &PathBuf,
-) -> Result<(), CliError> {
+pub async fn init_project(template: &Option<String>, path: &PathBuf) -> Result<(), CliError> {
     println!("🚀 Initializing nocodo project at: {}", path.display());
-    
+
     // Create Manager client
     let client = ManagerClient::new(
         "/tmp/nocodo-manager.sock".to_string(),
-        None // Use default HTTP URL
+        None, // Use default HTTP URL
     );
-    
+
     // Check if Manager daemon is running
     if !client.check_manager_status().await? {
         return Err(CliError::Communication(
-            "Manager daemon is not running. Please start nocodo-manager first.".to_string()
+            "Manager daemon is not running. Please start nocodo-manager first.".to_string(),
         ));
     }
-    
+
     // Get available templates if no template specified
     if template.is_none() {
         println!("\n📋 Available templates:");
         match client.get_templates().await {
             Ok(templates) => {
                 for template in &templates {
-                    println!("  • {} - {} ({})", 
-                        template.name, 
-                        template.description,
-                        template.language
+                    println!(
+                        "  • {} - {} ({})",
+                        template.name, template.description, template.language
                     );
                 }
                 println!("\n💡 Use --template <name> to specify a template, or continue without one for a basic project.");
@@ -45,18 +41,20 @@ pub async fn init_project(
             }
         }
     }
-    
+
     // Extract project name from path
-    let project_name = path.file_name()
+    let project_name = path
+        .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("unnamed-project")
         .to_string();
-    
-    println!("\n🔧 Creating project '{}' with template: {}", 
-        project_name, 
+
+    println!(
+        "\n🔧 Creating project '{}' with template: {}",
+        project_name,
         template.as_deref().unwrap_or("default")
     );
-    
+
     // Create project request
     let request = CreateProjectRequest {
         name: project_name.clone(),
@@ -65,34 +63,34 @@ pub async fn init_project(
         framework: None,
         template: template.clone(),
     };
-    
+
     // Create project via Manager API
     match client.create_project(request).await {
         Ok(project) => {
             println!("✅ Project '{}' created successfully!", project.name);
             println!("📁 Location: {}", project.path);
-            
+
             if let Some(language) = &project.language {
                 println!("🔤 Language: {}", language);
             }
-            
+
             if let Some(framework) = &project.framework {
                 println!("🛠️  Framework: {}", framework);
             }
-            
+
             println!("📦 Status: {}", project.status);
-            
+
             if project.status == "initialized" {
                 println!("\n🎉 Your project is ready! You can now:");
                 println!("   • cd {}", project.path);
                 println!("   • Start coding with AI assistance using nocodo session");
-                
+
                 // Show template-specific next steps
                 if let Some(template_name) = template {
                     show_template_next_steps(template_name);
                 }
             }
-            
+
             info!("Project initialization completed: {}", project.id);
         }
         Err(e) => {
@@ -100,7 +98,7 @@ pub async fn init_project(
             return Err(e);
         }
     }
-    
+
     Ok(())
 }
 

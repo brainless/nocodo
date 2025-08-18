@@ -6,19 +6,19 @@ use thiserror::Error;
 pub enum AppError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
-    
+
     #[error("Configuration error: {0}")]
     Config(#[from] config::ConfigError),
-    
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Project not found: {0}")]
     ProjectNotFound(String),
-    
+
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
-    
+
     #[error("Internal server error: {0}")]
     Internal(String),
 }
@@ -35,13 +35,14 @@ impl ResponseError for AppError {
             error: self.error_type(),
             message: self.to_string(),
         };
-        
+
         match self {
             AppError::ProjectNotFound(_) => HttpResponse::NotFound().json(error_response),
             AppError::InvalidRequest(_) => HttpResponse::BadRequest().json(error_response),
-            AppError::Database(_) | AppError::Config(_) | AppError::Io(_) | AppError::Internal(_) => {
-                HttpResponse::InternalServerError().json(error_response)
-            }
+            AppError::Database(_)
+            | AppError::Config(_)
+            | AppError::Io(_)
+            | AppError::Internal(_) => HttpResponse::InternalServerError().json(error_response),
         }
     }
 }
