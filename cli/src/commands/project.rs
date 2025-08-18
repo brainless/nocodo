@@ -2,7 +2,7 @@
 
 use crate::{
     cli::ProjectCommands,
-    client::{CreateProjectRequest, ManagerClient},
+    client::{AddExistingProjectRequest, ManagerClient},
     commands::analyze::ProjectAnalyzer,
     error::CliError,
 };
@@ -105,18 +105,17 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
         ));
     }
 
-    // Create project request
-    let create_request = CreateProjectRequest {
+    // Create add existing project request
+    let add_existing_request = AddExistingProjectRequest {
         name: project_name.clone(),
-        path: Some(absolute_path_str),
+        path: absolute_path_str,
         language,
         framework,
-        template: None,
     };
 
     // Send request to manager
-    info!("Creating project via API...");
-    let created_project = client.create_project(create_request).await?;
+    info!("Adding existing project via API...");
+    let created_project = client.add_existing_project(add_existing_request).await?;
 
     // Success output
     println!("✓ Detected {} project: {}", 
