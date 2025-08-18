@@ -1,9 +1,10 @@
 import { Component, createSignal, createEffect, Show, For } from 'solid-js';
-import { FileInfo, FileListResponse, Project } from '../types';
+import { FileInfo, FileListResponse } from '../types';
 import { apiClient } from '../api';
 
 interface FileBrowserProps {
-  project: Project;
+  projectId: string;
+  projectName?: string;
   onFileSelect?: (file: FileInfo) => void;
 }
 
@@ -19,14 +20,14 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
 
   // Load files for the current path
   const loadFiles = async (path: string = '') => {
-    if (!props.project) return;
-    
+    if (!props.projectId) return;
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const response: FileListResponse = await apiClient.listFiles({
-        project_id: props.project.id,
+        project_id: props.projectId,
         path: path || undefined,
       });
       
@@ -39,11 +40,10 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
     }
   };
 
-// Load files when project id becomes available/changes
+  // Load root on first render and when project id changes
   createEffect(() => {
-    const projectId = props.project?.id;
+    const projectId = props.projectId;
     if (projectId) {
-      // Always load root on project change
       loadFiles('');
     }
   });
@@ -67,14 +67,14 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
   };
 
   const createFile = async () => {
-    if (!props.project || !newFileName().trim()) return;
+    if (!props.projectId || !newFileName().trim()) return;
 
     try {
       const fileName = newFileName().trim();
       const filePath = currentPath() ? `${currentPath()}/${fileName}` : fileName;
       
       await apiClient.createFile({
-        project_id: props.project.id,
+        project_id: props.projectId,
         path: filePath,
         content: newFileIsDirectory() ? undefined : '',
         is_directory: newFileIsDirectory(),
@@ -92,14 +92,14 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
   };
 
   const deleteFile = async (file: FileInfo) => {
-    if (!props.project) return;
+    if (!props.projectId) return;
     
     if (!confirm(`Are you sure you want to delete ${file.name}?`)) {
       return;
     }
 
     try {
-      await apiClient.deleteFile(file.path, props.project.id);
+      await apiClient.deleteFile(file.path, props.projectId);
       
       // Reload current directory
       loadFiles(currentPath());
@@ -132,7 +132,7 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
         <div>
           <h2 class="text-lg font-medium text-gray-900">Files</h2>
           <p class="text-sm text-gray-600">
-            Project: {props.project.name}
+            Project: {props.projectName || props.projectId}
             {currentPath() && (
               <span class="ml-2 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
                 {currentPath()}
@@ -180,80 +180,76 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
         </div>
       </Show>
 
+      {/* Loading indicator (non-blocking) */}
+      <Show when={loading()}>
+        <div class="text-xs text-gray-500">Loading files...</div>
+      </Show>
+
       {/* File list */}
       <div class="border border-gray-200 rounded-lg overflow-hidden">
         <Show 
-          when={!loading()} 
+          when={files().length > 0}
           fallback={
             <div class="p-4 text-center text-gray-500">
-              Loading files...
+              {loading() ? 'Loading files...' : 'No files found'}
             </div>
           }
         >
-          <Show 
-            when={files().length > 0}
-            fallback={
-              <div class="p-4 text-center text-gray-500">
-                No files found
-              </div>
-            }
-          >
-            <table class="w-full">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                    Name
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                    Size
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                    Modified
-                  </th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200">
-                <For each={files()}>
-                  {(file) => (
-                    <tr 
-                      class={`hover:bg-gray-50 ${selectedFile()?.path === file.path ? 'bg-blue-50' : ''}`}
-                    >
-                      <td class="px-4 py-2">
-                        <button
-                          onClick={() => navigateToDirectory(file)}
-                          class="flex items-center space-x-2 text-left hover:text-blue-600 transition-colors"
-                        >
-                          <span class="text-gray-400">
-                            {file.is_directory ? '📁' : '📄'}
-                          </span>
-                          <span class={`${file.is_directory ? 'font-medium' : ''}`}>
-                            {file.name}
-                          </span>
-                        </button>
-                      </td>
-                      <td class="px-4 py-2 text-sm text-gray-600">
-                        {file.is_directory ? '-' : formatSize(file.size)}
-                      </td>
-                      <td class="px-4 py-2 text-sm text-gray-600">
-                        {formatDate(file.modified_at)}
-                      </td>
-                      <td class="px-4 py-2 text-right">
-                        <button
-                          onClick={() => deleteFile(file)}
-                          class="text-sm text-red-600 hover:text-red-800 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </Show>
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  Name
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  Size
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  Modified
+                </th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <For each={files()}>
+                {(file) => (
+                  <tr 
+                    class={`hover:bg-gray-50 ${selectedFile()?.path === file.path ? 'bg-blue-50' : ''}`}
+                  >
+                    <td class="px-4 py-2">
+                      <button
+                        onClick={() => navigateToDirectory(file)}
+                        class="flex items-center space-x-2 text-left hover:text-blue-600 transition-colors"
+                      >
+                        <span class="text-gray-400">
+                          {file.is_directory ? '📁' : '📄'}
+                        </span>
+                        <span class={`${file.is_directory ? 'font-medium' : ''}`}>
+                          {file.name}
+                        </span>
+                      </button>
+                    </td>
+                    <td class="px-4 py-2 text-sm text-gray-600">
+                      {file.is_directory ? '-' : formatSize(file.size)}
+                    </td>
+                    <td class="px-4 py-2 text-sm text-gray-600">
+                      {formatDate(file.modified_at)}
+                    </td>
+                    <td class="px-4 py-2 text-right">
+                      <button
+                        onClick={() => deleteFile(file)}
+                        class="text-sm text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
         </Show>
       </div>
 
