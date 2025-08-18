@@ -96,6 +96,12 @@ pub enum Commands {
         prompt: String,
     },
 
+    /// Project management operations
+    Project {
+        #[command(subcommand)]
+        action: ProjectCommands,
+    },
+
     /// Show version information
     Version,
 }
@@ -141,6 +147,16 @@ pub enum ConfigCommands {
     Init,
 }
 
+#[derive(Debug, Subcommand)]
+pub enum ProjectCommands {
+    /// Add an existing project to the nocodo manager
+    Add {
+        /// Path to project directory (defaults to current directory)
+        #[arg(help = "Path to project directory (defaults to current directory)")]
+        path: Option<PathBuf>,
+    },
+}
+
 #[derive(Debug, Clone, clap::ValueEnum)]
 pub enum OutputFormat {
     Json,
@@ -162,6 +178,7 @@ impl Cli {
             Some(Commands::Structure { action }) => self.handle_structure(action).await,
             Some(Commands::Config { action }) => self.handle_config(action).await,
             Some(Commands::Session { tool, prompt }) => self.handle_session(tool, prompt).await,
+            Some(Commands::Project { action }) => self.handle_project(action).await,
             Some(Commands::Version) => self.handle_version().await,
             None => {
                 // No subcommand provided, show help
@@ -206,6 +223,10 @@ impl Cli {
 
     async fn handle_session(&self, tool: &str, prompt: &str) -> Result<(), CliError> {
         execute_ai_session(tool, prompt).await
+    }
+
+    async fn handle_project(&self, action: &ProjectCommands) -> Result<(), CliError> {
+        handle_project_command(action).await
     }
 
     async fn handle_version(&self) -> Result<(), CliError> {
