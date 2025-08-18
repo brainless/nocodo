@@ -1,11 +1,12 @@
-import { Component, createSignal } from 'solid-js';
+import { Component } from 'solid-js';
+import { A, Route } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
 import { WebSocketProvider, useWebSocketConnection } from './WebSocketProvider';
 
 // Connection Status Component
 const ConnectionStatus: Component = () => {
-  const { state, isConnected, error } = useWebSocketConnection();
+  const { state, error } = useWebSocketConnection();
   
   const getStatusColor = () => {
     switch (state) {
@@ -36,80 +37,82 @@ const ConnectionStatus: Component = () => {
   );
 };
 
-// Main App Component (wrapped with WebSocket provider)
-const AppContent: Component = () => {
-  const [activeView, setActiveView] = createSignal<'projects' | 'create'>('projects');
-  const [refreshKey, setRefreshKey] = createSignal(0);
-
-  const handleProjectCreated = () => {
-    setActiveView('projects');
-    setRefreshKey(prev => prev + 1);
-  };
-
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
-  };
-
+// Layout component with navigation (shared across all routes)
+const Layout: Component<{ children: any }> = (props) => {
   return (
-    <div class="min-h-screen bg-gray-50">
-      <div class="container mx-auto px-4 py-8">
-        <header class="mb-8">
-          <div class="flex justify-between items-start">
-            <div>
-              <h1 class="text-3xl font-bold text-gray-900 mb-2">nocodo Manager</h1>
-              <p class="text-gray-600">AI-assisted development environment</p>
+    <WebSocketProvider>
+      <div class="min-h-screen bg-gray-50">
+        <div class="container mx-auto px-4 py-8">
+          <header class="mb-8">
+            <div class="flex justify-between items-start">
+              <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">nocodo Manager</h1>
+                <p class="text-gray-600">AI-assisted development environment</p>
+              </div>
+              <ConnectionStatus />
             </div>
-            <ConnectionStatus />
-          </div>
-        </header>
+          </header>
 
-        <nav class="mb-8">
-          <div class="flex space-x-4">
-            <button
-              onClick={() => setActiveView('projects')}
-              class={`px-4 py-2 rounded-md font-medium transition-colors ${
-                activeView() === 'projects'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-              }`}
-            >
-              Projects
-            </button>
-            <button
-              onClick={() => setActiveView('create')}
-              class={`px-4 py-2 rounded-md font-medium transition-colors ${
-                activeView() === 'create'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-              }`}
-            >
-              Create Project
-            </button>
-          </div>
-        </nav>
+          <nav class="mb-8">
+            <div class="flex space-x-4">
+              <A
+                href="/"
+                class="px-4 py-2 rounded-md font-medium transition-colors"
+                activeClass="bg-blue-500 text-white"
+                inactiveClass="bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+                end
+              >
+                Projects
+              </A>
+              <A
+                href="/projects/create"
+                class="px-4 py-2 rounded-md font-medium transition-colors"
+                activeClass="bg-blue-500 text-white"
+                inactiveClass="bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+              >
+                Create Project
+              </A>
+            </div>
+          </nav>
 
-        <main class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {activeView() === 'projects' ? (
-            <ProjectList key={refreshKey()} onRefresh={handleRefresh} />
-          ) : (
-            <CreateProjectForm onProjectCreated={handleProjectCreated} />
-          )}
-        </main>
+          <main class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {props.children}
+          </main>
 
-        <footer class="mt-8 text-center text-sm text-gray-500">
-          <p>nocodo Manager - Minimal Web Interface</p>
-        </footer>
+          <footer class="mt-8 text-center text-sm text-gray-500">
+            <p>nocodo Manager - Minimal Web Interface</p>
+          </footer>
+        </div>
       </div>
-    </div>
+    </WebSocketProvider>
   );
 };
 
-// Root App Component with WebSocket Provider
+// Projects Page
+const ProjectsPage: Component = () => {
+  return (
+    <Layout>
+      <ProjectList />
+    </Layout>
+  );
+};
+
+// Create Project Page
+const CreateProjectPage: Component = () => {
+  return (
+    <Layout>
+      <CreateProjectForm />
+    </Layout>
+  );
+};
+
+// Root App Component - defines the routes
 const App: Component = () => {
   return (
-    <WebSocketProvider>
-      <AppContent />
-    </WebSocketProvider>
+    <>
+      <Route path="/" component={ProjectsPage} />
+      <Route path="/projects/create" component={CreateProjectPage} />
+    </>
   );
 };
 
