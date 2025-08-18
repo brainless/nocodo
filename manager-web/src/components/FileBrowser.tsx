@@ -39,9 +39,11 @@ const FileBrowser: Component<FileBrowserProps> = (props) => {
     }
   };
 
-  // Load files when component mounts or project changes
+// Load files when project id becomes available/changes
   createEffect(() => {
-    if (props.project) {
+    const projectId = props.project?.id;
+    if (projectId) {
+      // Always load root on project change
       loadFiles('');
     }
   });
