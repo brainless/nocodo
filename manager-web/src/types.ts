@@ -16,6 +16,13 @@ export interface CreateProjectRequest {
   framework?: string;
 }
 
+export interface AddExistingProjectRequest {
+  name: string;
+  path: string; // Required - must be existing directory
+  language?: string;
+  framework?: string;
+}
+
 export interface ApiError {
   error: string;
   message?: string;

@@ -1,7 +1,7 @@
 use crate::database::Database;
 use crate::error::AppError;
 use crate::models::{
-    CreateProjectRequest, Project, ProjectListResponse, ProjectResponse, ServerStatus,
+    AddExistingProjectRequest, CreateProjectRequest, Project, ProjectListResponse, ProjectResponse, ServerStatus,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -271,6 +271,85 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
 
     tracing::info!("Git repository initialized at {}", project_path.display());
     Ok(())
+}
+
+pub async fn add_existing_project(
+    data: web::Data<AppState>,
+    request: web::Json<AddExistingProjectRequest>,
+) -> Result<HttpResponse, AppError> {
+    let req = request.into_inner();
+
+    // Validate project name
+    if req.name.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Project name cannot be empty".to_string(),
+        ));
+    }
+
+    // Validate path is provided
+    if req.path.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Project path cannot be empty".to_string(),
+        ));
+    }
+
+    let project_path = Path::new(&req.path);
+
+    // Validate directory exists and is accessible
+    if !project_path.exists() {
+        return Err(AppError::InvalidRequest(format!(
+            "Project directory does not exist: {}",
+            project_path.display()
+        )));
+    }
+
+    if !project_path.is_dir() {
+        return Err(AppError::InvalidRequest(format!(
+            "Path is not a directory: {}",
+            project_path.display()
+        )));
+    }
+
+    // Convert to absolute path for consistency
+    let absolute_path = project_path
+        .canonicalize()
+        .map_err(|e| AppError::InvalidRequest(format!(
+            "Failed to resolve absolute path for {}: {}",
+            project_path.display(),
+            e
+        )))?;
+    
+    let absolute_path_str = absolute_path.to_string_lossy().to_string();
+
+    // Check if project with this path already exists in database
+    if let Ok(_existing) = data.database.get_project_by_path(&absolute_path_str) {
+        return Err(AppError::InvalidRequest(format!(
+            "Project already registered at path: {}",
+            absolute_path.display()
+        )));
+    }
+
+    // Create the project object
+    let mut project = Project::new(req.name.clone(), absolute_path_str);
+    project.language = req.language;
+    project.framework = req.framework;
+    project.status = "registered".to_string(); // Different status to distinguish from created projects
+
+    // Save to database
+    data.database.create_project(&project)?;
+
+    // Broadcast project creation via WebSocket
+    data.ws_broadcaster
+        .broadcast_project_created(project.clone());
+
+    tracing::info!(
+        "Successfully registered existing project '{}' at {}",
+        project.name,
+        project.path
+    );
+
+    let response = ProjectResponse { project };
+    Ok(HttpResponse::Created().json(response))
 }
 
 pub async fn get_templates() -> Result<HttpResponse, AppError> {
