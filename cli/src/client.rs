@@ -38,13 +38,62 @@ pub struct AiSession {
     pub ended_at: Option<i64>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateProjectRequest {
+    pub name: String,
+    pub path: Option<String>,
+    pub language: Option<String>,
+    pub framework: Option<String>,
+    pub template: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub language: Option<String>,
+    pub framework: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectResponse {
+    pub project: Project,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectTemplate {
+    pub name: String,
+    pub description: String,
+    pub language: String,
+    pub framework: Option<String>,
+    pub files: Vec<TemplateFile>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TemplateFile {
+    pub path: String,
+    pub content: String,
+    pub executable: bool,
+}
+
 pub struct ManagerClient {
     socket_path: String,
+    http_client: reqwest::Client,
+    manager_url: String,
 }
 
 impl ManagerClient {
-    pub fn new(socket_path: String) -> Self {
-        Self { socket_path }
+    pub fn new(socket_path: String, manager_url: Option<String>) -> Self {
+        let manager_url = manager_url.unwrap_or_else(|| "http://localhost:8081".to_string());
+        Self { 
+            socket_path,
+            http_client: reqwest::Client::new(),
+            manager_url,
+        }
     }
 
     pub async fn send_request(&self, request: SocketRequest) -> Result<SocketResponse, CliError> {
@@ -188,6 +237,82 @@ impl ManagerClient {
             SocketResponse::Error { message } => {
                 error!("Failed to fail AI session: {}", message);
                 Err(CliError::Communication(format!("Manager error: {}", message)))
+            }
+        }
+    }
+    
+    // HTTP API methods
+    
+    pub async fn create_project(&self, request: CreateProjectRequest) -> Result<Project, CliError> {
+        info!("Creating project '{}' via HTTP API", request.name);
+        
+        let url = format!("{}/api/projects", self.manager_url);
+        debug!("POST {}", url);
+        
+        let response = self.http_client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {}", e)))?;
+            
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!("HTTP {} error: {}", status, error_text)));
+        }
+        
+        let project_response: ProjectResponse = response.json().await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+            
+        info!("Project '{}' created successfully at {}", project_response.project.name, project_response.project.path);
+        Ok(project_response.project)
+    }
+    
+    pub async fn get_templates(&self) -> Result<Vec<ProjectTemplate>, CliError> {
+        info!("Fetching available templates via HTTP API");
+        
+        let url = format!("{}/api/templates", self.manager_url);
+        debug!("GET {}", url);
+        
+        let response = self.http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {}", e)))?;
+            
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!("HTTP {} error: {}", status, error_text)));
+        }
+        
+        let templates: Vec<ProjectTemplate> = response.json().await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+            
+        info!("Fetched {} templates", templates.len());
+        Ok(templates)
+    }
+    
+    pub async fn check_manager_status(&self) -> Result<bool, CliError> {
+        let url = format!("{}/api/health", self.manager_url);
+        debug!("Checking Manager daemon status at: {}", url);
+        
+        match self.http_client.get(&url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    debug!("Manager daemon is responsive");
+                    Ok(true)
+                } else {
+                    debug!("Manager daemon returned error status: {}", response.status());
+                    Ok(false)
+                }
+            }
+            Err(e) => {
+                debug!("Failed to connect to Manager daemon: {}", e);
+                Ok(false)
             }
         }
     }

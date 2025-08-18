@@ -44,6 +44,7 @@ pub struct CreateProjectRequest {
     pub path: Option<String>,
     pub language: Option<String>,
     pub framework: Option<String>,
+    pub template: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
