@@ -10,10 +10,10 @@ const ProjectFilesPage: Component = () => {
   const navigate = useNavigate();
   const [project, setProject] = createSignal<Project | null>(null);
   const [selectedFile, setSelectedFile] = createSignal<FileInfo | null>(null);
-  const [loading, setLoading] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
-  // Load project details
+  // Optionally load project details for display name, but don't block UI
   onMount(async () => {
     const projectId = params.id;
     if (!projectId) {
@@ -42,54 +42,21 @@ const ProjectFilesPage: Component = () => {
     setSelectedFile(null);
   };
 
-  if (loading()) {
-    return (
-      <div class="flex items-center justify-center min-h-64">
-        <div class="text-center text-gray-500">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
-          Loading project...
-        </div>
-      </div>
-    );
-  }
-
-  if (error()) {
-    return (
-      <div class="bg-red-50 border border-red-200 rounded-md p-4">
-        <div class="flex items-center justify-between">
-          <p class="text-sm text-red-600">{error()}</p>
-          <button
-            onClick={() => navigate('/')}
-            class="text-sm text-red-800 hover:text-red-900 underline"
-          >
-            ← Back to Projects
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!project()) {
-    return (
-      <div class="text-center text-gray-500">
-        <p>Project not found</p>
-        <button
-          onClick={() => navigate('/')}
-          class="mt-2 text-blue-600 hover:text-blue-800 underline"
-        >
-          ← Back to Projects
-        </button>
-      </div>
-    );
-  }
-
+  // Render immediately; show error banner if needed
   return (
     <div class="space-y-6">
+      {/* Optional error banner */}
+      <Show when={error()}>
+        <div class="bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md p-3 text-sm">
+          {error()}
+        </div>
+      </Show>
+
       {/* Header */}
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">
-            {project()!.name}
+            {project()?.name || params.id}
           </h1>
           <p class="text-sm text-gray-600 mt-1">
             Project files and editor
@@ -107,7 +74,8 @@ const ProjectFilesPage: Component = () => {
         {/* File Browser */}
         <div class="border border-gray-200 rounded-lg p-4 overflow-hidden flex flex-col">
           <FileBrowser 
-            project={project()!}
+            projectId={params.id}
+            projectName={project()?.name}
             onFileSelect={handleFileSelect}
           />
         </div>
