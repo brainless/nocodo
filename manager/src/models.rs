@@ -139,3 +139,59 @@ pub struct AddExistingProjectRequest {
     pub language: Option<String>,
     pub framework: Option<String>,
 }
+
+// File operation models
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileInfo {
+    pub name: String,
+    pub path: String,
+    pub is_directory: bool,
+    pub size: Option<u64>,
+    pub modified_at: Option<i64>,
+    pub created_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileListRequest {
+    pub project_id: Option<String>,
+    pub path: Option<String>, // Relative path within project, defaults to root
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileListResponse {
+    pub files: Vec<FileInfo>,
+    pub current_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileCreateRequest {
+    pub project_id: String,
+    pub path: String, // Relative path within project
+    pub content: Option<String>, // None for directories
+    pub is_directory: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileUpdateRequest {
+    pub project_id: String,
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileContentResponse {
+    pub path: String,
+    pub content: String,
+    pub modified_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileResponse {
+    pub file: FileInfo,
+}
