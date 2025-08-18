@@ -48,6 +48,14 @@ pub struct CreateProjectRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct AddExistingProjectRequest {
+    pub name: String,
+    pub path: String, // Required - must be existing directory
+    pub language: Option<String>,
+    pub framework: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
     pub id: String,
     pub name: String,
@@ -303,6 +311,44 @@ impl ManagerClient {
 
         info!(
             "Project '{}' created successfully at {}",
+            project_response.project.name, project_response.project.path
+        );
+        Ok(project_response.project)
+    }
+
+    pub async fn add_existing_project(&self, request: AddExistingProjectRequest) -> Result<Project, CliError> {
+        info!("Adding existing project '{}' via HTTP API", request.name);
+
+        let url = format!("{}/api/projects/add-existing", self.manager_url);
+        debug!("POST {}", url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {} error: {}",
+                status, error_text
+            )));
+        }
+
+        let project_response: ProjectResponse = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+
+        info!(
+            "Existing project '{}' registered successfully at {}",
             project_response.project.name, project_response.project.path
         );
         Ok(project_response.project)
