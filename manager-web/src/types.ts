@@ -52,3 +52,45 @@ export interface WebSocketClient {
   onStateChange(callback: (state: WebSocketConnectionState) => void): void;
   getState(): WebSocketConnectionState;
 }
+
+// File operation types
+export interface FileInfo {
+  name: string;
+  path: string;
+  is_directory: boolean;
+  size?: number;
+  modified_at?: number;
+  created_at?: number;
+}
+
+export interface FileListRequest {
+  project_id?: string;
+  path?: string; // Relative path within project, defaults to root
+}
+
+export interface FileListResponse {
+  files: FileInfo[];
+  current_path: string;
+}
+
+export interface FileCreateRequest {
+  project_id: string;
+  path: string; // Relative path within project
+  content?: string; // None for directories
+  is_directory: boolean;
+}
+
+export interface FileUpdateRequest {
+  project_id: string;
+  content: string;
+}
+
+export interface FileContentResponse {
+  path: string;
+  content: string;
+  modified_at?: number;
+}
+
+export interface FileResponse {
+  file: FileInfo;
+}

@@ -1,4 +1,14 @@
-import { Project, CreateProjectRequest, ApiError } from './types';
+import { 
+  Project, 
+  CreateProjectRequest, 
+  ApiError, 
+  FileListRequest,
+  FileListResponse,
+  FileCreateRequest,
+  FileUpdateRequest,
+  FileContentResponse,
+  FileResponse
+} from './types';
 
 class ApiClient {
   private baseURL = '/api';
@@ -33,6 +43,11 @@ class ApiClient {
     return response.projects;
   }
   
+  async fetchProject(id: string): Promise<Project> {
+    const response = await this.request<{project: Project}>(`/projects/${id}`);
+    return response.project;
+  }
+  
   async createProject(data: CreateProjectRequest): Promise<Project> {
     return this.request('/projects', {
       method: 'POST',
@@ -42,6 +57,47 @@ class ApiClient {
   
   async deleteProject(id: string): Promise<void> {
     return this.request(`/projects/${id}`, {
+      method: 'DELETE',
+    });
+  }
+  
+  // File operations
+  async listFiles(params: FileListRequest): Promise<FileListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params.project_id) queryParams.set('project_id', params.project_id);
+    if (params.path) queryParams.set('path', params.path);
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/files${queryString ? '?' + queryString : ''}`;
+    return this.request<FileListResponse>(endpoint);
+  }
+  
+  async createFile(data: FileCreateRequest): Promise<FileResponse> {
+    return this.request('/files', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+  
+  async getFileContent(filePath: string, projectId: string): Promise<FileContentResponse> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('project_id', projectId);
+    
+    return this.request<FileContentResponse>(`/files/${encodeURIComponent(filePath)}?${queryParams.toString()}`);
+  }
+  
+  async updateFile(filePath: string, data: FileUpdateRequest): Promise<FileContentResponse> {
+    return this.request(`/files/${encodeURIComponent(filePath)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+  
+  async deleteFile(filePath: string, projectId: string): Promise<void> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('project_id', projectId);
+    
+    return this.request(`/files/${encodeURIComponent(filePath)}?${queryParams.toString()}`, {
       method: 'DELETE',
     });
   }
