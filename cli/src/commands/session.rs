@@ -17,7 +17,7 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     
     // Use default socket path for now - could be made configurable
     let socket_path = "/tmp/nocodo-manager.sock".to_string();
-    let client = ManagerClient::new(socket_path);
+    let client = ManagerClient::new(socket_path, None);
 
     // Create AI session with Manager daemon
     let session = match client.create_ai_session(
