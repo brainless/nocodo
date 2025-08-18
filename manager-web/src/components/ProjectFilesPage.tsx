@@ -23,14 +23,7 @@ const ProjectFilesPage: Component = () => {
 
     try {
       setLoading(true);
-      const response = await apiClient.fetchProjects();
-      const proj = response.find(p => p.id === projectId);
-      
-      if (!proj) {
-        setError('Project not found');
-        return;
-      }
-      
+      const proj = await apiClient.fetchProject(projectId);
       setProject(proj);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load project');
