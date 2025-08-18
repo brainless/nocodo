@@ -1,4 +1,5 @@
 import { Component, createSignal, onMount, createEffect } from 'solid-js';
+import { A } from '@solidjs/router';
 import { Project, WebSocketMessage } from '../types';
 import { apiClient } from '../api';
 import { useWebSocket } from '../WebSocketProvider';
@@ -150,13 +151,21 @@ const ProjectList: Component<ProjectListProps> = (props) => {
                     Created: {new Date(project.created_at * 1000).toLocaleDateString()}
                   </p>
                 </div>
-                <button
-                  onClick={() => deleteProject(project.id)}
-                  class="text-red-500 hover:text-red-700 text-sm"
-                  title="Delete project"
-                >
-                  Delete
-                </button>
+                <div class="flex flex-col space-y-2">
+                  <A
+                    href={`/projects/${project.id}/files`}
+                    class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-center"
+                  >
+                    Files
+                  </A>
+                  <button
+                    onClick={() => deleteProject(project.id)}
+                    class="px-3 py-1 text-sm text-red-500 hover:text-red-700 border border-red-500 hover:border-red-700 rounded transition-colors"
+                    title="Delete project"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))}
