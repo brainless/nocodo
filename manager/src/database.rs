@@ -150,6 +150,38 @@ impl Database {
         Ok(project)
     }
 
+    pub fn get_project_by_path(&self, path: &str) -> AppResult<Project> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, name, path, language, framework, status, created_at, updated_at 
+             FROM projects WHERE path = ?",
+        )?;
+
+        let project = stmt
+            .query_row([path], |row| {
+                Ok(Project {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    path: row.get(2)?,
+                    language: row.get(3)?,
+                    framework: row.get(4)?,
+                    status: row.get(5)?,
+                    created_at: row.get(6)?,
+                    updated_at: row.get(7)?,
+                })
+            })
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => AppError::ProjectNotFound(format!("No project found at path: {}", path)),
+                _ => AppError::Database(e),
+            })?;
+
+        Ok(project)
+    }
+
     pub fn create_project(&self, project: &Project) -> AppResult<()> {
         let conn = self
             .connection
