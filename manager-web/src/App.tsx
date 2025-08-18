@@ -2,6 +2,7 @@ import { Component } from 'solid-js';
 import { A, Route } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
+import ProjectFilesPage from './components/ProjectFilesPage';
 import { WebSocketProvider, useWebSocketConnection } from './WebSocketProvider';
 
 // Connection Status Component
@@ -106,12 +107,26 @@ const CreateProjectPage: Component = () => {
   );
 };
 
+// Files Page (without layout since it has its own)
+const FilesPageWrapper: Component = () => {
+  return (
+    <WebSocketProvider>
+      <div class="min-h-screen bg-gray-50">
+        <div class="container mx-auto px-4 py-8">
+          <ProjectFilesPage />
+        </div>
+      </div>
+    </WebSocketProvider>
+  );
+};
+
 // Root App Component - defines the routes
 const App: Component = () => {
   return (
     <>
       <Route path="/" component={ProjectsPage} />
       <Route path="/projects/create" component={CreateProjectPage} />
+      <Route path="/projects/:id/files" component={FilesPageWrapper} />
     </>
   );
 };

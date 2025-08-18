@@ -77,7 +77,13 @@ async fn main() -> AppResult<()> {
                         .route("/projects/add-existing", web::post().to(handlers::add_existing_project))
                         .route("/projects/{id}", web::get().to(handlers::get_project))
                         .route("/projects/{id}", web::delete().to(handlers::delete_project))
-                        .route("/templates", web::get().to(handlers::get_templates)),
+                        .route("/templates", web::get().to(handlers::get_templates))
+                        // File operation endpoints
+                        .route("/files", web::get().to(handlers::list_files))
+                        .route("/files", web::post().to(handlers::create_file))
+                        .route("/files/{path:.*}", web::get().to(handlers::get_file_content))
+                        .route("/files/{path:.*}", web::put().to(handlers::update_file))
+                        .route("/files/{path:.*}", web::delete().to(handlers::delete_file)),
                 )
                 // WebSocket endpoint
                 .route("/ws", web::get().to(websocket::websocket_handler))
