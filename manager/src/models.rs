@@ -30,7 +30,7 @@ impl Project {
             updated_at: now,
         }
     }
-    
+
     #[allow(dead_code)]
     pub fn update_timestamp(&mut self) {
         self.updated_at = Utc::now().timestamp();
@@ -82,10 +82,10 @@ pub struct AiSession {
 
 impl AiSession {
     pub fn new(
-        project_id: Option<String>, 
-        tool_name: String, 
+        project_id: Option<String>,
+        tool_name: String,
         prompt: String,
-        project_context: Option<String>
+        project_context: Option<String>,
     ) -> Self {
         let now = Utc::now().timestamp();
         Self {
@@ -99,12 +99,12 @@ impl AiSession {
             ended_at: None,
         }
     }
-    
+
     pub fn complete(&mut self) {
         self.status = "completed".to_string();
         self.ended_at = Some(Utc::now().timestamp());
     }
-    
+
     pub fn fail(&mut self) {
         self.status = "failed".to_string();
         self.ended_at = Some(Utc::now().timestamp());

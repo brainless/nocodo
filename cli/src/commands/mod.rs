@@ -1,5 +1,5 @@
 //! Command implementations for the nocodo CLI
-//! 
+//!
 //! This module contains the actual implementation of CLI commands,
 //! organized by functionality for better maintainability.
 

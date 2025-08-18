@@ -7,24 +7,30 @@ use tracing::{debug, error, info, warn};
 
 /// Execute an AI coding session with enhanced context
 pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError> {
-    info!("Starting AI session with tool: {} and prompt: {}", tool, prompt);
+    info!(
+        "Starting AI session with tool: {} and prompt: {}",
+        tool, prompt
+    );
 
     // Get current working directory as project path
     let project_path = env::current_dir()
         .map_err(|e| CliError::Command(format!("Failed to get current directory: {}", e)))?
         .to_string_lossy()
         .to_string();
-    
+
     // Use default socket path for now - could be made configurable
     let socket_path = "/tmp/nocodo-manager.sock".to_string();
     let client = ManagerClient::new(socket_path, None);
 
     // Create AI session with Manager daemon
-    let session = match client.create_ai_session(
-        tool.to_string(),
-        prompt.to_string(),
-        Some(project_path.clone())
-    ).await {
+    let session = match client
+        .create_ai_session(
+            tool.to_string(),
+            prompt.to_string(),
+            Some(project_path.clone()),
+        )
+        .await
+    {
         Ok(session) => {
             info!("Created AI session: {}", session.id);
             session
@@ -32,7 +38,7 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
         Err(e) => {
             warn!("Failed to create AI session with Manager: {}", e);
             warn!("Proceeding without Manager integration");
-            
+
             // For now, continue without Manager integration during development
             // Create a mock session for logging purposes
             use crate::client::AiSession;
@@ -73,11 +79,14 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     );
 
     info!("Executing {} with enhanced context", tool);
-    debug!("Enhanced prompt length: {} characters", enhanced_prompt.len());
+    debug!(
+        "Enhanced prompt length: {} characters",
+        enhanced_prompt.len()
+    );
 
     // Execute the AI tool with the enhanced prompt
     let result = execute_ai_tool(tool, &enhanced_prompt).await;
-    
+
     // Mark session as completed or failed based on result
     match result {
         Ok(()) => {
@@ -101,7 +110,7 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
     // Map tool names to actual commands
     let command = match tool.to_lowercase().as_str() {
         "claude" | "claude-code" => "claude",
-        "gemini" | "gemini-cli" => "gemini", 
+        "gemini" | "gemini-cli" => "gemini",
         "openai" | "openai-cli" => "openai",
         _ => {
             // Try to use the tool name directly
@@ -123,16 +132,14 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
 
     if !tool_available {
         return Err(CliError::Command(format!(
-            "AI tool '{}' not found. Please ensure it's installed and in your PATH.", 
+            "AI tool '{}' not found. Please ensure it's installed and in your PATH.",
             command
         )));
     }
 
     // Create a temporary file for the prompt
     let temp_dir = env::temp_dir();
-    let prompt_file = temp_dir.join(format!("nocodo_prompt_{}.txt", 
-        std::process::id()
-    ));
+    let prompt_file = temp_dir.join(format!("nocodo_prompt_{}.txt", std::process::id()));
 
     // Write prompt to temporary file
     std::fs::write(&prompt_file, prompt)
@@ -142,7 +149,7 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
 
     // Execute the AI tool with different approaches based on the tool
     let mut cmd = Command::new(command);
-    
+
     match tool.to_lowercase().as_str() {
         "claude" | "claude-code" => {
             // Claude CLI accepts prompts directly as arguments
@@ -175,9 +182,8 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
     } else {
         let exit_code = status.code().unwrap_or(-1);
         Err(CliError::Command(format!(
-            "AI tool '{}' failed with exit code: {}", 
-            command, 
-            exit_code
+            "AI tool '{}' failed with exit code: {}",
+            command, exit_code
         )))
     }
 }
