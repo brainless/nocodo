@@ -29,7 +29,8 @@ class ApiClient {
   }
 
   async fetchProjects(): Promise<Project[]> {
-    return this.request('/projects');
+    const response = await this.request<{projects: Project[]}>('/projects');
+    return response.projects;
   }
   
   async createProject(data: CreateProjectRequest): Promise<Project> {
