@@ -1,7 +1,7 @@
 use actix_web::{test, web, App};
 use nocodo_manager::{
     database::Database,
-    handlers::{AppState, create_project, get_projects, health_check},
+    handlers::{create_project, get_projects, health_check, AppState},
     models::CreateProjectRequest,
 };
 use std::sync::Arc;
@@ -13,7 +13,7 @@ async fn test_health_check() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
-    
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
@@ -22,13 +22,11 @@ async fn test_health_check() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/health", web::get().to(health_check))
+            .route("/api/health", web::get().to(health_check)),
     )
     .await;
 
-    let req = test::TestRequest::get()
-        .uri("/api/health")
-        .to_request();
+    let req = test::TestRequest::get().uri("/api/health").to_request();
 
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
@@ -44,7 +42,7 @@ async fn test_get_projects_empty() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
-    
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
@@ -53,13 +51,11 @@ async fn test_get_projects_empty() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/projects", web::get().to(get_projects))
+            .route("/api/projects", web::get().to(get_projects)),
     )
     .await;
 
-    let req = test::TestRequest::get()
-        .uri("/api/projects")
-        .to_request();
+    let req = test::TestRequest::get().uri("/api/projects").to_request();
 
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
@@ -73,7 +69,7 @@ async fn test_create_project() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
-    
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
@@ -82,7 +78,7 @@ async fn test_create_project() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/projects", web::post().to(create_project))
+            .route("/api/projects", web::post().to(create_project)),
     )
     .await;
 
@@ -104,7 +100,7 @@ async fn test_create_project() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let project = &body["project"];
-    
+
     assert_eq!(project["name"], "test-project");
     assert_eq!(project["path"], "/tmp/test-project");
     assert_eq!(project["language"], "rust");
@@ -120,7 +116,7 @@ async fn test_create_project_with_default_path() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
-    
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
@@ -129,7 +125,7 @@ async fn test_create_project_with_default_path() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/projects", web::post().to(create_project))
+            .route("/api/projects", web::post().to(create_project)),
     )
     .await;
 
@@ -150,12 +146,15 @@ async fn test_create_project_with_default_path() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let project = &body["project"];
-    
+
     assert_eq!(project["name"], "default-path-project");
     assert_eq!(project["language"], "javascript");
     assert!(project["framework"].is_null());
     // Path should contain the project name
-    assert!(project["path"].as_str().unwrap().contains("default-path-project"));
+    assert!(project["path"]
+        .as_str()
+        .unwrap()
+        .contains("default-path-project"));
 }
 
 #[actix_rt::test]
@@ -163,7 +162,7 @@ async fn test_create_project_invalid_name() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
-    
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
@@ -172,7 +171,7 @@ async fn test_create_project_invalid_name() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/projects", web::post().to(create_project))
+            .route("/api/projects", web::post().to(create_project)),
     )
     .await;
 
@@ -193,7 +192,10 @@ async fn test_create_project_invalid_name() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["error"], "invalid_request");
-    assert!(body["message"].as_str().unwrap().contains("Project name cannot be empty"));
+    assert!(body["message"]
+        .as_str()
+        .unwrap()
+        .contains("Project name cannot be empty"));
 }
 
 #[actix_rt::test]
@@ -201,7 +203,7 @@ async fn test_get_projects_after_creation() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
-    
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
@@ -211,7 +213,7 @@ async fn test_get_projects_after_creation() {
         App::new()
             .app_data(app_state)
             .route("/api/projects", web::get().to(get_projects))
-            .route("/api/projects", web::post().to(create_project))
+            .route("/api/projects", web::post().to(create_project)),
     )
     .await;
 
@@ -232,9 +234,7 @@ async fn test_get_projects_after_creation() {
     assert!(resp.status().is_success());
 
     // Now test getting projects
-    let req = test::TestRequest::get()
-        .uri("/api/projects")
-        .to_request();
+    let req = test::TestRequest::get().uri("/api/projects").to_request();
 
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
@@ -242,7 +242,7 @@ async fn test_get_projects_after_creation() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let projects = body["projects"].as_array().unwrap();
     assert_eq!(projects.len(), 1);
-    
+
     let project = &projects[0];
     assert_eq!(project["name"], "list-test-project");
     assert_eq!(project["language"], "python");

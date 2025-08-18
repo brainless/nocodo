@@ -1,7 +1,7 @@
 use crate::error::{AppError, AppResult};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -28,7 +28,7 @@ impl TemplateManager {
     pub fn new() -> Self {
         Self
     }
-    
+
     pub fn get_available_templates() -> Vec<ProjectTemplate> {
         vec![
             Self::rust_web_api_template(),
@@ -36,32 +36,35 @@ impl TemplateManager {
             Self::static_site_template(),
         ]
     }
-    
+
     pub fn get_template(name: &str) -> AppResult<ProjectTemplate> {
         match name {
             "rust-web-api" => Ok(Self::rust_web_api_template()),
             "node-web-app" => Ok(Self::node_web_app_template()),
             "static-site" => Ok(Self::static_site_template()),
-            _ => Err(AppError::InvalidRequest(format!("Unknown template: {}", name))),
+            _ => Err(AppError::InvalidRequest(format!(
+                "Unknown template: {}",
+                name
+            ))),
         }
     }
-    
+
     pub fn apply_template(template: &ProjectTemplate, project_path: &Path) -> AppResult<()> {
         // Create the project directory
         fs::create_dir_all(project_path)?;
-        
+
         // Create all template files
         for file in &template.files {
             let file_path = project_path.join(&file.path);
-            
+
             // Create parent directories if needed
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            
+
             // Write the file content
             fs::write(&file_path, &file.content)?;
-            
+
             // Set executable permissions if needed
             #[cfg(unix)]
             if file.executable {
@@ -71,11 +74,15 @@ impl TemplateManager {
                 fs::set_permissions(&file_path, perms)?;
             }
         }
-        
-        tracing::info!("Applied template {} to {}", template.name, project_path.display());
+
+        tracing::info!(
+            "Applied template {} to {}",
+            template.name,
+            project_path.display()
+        );
         Ok(())
     }
-    
+
     fn rust_web_api_template() -> ProjectTemplate {
         ProjectTemplate {
             name: "rust-web-api".to_string(),
@@ -100,7 +107,8 @@ ts-rs = "7.1"
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -146,7 +154,8 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -157,7 +166,8 @@ async fn main() -> std::io::Result<()> {
 *.db
 *.sqlite
 .DS_Store
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -187,13 +197,14 @@ cargo run
 cargo install cargo-watch
 cargo watch -x run
 ```
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
             ],
         }
     }
-    
+
     fn node_web_app_template() -> ProjectTemplate {
         ProjectTemplate {
             name: "node-web-app".to_string(),
@@ -228,7 +239,8 @@ cargo watch -x run
     "nodemon": "^3.0.2"
   }
 }
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -248,7 +260,8 @@ cargo watch -x run
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -285,7 +298,8 @@ app.get('/health', (req: Request, res: Response) => {
 app.listen(PORT, () => {
   console.log(`{{project_name}} server running on http://localhost:${PORT}`);
 });
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -298,7 +312,8 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -333,13 +348,14 @@ npm run build
 # Start production server
 npm start
 ```
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
             ],
         }
     }
-    
+
     fn static_site_template() -> ProjectTemplate {
         ProjectTemplate {
             name: "static-site".to_string(),
@@ -378,7 +394,8 @@ npm start
     <script src="script.js"></script>
 </body>
 </html>
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -464,7 +481,8 @@ footer {
     bottom: 0;
     width: 100%;
 }
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -496,7 +514,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -505,7 +524,8 @@ document.addEventListener('DOMContentLoaded', function() {
 Thumbs.db
 *.log
 .env
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
                 TemplateFile {
@@ -542,7 +562,8 @@ php -S localhost:8000
 - Modern CSS styling
 - Interactive JavaScript
 - Clean, semantic HTML structure
-"#.to_string(),
+"#
+                    .to_string(),
                     executable: false,
                 },
             ],
