@@ -17,6 +17,8 @@ pub enum SocketRequest {
     GetProjectByPath { project_path: String },
     CompleteAiSession { session_id: String },
     FailAiSession { session_id: String },
+    // New: record one-shot AI output for a session
+    RecordAiOutput { session_id: String, output: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -236,6 +238,30 @@ impl SocketServer {
                         SocketResponse::Error {
                             message: format!("Session not found: {}", session_id),
                         }
+                    }
+                }
+            }
+
+            SocketRequest::RecordAiOutput { session_id, output } => {
+                info!("Recording AI output for session: {} ({} bytes)", session_id, output.len());
+
+                // Ensure session exists
+                match database.get_ai_session_by_id(&session_id) {
+                    Ok(_session) => {
+                        match database.create_ai_session_output(&session_id, &output) {
+                            Ok(()) => {
+                                let data = serde_json::json!({ "ok": true, "session_id": session_id });
+                                SocketResponse::Success { data }
+                            }
+                            Err(e) => {
+                                error!("Failed to record AI output: {}", e);
+                                SocketResponse::Error { message: format!("Failed to record output: {}", e) }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("AI session not found for recording output: {}", e);
+                        SocketResponse::Error { message: format!("Session not found: {}", session_id) }
                     }
                 }
             }
