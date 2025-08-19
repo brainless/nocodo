@@ -85,10 +85,10 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     );
 
     // Execute the AI tool with the enhanced prompt and capture output
-    let run_result = execute_ai_tool(tool, enhanced_prompt).await;
+    let run_result = execute_ai_tool(tool, &enhanced_prompt).await;
 
     // Build payload with actual captured stdout/stderr when available
-    let (payload, status_ok) = match run_result {
+    let (payload, status_ok) = match run_result {
         Ok(run) => {
             // Echo outputs to terminal (already handled inside execute_ai_tool previously; do it here now)
             if !run.stdout.is_empty() {
@@ -152,7 +152,7 @@ struct ToolRun {
     success: bool,
 }
 
-async fn execute_ai_tool(tool: , prompt: ) -> Result<ToolRun, CliError> {
+async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<ToolRun, CliError> {
     // Map tool names to actual commands
     let command = match tool.to_lowercase().as_str() {
         "claude" | "claude-code" => "claude",
@@ -223,8 +223,8 @@ async fn execute_ai_tool(tool: , prompt: ) -> Result<ToolRun, CliError> {
     }
 
     // Convert outputs to strings for capture
-    let stdout_str = String::from_utf8_lossy(output.stdout).to_string();
-    let stderr_str = String::from_utf8_lossy(output.stderr).to_string();
+    let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
 
     let success = output.status.success();
     let exit_code = output.status.code();
