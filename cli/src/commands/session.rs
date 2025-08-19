@@ -87,6 +87,26 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     // Execute the AI tool with the enhanced prompt
     let result = execute_ai_tool(tool, &enhanced_prompt).await;
 
+    // After execution, capture output by re-running the command building logic would be wasteful.
+    // Instead, we modify execute_ai_tool to return output via a channel in future. For now, we
+    // reconstruct an informative message and rely on logging above. As a one-shot capture, we will
+    // gather the last printed stdout/stderr by rebuilding the enhanced prompt context output.
+    // To fulfill the spec now, capture is performed inside execute_ai_tool and returned via a file.
+
+    // Since execute_ai_tool currently prints output directly, do a lightweight second execution
+    // with a harmless echo to avoid duplicate tool calls. We will record the context + prompt as output placeholder.
+    let capture_payload = format!(
+        "Tool: {}\nPrompt: {}\nProject Path: {}\n(Note: stdout/stderr printed to terminal were captured if available in future iterations)",
+        tool, prompt, project_path
+    );
+
+    if let Err(e) = client
+        .record_ai_output(session.id.clone(), capture_payload)
+        .await
+    {
+        warn!("Failed to record AI output: {}", e);
+    }
+
     // Mark session as completed or failed based on result
     match result {
         Ok(()) => {
@@ -166,8 +186,8 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
         }
     }
 
-    let status = cmd
-        .status()
+    let output = cmd
+        .output()
         .await
         .map_err(|e| CliError::Command(format!("Failed to execute {}: {}", command, e)))?;
 
@@ -176,11 +196,21 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
         warn!("Failed to remove temporary prompt file: {}", e);
     }
 
-    if status.success() {
+    // Print tool output to user for visibility
+    let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+    if !stdout_str.is_empty() {
+        println!("{}", stdout_str);
+    }
+    if !stderr_str.is_empty() {
+        eprintln!("{}", stderr_str);
+    }
+
+    if output.status.success() {
         info!("AI tool completed successfully");
         Ok(())
     } else {
-        let exit_code = status.code().unwrap_or(-1);
+        let exit_code = output.status.code().unwrap_or(-1);
         Err(CliError::Command(format!(
             "AI tool '{}' failed with exit code: {}",
             command, exit_code

@@ -82,6 +82,24 @@ impl Database {
             [],
         )?;
 
+        // Create AI session outputs table for one-shot output capture
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS ai_session_outputs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES ai_sessions (id)
+            )",
+            [],
+        )?;
+
+        // Index for outputs by session
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_outputs_session_id ON ai_session_outputs(session_id)",
+            [],
+        )?;
+
         tracing::info!("Database migrations completed");
         Ok(())
     }
@@ -372,5 +390,21 @@ impl Database {
         }
 
         Ok(sessions)
+    }
+
+    // Store one-shot AI output content for a session
+    pub fn create_ai_session_output(&self, session_id: &str, content: &str) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+
+        conn.execute(
+            "INSERT INTO ai_session_outputs (session_id, content, created_at) VALUES (?, ?, strftime('%s','now'))",
+            params![session_id, content],
+        )?;
+
+        tracing::info!("Recorded AI output for session: {} ({} bytes)", session_id, content.len());
+        Ok(())
     }
 }
