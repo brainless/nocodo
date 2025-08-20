@@ -6,6 +6,11 @@ use tracing::{debug, error, info};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SocketRequest {
+    // Health and identity
+    Ping,
+    Identify { client_id: String, token: Option<String> },
+
+    // Sessions and project context
     CreateAiSession(CreateAiSessionRequest),
     GetProjectContext { project_path: String },
     GetProjectByPath { project_path: String },
@@ -103,6 +108,22 @@ impl ManagerClient {
             socket_path,
             http_client: reqwest::Client::new(),
             manager_url,
+        }
+    }
+
+    pub async fn ping(&self) -> Result<bool, CliError> {
+        let request = SocketRequest::Ping;
+        match self.send_request(request).await? {
+            SocketResponse::Success { data } => Ok(data.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)),
+            SocketResponse::Error { .. } => Ok(false),
+        }
+    }
+
+    pub async fn identify(&self, client_id: String, token: Option<String>) -> Result<serde_json::Value, CliError> {
+        let request = SocketRequest::Identify { client_id, token };
+        match self.send_request(request).await? {
+            SocketResponse::Success { data } => Ok(data),
+            SocketResponse::Error { message } => Err(CliError::Communication(format!("Manager error: {}", message))),
         }
     }
 

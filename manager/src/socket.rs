@@ -9,9 +9,16 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
+use std::fs::Permissions;
+use std::os::unix::fs::PermissionsExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SocketRequest {
+    // Health and identity
+    Ping,
+    Identify { client_id: String, token: Option<String> },
+
+    // Sessions and project context
     CreateAiSession(CreateAiSessionRequest),
     GetProjectContext { project_path: String },
     GetProjectByPath { project_path: String },
@@ -41,6 +48,11 @@ impl SocketServer {
 
         let listener = UnixListener::bind(socket_path)
             .map_err(|e| AppError::Internal(format!("Failed to bind Unix socket: {}", e)))?;
+
+        // Restrict socket permissions to 600 (owner read/write)
+        if let Err(e) = std::fs::set_permissions(socket_path, Permissions::from_mode(0o600)) {
+            warn!("Failed to set socket permissions on {}: {}", socket_path, e);
+        }
 
         info!("Unix socket server listening on: {}", socket_path);
 
@@ -111,6 +123,21 @@ impl SocketServer {
 
     async fn process_request(request: SocketRequest, database: &Database) -> SocketResponse {
         match request {
+            SocketRequest::Ping => {
+                let data = serde_json::json!({ "ok": true });
+                SocketResponse::Success { data }
+            }
+
+            SocketRequest::Identify { client_id, token } => {
+                info!("Client identified: {}", client_id);
+                // For MVP: accept any token if provided; log presence
+                let data = serde_json::json!({
+                    "client_id": client_id,
+                    "authenticated": token.is_some(),
+                });
+                SocketResponse::Success { data }
+            }
+
             SocketRequest::CreateAiSession(req) => {
                 info!("Creating AI session for tool: {}", req.tool_name);
 
