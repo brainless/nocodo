@@ -83,7 +83,13 @@ async fn main() -> AppResult<()> {
                         .route("/files", web::post().to(handlers::create_file))
                         .route("/files/{path:.*}", web::get().to(handlers::get_file_content))
                         .route("/files/{path:.*}", web::put().to(handlers::update_file))
-                        .route("/files/{path:.*}", web::delete().to(handlers::delete_file)),
+                        .route("/files/{path:.*}", web::delete().to(handlers::delete_file))
+                        // AI session endpoints
+                        .route("/ai/sessions", web::post().to(handlers::create_ai_session))
+                        .route("/ai/sessions", web::get().to(handlers::list_ai_sessions))
+                        .route("/ai/sessions/{id}", web::get().to(handlers::get_ai_session))
+                        .route("/ai/sessions/{id}/outputs", web::post().to(handlers::record_ai_output))
+                        .route("/ai/sessions/{id}/outputs", web::get().to(handlers::list_ai_outputs)),
                 )
                 // WebSocket endpoint
                 .route("/ws", web::get().to(websocket::websocket_handler))

@@ -131,6 +131,27 @@ pub struct AiSessionListResponse {
     pub sessions: Vec<AiSession>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiSessionOutput {
+    pub id: i64,
+    pub session_id: String,
+    pub content: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiSessionOutputListResponse {
+    pub outputs: Vec<AiSessionOutput>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct RecordAiOutputRequest {
+    pub content: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AddExistingProjectRequest {
