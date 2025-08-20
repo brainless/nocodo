@@ -11,6 +11,8 @@ pub enum SocketRequest {
     GetProjectByPath { project_path: String },
     CompleteAiSession { session_id: String },
     FailAiSession { session_id: String },
+    // New: record one-shot AI output for a session
+    RecordAiOutput { session_id: String, output: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -273,6 +275,19 @@ impl ManagerClient {
                     message
                 )))
             }
+        }
+    }
+
+    pub async fn record_ai_output(&self, session_id: String, output: String) -> Result<(), CliError> {
+        info!("Recording AI output for session: {} ({} bytes)", session_id, output.len());
+        let request = SocketRequest::RecordAiOutput { session_id, output };
+        let response = self.send_request(request).await?;
+        match response {
+            SocketResponse::Success { .. } => Ok(()),
+            SocketResponse::Error { message } => Err(CliError::Communication(format!(
+                "Manager error: {}",
+                message
+            ))),
         }
     }
 
