@@ -16,6 +16,43 @@ export interface CreateProjectRequest {
   framework?: string;
 }
 
+// AI session types
+export interface AiSession {
+  id: string;
+  project_id?: string;
+  tool_name: string;
+  status: string;
+  prompt: string;
+  project_context?: string;
+  started_at: number;
+  ended_at?: number;
+}
+
+export interface CreateAiSessionRequest {
+  project_id?: string;
+  tool_name: string;
+  prompt: string;
+}
+
+export interface AiSessionResponse {
+  session: AiSession;
+}
+
+export interface AiSessionListResponse {
+  sessions: AiSession[];
+}
+
+export interface AiSessionOutput {
+  id: number;
+  session_id: string;
+  content: string;
+  created_at: number;
+}
+
+export interface AiSessionOutputListResponse {
+  outputs: AiSessionOutput[];
+}
+
 export interface AddExistingProjectRequest {
   name: string;
   path: string; // Required - must be existing directory
