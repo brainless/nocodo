@@ -2,6 +2,10 @@
 
 nocodo is a local AI-assisted development environment that provides guardrails and good software engineering practices for code generation. It works with CLI-based coding software like Claude Code, Gemini CLI, OpenCode, Qwen Code, etc. The system runs entirely on your Linux machine, providing a complete development workflow without cloud dependencies.
 
+
+![nocodo CLI running Claude Code and claude reading about nocodo CLI](./website/src/assets/Warp_nocodo_ClaudeCode.png "nocodo CLI running Claude Code and claude reading about nocodo CLI")
+
+
 > **MVP Focus**: Currently implementing a minimal viable product that runs locally on Linux laptops, focusing on the three core components: Manager daemon, Manager Web app, and nocodo CLI.
 
 > [!NOTE]
