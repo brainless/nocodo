@@ -7,7 +7,11 @@ import {
   FileCreateRequest,
   FileUpdateRequest,
   FileContentResponse,
-  FileResponse
+  FileResponse,
+  CreateAiSessionRequest,
+  AiSessionResponse,
+  AiSessionListResponse,
+  AiSessionOutputListResponse
 } from './types';
 
 class ApiClient {
@@ -93,7 +97,7 @@ class ApiClient {
     });
   }
   
-  async deleteFile(filePath: string, projectId: string): Promisecvoide {
+  async deleteFile(filePath: string, projectId: string): Promise<void> {
     const queryParams = new URLSearchParams();
     queryParams.set('project_id', projectId);
     
@@ -103,30 +107,29 @@ class ApiClient {
   }
 
   // AI session endpoints
-  async createAiSession(data: CreateAiSessionRequest): PromisecAiSessionResponsee {
+  async createAiSession(data: CreateAiSessionRequest): Promise<AiSessionResponse> {
     return this.request('/ai/sessions', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async listAiSessions(): PromisecAiSessionListResponsee {
+  async listAiSessions(): Promise<AiSessionListResponse> {
     return this.request('/ai/sessions');
   }
 
-  async getAiSession(id: string): PromisecAiSessionResponsee {
+  async getAiSession(id: string): Promise<AiSessionResponse> {
     return this.request(`/ai/sessions/${id}`);
-    
   }
 
-  async recordAiOutput(id: string, content: string): Promisec{ ok: boolean }e {
+  async recordAiOutput(id: string, content: string): Promise<{ ok: boolean }> {
     return this.request(`/ai/sessions/${id}/outputs`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
   }
 
-  async listAiOutputs(id: string): PromisecAiSessionOutputListResponsee {
+  async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
     return this.request(`/ai/sessions/${id}/outputs`);
   }
 }
