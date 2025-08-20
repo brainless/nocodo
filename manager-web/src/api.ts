@@ -7,7 +7,11 @@ import {
   FileCreateRequest,
   FileUpdateRequest,
   FileContentResponse,
-  FileResponse
+  FileResponse,
+  CreateAiSessionRequest,
+  AiSessionResponse,
+  AiSessionListResponse,
+  AiSessionOutputListResponse
 } from './types';
 
 class ApiClient {
@@ -100,6 +104,33 @@ class ApiClient {
     return this.request(`/files/${encodeURIComponent(filePath)}?${queryParams.toString()}`, {
       method: 'DELETE',
     });
+  }
+
+  // AI session endpoints
+  async createAiSession(data: CreateAiSessionRequest): Promise<AiSessionResponse> {
+    return this.request('/ai/sessions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async listAiSessions(): Promise<AiSessionListResponse> {
+    return this.request('/ai/sessions');
+  }
+
+  async getAiSession(id: string): Promise<AiSessionResponse> {
+    return this.request(`/ai/sessions/${id}`);
+  }
+
+  async recordAiOutput(id: string, content: string): Promise<{ ok: boolean }> {
+    return this.request(`/ai/sessions/${id}/outputs`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
+    return this.request(`/ai/sessions/${id}/outputs`);
   }
 }
 
