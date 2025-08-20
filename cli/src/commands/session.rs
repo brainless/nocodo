@@ -84,29 +84,75 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
         enhanced_prompt.len()
     );
 
-    // Execute the AI tool with the enhanced prompt
-    let result = execute_ai_tool(tool, &enhanced_prompt).await;
+    // Execute the AI tool with the enhanced prompt and capture output
+    let run_result = execute_ai_tool(tool, &enhanced_prompt).await;
 
-    // Mark session as completed or failed based on result
-    match result {
-        Ok(()) => {
-            info!("AI tool execution completed successfully");
-            if let Err(e) = client.complete_ai_session(session.id.clone()).await {
-                warn!("Failed to mark session as completed: {}", e);
+    // Build payload with actual captured stdout/stderr when available
+    let (payload, status_ok) = match run_result {
+        Ok(run) => {
+            // Echo outputs to terminal (already handled inside execute_ai_tool previously; do it here now)
+            if !run.stdout.is_empty() {
+                println!("{}", run.stdout);
             }
-        }
-        Err(ref e) => {
-            error!("AI tool execution failed: {}", e);
-            if let Err(fail_err) = client.fail_ai_session(session.id.clone()).await {
-                warn!("Failed to mark session as failed: {}", fail_err);
+            if !run.stderr.is_empty() {
+                eprintln!("{}", run.stderr);
             }
+            let p = serde_json::json!({
+                "tool": tool,
+                "prompt": prompt,
+                "project_path": project_path,
+                "success": run.success,
+                "exit_code": run.exit_code,
+                "stdout": run.stdout,
+                "stderr": run.stderr,
+            }).to_string();
+            (p, true)
         }
+        Err(err) => {
+            let p = serde_json::json!({
+                "tool": tool,
+                "prompt": prompt,
+                "project_path": project_path,
+                "success": false,
+                "error": err.to_string(),
+                "stdout": "",
+                "stderr": "",
+            }).to_string();
+            (p, false)
+        }
+    };
+
+    if let Err(e) = client
+        .record_ai_output(session.id.clone(), payload)
+        .await
+    {
+        warn!("Failed to record AI output: {}", e);
     }
 
-    result
+    // Mark session as completed or failed based on result
+    if status_ok {
+        info!("AI tool execution completed successfully");
+        if let Err(e) = client.complete_ai_session(session.id.clone()).await {
+            warn!("Failed to mark session as completed: {}", e);
+        }
+        Ok(())
+    } else {
+        error!("AI tool execution failed");
+        if let Err(fail_err) = client.fail_ai_session(session.id.clone()).await {
+            warn!("Failed to mark session as failed: {}", fail_err);
+        }
+        Err(CliError::Command("AI tool execution failed".to_string()))
+    }
 }
 
-async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
+struct ToolRun {
+    stdout: String,
+    stderr: String,
+    exit_code: Option<i32>,
+    success: bool,
+}
+
+async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<ToolRun, CliError> {
     // Map tool names to actual commands
     let command = match tool.to_lowercase().as_str() {
         "claude" | "claude-code" => "claude",
@@ -166,8 +212,8 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
         }
     }
 
-    let status = cmd
-        .status()
+    let output = cmd
+        .output()
         .await
         .map_err(|e| CliError::Command(format!("Failed to execute {}: {}", command, e)))?;
 
@@ -176,14 +222,24 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<(), CliError> {
         warn!("Failed to remove temporary prompt file: {}", e);
     }
 
-    if status.success() {
+    // Convert outputs to strings for capture
+    let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+
+    let success = output.status.success();
+    let exit_code = output.status.code();
+
+    if success {
         info!("AI tool completed successfully");
-        Ok(())
     } else {
-        let exit_code = status.code().unwrap_or(-1);
-        Err(CliError::Command(format!(
-            "AI tool '{}' failed with exit code: {}",
-            command, exit_code
-        )))
+        let code = exit_code.unwrap_or(-1);
+        info!("AI tool completed with non-zero exit: {}", code);
     }
+
+    Ok(ToolRun {
+        stdout: stdout_str,
+        stderr: stderr_str,
+        exit_code,
+        success,
+    })
 }
