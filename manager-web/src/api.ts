@@ -93,13 +93,41 @@ class ApiClient {
     });
   }
   
-  async deleteFile(filePath: string, projectId: string): Promise<void> {
+  async deleteFile(filePath: string, projectId: string): Promisecvoide {
     const queryParams = new URLSearchParams();
     queryParams.set('project_id', projectId);
     
     return this.request(`/files/${encodeURIComponent(filePath)}?${queryParams.toString()}`, {
       method: 'DELETE',
     });
+  }
+
+  // AI session endpoints
+  async createAiSession(data: CreateAiSessionRequest): PromisecAiSessionResponsee {
+    return this.request('/ai/sessions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async listAiSessions(): PromisecAiSessionListResponsee {
+    return this.request('/ai/sessions');
+  }
+
+  async getAiSession(id: string): PromisecAiSessionResponsee {
+    return this.request(`/ai/sessions/${id}`);
+    
+  }
+
+  async recordAiOutput(id: string, content: string): Promisec{ ok: boolean }e {
+    return this.request(`/ai/sessions/${id}/outputs`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async listAiOutputs(id: string): PromisecAiSessionOutputListResponsee {
+    return this.request(`/ai/sessions/${id}/outputs`);
   }
 }
 
