@@ -3,6 +3,7 @@ use crate::error::AppError;
 use crate::models::{
     AddExistingProjectRequest, CreateProjectRequest, Project, ProjectListResponse, ProjectResponse, ServerStatus,
     FileInfo, FileListRequest, FileListResponse, FileCreateRequest, FileUpdateRequest, FileContentResponse, FileResponse,
+    CreateAiSessionRequest, AiSessionResponse, AiSessionListResponse, RecordAiOutputRequest, AiSessionOutputListResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -718,4 +719,90 @@ pub async fn delete_file(
     }
     
     Ok(HttpResponse::NoContent().finish())
+}
+
+// AI session HTTP handlers
+pub async fn create_ai_session(
+    data: web::Data<AppState>,
+    request: web::Json<CreateAiSessionRequest>,
+) -> Result<HttpResponse, AppError> {
+    let req = request.into_inner();
+
+    // Optional: Validate tool_name/prompt
+    if req.tool_name.trim().is_empty() {
+        return Err(AppError::InvalidRequest("tool_name is required".into()));
+    }
+    if req.prompt.trim().is_empty() {
+        return Err(AppError::InvalidRequest("prompt is required".into()));
+    }
+
+    // Generate simple context if project_id present
+    let project_context = if let Some(ref project_id) = req.project_id {
+        let project = data.database.get_project_by_id(project_id)?;
+        Some(format!("Project: {}\nPath: {}", project.name, project.path))
+    } else { None };
+
+    let mut session = crate::models::AiSession::new(
+        req.project_id.clone(),
+        req.tool_name,
+        req.prompt,
+        project_context,
+    );
+
+    // Persist
+    data.database.create_ai_session(&session)?;
+
+    // Response
+    let response = AiSessionResponse { session: session.clone() };
+    Ok(HttpResponse::Created().json(response))
+}
+
+pub async fn list_ai_sessions(
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let sessions = data.database.get_all_ai_sessions()?;
+    let response = AiSessionListResponse { sessions };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn get_ai_session(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let session = data.database.get_ai_session_by_id(&id)?;
+    let response = AiSessionResponse { session };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn record_ai_output(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+    request: web::Json<RecordAiOutputRequest>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let req = request.into_inner();
+
+    if req.content.trim().is_empty() {
+        return Err(AppError::InvalidRequest("content is required".into()));
+    }
+
+    // Ensure session exists
+    let _ = data.database.get_ai_session_by_id(&id)?;
+
+    data.database.create_ai_session_output(&id, &req.content)?;
+    Ok(HttpResponse::Created().json(serde_json::json!({"ok": true})))
+}
+
+pub async fn list_ai_outputs(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    // Ensure session exists
+    let _ = data.database.get_ai_session_by_id(&id)?;
+
+    let outputs = data.database.get_ai_session_outputs(&id)?;
+    let response = AiSessionOutputListResponse { outputs };
+    Ok(HttpResponse::Ok().json(response))
 }
