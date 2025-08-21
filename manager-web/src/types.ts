@@ -28,6 +28,9 @@ export interface AiSession {
   ended_at?: number;
 }
 
+// AI session status enum (generated from Rust with ts-rs)
+export type AiSessionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
 export interface CreateAiSessionRequest {
   project_id?: string;
   tool_name: string;

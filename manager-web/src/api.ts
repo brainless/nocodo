@@ -11,7 +11,9 @@ import {
   CreateAiSessionRequest,
   AiSessionResponse,
   AiSessionListResponse,
-  AiSessionOutputListResponse
+  AiSessionOutputListResponse,
+  AiSession,
+  AiSessionStatus
 } from './types';
 
 class ApiClient {
@@ -131,6 +133,86 @@ class ApiClient {
 
   async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
     return this.request(`/ai/sessions/${id}/outputs`);
+  }
+
+  // New methods for issue #32
+  /**
+   * List all AI sessions
+   * @returns Promise resolving to an array of AiSession objects
+   */
+  async listSessions(): Promise<AiSession[]> {
+    const response = await this.listAiSessions();
+    return response.sessions;
+  }
+
+  /**
+   * Get a specific AI session by ID
+   * @param id - The session ID
+   * @returns Promise resolving to an AiSession object
+   */
+  async getSession(id: string): Promise<AiSession> {
+    const response = await this.getAiSession(id);
+    return response.session;
+  }
+
+  /**
+   * Subscribe to live updates for an AI session via WebSocket
+   * @param id - The session ID
+   * @param onMessage - Callback function to handle incoming messages
+   * @param onError - Callback function to handle errors
+   * @param onOpen - Callback function when connection opens
+   * @param onClose - Callback function when connection closes
+   * @returns WebSocket connection object with close method
+   */
+  subscribeSession(
+    id: string,
+    onMessage: (data: any) => void,
+    onError?: (error: Error) => void,
+    onOpen?: () => void,
+    onClose?: () => void
+  ): { close: () => void } {
+    // Create WebSocket URL for AI session updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/ai-sessions/${id}`;
+    
+    // Create WebSocket connection
+    const ws = new WebSocket(wsUrl);
+    
+    // Set up event handlers
+    ws.onopen = () => {
+      console.log(`WebSocket connected for AI session ${id}`);
+      if (onOpen) onOpen();
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+        if (onError) onError(new Error('Failed to parse WebSocket message'));
+      }
+    };
+    
+    ws.onerror = (event) => {
+      console.error(`WebSocket error for AI session ${id}:`, event);
+      if (onError) onError(new Error('WebSocket connection error'));
+    };
+    
+    ws.onclose = () => {
+      console.log(`WebSocket closed for AI session ${id}`);
+      if (onClose) onClose();
+    };
+    
+    // Return close method to allow cleanup
+    return {
+      close: () => {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      }
+    };
   }
 }
 
