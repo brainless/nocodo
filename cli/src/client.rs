@@ -4,6 +4,8 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 use tracing::{debug, error, info};
 
+// Keep SocketRequest enums in sync with manager/src/socket.rs
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SocketRequest {
     // Health and identity
