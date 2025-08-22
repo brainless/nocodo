@@ -3,6 +3,8 @@ import { useParams, A } from '@solidjs/router';
 import { AiSession, Project, AiSessionStatus } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
+import { StatusBadge, ToolIcon, ProjectBadge } from './SessionRow';
+import SessionTimeline from './SessionTimeline';
 
 // Utility function to format timestamps
 const formatTimestamp = (timestamp: number): string => {
@@ -29,51 +31,58 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
   return `${seconds}s`;
 };
 
-// Status badge component
-const StatusBadge: Component<{ status: AiSessionStatus; size?: 'sm' | 'md' }> = (props) => {
-  const getStatusColor = () => {
-    switch (props.status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'running': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
-      case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (props.status) {
-      case 'completed': return '✓';
-      case 'running': return '⟳';
-      case 'failed': return '✗';
-      case 'cancelled': return '○';
-      case 'pending': return '⏳';
-      default: return '?';
-    }
-  };
-
-  const sizeClasses = props.size === 'md' 
-    ? 'px-3 py-2 text-sm' 
-    : 'px-2 py-1 text-xs';
-
-  return (
-    <span class={`${sizeClasses} font-medium rounded-full border ${getStatusColor()} inline-flex items-center gap-1`}>
-      <span class={props.status === 'running' ? 'animate-spin' : ''}>{getStatusIcon()}</span>
-      {props.status}
-    </span>
-  );
-};
 
 // Live status indicator for running sessions
-const LiveStatusIndicator: Component<{ isConnected: boolean }> = (props) => (
-  <div class="flex items-center space-x-2">
-    <div class={`w-2 h-2 rounded-full ${props.isConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
-    <span class="text-sm text-gray-600">
-      {props.isConnected ? 'Live updates' : 'No live connection'}
-    </span>
-  </div>
-);
+const LiveStatusIndicator: Component<{ 
+  connectionStatus: 'connected' | 'disconnected' | 'error' | 'fallback';
+}> = (props) => {
+  const getStatusInfo = () => {
+    switch (props.connectionStatus) {
+      case 'connected':
+        return {
+          color: 'bg-green-400',
+          animation: 'animate-pulse',
+          text: 'Live updates',
+          description: 'Real-time WebSocket connection active'
+        };
+      case 'fallback':
+        return {
+          color: 'bg-yellow-400',
+          animation: 'animate-pulse',
+          text: 'Polling updates',
+          description: 'Using polling fallback (5s intervals)'
+        };
+      case 'error':
+        return {
+          color: 'bg-red-400',
+          animation: '',
+          text: 'Connection error',
+          description: 'Unable to connect to live updates'
+        };
+      default:
+        return {
+          color: 'bg-gray-400',
+          animation: '',
+          text: 'No live connection',
+          description: 'Not receiving live updates'
+        };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
+
+  return (
+    <div class="flex flex-col items-end space-y-1">
+      <div class="flex items-center space-x-2">
+        <div class={`w-2 h-2 rounded-full ${statusInfo.color} ${statusInfo.animation}`}></div>
+        <span class="text-sm text-gray-600">{statusInfo.text}</span>
+      </div>
+      <span class="text-xs text-gray-500" title={statusInfo.description}>
+        {statusInfo.description}
+      </span>
+    </div>
+  );
+};
 
 const AiSessionDetail: Component = () => {
   const params = useParams<{ id: string }>();
@@ -133,12 +142,27 @@ const AiSessionDetail: Component = () => {
 
   return (
     <div class="space-y-6">
-      {/* Navigation */}
-      <div class="flex items-center space-x-2 text-sm text-gray-500">
-        <A href="/ai/sessions" class="hover:text-gray-700">AI Sessions</A>
-        <span>›</span>
-        <span class="text-gray-900">Session Details</span>
-      </div>
+      {/* Breadcrumb navigation */}
+      <nav class="flex" aria-label="Breadcrumb">
+        <ol role="list" class="flex items-center space-x-2 text-sm">
+          <li>
+            <A 
+              href="/ai/sessions" 
+              class="text-gray-500 hover:text-gray-700 focus:outline-none focus:underline"
+            >
+              AI Sessions
+            </A>
+          </li>
+          <li>
+            <span class="text-gray-400" aria-hidden="true">›</span>
+          </li>
+          <li>
+            <span class="text-gray-900 font-medium" aria-current="page">
+              Session Details
+            </span>
+          </li>
+        </ol>
+      </nav>
 
       <Show when={store.loading && !session()}>
         <div class="flex justify-center items-center py-8">
@@ -170,131 +194,153 @@ const AiSessionDetail: Component = () => {
       </Show>
 
       <Show when={session()}>
-        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-          {/* Header */}
-          <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-              <div>
-                <h1 class="text-2xl font-bold text-gray-900">Session Details</h1>
-                <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                  Session ID: {session()!.id}
-                </p>
-              </div>
-              <div class="flex flex-col items-end space-y-2">
-                <StatusBadge status={session()!.status as AiSessionStatus} size="md" />
-                <Show when={session()!.status === 'running'}>
-                  <LiveStatusIndicator isConnected={isConnected()} />
-                </Show>
-              </div>
-            </div>
-          </div>
-
-          {/* Session Information */}
-          <div class="px-4 py-5 sm:p-6">
-            <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-              {/* Tool */}
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Tool</dt>
-                <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded">
-                  {session()!.tool_name}
-                </dd>
-              </div>
-
-              {/* Project */}
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Project</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                  <Show 
-                    when={project()} 
-                    fallback={session()!.project_id ? `Project ${session()!.project_id}` : 'No Project'}
-                  >
-                    <A 
-                      href={`/projects/${project()!.id}/files`}
-                      class="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      {project()!.name}
-                    </A>
-                    <div class="text-xs text-gray-500 mt-1">
-                      {project()!.path}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main content */}
+          <div class="lg:col-span-2 space-y-6">
+            {/* Session header card */}
+            <div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+              <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <h1 class="text-2xl font-bold text-gray-900 mb-2">Session Details</h1>
+                    <div class="flex items-center space-x-4 mb-3">
+                      <StatusBadge status={session()!.status as AiSessionStatus} size="md" showIcon={true} />
+                      <ToolIcon toolName={session()!.tool_name} />
                     </div>
-                  </Show>
-                </dd>
-              </div>
-
-              {/* Started At */}
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Started</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                  {formatTimestamp(session()!.started_at)}
-                </dd>
-              </div>
-
-              {/* Ended At */}
-              <Show when={session()!.ended_at}>
-                <div>
-                  <dt class="text-sm font-medium text-gray-500">Ended</dt>
-                  <dd class="mt-1 text-sm text-gray-900">
-                    {formatTimestamp(session()!.ended_at!)}
-                  </dd>
-                </div>
-              </Show>
-
-              {/* Duration */}
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Duration</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                  {formatDuration(session()!.started_at, session()!.ended_at)}
-                  <Show when={!session()!.ended_at}>
-                    <span class="text-gray-500"> (ongoing)</span>
-                  </Show>
-                </dd>
-              </div>
-
-              {/* Status with timestamp */}
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Current Status</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                  <StatusBadge status={session()!.status as AiSessionStatus} />
+                    <p class="text-sm text-gray-600">
+                      Session ID: <code class="bg-gray-100 px-2 py-1 rounded font-mono text-xs">{session()!.id}</code>
+                    </p>
+                  </div>
                   <Show when={session()!.status === 'running'}>
-                    <div class="mt-1 text-xs text-gray-500">
-                      Last updated: {new Date().toLocaleTimeString()}
+                    <LiveStatusIndicator connectionStatus={actions.getConnectionStatus(params.id)} />
+                  </Show>
+                </div>
+              </div>
+
+              {/* Session Information */}
+              <div class="px-6 py-4">
+                <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                  {/* Project */}
+                  <div>
+                    <dt class="text-sm font-medium text-gray-500 mb-1">Project</dt>
+                    <dd>
+                      <Show 
+                        when={project()} 
+                        fallback={<ProjectBadge project={null} projectId={session()!.project_id} />}
+                      >
+                        <div class="space-y-2">
+                          <ProjectBadge project={project()} />
+                          <A 
+                            href={`/projects/${project()!.id}/files`}
+                            class="text-sm text-blue-600 hover:text-blue-800 font-medium block focus:outline-none focus:underline"
+                          >
+                            View project files →
+                          </A>
+                          <div class="text-xs text-gray-500">
+                            {project()!.path}
+                          </div>
+                        </div>
+                      </Show>
+                    </dd>
+                  </div>
+
+                  {/* Started At */}
+                  <div>
+                    <dt class="text-sm font-medium text-gray-500 mb-1">Started</dt>
+                    <dd class="text-sm text-gray-900">
+                      <time dateTime={new Date(session()!.started_at * 1000).toISOString()}>
+                        {formatTimestamp(session()!.started_at)}
+                      </time>
+                    </dd>
+                  </div>
+
+                  {/* Ended At */}
+                  <Show when={session()!.ended_at}>
+                    <div>
+                      <dt class="text-sm font-medium text-gray-500 mb-1">Ended</dt>
+                      <dd class="text-sm text-gray-900">
+                        <time dateTime={new Date(session()!.ended_at! * 1000).toISOString()}>
+                          {formatTimestamp(session()!.ended_at!)}
+                        </time>
+                      </dd>
                     </div>
                   </Show>
-                </dd>
+
+                  {/* Duration */}
+                  <div>
+                    <dt class="text-sm font-medium text-gray-500 mb-1">Duration</dt>
+                    <dd class="text-sm text-gray-900">
+                      {formatDuration(session()!.started_at, session()!.ended_at)}
+                      <Show when={!session()!.ended_at}>
+                        <span class="text-blue-600 font-medium"> (ongoing)</span>
+                      </Show>
+                    </dd>
+                  </div>
+                </dl>
               </div>
-            </dl>
+            </div>
+
+            {/* Prompt Section */}
+            <Show when={session()!.prompt}>
+              <div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <h3 class="text-lg font-medium text-gray-900">Session Prompt</h3>
+                  <p class="text-sm text-gray-600 mt-1">The original request sent to the AI tool</p>
+                </div>
+                <div class="px-6 py-4">
+                  <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <pre class="text-sm text-gray-900 whitespace-pre-wrap font-sans leading-relaxed">
+                      {session()!.prompt}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </Show>
+
+            {/* Project Context */}
+            <Show when={session()!.project_context}>
+              <div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <h3 class="text-lg font-medium text-gray-900">Project Context</h3>
+                  <p class="text-sm text-gray-600 mt-1">Additional context provided to the AI tool</p>
+                </div>
+                <div class="px-6 py-4">
+                  <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <pre class="text-sm text-gray-900 whitespace-pre-wrap font-mono leading-relaxed">
+                      {session()!.project_context}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </Show>
           </div>
 
-          {/* Prompt Section */}
-          <Show when={session()!.prompt}>
-            <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
-              <dt class="text-sm font-medium text-gray-500 mb-2">Prompt</dt>
-              <dd class="text-sm text-gray-900 bg-gray-50 p-4 rounded-md font-mono whitespace-pre-wrap">
-                {session()!.prompt}
-              </dd>
-            </div>
-          </Show>
-
-          {/* Project Context */}
-          <Show when={session()!.project_context}>
-            <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
-              <dt class="text-sm font-medium text-gray-500 mb-2">Project Context</dt>
-              <dd class="text-sm text-gray-900 bg-gray-50 p-4 rounded-md font-mono whitespace-pre-wrap">
-                {session()!.project_context}
-              </dd>
-            </div>
-          </Show>
+          {/* Sidebar */}
+          <div class="lg:col-span-1 space-y-6">
+            {/* Timeline */}
+            <SessionTimeline session={session()!} />
+          </div>
         </div>
       </Show>
 
-      {/* Back to Sessions */}
-      <div class="flex justify-start">
+      {/* Action buttons */}
+      <div class="flex justify-between items-center pt-6 border-t border-gray-200">
         <A 
           href="/ai/sessions"
-          class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          ← Back to Sessions
+          <span class="mr-2" aria-hidden="true">←</span>
+          Back to Sessions
         </A>
+        <Show when={session() && session()!.project_id}>
+          <A 
+            href={`/projects/${session()!.project_id}/files`}
+            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            View Project
+            <span class="ml-2" aria-hidden="true">→</span>
+          </A>
+        </Show>
       </div>
     </div>
   );
