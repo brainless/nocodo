@@ -9,6 +9,8 @@ interface SessionsStore {
   loading: boolean;
   error: string | null;
   subscriptions: Record<string, { close: () => void }>;
+  pollingTimers: Record<string, NodeJS.Timeout>;
+  connectionStatus: Record<string, 'connected' | 'disconnected' | 'error' | 'fallback'>;
 }
 
 interface SessionsActions {
@@ -17,6 +19,9 @@ interface SessionsActions {
   connect: (id: string) => Promise<void>;
   disconnect: (id: string) => void;
   updateSessionStatus: (id: string, status: AiSessionStatus) => void;
+  startPolling: (id: string) => void;
+  stopPolling: (id: string) => void;
+  getConnectionStatus: (id: string) => 'connected' | 'disconnected' | 'error' | 'fallback';
 }
 
 interface SessionsContextValue {
@@ -33,6 +38,8 @@ export const SessionsProvider: ParentComponent = (props) => {
     loading: false,
     error: null,
     subscriptions: {},
+    pollingTimers: {},
+    connectionStatus: {},
   });
 
   const actions: SessionsActions = {
@@ -91,9 +98,15 @@ export const SessionsProvider: ParentComponent = (props) => {
       }
 
       try {
+        setStore('connectionStatus', id, 'connected');
+        
         const subscription = apiClient.subscribeSession(
           id,
           (data) => {
+            // WebSocket is working, stop any fallback polling
+            actions.stopPolling(id);
+            setStore('connectionStatus', id, 'connected');
+            
             if (data.type === 'status_update' && data.status) {
               actions.updateSessionStatus(id, data.status);
             }
@@ -107,14 +120,29 @@ export const SessionsProvider: ParentComponent = (props) => {
           },
           (error) => {
             console.error(`WebSocket error for session ${id}:`, error);
-            setStore('error', `Connection error for session ${id}: ${error.message}`);
+            setStore('connectionStatus', id, 'error');
+            
+            // Start polling as fallback
+            console.log(`Starting polling fallback for session ${id}`);
+            actions.startPolling(id);
+            setStore('connectionStatus', id, 'fallback');
           },
           () => {
             console.log(`WebSocket connected for session ${id}`);
+            setStore('connectionStatus', id, 'connected');
           },
           () => {
             console.log(`WebSocket disconnected for session ${id}`);
             setStore('subscriptions', id, undefined!);
+            setStore('connectionStatus', id, 'disconnected');
+            
+            // Start polling as fallback if session is still running
+            const session = store.byId[id];
+            if (session && session.status === 'running') {
+              console.log(`Starting polling fallback for disconnected session ${id}`);
+              actions.startPolling(id);
+              setStore('connectionStatus', id, 'fallback');
+            }
           }
         );
 
@@ -122,8 +150,12 @@ export const SessionsProvider: ParentComponent = (props) => {
         
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to connect to session';
-        setStore('error', errorMessage);
         console.error('Failed to connect to session:', err);
+        setStore('connectionStatus', id, 'error');
+        
+        // Start polling as fallback
+        actions.startPolling(id);
+        setStore('connectionStatus', id, 'fallback');
       }
     },
 
@@ -133,6 +165,10 @@ export const SessionsProvider: ParentComponent = (props) => {
         subscription.close();
         setStore('subscriptions', id, undefined!);
       }
+      
+      // Stop any polling timers
+      actions.stopPolling(id);
+      setStore('connectionStatus', id, 'disconnected');
     },
 
     updateSessionStatus: (id: string, status: AiSessionStatus) => {
@@ -142,6 +178,60 @@ export const SessionsProvider: ParentComponent = (props) => {
       if (existingIndex >= 0) {
         setStore('list', existingIndex, 'status', status);
       }
+      
+      // Stop polling if session is no longer running
+      if (status !== 'running') {
+        actions.stopPolling(id);
+      }
+    },
+
+    startPolling: (id: string) => {
+      // Don't start polling if already polling
+      if (store.pollingTimers[id]) {
+        return;
+      }
+      
+      const pollSession = async () => {
+        try {
+          const session = await apiClient.getSession(id);
+          if (session) {
+            // Update the session data
+            setStore('byId', id, session);
+            const existingIndex = store.list.findIndex(s => s.id === id);
+            if (existingIndex >= 0) {
+              setStore('list', existingIndex, session);
+            }
+            
+            // Stop polling if session is no longer running
+            if (session.status !== 'running') {
+              actions.stopPolling(id);
+            }
+          }
+        } catch (err) {
+          console.error(`Polling error for session ${id}:`, err);
+          // Continue polling even on errors
+        }
+      };
+      
+      // Poll immediately, then every 5 seconds
+      pollSession();
+      const timerId = setInterval(pollSession, 5000);
+      setStore('pollingTimers', id, timerId);
+      
+      console.log(`Started polling for session ${id}`);
+    },
+
+    stopPolling: (id: string) => {
+      const timerId = store.pollingTimers[id];
+      if (timerId) {
+        clearInterval(timerId);
+        setStore('pollingTimers', id, undefined!);
+        console.log(`Stopped polling for session ${id}`);
+      }
+    },
+
+    getConnectionStatus: (id: string) => {
+      return store.connectionStatus[id] || 'disconnected';
     },
   };
 
