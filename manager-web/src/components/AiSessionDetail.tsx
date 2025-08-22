@@ -1,5 +1,5 @@
 import { Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
-import { useParams, A } from '@solidjs/router';
+import { useParams, useNavigate, A } from '@solidjs/router';
 import { AiSession, Project, AiSessionStatus } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
@@ -86,6 +86,7 @@ const LiveStatusIndicator: Component<{
 
 const AiSessionDetail: Component = () => {
   const params = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { store, actions } = useSessions();
   const [project, setProject] = createSignal<Project | null>(null);
   const [isConnected, setIsConnected] = createSignal(false);
@@ -146,12 +147,12 @@ const AiSessionDetail: Component = () => {
       <nav class="flex" aria-label="Breadcrumb">
         <ol role="list" class="flex items-center space-x-2 text-sm">
           <li>
-            <A 
-              href="/ai/sessions" 
-              class="text-gray-500 hover:text-gray-700 focus:outline-none focus:underline"
+            <button
+              onClick={() => navigate('/ai/sessions')}
+              class="text-gray-500 hover:text-gray-700 focus:outline-none focus:underline cursor-pointer"
             >
               AI Sessions
-            </A>
+            </button>
           </li>
           <li>
             <span class="text-gray-400" aria-hidden="true">›</span>
@@ -187,9 +188,12 @@ const AiSessionDetail: Component = () => {
       <Show when={!store.loading && !session()}>
         <div class="text-center py-8">
           <div class="text-gray-400 text-lg mb-2">Session not found</div>
-          <A href="/ai/sessions" class="text-blue-600 hover:text-blue-800">
+          <button
+            onClick={() => navigate('/ai/sessions')}
+            class="text-blue-600 hover:text-blue-800 cursor-pointer focus:outline-none focus:underline"
+          >
             ← Back to sessions
-          </A>
+          </button>
         </div>
       </Show>
 
@@ -325,21 +329,21 @@ const AiSessionDetail: Component = () => {
 
       {/* Action buttons */}
       <div class="flex justify-between items-center pt-6 border-t border-gray-200">
-        <A 
-          href="/ai/sessions"
-          class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <button
+          onClick={() => navigate('/ai/sessions')}
+          class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
         >
           <span class="mr-2" aria-hidden="true">←</span>
           Back to Sessions
-        </A>
+        </button>
         <Show when={session() && session()!.project_id}>
-          <A 
-            href={`/projects/${session()!.project_id}/files`}
-            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <button
+            onClick={() => navigate(`/projects/${session()!.project_id}/files`)}
+            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             View Project
             <span class="ml-2" aria-hidden="true">→</span>
-          </A>
+          </button>
         </Show>
       </div>
     </div>
