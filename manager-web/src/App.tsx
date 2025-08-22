@@ -1,5 +1,5 @@
 import { Component } from 'solid-js';
-import { A, Route } from '@solidjs/router';
+import { A, Route, Routes } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
 import ProjectFilesPage from './components/ProjectFilesPage';
@@ -153,13 +153,13 @@ const AiSessionDetailPage: Component = () => {
 // Root App Component - defines the routes
 const App: Component = () => {
   return (
-    <>
+    <Routes>
       <Route path="/" component={ProjectsPage} />
       <Route path="/projects/create" component={CreateProjectPage} />
       <Route path="/projects/:id/files" component={FilesPageWrapper} />
       <Route path="/ai/sessions" component={AiSessionsPage} />
       <Route path="/ai/sessions/:id" component={AiSessionDetailPage} />
-    </>
+    </Routes>
   );
 };
 
