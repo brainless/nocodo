@@ -3,7 +3,10 @@ import { A, Route } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
 import ProjectFilesPage from './components/ProjectFilesPage';
+import AiSessionsList from './components/AiSessionsList';
+import AiSessionDetail from './components/AiSessionDetail';
 import { WebSocketProvider, useWebSocketConnection } from './WebSocketProvider';
+import { SessionsProvider } from './stores/sessionsStore';
 
 // Connection Status Component
 const ConnectionStatus: Component = () => {
@@ -42,8 +45,9 @@ const ConnectionStatus: Component = () => {
 const Layout: Component<{ children: any }> = (props) => {
   return (
     <WebSocketProvider>
-      <div class="min-h-screen bg-gray-50">
-        <div class="container mx-auto px-4 py-8">
+      <SessionsProvider>
+        <div class="min-h-screen bg-gray-50">
+          <div class="container mx-auto px-4 py-8">
           <header class="mb-8">
             <div class="flex justify-between items-start">
               <div>
@@ -73,6 +77,14 @@ const Layout: Component<{ children: any }> = (props) => {
               >
                 Create Project
               </A>
+              <A
+                href="/ai/sessions"
+                class="px-4 py-2 rounded-md font-medium transition-colors"
+                activeClass="bg-blue-500 text-white"
+                inactiveClass="bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+              >
+                AI Sessions
+              </A>
             </div>
           </nav>
 
@@ -83,8 +95,9 @@ const Layout: Component<{ children: any }> = (props) => {
           <footer class="mt-8 text-center text-sm text-gray-500">
             <p>nocodo Manager - Minimal Web Interface</p>
           </footer>
+          </div>
         </div>
-      </div>
+      </SessionsProvider>
     </WebSocketProvider>
   );
 };
@@ -120,6 +133,23 @@ const FilesPageWrapper: Component = () => {
   );
 };
 
+// AI Sessions Pages
+const AiSessionsPage: Component = () => {
+  return (
+    <Layout>
+      <AiSessionsList />
+    </Layout>
+  );
+};
+
+const AiSessionDetailPage: Component = () => {
+  return (
+    <Layout>
+      <AiSessionDetail />
+    </Layout>
+  );
+};
+
 // Root App Component - defines the routes
 const App: Component = () => {
   return (
@@ -127,6 +157,8 @@ const App: Component = () => {
       <Route path="/" component={ProjectsPage} />
       <Route path="/projects/create" component={CreateProjectPage} />
       <Route path="/projects/:id/files" component={FilesPageWrapper} />
+      <Route path="/ai/sessions" component={AiSessionsPage} />
+      <Route path="/ai/sessions/:id" component={AiSessionDetailPage} />
     </>
   );
 };
