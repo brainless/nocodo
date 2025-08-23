@@ -160,15 +160,24 @@ export const SessionsProvider: ParentComponent = (props) => {
     },
 
     disconnect: (id: string) => {
-      const subscription = store.subscriptions[id];
-      if (subscription) {
-        subscription.close();
-        setStore('subscriptions', id, undefined!);
+      try {
+        const subscription = store.subscriptions[id];
+        if (subscription) {
+          subscription.close();
+          setStore('subscriptions', id, undefined!);
+        }
+        
+        // Stop any polling timers
+        actions.stopPolling(id);
+        
+        // Only update connection status if store still exists
+        if (store.connectionStatus) {
+          setStore('connectionStatus', id, 'disconnected');
+        }
+      } catch (error) {
+        // Ignore errors during cleanup (component might be unmounting)
+        console.warn(`Error during session disconnect for ${id}:`, error);
       }
-      
-      // Stop any polling timers
-      actions.stopPolling(id);
-      setStore('connectionStatus', id, 'disconnected');
     },
 
     updateSessionStatus: (id: string, status: AiSessionStatus) => {
@@ -222,11 +231,18 @@ export const SessionsProvider: ParentComponent = (props) => {
     },
 
     stopPolling: (id: string) => {
-      const timerId = store.pollingTimers[id];
-      if (timerId) {
-        clearInterval(timerId);
-        setStore('pollingTimers', id, undefined!);
-        console.log(`Stopped polling for session ${id}`);
+      try {
+        const timerId = store.pollingTimers?.[id];
+        if (timerId) {
+          clearInterval(timerId);
+          if (store.pollingTimers) {
+            setStore('pollingTimers', id, undefined!);
+          }
+          console.log(`Stopped polling for session ${id}`);
+        }
+      } catch (error) {
+        // Ignore errors during cleanup
+        console.warn(`Error stopping polling for session ${id}:`, error);
       }
     },
 
