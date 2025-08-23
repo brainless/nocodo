@@ -5,6 +5,7 @@ import CreateProjectForm from './components/CreateProjectForm';
 import ProjectFilesPage from './components/ProjectFilesPage';
 import AiSessionsList from './components/AiSessionsList';
 import AiSessionDetail from './components/AiSessionDetail';
+import Dashboard from './components/Dashboard';
 import { WebSocketProvider, useWebSocketConnection } from './WebSocketProvider';
 import { SessionsProvider } from './stores/sessionsStore';
 
@@ -67,6 +68,14 @@ const Layout: Component<{ children: any }> = (props) => {
                 inactiveClass="bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
                 end
               >
+                Dashboard
+              </A>
+              <A
+                href="/projects"
+                class="px-4 py-2 rounded-md font-medium transition-colors"
+                activeClass="bg-blue-500 text-white"
+                inactiveClass="bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+              >
                 Projects
               </A>
               <A
@@ -99,6 +108,15 @@ const Layout: Component<{ children: any }> = (props) => {
         </div>
       </SessionsProvider>
     </WebSocketProvider>
+  );
+};
+
+// Dashboard Page
+const DashboardPage: Component = () => {
+  return (
+    <Layout>
+      <Dashboard />
+    </Layout>
   );
 };
 
@@ -154,7 +172,8 @@ const AiSessionDetailPage: Component = () => {
 const App: Component = () => {
   return (
     <>
-      <Route path="/" component={ProjectsPage} />
+      <Route path="/" component={DashboardPage} />
+      <Route path="/projects" component={ProjectsPage} />
       <Route path="/projects/create" component={CreateProjectPage} />
       <Route path="/projects/:id/files" component={FilesPageWrapper} />
       <Route path="/ai/sessions" component={AiSessionsPage} />
