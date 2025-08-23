@@ -12,7 +12,9 @@ pub struct Project {
     pub language: Option<String>,
     pub framework: Option<String>,
     pub status: String,
+    #[ts(type = "number")]
     pub created_at: i64,
+    #[ts(type = "number")]
     pub updated_at: i64,
 }
 
@@ -76,7 +78,9 @@ pub struct AiSession {
     pub status: String,
     pub prompt: String,
     pub project_context: Option<String>,
+    #[ts(type = "number")]
     pub started_at: i64,
+    #[ts(type = "number | null")]
     pub ended_at: Option<i64>,
 }
 
@@ -134,9 +138,11 @@ pub struct AiSessionListResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AiSessionOutput {
+    #[ts(type = "number")]
     pub id: i64,
     pub session_id: String,
     pub content: String,
+    #[ts(type = "number")]
     pub created_at: i64,
 }
 
@@ -168,8 +174,11 @@ pub struct FileInfo {
     pub name: String,
     pub path: String,
     pub is_directory: bool,
+    #[ts(type = "number | null")]
     pub size: Option<u64>,
+    #[ts(type = "number | null")]
     pub modified_at: Option<i64>,
+    #[ts(type = "number | null")]
     pub created_at: Option<i64>,
 }
 
@@ -208,6 +217,7 @@ pub struct FileUpdateRequest {
 pub struct FileContentResponse {
     pub path: String,
     pub content: String,
+    #[ts(type = "number | null")]
     pub modified_at: Option<i64>,
 }
 

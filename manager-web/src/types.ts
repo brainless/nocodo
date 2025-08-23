@@ -1,74 +1,15 @@
-// Basic types for the Manager API
-export interface Project {
-  id: string;
-  name: string;
-  path: string;
-  language?: string;
-  framework?: string;
-  status: string;
-  created_at: number;
-  updated_at: number;
-}
+// Re-export all generated types from ts-rs
+export * from './generated';
 
-export interface CreateProjectRequest {
-  name: string;
-  language?: string;
-  framework?: string;
-}
-
-// AI session types
-export interface AiSession {
-  id: string;
-  project_id?: string;
-  tool_name: string;
-  status: string;
-  prompt: string;
-  project_context?: string;
-  started_at: number;
-  ended_at?: number;
-}
-
-// AI session status enum (generated from Rust with ts-rs)
+// Additional types not generated from Rust
 export type AiSessionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-
-export interface CreateAiSessionRequest {
-  project_id?: string;
-  tool_name: string;
-  prompt: string;
-}
-
-export interface AiSessionResponse {
-  session: AiSession;
-}
-
-export interface AiSessionListResponse {
-  sessions: AiSession[];
-}
-
-export interface AiSessionOutput {
-  id: number;
-  session_id: string;
-  content: string;
-  created_at: number;
-}
-
-export interface AiSessionOutputListResponse {
-  outputs: AiSessionOutput[];
-}
-
-export interface AddExistingProjectRequest {
-  name: string;
-  path: string; // Required - must be existing directory
-  language?: string;
-  framework?: string;
-}
 
 export interface ApiError {
   error: string;
   message?: string;
 }
 
-// WebSocket message types (generated from Rust with ts-rs)
+// WebSocket message types (not generated from Rust - client-specific)
 export type WebSocketMessage =
   | { type: "Connected"; payload: { client_id: string } }
   | { type: "Disconnected"; payload: { client_id: string } }
@@ -91,46 +32,4 @@ export interface WebSocketClient {
   onMessage(callback: (message: WebSocketMessage) => void): void;
   onStateChange(callback: (state: WebSocketConnectionState) => void): void;
   getState(): WebSocketConnectionState;
-}
-
-// File operation types
-export interface FileInfo {
-  name: string;
-  path: string;
-  is_directory: boolean;
-  size?: number;
-  modified_at?: number;
-  created_at?: number;
-}
-
-export interface FileListRequest {
-  project_id?: string;
-  path?: string; // Relative path within project, defaults to root
-}
-
-export interface FileListResponse {
-  files: FileInfo[];
-  current_path: string;
-}
-
-export interface FileCreateRequest {
-  project_id: string;
-  path: string; // Relative path within project
-  content?: string; // None for directories
-  is_directory: boolean;
-}
-
-export interface FileUpdateRequest {
-  project_id: string;
-  content: string;
-}
-
-export interface FileContentResponse {
-  path: string;
-  content: string;
-  modified_at?: number;
-}
-
-export interface FileResponse {
-  file: FileInfo;
 }
