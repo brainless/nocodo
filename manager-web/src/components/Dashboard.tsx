@@ -157,7 +157,7 @@ const SessionsCard: Component = () => {
   };
 
   const recentSessions = () => {
-    return store.list
+    return [...store.list]
       .sort((a, b) => b.started_at - a.started_at)
       .slice(0, 5);
   };

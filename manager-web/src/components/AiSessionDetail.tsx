@@ -1,5 +1,5 @@
 import { Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
-import { useParams, useNavigate, A } from '@solidjs/router';
+import { useParams, A } from '@solidjs/router';
 import { AiSession, Project, AiSessionStatus } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
@@ -86,7 +86,6 @@ const LiveStatusIndicator: Component<{
 
 const AiSessionDetail: Component = () => {
   const params = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { store, actions } = useSessions();
   const [project, setProject] = createSignal<Project | null>(null);
   const [isConnected, setIsConnected] = createSignal(false);
@@ -105,41 +104,57 @@ const AiSessionDetail: Component = () => {
   };
 
   // Load session data and connect to live updates
-  onMount(async () => {
-    // First try to get from store, if not available fetch from API
-    let sessionData = session();
-    if (!sessionData) {
-      sessionData = await actions.fetchById(params.id);
-    }
+  onMount(() => {
+    // Use a flag to prevent operations after unmount
+    let isMounted = true;
+    
+    // Load session data safely
+    const loadSessionData = async () => {
+      try {
+        // First try to get from store, if not available fetch from API
+        let sessionData = session();
+        if (!sessionData && isMounted) {
+          sessionData = await actions.fetchById(params.id);
+        }
 
-    // Fetch associated project if it exists
-    if (sessionData?.project_id) {
-      fetchProject(sessionData.project_id);
-    }
+        // Only proceed if component is still mounted
+        if (!isMounted || !sessionData) return;
 
-    // Connect to live updates for running sessions
-    if (sessionData?.status === 'running') {
-      actions.connect(params.id);
-      setIsConnected(true);
-    }
+        // Fetch associated project if it exists
+        if (sessionData.project_id) {
+          fetchProject(sessionData.project_id).catch(console.error);
+        }
+
+        // Connect to live updates for running sessions
+        if (sessionData.status === 'running') {
+          actions.connect(params.id);
+          setIsConnected(true);
+        }
+      } catch (error) {
+        console.error('Failed to load session data:', error);
+      }
+    };
+    
+    // Start loading asynchronously
+    loadSessionData();
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
   });
 
   // Cleanup: disconnect from live updates when leaving
   onCleanup(() => {
-    actions.disconnect(params.id);
-    setIsConnected(false);
-  });
-
-  // Handle reconnection when session changes to running state
-  const handleStatusChange = (newStatus: string) => {
-    if (newStatus === 'running' && !isConnected()) {
-      actions.connect(params.id);
-      setIsConnected(true);
-    } else if (newStatus !== 'running' && isConnected()) {
+    try {
       actions.disconnect(params.id);
       setIsConnected(false);
+    } catch (error) {
+      // Ignore cleanup errors during unmounting
+      console.warn('Error during cleanup:', error);
     }
-  };
+  });
+
 
   return (
     <div class="space-y-6">
@@ -147,12 +162,12 @@ const AiSessionDetail: Component = () => {
       <nav class="flex" aria-label="Breadcrumb">
         <ol role="list" class="flex items-center space-x-2 text-sm">
           <li>
-            <button
-              onClick={() => navigate('/ai/sessions')}
+            <A
+              href="/ai/sessions"
               class="text-gray-500 hover:text-gray-700 focus:outline-none focus:underline cursor-pointer"
             >
               AI Sessions
-            </button>
+            </A>
           </li>
           <li>
             <span class="text-gray-400" aria-hidden="true">›</span>
@@ -188,12 +203,12 @@ const AiSessionDetail: Component = () => {
       <Show when={!store.loading && !session()}>
         <div class="text-center py-8">
           <div class="text-gray-400 text-lg mb-2">Session not found</div>
-          <button
-            onClick={() => navigate('/ai/sessions')}
+          <A
+            href="/ai/sessions"
             class="text-blue-600 hover:text-blue-800 cursor-pointer focus:outline-none focus:underline"
           >
             ← Back to sessions
-          </button>
+          </A>
         </div>
       </Show>
 
@@ -329,21 +344,21 @@ const AiSessionDetail: Component = () => {
 
       {/* Action buttons */}
       <div class="flex justify-between items-center pt-6 border-t border-gray-200">
-        <button
-          onClick={() => navigate('/ai/sessions')}
+        <A
+          href="/ai/sessions"
           class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
         >
           <span class="mr-2" aria-hidden="true">←</span>
           Back to Sessions
-        </button>
+        </A>
         <Show when={session() && session()!.project_id}>
-          <button
-            onClick={() => navigate(`/projects/${session()!.project_id}/files`)}
+          <A
+            href={`/projects/${session()!.project_id}/files`}
             class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             View Project
             <span class="ml-2" aria-hidden="true">→</span>
-          </button>
+          </A>
         </Show>
       </div>
     </div>
