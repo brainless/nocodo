@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
-import { Router } from '@solidjs/router';
+import { MemoryRouter } from '@solidjs/router';
 import AiSessionsList from '../components/AiSessionsList';
 import { SessionsProvider } from '../stores/sessionsStore';
 import { apiClient } from '../api';
@@ -64,11 +64,11 @@ const mockSessions: AiSession[] = [
 // Test wrapper component
 const TestWrapper = ({ children }: { children: any }) => {
   return (
-    <Router>
+    <MemoryRouter>
       <SessionsProvider>
         {children}
       </SessionsProvider>
-    </Router>
+    </MemoryRouter>
   );
 };
 
@@ -99,12 +99,13 @@ describe('AiSessionsList Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText('AI Sessions')).toBeInTheDocument();
+      expect(screen.getByText('Monitor and manage your AI-assisted development sessions')).toBeInTheDocument();
     });
 
-    // Check that sessions are displayed
+    // Check that sessions are displayed via SessionRow components
     await waitFor(() => {
-      expect(screen.getByText('claude')).toBeInTheDocument();
-      expect(screen.getByText('gpt-4')).toBeInTheDocument();
+      expect(screen.getByLabelText('AI Tool: claude')).toBeInTheDocument();
+      expect(screen.getByLabelText('AI Tool: gpt-4')).toBeInTheDocument();
       expect(screen.getByText('Test Project 1')).toBeInTheDocument();
       expect(screen.getByText('Test Project 2')).toBeInTheDocument();
     });
@@ -124,7 +125,8 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
     
     await waitFor(() => {
-      expect(screen.getByText('No AI sessions found')).toBeInTheDocument();
+      expect(screen.getByText('No AI sessions yet')).toBeInTheDocument();
+      expect(screen.getByText('Start your first AI session using the nocodo CLI.')).toBeInTheDocument();
     });
   });
 
@@ -135,8 +137,9 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
     
     await waitFor(() => {
-      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText('Error Loading Sessions')).toBeInTheDocument();
       expect(screen.getByText(errorMessage)).toBeInTheDocument();
+      expect(screen.getByText('Try Again')).toBeInTheDocument();
     });
   });
 
@@ -144,9 +147,9 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
     
     await waitFor(() => {
-      expect(screen.getByText('running')).toBeInTheDocument();
-      expect(screen.getByText('completed')).toBeInTheDocument();
-      expect(screen.getByText('failed')).toBeInTheDocument();
+      expect(screen.getByLabelText('Session status: running')).toBeInTheDocument();
+      expect(screen.getByLabelText('Session status: completed')).toBeInTheDocument();
+      expect(screen.getByLabelText('Session status: failed')).toBeInTheDocument();
     });
   });
 
@@ -191,12 +194,15 @@ describe('AiSessionsList Component', () => {
 });
 
 describe('AiSessionsList Filters', () => {
-  test('renders filter dropdowns', async () => {
+  test('renders filter dropdowns with improved accessibility', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
     
     await waitFor(() => {
+      expect(screen.getByText('Filter Sessions')).toBeInTheDocument();
       expect(screen.getByLabelText('Tool')).toBeInTheDocument();
       expect(screen.getByLabelText('Status')).toBeInTheDocument();
+      expect(screen.getByText('Filter sessions by AI tool')).toBeInTheDocument();
+      expect(screen.getByText('Filter sessions by completion status')).toBeInTheDocument();
     });
   });
 
