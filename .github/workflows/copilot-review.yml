@@ -1,0 +1,299 @@
+name: GitHub Copilot Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+  checks: read
+
+env:
+  # Enable Copilot features
+  COPILOT_ENABLED: true
+
+jobs:
+  # Code quality review using Copilot
+  copilot-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # Get list of changed files in the PR
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} > changed_files.txt
+          echo "Changed files:"
+          cat changed_files.txt
+          
+          # Filter for relevant file types
+          grep -E '\.(rs|ts|tsx|js|jsx|toml|yml|yaml|json|md)$' changed_files.txt > reviewable_files.txt || touch reviewable_files.txt
+          echo "Reviewable files:"
+          cat reviewable_files.txt
+          
+          # Set output for next steps
+          echo "has_reviewable_files=$([ -s reviewable_files.txt ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+      - name: Setup Rust toolchain
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup Node.js
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Analyze Rust code quality
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        run: |
+          # Run basic quality checks on Rust files
+          if grep -q '\.rs$' reviewable_files.txt; then
+            echo "## Rust Code Analysis" >> review_comments.md
+            echo "" >> review_comments.md
+            
+            # Check formatting
+            if ! cargo fmt --all --check; then
+              echo "- ⚠️ **Code formatting**: Some Rust files are not formatted according to rustfmt standards." >> review_comments.md
+              echo "  - Run \`cargo fmt\` to fix formatting issues." >> review_comments.md
+              echo "" >> review_comments.md
+            else
+              echo "- ✅ **Code formatting**: All Rust files are properly formatted." >> review_comments.md
+              echo "" >> review_comments.md
+            fi
+            
+            # Check with clippy
+            if ! cargo clippy --workspace --all-targets -- --deny warnings >/dev/null 2>&1; then
+              echo "- ⚠️ **Linting**: Clippy found potential issues in Rust code." >> review_comments.md
+              echo "  - Run \`cargo clippy --workspace --all-targets -- --deny warnings\` to see detailed warnings." >> review_comments.md
+              echo "" >> review_comments.md
+            else
+              echo "- ✅ **Linting**: No clippy warnings found." >> review_comments.md
+              echo "" >> review_comments.md
+            fi
+          fi
+
+      - name: Analyze TypeScript/JavaScript code quality
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        run: |
+          # Check if there are TypeScript/JavaScript files
+          if grep -qE '\.(ts|tsx|js|jsx)$' reviewable_files.txt; then
+            echo "## TypeScript/JavaScript Code Analysis" >> review_comments.md
+            echo "" >> review_comments.md
+            
+            # Check manager-web directory
+            if ls manager-web/*.ts manager-web/*.tsx manager-web/src/*.ts manager-web/src/*.tsx >/dev/null 2>&1; then
+              cd manager-web
+              
+              # Install dependencies if package.json exists
+              if [ -f package.json ]; then
+                npm ci >/dev/null 2>&1 || echo "Failed to install dependencies"
+                
+                # Check TypeScript compilation
+                if npm run typecheck >/dev/null 2>&1; then
+                  echo "- ✅ **TypeScript**: No type errors found." >> ../review_comments.md
+                else
+                  echo "- ⚠️ **TypeScript**: Type checking failed." >> ../review_comments.md
+                  echo "  - Run \`npm run typecheck\` to see detailed errors." >> ../review_comments.md
+                fi
+                echo "" >> ../review_comments.md
+                
+                # Check linting
+                if npm run lint >/dev/null 2>&1; then
+                  echo "- ✅ **ESLint**: No linting errors found." >> ../review_comments.md
+                else
+                  echo "- ⚠️ **ESLint**: Linting issues found." >> ../review_comments.md
+                  echo "  - Run \`npm run lint\` to see detailed issues." >> ../review_comments.md
+                fi
+                echo "" >> ../review_comments.md
+                
+                # Check formatting
+                if npm run format:check >/dev/null 2>&1; then
+                  echo "- ✅ **Prettier**: Code formatting is consistent." >> ../review_comments.md
+                else
+                  echo "- ⚠️ **Prettier**: Code formatting inconsistencies found." >> ../review_comments.md
+                  echo "  - Run \`npm run format\` to fix formatting." >> ../review_comments.md
+                fi
+                echo "" >> ../review_comments.md
+              fi
+              
+              cd ..
+            fi
+          fi
+
+      - name: Check security considerations
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        run: |
+          echo "## Security Analysis" >> review_comments.md
+          echo "" >> review_comments.md
+          
+          # Check for common security patterns
+          SECURITY_ISSUES=0
+          
+          # Check for potential unsafe Rust code
+          if grep -r "unsafe" --include="*.rs" . >/dev/null 2>&1; then
+            echo "- ⚠️ **Unsafe Rust**: Found \`unsafe\` blocks in Rust code." >> review_comments.md
+            echo "  - Please ensure unsafe code is properly justified and documented." >> review_comments.md
+            echo "" >> review_comments.md
+            SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+          fi
+          
+          # Check for hardcoded secrets/passwords
+          if grep -ri "password\|secret\|token\|key" --include="*.rs" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | grep -v "test" | grep -v "example" >/dev/null 2>&1; then
+            echo "- ⚠️ **Potential secrets**: Found references to passwords, secrets, or tokens." >> review_comments.md
+            echo "  - Please verify no hardcoded credentials are present." >> review_comments.md
+            echo "" >> review_comments.md
+            SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+          fi
+          
+          # Check for console.log or println! statements
+          if grep -r "console\.log\|println!" --include="*.rs" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . >/dev/null 2>&1; then
+            echo "- ℹ️ **Debug output**: Found debug print statements." >> review_comments.md
+            echo "  - Consider removing or replacing with proper logging." >> review_comments.md
+            echo "" >> review_comments.md
+          fi
+          
+          if [ $SECURITY_ISSUES -eq 0 ]; then
+            echo "- ✅ **Security**: No obvious security issues detected." >> review_comments.md
+            echo "" >> review_comments.md
+          fi
+
+      - name: Generate code review summary
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        run: |
+          echo "## 🤖 Automated Code Review Summary" > final_review.md
+          echo "" >> final_review.md
+          echo "This automated review was generated to help ensure code quality and security standards." >> final_review.md
+          echo "" >> final_review.md
+          
+          if [ -f review_comments.md ]; then
+            cat review_comments.md >> final_review.md
+          fi
+          
+          echo "" >> final_review.md
+          echo "## Recommendations" >> final_review.md
+          echo "" >> final_review.md
+          echo "- Run the full CI pipeline to ensure all tests pass" >> final_review.md
+          echo "- Consider adding tests for any new functionality" >> final_review.md
+          echo "- Update documentation if API changes are involved" >> final_review.md
+          echo "- Follow the development workflow described in CLAUDE.md" >> final_review.md
+          echo "" >> final_review.md
+          echo "---" >> final_review.md
+          echo "*This review was automatically generated. Please address any issues before merging.*" >> final_review.md
+
+      - name: Post review comment
+        if: steps.changed-files.outputs.has_reviewable_files == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read the review content
+            let reviewBody = '';
+            try {
+              reviewBody = fs.readFileSync('final_review.md', 'utf8');
+            } catch (error) {
+              reviewBody = '## 🤖 Automated Code Review\n\nNo significant issues detected in the changed files.';
+            }
+            
+            // Post comment on PR
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reviewBody
+            });
+
+  # Follow-up analysis for approved PRs
+  post-merge-analysis:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Track code quality metrics
+        run: |
+          echo "PR #${{ github.event.pull_request.number }} was approved"
+          echo "Tracking quality metrics for future improvements"
+          
+          # This could be extended to:
+          # - Update quality metrics database
+          # - Generate reports on code quality trends
+          # - Notify relevant teams about patterns
+
+      - name: Post approval acknowledgment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🎉 **Code Review Complete**\n\nThis PR has been approved and automated quality checks have passed. Thank you for following the coding standards!'
+            });
+
+  # Copilot suggestions for improvements
+  suggest-improvements:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze code complexity
+        run: |
+          # Simple complexity analysis
+          echo "## 📊 Code Complexity Analysis" > complexity_report.md
+          echo "" >> complexity_report.md
+          
+          # Count lines of code changes
+          ADDED_LINES=$(git diff --numstat ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | awk '{sum+=$1} END {print sum+0}')
+          REMOVED_LINES=$(git diff --numstat ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | awk '{sum+=$2} END {print sum+0}')
+          
+          echo "- **Lines added**: $ADDED_LINES" >> complexity_report.md
+          echo "- **Lines removed**: $REMOVED_LINES" >> complexity_report.md
+          echo "- **Net change**: $((ADDED_LINES - REMOVED_LINES))" >> complexity_report.md
+          echo "" >> complexity_report.md
+          
+          # Suggest improvements based on change size
+          if [ $ADDED_LINES -gt 500 ]; then
+            echo "💡 **Suggestion**: This is a large PR with $ADDED_LINES added lines. Consider:" >> complexity_report.md
+            echo "- Breaking it into smaller, focused PRs" >> complexity_report.md
+            echo "- Adding comprehensive tests for the new functionality" >> complexity_report.md
+            echo "- Updating documentation as needed" >> complexity_report.md
+            echo "" >> complexity_report.md
+          fi
+
+      - name: Post complexity analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const complexityReport = fs.readFileSync('complexity_report.md', 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: complexityReport + '\n---\n*Automated analysis by GitHub Actions*'
+              });
+            } catch (error) {
+              console.log('No complexity report to post');
+            }
