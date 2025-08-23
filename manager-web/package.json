@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "sync-types": "node sync-types.js"
   },
   "dependencies": {
     "@solidjs/router": "^0.10.0",
