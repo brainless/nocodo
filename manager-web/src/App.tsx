@@ -1,4 +1,4 @@
-import { Component } from 'solid-js';
+import { Component, createSignal, createEffect, onMount } from 'solid-js';
 import { A, Route, Router } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
@@ -8,9 +8,11 @@ import AiSessionDetail from './components/AiSessionDetail';
 import Dashboard from './components/Dashboard';
 import { WebSocketProvider, useWebSocketConnection } from './WebSocketProvider';
 import { SessionsProvider } from './stores/sessionsStore';
+import { apiClient } from './api';
+import type { Project } from './types';
 
-// Connection Status Component
-const ConnectionStatus: Component = () => {
+// Status Bar Component for the bottom of the page
+const StatusBar: Component = () => {
   const { state, error } = useWebSocketConnection();
 
   const getStatusColor = (): string => {
@@ -40,75 +42,123 @@ const ConnectionStatus: Component = () => {
   };
 
   return (
-    <div class='flex items-center space-x-2 text-sm'>
-      <div class={`w-2 h-2 rounded-full ${getStatusColor()}`}></div>
-      <span class='text-gray-600'>{getStatusText()}</span>
-      {error && <span class='text-red-600 text-xs'>({error})</span>}
+    <div class='fixed bottom-0 left-0 right-0 bg-gray-100 border-t border-gray-200 px-4 py-2'>
+      <div class='container mx-auto flex justify-between items-center'>
+        <span class='text-sm text-gray-600'>nocodo Manager</span>
+        <div class='flex items-center space-x-2 text-sm'>
+          <div class={`w-2 h-2 rounded-full ${getStatusColor()}`}></div>
+          <span class='text-gray-600'>{getStatusText()}</span>
+          {error && <span class='text-red-600 text-xs'>({error})</span>}
+        </div>
+      </div>
     </div>
   );
 };
 
-// Layout component with navigation (shared across all routes)
+// Top Navigation Component
+const TopNavigation: Component = () => {
+  const [projects, setProjects] = createSignal<Project[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = createSignal(false);
+  let dropdownRef: HTMLDivElement | undefined;
+
+  onMount(async () => {
+    try {
+      const projectList = await apiClient.fetchProjects();
+      setProjects(projectList);
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    }
+
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  });
+
+  return (
+    <nav class='bg-white border-b border-gray-200 px-4 py-3'>
+      <div class='container mx-auto flex justify-between items-center'>
+        <div class='flex items-center space-x-4'>
+          {/* nocodo logo/home link */}
+          <A href='/' class='text-xl font-bold text-gray-900 hover:text-blue-600'>
+            nocodo
+          </A>
+          
+          {/* Project dropdown */}
+          <div class='relative' ref={dropdownRef}>
+            <button
+              class='flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+              onClick={() => setIsDropdownOpen(!isDropdownOpen())}
+            >
+              <span>Projects</span>
+              <svg class='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M19 9l-7 7-7-7' />
+              </svg>
+            </button>
+            
+            {isDropdownOpen() && (
+              <div class='absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-10'>
+                <div class='py-1'>
+                  <A href='/projects' class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'>
+                    All Projects
+                  </A>
+                  <A href='/projects/create' class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'>
+                    Create New Project
+                  </A>
+                  {projects().length > 0 && (
+                    <>
+                      <div class='border-t border-gray-200 my-1'></div>
+                      {projects().map(project => (
+                        <A 
+                          href={`/projects/${project.id}/files`} 
+                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                        >
+                          <div class='font-medium'>{project.name}</div>
+                          <div class='text-xs text-gray-500'>{project.language || 'Unknown'}</div>
+                        </A>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Right side - Chats link */}
+        <div class='flex items-center'>
+          <A 
+            href='/ai/sessions' 
+            class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md'
+          >
+            Chats
+          </A>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+// Layout component with new navigation structure
 const Layout: Component<{ children: any }> = props => {
   return (
-    <div class='min-h-screen bg-gray-50'>
-      <div class='container mx-auto px-4 py-8'>
-        <header class='mb-8'>
-          <div class='flex justify-between items-start'>
-            <div>
-              <h1 class='text-3xl font-bold text-gray-900 mb-2'>nocodo Manager</h1>
-              <p class='text-gray-600'>AI-assisted development environment</p>
-            </div>
-            <ConnectionStatus />
-          </div>
-        </header>
-
-        <nav class='mb-8'>
-          <div class='flex space-x-4'>
-            <A
-              href='/'
-              class='px-4 py-2 rounded-md font-medium transition-colors'
-              activeClass='bg-blue-500 text-white'
-              inactiveClass='bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-              end
-            >
-              Dashboard
-            </A>
-            <A
-              href='/projects'
-              class='px-4 py-2 rounded-md font-medium transition-colors'
-              activeClass='bg-blue-500 text-white'
-              inactiveClass='bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-            >
-              Projects
-            </A>
-            <A
-              href='/projects/create'
-              class='px-4 py-2 rounded-md font-medium transition-colors'
-              activeClass='bg-blue-500 text-white'
-              inactiveClass='bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-            >
-              Create Project
-            </A>
-            <A
-              href='/ai/sessions'
-              class='px-4 py-2 rounded-md font-medium transition-colors'
-              activeClass='bg-blue-500 text-white'
-              inactiveClass='bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-            >
-              AI Sessions
-            </A>
-          </div>
-        </nav>
-
-        <main class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
+    <div class='min-h-screen bg-gray-50 pb-12'> {/* pb-12 for status bar space */}
+      <TopNavigation />
+      
+      <main class='container mx-auto px-4 py-8'>
+        <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
           {props.children}
-        </main>
-
-        <footer class='mt-8 text-center text-sm text-gray-500'>
-          <p>nocodo Manager - Minimal Web Interface</p>
-        </footer>
-      </div>
+        </div>
+      </main>
+      
+      <StatusBar />
     </div>
   );
 };
