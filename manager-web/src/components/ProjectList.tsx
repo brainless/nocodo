@@ -1,8 +1,7 @@
-import { Component, createSignal, onMount, createEffect } from 'solid-js';
+import { Component, For, createSignal, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
-import { Project, WebSocketMessage } from '../types';
+import { Project } from '../types';
 import { apiClient } from '../api';
-import { useWebSocket } from '../WebSocketProvider';
 
 interface ProjectListProps {
   onRefresh?: () => void;
@@ -14,7 +13,7 @@ const ProjectList: Component<ProjectListProps> = props => {
   const [error, setError] = createSignal<string | null>(null);
 
   // Get WebSocket context
-  const { store: wsStore } = useWebSocket();
+  // const { store: wsStore } = useWebSocket();
 
   const loadProjects = async () => {
     try {
@@ -120,57 +119,59 @@ const ProjectList: Component<ProjectListProps> = props => {
         </div>
       ) : (
         <div class='space-y-3'>
-          {projects().map(project => (
-            <div class='p-4 border border-gray-200 rounded-lg bg-white shadow-sm'>
-              <div class='flex items-start justify-between'>
-                <div>
-                  <h3 class='font-medium text-lg'>{project.name}</h3>
-                  <p class='text-sm text-gray-600 mt-1'>{project.path}</p>
-                  <div class='flex items-center gap-4 mt-2 text-sm text-gray-500'>
-                    {project.language && (
-                      <span class='bg-blue-100 text-blue-800 px-2 py-1 rounded'>
-                        {project.language}
+          <For each={projects()}>
+            {project => (
+              <div class='p-4 border border-gray-200 rounded-lg bg-white shadow-sm'>
+                <div class='flex items-start justify-between'>
+                  <div>
+                    <h3 class='font-medium text-lg'>{project.name}</h3>
+                    <p class='text-sm text-gray-600 mt-1'>{project.path}</p>
+                    <div class='flex items-center gap-4 mt-2 text-sm text-gray-500'>
+                      {project.language && (
+                        <span class='bg-blue-100 text-blue-800 px-2 py-1 rounded'>
+                          {project.language}
+                        </span>
+                      )}
+                      {project.framework && (
+                        <span class='bg-green-100 text-green-800 px-2 py-1 rounded'>
+                          {project.framework}
+                        </span>
+                      )}
+                      <span
+                        class={`px-2 py-1 rounded text-xs uppercase font-medium ${
+                          project.status === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : project.status === 'inactive'
+                              ? 'bg-gray-100 text-gray-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {project.status}
                       </span>
-                    )}
-                    {project.framework && (
-                      <span class='bg-green-100 text-green-800 px-2 py-1 rounded'>
-                        {project.framework}
-                      </span>
-                    )}
-                    <span
-                      class={`px-2 py-1 rounded text-xs uppercase font-medium ${
-                        project.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : project.status === 'inactive'
-                            ? 'bg-gray-100 text-gray-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                      }`}
-                    >
-                      {project.status}
-                    </span>
+                    </div>
+                    <p class='text-xs text-gray-400 mt-2'>
+                      Created: {new Date(project.created_at * 1000).toLocaleDateString()}
+                    </p>
                   </div>
-                  <p class='text-xs text-gray-400 mt-2'>
-                    Created: {new Date(project.created_at * 1000).toLocaleDateString()}
-                  </p>
-                </div>
-                <div class='flex flex-col space-y-2'>
-                  <A
-                    href={`/projects/${project.id}/files`}
-                    class='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-center'
-                  >
-                    Files
-                  </A>
-                  <button
-                    onClick={() => deleteProject(project.id)}
-                    class='px-3 py-1 text-sm text-red-500 hover:text-red-700 border border-red-500 hover:border-red-700 rounded transition-colors'
-                    title='Delete project'
-                  >
-                    Delete
-                  </button>
+                  <div class='flex flex-col space-y-2'>
+                    <A
+                      href={`/projects/${project.id}/files`}
+                      class='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-center'
+                    >
+                      Files
+                    </A>
+                    <button
+                      onClick={() => deleteProject(project.id)}
+                      class='px-3 py-1 text-sm text-red-500 hover:text-red-700 border border-red-500 hover:border-red-700 rounded transition-colors'
+                      title='Delete project'
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )}
+          </For>
         </div>
       )}
     </div>

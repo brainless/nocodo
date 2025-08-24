@@ -27,7 +27,7 @@ async fn show_config() -> Result<(), CliError> {
 
 /// Set a configuration value
 async fn set_config(key: &str, value: &str) -> Result<(), CliError> {
-    println!("Setting {} = {}", key, value);
+    println!("Setting {key} = {value}");
     println!("Configuration setting functionality - Coming soon!");
 
     // Future: This will implement:
@@ -41,7 +41,7 @@ async fn set_config(key: &str, value: &str) -> Result<(), CliError> {
 
 /// Get a configuration value
 async fn get_config(key: &str) -> Result<(), CliError> {
-    println!("Getting configuration for: {}", key);
+    println!("Getting configuration for: {key}");
     println!("Configuration getting functionality - Coming soon!");
 
     // Future: This will implement:

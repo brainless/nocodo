@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{commands, error::CliError};
 use commands::*;
@@ -203,13 +203,13 @@ impl Cli {
 
     async fn handle_validate(
         &self,
-        file: &PathBuf,
+        file: &Path,
         language: &Option<String>,
     ) -> Result<(), CliError> {
         validate_code(file, language).await
     }
 
-    async fn handle_init(&self, template: &Option<String>, path: &PathBuf) -> Result<(), CliError> {
+    async fn handle_init(&self, template: &Option<String>, path: &Path) -> Result<(), CliError> {
         init_project(template, path).await
     }
 

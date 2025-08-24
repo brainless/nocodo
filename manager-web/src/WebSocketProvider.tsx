@@ -1,13 +1,6 @@
-import {
-  Component,
-  createContext,
-  useContext,
-  onMount,
-  onCleanup,
-  ParentComponent,
-} from 'solid-js';
+import { ParentComponent, createContext, onCleanup, onMount, useContext } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { Project, WebSocketMessage, WebSocketConnectionState } from './types';
+import { WebSocketConnectionState, WebSocketMessage } from './types';
 import { getWebSocketClient } from './websocket';
 
 // WebSocket store interface
@@ -52,12 +45,12 @@ export const WebSocketProvider: ParentComponent = props => {
   // Actions
   const actions: WebSocketActions = {
     connect: () => {
-      console.log('WebSocket connect requested');
+      // WebSocket connect requested
       wsClient.connect();
     },
 
     disconnect: () => {
-      console.log('WebSocket disconnect requested');
+      // WebSocket disconnect requested
       wsClient.disconnect();
     },
 
@@ -68,11 +61,11 @@ export const WebSocketProvider: ParentComponent = props => {
 
   // Setup WebSocket event handlers
   onMount(() => {
-    console.log('WebSocket provider mounted, setting up event handlers');
+    // WebSocket provider mounted, setting up event handlers
 
     // Handle state changes
     wsClient.onStateChange(state => {
-      console.log('WebSocket state changed to:', state);
+      // WebSocket state changed to: ${state}
       setStore('connectionState', state);
       setStore('isConnected', state === 'connected');
 
@@ -85,19 +78,19 @@ export const WebSocketProvider: ParentComponent = props => {
 
     // Handle incoming messages
     wsClient.onMessage(message => {
-      console.log('WebSocket message received in provider:', message);
+      // WebSocket message received in provider
       setStore('lastMessage', message);
 
       // Handle specific message types
       switch (message.type) {
         case 'Connected':
           setStore('clientId', message.payload.client_id);
-          console.log('WebSocket client connected with ID:', message.payload.client_id);
+          // WebSocket client connected with ID: ${message.payload.client_id}
           break;
 
         case 'Error':
           setStore('error', message.payload.message);
-          console.error('WebSocket error:', message.payload.message);
+          // WebSocket error: ${message.payload.message}
           break;
 
         default:
@@ -112,7 +105,7 @@ export const WebSocketProvider: ParentComponent = props => {
 
   // Cleanup on unmount
   onCleanup(() => {
-    console.log('WebSocket provider unmounting, disconnecting...');
+    // WebSocket provider unmounting, disconnecting...
     actions.disconnect();
   });
 

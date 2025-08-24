@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { apiClient } from '../api';
 import type { AiSession, AiSessionListResponse, AiSessionResponse } from '../types';
 
@@ -194,7 +194,7 @@ describe('API Client - AI Sessions', () => {
       const onMessage = vi.fn();
       const onOpen = vi.fn();
 
-      const connection = apiClient.subscribeSession(sessionId, onMessage, undefined, onOpen);
+      apiClient.subscribeSession(sessionId, onMessage, undefined, onOpen);
 
       // Simulate WebSocket open event
       mockWebSocket.onopen();

@@ -1,5 +1,5 @@
-import { Component, createSignal, createEffect, Show } from 'solid-js';
-import { FileInfo, FileContentResponse, Project } from '../types';
+import { Component, Show, createEffect, createSignal } from 'solid-js';
+import { FileContentResponse, FileInfo, Project } from '../types';
 import { apiClient } from '../api';
 
 interface FileEditorProps {

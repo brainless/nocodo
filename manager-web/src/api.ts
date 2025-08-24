@@ -1,19 +1,18 @@
 import {
-  Project,
-  CreateProjectRequest,
-  ApiError,
-  FileListRequest,
-  FileListResponse,
-  FileCreateRequest,
-  FileUpdateRequest,
-  FileContentResponse,
-  FileResponse,
-  CreateAiSessionRequest,
-  AiSessionResponse,
+  AiSession,
   AiSessionListResponse,
   AiSessionOutputListResponse,
-  AiSession,
-  AiSessionStatus,
+  AiSessionResponse,
+  ApiError,
+  CreateAiSessionRequest,
+  CreateProjectRequest,
+  FileContentResponse,
+  FileCreateRequest,
+  FileListRequest,
+  FileListResponse,
+  FileResponse,
+  FileUpdateRequest,
+  Project,
 } from './types';
 
 class ApiClient {
@@ -71,7 +70,7 @@ class ApiClient {
     if (params.path) queryParams.set('path', params.path);
 
     const queryString = queryParams.toString();
-    const endpoint = `/files${queryString ? '?' + queryString : ''}`;
+    const endpoint = `/files${queryString ? `?${queryString}` : ''}`;
     return this.request<FileListResponse>(endpoint);
   }
 

@@ -45,7 +45,12 @@ async fn main() -> AppResult<()> {
     tracing::info!("WebSocket server started");
 
     // Start Unix socket server
-    let socket_server = SocketServer::new(&config.socket.path, Arc::clone(&database)).await?;
+    let socket_server = SocketServer::new(
+        &config.socket.path,
+        Arc::clone(&database),
+        Arc::clone(&broadcaster),
+    )
+    .await?;
     let socket_task = tokio::spawn(async move {
         if let Err(e) = socket_server.run().await {
             tracing::error!("Socket server error: {}", e);
@@ -103,8 +108,9 @@ async fn main() -> AppResult<()> {
                             web::get().to(handlers::list_ai_outputs),
                         ),
                 )
-                // WebSocket endpoint
+                // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
+                .route("/ws/ai-sessions/{id}", web::get().to(websocket::ai_session_websocket_handler))
                 // Serve static files from ./web/dist if it exists
                 .service(
                     fs::Files::new("/", "./web/dist")

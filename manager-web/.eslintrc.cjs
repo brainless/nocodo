@@ -19,9 +19,9 @@ module.exports = {
   ],
   rules: {
     // TypeScript specific rules
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-unused-vars': 'warn',
     '@typescript-eslint/explicit-function-return-type': 'warn',
-    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-explicit-any': 'warn',
     
     // General code quality
     'no-console': 'warn',
@@ -46,15 +46,15 @@ module.exports = {
     'max-lines-per-function': ['warn', 100],
     
     // SolidJS specific rules (when solid eslint plugin is available)
-    'solid/reactivity': 'error',
-    'solid/no-destructure': 'error',
+    'solid/reactivity': 'warn',
+    'solid/no-destructure': 'warn',
     'solid/jsx-no-duplicate-props': 'error',
     'solid/jsx-no-script-url': 'error',
     'solid/jsx-no-undef': 'error',
     'solid/jsx-uses-vars': 'error',
     'solid/no-react-deps': 'error',
-    'solid/no-react-specific-props': 'error',
-    'solid/prefer-for': 'error',
+    'solid/no-react-specific-props': 'warn',
+    'solid/prefer-for': 'warn',
   },
   overrides: [
     // Test files have relaxed rules

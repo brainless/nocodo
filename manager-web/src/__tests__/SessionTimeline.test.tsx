@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
 import SessionTimeline from '../components/SessionTimeline';
 import type { AiSession } from '../types';
