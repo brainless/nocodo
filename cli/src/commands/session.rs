@@ -23,7 +23,10 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     let client = ManagerClient::new(socket_path, None);
 
     // Try to create AI session via HTTP API first, then fall back to Unix socket
-    let session = match client.create_ai_session_http(tool, prompt, project_path.clone()).await {
+    let session = match client
+        .create_ai_session_http(tool, prompt, project_path.clone())
+        .await
+    {
         Ok(session) => {
             info!("Created AI session via HTTP API: {}", session.id);
             session
@@ -31,7 +34,7 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
         Err(http_err) => {
             warn!("Failed to create AI session via HTTP API: {}", http_err);
             info!("Trying Unix socket as fallback");
-            
+
             match client
                 .create_ai_session(
                     tool.to_string(),

@@ -26,7 +26,7 @@ pub enum WebSocketMessage {
 
     // Status updates
     ProjectStatusChanged { project_id: String, status: String },
-    
+
     // AI session updates
     AiSessionCreated { session: AiSession },
     AiSessionStatusChanged { session_id: String, status: String },
@@ -302,7 +302,10 @@ pub async fn ai_session_websocket_handler(
     session_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let session_id = session_id.into_inner();
-    tracing::debug!("AI session WebSocket connection request received for session: {}", session_id);
+    tracing::debug!(
+        "AI session WebSocket connection request received for session: {}",
+        session_id
+    );
 
     // For now, we'll use the same WebSocket connection logic
     // All clients will receive all AI session events
@@ -321,6 +324,7 @@ pub struct WebSocketBroadcaster {
     server: Arc<Addr<WebSocketServer>>,
 }
 
+#[allow(dead_code)]
 impl WebSocketBroadcaster {
     pub fn new(server: Addr<WebSocketServer>) -> Self {
         Self {

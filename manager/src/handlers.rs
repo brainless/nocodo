@@ -890,6 +890,7 @@ pub async fn check_project_path_conflicts(
 }
 
 /// Extract project name from Git repository remote URL if available
+#[allow(dead_code)]
 fn extract_git_repo_name(project_path: &std::path::Path) -> Option<String> {
     // Check if it's a Git repository
     if !project_path.join(".git").exists() {
@@ -915,7 +916,7 @@ fn extract_git_repo_name(project_path: &std::path::Path) -> Option<String> {
     // git@github.com:user/repo.git -> repo
     // https://github.com/user/repo -> repo
 
-    let repo_name = if let Some(last_segment) = remote_url.split('/').last() {
+    let repo_name = if let Some(last_segment) = remote_url.split('/').next_back() {
         // Remove .git suffix if present
         if last_segment.ends_with(".git") {
             last_segment.strip_suffix(".git").unwrap_or(last_segment)
