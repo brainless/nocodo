@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
 import { MemoryRouter } from '@solidjs/router';
 import AiSessionsList from '../components/AiSessionsList';
@@ -74,17 +74,18 @@ const TestWrapper = (props: { children: any }) => {
   );
 };
 
-beforeEach(() => {
+// Setup API mocks
+vi.beforeEach(() => {
   vi.resetAllMocks();
-
   // Mock API calls
   (apiClient.listSessions as any).mockResolvedValue(mockSessions);
   (apiClient.fetchProjects as any).mockResolvedValue(mockProjects);
 });
 
-afterEach(() => {
+vi.afterEach(() => {
   vi.restoreAllMocks();
 });
+
 
 describe('AiSessionsList Component', () => {
   test('renders loading state initially', async () => {
