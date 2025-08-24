@@ -63,7 +63,7 @@ pub async fn create_project(
         project_path.to_path_buf()
     } else {
         std::env::current_dir()
-            .map_err(|e| AppError::Internal(format!("Failed to get current directory: {}", e)))?
+            .map_err(|e| AppError::Internal(format!("Failed to get current directory: {e}")))?
             .join(project_path)
     };
 
@@ -102,7 +102,7 @@ pub async fn create_project(
     } else {
         // Create basic project directory structure
         std::fs::create_dir_all(&absolute_project_path).map_err(|e| {
-            AppError::Internal(format!("Failed to create project directory: {}", e))
+            AppError::Internal(format!("Failed to create project directory: {e}"))
         })?;
 
         // Create a basic README.md
@@ -114,7 +114,7 @@ A new project created with nocodo.
             req.name
         );
         std::fs::write(absolute_project_path.join("README.md"), readme_content)
-            .map_err(|e| AppError::Internal(format!("Failed to create README.md: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to create README.md: {e}")))?;
     }
 
     // Initialize Git repository
@@ -169,7 +169,7 @@ pub async fn health_check(data: web::Data<AppState>) -> Result<HttpResponse, App
     let uptime = data
         .start_time
         .elapsed()
-        .map_err(|e| AppError::Internal(format!("Failed to calculate uptime: {}", e)))?
+        .map_err(|e| AppError::Internal(format!("Failed to calculate uptime: {e}")))?
         .as_secs();
 
     let status = ServerStatus {
@@ -193,7 +193,7 @@ fn apply_project_template(
 
     // Create project directory
     std::fs::create_dir_all(project_path)
-        .map_err(|e| AppError::Internal(format!("Failed to create project directory: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to create project directory: {e}")))?;
 
     // Apply template files
     for file in &template.files {
@@ -213,7 +213,7 @@ fn apply_project_template(
         // Process template content
         let processed_content = handlebars
             .render_template(&file.content, &context)
-            .map_err(|e| AppError::Internal(format!("Template processing error: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Template processing error: {e}")))?;
 
         // Write the file content
         std::fs::write(&file_path, processed_content).map_err(|e| {
@@ -249,7 +249,7 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
         .arg("init")
         .current_dir(project_path)
         .output()
-        .map_err(|e| AppError::Internal(format!("Failed to run git init: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to run git init: {e}")))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
@@ -260,10 +260,10 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
 
     // Add all files to git
     let output = Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(project_path)
         .output()
-        .map_err(|e| AppError::Internal(format!("Failed to run git add: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to run git add: {e}")))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
@@ -273,10 +273,10 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
 
     // Create initial commit
     let output = Command::new("git")
-        .args(&["commit", "-m", "Initial commit from nocodo"])
+        .args(["commit", "-m", "Initial commit from nocodo"])
         .current_dir(project_path)
         .output()
-        .map_err(|e| AppError::Internal(format!("Failed to run git commit: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to run git commit: {e}")))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
@@ -395,10 +395,10 @@ pub async fn list_files(
     // Security check: ensure the path is within the project directory
     let canonical_full_path = full_path
         .canonicalize()
-        .map_err(|e| AppError::InvalidRequest(format!("Invalid path: {}", e)))?;
+        .map_err(|e| AppError::InvalidRequest(format!("Invalid path: {e}")))?;
     let canonical_project_path = project_path
         .canonicalize()
-        .map_err(|e| AppError::Internal(format!("Invalid project path: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Invalid project path: {e}")))?;
 
     if !canonical_full_path.starts_with(&canonical_project_path) {
         return Err(AppError::InvalidRequest(
@@ -420,17 +420,17 @@ pub async fn list_files(
 
     // Read directory contents
     let entries = std::fs::read_dir(&canonical_full_path)
-        .map_err(|e| AppError::Internal(format!("Failed to read directory: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to read directory: {e}")))?;
 
     let mut files = Vec::new();
 
     for entry in entries {
         let entry =
-            entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {}", e)))?;
+            entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {e}")))?;
         let path = entry.path();
         let metadata = entry
             .metadata()
-            .map_err(|e| AppError::Internal(format!("Failed to read metadata: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to read metadata: {e}")))?;
 
         let name = path
             .file_name()
@@ -496,14 +496,14 @@ pub async fn create_file(
     // Security check: ensure the path is within the project directory
     let canonical_project_path = project_path
         .canonicalize()
-        .map_err(|e| AppError::Internal(format!("Invalid project path: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Invalid project path: {e}")))?;
 
     // Check if parent directory exists and resolve path
     if let Some(parent) = full_path.parent() {
         if parent.exists() {
             let canonical_parent = parent
                 .canonicalize()
-                .map_err(|e| AppError::InvalidRequest(format!("Invalid parent path: {}", e)))?;
+                .map_err(|e| AppError::InvalidRequest(format!("Invalid parent path: {e}")))?;
 
             if !canonical_parent.starts_with(&canonical_project_path) {
                 return Err(AppError::InvalidRequest(
@@ -527,23 +527,23 @@ pub async fn create_file(
     // Create file or directory
     if req.is_directory {
         std::fs::create_dir_all(&full_path)
-            .map_err(|e| AppError::Internal(format!("Failed to create directory: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to create directory: {e}")))?;
     } else {
         // Create parent directories if needed
         if let Some(parent) = full_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                AppError::Internal(format!("Failed to create parent directories: {}", e))
+                AppError::Internal(format!("Failed to create parent directories: {e}"))
             })?;
         }
 
         let content = req.content.unwrap_or_default();
         std::fs::write(&full_path, content)
-            .map_err(|e| AppError::Internal(format!("Failed to write file: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to write file: {e}")))?;
     }
 
     // Get file metadata for response
     let metadata = std::fs::metadata(&full_path)
-        .map_err(|e| AppError::Internal(format!("Failed to read metadata: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to read metadata: {e}")))?;
 
     let file_name = full_path
         .file_name()
@@ -605,10 +605,10 @@ pub async fn get_file_content(
     // Security check: ensure the path is within the project directory
     let canonical_full_path = full_path
         .canonicalize()
-        .map_err(|e| AppError::InvalidRequest(format!("Invalid file path: {}", e)))?;
+        .map_err(|e| AppError::InvalidRequest(format!("Invalid file path: {e}")))?;
     let canonical_project_path = project_path
         .canonicalize()
-        .map_err(|e| AppError::Internal(format!("Invalid project path: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Invalid project path: {e}")))?;
 
     if !canonical_full_path.starts_with(&canonical_project_path) {
         return Err(AppError::InvalidRequest(
@@ -626,10 +626,10 @@ pub async fn get_file_content(
 
     // Read file content
     let content = std::fs::read_to_string(&canonical_full_path)
-        .map_err(|e| AppError::Internal(format!("Failed to read file: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to read file: {e}")))?;
 
     let metadata = std::fs::metadata(&canonical_full_path)
-        .map_err(|e| AppError::Internal(format!("Failed to read metadata: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to read metadata: {e}")))?;
 
     let response = FileContentResponse {
         path: file_path,
@@ -660,10 +660,10 @@ pub async fn update_file(
     // Security check: ensure the path is within the project directory
     let canonical_full_path = full_path
         .canonicalize()
-        .map_err(|e| AppError::InvalidRequest(format!("Invalid file path: {}", e)))?;
+        .map_err(|e| AppError::InvalidRequest(format!("Invalid file path: {e}")))?;
     let canonical_project_path = project_path
         .canonicalize()
-        .map_err(|e| AppError::Internal(format!("Invalid project path: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Invalid project path: {e}")))?;
 
     if !canonical_full_path.starts_with(&canonical_project_path) {
         return Err(AppError::InvalidRequest(
@@ -681,10 +681,10 @@ pub async fn update_file(
 
     // Write file content
     std::fs::write(&canonical_full_path, &req.content)
-        .map_err(|e| AppError::Internal(format!("Failed to write file: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to write file: {e}")))?;
 
     let metadata = std::fs::metadata(&canonical_full_path)
-        .map_err(|e| AppError::Internal(format!("Failed to read metadata: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to read metadata: {e}")))?;
 
     tracing::info!("Updated file '{}' in project '{}'", file_path, project.name);
 
@@ -719,10 +719,10 @@ pub async fn delete_file(
     // Security check: ensure the path is within the project directory
     let canonical_full_path = full_path
         .canonicalize()
-        .map_err(|e| AppError::InvalidRequest(format!("Invalid file path: {}", e)))?;
+        .map_err(|e| AppError::InvalidRequest(format!("Invalid file path: {e}")))?;
     let canonical_project_path = project_path
         .canonicalize()
-        .map_err(|e| AppError::Internal(format!("Invalid project path: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Invalid project path: {e}")))?;
 
     if !canonical_full_path.starts_with(&canonical_project_path) {
         return Err(AppError::InvalidRequest(
@@ -739,7 +739,7 @@ pub async fn delete_file(
     // Delete file or directory
     if canonical_full_path.is_dir() {
         std::fs::remove_dir_all(&canonical_full_path)
-            .map_err(|e| AppError::Internal(format!("Failed to remove directory: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to remove directory: {e}")))?;
         tracing::info!(
             "Deleted directory '{}' from project '{}'",
             file_path,
@@ -747,7 +747,7 @@ pub async fn delete_file(
         );
     } else {
         std::fs::remove_file(&canonical_full_path)
-            .map_err(|e| AppError::Internal(format!("Failed to remove file: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to remove file: {e}")))?;
         tracing::info!(
             "Deleted file '{}' from project '{}'",
             file_path,
@@ -781,7 +781,7 @@ pub async fn create_ai_session(
         None
     };
 
-    let mut session = crate::models::AiSession::new(
+    let session = crate::models::AiSession::new(
         req.project_id.clone(),
         req.tool_name,
         req.prompt,

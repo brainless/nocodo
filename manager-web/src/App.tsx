@@ -49,7 +49,7 @@ const ConnectionStatus: Component = () => {
 };
 
 // Layout component with navigation (shared across all routes)
-const Layout: Component<{ children: unknown }> = props => {
+const Layout: Component<{ children: any }> = props => {
   return (
     <WebSocketProvider>
       <SessionsProvider>

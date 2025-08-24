@@ -61,7 +61,7 @@ impl SocketServer {
         }
 
         let listener = UnixListener::bind(socket_path)
-            .map_err(|e| AppError::Internal(format!("Failed to bind Unix socket: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to bind Unix socket: {e}")))?;
 
         // Restrict socket permissions to 600 (owner read/write)
         if let Err(e) = std::fs::set_permissions(socket_path, Permissions::from_mode(0o600)) {
@@ -108,27 +108,27 @@ impl SocketServer {
                 return Ok(());
             }
             Ok(_) => {
-                let request: SocketRequest = serde_json::from_str(&line.trim()).map_err(|e| {
-                    AppError::Internal(format!("Failed to parse socket request: {}", e))
+                let request: SocketRequest = serde_json::from_str(line.trim()).map_err(|e| {
+                    AppError::Internal(format!("Failed to parse socket request: {e}"))
                 })?;
 
                 let response = Self::process_request(request, &database).await;
                 let response_json = serde_json::to_string(&response).map_err(|e| {
-                    AppError::Internal(format!("Failed to serialize response: {}", e))
+                    AppError::Internal(format!("Failed to serialize response: {e}"))
                 })?;
 
                 writer
                     .write_all(response_json.as_bytes())
                     .await
-                    .map_err(|e| AppError::Internal(format!("Failed to write response: {}", e)))?;
+                    .map_err(|e| AppError::Internal(format!("Failed to write response: {e}")))?;
                 writer
                     .write_all(b"\n")
                     .await
-                    .map_err(|e| AppError::Internal(format!("Failed to write newline: {}", e)))?;
+                    .map_err(|e| AppError::Internal(format!("Failed to write newline: {e}")))?;
             }
             Err(e) => {
                 error!("Failed to read from socket: {}", e);
-                return Err(AppError::Internal(format!("Socket read error: {}", e)));
+                return Err(AppError::Internal(format!("Socket read error: {e}")));
             }
         }
 
@@ -183,7 +183,7 @@ impl SocketServer {
                     Err(e) => {
                         error!("Failed to create AI session: {}", e);
                         SocketResponse::Error {
-                            message: format!("Failed to create AI session: {}", e),
+                            message: format!("Failed to create AI session: {e}"),
                         }
                     }
                 }
@@ -214,14 +214,14 @@ impl SocketServer {
                                 SocketResponse::Success { data }
                             }
                             None => SocketResponse::Error {
-                                message: format!("No project found for path: {}", project_path),
+                                message: format!("No project found for path: {project_path}"),
                             },
                         }
                     }
                     Err(e) => {
                         error!("Failed to get projects: {}", e);
                         SocketResponse::Error {
-                            message: format!("Database error: {}", e),
+                            message: format!("Database error: {e}"),
                         }
                     }
                 }
@@ -241,7 +241,7 @@ impl SocketServer {
                             Err(e) => {
                                 error!("Failed to update AI session: {}", e);
                                 SocketResponse::Error {
-                                    message: format!("Failed to complete session: {}", e),
+                                    message: format!("Failed to complete session: {e}"),
                                 }
                             }
                         }
@@ -249,7 +249,7 @@ impl SocketServer {
                     Err(e) => {
                         error!("AI session not found: {}", e);
                         SocketResponse::Error {
-                            message: format!("Session not found: {}", session_id),
+                            message: format!("Session not found: {session_id}"),
                         }
                     }
                 }
@@ -269,7 +269,7 @@ impl SocketServer {
                             Err(e) => {
                                 error!("Failed to update AI session: {}", e);
                                 SocketResponse::Error {
-                                    message: format!("Failed to fail session: {}", e),
+                                    message: format!("Failed to fail session: {e}"),
                                 }
                             }
                         }
@@ -277,7 +277,7 @@ impl SocketServer {
                     Err(e) => {
                         error!("AI session not found: {}", e);
                         SocketResponse::Error {
-                            message: format!("Session not found: {}", session_id),
+                            message: format!("Session not found: {session_id}"),
                         }
                     }
                 }
@@ -300,14 +300,14 @@ impl SocketServer {
                         Err(e) => {
                             error!("Failed to record AI output: {}", e);
                             SocketResponse::Error {
-                                message: format!("Failed to record output: {}", e),
+                                message: format!("Failed to record output: {e}"),
                             }
                         }
                     },
                     Err(e) => {
                         error!("AI session not found for recording output: {}", e);
                         SocketResponse::Error {
-                            message: format!("Session not found: {}", session_id),
+                            message: format!("Session not found: {session_id}"),
                         }
                     }
                 }
@@ -335,8 +335,7 @@ impl SocketServer {
             .unwrap_or("Unknown");
 
         format!(
-            "Working directory: {}\nProject name (inferred): {}",
-            project_path, project_name
+            "Working directory: {project_path}\nProject name (inferred): {project_name}"
         )
     }
 }

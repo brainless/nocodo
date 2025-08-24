@@ -1,12 +1,24 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
-import { MemoryRouter } from '@solidjs/router';
-import SessionRow, { ProjectBadge, StatusBadge, ToolIcon } from '../components/SessionRow';
 import type { AiSession, Project } from '../types';
 
-// Test wrapper component with router
+// Mock the router components
+vi.mock('@solidjs/router', () => ({
+  A: (props: any) => (
+    <a href={props.href} class={props.class} role={props.role} aria-label={props['aria-label']}>
+      {props.children}
+    </a>
+  ),
+  MemoryRouter: (props: any) => props.children,
+  useParams: () => ({ id: 'test-id' }),
+  useNavigate: () => vi.fn(),
+}));
+
+import SessionRow, { ProjectBadge, StatusBadge, ToolIcon } from '../components/SessionRow';
+
+// Simple test wrapper
 const TestWrapper = (props: { children: any }) => {
-  return <MemoryRouter>{props.children}</MemoryRouter>;
+  return <div>{props.children}</div>;
 };
 
 // Mock data

@@ -11,8 +11,6 @@ pub enum CliError {
     Analysis(String),
     /// Command execution errors
     Command(String),
-    /// Validation errors
-    Validation(String),
     /// Communication with Manager daemon errors
     Communication(String),
     /// Generic errors from anyhow
@@ -22,13 +20,12 @@ pub enum CliError {
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CliError::Config(msg) => write!(f, "Configuration error: {}", msg),
-            CliError::Io(err) => write!(f, "I/O error: {}", err),
-            CliError::Analysis(msg) => write!(f, "Analysis error: {}", msg),
-            CliError::Command(msg) => write!(f, "Command error: {}", msg),
-            CliError::Validation(msg) => write!(f, "Validation error: {}", msg),
-            CliError::Communication(msg) => write!(f, "Communication error: {}", msg),
-            CliError::Other(err) => write!(f, "Error: {}", err),
+            CliError::Config(msg) => write!(f, "Configuration error: {msg}"),
+            CliError::Io(err) => write!(f, "I/O error: {err}"),
+            CliError::Analysis(msg) => write!(f, "Analysis error: {msg}"),
+            CliError::Command(msg) => write!(f, "Command error: {msg}"),
+            CliError::Communication(msg) => write!(f, "Communication error: {msg}"),
+            CliError::Other(err) => write!(f, "Error: {err}"),
         }
     }
 }
@@ -51,7 +48,6 @@ impl CliError {
             CliError::Io(_) => 3,
             CliError::Analysis(_) => 4,
             CliError::Command(_) => 5,
-            CliError::Validation(_) => 6,
             CliError::Communication(_) => 7,
             CliError::Other(_) => 1,
         }
@@ -82,5 +78,3 @@ impl From<serde_yaml::Error> for CliError {
     }
 }
 
-/// Result type alias for CLI operations
-pub type CliResult<T> = Result<T, CliError>;

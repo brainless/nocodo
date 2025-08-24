@@ -9,7 +9,7 @@ pub fn init_logging(verbose: bool) -> Result<(), CliError> {
     // Can be overridden with RUST_LOG environment variable
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new(default_level))
-        .map_err(|e| CliError::Config(format!("Failed to create log filter: {}", e)))?;
+        .map_err(|e| CliError::Config(format!("Failed to create log filter: {e}")))?;
 
     // Create a fmt layer that logs to stdout
     let fmt_layer = fmt::layer()
@@ -25,7 +25,7 @@ pub fn init_logging(verbose: bool) -> Result<(), CliError> {
         .with(env_filter)
         .with(fmt_layer)
         .try_init()
-        .map_err(|e| CliError::Config(format!("Failed to initialize logging: {}", e)))?;
+        .map_err(|e| CliError::Config(format!("Failed to initialize logging: {e}")))?;
 
     Ok(())
 }
