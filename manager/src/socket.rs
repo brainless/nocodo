@@ -1,6 +1,7 @@
 use crate::database::Database;
 use crate::error::{AppError, AppResult};
 use crate::models::{AiSession, CreateAiSessionRequest, Project};
+use crate::websocket::WebSocketBroadcaster;
 use serde::{Deserialize, Serialize};
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
@@ -51,17 +52,22 @@ pub enum SocketResponse {
 pub struct SocketServer {
     listener: UnixListener,
     database: Arc<Database>,
+    ws_broadcaster: Arc<WebSocketBroadcaster>,
 }
 
 impl SocketServer {
-    pub async fn new(socket_path: &str, database: Arc<Database>) -> AppResult<Self> {
+    pub async fn new(
+        socket_path: &str,
+        database: Arc<Database>,
+        ws_broadcaster: Arc<WebSocketBroadcaster>,
+    ) -> AppResult<Self> {
         // Remove existing socket file if it exists
         if Path::new(socket_path).exists() {
             std::fs::remove_file(socket_path)?;
         }
 
         let listener = UnixListener::bind(socket_path)
-            .map_err(|e| AppError::Internal(format!("Failed to bind Unix socket: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to bind Unix socket: {e}")))?;
 
         // Restrict socket permissions to 600 (owner read/write)
         if let Err(e) = std::fs::set_permissions(socket_path, Permissions::from_mode(0o600)) {
@@ -70,7 +76,11 @@ impl SocketServer {
 
         info!("Unix socket server listening on: {}", socket_path);
 
-        Ok(SocketServer { listener, database })
+        Ok(SocketServer {
+            listener,
+            database,
+            ws_broadcaster,
+        })
     }
 
     pub async fn run(self) -> AppResult<()> {
@@ -82,8 +92,9 @@ impl SocketServer {
             match stream {
                 Ok(stream) => {
                     let db = Arc::clone(&self.database);
+                    let ws_broadcaster = Arc::clone(&self.ws_broadcaster);
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_connection(stream, db).await {
+                        if let Err(e) = Self::handle_connection(stream, db, ws_broadcaster).await {
                             error!("Error handling socket connection: {}", e);
                         }
                     });
@@ -97,7 +108,11 @@ impl SocketServer {
         Ok(())
     }
 
-    async fn handle_connection(stream: UnixStream, database: Arc<Database>) -> AppResult<()> {
+    async fn handle_connection(
+        stream: UnixStream,
+        database: Arc<Database>,
+        ws_broadcaster: Arc<WebSocketBroadcaster>,
+    ) -> AppResult<()> {
         let (reader, mut writer) = stream.into_split();
         let mut reader = BufReader::new(reader);
 
@@ -108,34 +123,38 @@ impl SocketServer {
                 return Ok(());
             }
             Ok(_) => {
-                let request: SocketRequest = serde_json::from_str(&line.trim()).map_err(|e| {
-                    AppError::Internal(format!("Failed to parse socket request: {}", e))
+                let request: SocketRequest = serde_json::from_str(line.trim()).map_err(|e| {
+                    AppError::Internal(format!("Failed to parse socket request: {e}"))
                 })?;
 
-                let response = Self::process_request(request, &database).await;
+                let response = Self::process_request(request, &database, &ws_broadcaster).await;
                 let response_json = serde_json::to_string(&response).map_err(|e| {
-                    AppError::Internal(format!("Failed to serialize response: {}", e))
+                    AppError::Internal(format!("Failed to serialize response: {e}"))
                 })?;
 
                 writer
                     .write_all(response_json.as_bytes())
                     .await
-                    .map_err(|e| AppError::Internal(format!("Failed to write response: {}", e)))?;
+                    .map_err(|e| AppError::Internal(format!("Failed to write response: {e}")))?;
                 writer
                     .write_all(b"\n")
                     .await
-                    .map_err(|e| AppError::Internal(format!("Failed to write newline: {}", e)))?;
+                    .map_err(|e| AppError::Internal(format!("Failed to write newline: {e}")))?;
             }
             Err(e) => {
                 error!("Failed to read from socket: {}", e);
-                return Err(AppError::Internal(format!("Socket read error: {}", e)));
+                return Err(AppError::Internal(format!("Socket read error: {e}")));
             }
         }
 
         Ok(())
     }
 
-    async fn process_request(request: SocketRequest, database: &Database) -> SocketResponse {
+    async fn process_request(
+        request: SocketRequest,
+        database: &Database,
+        ws_broadcaster: &WebSocketBroadcaster,
+    ) -> SocketResponse {
         match request {
             SocketRequest::Ping => {
                 let data = serde_json::json!({ "ok": true });
@@ -177,13 +196,16 @@ impl SocketServer {
 
                 match database.create_ai_session(&session) {
                     Ok(()) => {
+                        // Broadcast AI session creation via WebSocket
+                        ws_broadcaster.broadcast_ai_session_created(session.clone());
+                        
                         let data = serde_json::to_value(&session).unwrap_or_default();
                         SocketResponse::Success { data }
                     }
                     Err(e) => {
                         error!("Failed to create AI session: {}", e);
                         SocketResponse::Error {
-                            message: format!("Failed to create AI session: {}", e),
+                            message: format!("Failed to create AI session: {e}"),
                         }
                     }
                 }
@@ -214,14 +236,14 @@ impl SocketServer {
                                 SocketResponse::Success { data }
                             }
                             None => SocketResponse::Error {
-                                message: format!("No project found for path: {}", project_path),
+                                message: format!("No project found for path: {project_path}"),
                             },
                         }
                     }
                     Err(e) => {
                         error!("Failed to get projects: {}", e);
                         SocketResponse::Error {
-                            message: format!("Database error: {}", e),
+                            message: format!("Database error: {e}"),
                         }
                     }
                 }
@@ -235,13 +257,16 @@ impl SocketServer {
                         session.complete();
                         match database.update_ai_session(&session) {
                             Ok(()) => {
+                                // Broadcast AI session completion via WebSocket
+                                ws_broadcaster.broadcast_ai_session_completed(session.id.clone());
+                                
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
                             }
                             Err(e) => {
                                 error!("Failed to update AI session: {}", e);
                                 SocketResponse::Error {
-                                    message: format!("Failed to complete session: {}", e),
+                                    message: format!("Failed to complete session: {e}"),
                                 }
                             }
                         }
@@ -249,7 +274,7 @@ impl SocketServer {
                     Err(e) => {
                         error!("AI session not found: {}", e);
                         SocketResponse::Error {
-                            message: format!("Session not found: {}", session_id),
+                            message: format!("Session not found: {session_id}"),
                         }
                     }
                 }
@@ -263,13 +288,16 @@ impl SocketServer {
                         session.fail();
                         match database.update_ai_session(&session) {
                             Ok(()) => {
+                                // Broadcast AI session failure via WebSocket
+                                ws_broadcaster.broadcast_ai_session_failed(session.id.clone());
+                                
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
                             }
                             Err(e) => {
                                 error!("Failed to update AI session: {}", e);
                                 SocketResponse::Error {
-                                    message: format!("Failed to fail session: {}", e),
+                                    message: format!("Failed to fail session: {e}"),
                                 }
                             }
                         }
@@ -277,7 +305,7 @@ impl SocketServer {
                     Err(e) => {
                         error!("AI session not found: {}", e);
                         SocketResponse::Error {
-                            message: format!("Session not found: {}", session_id),
+                            message: format!("Session not found: {session_id}"),
                         }
                     }
                 }
@@ -300,14 +328,14 @@ impl SocketServer {
                         Err(e) => {
                             error!("Failed to record AI output: {}", e);
                             SocketResponse::Error {
-                                message: format!("Failed to record output: {}", e),
+                                message: format!("Failed to record output: {e}"),
                             }
                         }
                     },
                     Err(e) => {
                         error!("AI session not found for recording output: {}", e);
                         SocketResponse::Error {
-                            message: format!("Session not found: {}", session_id),
+                            message: format!("Session not found: {session_id}"),
                         }
                     }
                 }
@@ -334,9 +362,6 @@ impl SocketServer {
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown");
 
-        format!(
-            "Working directory: {}\nProject name (inferred): {}",
-            project_path, project_name
-        )
+        format!("Working directory: {project_path}\nProject name (inferred): {project_name}")
     }
 }

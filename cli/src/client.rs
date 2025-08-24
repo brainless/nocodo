@@ -127,44 +127,19 @@ impl ManagerClient {
         }
     }
 
-    pub async fn ping(&self) -> Result<bool, CliError> {
-        let request = SocketRequest::Ping;
-        match self.send_request(request).await? {
-            SocketResponse::Success { data } => {
-                Ok(data.get("ok").and_then(|v| v.as_bool()).unwrap_or(false))
-            }
-            SocketResponse::Error { .. } => Ok(false),
-        }
-    }
-
-    pub async fn identify(
-        &self,
-        client_id: String,
-        token: Option<String>,
-    ) -> Result<serde_json::Value, CliError> {
-        let request = SocketRequest::Identify { client_id, token };
-        match self.send_request(request).await? {
-            SocketResponse::Success { data } => Ok(data),
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {}",
-                message
-            ))),
-        }
-    }
-
     pub async fn send_request(&self, request: SocketRequest) -> Result<SocketResponse, CliError> {
         debug!("Connecting to Manager daemon at: {}", self.socket_path);
 
         let stream = UnixStream::connect(&self.socket_path).await.map_err(|e| {
             error!("Failed to connect to Manager daemon: {}", e);
             CliError::Communication(format!(
-                "Cannot connect to Manager daemon at {}: {}. Make sure nocodo-manager is running.",
-                self.socket_path, e
+                "Cannot connect to Manager daemon at {}: {e}. Make sure nocodo-manager is running.",
+                self.socket_path
             ))
         })?;
 
         let request_json = serde_json::to_string(&request)
-            .map_err(|e| CliError::Communication(format!("Failed to serialize request: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to serialize request: {e}")))?;
 
         debug!("Sending request: {}", request_json);
 
@@ -173,23 +148,23 @@ impl ManagerClient {
         writer
             .write_all(request_json.as_bytes())
             .await
-            .map_err(|e| CliError::Communication(format!("Failed to write to socket: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to write to socket: {e}")))?;
         writer
             .write_all(b"\n")
             .await
-            .map_err(|e| CliError::Communication(format!("Failed to write newline: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to write newline: {e}")))?;
 
         let mut reader = BufReader::new(reader);
         let mut response_line = String::new();
         reader
             .read_line(&mut response_line)
             .await
-            .map_err(|e| CliError::Communication(format!("Failed to read response: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to read response: {e}")))?;
 
         debug!("Received response: {}", response_line.trim());
 
-        let response: SocketResponse = serde_json::from_str(&response_line.trim())
-            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+        let response: SocketResponse = serde_json::from_str(response_line.trim())
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
         Ok(response)
     }
@@ -232,7 +207,7 @@ impl ManagerClient {
         match response {
             SocketResponse::Success { data } => {
                 let session: AiSession = serde_json::from_value(data).map_err(|e| {
-                    CliError::Communication(format!("Failed to parse session data: {}", e))
+                    CliError::Communication(format!("Failed to parse session data: {e}"))
                 })?;
 
                 info!("Created AI session: {}", session.id);
@@ -240,10 +215,7 @@ impl ManagerClient {
             }
             SocketResponse::Error { message } => {
                 error!("Failed to create AI session: {}", message);
-                Err(CliError::Communication(format!(
-                    "Manager error: {}",
-                    message
-                )))
+                Err(CliError::Communication(format!("Manager error: {message}")))
             }
         }
     }
@@ -259,10 +231,9 @@ impl ManagerClient {
                 })?;
                 Ok(context.to_string())
             }
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {}",
-                message
-            ))),
+            SocketResponse::Error { message } => {
+                Err(CliError::Communication(format!("Manager error: {message}")))
+            }
         }
     }
 
@@ -275,10 +246,9 @@ impl ManagerClient {
 
         match response {
             SocketResponse::Success { data } => Ok(data),
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {}",
-                message
-            ))),
+            SocketResponse::Error { message } => {
+                Err(CliError::Communication(format!("Manager error: {message}")))
+            }
         }
     }
 
@@ -295,10 +265,7 @@ impl ManagerClient {
             }
             SocketResponse::Error { message } => {
                 error!("Failed to complete AI session: {}", message);
-                Err(CliError::Communication(format!(
-                    "Manager error: {}",
-                    message
-                )))
+                Err(CliError::Communication(format!("Manager error: {message}")))
             }
         }
     }
@@ -316,10 +283,7 @@ impl ManagerClient {
             }
             SocketResponse::Error { message } => {
                 error!("Failed to fail AI session: {}", message);
-                Err(CliError::Communication(format!(
-                    "Manager error: {}",
-                    message
-                )))
+                Err(CliError::Communication(format!("Manager error: {message}")))
             }
         }
     }
@@ -338,14 +302,122 @@ impl ManagerClient {
         let response = self.send_request(request).await?;
         match response {
             SocketResponse::Success { .. } => Ok(()),
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {}",
-                message
-            ))),
+            SocketResponse::Error { message } => {
+                Err(CliError::Communication(format!("Manager error: {message}")))
+            }
         }
     }
 
     // HTTP API methods
+
+    pub async fn create_ai_session_http(
+        &self,
+        tool_name: &str,
+        prompt: &str,
+        project_path: String,
+    ) -> Result<AiSession, CliError> {
+        info!("Creating AI session via HTTP API for tool: {}", tool_name);
+
+        // First, try to get project info if we have a project path
+        let project_id = match self.get_project_by_http_path(project_path.clone()).await {
+            Ok(project) => {
+                info!(
+                    "Found existing project: {}",
+                    project["name"].as_str().unwrap_or("Unknown")
+                );
+                Some(project["id"].as_str().unwrap_or("").to_string())
+            }
+            Err(_) => {
+                debug!("No existing project found for path: {}", project_path);
+                None
+            }
+        };
+
+        let request_body = serde_json::json!({
+            "project_id": project_id,
+            "tool_name": tool_name,
+            "prompt": prompt
+        });
+
+        let url = format!("{}/api/ai/sessions", self.manager_url);
+        debug!("POST {}", url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let session_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        let session: AiSession = serde_json::from_value(session_response["session"].clone())
+            .map_err(|e| {
+                CliError::Communication(format!("Failed to parse session data: {e}"))
+            })?;
+
+        info!("Created AI session via HTTP API: {}", session.id);
+        Ok(session)
+    }
+
+    async fn get_project_by_http_path(&self, project_path: String) -> Result<serde_json::Value, CliError> {
+        let url = format!("{}/api/projects", self.manager_url);
+        debug!("GET {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let projects_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        let projects = projects_response["projects"]
+            .as_array()
+            .ok_or_else(|| CliError::Communication("Invalid projects response format".to_string()))?;
+
+        for project in projects {
+            if let Some(path) = project["path"].as_str() {
+                if path == project_path {
+                    return Ok(project.clone());
+                }
+            }
+        }
+
+        Err(CliError::Communication(format!(
+            "No project found for path: {project_path}"
+        )))
+    }
 
     pub async fn create_project(&self, request: CreateProjectRequest) -> Result<Project, CliError> {
         info!("Creating project '{}' via HTTP API", request.name);
@@ -359,7 +431,7 @@ impl ManagerClient {
             .json(&request)
             .send()
             .await
-            .map_err(|e| CliError::Communication(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -368,15 +440,14 @@ impl ManagerClient {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(CliError::Communication(format!(
-                "HTTP {} error: {}",
-                status, error_text
+                "HTTP {status} error: {error_text}"
             )));
         }
 
         let project_response: ProjectResponse = response
             .json()
             .await
-            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
         info!(
             "Project '{}' created successfully at {}",
@@ -400,7 +471,7 @@ impl ManagerClient {
             .json(&request)
             .send()
             .await
-            .map_err(|e| CliError::Communication(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -409,15 +480,14 @@ impl ManagerClient {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(CliError::Communication(format!(
-                "HTTP {} error: {}",
-                status, error_text
+                "HTTP {status} error: {error_text}"
             )));
         }
 
         let project_response: ProjectResponse = response
             .json()
             .await
-            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
         info!(
             "Existing project '{}' registered successfully at {}",
@@ -437,7 +507,7 @@ impl ManagerClient {
             .get(&url)
             .send()
             .await
-            .map_err(|e| CliError::Communication(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -446,15 +516,14 @@ impl ManagerClient {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(CliError::Communication(format!(
-                "HTTP {} error: {}",
-                status, error_text
+                "HTTP {status} error: {error_text}"
             )));
         }
 
         let templates: Vec<ProjectTemplate> = response
             .json()
             .await
-            .map_err(|e| CliError::Communication(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
         info!("Fetched {} templates", templates.len());
         Ok(templates)

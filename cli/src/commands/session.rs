@@ -14,7 +14,7 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
 
     // Get current working directory as project path
     let project_path = env::current_dir()
-        .map_err(|e| CliError::Command(format!("Failed to get current directory: {}", e)))?
+        .map_err(|e| CliError::Command(format!("Failed to get current directory: {e}")))?
         .to_string_lossy()
         .to_string();
 
@@ -22,38 +22,49 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     let socket_path = "/tmp/nocodo-manager.sock".to_string();
     let client = ManagerClient::new(socket_path, None);
 
-    // Create AI session with Manager daemon
-    let session = match client
-        .create_ai_session(
-            tool.to_string(),
-            prompt.to_string(),
-            Some(project_path.clone()),
-        )
-        .await
-    {
+    // Try to create AI session via HTTP API first, then fall back to Unix socket
+    let session = match client.create_ai_session_http(tool, prompt, project_path.clone()).await {
         Ok(session) => {
-            info!("Created AI session: {}", session.id);
+            info!("Created AI session via HTTP API: {}", session.id);
             session
         }
-        Err(e) => {
-            warn!("Failed to create AI session with Manager: {}", e);
-            warn!("Proceeding without Manager integration");
+        Err(http_err) => {
+            warn!("Failed to create AI session via HTTP API: {}", http_err);
+            info!("Trying Unix socket as fallback");
+            
+            match client
+                .create_ai_session(
+                    tool.to_string(),
+                    prompt.to_string(),
+                    Some(project_path.clone()),
+                )
+                .await
+            {
+                Ok(session) => {
+                    info!("Created AI session via Unix socket: {}", session.id);
+                    session
+                }
+                Err(e) => {
+                    warn!("Failed to create AI session with Manager: {}", e);
+                    warn!("Proceeding without Manager integration");
 
-            // For now, continue without Manager integration during development
-            // Create a mock session for logging purposes
-            use crate::client::AiSession;
-            AiSession {
-                id: format!("mock-session-{}", std::process::id()),
-                project_id: None,
-                tool_name: tool.to_string(),
-                status: "running".to_string(),
-                prompt: prompt.to_string(),
-                project_context: None,
-                started_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as i64,
-                ended_at: None,
+                    // For now, continue without Manager integration during development
+                    // Create a mock session for logging purposes
+                    use crate::client::AiSession;
+                    AiSession {
+                        id: format!("mock-session-{}", std::process::id()),
+                        project_id: None,
+                        tool_name: tool.to_string(),
+                        status: "running".to_string(),
+                        prompt: prompt.to_string(),
+                        project_context: None,
+                        started_at: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs() as i64,
+                        ended_at: None,
+                    }
+                }
             }
         }
     };
@@ -67,15 +78,13 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
         }
         Err(e) => {
             warn!("Failed to get project context: {}", e);
-            format!("Working directory: {}", project_path)
+            format!("Working directory: {project_path}")
         }
     };
 
     // Build enhanced prompt with context
     let enhanced_prompt = format!(
-        "Project Context:\n{}\n\nUser Request:\n{}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes.",
-        context,
-        prompt
+        "Project Context:\n{context}\n\nUser Request:\n{prompt}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes."
     );
 
     info!("Executing {} with enhanced context", tool);
@@ -177,8 +186,7 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<ToolRun, CliError> 
 
     if !tool_available {
         return Err(CliError::Command(format!(
-            "AI tool '{}' not found. Please ensure it's installed and in your PATH.",
-            command
+            "AI tool '{command}' not found. Please ensure it's installed and in your PATH."
         )));
     }
 
@@ -188,7 +196,7 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<ToolRun, CliError> 
 
     // Write prompt to temporary file
     std::fs::write(&prompt_file, prompt)
-        .map_err(|e| CliError::Command(format!("Failed to write prompt file: {}", e)))?;
+        .map_err(|e| CliError::Command(format!("Failed to write prompt file: {e}")))?;
 
     info!("Wrote prompt to temporary file: {:?}", prompt_file);
 
@@ -214,7 +222,7 @@ async fn execute_ai_tool(tool: &str, prompt: &str) -> Result<ToolRun, CliError> 
     let output = cmd
         .output()
         .await
-        .map_err(|e| CliError::Command(format!("Failed to execute {}: {}", command, e)))?;
+        .map_err(|e| CliError::Command(format!("Failed to execute {command}: {e}")))?;
 
     // Clean up temporary file
     if let Err(e) = std::fs::remove_file(&prompt_file) {

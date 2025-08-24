@@ -1,9 +1,9 @@
-import { Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
-import { useParams, A } from '@solidjs/router';
-import { AiSession, Project, AiSessionStatus } from '../types';
+import { Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
+import { A, useParams } from '@solidjs/router';
+import { AiSessionStatus, Project } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
-import { StatusBadge, ToolIcon, ProjectBadge } from './SessionRow';
+import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 import SessionTimeline from './SessionTimeline';
 
 // Utility function to format timestamps
@@ -87,7 +87,7 @@ const AiSessionDetail: Component = () => {
   const params = useParams<{ id: string }>();
   const { store, actions } = useSessions();
   const [project, setProject] = createSignal<Project | null>(null);
-  const [isConnected, setIsConnected] = createSignal(false);
+  const [, setIsConnected] = createSignal(false);
 
   const session = () => store.byId[params.id];
 
@@ -113,7 +113,12 @@ const AiSessionDetail: Component = () => {
         // First try to get from store, if not available fetch from API
         let sessionData = session();
         if (!sessionData && isMounted) {
-          sessionData = await actions.fetchById(params.id);
+          const fetchedData = await actions.fetchById(params.id);
+          if (!fetchedData) {
+            console.error('Session not found');
+            return;
+          }
+          sessionData = fetchedData;
         }
 
         // Only proceed if component is still mounted
@@ -252,7 +257,12 @@ const AiSessionDetail: Component = () => {
                     <dd>
                       <Show
                         when={project()}
-                        fallback={<ProjectBadge project={null} projectId={session()!.project_id} />}
+                        fallback={
+                          <ProjectBadge
+                            project={null}
+                            projectId={session()!.project_id ?? undefined}
+                          />
+                        }
                       >
                         <div class='space-y-2'>
                           <ProjectBadge project={project()} />
@@ -294,7 +304,7 @@ const AiSessionDetail: Component = () => {
                   <div>
                     <dt class='text-sm font-medium text-gray-500 mb-1'>Duration</dt>
                     <dd class='text-sm text-gray-900'>
-                      {formatDuration(session()!.started_at, session()!.ended_at)}
+                      {formatDuration(session()!.started_at, session()!.ended_at ?? undefined)}
                       <Show when={!session()!.ended_at}>
                         <span class='text-blue-600 font-medium'> (ongoing)</span>
                       </Show>

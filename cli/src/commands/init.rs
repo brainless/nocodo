@@ -2,11 +2,11 @@
 
 use crate::client::{CreateProjectRequest, ManagerClient};
 use crate::error::CliError;
-use std::path::PathBuf;
+use std::path::Path;
 use tracing::{error, info, warn};
 
 /// Initialize a new project with nocodo support
-pub async fn init_project(template: &Option<String>, path: &PathBuf) -> Result<(), CliError> {
+pub async fn init_project(template: &Option<String>, path: &Path) -> Result<(), CliError> {
     println!("🚀 Initializing nocodo project at: {}", path.display());
 
     // Create Manager client
@@ -71,11 +71,11 @@ pub async fn init_project(template: &Option<String>, path: &PathBuf) -> Result<(
             println!("📁 Location: {}", project.path);
 
             if let Some(language) = &project.language {
-                println!("🔤 Language: {}", language);
+                println!("🔤 Language: {language}");
             }
 
             if let Some(framework) = &project.framework {
-                println!("🛠️  Framework: {}", framework);
+                println!("🛠️  Framework: {framework}");
             }
 
             println!("📦 Status: {}", project.status);

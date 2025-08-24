@@ -24,6 +24,12 @@ pub struct TemplateFile {
 
 pub struct TemplateManager;
 
+impl Default for TemplateManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TemplateManager {
     pub fn new() -> Self {
         Self
@@ -43,8 +49,7 @@ impl TemplateManager {
             "node-web-app" => Ok(Self::node_web_app_template()),
             "static-site" => Ok(Self::static_site_template()),
             _ => Err(AppError::InvalidRequest(format!(
-                "Unknown template: {}",
-                name
+                "Unknown template: {name}"
             ))),
         }
     }

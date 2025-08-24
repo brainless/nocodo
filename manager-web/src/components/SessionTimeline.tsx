@@ -1,5 +1,5 @@
 import { Component, For, Show, createMemo } from 'solid-js';
-import { AiSession, AiSessionStatus } from '../types';
+import { AiSession } from '../types';
 
 // Timeline event interface
 interface TimelineEvent {

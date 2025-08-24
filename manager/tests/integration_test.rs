@@ -1,7 +1,8 @@
-use actix_rt;
+use actix::Actor;
 use actix_web::{test, web, App};
 use nocodo_manager::database::Database;
 use nocodo_manager::handlers::{create_project, get_templates, AppState};
+use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::tempdir;
@@ -14,9 +15,11 @@ async fn test_project_creation_workflow() {
     let database = Arc::new(Database::new(&db_path).unwrap());
 
     // Create app state
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database: database.clone(),
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     // Initialize the test app
@@ -65,10 +68,7 @@ async fn test_project_creation_workflow() {
         let status = create_resp.status();
         let error_body = test::read_body(create_resp).await;
         let error_text = std::str::from_utf8(&error_body).unwrap_or("<invalid utf8>");
-        panic!(
-            "Project creation failed with status {}: {}",
-            status, error_text
-        );
+        panic!("Project creation failed with status {status}: {error_text}");
     }
 
     let project_response: serde_json::Value = test::read_body_json(create_resp).await;
@@ -131,9 +131,11 @@ async fn test_project_creation_error_handling() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(

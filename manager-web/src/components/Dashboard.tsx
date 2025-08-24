@@ -1,6 +1,6 @@
-import { Component, createSignal, onMount, For } from 'solid-js';
+import { Component, For, createSignal, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
-import { Project, AiSession } from '../types';
+import { Project } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
 
@@ -206,7 +206,7 @@ const SessionsCard: Component = () => {
                     </div>
                     <p class='text-sm text-gray-600 truncate mb-1'>{session.prompt}</p>
                     <div class='flex items-center space-x-3 text-xs text-gray-500'>
-                      <span>{getProjectName(session.project_id)}</span>
+                      <span>{getProjectName(session.project_id ?? undefined)}</span>
                       <span>•</span>
                       <span>{formatTimestamp(session.started_at)}</span>
                     </div>

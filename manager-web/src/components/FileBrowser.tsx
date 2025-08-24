@@ -1,4 +1,4 @@
-import { Component, createSignal, createEffect, Show, For } from 'solid-js';
+import { Component, For, Show, createEffect, createSignal } from 'solid-js';
 import { FileInfo, FileListResponse } from '../types';
 import { apiClient } from '../api';
 
@@ -228,9 +228,11 @@ const FileBrowser: Component<FileBrowserProps> = props => {
                       </button>
                     </td>
                     <td class='px-4 py-2 text-sm text-gray-600'>
-                      {file.is_directory ? '-' : formatSize(file.size)}
+                      {file.is_directory ? '-' : formatSize(file.size ?? 0)}
                     </td>
-                    <td class='px-4 py-2 text-sm text-gray-600'>{formatDate(file.modified_at)}</td>
+                    <td class='px-4 py-2 text-sm text-gray-600'>
+                      {formatDate(file.modified_at ?? Date.now() / 1000)}
+                    </td>
                     <td class='px-4 py-2 text-right'>
                       <button
                         onClick={() => deleteFile(file)}

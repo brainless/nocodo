@@ -1,8 +1,10 @@
+use actix::Actor;
 use actix_web::{test, web, App};
 use nocodo_manager::{
     database::Database,
     handlers::{create_project, get_projects, health_check, AppState},
     models::CreateProjectRequest,
+    websocket::{WebSocketBroadcaster, WebSocketServer},
 };
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -14,9 +16,11 @@ async fn test_health_check() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(
@@ -43,9 +47,11 @@ async fn test_get_projects_empty() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(
@@ -70,9 +76,11 @@ async fn test_create_project() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(
@@ -87,6 +95,7 @@ async fn test_create_project() {
         path: Some("/tmp/test-project".to_string()),
         language: Some("rust".to_string()),
         framework: Some("actix-web".to_string()),
+        template: None,
     };
 
     let req = test::TestRequest::post()
@@ -117,9 +126,11 @@ async fn test_create_project_with_default_path() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(
@@ -134,6 +145,7 @@ async fn test_create_project_with_default_path() {
         path: None, // Should use default path generation
         language: Some("javascript".to_string()),
         framework: None,
+        template: None,
     };
 
     let req = test::TestRequest::post()
@@ -163,9 +175,11 @@ async fn test_create_project_invalid_name() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(
@@ -180,6 +194,7 @@ async fn test_create_project_invalid_name() {
         path: None,
         language: None,
         framework: None,
+        template: None,
     };
 
     let req = test::TestRequest::post()
@@ -204,9 +219,11 @@ async fn test_get_projects_after_creation() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    let ws_server = WebSocketServer::default().start();
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
     });
 
     let app = test::init_service(
@@ -223,6 +240,7 @@ async fn test_get_projects_after_creation() {
         path: Some("/tmp/list-test".to_string()),
         language: Some("python".to_string()),
         framework: Some("django".to_string()),
+        template: None,
     };
 
     let req = test::TestRequest::post()

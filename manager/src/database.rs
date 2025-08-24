@@ -37,7 +37,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         // Create projects table
         conn.execute(
@@ -108,7 +108,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
             "SELECT id, name, path, language, framework, status, created_at, updated_at 
@@ -140,7 +140,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
             "SELECT id, name, path, language, framework, status, created_at, updated_at 
@@ -172,7 +172,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
             "SELECT id, name, path, language, framework, status, created_at, updated_at 
@@ -194,7 +194,7 @@ impl Database {
             })
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => {
-                    AppError::ProjectNotFound(format!("No project found at path: {}", path))
+                    AppError::ProjectNotFound(format!("No project found at path: {path}"))
                 }
                 _ => AppError::Database(e),
             })?;
@@ -206,7 +206,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
             "INSERT INTO projects (id, name, path, language, framework, status, created_at, updated_at)
@@ -232,7 +232,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let rows_affected = conn.execute(
             "UPDATE projects SET name = ?, path = ?, language = ?, framework = ?, 
@@ -260,7 +260,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let rows_affected = conn.execute("DELETE FROM projects WHERE id = ?", [id])?;
 
@@ -277,7 +277,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
             "INSERT INTO ai_sessions (id, project_id, tool_name, status, prompt, project_context, started_at, ended_at)
@@ -306,7 +306,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, tool_name, status, prompt, project_context, started_at, ended_at
@@ -328,7 +328,7 @@ impl Database {
             })
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => {
-                    AppError::Internal(format!("AI session not found: {}", id))
+                    AppError::Internal(format!("AI session not found: {id}"))
                 }
                 _ => AppError::Database(e),
             })?;
@@ -340,7 +340,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let rows_affected = conn.execute(
             "UPDATE ai_sessions SET status = ?, ended_at = ? WHERE id = ?",
@@ -366,7 +366,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, tool_name, status, prompt, project_context, started_at, ended_at
@@ -399,7 +399,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
             "INSERT INTO ai_session_outputs (session_id, content, created_at) VALUES (?, ?, strftime('%s','now'))",
@@ -419,7 +419,7 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
             "SELECT id, session_id, content, created_at FROM ai_session_outputs WHERE session_id = ? ORDER BY id ASC",
