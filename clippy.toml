@@ -1,0 +1,34 @@
+# Clippy configuration for nocodo project
+# Strict linting rules for code quality and best practices
+
+# Set maximum complexity allowed for functions
+cognitive-complexity-threshold = 25
+
+# Enforce documentation for public items
+missing-docs-in-private-items = false
+
+# Set limits for various constructs
+too-many-arguments-threshold = 7
+type-complexity-threshold = 250
+single-char-lifetime-names-threshold = 4
+trivial-copy-pass-by-ref-threshold = 256
+
+# Enable additional lints beyond defaults
+# These will be enforced in CI with --deny warnings
+
+# Naming conventions
+disallowed-names = ["foo", "bar", "baz", "toto", "tata", "titi"]
+
+# Performance and efficiency
+avoid-breaking-exported-api = false
+msrv = "1.70.0"  # Minimum supported Rust version
+
+# Documentation and style
+doc-valid-idents = ["GitHub", "GitLab", "JavaScript", "TypeScript", "WebSocket", "HTML", "URL", "UUID", "API", "HTTP", "CLI", "AI", "LLM", "JSON", "SQL", "SQLite"]
+
+# Error handling
+large-error-types-threshold = 128
+
+# Security and safety
+allow-dbg-in-tests = true
+allow-print-in-tests = true
