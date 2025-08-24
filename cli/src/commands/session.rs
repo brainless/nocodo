@@ -105,7 +105,8 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
                 "exit_code": run.exit_code,
                 "stdout": run.stdout,
                 "stderr": run.stderr,
-            }).to_string();
+            })
+            .to_string();
             (p, true)
         }
         Err(err) => {
@@ -117,15 +118,13 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
                 "error": err.to_string(),
                 "stdout": "",
                 "stderr": "",
-            }).to_string();
+            })
+            .to_string();
             (p, false)
         }
     };
 
-    if let Err(e) = client
-        .record_ai_output(session.id.clone(), payload)
-        .await
-    {
+    if let Err(e) = client.record_ai_output(session.id.clone(), payload).await {
         warn!("Failed to record AI output: {}", e);
     }
 

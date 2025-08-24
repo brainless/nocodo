@@ -8,7 +8,7 @@ interface FileEditorProps {
   onClose: () => void;
 }
 
-const FileEditor: Component<FileEditorProps> = (props) => {
+const FileEditor: Component<FileEditorProps> = props => {
   const [content, setContent] = createSignal<string>('');
   const [originalContent, setOriginalContent] = createSignal<string>('');
   const [loading, setLoading] = createSignal(false);
@@ -91,20 +91,18 @@ const FileEditor: Component<FileEditorProps> = (props) => {
   // Show error if trying to edit a directory
   if (props.file?.is_directory) {
     return (
-      <div class="space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-medium text-gray-900">
-            Cannot Edit Directory
-          </h2>
+      <div class='space-y-4'>
+        <div class='flex items-center justify-between'>
+          <h2 class='text-lg font-medium text-gray-900'>Cannot Edit Directory</h2>
           <button
             onClick={props.onClose}
-            class="text-gray-500 hover:text-gray-700 transition-colors"
+            class='text-gray-500 hover:text-gray-700 transition-colors'
           >
             ✕
           </button>
         </div>
-        <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-          <p class="text-sm text-yellow-700">
+        <div class='bg-yellow-50 border border-yellow-200 rounded-md p-3'>
+          <p class='text-sm text-yellow-700'>
             Cannot edit directory "{props.file.name}". Please select a file to edit.
           </p>
         </div>
@@ -113,20 +111,18 @@ const FileEditor: Component<FileEditorProps> = (props) => {
   }
 
   return (
-    <div class="space-y-4 h-full flex flex-col">
+    <div class='space-y-4 h-full flex flex-col'>
       {/* Header */}
-      <div class="flex items-center justify-between flex-shrink-0">
+      <div class='flex items-center justify-between flex-shrink-0'>
         <div>
-          <h2 class="text-lg font-medium text-gray-900">
-            Edit File
-          </h2>
-          <p class="text-sm text-gray-600">
+          <h2 class='text-lg font-medium text-gray-900'>Edit File</h2>
+          <p class='text-sm text-gray-600'>
             {props.file.name}
-            {hasChanges() && <span class="ml-2 text-orange-600">• Modified</span>}
+            {hasChanges() && <span class='ml-2 text-orange-600'>• Modified</span>}
           </p>
         </div>
-        
-        <div class="flex items-center space-x-2">
+
+        <div class='flex items-center space-x-2'>
           <button
             onClick={saveFile}
             disabled={!hasChanges() || saving()}
@@ -140,7 +136,7 @@ const FileEditor: Component<FileEditorProps> = (props) => {
           </button>
           <button
             onClick={handleClose}
-            class="text-gray-500 hover:text-gray-700 transition-colors text-lg"
+            class='text-gray-500 hover:text-gray-700 transition-colors text-lg'
           >
             ✕
           </button>
@@ -149,40 +145,40 @@ const FileEditor: Component<FileEditorProps> = (props) => {
 
       {/* Error display */}
       <Show when={error()}>
-        <div class="bg-red-50 border border-red-200 rounded-md p-3 flex-shrink-0">
-          <p class="text-sm text-red-600">{error()}</p>
+        <div class='bg-red-50 border border-red-200 rounded-md p-3 flex-shrink-0'>
+          <p class='text-sm text-red-600'>{error()}</p>
         </div>
       </Show>
 
       {/* Content editor */}
-      <div class="flex-1 flex flex-col">
-        <Show 
-          when={!loading()} 
+      <div class='flex-1 flex flex-col'>
+        <Show
+          when={!loading()}
           fallback={
-            <div class="flex-1 flex items-center justify-center">
-              <div class="text-center text-gray-500">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+            <div class='flex-1 flex items-center justify-center'>
+              <div class='text-center text-gray-500'>
+                <div class='animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2'></div>
                 Loading file content...
               </div>
             </div>
           }
         >
-          <div class="flex-1 flex flex-col">
-            <div class="mb-2 flex items-center justify-between text-xs text-gray-500">
+          <div class='flex-1 flex flex-col'>
+            <div class='mb-2 flex items-center justify-between text-xs text-gray-500'>
               <span>Content</span>
-              <div class="flex items-center space-x-4">
+              <div class='flex items-center space-x-4'>
                 <span>Lines: {content().split('\n').length}</span>
                 <span>Characters: {content().length}</span>
-                <span class="text-gray-400">Ctrl+S to save</span>
+                <span class='text-gray-400'>Ctrl+S to save</span>
               </div>
             </div>
-            
+
             <textarea
               value={content()}
-              onInput={(e) => setContent(e.target.value)}
+              onInput={e => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              class="flex-1 w-full p-4 border border-gray-300 rounded-md font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="File content..."
+              class='flex-1 w-full p-4 border border-gray-300 rounded-md font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500'
+              placeholder='File content...'
               spellcheck={false}
             />
           </div>
@@ -190,15 +186,13 @@ const FileEditor: Component<FileEditorProps> = (props) => {
       </div>
 
       {/* Footer with keyboard shortcuts */}
-      <div class="flex-shrink-0 text-xs text-gray-500 border-t pt-2">
-        <div class="flex justify-between items-center">
+      <div class='flex-shrink-0 text-xs text-gray-500 border-t pt-2'>
+        <div class='flex justify-between items-center'>
           <div>
-            <span class="font-medium">Shortcuts:</span>
-            <span class="ml-2">Ctrl+S: Save</span>
+            <span class='font-medium'>Shortcuts:</span>
+            <span class='ml-2'>Ctrl+S: Save</span>
           </div>
-          <div>
-            File: {props.file.path}
-          </div>
+          <div>File: {props.file.path}</div>
         </div>
       </div>
     </div>

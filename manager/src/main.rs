@@ -74,22 +74,34 @@ async fn main() -> AppResult<()> {
                         .route("/health", web::get().to(handlers::health_check))
                         .route("/projects", web::get().to(handlers::get_projects))
                         .route("/projects", web::post().to(handlers::create_project))
-                        .route("/projects/add-existing", web::post().to(handlers::add_existing_project))
+                        .route(
+                            "/projects/add-existing",
+                            web::post().to(handlers::add_existing_project),
+                        )
                         .route("/projects/{id}", web::get().to(handlers::get_project))
                         .route("/projects/{id}", web::delete().to(handlers::delete_project))
                         .route("/templates", web::get().to(handlers::get_templates))
                         // File operation endpoints
                         .route("/files", web::get().to(handlers::list_files))
                         .route("/files", web::post().to(handlers::create_file))
-                        .route("/files/{path:.*}", web::get().to(handlers::get_file_content))
+                        .route(
+                            "/files/{path:.*}",
+                            web::get().to(handlers::get_file_content),
+                        )
                         .route("/files/{path:.*}", web::put().to(handlers::update_file))
                         .route("/files/{path:.*}", web::delete().to(handlers::delete_file))
                         // AI session endpoints
                         .route("/ai/sessions", web::post().to(handlers::create_ai_session))
                         .route("/ai/sessions", web::get().to(handlers::list_ai_sessions))
                         .route("/ai/sessions/{id}", web::get().to(handlers::get_ai_session))
-                        .route("/ai/sessions/{id}/outputs", web::post().to(handlers::record_ai_output))
-                        .route("/ai/sessions/{id}/outputs", web::get().to(handlers::list_ai_outputs)),
+                        .route(
+                            "/ai/sessions/{id}/outputs",
+                            web::post().to(handlers::record_ai_output),
+                        )
+                        .route(
+                            "/ai/sessions/{id}/outputs",
+                            web::get().to(handlers::list_ai_outputs),
+                        ),
                 )
                 // WebSocket endpoint
                 .route("/ws", web::get().to(websocket::websocket_handler))

@@ -1,4 +1,11 @@
-import { Component, createContext, useContext, onMount, onCleanup, ParentComponent } from 'solid-js';
+import {
+  Component,
+  createContext,
+  useContext,
+  onMount,
+  onCleanup,
+  ParentComponent,
+} from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { AiSession, AiSessionStatus } from '../types';
 import { apiClient } from '../api';
@@ -31,7 +38,7 @@ interface SessionsContextValue {
 
 const SessionsContext = createContext<SessionsContextValue>();
 
-export const SessionsProvider: ParentComponent = (props) => {
+export const SessionsProvider: ParentComponent = props => {
   const [store, setStore] = createStore<SessionsStore>({
     list: [],
     byId: {},
@@ -47,17 +54,19 @@ export const SessionsProvider: ParentComponent = (props) => {
       try {
         setStore('loading', true);
         setStore('error', null);
-        
+
         const sessions = await apiClient.listSessions();
-        
+
         setStore('list', sessions);
-        
-        const byId = sessions.reduce((acc, session) => {
-          acc[session.id] = session;
-          return acc;
-        }, {} as Record<string, AiSession>);
+
+        const byId = sessions.reduce(
+          (acc, session) => {
+            acc[session.id] = session;
+            return acc;
+          },
+          {} as Record<string, AiSession>
+        );
         setStore('byId', byId);
-        
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch sessions';
         setStore('error', errorMessage);
@@ -70,18 +79,18 @@ export const SessionsProvider: ParentComponent = (props) => {
     fetchById: async (id: string) => {
       try {
         setStore('error', null);
-        
+
         const session = await apiClient.getSession(id);
-        
+
         setStore('byId', id, session);
-        
+
         const existingIndex = store.list.findIndex(s => s.id === id);
         if (existingIndex >= 0) {
           setStore('list', existingIndex, session);
         } else {
           setStore('list', prev => [...prev, session]);
         }
-        
+
         return session;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch session';
@@ -99,14 +108,14 @@ export const SessionsProvider: ParentComponent = (props) => {
 
       try {
         setStore('connectionStatus', id, 'connected');
-        
+
         const subscription = apiClient.subscribeSession(
           id,
-          (data) => {
+          data => {
             // WebSocket is working, stop any fallback polling
             actions.stopPolling(id);
             setStore('connectionStatus', id, 'connected');
-            
+
             if (data.type === 'status_update' && data.status) {
               actions.updateSessionStatus(id, data.status);
             }
@@ -118,10 +127,10 @@ export const SessionsProvider: ParentComponent = (props) => {
               }
             }
           },
-          (error) => {
+          error => {
             console.error(`WebSocket error for session ${id}:`, error);
             setStore('connectionStatus', id, 'error');
-            
+
             // Start polling as fallback
             console.log(`Starting polling fallback for session ${id}`);
             actions.startPolling(id);
@@ -135,7 +144,7 @@ export const SessionsProvider: ParentComponent = (props) => {
             console.log(`WebSocket disconnected for session ${id}`);
             setStore('subscriptions', id, undefined!);
             setStore('connectionStatus', id, 'disconnected');
-            
+
             // Start polling as fallback if session is still running
             const session = store.byId[id];
             if (session && session.status === 'running') {
@@ -147,12 +156,11 @@ export const SessionsProvider: ParentComponent = (props) => {
         );
 
         setStore('subscriptions', id, subscription);
-        
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to connect to session';
         console.error('Failed to connect to session:', err);
         setStore('connectionStatus', id, 'error');
-        
+
         // Start polling as fallback
         actions.startPolling(id);
         setStore('connectionStatus', id, 'fallback');
@@ -166,10 +174,10 @@ export const SessionsProvider: ParentComponent = (props) => {
           subscription.close();
           setStore('subscriptions', id, undefined!);
         }
-        
+
         // Stop any polling timers
         actions.stopPolling(id);
-        
+
         // Only update connection status if store still exists
         if (store.connectionStatus) {
           setStore('connectionStatus', id, 'disconnected');
@@ -182,12 +190,12 @@ export const SessionsProvider: ParentComponent = (props) => {
 
     updateSessionStatus: (id: string, status: AiSessionStatus) => {
       setStore('byId', id, 'status', status);
-      
+
       const existingIndex = store.list.findIndex(s => s.id === id);
       if (existingIndex >= 0) {
         setStore('list', existingIndex, 'status', status);
       }
-      
+
       // Stop polling if session is no longer running
       if (status !== 'running') {
         actions.stopPolling(id);
@@ -199,7 +207,7 @@ export const SessionsProvider: ParentComponent = (props) => {
       if (store.pollingTimers[id]) {
         return;
       }
-      
+
       const pollSession = async () => {
         try {
           const session = await apiClient.getSession(id);
@@ -210,7 +218,7 @@ export const SessionsProvider: ParentComponent = (props) => {
             if (existingIndex >= 0) {
               setStore('list', existingIndex, session);
             }
-            
+
             // Stop polling if session is no longer running
             if (session.status !== 'running') {
               actions.stopPolling(id);
@@ -221,12 +229,12 @@ export const SessionsProvider: ParentComponent = (props) => {
           // Continue polling even on errors
         }
       };
-      
+
       // Poll immediately, then every 5 seconds
       pollSession();
       const timerId = setInterval(pollSession, 5000);
       setStore('pollingTimers', id, timerId);
-      
+
       console.log(`Started polling for session ${id}`);
     },
 
@@ -264,11 +272,7 @@ export const SessionsProvider: ParentComponent = (props) => {
     actions,
   };
 
-  return (
-    <SessionsContext.Provider value={contextValue}>
-      {props.children}
-    </SessionsContext.Provider>
-  );
+  return <SessionsContext.Provider value={contextValue}>{props.children}</SessionsContext.Provider>;
 };
 
 export const useSessions = () => {

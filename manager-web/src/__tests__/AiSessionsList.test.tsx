@@ -13,19 +13,23 @@ const mockProjects: Project[] = [
   {
     id: 'project-456',
     name: 'Test Project 1',
-    path: '/path/to/project1',
+    path: '/test/project1',
+    language: 'typescript',
+    framework: 'solidjs',
     status: 'active',
     created_at: 1640995200000,
-    updated_at: 1640995200000
+    updated_at: 1640995200000,
   },
   {
     id: 'project-789',
     name: 'Test Project 2',
-    path: '/path/to/project2',
+    path: '/test/project2',
+    language: 'javascript',
+    framework: 'react',
     status: 'active',
     created_at: 1640995200000,
-    updated_at: 1640995200000
-  }
+    updated_at: 1640995200000,
+  },
 ];
 
 const mockSessions: AiSession[] = [
@@ -37,7 +41,7 @@ const mockSessions: AiSession[] = [
     prompt: 'Test prompt for session 1',
     project_context: 'Test context 1',
     started_at: 1640995200,
-    ended_at: undefined
+    ended_at: null,
   },
   {
     id: 'session-456',
@@ -47,34 +51,32 @@ const mockSessions: AiSession[] = [
     prompt: 'Test prompt for session 2',
     project_context: 'Test context 2',
     started_at: 1640995100,
-    ended_at: 1640995300
+    ended_at: 1640995300,
   },
   {
     id: 'session-789',
-    project_id: undefined,
+    project_id: null,
     tool_name: 'claude',
     status: 'failed',
     prompt: 'Test prompt for session 3',
-    project_context: undefined,
+    project_context: null,
     started_at: 1640994800,
-    ended_at: 1640995000
-  }
+    ended_at: 1640995000,
+  },
 ];
 
 // Test wrapper component
 const TestWrapper = ({ children }: { children: any }) => {
   return (
     <MemoryRouter>
-      <SessionsProvider>
-        {children}
-      </SessionsProvider>
+      <SessionsProvider>{children}</SessionsProvider>
     </MemoryRouter>
   );
 };
 
 beforeEach(() => {
   vi.resetAllMocks();
-  
+
   // Mock API calls
   (apiClient.listSessions as any).mockResolvedValue(mockSessions);
   (apiClient.fetchProjects as any).mockResolvedValue(mockProjects);
@@ -87,19 +89,23 @@ afterEach(() => {
 describe('AiSessionsList Component', () => {
   test('renders loading state initially', async () => {
     // Make API calls slow to test loading state
-    (apiClient.listSessions as any).mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(mockSessions), 100)));
-    
+    (apiClient.listSessions as any).mockImplementation(
+      () => new Promise(resolve => setTimeout(() => resolve(mockSessions), 100))
+    );
+
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     expect(screen.getByText('Loading sessions...')).toBeInTheDocument();
   });
 
   test('renders sessions list after loading', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('AI Sessions')).toBeInTheDocument();
-      expect(screen.getByText('Monitor and manage your AI-assisted development sessions')).toBeInTheDocument();
+      expect(
+        screen.getByText('Monitor and manage your AI-assisted development sessions')
+      ).toBeInTheDocument();
     });
 
     // Check that sessions are displayed via SessionRow components
@@ -113,7 +119,7 @@ describe('AiSessionsList Component', () => {
 
   test('shows session count', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('3 sessions')).toBeInTheDocument();
     });
@@ -121,21 +127,23 @@ describe('AiSessionsList Component', () => {
 
   test('renders empty state when no sessions', async () => {
     (apiClient.listSessions as any).mockResolvedValue([]);
-    
+
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('No AI sessions yet')).toBeInTheDocument();
-      expect(screen.getByText('Start your first AI session using the nocodo CLI.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Start your first AI session using the nocodo CLI.')
+      ).toBeInTheDocument();
     });
   });
 
   test('displays error state', async () => {
     const errorMessage = 'Failed to fetch sessions';
     (apiClient.listSessions as any).mockRejectedValue(new Error(errorMessage));
-    
+
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('Error Loading Sessions')).toBeInTheDocument();
       expect(screen.getByText(errorMessage)).toBeInTheDocument();
@@ -145,7 +153,7 @@ describe('AiSessionsList Component', () => {
 
   test('renders status badges correctly', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByLabelText('Session status: running')).toBeInTheDocument();
       expect(screen.getByLabelText('Session status: completed')).toBeInTheDocument();
@@ -155,7 +163,7 @@ describe('AiSessionsList Component', () => {
 
   test('shows project names correctly', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('Test Project 1')).toBeInTheDocument();
       expect(screen.getByText('Test Project 2')).toBeInTheDocument();
@@ -165,7 +173,7 @@ describe('AiSessionsList Component', () => {
 
   test('displays session prompts', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('Test prompt for session 1')).toBeInTheDocument();
       expect(screen.getByText('Test prompt for session 2')).toBeInTheDocument();
@@ -175,7 +183,7 @@ describe('AiSessionsList Component', () => {
 
   test('sorts sessions by newest first', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       const sessions = screen.getAllByText(/Test prompt for session/);
       // Should be sorted by started_at descending
@@ -187,7 +195,7 @@ describe('AiSessionsList Component', () => {
 
   test('makes correct API calls on mount', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     expect(apiClient.listSessions).toHaveBeenCalled();
     expect(apiClient.fetchProjects).toHaveBeenCalled();
   });
@@ -196,7 +204,7 @@ describe('AiSessionsList Component', () => {
 describe('AiSessionsList Filters', () => {
   test('renders filter dropdowns with improved accessibility', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       expect(screen.getByText('Filter Sessions')).toBeInTheDocument();
       expect(screen.getByLabelText('Tool')).toBeInTheDocument();
@@ -208,11 +216,11 @@ describe('AiSessionsList Filters', () => {
 
   test('shows filter options based on available data', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       const toolSelect = screen.getByLabelText('Tool');
       expect(toolSelect).toBeInTheDocument();
-      
+
       const statusSelect = screen.getByLabelText('Status');
       expect(statusSelect).toBeInTheDocument();
     });
@@ -220,7 +228,7 @@ describe('AiSessionsList Filters', () => {
 
   test('shows clear filters option when filters applied', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
-    
+
     await waitFor(() => {
       const toolSelect = screen.getByLabelText('Tool');
       // Simulate selecting a filter (this would need more sophisticated testing in a real scenario)

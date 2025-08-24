@@ -2,6 +2,8 @@ use crate::database::Database;
 use crate::error::{AppError, AppResult};
 use crate::models::{AiSession, CreateAiSessionRequest, Project};
 use serde::{Deserialize, Serialize};
+use std::fs::Permissions;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -9,23 +11,35 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
-use std::fs::Permissions;
-use std::os::unix::fs::PermissionsExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SocketRequest {
     // Health and identity
     Ping,
-    Identify { client_id: String, token: Option<String> },
+    Identify {
+        client_id: String,
+        token: Option<String>,
+    },
 
     // Sessions and project context
     CreateAiSession(CreateAiSessionRequest),
-    GetProjectContext { project_path: String },
-    GetProjectByPath { project_path: String },
-    CompleteAiSession { session_id: String },
-    FailAiSession { session_id: String },
+    GetProjectContext {
+        project_path: String,
+    },
+    GetProjectByPath {
+        project_path: String,
+    },
+    CompleteAiSession {
+        session_id: String,
+    },
+    FailAiSession {
+        session_id: String,
+    },
     // New: record one-shot AI output for a session
-    RecordAiOutput { session_id: String, output: String },
+    RecordAiOutput {
+        session_id: String,
+        output: String,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -270,25 +284,31 @@ impl SocketServer {
             }
 
             SocketRequest::RecordAiOutput { session_id, output } => {
-                info!("Recording AI output for session: {} ({} bytes)", session_id, output.len());
+                info!(
+                    "Recording AI output for session: {} ({} bytes)",
+                    session_id,
+                    output.len()
+                );
 
                 // Ensure session exists
                 match database.get_ai_session_by_id(&session_id) {
-                    Ok(_session) => {
-                        match database.create_ai_session_output(&session_id, &output) {
-                            Ok(()) => {
-                                let data = serde_json::json!({ "ok": true, "session_id": session_id });
-                                SocketResponse::Success { data }
-                            }
-                            Err(e) => {
-                                error!("Failed to record AI output: {}", e);
-                                SocketResponse::Error { message: format!("Failed to record output: {}", e) }
+                    Ok(_session) => match database.create_ai_session_output(&session_id, &output) {
+                        Ok(()) => {
+                            let data = serde_json::json!({ "ok": true, "session_id": session_id });
+                            SocketResponse::Success { data }
+                        }
+                        Err(e) => {
+                            error!("Failed to record AI output: {}", e);
+                            SocketResponse::Error {
+                                message: format!("Failed to record output: {}", e),
                             }
                         }
-                    }
+                    },
                     Err(e) => {
                         error!("AI session not found for recording output: {}", e);
-                        SocketResponse::Error { message: format!("Session not found: {}", session_id) }
+                        SocketResponse::Error {
+                            message: format!("Session not found: {}", session_id),
+                        }
                     }
                 }
             }

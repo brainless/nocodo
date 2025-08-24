@@ -15,7 +15,7 @@ const mockSession1: AiSession = {
   prompt: 'Test prompt 1',
   project_context: 'Test context 1',
   started_at: 1640995200000,
-  ended_at: undefined
+  ended_at: null,
 };
 
 const mockSession2: AiSession = {
@@ -26,7 +26,7 @@ const mockSession2: AiSession = {
   prompt: 'Test prompt 2',
   project_context: 'Test context 2',
   started_at: 1640995100000,
-  ended_at: 1640995300000
+  ended_at: 1640995300000,
 };
 
 const mockSessionList = [mockSession1, mockSession2];
@@ -37,7 +37,7 @@ const mockWebSocketClose = vi.fn();
 
 beforeEach(() => {
   vi.resetAllMocks();
-  
+
   // Setup WebSocket mock
   mockWebSocket = {
     readyState: 1, // OPEN
@@ -47,24 +47,24 @@ beforeEach(() => {
     onerror: null,
     onclose: null,
   };
-  
+
   Object.defineProperty(global, 'WebSocket', {
     value: vi.fn().mockImplementation(() => mockWebSocket),
     writable: true,
-    configurable: true
+    configurable: true,
   });
-  
+
   (global.WebSocket as any).CONNECTING = 0;
   (global.WebSocket as any).OPEN = 1;
   (global.WebSocket as any).CLOSING = 2;
   (global.WebSocket as any).CLOSED = 3;
-  
+
   Object.defineProperty(window, 'location', {
     value: {
       protocol: 'http:',
-      host: 'localhost:8081'
+      host: 'localhost:8081',
     },
-    writable: true
+    writable: true,
   });
 });
 
@@ -101,11 +101,14 @@ describe('Sessions Store Logic', () => {
 
     // Simulate fetchList success
     setStore('list', mockSessionList);
-    
-    const byId = mockSessionList.reduce((acc, session) => {
-      acc[session.id] = session;
-      return acc;
-    }, {} as Record<string, AiSession>);
+
+    const byId = mockSessionList.reduce(
+      (acc, session) => {
+        acc[session.id] = session;
+        return acc;
+      },
+      {} as Record<string, AiSession>
+    );
     setStore('byId', byId);
 
     expect(store.list).toEqual(mockSessionList);
@@ -167,18 +170,18 @@ describe('Sessions Store Logic', () => {
 describe('API Integration', () => {
   test('should call listSessions API', async () => {
     (apiClient.listSessions as any).mockResolvedValueOnce(mockSessionList);
-    
+
     const result = await apiClient.listSessions();
-    
+
     expect(apiClient.listSessions).toHaveBeenCalled();
     expect(result).toEqual(mockSessionList);
   });
 
   test('should call getSession API with correct id', async () => {
     (apiClient.getSession as any).mockResolvedValueOnce(mockSession1);
-    
+
     const result = await apiClient.getSession('session-123');
-    
+
     expect(apiClient.getSession).toHaveBeenCalledWith('session-123');
     expect(result).toEqual(mockSession1);
   });
@@ -186,14 +189,14 @@ describe('API Integration', () => {
   test('should handle API errors', async () => {
     const errorMessage = 'API Error';
     (apiClient.listSessions as any).mockRejectedValueOnce(new Error(errorMessage));
-    
+
     await expect(apiClient.listSessions()).rejects.toThrow(errorMessage);
   });
 
   test('should create WebSocket subscription', () => {
     const mockSubscription = { close: mockWebSocketClose };
     (apiClient.subscribeSession as any).mockReturnValueOnce(mockSubscription);
-    
+
     const subscription = apiClient.subscribeSession(
       'session-123',
       vi.fn(),
@@ -201,7 +204,7 @@ describe('API Integration', () => {
       vi.fn(),
       vi.fn()
     );
-    
+
     expect(apiClient.subscribeSession).toHaveBeenCalledWith(
       'session-123',
       expect.any(Function),
