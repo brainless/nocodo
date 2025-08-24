@@ -200,9 +200,7 @@ jobs:
 
       - name: Test CLI component
         working-directory: cli
-        run: |
-          cargo test --verbose
-          cargo test --doc --verbose
+        run: cargo test --verbose
 
   manager-tests:
     runs-on: ubuntu-latest

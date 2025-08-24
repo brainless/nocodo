@@ -27,7 +27,7 @@ actix-files = "0.6"
 actix-web-actors = "4.2"
 actix = "0.13"
 rusqlite = { version = "0.30", features = ["bundled"] }
-config = "0.13"
+config = "0.15"
 thiserror = "1.0"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
