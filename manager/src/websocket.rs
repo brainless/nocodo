@@ -1,4 +1,4 @@
-use crate::models::Project;
+use crate::models::{AiSession, Project};
 use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
@@ -26,6 +26,12 @@ pub enum WebSocketMessage {
 
     // Status updates
     ProjectStatusChanged { project_id: String, status: String },
+    
+    // AI session updates
+    AiSessionCreated { session: AiSession },
+    AiSessionStatusChanged { session_id: String, status: String },
+    AiSessionCompleted { session_id: String },
+    AiSessionFailed { session_id: String },
 
     // Error handling
     Error { message: String },
@@ -288,6 +294,28 @@ pub async fn websocket_handler(
     resp
 }
 
+/// AI session WebSocket endpoint handler
+pub async fn ai_session_websocket_handler(
+    req: HttpRequest,
+    stream: web::Payload,
+    srv: web::Data<Addr<WebSocketServer>>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let session_id = session_id.into_inner();
+    tracing::debug!("AI session WebSocket connection request received for session: {}", session_id);
+
+    // For now, we'll use the same WebSocket connection logic
+    // All clients will receive all AI session events
+    let resp = ws::start(
+        WebSocketConnection::new(srv.get_ref().clone()),
+        &req,
+        stream,
+    );
+
+    tracing::debug!("AI session WebSocket connection established");
+    resp
+}
+
 /// Utility functions for broadcasting messages
 pub struct WebSocketBroadcaster {
     server: Arc<Addr<WebSocketServer>>,
@@ -325,6 +353,34 @@ impl WebSocketBroadcaster {
     pub fn broadcast_project_status_change(&self, project_id: String, status: String) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::ProjectStatusChanged { project_id, status },
+        });
+    }
+
+    /// Broadcast AI session creation
+    pub fn broadcast_ai_session_created(&self, session: AiSession) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::AiSessionCreated { session },
+        });
+    }
+
+    /// Broadcast AI session status change
+    pub fn broadcast_ai_session_status_change(&self, session_id: String, status: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::AiSessionStatusChanged { session_id, status },
+        });
+    }
+
+    /// Broadcast AI session completion
+    pub fn broadcast_ai_session_completed(&self, session_id: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::AiSessionCompleted { session_id },
+        });
+    }
+
+    /// Broadcast AI session failure
+    pub fn broadcast_ai_session_failed(&self, session_id: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::AiSessionFailed { session_id },
         });
     }
 }

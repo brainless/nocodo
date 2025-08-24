@@ -1,6 +1,7 @@
 use crate::database::Database;
 use crate::error::{AppError, AppResult};
 use crate::models::{AiSession, CreateAiSessionRequest, Project};
+use crate::websocket::WebSocketBroadcaster;
 use serde::{Deserialize, Serialize};
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
@@ -51,10 +52,15 @@ pub enum SocketResponse {
 pub struct SocketServer {
     listener: UnixListener,
     database: Arc<Database>,
+    ws_broadcaster: Arc<WebSocketBroadcaster>,
 }
 
 impl SocketServer {
-    pub async fn new(socket_path: &str, database: Arc<Database>) -> AppResult<Self> {
+    pub async fn new(
+        socket_path: &str,
+        database: Arc<Database>,
+        ws_broadcaster: Arc<WebSocketBroadcaster>,
+    ) -> AppResult<Self> {
         // Remove existing socket file if it exists
         if Path::new(socket_path).exists() {
             std::fs::remove_file(socket_path)?;
@@ -70,7 +76,11 @@ impl SocketServer {
 
         info!("Unix socket server listening on: {}", socket_path);
 
-        Ok(SocketServer { listener, database })
+        Ok(SocketServer {
+            listener,
+            database,
+            ws_broadcaster,
+        })
     }
 
     pub async fn run(self) -> AppResult<()> {
@@ -82,8 +92,9 @@ impl SocketServer {
             match stream {
                 Ok(stream) => {
                     let db = Arc::clone(&self.database);
+                    let ws_broadcaster = Arc::clone(&self.ws_broadcaster);
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_connection(stream, db).await {
+                        if let Err(e) = Self::handle_connection(stream, db, ws_broadcaster).await {
                             error!("Error handling socket connection: {}", e);
                         }
                     });
@@ -97,7 +108,11 @@ impl SocketServer {
         Ok(())
     }
 
-    async fn handle_connection(stream: UnixStream, database: Arc<Database>) -> AppResult<()> {
+    async fn handle_connection(
+        stream: UnixStream,
+        database: Arc<Database>,
+        ws_broadcaster: Arc<WebSocketBroadcaster>,
+    ) -> AppResult<()> {
         let (reader, mut writer) = stream.into_split();
         let mut reader = BufReader::new(reader);
 
@@ -112,7 +127,7 @@ impl SocketServer {
                     AppError::Internal(format!("Failed to parse socket request: {e}"))
                 })?;
 
-                let response = Self::process_request(request, &database).await;
+                let response = Self::process_request(request, &database, &ws_broadcaster).await;
                 let response_json = serde_json::to_string(&response).map_err(|e| {
                     AppError::Internal(format!("Failed to serialize response: {e}"))
                 })?;
@@ -135,7 +150,11 @@ impl SocketServer {
         Ok(())
     }
 
-    async fn process_request(request: SocketRequest, database: &Database) -> SocketResponse {
+    async fn process_request(
+        request: SocketRequest,
+        database: &Database,
+        ws_broadcaster: &WebSocketBroadcaster,
+    ) -> SocketResponse {
         match request {
             SocketRequest::Ping => {
                 let data = serde_json::json!({ "ok": true });
@@ -177,6 +196,9 @@ impl SocketServer {
 
                 match database.create_ai_session(&session) {
                     Ok(()) => {
+                        // Broadcast AI session creation via WebSocket
+                        ws_broadcaster.broadcast_ai_session_created(session.clone());
+                        
                         let data = serde_json::to_value(&session).unwrap_or_default();
                         SocketResponse::Success { data }
                     }
@@ -235,6 +257,9 @@ impl SocketServer {
                         session.complete();
                         match database.update_ai_session(&session) {
                             Ok(()) => {
+                                // Broadcast AI session completion via WebSocket
+                                ws_broadcaster.broadcast_ai_session_completed(session.id.clone());
+                                
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
                             }
@@ -263,6 +288,9 @@ impl SocketServer {
                         session.fail();
                         match database.update_ai_session(&session) {
                             Ok(()) => {
+                                // Broadcast AI session failure via WebSocket
+                                ws_broadcaster.broadcast_ai_session_failed(session.id.clone());
+                                
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
                             }
