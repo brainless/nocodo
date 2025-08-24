@@ -789,6 +789,9 @@ pub async fn create_ai_session(
     // Persist
     data.database.create_ai_session(&session)?;
 
+    // Broadcast AI session creation via WebSocket
+    data.ws_broadcaster.broadcast_ai_session_created(session.clone());
+
     // Response
     let response = AiSessionResponse {
         session: session.clone(),

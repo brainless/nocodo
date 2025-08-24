@@ -22,38 +22,49 @@ pub async fn execute_ai_session(tool: &str, prompt: &str) -> Result<(), CliError
     let socket_path = "/tmp/nocodo-manager.sock".to_string();
     let client = ManagerClient::new(socket_path, None);
 
-    // Create AI session with Manager daemon
-    let session = match client
-        .create_ai_session(
-            tool.to_string(),
-            prompt.to_string(),
-            Some(project_path.clone()),
-        )
-        .await
-    {
+    // Try to create AI session via HTTP API first, then fall back to Unix socket
+    let session = match client.create_ai_session_http(tool, prompt, project_path.clone()).await {
         Ok(session) => {
-            info!("Created AI session: {}", session.id);
+            info!("Created AI session via HTTP API: {}", session.id);
             session
         }
-        Err(e) => {
-            warn!("Failed to create AI session with Manager: {}", e);
-            warn!("Proceeding without Manager integration");
+        Err(http_err) => {
+            warn!("Failed to create AI session via HTTP API: {}", http_err);
+            info!("Trying Unix socket as fallback");
+            
+            match client
+                .create_ai_session(
+                    tool.to_string(),
+                    prompt.to_string(),
+                    Some(project_path.clone()),
+                )
+                .await
+            {
+                Ok(session) => {
+                    info!("Created AI session via Unix socket: {}", session.id);
+                    session
+                }
+                Err(e) => {
+                    warn!("Failed to create AI session with Manager: {}", e);
+                    warn!("Proceeding without Manager integration");
 
-            // For now, continue without Manager integration during development
-            // Create a mock session for logging purposes
-            use crate::client::AiSession;
-            AiSession {
-                id: format!("mock-session-{}", std::process::id()),
-                project_id: None,
-                tool_name: tool.to_string(),
-                status: "running".to_string(),
-                prompt: prompt.to_string(),
-                project_context: None,
-                started_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as i64,
-                ended_at: None,
+                    // For now, continue without Manager integration during development
+                    // Create a mock session for logging purposes
+                    use crate::client::AiSession;
+                    AiSession {
+                        id: format!("mock-session-{}", std::process::id()),
+                        project_id: None,
+                        tool_name: tool.to_string(),
+                        status: "running".to_string(),
+                        prompt: prompt.to_string(),
+                        project_context: None,
+                        started_at: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs() as i64,
+                        ended_at: None,
+                    }
+                }
             }
         }
     };

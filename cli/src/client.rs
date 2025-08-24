@@ -310,6 +310,115 @@ impl ManagerClient {
 
     // HTTP API methods
 
+    pub async fn create_ai_session_http(
+        &self,
+        tool_name: &str,
+        prompt: &str,
+        project_path: String,
+    ) -> Result<AiSession, CliError> {
+        info!("Creating AI session via HTTP API for tool: {}", tool_name);
+
+        // First, try to get project info if we have a project path
+        let project_id = match self.get_project_by_http_path(project_path.clone()).await {
+            Ok(project) => {
+                info!(
+                    "Found existing project: {}",
+                    project["name"].as_str().unwrap_or("Unknown")
+                );
+                Some(project["id"].as_str().unwrap_or("").to_string())
+            }
+            Err(_) => {
+                debug!("No existing project found for path: {}", project_path);
+                None
+            }
+        };
+
+        let request_body = serde_json::json!({
+            "project_id": project_id,
+            "tool_name": tool_name,
+            "prompt": prompt
+        });
+
+        let url = format!("{}/api/ai/sessions", self.manager_url);
+        debug!("POST {}", url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let session_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        let session: AiSession = serde_json::from_value(session_response["session"].clone())
+            .map_err(|e| {
+                CliError::Communication(format!("Failed to parse session data: {e}"))
+            })?;
+
+        info!("Created AI session via HTTP API: {}", session.id);
+        Ok(session)
+    }
+
+    async fn get_project_by_http_path(&self, project_path: String) -> Result<serde_json::Value, CliError> {
+        let url = format!("{}/api/projects", self.manager_url);
+        debug!("GET {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let projects_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        let projects = projects_response["projects"]
+            .as_array()
+            .ok_or_else(|| CliError::Communication("Invalid projects response format".to_string()))?;
+
+        for project in projects {
+            if let Some(path) = project["path"].as_str() {
+                if path == project_path {
+                    return Ok(project.clone());
+                }
+            }
+        }
+
+        Err(CliError::Communication(format!(
+            "No project found for path: {project_path}"
+        )))
+    }
+
     pub async fn create_project(&self, request: CreateProjectRequest) -> Result<Project, CliError> {
         info!("Creating project '{}' via HTTP API", request.name);
 
