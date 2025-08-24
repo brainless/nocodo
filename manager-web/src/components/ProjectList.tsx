@@ -1,8 +1,7 @@
-import { Component, For, createEffect, createSignal, onMount } from 'solid-js';
+import { Component, For, createSignal, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
-import { Project, WebSocketMessage } from '../types';
+import { Project } from '../types';
 import { apiClient } from '../api';
-import { useWebSocket } from '../WebSocketProvider';
 
 interface ProjectListProps {
   onRefresh?: () => void;
@@ -14,7 +13,7 @@ const ProjectList: Component<ProjectListProps> = props => {
   const [error, setError] = createSignal<string | null>(null);
 
   // Get WebSocket context
-  const { store: wsStore } = useWebSocket();
+  // const { store: wsStore } = useWebSocket();
 
   const loadProjects = async () => {
     try {

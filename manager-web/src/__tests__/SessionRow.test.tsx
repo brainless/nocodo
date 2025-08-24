@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
 import { MemoryRouter } from '@solidjs/router';
 import SessionRow, { ProjectBadge, StatusBadge, ToolIcon } from '../components/SessionRow';
@@ -253,7 +253,7 @@ describe('SessionRow Component', () => {
           session={mockRunningSession}
           project={mockProject}
           showPrompt={true}
-          class='custom-class'
+          className='custom-class'
         />
       ),
       { wrapper: TestWrapper }

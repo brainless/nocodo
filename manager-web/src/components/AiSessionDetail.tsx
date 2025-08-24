@@ -1,6 +1,6 @@
 import { Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useParams } from '@solidjs/router';
-import { AiSession, AiSessionStatus, Project } from '../types';
+import { AiSessionStatus, Project } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
@@ -87,7 +87,7 @@ const AiSessionDetail: Component = () => {
   const params = useParams<{ id: string }>();
   const { store, actions } = useSessions();
   const [project, setProject] = createSignal<Project | null>(null);
-  const [isConnected, setIsConnected] = createSignal(false);
+  const [, setIsConnected] = createSignal(false);
 
   const session = () => store.byId[params.id];
 
@@ -113,7 +113,12 @@ const AiSessionDetail: Component = () => {
         // First try to get from store, if not available fetch from API
         let sessionData = session();
         if (!sessionData && isMounted) {
-          sessionData = await actions.fetchById(params.id);
+          const fetchedData = await actions.fetchById(params.id);
+          if (!fetchedData) {
+            console.error('Session not found');
+            return;
+          }
+          sessionData = fetchedData;
         }
 
         // Only proceed if component is still mounted

@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { createRoot } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { apiClient } from '../api';
 import type { AiSession } from '../types';

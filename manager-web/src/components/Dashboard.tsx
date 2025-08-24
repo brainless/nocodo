@@ -1,6 +1,6 @@
 import { Component, For, createSignal, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
-import { AiSession, Project } from '../types';
+import { Project } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
 

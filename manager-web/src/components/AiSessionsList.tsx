@@ -1,29 +1,9 @@
 import { Component, For, Show, createSignal, onMount } from 'solid-js';
-import { AiSession, AiSessionStatus, Project } from '../types';
+import { AiSessionStatus, Project } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
-import SessionRow, { StatusBadge } from './SessionRow';
+import SessionRow from './SessionRow';
 
-// Utility function to format timestamps
-const formatTimestamp = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000); // Convert from Unix timestamp
-  return date.toLocaleString();
-};
-
-// Utility function to format duration
-const formatDuration = (startedAt: number, endedAt?: number): string => {
-  const start = new Date(startedAt * 1000);
-  const end = endedAt ? new Date(endedAt * 1000) : new Date();
-  const durationMs = end.getTime() - start.getTime();
-
-  const minutes = Math.floor(durationMs / 60000);
-  const seconds = Math.floor((durationMs % 60000) / 1000);
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
-};
 
 // Filter component with improved accessibility
 interface FiltersProps {
@@ -112,12 +92,6 @@ const AiSessionsList: Component = () => {
     }
   };
 
-  // Get project name by ID
-  const getProjectName = (projectId?: string) => {
-    if (!projectId) return 'No Project';
-    const project = projects().find(p => p.id === projectId);
-    return project?.name || `Project ${projectId}`;
-  };
 
   // Filter sessions based on current filters
   const filteredSessions = () => {

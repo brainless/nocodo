@@ -150,7 +150,7 @@ export const SessionsProvider: ParentComponent = props => {
 
         setStore('subscriptions', id, subscription);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to connect to session';
+        // const errorMessage = err instanceof Error ? err.message : 'Failed to connect to session';
         console.error('Failed to connect to session:', err);
         setStore('connectionStatus', id, 'error');
 

@@ -194,7 +194,7 @@ describe('API Client - AI Sessions', () => {
       const onMessage = vi.fn();
       const onOpen = vi.fn();
 
-      const connection = apiClient.subscribeSession(sessionId, onMessage, undefined, onOpen);
+      apiClient.subscribeSession(sessionId, onMessage, undefined, onOpen);
 
       // Simulate WebSocket open event
       mockWebSocket.onopen();
