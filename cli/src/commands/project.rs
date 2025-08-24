@@ -28,7 +28,7 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
 
     // Convert to absolute path
     let absolute_path = target_path.canonicalize().map_err(|e| {
-        CliError::Analysis(format!("Failed to resolve path {:?}: {}", target_path, e))
+        CliError::Analysis(format!("Failed to resolve path {target_path:?}: {e}"))
     })?;
 
     info!("Resolved absolute path: {:?}", absolute_path);
@@ -99,7 +99,7 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
 
     // Check if this path is inside an existing project
     // We need to check all existing projects to see if this path is a subdirectory of any of them
-    if let Err(_) = validate_not_inside_existing_project(&client, &absolute_path).await {
+    if (validate_not_inside_existing_project(&client, &absolute_path).await).is_err() {
         return Err(CliError::Analysis(
             "Cannot add a folder that is inside an existing project as another project".to_string(),
         ));

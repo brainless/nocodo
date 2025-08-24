@@ -1,14 +1,14 @@
 //! Code validation command implementation
 
 use crate::error::CliError;
-use std::path::PathBuf;
+use std::path::Path;
 
 /// Validate code against project guardrails
-pub async fn validate_code(file: &PathBuf, language: &Option<String>) -> Result<(), CliError> {
-    println!("Validating file: {:?}", file);
+pub async fn validate_code(file: &Path, language: &Option<String>) -> Result<(), CliError> {
+    println!("Validating file: {file:?}");
 
     if let Some(lang) = language {
-        println!("Language: {}", lang);
+        println!("Language: {lang}");
     } else {
         println!("Language: auto-detect");
     }

@@ -141,7 +141,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                     Err(e) => {
                         tracing::warn!("Failed to parse WebSocket message: {}", e);
                         let error_msg = WebSocketMessage::Error {
-                            message: format!("Invalid message format: {}", e),
+                            message: format!("Invalid message format: {e}"),
                         };
                         if let Ok(json) = serde_json::to_string(&error_msg) {
                             ctx.text(json);
@@ -166,18 +166,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 
 /// WebSocket server that manages all connections
 #[derive(Debug)]
+#[derive(Default)]
 pub struct WebSocketServer {
     /// Active connections
     connections: HashMap<String, Addr<WebSocketConnection>>,
 }
 
-impl Default for WebSocketServer {
-    fn default() -> Self {
-        Self {
-            connections: HashMap::new(),
-        }
-    }
-}
 
 impl Actor for WebSocketServer {
     type Context = Context<Self>;

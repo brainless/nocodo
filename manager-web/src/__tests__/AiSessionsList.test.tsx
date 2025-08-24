@@ -1,12 +1,24 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
-import { MemoryRouter } from '@solidjs/router';
-import AiSessionsList from '../components/AiSessionsList';
 import { SessionsProvider } from '../stores/sessionsStore';
 import { apiClient } from '../api';
 import type { AiSession, Project } from '../types';
 
 vi.mock('../api');
+
+// Mock the router components
+vi.mock('@solidjs/router', () => ({
+  A: (props: any) => (
+    <a href={props.href} class={props.class} role={props.role} aria-label={props['aria-label']}>
+      {props.children}
+    </a>
+  ),
+  MemoryRouter: (props: any) => <div>{props.children}</div>,
+  useParams: () => ({ id: 'test-id' }),
+  useNavigate: () => vi.fn(),
+}));
+
+import AiSessionsList from '../components/AiSessionsList';
 
 // Mock data
 const mockProjects: Project[] = [
@@ -68,24 +80,21 @@ const mockSessions: AiSession[] = [
 // Test wrapper component
 const TestWrapper = (props: { children: any }) => {
   return (
-    <MemoryRouter>
-      <SessionsProvider>{props.children}</SessionsProvider>
-    </MemoryRouter>
+    <SessionsProvider>{props.children}</SessionsProvider>
   );
 };
 
 // Setup API mocks
-vi.beforeEach(() => {
+beforeEach(() => {
   vi.resetAllMocks();
   // Mock API calls
   (apiClient.listSessions as any).mockResolvedValue(mockSessions);
   (apiClient.fetchProjects as any).mockResolvedValue(mockProjects);
 });
 
-vi.afterEach(() => {
+afterEach(() => {
   vi.restoreAllMocks();
 });
-
 
 describe('AiSessionsList Component', () => {
   test('renders loading state initially', async () => {

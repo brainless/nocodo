@@ -49,7 +49,7 @@ impl AppConfig {
         // Create config directory if it doesn't exist
         if let Some(parent) = config_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                ConfigError::Message(format!("Failed to create config directory: {}", e))
+                ConfigError::Message(format!("Failed to create config directory: {e}"))
             })?;
         }
 
@@ -67,7 +67,7 @@ path = "~/.local/share/nocodo/manager.db"
 path = "/tmp/nocodo-manager.sock"
 "#;
             std::fs::write(&config_path, default_config).map_err(|e| {
-                ConfigError::Message(format!("Failed to write default config: {}", e))
+                ConfigError::Message(format!("Failed to write default config: {e}"))
             })?;
         }
 

@@ -90,7 +90,7 @@ tokio = {{ version = "1.0", features = ["full"] }}
 "#,
                 members
                     .iter()
-                    .map(|m| format!("    \"{}\"", m))
+                    .map(|m| format!("    \"{m}\""))
                     .collect::<Vec<_>>()
                     .join(",\n")
             );
@@ -155,7 +155,7 @@ app.listen(port, () => {
                     "\n[dependencies]\n{}",
                     dependencies
                         .iter()
-                        .map(|d| format!("{} = \"1.0\"", d))
+                        .map(|d| format!("{d} = \"1.0\""))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -168,7 +168,7 @@ app.listen(port, () => {
                     "\n[dev-dependencies]\n{}",
                     dev_dependencies
                         .iter()
-                        .map(|d| format!("{} = \"1.0\"", d))
+                        .map(|d| format!("{d} = \"1.0\""))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -182,10 +182,9 @@ app.listen(port, () => {
 
             let content = format!(
                 r#"[package]
-name = "{}"
+name = "{name}"
 version = "0.1.0"
-edition = "2021"{}{}{}"#,
-                name, lib_section, deps, dev_deps
+edition = "2021"{lib_section}{deps}{dev_deps}"#
             );
 
             self.create_file("Cargo.toml", &content);
@@ -234,18 +233,17 @@ edition = "2021"{}{}{}"#,
 
         fn create_member(&self, name: &str) {
             let member_dir = self.path().join(name);
-            std::fs::create_dir_all(&member_dir.join("src")).unwrap();
+            std::fs::create_dir_all(member_dir.join("src")).unwrap();
 
             let cargo_toml = format!(
                 r#"[package]
-name = "{}"
+name = "{name}"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 serde = {{ workspace = true }}
-"#,
-                name
+"#
             );
 
             std::fs::write(member_dir.join("Cargo.toml"), cargo_toml).unwrap();
@@ -281,7 +279,7 @@ serde = {{ workspace = true }}
         let rust_info = analysis.rust_info.as_ref().unwrap();
         assert_eq!(rust_info.package_name, Some("test-app".to_string()));
         assert!(!rust_info.is_workspace);
-        assert!(rust_info.lib_target == false);
+        assert!(!rust_info.lib_target);
         assert!(rust_info.bin_targets.contains(&"test-app".to_string()));
         // Dependencies order may vary due to HashMap
         assert_eq!(rust_info.dependencies.len(), 3);
@@ -546,7 +544,7 @@ pub async fn analyze_project(
         .unwrap_or_else(|| std::path::Path::new("."));
 
     let canonical_path = target_path.canonicalize().map_err(|e| {
-        CliError::Analysis(format!("Failed to resolve path {:?}: {}", target_path, e))
+        CliError::Analysis(format!("Failed to resolve path {target_path:?}: {e}"))
     })?;
 
     let analyzer = ProjectAnalyzer::new();
@@ -583,7 +581,7 @@ fn print_text_analysis(analysis: &ProjectAnalysis) {
     if !analysis.languages.is_empty() {
         println!("\n📊 Languages Detected:");
         for (lang, count) in &analysis.languages {
-            println!("   {}: {} lines", lang, count);
+            println!("   {lang}: {count} lines");
         }
     }
 
@@ -591,7 +589,7 @@ fn print_text_analysis(analysis: &ProjectAnalysis) {
     if let Some(rust_info) = &analysis.rust_info {
         println!("\n🦀 Rust Project Information:");
         if let Some(name) = &rust_info.package_name {
-            println!("   Package: {}", name);
+            println!("   Package: {name}");
         }
         println!(
             "   Workspace: {}",
@@ -622,10 +620,10 @@ fn print_text_analysis(analysis: &ProjectAnalysis) {
             if let Some(node_info) = analysis.node_projects.first() {
                 println!("\n🟢 Node.js Project Information:");
                 if let Some(name) = &node_info.package_name {
-                    println!("   Package: {}", name);
+                    println!("   Package: {name}");
                 }
                 if let Some(version) = &node_info.version {
-                    println!("   Version: {}", version);
+                    println!("   Version: {version}");
                 }
                 println!("   Package Manager: {:?}", node_info.package_manager);
 
@@ -660,7 +658,7 @@ fn print_text_analysis(analysis: &ProjectAnalysis) {
                 );
 
                 if let Some(version) = &node_info.version {
-                    println!("      Version: {}", version);
+                    println!("      Version: {version}");
                 }
 
                 println!("      Package Manager: {:?}", node_info.package_manager);
@@ -684,7 +682,7 @@ fn print_text_analysis(analysis: &ProjectAnalysis) {
     if !analysis.recommendations.is_empty() {
         println!("\n💡 Recommendations:");
         for rec in &analysis.recommendations {
-            println!("   • {}", rec);
+            println!("   • {rec}");
         }
     }
 
@@ -704,15 +702,13 @@ impl ProjectAnalyzer {
     pub async fn analyze(&self, path: &Path) -> Result<ProjectAnalysis, CliError> {
         if !path.exists() {
             return Err(CliError::Analysis(format!(
-                "Path does not exist: {:?}",
-                path
+                "Path does not exist: {path:?}"
             )));
         }
 
         if !path.is_dir() {
             return Err(CliError::Analysis(format!(
-                "Path is not a directory: {:?}",
-                path
+                "Path is not a directory: {path:?}"
             )));
         }
 
@@ -779,11 +775,11 @@ impl ProjectAnalyzer {
         }
 
         let cargo_content = fs::read_to_string(&cargo_toml_path)
-            .map_err(|e| CliError::Analysis(format!("Failed to read Cargo.toml: {}", e)))?;
+            .map_err(|e| CliError::Analysis(format!("Failed to read Cargo.toml: {e}")))?;
 
         let cargo_toml: toml::Value = cargo_content
             .parse()
-            .map_err(|e| CliError::Analysis(format!("Failed to parse Cargo.toml: {}", e)))?;
+            .map_err(|e| CliError::Analysis(format!("Failed to parse Cargo.toml: {e}")))?;
 
         let mut rust_info = RustProjectInfo {
             cargo_toml_path,
@@ -837,14 +833,14 @@ impl ProjectAnalyzer {
         // Extract dependencies
         if let Some(deps) = cargo_toml.get("dependencies") {
             if let Some(deps_table) = deps.as_table() {
-                rust_info.dependencies = deps_table.keys().map(|k| k.clone()).collect();
+                rust_info.dependencies = deps_table.keys().cloned().collect();
             }
         }
 
         // Extract dev dependencies
         if let Some(dev_deps) = cargo_toml.get("dev-dependencies") {
             if let Some(dev_deps_table) = dev_deps.as_table() {
-                rust_info.dev_dependencies = dev_deps_table.keys().map(|k| k.clone()).collect();
+                rust_info.dev_dependencies = dev_deps_table.keys().cloned().collect();
             }
         }
 
@@ -875,15 +871,6 @@ impl ProjectAnalyzer {
         Ok(Some(rust_info))
     }
 
-    async fn analyze_node_project(&self, path: &Path) -> Result<Option<NodeProjectInfo>, CliError> {
-        let package_json_path = path.join("package.json");
-
-        if !package_json_path.exists() {
-            return Ok(None);
-        }
-
-        self.analyze_node_project_at_path(path).await
-    }
 
     async fn find_all_node_projects(
         &self,
@@ -898,9 +885,9 @@ impl ProjectAnalyzer {
 
         for entry in walker {
             let entry =
-                entry.map_err(|e| CliError::Analysis(format!("Error walking directory: {}", e)))?;
+                entry.map_err(|e| CliError::Analysis(format!("Error walking directory: {e}")))?;
 
-            if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+            if !entry.file_type().is_some_and(|ft| ft.is_file()) {
                 continue;
             }
 
@@ -943,10 +930,10 @@ impl ProjectAnalyzer {
         }
 
         let package_content = fs::read_to_string(&package_json_path)
-            .map_err(|e| CliError::Analysis(format!("Failed to read package.json: {}", e)))?;
+            .map_err(|e| CliError::Analysis(format!("Failed to read package.json: {e}")))?;
 
         let package_json: serde_json::Value = serde_json::from_str(&package_content)
-            .map_err(|e| CliError::Analysis(format!("Failed to parse package.json: {}", e)))?;
+            .map_err(|e| CliError::Analysis(format!("Failed to parse package.json: {e}")))?;
 
         let mut node_info = NodeProjectInfo {
             package_json_path,
@@ -976,7 +963,7 @@ impl ProjectAnalyzer {
 
         // Extract dependencies
         if let Some(deps) = package_json.get("dependencies").and_then(|v| v.as_object()) {
-            node_info.dependencies = deps.keys().map(|k| k.clone()).collect();
+            node_info.dependencies = deps.keys().cloned().collect();
         }
 
         // Extract dev dependencies
@@ -984,7 +971,7 @@ impl ProjectAnalyzer {
             .get("devDependencies")
             .and_then(|v| v.as_object())
         {
-            node_info.dev_dependencies = dev_deps.keys().map(|k| k.clone()).collect();
+            node_info.dev_dependencies = dev_deps.keys().cloned().collect();
         }
 
         // Extract scripts
@@ -1033,17 +1020,16 @@ impl ProjectAnalyzer {
 
         if !member_cargo_toml.exists() {
             return Err(CliError::Analysis(format!(
-                "Member {} has no Cargo.toml",
-                member_name
+                "Member {member_name} has no Cargo.toml"
             )));
         }
 
         let cargo_content = fs::read_to_string(&member_cargo_toml).map_err(|e| {
-            CliError::Analysis(format!("Failed to read {}/Cargo.toml: {}", member_name, e))
+            CliError::Analysis(format!("Failed to read {member_name}/Cargo.toml: {e}"))
         })?;
 
         let cargo_toml: toml::Value = cargo_content.parse().map_err(|e| {
-            CliError::Analysis(format!("Failed to parse {}/Cargo.toml: {}", member_name, e))
+            CliError::Analysis(format!("Failed to parse {member_name}/Cargo.toml: {e}"))
         })?;
 
         let mut member_info = RustProjectInfo {
@@ -1067,14 +1053,14 @@ impl ProjectAnalyzer {
         // Extract dependencies
         if let Some(deps) = cargo_toml.get("dependencies") {
             if let Some(deps_table) = deps.as_table() {
-                member_info.dependencies = deps_table.keys().map(|k| k.clone()).collect();
+                member_info.dependencies = deps_table.keys().cloned().collect();
             }
         }
 
         // Extract dev dependencies
         if let Some(dev_deps) = cargo_toml.get("dev-dependencies") {
             if let Some(dev_deps_table) = dev_deps.as_table() {
-                member_info.dev_dependencies = dev_deps_table.keys().map(|k| k.clone()).collect();
+                member_info.dev_dependencies = dev_deps_table.keys().cloned().collect();
             }
         }
 
@@ -1117,9 +1103,9 @@ impl ProjectAnalyzer {
 
         for entry in walker {
             let entry =
-                entry.map_err(|e| CliError::Analysis(format!("Error walking directory: {}", e)))?;
+                entry.map_err(|e| CliError::Analysis(format!("Error walking directory: {e}")))?;
 
-            if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+            if !entry.file_type().is_some_and(|ft| ft.is_file()) {
                 continue;
             }
 
