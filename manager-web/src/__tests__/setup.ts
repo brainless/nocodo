@@ -37,7 +37,7 @@ Object.defineProperty(window, 'location', {
     search: '',
     hash: '',
     href: 'http://localhost:3000/',
-    origin: 'http://localhost:3000'
+    origin: 'http://localhost:3000',
   },
   writable: true,
 });
@@ -52,7 +52,7 @@ if (!globalThis.URL) {
     pathname: string;
     search: string;
     hash: string;
-    
+
     constructor(url: string, base?: string) {
       this.href = url;
       this.origin = 'http://localhost:3000';
@@ -74,6 +74,6 @@ if (!globalThis.history) {
     forward: vi.fn(),
     go: vi.fn(),
     state: null,
-    length: 1
+    length: 1,
   } as any;
 }

@@ -54,7 +54,8 @@ impl TemplateManager {
         }
     }
 
-    pub fn apply_template(template: &ProjectTemplate, project_path: &Path) -> AppResult<()> {
+#[allow(dead_code)]
+pub fn apply_template(template: &ProjectTemplate, project_path: &Path) -> AppResult<()> {
         // Create the project directory
         fs::create_dir_all(project_path)?;
 

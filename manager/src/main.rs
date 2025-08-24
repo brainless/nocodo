@@ -110,7 +110,10 @@ async fn main() -> AppResult<()> {
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
-                .route("/ws/ai-sessions/{id}", web::get().to(websocket::ai_session_websocket_handler))
+                .route(
+                    "/ws/ai-sessions/{id}",
+                    web::get().to(websocket::ai_session_websocket_handler),
+                )
                 // Serve static files from ./web/dist if it exists
                 .service(
                     fs::Files::new("/", "./web/dist")

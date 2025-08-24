@@ -66,7 +66,7 @@ const ProjectFilesPage: Component = () => {
         </button>
       </div>
 
-      <div class='grid grid-cols-1 lg:grid-cols-2 gap-6 h-screen max-h-[calc(100vh-200px)]'>
+      <div class='grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px] max-h-[calc(100vh-300px)]'>
         {/* File Browser */}
         <div class='border border-gray-200 rounded-lg p-4 overflow-hidden flex flex-col'>
           <FileBrowser

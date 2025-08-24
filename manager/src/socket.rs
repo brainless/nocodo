@@ -198,7 +198,7 @@ impl SocketServer {
                     Ok(()) => {
                         // Broadcast AI session creation via WebSocket
                         ws_broadcaster.broadcast_ai_session_created(session.clone());
-                        
+
                         let data = serde_json::to_value(&session).unwrap_or_default();
                         SocketResponse::Success { data }
                     }
@@ -259,7 +259,7 @@ impl SocketServer {
                             Ok(()) => {
                                 // Broadcast AI session completion via WebSocket
                                 ws_broadcaster.broadcast_ai_session_completed(session.id.clone());
-                                
+
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
                             }
@@ -290,7 +290,7 @@ impl SocketServer {
                             Ok(()) => {
                                 // Broadcast AI session failure via WebSocket
                                 ws_broadcaster.broadcast_ai_session_failed(session.id.clone());
-                                
+
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
                             }
