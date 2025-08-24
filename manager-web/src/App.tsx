@@ -13,7 +13,7 @@ import { SessionsProvider } from './stores/sessionsStore';
 const ConnectionStatus: Component = () => {
   const { state, error } = useWebSocketConnection();
 
-  const getStatusColor = () => {
+  const getStatusColor = (): string => {
     switch (state) {
       case 'connected':
         return 'bg-green-500';
@@ -26,7 +26,7 @@ const ConnectionStatus: Component = () => {
     }
   };
 
-  const getStatusText = () => {
+  const getStatusText = (): string => {
     switch (state) {
       case 'connected':
         return 'Connected';
@@ -49,7 +49,7 @@ const ConnectionStatus: Component = () => {
 };
 
 // Layout component with navigation (shared across all routes)
-const Layout: Component<{ children: any }> = props => {
+const Layout: Component<{ children: unknown }> = props => {
   return (
     <WebSocketProvider>
       <SessionsProvider>

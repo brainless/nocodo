@@ -4,7 +4,6 @@ import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
 import SessionRow from './SessionRow';
 
-
 // Filter component with improved accessibility
 interface FiltersProps {
   toolFilter: string;
@@ -91,7 +90,6 @@ const AiSessionsList: Component = () => {
       console.error('Failed to fetch projects:', err);
     }
   };
-
 
   // Filter sessions based on current filters
   const filteredSessions = () => {

@@ -230,7 +230,9 @@ const FileBrowser: Component<FileBrowserProps> = props => {
                     <td class='px-4 py-2 text-sm text-gray-600'>
                       {file.is_directory ? '-' : formatSize(file.size ?? 0)}
                     </td>
-                    <td class='px-4 py-2 text-sm text-gray-600'>{formatDate(file.modified_at ?? Date.now() / 1000)}</td>
+                    <td class='px-4 py-2 text-sm text-gray-600'>
+                      {formatDate(file.modified_at ?? Date.now() / 1000)}
+                    </td>
                     <td class='px-4 py-2 text-right'>
                       <button
                         onClick={() => deleteFile(file)}
