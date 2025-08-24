@@ -93,7 +93,7 @@ const AiSessionsList: Component = () => {
 
   // Filter sessions based on current filters
   const filteredSessions = () => {
-    let sessions = store.list;
+    let sessions = [...store.list]; // Create a copy to avoid mutating the store
 
     if (toolFilter()) {
       sessions = sessions.filter(session => session.tool_name === toolFilter());
