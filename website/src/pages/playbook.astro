@@ -1,0 +1,303 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Button from '../components/UI/Button.astro';
+---
+
+<Layout 
+  title="nocodo Playbook - Complete Guide to Vibe Coding" 
+  description="A comprehensive playbook for vibe coding methodology using terminal-based coding tools and structured prompting flows for MVP web application development"
+>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Fixed Reading Progress Bar -->
+    <div class="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm" id="progress-container">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div class="flex items-center justify-between text-sm text-gray-600 mb-2">
+          <span class="font-medium">Reading Progress</span>
+          <span id="reading-progress-text" class="font-medium text-green-600">0%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5">
+          <div id="reading-progress-bar" class="bg-green-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="py-12 pt-32">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-8">
+          <ol class="flex items-center space-x-2 text-sm text-gray-500">
+            <li><a href="/" class="hover:text-gray-700">Home</a></li>
+            <li>/</li>
+            <li class="text-gray-900">Playbook</li>
+          </ol>
+        </nav>
+
+        <!-- Article Header -->
+        <header class="mb-8">
+          <div class="flex items-center space-x-3 mb-4">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="text-sm text-green-600 font-medium">Complete Guide</div>
+              <h1 class="text-4xl font-bold text-gray-900">Playbook for Vibe Coding an MVP Web Application</h1>
+            </div>
+          </div>
+          
+          <p class="text-xl text-gray-600">Using terminal-based coding tools and a structured prompting flow where you are the Product Owner and Project Manager</p>
+          
+          <!-- Tags -->
+          <div class="mt-4 flex flex-wrap gap-2">
+            <span class="inline-block px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Vibe Coding</span>
+            <span class="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">AI Development</span>
+            <span class="inline-block px-3 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">MVP Strategy</span>
+            <span class="inline-block px-3 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">Project Management</span>
+          </div>
+        </header>
+
+        <!-- Article Content -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200" id="article-content">
+          <div class="content-prose p-8">
+            
+            <h2 id="starting-project">Starting a Project</h2>
+
+            <ul>
+              <li>Create a project, add a <code>specs</code> folder and <code>PROJECT.md</code> in it.</li>
+              <li>Start with your business problem.</li>
+              <li>Voice record user(s) flow, transcribe (Google AI Studio), and create a Markdown file.</li>
+              <li>Save to <code>specs/THOUGHTS.txt</code>.</li>
+              <li>Prompt any coding agent: "Take transcription and write <code>specs/PROJECT.md</code>, focus on MVP only."</li>
+              <li>Prompt: "Read <code>specs/PROJECT.md</code>, add <code>Questions for Clarification</code>, with questions and default answers focusing on business, UI/UX, user journey, and similar details for MVP. I will edit answers if needed."</li>
+              <li>Check <code>specs/PROJECT.md</code>, see the section <code>Questions for Clarification</code>, and edit answers as needed.</li>
+              <li>Prompt: "We want reliable software, typed languages for backend/frontend apps only. API payload types should be generated from the backend. Deployment automation using infrastructure as code and GitHub-based CI/CD. We want end-to-end and integration tests, code format, lint checks through CI/CD. Read <code>specs/PROJECT.md</code> and create additional documents in the <code>specs/</code> folder where we need to capture business details like <code>Choices for XYZ field in API/UI</code> or technical details like <code>Deployment Plan</code>, <code>Backup Plan</code>, <code>Testing Plan</code>. Link the created documents to <code>specs/PROJECT.md</code>."</li>
+              <li>Prompt: "Read documents in <code>specs/</code>, create <code>CLAUDE.md</code> for Claude Code, link to documents in <code>specs/</code> as needed. Create <code>README.md</code> for Product Owners and general users."</li>
+              <li>I will paste <code>Development Workflow</code> (see below) into <code>CLAUDE.md</code>; change it as you need.</li>
+              <li>Prompt: "Let's create a GitHub issue to build the backend and web app with a basic 'Hello World' API between them so we can manually test the apps and integration. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. Mention in the issue: Types in API must be generated from the backend. Use the <code>gh</code> command for GitHub."</li>
+              <li>Work on the first issue using the prompts in <code>Initiate Development</code></li>
+            </ul>
+
+            <h2 id="initiate-development">Initiate Development</h2>
+
+            <ul>
+              <li>Prompt referring to the GitHub issue: "Please attempt GitHub issue &lt;__&gt;, use the <code>gh</code> command, follow <code>Development Workflow</code> in <code>CLAUDE.md</code>. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. When you want me to test, let me know; I will run the backend and web apps myself."</li>
+              <li>You should test manually, running backend and web applications locally.</li>
+              <li>If you have errors, see <code>Tackle Errors</code>, get errors fixed, making sure you can test this "Hello World" version of your app.</li>
+              <li>Prompt: "Let's create a GitHub issue to create a GitHub Actions workflow for code quality checks, format, and lint (backend and web app). Also, a workflow for GitHub Copilot review. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. Use the <code>gh</code> command for GitHub."</li>
+              <li>Optionally, but much more technical and depends on what infrastructure you want to use: "Create a GitHub issue to create deployment code/scripts for this project. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. The deployment process should be idempotent, should have scripts for backups and checking the status of services and backups."</li>
+              <li>At this point, I will manually add CodeRabbit, Graphite > Diamond, etc., for AI code review.</li>
+              <li>Continue development as in <code>Regular Development</code></li>
+            </ul>
+
+            <h2 id="work-planning">Work Planning and GitHub Issues</h2>
+
+            <ul>
+              <li>When the core "Hello World" works, telling me I can start planning the whole MVP, I ask: "Create GitHub issues for backend and frontend tasks, in chunks that are easy to test manually. Focus only on goals set in <code>specs/PROJECT.md</code> and linked documents. Mention <code>Acceptance Criteria</code> in each issue. Mention in issues: Types in API must be generated from the backend. Use the <code>gh</code> command for GitHub."</li>
+              <li>You will need to use this template for MVP and then next phases.</li>
+            </ul>
+
+            <h2 id="regular-development">Regular Development</h2>
+
+            <ul>
+              <li>Prompt referring to the GitHub issue: "Please attempt GitHub issue &lt;__&gt;, use the <code>gh</code> command, follow <code>Development Workflow</code> in <code>CLAUDE.md</code>. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. When you want me to test, let me know; I will run the backend and web apps myself."</li>
+              <li>You should test manually, running backend and web applications locally.</li>
+              <li>If you have errors, see <code>Tackle Errors</code>.</li>
+              <li>Prompt, assuming CodeRabbit, Graphite > Diamond, etc., are integrated and have commented about issues in a Pull Request: "Please read comments in PR &lt;__&gt; and attempt to fix them. Use the <code>gh</code> command."</li>
+              <li>You should test manually, running backend and web applications locally; repeat for the next GitHub issue.</li>
+            </ul>
+
+            <h2 id="tackle-errors">Tackle Errors</h2>
+
+            <ul>
+              <li>Save logs from Chrome Console or Terminal into files in a folder like <code>test_logs</code>.</li>
+              <li>Create the folder <code>test_logs</code> in your project.</li>
+              <li>Prompt: "I will share logs if needed during testing into <code>test_logs</code>. Please add this folder to <code>.gitignore</code>; files here should never be in git."</li>
+              <li>Run backend, web apps, test, share errors from logs.</li>
+              <li>Prompts like (edit as needed): "I found an error when running the web app, at URL &lt;___&gt;. The log is in <code>test_logs/chrome_console.log</code>."</li>
+            </ul>
+
+            <h2 id="tools-needed">Tools Needed</h2>
+
+            <ul>
+              <li>Terminal</li>
+              <li>Terminal-based coding tools, usually Claude Code for initial structure.</li>
+              <li><code>git</code> CLI tool</li>
+              <li>Backend language, like Python, Golang, or NodeJS.</li>
+              <li>NodeJS for frontend development.</li>
+              <li>GitHub CLI tool, <code>gh</code> referred to above.</li>
+              <li>Once GitHub-based is set, a few issues work well and are tested, I use a mix of Gemini CLI, Continue.dev CLI, Qwen Code CLI, Cursor CLI.</li>
+            </ul>
+
+            <h2 id="development-workflow">Development Workflow (in any agent's Markdown file)</h2>
+
+            <ul>
+              <li>Create a new branch for each task</li>
+              <li>Branch names should start with <code>feature/</code>, <code>chore/</code>, or <code>fix/</code></li>
+              <li>Add tests for any new features added, particularly integration or end-to-end tests</li>
+              <li>Run formatters, linters, and tests before committing changes</li>
+              <li>When finished, please commit and push to the new branch</li>
+              <li>Please mention the GitHub issue if provided</li>
+              <li>Commit small chunks</li>
+              <li>Selectively add files to git; maintain <code>.gitignore</code></li>
+              <li>If working on a GitHub issue: create a PR, update the task in the end</li>
+              <li>If working on a GitHub issue: do not close the issue until I manually test</li>
+            </ul>
+
+            <!-- Getting Started Section -->
+            <div class="bg-green-50 border-l-4 border-green-500 p-6 my-8 rounded-r-lg">
+              <div class="flex items-center mb-4">
+                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                  <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <h3 class="text-lg font-medium text-green-900">Ready to Start?</h3>
+              </div>
+              <p class="text-green-800 mb-4">
+                This playbook provides a complete framework for building MVPs using AI-assisted development. 
+                Follow the structured approach above to transform your ideas into working software.
+              </p>
+              <div class="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  href="/blog/nocodo-introduction"
+                  variant="primary"
+                  class="inline-flex items-center"
+                >
+                  Read the Introduction
+                  <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </Button>
+                <Button 
+                  href="/fundamentals"
+                  variant="outline"
+                  class="inline-flex items-center"
+                >
+                  Learn the Fundamentals
+                  <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                  </svg>
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        </article>
+
+        <!-- Navigation -->
+        <nav class="mt-12 flex justify-between">
+          <Button 
+            href="/"
+            variant="outline"
+            class="inline-flex items-center"
+          >
+            ← Back to Home
+          </Button>
+          
+          <Button 
+            href="/blog"
+            variant="primary"
+            class="inline-flex items-center"
+          >
+            Read Blog Articles →
+          </Button>
+        </nav>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Reading progress
+  const progressBar = document.getElementById('reading-progress-bar');
+  const progressText = document.getElementById('reading-progress-text');
+  const articleContent = document.getElementById('article-content');
+
+  function updateReadingProgress() {
+    if (!articleContent) return;
+    const articleRect = articleContent.getBoundingClientRect();
+    const articleHeight = articleContent.offsetHeight;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate how much of the article has been scrolled past
+    const scrolled = Math.max(0, -articleRect.top);
+    const totalScrollable = articleHeight - viewportHeight;
+    
+    if (totalScrollable <= 0) {
+      // Article is shorter than viewport
+      const progress = articleRect.top <= 0 ? 100 : 0;
+      if (progressBar) progressBar.style.width = progress + '%';
+      if (progressText) progressText.textContent = Math.round(progress) + '%';
+    } else {
+      const progress = Math.min(100, Math.max(0, (scrolled / totalScrollable) * 100));
+      if (progressBar) progressBar.style.width = progress + '%';
+      if (progressText) progressText.textContent = Math.round(progress) + '%';
+    }
+  }
+
+  // Update reading progress on scroll
+  window.addEventListener('scroll', updateReadingProgress);
+  window.addEventListener('resize', updateReadingProgress);
+  updateReadingProgress(); // Initial calculation
+</script>
+
+<style is:global>
+  /* Content prose styles */
+  .content-prose {
+    color: #374151;
+    line-height: 1.75;
+    max-width: none;
+  }
+  
+  .content-prose h2 {
+    color: #111827 !important;
+    font-weight: 700 !important;
+    font-size: 1.875rem !important;
+    margin-top: 3rem !important;
+    margin-bottom: 1rem !important;
+    line-height: 1.2 !important;
+    scroll-margin-top: 6rem !important;
+  }
+  
+  .content-prose h3 {
+    color: #111827 !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-top: 2rem !important;
+    margin-bottom: 0.75rem !important;
+    line-height: 1.3 !important;
+    scroll-margin-top: 6rem !important;
+  }
+  
+  .content-prose p {
+    margin-bottom: 1.25rem !important;
+    color: #374151 !important;
+  }
+  
+  .content-prose ul {
+    margin: 1.25rem 0 !important;
+    padding-left: 1.5rem !important;
+  }
+  
+  .content-prose li {
+    margin-bottom: 0.5rem !important;
+    list-style-type: disc !important;
+    color: #374151 !important;
+  }
+  
+  .content-prose code {
+    color: #dc2626 !important;
+    background-color: #f3f4f6 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace !important;
+    font-size: 0.875rem !important;
+  }
+  
+  .content-prose strong {
+    font-weight: 600 !important;
+    color: #111827 !important;
+  }
+</style>
