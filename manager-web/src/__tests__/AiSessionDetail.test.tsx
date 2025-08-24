@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
 import { MemoryRouter } from '@solidjs/router';
-import { mergeProps } from 'solid-js';
 import AiSessionDetail from '../components/AiSessionDetail';
 import { SessionsProvider } from '../stores/sessionsStore';
 import { apiClient } from '../api';
@@ -56,7 +55,6 @@ const mockSessionWithoutProject: AiSession = {
 
 // Test wrapper component with router
 const TestWrapper = (props: { children: any; initialPath?: string }) => {
-  const initialPath = props.initialPath || '/ai/sessions/session-123';
   return (
     <MemoryRouter>
       <SessionsProvider>{props.children}</SessionsProvider>

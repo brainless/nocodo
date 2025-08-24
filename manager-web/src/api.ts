@@ -3,7 +3,6 @@ import {
   AiSessionListResponse,
   AiSessionOutputListResponse,
   AiSessionResponse,
-  AiSessionStatus,
   ApiError,
   CreateAiSessionRequest,
   CreateProjectRequest,

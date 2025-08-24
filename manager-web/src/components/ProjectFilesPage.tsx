@@ -10,7 +10,7 @@ const ProjectFilesPage: Component = () => {
   const navigate = useNavigate();
   const [project, setProject] = createSignal<Project | null>(null);
   const [selectedFile, setSelectedFile] = createSignal<FileInfo | null>(null);
-  const [loading, setLoading] = createSignal(false);
+  const [, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
   // Optionally load project details for display name, but don't block UI
