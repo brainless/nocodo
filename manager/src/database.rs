@@ -193,7 +193,9 @@ impl Database {
                 })
             })
             .map_err(|e| match e {
-                rusqlite::Error::QueryReturnedNoRows => AppError::ProjectNotFound(format!("No project found at path: {}", path)),
+                rusqlite::Error::QueryReturnedNoRows => {
+                    AppError::ProjectNotFound(format!("No project found at path: {}", path))
+                }
                 _ => AppError::Database(e),
             })?;
 
@@ -404,7 +406,11 @@ impl Database {
             params![session_id, content],
         )?;
 
-        tracing::info!("Recorded AI output for session: {} ({} bytes)", session_id, content.len());
+        tracing::info!(
+            "Recorded AI output for session: {} ({} bytes)",
+            session_id,
+            content.len()
+        );
         Ok(())
     }
 
@@ -429,7 +435,9 @@ impl Database {
         })?;
 
         let mut outputs = Vec::new();
-        for item in iter { outputs.push(item?); }
+        for item in iter {
+            outputs.push(item?);
+        }
         Ok(outputs)
     }
 }

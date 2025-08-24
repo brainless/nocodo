@@ -59,7 +59,7 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
 
     // Extract project name from directory name or project files
     let project_name = extract_project_name(&absolute_path, &analysis)?;
-    
+
     // Determine primary language and framework
     let language = if !analysis.primary_language.is_empty() {
         Some(analysis.primary_language.clone())
@@ -118,18 +118,24 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
     let created_project = client.add_existing_project(add_existing_request).await?;
 
     // Success output
-    println!("✓ Detected {} project: {}", 
-             created_project.language.as_deref().unwrap_or("unknown"), 
-             created_project.name);
-    println!("✓ Added project \"{}\" at {}", 
-             created_project.name, 
-             created_project.path);
+    println!(
+        "✓ Detected {} project: {}",
+        created_project.language.as_deref().unwrap_or("unknown"),
+        created_project.name
+    );
+    println!(
+        "✓ Added project \"{}\" at {}",
+        created_project.name, created_project.path
+    );
 
     Ok(())
 }
 
 /// Extract project name from path and analysis
-fn extract_project_name(path: &Path, analysis: &crate::commands::analyze::ProjectAnalysis) -> Result<String, CliError> {
+fn extract_project_name(
+    path: &Path,
+    analysis: &crate::commands::analyze::ProjectAnalysis,
+) -> Result<String, CliError> {
     // Try to get name from Rust project
     if let Some(rust_info) = &analysis.rust_info {
         if let Some(package_name) = &rust_info.package_name {
@@ -160,7 +166,7 @@ fn detect_framework(analysis: &crate::commands::analyze::ProjectAnalysis) -> Opt
         return None;
     }
 
-    // Check if it's a Node.js project  
+    // Check if it's a Node.js project
     if let Some(node_info) = &analysis.node_info {
         // Check common framework dependencies
         if node_info.dependencies.contains(&"express".to_string()) {
@@ -193,34 +199,36 @@ async fn validate_not_inside_existing_project(
     // TODO: Implement proper validation by fetching all existing projects from manager
     // and checking if the given path is a subdirectory of any existing project
     // For now, we'll do a simple check by looking for common project markers in parent directories
-    
+
     let mut current_path = path.parent();
     while let Some(parent) = current_path {
         // Check for common project root markers in parent directories
-        if parent.join("Cargo.toml").exists() 
+        if parent.join("Cargo.toml").exists()
             || parent.join("package.json").exists()
-            || parent.join(".git").exists() {
-            
+            || parent.join(".git").exists()
+        {
             // This could be a parent project, but we need more sophisticated checking
             // For MVP, we'll allow this and let the manager handle the uniqueness validation
             warn!("Found potential parent project at: {:?}", parent);
         }
-        
+
         current_path = parent.parent();
-        
+
         // Don't go beyond reasonable depth
         if parent.components().count() < 2 {
             break;
         }
     }
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::analyze::{ProjectAnalysis, ProjectType, RustProjectInfo, NodeProjectInfo, PackageManager};
+    use crate::commands::analyze::{
+        NodeProjectInfo, PackageManager, ProjectAnalysis, ProjectType, RustProjectInfo,
+    };
     use std::collections::HashMap;
     use tempfile::TempDir;
 
@@ -228,7 +236,7 @@ mod tests {
     fn test_extract_project_name_from_rust_project() {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
-        
+
         let rust_info = RustProjectInfo {
             cargo_toml_path: path.join("Cargo.toml"),
             is_workspace: false,
@@ -239,7 +247,7 @@ mod tests {
             bin_targets: vec![],
             lib_target: false,
         };
-        
+
         let analysis = ProjectAnalysis {
             project_path: path.to_path_buf(),
             project_type: ProjectType::RustApplication,
@@ -252,7 +260,7 @@ mod tests {
             languages: HashMap::new(),
             recommendations: vec![],
         };
-        
+
         let name = extract_project_name(path, &analysis).unwrap();
         assert_eq!(name, "my-rust-app");
     }
@@ -261,7 +269,7 @@ mod tests {
     fn test_extract_project_name_from_node_project() {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
-        
+
         let node_info = NodeProjectInfo {
             package_json_path: path.join("package.json"),
             package_manager: PackageManager::Npm,
@@ -273,7 +281,7 @@ mod tests {
             main_entry: Some("index.js".to_string()),
             has_typescript: false,
         };
-        
+
         let analysis = ProjectAnalysis {
             project_path: path.to_path_buf(),
             project_type: ProjectType::NodeApplication,
@@ -286,7 +294,7 @@ mod tests {
             languages: HashMap::new(),
             recommendations: vec![],
         };
-        
+
         let name = extract_project_name(path, &analysis).unwrap();
         assert_eq!(name, "my-node-app");
     }
@@ -295,11 +303,11 @@ mod tests {
     fn test_extract_project_name_fallback_to_directory_name() {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
-        
+
         // Create a subdirectory with a specific name
         let project_path = path.join("my-project");
         std::fs::create_dir(&project_path).unwrap();
-        
+
         let analysis = ProjectAnalysis {
             project_path: project_path.clone(),
             project_type: ProjectType::Unknown,
@@ -312,7 +320,7 @@ mod tests {
             languages: HashMap::new(),
             recommendations: vec![],
         };
-        
+
         let name = extract_project_name(&project_path, &analysis).unwrap();
         assert_eq!(name, "my-project");
     }
@@ -321,7 +329,7 @@ mod tests {
     fn test_detect_framework_express() {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
-        
+
         let node_info = NodeProjectInfo {
             package_json_path: path.join("package.json"),
             package_manager: PackageManager::Npm,
@@ -333,7 +341,7 @@ mod tests {
             main_entry: Some("index.js".to_string()),
             has_typescript: false,
         };
-        
+
         let analysis = ProjectAnalysis {
             project_path: path.to_path_buf(),
             project_type: ProjectType::NodeApplication,
@@ -346,7 +354,7 @@ mod tests {
             languages: HashMap::new(),
             recommendations: vec![],
         };
-        
+
         let framework = detect_framework(&analysis);
         assert_eq!(framework, Some("express".to_string()));
     }
@@ -355,7 +363,7 @@ mod tests {
     fn test_detect_framework_react() {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
-        
+
         let node_info = NodeProjectInfo {
             package_json_path: path.join("package.json"),
             package_manager: PackageManager::Npm,
@@ -367,7 +375,7 @@ mod tests {
             main_entry: Some("index.js".to_string()),
             has_typescript: false,
         };
-        
+
         let analysis = ProjectAnalysis {
             project_path: path.to_path_buf(),
             project_type: ProjectType::NodeApplication,
@@ -380,7 +388,7 @@ mod tests {
             languages: HashMap::new(),
             recommendations: vec![],
         };
-        
+
         let framework = detect_framework(&analysis);
         assert_eq!(framework, Some("react".to_string()));
     }

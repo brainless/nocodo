@@ -12,7 +12,7 @@ const mockRunningSession: AiSession = {
   prompt: 'Create a new component',
   project_context: 'React app development',
   started_at: 1640995200,
-  ended_at: undefined
+  ended_at: null,
 };
 
 const mockCompletedSession: AiSession = {
@@ -23,18 +23,18 @@ const mockCompletedSession: AiSession = {
   prompt: 'Fix authentication bug',
   project_context: 'Authentication system',
   started_at: 1640995100,
-  ended_at: 1640995300
+  ended_at: 1640995300,
 };
 
 const mockFailedSession: AiSession = {
   id: 'session-789',
-  project_id: undefined,
+  project_id: null,
   tool_name: 'gemini',
   status: 'failed',
   prompt: 'Generate documentation',
-  project_context: undefined,
+  project_context: null,
   started_at: 1640994800,
-  ended_at: 1640995000
+  ended_at: 1640995000,
 };
 
 const mockCancelledSession: AiSession = {
@@ -45,35 +45,160 @@ const mockCancelledSession: AiSession = {
   prompt: 'Refactor code',
   project_context: 'Code improvement task',
   started_at: 1640994500,
-  ended_at: 1640994800
+  ended_at: 1640994800,
 };
 
 describe('SessionTimeline Component', () => {
   test('renders timeline header correctly', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
-    
+
     expect(screen.getByText('Session Timeline')).toBeInTheDocument();
-    expect(screen.getByText('Track the progress and key events of this AI session')).toBeInTheDocument();
+    expect(
+      screen.getByText('Track the progress and key events of this AI session')
+    ).toBeInTheDocument();
   });
 
   test('renders timeline events for completed session', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
-    
+
     // Should show created and started events
     expect(screen.getByText('Session Created')).toBeInTheDocument();
     expect(screen.getByText('Session Started')).toBeInTheDocument();
     expect(screen.getByText('Session Completed')).toBeInTheDocument();
-    
+
     // Should show tool name in description
     expect(screen.getByText('gpt-4 session initialized')).toBeInTheDocument();
     expect(screen.getByText('Began processing with gpt-4')).toBeInTheDocument();
   });
 
-  test('renders timeline events for failed session', () => {\n    render(() => <SessionTimeline session={mockFailedSession} />);\n    \n    expect(screen.getByText('Session Created')).toBeInTheDocument();\n    expect(screen.getByText('Session Started')).toBeInTheDocument();\n    expect(screen.getByText('Session Failed')).toBeInTheDocument();\n    \n    // Should show error message\n    expect(screen.getByText(/Ended with error after/)).toBeInTheDocument();\n  });\n\n  test('renders timeline events for cancelled session', () => {\n    render(() => <SessionTimeline session={mockCancelledSession} />);\n    \n    expect(screen.getByText('Session Created')).toBeInTheDocument();\n    expect(screen.getByText('Session Started')).toBeInTheDocument();\n    expect(screen.getByText('Session Cancelled')).toBeInTheDocument();\n    \n    // Should show cancellation message\n    expect(screen.getByText(/Cancelled by user after/)).toBeInTheDocument();\n  });\n\n  test('renders live indicator for running session', () => {\n    render(() => <SessionTimeline session={mockRunningSession} />);\n    \n    expect(screen.getByText('Session Created')).toBeInTheDocument();\n    expect(screen.getByText('Session Started')).toBeInTheDocument();\n    expect(screen.getByText('Session Running')).toBeInTheDocument();\n    expect(screen.getByText('Processing your request...')).toBeInTheDocument();\n    expect(screen.getByText('Live')).toBeInTheDocument();\n  });\n\n  test('does not show live indicator for completed session', () => {\n    render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    expect(screen.queryByText('Session Running')).not.toBeInTheDocument();\n    expect(screen.queryByText('Live')).not.toBeInTheDocument();\n  });\n\n  test('displays timeline summary correctly', () => {\n    render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    expect(screen.getByText('Total Events:')).toBeInTheDocument();\n    expect(screen.getByText('Session Status:')).toBeInTheDocument();\n    expect(screen.getByText('completed')).toBeInTheDocument();\n    \n    // Should show number of events (created + started + completed = 3)\n    expect(screen.getByText('3')).toBeInTheDocument();\n  });\n\n  test('renders events in chronological order', () => {\n    render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    const eventTitles = screen.getAllByRole('listitem');\n    // Events should be in order: created, started, completed\n    expect(eventTitles[0]).toHaveTextContent('Session Created');\n    expect(eventTitles[1]).toHaveTextContent('Session Started');\n    expect(eventTitles[2]).toHaveTextContent('Session Completed');\n  });\n\n  test('shows proper time formatting', () => {\n    render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    // Should show formatted timestamps for events\n    const timeElements = screen.getAllByRole('time');\n    expect(timeElements.length).toBeGreaterThan(0);\n    \n    // Each time element should have a dateTime attribute\n    timeElements.forEach(timeEl => {\n      expect(timeEl).toHaveAttribute('dateTime');\n    });\n  });\n\n  test('calculates duration correctly in event descriptions', () => {\n    render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    // For a session that ran for 200 seconds (1640995300 - 1640995100)\n    expect(screen.getByText(/Finished successfully in 3m 20s/)).toBeInTheDocument();\n  });\n\n  test('applies custom className', () => {\n    const { container } = render(() => (\n      <SessionTimeline session={mockCompletedSession} className=\"custom-timeline\" />\n    ));\n    \n    expect(container.firstChild).toHaveClass('custom-timeline');\n  });\n\n  test('has proper accessibility attributes', () => {\n    render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    // Timeline should have proper list semantics\n    const timelineList = screen.getByRole('list', { name: 'Session timeline events' });\n    expect(timelineList).toBeInTheDocument();\n    \n    const listItems = screen.getAllByRole('listitem');\n    expect(listItems.length).toBeGreaterThan(0);\n  });\n\n  test('shows different event icons correctly', () => {\n    const { container } = render(() => <SessionTimeline session={mockCompletedSession} />);\n    \n    // Should have different background colors for different event types\n    const iconContainers = container.querySelectorAll('[class*=\"bg-\"]');\n    expect(iconContainers.length).toBeGreaterThan(0);\n  });\n\n  test('handles session with very short duration', () => {\n    const shortSession: AiSession = {\n      ...mockCompletedSession,\n      started_at: 1640995200,\n      ended_at: 1640995210 // 10 seconds later\n    };\n    \n    render(() => <SessionTimeline session={shortSession} />);\n    \n    expect(screen.getByText(/Finished successfully in 10s/)).toBeInTheDocument();\n  });\n\n  test('handles session with no end time for running status', () => {\n    render(() => <SessionTimeline session={mockRunningSession} />);\n    \n    // Should not show completion event\n    expect(screen.queryByText('Session Completed')).not.toBeInTheDocument();\n    expect(screen.queryByText('Session Failed')).not.toBeInTheDocument();\n    expect(screen.queryByText('Session Cancelled')).not.toBeInTheDocument();\n    \n    // Should show running indicator\n    expect(screen.getByText('Session Running')).toBeInTheDocument();\n  });\n});\n"}}
-</function_results>
+  test('renders timeline events for failed session', () => {
+    render(() => <SessionTimeline session={mockFailedSession} />);
 
-Now let me update the existing tests to work with the new components:
+    expect(screen.getByText('Session Created')).toBeInTheDocument();
+    expect(screen.getByText('Session Started')).toBeInTheDocument();
+    expect(screen.getByText('Session Failed')).toBeInTheDocument();
 
-<function_calls>
-<invoke name="edit_files">
-<parameter name="title">Update AiSessionsList tests to work with new SessionRow component
+    // Should show error message
+    expect(screen.getByText(/Ended with error after/)).toBeInTheDocument();
+  });
+
+  test('renders timeline events for cancelled session', () => {
+    render(() => <SessionTimeline session={mockCancelledSession} />);
+
+    expect(screen.getByText('Session Created')).toBeInTheDocument();
+    expect(screen.getByText('Session Started')).toBeInTheDocument();
+    expect(screen.getByText('Session Cancelled')).toBeInTheDocument();
+
+    // Should show cancellation message
+    expect(screen.getByText(/Cancelled by user after/)).toBeInTheDocument();
+  });
+
+  test('renders live indicator for running session', () => {
+    render(() => <SessionTimeline session={mockRunningSession} />);
+
+    expect(screen.getByText('Session Created')).toBeInTheDocument();
+    expect(screen.getByText('Session Started')).toBeInTheDocument();
+    expect(screen.getByText('Session Running')).toBeInTheDocument();
+    expect(screen.getByText('Processing your request...')).toBeInTheDocument();
+    expect(screen.getByText('Live')).toBeInTheDocument();
+  });
+
+  test('does not show live indicator for completed session', () => {
+    render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    expect(screen.queryByText('Session Running')).not.toBeInTheDocument();
+    expect(screen.queryByText('Live')).not.toBeInTheDocument();
+  });
+
+  test('displays timeline summary correctly', () => {
+    render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    expect(screen.getByText('Total Events:')).toBeInTheDocument();
+    expect(screen.getByText('Session Status:')).toBeInTheDocument();
+    expect(screen.getByText('completed')).toBeInTheDocument();
+
+    // Should show number of events (created + started + completed = 3)
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  test('renders events in chronological order', () => {
+    render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    const eventTitles = screen.getAllByRole('listitem');
+    // Events should be in order: created, started, completed
+    expect(eventTitles[0]).toHaveTextContent('Session Created');
+    expect(eventTitles[1]).toHaveTextContent('Session Started');
+    expect(eventTitles[2]).toHaveTextContent('Session Completed');
+  });
+
+  test('shows proper time formatting', () => {
+    render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    // Should show formatted timestamps for events
+    const timeElements = screen.getAllByRole('time');
+    expect(timeElements.length).toBeGreaterThan(0);
+
+    // Each time element should have a dateTime attribute
+    timeElements.forEach(timeEl => {
+      expect(timeEl).toHaveAttribute('dateTime');
+    });
+  });
+
+  test('calculates duration correctly in event descriptions', () => {
+    render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    // For a session that ran for 200 seconds (1640995300 - 1640995100)
+    expect(screen.getByText(/Finished successfully in 3m 20s/)).toBeInTheDocument();
+  });
+
+  test('applies custom className', () => {
+    const { container } = render(() => (
+      <SessionTimeline session={mockCompletedSession} className='custom-timeline' />
+    ));
+
+    expect(container.firstChild).toHaveClass('custom-timeline');
+  });
+
+  test('has proper accessibility attributes', () => {
+    render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    // Timeline should have proper list semantics
+    const timelineList = screen.getByRole('list', { name: 'Session timeline events' });
+    expect(timelineList).toBeInTheDocument();
+
+    const listItems = screen.getAllByRole('listitem');
+    expect(listItems.length).toBeGreaterThan(0);
+  });
+
+  test('shows different event icons correctly', () => {
+    const { container } = render(() => <SessionTimeline session={mockCompletedSession} />);
+
+    // Should have different background colors for different event types
+    const iconContainers = container.querySelectorAll('[class*="bg-"]');
+    expect(iconContainers.length).toBeGreaterThan(0);
+  });
+
+  test('handles session with very short duration', () => {
+    const shortSession: AiSession = {
+      ...mockCompletedSession,
+      started_at: 1640995200,
+      ended_at: 1640995210, // 10 seconds later
+    };
+
+    render(() => <SessionTimeline session={shortSession} />);
+
+    expect(screen.getByText(/Finished successfully in 10s/)).toBeInTheDocument();
+  });
+
+  test('handles session with no end time for running status', () => {
+    render(() => <SessionTimeline session={mockRunningSession} />);
+
+    // Should not show completion event
+    expect(screen.queryByText('Session Completed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Session Failed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Session Cancelled')).not.toBeInTheDocument();
+
+    // Should show running indicator
+    expect(screen.getByText('Session Running')).toBeInTheDocument();
+  });
+});

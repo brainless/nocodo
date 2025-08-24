@@ -1,4 +1,11 @@
-import { Component, createContext, useContext, onMount, onCleanup, ParentComponent } from 'solid-js';
+import {
+  Component,
+  createContext,
+  useContext,
+  onMount,
+  onCleanup,
+  ParentComponent,
+} from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { Project, WebSocketMessage, WebSocketConnectionState } from './types';
 import { getWebSocketClient } from './websocket';
@@ -29,7 +36,7 @@ interface WebSocketContextValue {
 const WebSocketContext = createContext<WebSocketContextValue>();
 
 // WebSocket Provider Component
-export const WebSocketProvider: ParentComponent = (props) => {
+export const WebSocketProvider: ParentComponent = props => {
   // Create store for WebSocket state
   const [store, setStore] = createStore<WebSocketStore>({
     connectionState: 'disconnected',
@@ -48,12 +55,12 @@ export const WebSocketProvider: ParentComponent = (props) => {
       console.log('WebSocket connect requested');
       wsClient.connect();
     },
-    
+
     disconnect: () => {
       console.log('WebSocket disconnect requested');
       wsClient.disconnect();
     },
-    
+
     send: (message: WebSocketMessage) => {
       wsClient.send(message);
     },
@@ -64,11 +71,11 @@ export const WebSocketProvider: ParentComponent = (props) => {
     console.log('WebSocket provider mounted, setting up event handlers');
 
     // Handle state changes
-    wsClient.onStateChange((state) => {
+    wsClient.onStateChange(state => {
       console.log('WebSocket state changed to:', state);
       setStore('connectionState', state);
       setStore('isConnected', state === 'connected');
-      
+
       if (state === 'error') {
         setStore('error', 'Connection error occurred');
       } else if (state === 'connected') {
@@ -77,22 +84,22 @@ export const WebSocketProvider: ParentComponent = (props) => {
     });
 
     // Handle incoming messages
-    wsClient.onMessage((message) => {
+    wsClient.onMessage(message => {
       console.log('WebSocket message received in provider:', message);
       setStore('lastMessage', message);
-      
+
       // Handle specific message types
       switch (message.type) {
         case 'Connected':
           setStore('clientId', message.payload.client_id);
           console.log('WebSocket client connected with ID:', message.payload.client_id);
           break;
-          
+
         case 'Error':
           setStore('error', message.payload.message);
           console.error('WebSocket error:', message.payload.message);
           break;
-          
+
         default:
           // Other message types will be handled by specific components
           break;
@@ -115,9 +122,7 @@ export const WebSocketProvider: ParentComponent = (props) => {
   };
 
   return (
-    <WebSocketContext.Provider value={contextValue}>
-      {props.children}
-    </WebSocketContext.Provider>
+    <WebSocketContext.Provider value={contextValue}>{props.children}</WebSocketContext.Provider>
   );
 };
 
@@ -136,10 +141,10 @@ export const useWebSocketMessage = (
   callback: (message: WebSocketMessage) => void
 ) => {
   const { store } = useWebSocket();
-  
+
   // Create effect to watch for messages of specific type
   const cleanup = () => {};
-  
+
   onMount(() => {
     const checkMessage = () => {
       const message = store.lastMessage;
@@ -147,22 +152,22 @@ export const useWebSocketMessage = (
         callback(message);
       }
     };
-    
+
     // Check immediately in case message was already received
     checkMessage();
-    
+
     // Set up reactive effect to watch for new messages
     // Note: In a real implementation, you might want to use createEffect
     // but for simplicity, we'll let components handle this
   });
-  
+
   onCleanup(cleanup);
 };
 
 // Hook to get connection status
 export const useWebSocketConnection = () => {
   const { store, actions } = useWebSocket();
-  
+
   return {
     state: store.connectionState,
     isConnected: store.isConnected,

@@ -11,7 +11,7 @@ const mockSession: AiSession = {
   prompt: 'Test prompt',
   project_context: 'Test context',
   started_at: 1640995200000,
-  ended_at: undefined
+  ended_at: null,
 };
 
 const mockSessionList: AiSession[] = [
@@ -24,8 +24,8 @@ const mockSessionList: AiSession[] = [
     prompt: 'Another prompt',
     project_context: 'Another context',
     started_at: 1640995100000,
-    ended_at: 1640995300000
-  }
+    ended_at: 1640995300000,
+  },
 ];
 
 describe('API Client - AI Sessions', () => {
@@ -41,7 +41,7 @@ describe('API Client - AI Sessions', () => {
   describe('listSessions', () => {
     test('should fetch and return list of AI sessions', async () => {
       const mockResponse: AiSessionListResponse = {
-        sessions: mockSessionList
+        sessions: mockSessionList,
       };
 
       // Mock successful fetch response
@@ -65,7 +65,7 @@ describe('API Client - AI Sessions', () => {
     test('should handle API errors', async () => {
       const mockError = {
         error: 'Server Error',
-        message: 'Internal server error'
+        message: 'Internal server error',
       };
 
       (global.fetch as any).mockResolvedValueOnce({
@@ -88,7 +88,7 @@ describe('API Client - AI Sessions', () => {
   describe('getSession', () => {
     test('should fetch and return specific AI session', async () => {
       const mockResponse: AiSessionResponse = {
-        session: mockSession
+        session: mockSession,
       };
 
       (global.fetch as any).mockResolvedValueOnce({
@@ -110,7 +110,7 @@ describe('API Client - AI Sessions', () => {
     test('should handle 404 not found', async () => {
       const mockError = {
         error: 'Not Found',
-        message: 'Session not found'
+        message: 'Session not found',
       };
 
       (global.fetch as any).mockResolvedValueOnce({
@@ -132,9 +132,9 @@ describe('API Client - AI Sessions', () => {
       Object.defineProperty(global, 'WebSocket', {
         value: vi.fn().mockImplementation(() => mockWebSocket),
         writable: true,
-        configurable: true
+        configurable: true,
       });
-      
+
       // Add WebSocket constants to the constructor
       (global.WebSocket as any).CONNECTING = 0;
       (global.WebSocket as any).OPEN = 1;
@@ -149,37 +149,39 @@ describe('API Client - AI Sessions', () => {
         onerror: null,
         onclose: null,
       };
-      
+
       (global.WebSocket as any).mockImplementation(() => mockWebSocket);
     });
 
     test('should create WebSocket connection with correct URL', () => {
       const sessionId = 'session-123';
       const onMessage = vi.fn();
-      
+
       Object.defineProperty(window, 'location', {
         value: {
           protocol: 'http:',
-          host: 'localhost:8081'
+          host: 'localhost:8081',
         },
-        writable: true
+        writable: true,
       });
 
       apiClient.subscribeSession(sessionId, onMessage);
 
-      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8081/ws/ai-sessions/session-123');
+      expect(global.WebSocket).toHaveBeenCalledWith(
+        'ws://localhost:8081/ws/ai-sessions/session-123'
+      );
     });
 
     test('should use wss protocol for https', () => {
       const sessionId = 'session-123';
       const onMessage = vi.fn();
-      
+
       Object.defineProperty(window, 'location', {
         value: {
           protocol: 'https:',
-          host: 'example.com'
+          host: 'example.com',
         },
-        writable: true
+        writable: true,
       });
 
       apiClient.subscribeSession(sessionId, onMessage);
@@ -209,7 +211,7 @@ describe('API Client - AI Sessions', () => {
 
       // Simulate WebSocket message event
       const mockEvent = {
-        data: JSON.stringify(testData)
+        data: JSON.stringify(testData),
       };
       mockWebSocket.onmessage(mockEvent);
 
@@ -225,7 +227,7 @@ describe('API Client - AI Sessions', () => {
 
       // Simulate WebSocket message with invalid JSON
       const mockEvent = {
-        data: 'invalid json'
+        data: 'invalid json',
       };
       mockWebSocket.onmessage(mockEvent);
 
@@ -263,7 +265,7 @@ describe('API Client - AI Sessions', () => {
     test('should provide close method that closes WebSocket', () => {
       const sessionId = 'session-123';
       const onMessage = vi.fn();
-      
+
       // Mock WebSocket as OPEN
       mockWebSocket.readyState = (global.WebSocket as any).OPEN;
 
@@ -277,7 +279,7 @@ describe('API Client - AI Sessions', () => {
     test('should close WebSocket in CONNECTING state', () => {
       const sessionId = 'session-123';
       const onMessage = vi.fn();
-      
+
       // Mock WebSocket as CONNECTING
       mockWebSocket.readyState = (global.WebSocket as any).CONNECTING;
 
@@ -291,7 +293,7 @@ describe('API Client - AI Sessions', () => {
     test('should not close already closed WebSocket', () => {
       const sessionId = 'session-123';
       const onMessage = vi.fn();
-      
+
       // Mock WebSocket as CLOSED
       mockWebSocket.readyState = (global.WebSocket as any).CLOSED;
 

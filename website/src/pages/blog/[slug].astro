@@ -3,14 +3,14 @@ import Layout from '../../layouts/Layout.astro';
 import { getCollection, getEntry } from 'astro:content';
 
 export async function getStaticPaths() {
-  const playbookEntries = await getCollection('playbook');
-  return playbookEntries.map(entry => ({
+  const blogEntries = await getCollection('blog');
+  return blogEntries.map(entry => ({
     params: { slug: entry.slug },
   }));
 }
 
 const { slug } = Astro.params;
-const entry = await getEntry('playbook', slug);
+const entry = await getEntry('blog', slug);
 
 if (!entry) {
   throw new Error(`Entry not found: ${slug}`);
@@ -19,7 +19,7 @@ if (!entry) {
 const { Content, headings } = await entry.render();
 const { data } = entry;
 
-const title = data.title || 'nocodo Playbook';
+const title = data.title || 'nocodo Blog';
 const description = data.description || '';
 ---
 
@@ -43,7 +43,7 @@ const description = data.description || '';
             {headings.map((heading) => (
               <a 
                 href={`#${heading.slug}`}
-                class={`block text-sm hover:text-green-600 transition-colors toc-link ${
+                class={`block text-sm hover:text-blue-600 transition-colors toc-link ${
                   heading.depth === 1 ? 'font-semibold text-gray-900' :
                   heading.depth === 2 ? 'pl-4 text-gray-700' :
                   heading.depth === 3 ? 'pl-8 text-gray-600' :
@@ -64,10 +64,10 @@ const description = data.description || '';
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex items-center justify-between text-sm text-gray-600 mb-2">
           <span class="font-medium">Reading Progress</span>
-          <span id="reading-progress-text" class="font-medium text-green-600">0%</span>
+          <span id="reading-progress-text" class="font-medium text-blue-600">0%</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-1.5">
-          <div id="reading-progress-bar" class="bg-green-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+          <div id="reading-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
         </div>
       </div>
     </div>
@@ -75,7 +75,7 @@ const description = data.description || '';
     <!-- Floating TOC Button -->
     <button 
       id="toc-toggle"
-      class="fixed bottom-6 right-6 w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg transition-all duration-200 z-30 flex items-center justify-center group"
+      class="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-200 z-30 flex items-center justify-center group"
       title="Table of Contents"
     >
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,7 +91,7 @@ const description = data.description || '';
           <ol class="flex items-center space-x-2 text-sm text-gray-500">
             <li><a href="/" class="hover:text-gray-700">Home</a></li>
             <li>/</li>
-            <li><a href="/playbook" class="hover:text-gray-700">Playbook</a></li>
+            <li><a href="/blog" class="hover:text-gray-700">Blog</a></li>
             <li>/</li>
             <li class="text-gray-900">{title}</li>
           </ol>
@@ -100,13 +100,13 @@ const description = data.description || '';
         <!-- Article Header -->
         <header class="mb-8">
           <div class="flex items-center space-x-3 mb-4">
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
               </svg>
             </div>
             <div>
-              <div class="text-sm text-green-600 font-medium">nocodo Playbook</div>
+              <div class="text-sm text-blue-600 font-medium">nocodo Blog</div>
               <h1 class="text-4xl font-bold text-gray-900">{title}</h1>
             </div>
           </div>
@@ -119,7 +119,7 @@ const description = data.description || '';
           {data.tags && (
             <div class="mt-4 flex flex-wrap gap-2">
               {data.tags.map((tag) => (
-                <span class="inline-block px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                <span class="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
                   {tag}
                 </span>
               ))}
@@ -138,17 +138,17 @@ const description = data.description || '';
         <!-- Navigation -->
         <nav class="mt-12 flex justify-between">
           <a 
-            href="/playbook"
+            href="/blog"
             class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
           >
-            ← Back to Playbook
+            ← Back to Blog
           </a>
           
           <a 
-            href="/fundamentals"
-            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
+            href="/playbook"
+            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
           >
-            Start Learning Fundamentals →
+            Read the Playbook →
           </a>
         </nav>
       </div>
@@ -245,14 +245,14 @@ const description = data.description || '';
 
     // Remove all active states
     tocLinks.forEach(link => {
-      link.classList.remove('text-green-600', 'font-medium');
+      link.classList.remove('text-blue-600', 'font-medium');
     });
 
     // Add active state to current section
     if (currentHeading && (currentHeading as HTMLElement).id) {
       const currentLink = document.querySelector(`[data-heading-id="${(currentHeading as HTMLElement).id}"]`);
       if (currentLink) {
-        currentLink.classList.add('text-green-600', 'font-medium');
+        currentLink.classList.add('text-blue-600', 'font-medium');
       }
     }
   }
@@ -378,7 +378,7 @@ const description = data.description || '';
   }
 
   .content-prose blockquote {
-    border-left: 4px solid #16a34a;
+    border-left: 4px solid #2563eb;
     padding-left: 1rem;
     margin: 1.5rem 0;
     font-style: italic;

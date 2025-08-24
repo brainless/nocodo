@@ -10,16 +10,30 @@ use tracing::{debug, error, info};
 pub enum SocketRequest {
     // Health and identity
     Ping,
-    Identify { client_id: String, token: Option<String> },
+    Identify {
+        client_id: String,
+        token: Option<String>,
+    },
 
     // Sessions and project context
     CreateAiSession(CreateAiSessionRequest),
-    GetProjectContext { project_path: String },
-    GetProjectByPath { project_path: String },
-    CompleteAiSession { session_id: String },
-    FailAiSession { session_id: String },
+    GetProjectContext {
+        project_path: String,
+    },
+    GetProjectByPath {
+        project_path: String,
+    },
+    CompleteAiSession {
+        session_id: String,
+    },
+    FailAiSession {
+        session_id: String,
+    },
     // New: record one-shot AI output for a session
-    RecordAiOutput { session_id: String, output: String },
+    RecordAiOutput {
+        session_id: String,
+        output: String,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -116,16 +130,25 @@ impl ManagerClient {
     pub async fn ping(&self) -> Result<bool, CliError> {
         let request = SocketRequest::Ping;
         match self.send_request(request).await? {
-            SocketResponse::Success { data } => Ok(data.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)),
+            SocketResponse::Success { data } => {
+                Ok(data.get("ok").and_then(|v| v.as_bool()).unwrap_or(false))
+            }
             SocketResponse::Error { .. } => Ok(false),
         }
     }
 
-    pub async fn identify(&self, client_id: String, token: Option<String>) -> Result<serde_json::Value, CliError> {
+    pub async fn identify(
+        &self,
+        client_id: String,
+        token: Option<String>,
+    ) -> Result<serde_json::Value, CliError> {
         let request = SocketRequest::Identify { client_id, token };
         match self.send_request(request).await? {
             SocketResponse::Success { data } => Ok(data),
-            SocketResponse::Error { message } => Err(CliError::Communication(format!("Manager error: {}", message))),
+            SocketResponse::Error { message } => Err(CliError::Communication(format!(
+                "Manager error: {}",
+                message
+            ))),
         }
     }
 
@@ -301,8 +324,16 @@ impl ManagerClient {
         }
     }
 
-    pub async fn record_ai_output(&self, session_id: String, output: String) -> Result<(), CliError> {
-        info!("Recording AI output for session: {} ({} bytes)", session_id, output.len());
+    pub async fn record_ai_output(
+        &self,
+        session_id: String,
+        output: String,
+    ) -> Result<(), CliError> {
+        info!(
+            "Recording AI output for session: {} ({} bytes)",
+            session_id,
+            output.len()
+        );
         let request = SocketRequest::RecordAiOutput { session_id, output };
         let response = self.send_request(request).await?;
         match response {
@@ -354,7 +385,10 @@ impl ManagerClient {
         Ok(project_response.project)
     }
 
-    pub async fn add_existing_project(&self, request: AddExistingProjectRequest) -> Result<Project, CliError> {
+    pub async fn add_existing_project(
+        &self,
+        request: AddExistingProjectRequest,
+    ) -> Result<Project, CliError> {
         info!("Adding existing project '{}' via HTTP API", request.name);
 
         let url = format!("{}/api/projects/add-existing", self.manager_url);

@@ -200,7 +200,7 @@ pub struct FileListResponse {
 #[ts(export)]
 pub struct FileCreateRequest {
     pub project_id: String,
-    pub path: String, // Relative path within project
+    pub path: String,            // Relative path within project
     pub content: Option<String>, // None for directories
     pub is_directory: bool,
 }

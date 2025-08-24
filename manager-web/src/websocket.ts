@@ -11,7 +11,7 @@ export class RealtimeWebSocketClient implements WebSocketClient {
   private reconnectDelay = 1000; // Start with 1 second
   private pingInterval: number | null = null;
   private connectionState: WebSocketConnectionState = 'disconnected';
-  
+
   private messageCallbacks: ((message: WebSocketMessage) => void)[] = [];
   private stateCallbacks: ((state: WebSocketConnectionState) => void)[] = [];
 
@@ -25,7 +25,7 @@ export class RealtimeWebSocketClient implements WebSocketClient {
     } else {
       this.url = url;
     }
-    
+
     console.log('WebSocket client initialized with URL:', this.url);
   }
 
@@ -51,17 +51,17 @@ export class RealtimeWebSocketClient implements WebSocketClient {
   disconnect(): void {
     console.log('Manually disconnecting WebSocket');
     this.reconnectAttempts = this.maxReconnectAttempts; // Prevent reconnection
-    
+
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
-    
+
     if (this.socket) {
       this.socket.close(1000, 'Manual disconnect');
       this.socket = null;
     }
-    
+
     this.setState('disconnected');
   }
 
@@ -98,37 +98,37 @@ export class RealtimeWebSocketClient implements WebSocketClient {
       this.startPingInterval();
     };
 
-    this.socket.onclose = (event) => {
+    this.socket.onclose = event => {
       console.log('WebSocket connection closed:', event.code, event.reason);
       this.setState('disconnected');
-      
+
       if (this.pingInterval) {
         clearInterval(this.pingInterval);
         this.pingInterval = null;
       }
-      
+
       // Attempt reconnection if it wasn't a manual disconnect
       if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.attemptReconnect();
       }
     };
 
-    this.socket.onerror = (error) => {
+    this.socket.onerror = error => {
       console.error('WebSocket error:', error);
       this.setState('error');
     };
 
-    this.socket.onmessage = (event) => {
+    this.socket.onmessage = event => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
         console.debug('WebSocket message received:', message);
-        
+
         // Handle ping/pong internally
         if (message.type === 'Ping') {
           this.send({ type: 'Pong' });
           return;
         }
-        
+
         // Notify all callbacks
         this.messageCallbacks.forEach(callback => {
           try {
@@ -148,7 +148,7 @@ export class RealtimeWebSocketClient implements WebSocketClient {
     if (this.connectionState !== state) {
       console.log(`WebSocket state changed: ${this.connectionState} → ${state}`);
       this.connectionState = state;
-      
+
       // Notify all state change callbacks
       this.stateCallbacks.forEach(callback => {
         try {
@@ -168,9 +168,11 @@ export class RealtimeWebSocketClient implements WebSocketClient {
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-    
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    
+
+    console.log(
+      `Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+    );
+
     setTimeout(() => {
       if (this.connectionState === 'disconnected' || this.connectionState === 'error') {
         this.connect();

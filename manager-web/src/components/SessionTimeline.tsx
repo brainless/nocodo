@@ -19,7 +19,7 @@ const formatTimelineTimestamp = (timestamp: number): string => {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   });
 };
 
@@ -35,7 +35,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
     title: 'Session Created',
     description: `${session.tool_name} session initialized`,
     icon: '🚀',
-    iconColor: 'bg-blue-500'
+    iconColor: 'bg-blue-500',
   });
 
   // Session started event (for now, same as created)
@@ -46,13 +46,14 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
     title: 'Session Started',
     description: `Began processing with ${session.tool_name}`,
     icon: '▶️',
-    iconColor: 'bg-green-500'
+    iconColor: 'bg-green-500',
   });
 
   // Session end event (if completed)
   if (session.ended_at) {
-    const duration = Math.floor((session.ended_at - session.started_at));
-    const durationText = duration > 60 ? `${Math.floor(duration / 60)}m ${duration % 60}s` : `${duration}s`;
+    const duration = Math.floor(session.ended_at - session.started_at);
+    const durationText =
+      duration > 60 ? `${Math.floor(duration / 60)}m ${duration % 60}s` : `${duration}s`;
 
     switch (session.status) {
       case 'completed':
@@ -63,7 +64,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
           title: 'Session Completed',
           description: `Finished successfully in ${durationText}`,
           icon: '✅',
-          iconColor: 'bg-green-500'
+          iconColor: 'bg-green-500',
         });
         break;
       case 'failed':
@@ -74,7 +75,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
           title: 'Session Failed',
           description: `Ended with error after ${durationText}`,
           icon: '❌',
-          iconColor: 'bg-red-500'
+          iconColor: 'bg-red-500',
         });
         break;
       case 'cancelled':
@@ -85,7 +86,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
           title: 'Session Cancelled',
           description: `Cancelled by user after ${durationText}`,
           icon: '⚪',
-          iconColor: 'bg-gray-500'
+          iconColor: 'bg-gray-500',
         });
         break;
     }
@@ -95,29 +96,31 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
 };
 
 // Individual timeline event component
-const TimelineEventItem: Component<{ 
-  event: TimelineEvent; 
+const TimelineEventItem: Component<{
+  event: TimelineEvent;
   isLast: boolean;
   isActive?: boolean;
-}> = (props) => {
+}> = props => {
   return (
-    <div class="relative flex items-start">
+    <div class='relative flex items-start'>
       {/* Connector line */}
       <Show when={!props.isLast}>
-        <div class="absolute top-8 left-4 w-0.5 h-full bg-gray-200" aria-hidden="true"></div>
+        <div class='absolute top-8 left-4 w-0.5 h-full bg-gray-200' aria-hidden='true'></div>
       </Show>
 
       {/* Event icon */}
-      <div class={`relative flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-medium ${props.event.iconColor} ${props.isActive ? 'ring-4 ring-blue-100' : ''}`}>
-        <span aria-hidden="true">{props.event.icon}</span>
+      <div
+        class={`relative flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-medium ${props.event.iconColor} ${props.isActive ? 'ring-4 ring-blue-100' : ''}`}
+      >
+        <span aria-hidden='true'>{props.event.icon}</span>
       </div>
 
       {/* Event content */}
-      <div class="ml-4 flex-1 min-w-0">
-        <div class="flex items-center justify-between">
-          <h4 class="text-sm font-medium text-gray-900">{props.event.title}</h4>
-          <time 
-            class="text-xs text-gray-500"
+      <div class='ml-4 flex-1 min-w-0'>
+        <div class='flex items-center justify-between'>
+          <h4 class='text-sm font-medium text-gray-900'>{props.event.title}</h4>
+          <time
+            class='text-xs text-gray-500'
             dateTime={new Date(props.event.timestamp * 1000).toISOString()}
             title={new Date(props.event.timestamp * 1000).toLocaleString()}
           >
@@ -125,7 +128,7 @@ const TimelineEventItem: Component<{
           </time>
         </div>
         <Show when={props.event.description}>
-          <p class="text-sm text-gray-600 mt-1">{props.event.description}</p>
+          <p class='text-sm text-gray-600 mt-1'>{props.event.description}</p>
         </Show>
       </div>
     </div>
@@ -133,31 +136,37 @@ const TimelineEventItem: Component<{
 };
 
 // Live progress indicator for running sessions
-const LiveProgressIndicator: Component<{ session: AiSession }> = (props) => {
+const LiveProgressIndicator: Component<{ session: AiSession }> = props => {
   const session = () => props.session;
-  
+
   if (session().status !== 'running') return null;
 
   return (
-    <div class="relative flex items-start">
+    <div class='relative flex items-start'>
       {/* Animated connector line */}
-      <div class="absolute top-8 left-4 w-0.5 h-8 bg-gradient-to-b from-blue-500 to-transparent animate-pulse" aria-hidden="true"></div>
+      <div
+        class='absolute top-8 left-4 w-0.5 h-8 bg-gradient-to-b from-blue-500 to-transparent animate-pulse'
+        aria-hidden='true'
+      ></div>
 
       {/* Live indicator */}
-      <div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 ring-4 ring-blue-100 animate-pulse">
-        <div class="w-3 h-3 rounded-full bg-white animate-ping"></div>
+      <div class='relative flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 ring-4 ring-blue-100 animate-pulse'>
+        <div class='w-3 h-3 rounded-full bg-white animate-ping'></div>
       </div>
 
       {/* Live content */}
-      <div class="ml-4 flex-1 min-w-0">
-        <div class="flex items-center justify-between">
-          <h4 class="text-sm font-medium text-blue-900">Session Running</h4>
-          <div class="flex items-center text-xs text-blue-600">
-            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2" aria-hidden="true"></div>
+      <div class='ml-4 flex-1 min-w-0'>
+        <div class='flex items-center justify-between'>
+          <h4 class='text-sm font-medium text-blue-900'>Session Running</h4>
+          <div class='flex items-center text-xs text-blue-600'>
+            <div
+              class='w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2'
+              aria-hidden='true'
+            ></div>
             <span>Live</span>
           </div>
         </div>
-        <p class="text-sm text-blue-700 mt-1">Processing your request...</p>
+        <p class='text-sm text-blue-700 mt-1'>Processing your request...</p>
       </div>
     </div>
   );
@@ -170,9 +179,9 @@ interface SessionTimelineProps {
 }
 
 // Main SessionTimeline component
-const SessionTimeline: Component<SessionTimelineProps> = (props) => {
+const SessionTimeline: Component<SessionTimelineProps> = props => {
   const session = () => props.session;
-  
+
   const timelineEvents = createMemo(() => {
     return generateTimelineEvents(session());
   });
@@ -184,23 +193,17 @@ const SessionTimeline: Component<SessionTimelineProps> = (props) => {
   return (
     <div class={`bg-white rounded-lg border border-gray-200 p-6 ${props.className || ''}`}>
       {/* Timeline header */}
-      <div class="mb-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-2">Session Timeline</h3>
-        <p class="text-sm text-gray-600">
-          Track the progress and key events of this AI session
-        </p>
+      <div class='mb-6'>
+        <h3 class='text-lg font-medium text-gray-900 mb-2'>Session Timeline</h3>
+        <p class='text-sm text-gray-600'>Track the progress and key events of this AI session</p>
       </div>
 
       {/* Timeline content */}
-      <div 
-        class="space-y-6"
-        role="list"
-        aria-label="Session timeline events"
-      >
+      <div class='space-y-6' role='list' aria-label='Session timeline events'>
         <For each={timelineEvents()}>
           {(event, index) => (
-            <div role="listitem">
-              <TimelineEventItem 
+            <div role='listitem'>
+              <TimelineEventItem
                 event={event}
                 isLast={index() === timelineEvents().length - 1 && !isSessionRunning()}
               />
@@ -210,22 +213,22 @@ const SessionTimeline: Component<SessionTimelineProps> = (props) => {
 
         {/* Live progress indicator for running sessions */}
         <Show when={isSessionRunning()}>
-          <div role="listitem">
+          <div role='listitem'>
             <LiveProgressIndicator session={session()} />
           </div>
         </Show>
       </div>
 
       {/* Timeline summary */}
-      <div class="mt-6 pt-4 border-t border-gray-200">
-        <div class="grid grid-cols-2 gap-4 text-sm">
+      <div class='mt-6 pt-4 border-t border-gray-200'>
+        <div class='grid grid-cols-2 gap-4 text-sm'>
           <div>
-            <span class="text-gray-500">Total Events:</span>
-            <span class="ml-2 font-medium text-gray-900">{timelineEvents().length}</span>
+            <span class='text-gray-500'>Total Events:</span>
+            <span class='ml-2 font-medium text-gray-900'>{timelineEvents().length}</span>
           </div>
           <div>
-            <span class="text-gray-500">Session Status:</span>
-            <span class="ml-2 font-medium text-gray-900 capitalize">{session().status}</span>
+            <span class='text-gray-500'>Session Status:</span>
+            <span class='ml-2 font-medium text-gray-900 capitalize'>{session().status}</span>
           </div>
         </div>
       </div>
