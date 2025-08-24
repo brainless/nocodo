@@ -132,13 +132,13 @@ const TopNavigation: Component = () => {
           </div>
         </div>
         
-        {/* Right side - Chats link */}
+        {/* Right side - Sessions link */}
         <div class='flex items-center'>
           <A 
             href='/ai/sessions' 
-            class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md'
+            class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
           >
-            Chats
+            Sessions
           </A>
         </div>
       </div>
