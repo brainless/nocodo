@@ -213,7 +213,10 @@ const SessionRow: Component<SessionRowProps> = props => {
 
           {/* Project and duration row */}
           <div class='flex items-center justify-between mb-2'>
-            <ProjectBadge project={props.project ?? null} projectId={session().project_id ?? undefined} />
+            <ProjectBadge
+              project={props.project ?? null}
+              projectId={session().project_id ?? undefined}
+            />
             <div class='text-xs text-gray-500'>
               <span title='Session duration'>
                 Duration: {formatDuration(session().started_at, session().ended_at ?? undefined)}

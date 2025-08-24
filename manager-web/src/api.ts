@@ -71,7 +71,7 @@ class ApiClient {
     if (params.path) queryParams.set('path', params.path);
 
     const queryString = queryParams.toString();
-    const endpoint = `/files${queryString ? `?${  queryString}` : ''}`;
+    const endpoint = `/files${queryString ? `?${queryString}` : ''}`;
     return this.request<FileListResponse>(endpoint);
   }
 
