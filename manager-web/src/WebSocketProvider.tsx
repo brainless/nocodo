@@ -1,10 +1,4 @@
-import {
-  ParentComponent,
-  createContext,
-  onCleanup,
-  onMount,
-  useContext,
-} from 'solid-js';
+import { ParentComponent, createContext, onCleanup, onMount, useContext } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { WebSocketConnectionState, WebSocketMessage } from './types';
 import { getWebSocketClient } from './websocket';

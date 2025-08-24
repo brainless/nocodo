@@ -252,7 +252,12 @@ const AiSessionDetail: Component = () => {
                     <dd>
                       <Show
                         when={project()}
-                        fallback={<ProjectBadge project={null} projectId={session()!.project_id ?? undefined} />}
+                        fallback={
+                          <ProjectBadge
+                            project={null}
+                            projectId={session()!.project_id ?? undefined}
+                          />
+                        }
                       >
                         <div class='space-y-2'>
                           <ProjectBadge project={project()} />

@@ -12,7 +12,7 @@ export default defineConfig({
     },
     server: {
       deps: {
-        inline: [/solid-js/, /@solidjs\/testing-library/, /\@solidjs\/router/]
+        inline: [/solid-js/, /@solidjs\/testing-library/, /@solidjs\/router/]
       }
     },
     // Add proper handling for SolidJS

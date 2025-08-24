@@ -1,9 +1,4 @@
-import {
-  ParentComponent,
-  createContext,
-  onCleanup,
-  useContext,
-} from 'solid-js';
+import { ParentComponent, createContext, onCleanup, useContext } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { AiSession, AiSessionStatus } from '../types';
 import { apiClient } from '../api';
