@@ -44,36 +44,32 @@ const ProjectFilesPage: Component = () => {
 
   // Render immediately; show error banner if needed
   return (
-    <div class="space-y-6">
+    <div class='space-y-6'>
       {/* Optional error banner */}
       <Show when={error()}>
-        <div class="bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md p-3 text-sm">
+        <div class='bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md p-3 text-sm'>
           {error()}
         </div>
       </Show>
 
       {/* Header */}
-      <div class="flex items-center justify-between">
+      <div class='flex items-center justify-between'>
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">
-            {project()?.name || params.id}
-          </h1>
-          <p class="text-sm text-gray-600 mt-1">
-            Project files and editor
-          </p>
+          <h1 class='text-2xl font-bold text-gray-900'>{project()?.name || params.id}</h1>
+          <p class='text-sm text-gray-600 mt-1'>Project files and editor</p>
         </div>
         <button
           onClick={() => navigate('/')}
-          class="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          class='px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors'
         >
           ← Back to Projects
         </button>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-screen max-h-[calc(100vh-200px)]">
+      <div class='grid grid-cols-1 lg:grid-cols-2 gap-6 h-screen max-h-[calc(100vh-200px)]'>
         {/* File Browser */}
-        <div class="border border-gray-200 rounded-lg p-4 overflow-hidden flex flex-col">
-          <FileBrowser 
+        <div class='border border-gray-200 rounded-lg p-4 overflow-hidden flex flex-col'>
+          <FileBrowser
             projectId={params.id}
             projectName={project()?.name}
             onFileSelect={handleFileSelect}
@@ -81,24 +77,20 @@ const ProjectFilesPage: Component = () => {
         </div>
 
         {/* File Editor */}
-        <div class="border border-gray-200 rounded-lg p-4 overflow-hidden flex flex-col">
-          <Show 
+        <div class='border border-gray-200 rounded-lg p-4 overflow-hidden flex flex-col'>
+          <Show
             when={selectedFile()}
             fallback={
-              <div class="flex-1 flex items-center justify-center text-gray-500">
-                <div class="text-center">
-                  <div class="text-6xl mb-4">📄</div>
-                  <p class="text-lg font-medium mb-2">No file selected</p>
-                  <p class="text-sm">Click on a file in the browser to edit it</p>
+              <div class='flex-1 flex items-center justify-center text-gray-500'>
+                <div class='text-center'>
+                  <div class='text-6xl mb-4'>📄</div>
+                  <p class='text-lg font-medium mb-2'>No file selected</p>
+                  <p class='text-sm'>Click on a file in the browser to edit it</p>
                 </div>
               </div>
             }
           >
-            <FileEditor
-              project={project()!}
-              file={selectedFile()!}
-              onClose={handleEditorClose}
-            />
+            <FileEditor project={project()!} file={selectedFile()!} onClose={handleEditorClose} />
           </Show>
         </div>
       </div>

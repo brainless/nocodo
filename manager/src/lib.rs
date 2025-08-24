@@ -11,7 +11,7 @@ pub mod websocket;
 mod ts_bindings_tests {
     use super::models::*;
     use ts_rs::TS;
-    
+
     #[test]
     fn export_ts_bindings() {
         Project::export().expect("Failed to export Project bindings");
@@ -24,9 +24,11 @@ mod ts_bindings_tests {
         AiSessionResponse::export().expect("Failed to export AiSessionResponse bindings");
         AiSessionListResponse::export().expect("Failed to export AiSessionListResponse bindings");
         AiSessionOutput::export().expect("Failed to export AiSessionOutput bindings");
-        AiSessionOutputListResponse::export().expect("Failed to export AiSessionOutputListResponse bindings");
+        AiSessionOutputListResponse::export()
+            .expect("Failed to export AiSessionOutputListResponse bindings");
         RecordAiOutputRequest::export().expect("Failed to export RecordAiOutputRequest bindings");
-        AddExistingProjectRequest::export().expect("Failed to export AddExistingProjectRequest bindings");
+        AddExistingProjectRequest::export()
+            .expect("Failed to export AddExistingProjectRequest bindings");
         FileInfo::export().expect("Failed to export FileInfo bindings");
         FileListRequest::export().expect("Failed to export FileListRequest bindings");
         FileListResponse::export().expect("Failed to export FileListResponse bindings");
