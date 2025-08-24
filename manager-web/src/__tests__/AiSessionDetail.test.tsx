@@ -57,7 +57,7 @@ const mockSessionWithoutProject: AiSession = {
 const TestWrapper = (props: { sessionId?: string }) => {
   const sessionId = props.sessionId || 'session-123';
   const initialPath = `/ai/sessions/${sessionId}`;
-  
+
   return (
     <Router>
       <MemoryRouter initialEntries={[initialPath]}>
