@@ -190,14 +190,12 @@ const CreateProjectPage: Component = () => {
   );
 };
 
-// Files Page (without layout since it has its own)
+// Files Page - now uses Layout for consistency
 const FilesPageWrapper: Component = () => {
   return (
-    <div class='min-h-screen bg-gray-50'>
-      <div class='container mx-auto px-4 py-8'>
-        <ProjectFilesPage />
-      </div>
-    </div>
+    <Layout>
+      <ProjectFilesPage />
+    </Layout>
   );
 };
 
