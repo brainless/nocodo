@@ -101,9 +101,8 @@ pub async fn create_project(
         tracing::info!("Applied template {} to project {}", template.name, req.name);
     } else {
         // Create basic project directory structure
-        std::fs::create_dir_all(&absolute_project_path).map_err(|e| {
-            AppError::Internal(format!("Failed to create project directory: {e}"))
-        })?;
+        std::fs::create_dir_all(&absolute_project_path)
+            .map_err(|e| AppError::Internal(format!("Failed to create project directory: {e}")))?;
 
         // Create a basic README.md
         let readme_content = format!(
@@ -425,8 +424,7 @@ pub async fn list_files(
     let mut files = Vec::new();
 
     for entry in entries {
-        let entry =
-            entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {e}")))?;
+        let entry = entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {e}")))?;
         let path = entry.path();
         let metadata = entry
             .metadata()

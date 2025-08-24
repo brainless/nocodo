@@ -127,7 +127,6 @@ impl ManagerClient {
         }
     }
 
-
     pub async fn send_request(&self, request: SocketRequest) -> Result<SocketResponse, CliError> {
         debug!("Connecting to Manager daemon at: {}", self.socket_path);
 
@@ -216,9 +215,7 @@ impl ManagerClient {
             }
             SocketResponse::Error { message } => {
                 error!("Failed to create AI session: {}", message);
-                Err(CliError::Communication(format!(
-                    "Manager error: {message}"
-                )))
+                Err(CliError::Communication(format!("Manager error: {message}")))
             }
         }
     }
@@ -234,9 +231,9 @@ impl ManagerClient {
                 })?;
                 Ok(context.to_string())
             }
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {message}"
-            ))),
+            SocketResponse::Error { message } => {
+                Err(CliError::Communication(format!("Manager error: {message}")))
+            }
         }
     }
 
@@ -249,9 +246,9 @@ impl ManagerClient {
 
         match response {
             SocketResponse::Success { data } => Ok(data),
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {message}"
-            ))),
+            SocketResponse::Error { message } => {
+                Err(CliError::Communication(format!("Manager error: {message}")))
+            }
         }
     }
 
@@ -268,9 +265,7 @@ impl ManagerClient {
             }
             SocketResponse::Error { message } => {
                 error!("Failed to complete AI session: {}", message);
-                Err(CliError::Communication(format!(
-                    "Manager error: {message}"
-                )))
+                Err(CliError::Communication(format!("Manager error: {message}")))
             }
         }
     }
@@ -288,9 +283,7 @@ impl ManagerClient {
             }
             SocketResponse::Error { message } => {
                 error!("Failed to fail AI session: {}", message);
-                Err(CliError::Communication(format!(
-                    "Manager error: {message}"
-                )))
+                Err(CliError::Communication(format!("Manager error: {message}")))
             }
         }
     }
@@ -309,9 +302,9 @@ impl ManagerClient {
         let response = self.send_request(request).await?;
         match response {
             SocketResponse::Success { .. } => Ok(()),
-            SocketResponse::Error { message } => Err(CliError::Communication(format!(
-                "Manager error: {message}"
-            ))),
+            SocketResponse::Error { message } => {
+                Err(CliError::Communication(format!("Manager error: {message}")))
+            }
         }
     }
 

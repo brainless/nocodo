@@ -543,9 +543,9 @@ pub async fn analyze_project(
         .map(|p| p.as_path())
         .unwrap_or_else(|| std::path::Path::new("."));
 
-    let canonical_path = target_path.canonicalize().map_err(|e| {
-        CliError::Analysis(format!("Failed to resolve path {target_path:?}: {e}"))
-    })?;
+    let canonical_path = target_path
+        .canonicalize()
+        .map_err(|e| CliError::Analysis(format!("Failed to resolve path {target_path:?}: {e}")))?;
 
     let analyzer = ProjectAnalyzer::new();
     let analysis = analyzer.analyze(&canonical_path).await?;
@@ -701,9 +701,7 @@ impl ProjectAnalyzer {
 
     pub async fn analyze(&self, path: &Path) -> Result<ProjectAnalysis, CliError> {
         if !path.exists() {
-            return Err(CliError::Analysis(format!(
-                "Path does not exist: {path:?}"
-            )));
+            return Err(CliError::Analysis(format!("Path does not exist: {path:?}")));
         }
 
         if !path.is_dir() {
@@ -870,7 +868,6 @@ impl ProjectAnalyzer {
 
         Ok(Some(rust_info))
     }
-
 
     async fn find_all_node_projects(
         &self,

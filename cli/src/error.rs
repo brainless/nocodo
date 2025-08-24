@@ -77,4 +77,3 @@ impl From<serde_yaml::Error> for CliError {
         CliError::Other(err.into())
     }
 }
-

@@ -165,13 +165,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 }
 
 /// WebSocket server that manages all connections
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct WebSocketServer {
     /// Active connections
     connections: HashMap<String, Addr<WebSocketConnection>>,
 }
-
 
 impl Actor for WebSocketServer {
     type Context = Context<Self>;

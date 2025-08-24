@@ -1,3 +1,4 @@
+use actix::Actor;
 use actix_web::{test, web, App};
 use nocodo_manager::{
     database::Database,
@@ -5,7 +6,6 @@ use nocodo_manager::{
     models::CreateProjectRequest,
     websocket::{WebSocketBroadcaster, WebSocketServer},
 };
-use actix::Actor;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::tempdir;

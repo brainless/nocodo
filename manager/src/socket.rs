@@ -334,8 +334,6 @@ impl SocketServer {
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown");
 
-        format!(
-            "Working directory: {project_path}\nProject name (inferred): {project_name}"
-        )
+        format!("Working directory: {project_path}\nProject name (inferred): {project_name}")
     }
 }
