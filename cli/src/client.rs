@@ -367,15 +367,16 @@ impl ManagerClient {
             .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
         let session: AiSession = serde_json::from_value(session_response["session"].clone())
-            .map_err(|e| {
-                CliError::Communication(format!("Failed to parse session data: {e}"))
-            })?;
+            .map_err(|e| CliError::Communication(format!("Failed to parse session data: {e}")))?;
 
         info!("Created AI session via HTTP API: {}", session.id);
         Ok(session)
     }
 
-    async fn get_project_by_http_path(&self, project_path: String) -> Result<serde_json::Value, CliError> {
+    async fn get_project_by_http_path(
+        &self,
+        project_path: String,
+    ) -> Result<serde_json::Value, CliError> {
         let url = format!("{}/api/projects", self.manager_url);
         debug!("GET {}", url);
 
@@ -402,9 +403,9 @@ impl ManagerClient {
             .await
             .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
-        let projects = projects_response["projects"]
-            .as_array()
-            .ok_or_else(|| CliError::Communication("Invalid projects response format".to_string()))?;
+        let projects = projects_response["projects"].as_array().ok_or_else(|| {
+            CliError::Communication("Invalid projects response format".to_string())
+        })?;
 
         for project in projects {
             if let Some(path) = project["path"].as_str() {

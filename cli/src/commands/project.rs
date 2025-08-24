@@ -256,7 +256,7 @@ fn extract_git_repo_name(project_path: &Path) -> Option<String> {
     // git@github.com:user/repo.git -> repo
     // https://github.com/user/repo -> repo
 
-    let repo_name = if let Some(last_segment) = remote_url.split('/').last() {
+    let repo_name = if let Some(last_segment) = remote_url.split('/').next_back() {
         // Remove .git suffix if present
         if last_segment.ends_with(".git") {
             last_segment.strip_suffix(".git").unwrap_or(last_segment)
