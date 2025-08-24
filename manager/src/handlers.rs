@@ -343,6 +343,11 @@ pub async fn add_existing_project(
         )));
     }
 
+    // Check if project exists in current or parent paths
+    if let Err(err_msg) = check_project_path_conflicts(&data.database, &absolute_path).await {
+        return Err(AppError::InvalidRequest(err_msg));
+    }
+
     // Create the project object
     let mut project = Project::new(req.name.clone(), absolute_path_str);
     project.language = req.language;
@@ -790,7 +795,8 @@ pub async fn create_ai_session(
     data.database.create_ai_session(&session)?;
 
     // Broadcast AI session creation via WebSocket
-    data.ws_broadcaster.broadcast_ai_session_created(session.clone());
+    data.ws_broadcaster
+        .broadcast_ai_session_created(session.clone());
 
     // Response
     let response = AiSessionResponse {
@@ -845,4 +851,85 @@ pub async fn list_ai_outputs(
     let outputs = data.database.get_ai_session_outputs(&id)?;
     let response = AiSessionOutputListResponse { outputs };
     Ok(HttpResponse::Ok().json(response))
+}
+
+/// Check for project path conflicts - ensure the requested path is not inside an existing project
+/// or that an existing project is not inside the requested path
+pub async fn check_project_path_conflicts(
+    database: &Database,
+    requested_path: &std::path::Path,
+) -> Result<(), String> {
+    // Get all existing projects
+    let existing_projects = database
+        .get_all_projects()
+        .map_err(|e| format!("Failed to fetch existing projects: {e}"))?;
+
+    let requested_path_str = requested_path.to_string_lossy();
+
+    for project in existing_projects {
+        let existing_path = std::path::Path::new(&project.path);
+
+        // Check if requested path is inside an existing project
+        if requested_path.starts_with(existing_path) && requested_path != existing_path {
+            return Err(format!(
+                "Cannot add project at '{}' because it is inside existing project '{}' at '{}'",
+                requested_path_str, project.name, project.path
+            ));
+        }
+
+        // Check if existing project is inside requested path
+        if existing_path.starts_with(requested_path) && existing_path != requested_path {
+            return Err(format!(
+                "Cannot add project at '{}' because it contains existing project '{}' at '{}'",
+                requested_path_str, project.name, project.path
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Extract project name from Git repository remote URL if available
+fn extract_git_repo_name(project_path: &std::path::Path) -> Option<String> {
+    // Check if it's a Git repository
+    if !project_path.join(".git").exists() {
+        return None;
+    }
+
+    // Try to get the remote URL
+    let output = Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(project_path)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    // Extract repository name from various URL formats
+    // Examples:
+    // https://github.com/user/repo.git -> repo
+    // git@github.com:user/repo.git -> repo
+    // https://github.com/user/repo -> repo
+
+    let repo_name = if let Some(last_segment) = remote_url.split('/').last() {
+        // Remove .git suffix if present
+        if last_segment.ends_with(".git") {
+            last_segment.strip_suffix(".git").unwrap_or(last_segment)
+        } else {
+            last_segment
+        }
+    } else {
+        return None;
+    };
+
+    // Validate that the extracted name is reasonable
+    if repo_name.is_empty() || repo_name.contains(' ') {
+        return None;
+    }
+
+    Some(repo_name.to_string())
 }
