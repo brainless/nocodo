@@ -1,4 +1,4 @@
-import { WebSocketMessage, WebSocketConnectionState, WebSocketClient } from './types';
+import { WebSocketClient, WebSocketConnectionState, WebSocketMessage } from './types';
 
 /**
  * WebSocket client for real-time communication with the Manager daemon

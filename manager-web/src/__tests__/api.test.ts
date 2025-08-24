@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { apiClient } from '../api';
 import type { AiSession, AiSessionListResponse, AiSessionResponse } from '../types';
 

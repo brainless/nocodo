@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import solid from 'vite-plugin-solid';
 
 export default defineConfig({
+  plugins: [solid()],
   test: {
     environment: 'jsdom',
     globals: true,
@@ -10,7 +12,14 @@ export default defineConfig({
     },
     server: {
       deps: {
-        inline: [/solid-js/, /@solidjs\/testing-library/]
+        inline: [/solid-js/, /@solidjs\/testing-library/, /\@solidjs\/router/]
+      }
+    },
+    // Add proper handling for SolidJS
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true
       }
     }
   },
