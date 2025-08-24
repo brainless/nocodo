@@ -8,21 +8,8 @@ import Button from '../components/UI/Button.astro';
   description="A comprehensive playbook for vibe coding methodology using terminal-based coding tools and structured prompting flows for MVP web application development"
 >
   <div class="min-h-screen bg-gray-50">
-    <!-- Fixed Reading Progress Bar -->
-    <div class="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm" id="progress-container">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div class="flex items-center justify-between text-sm text-gray-600 mb-2">
-          <span class="font-medium">Reading Progress</span>
-          <span id="reading-progress-text" class="font-medium text-green-600">0%</span>
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-1.5">
-          <div id="reading-progress-bar" class="bg-green-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-        </div>
-      </div>
-    </div>
-
     <!-- Main Content -->
-    <div class="py-12 pt-32">
+    <div class="py-12">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Breadcrumb -->
         <nav class="mb-8">
@@ -58,12 +45,19 @@ import Button from '../components/UI/Button.astro';
           </div>
         </header>
 
-        <!-- Article Content -->
-        <article class="bg-white rounded-lg shadow-sm border border-gray-200" id="article-content">
+        <!-- Starting a Project Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="starting-project">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Starting a Project</h2>
+            </div>
+          </div>
           <div class="content-prose p-8">
-            
-            <h2 id="starting-project">Starting a Project</h2>
-
             <ul>
               <li>Create a project, add a <code>specs</code> folder and <code>PROJECT.md</code> in it.</li>
               <li>Start with your business problem.</li>
@@ -78,9 +72,22 @@ import Button from '../components/UI/Button.astro';
               <li>Prompt: "Let's create a GitHub issue to build the backend and web app with a basic 'Hello World' API between them so we can manually test the apps and integration. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. Mention in the issue: Types in API must be generated from the backend. Use the <code>gh</code> command for GitHub."</li>
               <li>Work on the first issue using the prompts in <code>Initiate Development</code></li>
             </ul>
+          </div>
+        </article>
 
-            <h2 id="initiate-development">Initiate Development</h2>
-
+        <!-- Initiate Development Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="initiate-development">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Initiate Development</h2>
+            </div>
+          </div>
+          <div class="content-prose p-8">
             <ul>
               <li>Prompt referring to the GitHub issue: "Please attempt GitHub issue &lt;__&gt;, use the <code>gh</code> command, follow <code>Development Workflow</code> in <code>CLAUDE.md</code>. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. When you want me to test, let me know; I will run the backend and web apps myself."</li>
               <li>You should test manually, running backend and web applications locally.</li>
@@ -90,16 +97,42 @@ import Button from '../components/UI/Button.astro';
               <li>At this point, I will manually add CodeRabbit, Graphite > Diamond, etc., for AI code review.</li>
               <li>Continue development as in <code>Regular Development</code></li>
             </ul>
+          </div>
+        </article>
 
-            <h2 id="work-planning">Work Planning and GitHub Issues</h2>
-
+        <!-- Work Planning Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="work-planning">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Work Planning and GitHub Issues</h2>
+            </div>
+          </div>
+          <div class="content-prose p-8">
             <ul>
               <li>When the core "Hello World" works, telling me I can start planning the whole MVP, I ask: "Create GitHub issues for backend and frontend tasks, in chunks that are easy to test manually. Focus only on goals set in <code>specs/PROJECT.md</code> and linked documents. Mention <code>Acceptance Criteria</code> in each issue. Mention in issues: Types in API must be generated from the backend. Use the <code>gh</code> command for GitHub."</li>
               <li>You will need to use this template for MVP and then next phases.</li>
             </ul>
+          </div>
+        </article>
 
-            <h2 id="regular-development">Regular Development</h2>
-
+        <!-- Regular Development Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="regular-development">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Regular Development</h2>
+            </div>
+          </div>
+          <div class="content-prose p-8">
             <ul>
               <li>Prompt referring to the GitHub issue: "Please attempt GitHub issue &lt;__&gt;, use the <code>gh</code> command, follow <code>Development Workflow</code> in <code>CLAUDE.md</code>. Follow <code>specs/PROJECT.md</code> and linked documents for technical inputs. When you want me to test, let me know; I will run the backend and web apps myself."</li>
               <li>You should test manually, running backend and web applications locally.</li>
@@ -107,9 +140,22 @@ import Button from '../components/UI/Button.astro';
               <li>Prompt, assuming CodeRabbit, Graphite > Diamond, etc., are integrated and have commented about issues in a Pull Request: "Please read comments in PR &lt;__&gt; and attempt to fix them. Use the <code>gh</code> command."</li>
               <li>You should test manually, running backend and web applications locally; repeat for the next GitHub issue.</li>
             </ul>
+          </div>
+        </article>
 
-            <h2 id="tackle-errors">Tackle Errors</h2>
-
+        <!-- Tackle Errors Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="tackle-errors">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Tackle Errors</h2>
+            </div>
+          </div>
+          <div class="content-prose p-8">
             <ul>
               <li>Save logs from Chrome Console or Terminal into files in a folder like <code>test_logs</code>.</li>
               <li>Create the folder <code>test_logs</code> in your project.</li>
@@ -117,9 +163,23 @@ import Button from '../components/UI/Button.astro';
               <li>Run backend, web apps, test, share errors from logs.</li>
               <li>Prompts like (edit as needed): "I found an error when running the web app, at URL &lt;___&gt;. The log is in <code>test_logs/chrome_console.log</code>."</li>
             </ul>
+          </div>
+        </article>
 
-            <h2 id="tools-needed">Tools Needed</h2>
-
+        <!-- Tools Needed Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="tools-needed">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Tools Needed</h2>
+            </div>
+          </div>
+          <div class="content-prose p-8">
             <ul>
               <li>Terminal</li>
               <li>Terminal-based coding tools, usually Claude Code for initial structure.</li>
@@ -129,9 +189,23 @@ import Button from '../components/UI/Button.astro';
               <li>GitHub CLI tool, <code>gh</code> referred to above.</li>
               <li>Once GitHub-based is set, a few issues work well and are tested, I use a mix of Gemini CLI, Continue.dev CLI, Qwen Code CLI, Cursor CLI.</li>
             </ul>
+          </div>
+        </article>
 
-            <h2 id="development-workflow">Development Workflow (in any agent's Markdown file)</h2>
-
+        <!-- Development Workflow Section -->
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8" id="development-workflow">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center mr-4">
+                <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900">Development Workflow</h2>
+            </div>
+          </div>
+          <div class="content-prose p-8">
+            <p class="text-gray-600 mb-4"><em>Add this to any agent's Markdown file (like CLAUDE.md)</em></p>
             <ul>
               <li>Create a new branch for each task</li>
               <li>Branch names should start with <code>feature/</code>, <code>chore/</code>, or <code>fix/</code></li>
@@ -144,47 +218,9 @@ import Button from '../components/UI/Button.astro';
               <li>If working on a GitHub issue: create a PR, update the task in the end</li>
               <li>If working on a GitHub issue: do not close the issue until I manually test</li>
             </ul>
-
-            <!-- Getting Started Section -->
-            <div class="bg-green-50 border-l-4 border-green-500 p-6 my-8 rounded-r-lg">
-              <div class="flex items-center mb-4">
-                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                  <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                  </svg>
-                </div>
-                <h3 class="text-lg font-medium text-green-900">Ready to Start?</h3>
-              </div>
-              <p class="text-green-800 mb-4">
-                This playbook provides a complete framework for building MVPs using AI-assisted development. 
-                Follow the structured approach above to transform your ideas into working software.
-              </p>
-              <div class="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  href="/blog/nocodo-introduction"
-                  variant="primary"
-                  class="inline-flex items-center"
-                >
-                  Read the Introduction
-                  <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                  </svg>
-                </Button>
-                <Button 
-                  href="/fundamentals"
-                  variant="outline"
-                  class="inline-flex items-center"
-                >
-                  Learn the Fundamentals
-                  <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                  </svg>
-                </Button>
-              </div>
-            </div>
-
           </div>
         </article>
+
 
         <!-- Navigation -->
         <nav class="mt-12 flex justify-between">
@@ -209,39 +245,6 @@ import Button from '../components/UI/Button.astro';
   </div>
 </Layout>
 
-<script>
-  // Reading progress
-  const progressBar = document.getElementById('reading-progress-bar');
-  const progressText = document.getElementById('reading-progress-text');
-  const articleContent = document.getElementById('article-content');
-
-  function updateReadingProgress() {
-    if (!articleContent) return;
-    const articleRect = articleContent.getBoundingClientRect();
-    const articleHeight = articleContent.offsetHeight;
-    const viewportHeight = window.innerHeight;
-    
-    // Calculate how much of the article has been scrolled past
-    const scrolled = Math.max(0, -articleRect.top);
-    const totalScrollable = articleHeight - viewportHeight;
-    
-    if (totalScrollable <= 0) {
-      // Article is shorter than viewport
-      const progress = articleRect.top <= 0 ? 100 : 0;
-      if (progressBar) progressBar.style.width = progress + '%';
-      if (progressText) progressText.textContent = Math.round(progress) + '%';
-    } else {
-      const progress = Math.min(100, Math.max(0, (scrolled / totalScrollable) * 100));
-      if (progressBar) progressBar.style.width = progress + '%';
-      if (progressText) progressText.textContent = Math.round(progress) + '%';
-    }
-  }
-
-  // Update reading progress on scroll
-  window.addEventListener('scroll', updateReadingProgress);
-  window.addEventListener('resize', updateReadingProgress);
-  updateReadingProgress(); // Initial calculation
-</script>
 
 <style is:global>
   /* Content prose styles */
