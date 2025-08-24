@@ -27,9 +27,9 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
     info!("Adding project at path: {:?}", target_path);
 
     // Convert to absolute path
-    let absolute_path = target_path.canonicalize().map_err(|e| {
-        CliError::Analysis(format!("Failed to resolve path {target_path:?}: {e}"))
-    })?;
+    let absolute_path = target_path
+        .canonicalize()
+        .map_err(|e| CliError::Analysis(format!("Failed to resolve path {target_path:?}: {e}")))?;
 
     info!("Resolved absolute path: {:?}", absolute_path);
 
