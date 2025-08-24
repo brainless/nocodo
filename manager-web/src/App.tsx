@@ -90,7 +90,7 @@ const TopNavigation: Component = () => {
           <A href='/' class='text-xl font-bold text-gray-900 hover:text-blue-600'>
             nocodo
           </A>
-          
+
           {/* Project dropdown */}
           <div class='relative' ref={dropdownRef}>
             <button
@@ -99,25 +99,36 @@ const TopNavigation: Component = () => {
             >
               <span>Projects</span>
               <svg class='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M19 9l-7 7-7-7' />
+                <path
+                  stroke-linecap='round'
+                  stroke-linejoin='round'
+                  stroke-width={2}
+                  d='M19 9l-7 7-7-7'
+                />
               </svg>
             </button>
-            
+
             {isDropdownOpen() && (
               <div class='absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-10'>
                 <div class='py-1'>
-                  <A href='/projects' class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'>
+                  <A
+                    href='/projects'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                  >
                     All Projects
                   </A>
-                  <A href='/projects/create' class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'>
+                  <A
+                    href='/projects/create'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                  >
                     Create New Project
                   </A>
                   {projects().length > 0 && (
                     <>
                       <div class='border-t border-gray-200 my-1'></div>
                       {projects().map(project => (
-                        <A 
-                          href={`/projects/${project.id}/files`} 
+                        <A
+                          href={`/projects/${project.id}/files`}
                           class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
                         >
                           <div class='font-medium'>{project.name}</div>
@@ -131,11 +142,11 @@ const TopNavigation: Component = () => {
             )}
           </div>
         </div>
-        
+
         {/* Right side - Sessions link */}
         <div class='flex items-center'>
-          <A 
-            href='/ai/sessions' 
+          <A
+            href='/ai/sessions'
             class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
           >
             Sessions
@@ -149,15 +160,13 @@ const TopNavigation: Component = () => {
 // Layout component with new navigation structure
 const Layout: Component<{ children: any }> = props => {
   return (
-    <div class='min-h-screen bg-gray-50 pb-12'> {/* pb-12 for status bar space */}
+    <div class='min-h-screen bg-gray-50 pb-12'>
+      {' '}
+      {/* pb-12 for status bar space */}
       <TopNavigation />
-      
       <main class='container mx-auto px-4 py-8'>
-        <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-          {props.children}
-        </div>
+        <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>{props.children}</div>
       </main>
-      
       <StatusBar />
     </div>
   );

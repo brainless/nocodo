@@ -79,9 +79,7 @@ const mockSessions: AiSession[] = [
 
 // Test wrapper component
 const TestWrapper = (props: { children: any }) => {
-  return (
-    <SessionsProvider>{props.children}</SessionsProvider>
-  );
+  return <SessionsProvider>{props.children}</SessionsProvider>;
 };
 
 // Setup API mocks
