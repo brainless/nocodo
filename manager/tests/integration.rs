@@ -93,7 +93,7 @@ async fn test_create_project() {
     // Use a temporary directory for the project path
     let project_temp_dir = tempdir().unwrap();
     let project_path = project_temp_dir.path().join("test-project");
-    
+
     let create_request = CreateProjectRequest {
         name: "test-project".to_string(),
         path: Some(project_path.to_string_lossy().to_string()),
@@ -108,16 +108,19 @@ async fn test_create_project() {
         .to_request();
 
     let resp = test::call_service(&app, req).await;
-    
+
     // Debug output for failing test
     let status = resp.status();
     if !status.is_success() {
         let body: serde_json::Value = test::read_body_json(resp).await;
-        eprintln!("Response status: {}", status);
-        eprintln!("Response body: {}", serde_json::to_string_pretty(&body).unwrap());
-        panic!("Request failed with status: {}", status);
+        eprintln!("Response status: {status}");
+        eprintln!(
+            "Response body: {}",
+            serde_json::to_string_pretty(&body).unwrap()
+        );
+        panic!("Request failed with status: {status}");
     }
-    
+
     assert!(status.is_success());
     assert_eq!(status, 201); // Created
 
@@ -157,7 +160,7 @@ async fn test_create_project_with_default_path() {
     // Use a temporary directory for the default path test
     let default_projects_dir = temp_dir.path().join("projects");
     let default_path_project_dir = default_projects_dir.join("default-path-project");
-    
+
     // Mock the home directory by setting the path in the request
     let create_request = CreateProjectRequest {
         name: "default-path-project".to_string(),
@@ -173,16 +176,19 @@ async fn test_create_project_with_default_path() {
         .to_request();
 
     let resp = test::call_service(&app, req).await;
-    
+
     // Debug output for failing test
     let status = resp.status();
     if !status.is_success() {
         let body: serde_json::Value = test::read_body_json(resp).await;
-        eprintln!("Response status: {}", status);
-        eprintln!("Response body: {}", serde_json::to_string_pretty(&body).unwrap());
-        panic!("Request failed with status: {}", status);
+        eprintln!("Response status: {status}");
+        eprintln!(
+            "Response body: {}",
+            serde_json::to_string_pretty(&body).unwrap()
+        );
+        panic!("Request failed with status: {status}");
     }
-    
+
     assert!(status.is_success());
 
     let body: serde_json::Value = test::read_body_json(resp).await;
@@ -266,7 +272,13 @@ async fn test_get_projects_after_creation() {
     // Create a project first
     let create_request = CreateProjectRequest {
         name: "list-test-project".to_string(),
-        path: Some(temp_dir.path().join("list-test").to_string_lossy().to_string()),
+        path: Some(
+            temp_dir
+                .path()
+                .join("list-test")
+                .to_string_lossy()
+                .to_string(),
+        ),
         language: Some("python".to_string()),
         framework: Some("django".to_string()),
         template: None,
