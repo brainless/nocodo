@@ -7,6 +7,7 @@ use crate::{
     error::CliError,
 };
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use tracing::{info, warn};
 
 /// Handle project management commands
@@ -57,7 +58,7 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
         warn!("No files found in directory - this may not be a valid project");
     }
 
-    // Extract project name from directory name or project files
+    // Extract project name from Git repository, project files, or directory name
     let project_name = extract_project_name(&absolute_path, &analysis)?;
 
     // Determine primary language and framework
@@ -150,6 +151,12 @@ fn extract_project_name(
         }
     }
 
+    // Try to get name from Git repository remote URL
+    if let Some(git_name) = extract_git_repo_name(path) {
+        info!("Using Git repository name: {}", git_name);
+        return Ok(git_name);
+    }
+
     // Fall back to directory name
     path.file_name()
         .and_then(|name| name.to_str())
@@ -221,6 +228,51 @@ async fn validate_not_inside_existing_project(
     }
 
     Ok(())
+}
+
+/// Extract project name from Git repository remote URL if available
+fn extract_git_repo_name(project_path: &Path) -> Option<String> {
+    // Check if it's a Git repository
+    if !project_path.join(".git").exists() {
+        return None;
+    }
+
+    // Try to get the remote URL
+    let output = Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(project_path)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    // Extract repository name from various URL formats
+    // Examples:
+    // https://github.com/user/repo.git -> repo
+    // git@github.com:user/repo.git -> repo
+    // https://github.com/user/repo -> repo
+
+    let repo_name = if let Some(last_segment) = remote_url.split('/').last() {
+        // Remove .git suffix if present
+        if last_segment.ends_with(".git") {
+            last_segment.strip_suffix(".git").unwrap_or(last_segment)
+        } else {
+            last_segment
+        }
+    } else {
+        return None;
+    };
+
+    // Validate that the extracted name is reasonable
+    if repo_name.is_empty() || repo_name.contains(' ') {
+        return None;
+    }
+
+    Some(repo_name.to_string())
 }
 
 #[cfg(test)]
