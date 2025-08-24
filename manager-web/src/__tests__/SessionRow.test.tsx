@@ -1,12 +1,12 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
 import { MemoryRouter } from '@solidjs/router';
-import SessionRow, { StatusBadge, ToolIcon, ProjectBadge } from '../components/SessionRow';
+import SessionRow, { ProjectBadge, StatusBadge, ToolIcon } from '../components/SessionRow';
 import type { AiSession, Project } from '../types';
 
 // Test wrapper component with router
-const TestWrapper = ({ children }: { children: any }) => {
-  return <MemoryRouter>{children}</MemoryRouter>;
+const TestWrapper = (props: { children: any }) => {
+  return <MemoryRouter>{props.children}</MemoryRouter>;
 };
 
 // Mock data
@@ -253,7 +253,7 @@ describe('SessionRow Component', () => {
           session={mockRunningSession}
           project={mockProject}
           showPrompt={true}
-          className='custom-class'
+          class='custom-class'
         />
       ),
       { wrapper: TestWrapper }

@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount, createEffect } from 'solid-js';
+import { Component, For, createEffect, createSignal, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
 import { Project, WebSocketMessage } from '../types';
 import { apiClient } from '../api';
@@ -120,7 +120,7 @@ const ProjectList: Component<ProjectListProps> = props => {
         </div>
       ) : (
         <div class='space-y-3'>
-          {projects().map(project => (
+          <For each={projects()}>{project => (
             <div class='p-4 border border-gray-200 rounded-lg bg-white shadow-sm'>
               <div class='flex items-start justify-between'>
                 <div>
@@ -170,7 +170,7 @@ const ProjectList: Component<ProjectListProps> = props => {
                 </div>
               </div>
             </div>
-          ))}
+          )}</For>
         </div>
       )}
     </div>

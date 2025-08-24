@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
 import SessionTimeline from '../components/SessionTimeline';
 import type { AiSession } from '../types';
@@ -153,7 +153,7 @@ describe('SessionTimeline Component', () => {
 
   test('applies custom className', () => {
     const { container } = render(() => (
-      <SessionTimeline session={mockCompletedSession} className='custom-timeline' />
+      <SessionTimeline session={mockCompletedSession} class='custom-timeline' />
     ));
 
     expect(container.firstChild).toHaveClass('custom-timeline');

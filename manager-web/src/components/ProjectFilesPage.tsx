@@ -1,6 +1,6 @@
-import { Component, createSignal, onMount, Show } from 'solid-js';
-import { useParams, useNavigate } from '@solidjs/router';
-import { Project, FileInfo } from '../types';
+import { Component, Show, createSignal, onMount } from 'solid-js';
+import { useNavigate, useParams } from '@solidjs/router';
+import { FileInfo, Project } from '../types';
 import { apiClient } from '../api';
 import FileBrowser from './FileBrowser';
 import FileEditor from './FileEditor';

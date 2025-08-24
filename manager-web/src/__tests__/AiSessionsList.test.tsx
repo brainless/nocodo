@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
 import { MemoryRouter } from '@solidjs/router';
 import AiSessionsList from '../components/AiSessionsList';
@@ -66,10 +66,10 @@ const mockSessions: AiSession[] = [
 ];
 
 // Test wrapper component
-const TestWrapper = ({ children }: { children: any }) => {
+const TestWrapper = (props: { children: any }) => {
   return (
     <MemoryRouter>
-      <SessionsProvider>{children}</SessionsProvider>
+      <SessionsProvider>{props.children}</SessionsProvider>
     </MemoryRouter>
   );
 };

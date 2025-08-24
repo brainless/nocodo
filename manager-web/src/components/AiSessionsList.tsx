@@ -1,5 +1,5 @@
-import { Component, createSignal, onMount, For, Show } from 'solid-js';
-import { AiSession, Project, AiSessionStatus } from '../types';
+import { Component, For, Show, createSignal, onMount } from 'solid-js';
+import { AiSession, AiSessionStatus, Project } from '../types';
 import { useSessions } from '../stores/sessionsStore';
 import { apiClient } from '../api';
 import SessionRow, { StatusBadge } from './SessionRow';

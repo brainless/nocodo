@@ -1,4 +1,4 @@
-import { Component, createSignal, createEffect, Show, For } from 'solid-js';
+import { Component, For, Show, createEffect, createSignal } from 'solid-js';
 import { FileInfo, FileListResponse } from '../types';
 import { apiClient } from '../api';
 

@@ -1,6 +1,6 @@
 import { Component, Show } from 'solid-js';
 import { A } from '@solidjs/router';
-import { AiSession, Project, AiSessionStatus } from '../types';
+import { AiSession, AiSessionStatus, Project } from '../types';
 
 // Utility function to format timestamps
 const formatTimestamp = (timestamp: number): string => {
@@ -213,10 +213,10 @@ const SessionRow: Component<SessionRowProps> = props => {
 
           {/* Project and duration row */}
           <div class='flex items-center justify-between mb-2'>
-            <ProjectBadge project={props.project} projectId={session().project_id} />
+            <ProjectBadge project={props.project ?? null} projectId={session().project_id ?? undefined} />
             <div class='text-xs text-gray-500'>
               <span title='Session duration'>
-                Duration: {formatDuration(session().started_at, session().ended_at)}
+                Duration: {formatDuration(session().started_at, session().ended_at ?? undefined)}
                 <Show when={!session().ended_at}>
                   <span class='text-blue-600'> (ongoing)</span>
                 </Show>
