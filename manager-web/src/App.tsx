@@ -129,7 +129,7 @@ const TopNavigation: Component = () => {
                       <For each={projects()}>
                         {project => (
                           <A
-                            href={`/projects/${project.id}/files`}
+                            href={`/projects/${project.id}`}
                             class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
                           >
                             <div class='font-medium'>{project.name}</div>
