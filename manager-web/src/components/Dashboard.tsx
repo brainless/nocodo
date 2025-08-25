@@ -311,7 +311,7 @@ const StartAiSessionForm: Component = () => {
               id='customTool'
               type='text'
               placeholder='e.g., my-tool'
-              class='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+              class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
               value={customTool()}
               onInput={e => setCustomTool(e.currentTarget.value)}
             />
@@ -325,7 +325,7 @@ const StartAiSessionForm: Component = () => {
             id='prompt'
             required
             rows={3}
-            class='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
             placeholder='Describe what you want the AI tool to do...'
             value={prompt()}
             onInput={e => setPrompt(e.currentTarget.value)}
