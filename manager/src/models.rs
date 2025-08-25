@@ -55,7 +55,13 @@ pub struct ProjectComponent {
 }
 
 impl ProjectComponent {
-    pub fn new(project_id: String, name: String, path: String, language: String, framework: Option<String>) -> Self {
+    pub fn new(
+        project_id: String,
+        name: String,
+        path: String,
+        language: String,
+        framework: Option<String>,
+    ) -> Self {
         let now = Utc::now().timestamp();
         Self {
             id: Uuid::new_v4().to_string(),

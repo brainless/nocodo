@@ -495,7 +495,6 @@ const Dashboard: Component = () => {
 
       {/* Start AI Session */}
       <StartAiSessionForm />
-
     </div>
   );
 };

@@ -79,7 +79,9 @@ const CreateProjectForm: Component<CreateProjectFormProps> = props => {
         </div>
 
         <div>
-          <label class='block text-sm font-medium text-gray-700 mb-1'>Project Path (Full path)</label>
+          <label class='block text-sm font-medium text-gray-700 mb-1'>
+            Project Path (Full path)
+          </label>
           <input
             type='text'
             value={formData().path || ''}
@@ -87,7 +89,9 @@ const CreateProjectForm: Component<CreateProjectFormProps> = props => {
             class='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
             placeholder='/home/me/Projects/my-awesome-project'
           />
-          <p class='text-xs text-gray-500 mt-1'>Leave blank to let manager choose a default path.</p>
+          <p class='text-xs text-gray-500 mt-1'>
+            Leave blank to let manager choose a default path.
+          </p>
         </div>
 
         {error() && (
