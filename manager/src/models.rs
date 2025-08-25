@@ -158,6 +158,13 @@ pub struct RecordAiOutputRequest {
     pub content: String,
 }
 
+/// Send interactive input to a running AI session (Phase 1 streaming)
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiSessionInputRequest {
+    pub content: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AddExistingProjectRequest {
