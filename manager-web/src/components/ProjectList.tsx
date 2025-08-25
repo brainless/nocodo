@@ -155,7 +155,7 @@ const ProjectList: Component<ProjectListProps> = props => {
                   </div>
                   <div class='flex flex-col space-y-2'>
                     <A
-                      href={`/projects/${project.id}`}
+                      href={`/projects/${project.id}/work`}
                       class='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-center'
                     >
                       Open
