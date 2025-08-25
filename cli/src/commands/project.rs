@@ -3,7 +3,6 @@
 use crate::{
     cli::ProjectCommands,
     client::{AddExistingProjectRequest, ManagerClient},
-    commands::analyze::ProjectAnalyzer,
     error::CliError,
 };
 use std::path::{Path, PathBuf};
@@ -49,30 +48,16 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
         )));
     }
 
-    // Analyze the project to extract metadata
-    let analyzer = ProjectAnalyzer::new();
-    let analysis = analyzer.analyze(&absolute_path).await?;
+    // Let manager analyze: skip local analysis to keep CLI thin
+    // Extract project name from Git or directory name
+    let project_name = extract_project_name_minimal(&absolute_path)?;
 
-    // Check if this looks like a valid project
-    if analysis.file_count == 0 {
-        warn!("No files found in directory - this may not be a valid project");
-    }
-
-    // Extract project name from Git repository, project files, or directory name
-    let project_name = extract_project_name(&absolute_path, &analysis)?;
-
-    // Determine primary language and framework
-    let language = if !analysis.primary_language.is_empty() {
-        Some(analysis.primary_language.clone())
-    } else {
-        None
-    };
-
-    let framework = detect_framework(&analysis);
+    let language: Option<String> = None;
+    let framework: Option<String> = None;
 
     info!(
-        "Detected project: name='{}', language={:?}, framework={:?}",
-        project_name, language, framework
+        "Registering project: name='{}' (language/framework will be detected by manager)",
+        project_name
     );
 
     // Create manager client
@@ -132,25 +117,8 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Extract project name from path and analysis
-fn extract_project_name(
-    path: &Path,
-    analysis: &crate::commands::analyze::ProjectAnalysis,
-) -> Result<String, CliError> {
-    // Try to get name from Rust project
-    if let Some(rust_info) = &analysis.rust_info {
-        if let Some(package_name) = &rust_info.package_name {
-            return Ok(package_name.clone());
-        }
-    }
-
-    // Try to get name from Node.js project
-    if let Some(node_info) = &analysis.node_info {
-        if let Some(package_name) = &node_info.package_name {
-            return Ok(package_name.clone());
-        }
-    }
-
+/// Extract project name from path (minimal, no deep analysis)
+fn extract_project_name_minimal(path: &Path) -> Result<String, CliError> {
     // Try to get name from Git repository remote URL
     if let Some(git_name) = extract_git_repo_name(path) {
         info!("Using Git repository name: {}", git_name);

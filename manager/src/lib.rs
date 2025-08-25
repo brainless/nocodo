@@ -16,6 +16,8 @@ mod ts_bindings_tests {
     #[test]
     fn export_ts_bindings() {
         Project::export().expect("Failed to export Project bindings");
+        ProjectComponent::export().expect("Failed to export ProjectComponent bindings");
+        ProjectDetailsResponse::export().expect("Failed to export ProjectDetailsResponse bindings");
         CreateProjectRequest::export().expect("Failed to export CreateProjectRequest bindings");
         ProjectResponse::export().expect("Failed to export ProjectResponse bindings");
         ProjectListResponse::export().expect("Failed to export ProjectListResponse bindings");

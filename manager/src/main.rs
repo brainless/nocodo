@@ -102,6 +102,7 @@ async fn main() -> AppResult<()> {
                         )
                         .route("/projects/{id}", web::get().to(handlers::get_project))
                         .route("/projects/{id}", web::delete().to(handlers::delete_project))
+                        .route("/projects/{id}/details", web::get().to(handlers::get_project_details))
                         .route("/templates", web::get().to(handlers::get_templates))
                         // File operation endpoints
                         .route("/files", web::get().to(handlers::list_files))
