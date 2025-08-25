@@ -21,7 +21,13 @@ export * from './types/generated/RecordAiOutputRequest';
 export * from './types/generated/ServerStatus';
 
 // Additional types not generated from Rust
-export type AiSessionStatus = 'pending' | 'started' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type AiSessionStatus =
+  | 'pending'
+  | 'started'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export interface ApiError {
   error: string;

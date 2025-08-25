@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal, onMount, onCleanup } from 'solid-js';
+import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
 import { Project } from '../types';
 import { apiClient } from '../api';
@@ -214,7 +214,9 @@ const StartAiSessionForm: Component = () => {
       <h3 class='text-lg font-semibold text-gray-900 mb-4'>Start AI Session</h3>
       <form onSubmit={handleSubmit} class='space-y-4'>
         <div>
-          <label for='project' class='block text-sm font-medium text-gray-700'>Project (optional)</label>
+          <label for='project' class='block text-sm font-medium text-gray-700'>
+            Project (optional)
+          </label>
           <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
             <button
               type='button'
@@ -225,11 +227,22 @@ const StartAiSessionForm: Component = () => {
             >
               <span class='truncate'>
                 {selectedProjectId()
-                  ? (projects().find(p => p.id === selectedProjectId())?.name || `Project ${selectedProjectId()}`)
+                  ? projects().find(p => p.id === selectedProjectId())?.name ||
+                    `Project ${selectedProjectId()}`
                   : 'No Project'}
               </span>
-              <svg class='w-4 h-4 ml-2 text-gray-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M19 9l-7 7-7-7' />
+              <svg
+                class='w-4 h-4 ml-2 text-gray-500'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  stroke-linecap='round'
+                  stroke-linejoin='round'
+                  stroke-width={2}
+                  d='M19 9l-7 7-7-7'
+                />
               </svg>
             </button>
             {isProjectOpen() && (
@@ -268,7 +281,9 @@ const StartAiSessionForm: Component = () => {
 
         <div class='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <div>
-            <label for='tool' class='block text-sm font-medium text-gray-700'>Tool</label>
+            <label for='tool' class='block text-sm font-medium text-gray-700'>
+              Tool
+            </label>
             <div class='mt-1 relative' ref={(el: HTMLDivElement) => (toolDdRef = el)}>
               <button
                 type='button'
@@ -278,8 +293,18 @@ const StartAiSessionForm: Component = () => {
                 aria-expanded={isToolOpen()}
               >
                 <span class='truncate'>{toolName()}</span>
-                <svg class='w-4 h-4 ml-2 text-gray-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M19 9l-7 7-7-7' />
+                <svg
+                  class='w-4 h-4 ml-2 text-gray-500'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    stroke-linecap='round'
+                    stroke-linejoin='round'
+                    stroke-width={2}
+                    d='M19 9l-7 7-7-7'
+                  />
                 </svg>
               </button>
               {isToolOpen() && (
@@ -306,7 +331,9 @@ const StartAiSessionForm: Component = () => {
             <p class='mt-1 text-xs text-gray-500'>Select a tool or enter a custom one below</p>
           </div>
           <div>
-            <label for='customTool' class='block text-sm font-medium text-gray-700'>Custom Tool (optional)</label>
+            <label for='customTool' class='block text-sm font-medium text-gray-700'>
+              Custom Tool (optional)
+            </label>
             <input
               id='customTool'
               type='text'
@@ -315,12 +342,16 @@ const StartAiSessionForm: Component = () => {
               value={customTool()}
               onInput={e => setCustomTool(e.currentTarget.value)}
             />
-            <p class='mt-1 text-xs text-gray-500'>If provided, this will override the selected tool</p>
+            <p class='mt-1 text-xs text-gray-500'>
+              If provided, this will override the selected tool
+            </p>
           </div>
         </div>
 
         <div>
-          <label for='prompt' class='block text-sm font-medium text-gray-700'>Prompt</label>
+          <label for='prompt' class='block text-sm font-medium text-gray-700'>
+            Prompt
+          </label>
           <textarea
             id='prompt'
             required
