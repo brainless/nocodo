@@ -187,7 +187,7 @@ const SessionTimeline: Component<SessionTimelineProps> = props => {
   });
 
   const isSessionRunning = createMemo(() => {
-    return session().status === 'running';
+    return session().status === 'running' || session().status === 'started';
   });
 
   return (

@@ -37,9 +37,32 @@ impl Runner {
         let mut cmd = Command::new(&cmd_name);
         cmd.args(args);
 
-        // Set working directory if project context path is available in the context string (best-effort)
-        // Note: A more robust approach would pass the project path separately from session
-        // Here we rely on process running in current directory.
+        // If this session is associated with a project, run the tool in that project's directory
+        if let Some(ref project_id) = session.project_id {
+            if let Ok(project) = self.db.get_project_by_id(project_id) {
+                let project_dir = std::path::Path::new(&project.path);
+                if project_dir.exists() {
+                    cmd.current_dir(project_dir);
+                } else {
+                    // Best-effort: record a hint in outputs to help diagnostics
+                    let _ = self.db.create_ai_session_output(
+                        &session_id,
+                        &format!(
+                            "[nocodo runner] Warning: Project directory not found: {}. Running in Manager's CWD.",
+                            project.path
+                        ),
+                    );
+                }
+            } else {
+                let _ = self.db.create_ai_session_output(
+                    &session_id,
+                    &format!(
+                        "[nocodo runner] Warning: Unable to load project for id {}. Running in Manager's CWD.",
+                        project_id
+                    ),
+                );
+            }
+        }
 
         cmd.stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -50,7 +73,7 @@ impl Runner {
             Err(e) => {
                 let _ = self
                     .db
-                    .create_ai_session_output(&session_id, &format!("Failed to start tool '{}': {}", cmd_name, e));
+                    .create_ai_session_output(&session_id, &format!("Failed to start tool '{cmd_name}': {e}"));
                 self.mark_failed(&session_id).await.ok();
                 return Err(anyhow::anyhow!(e));
             }
@@ -145,7 +168,8 @@ impl Runner {
             "claude" | "claude-code" => "claude".to_string(),
             "gemini" | "gemini-cli" => "gemini".to_string(),
             "openai" | "openai-cli" => "openai".to_string(),
-            "qwen" | "qwen-code" => "qwen-code".to_string(),
+            // Qwen Code CLI binary is `qwen`
+            "qwen" | "qwen-code" => "qwen".to_string(),
             _ => t,
         };
 
@@ -160,6 +184,11 @@ impl Runner {
         // Claude generally supports --print with inline prompt
         if cmd == "claude" {
             return Ok((cmd, vec!["--print".to_string(), prompt.to_string()], None));
+        }
+
+        // Qwen Code expects --prompt <text>
+        if cmd == "qwen" {
+            return Ok((cmd, vec!["--prompt".to_string(), prompt.to_string()], None));
         }
 
         // Generic: pass prompt as a single arg

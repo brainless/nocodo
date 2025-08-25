@@ -3,6 +3,13 @@ import { createStore } from 'solid-js/store';
 import { AiSession, AiSessionStatus } from '../types';
 import { apiClient } from '../api';
 
+interface OutputChunk {
+  stream?: 'stdout' | 'stderr';
+  content: string;
+  seq?: number;
+  created_at?: number;
+}
+
 interface SessionsStore {
   list: AiSession[];
   byId: Record<string, AiSession>;
@@ -11,17 +18,22 @@ interface SessionsStore {
   subscriptions: Record<string, { close: () => void }>;
   pollingTimers: Record<string, NodeJS.Timeout>;
   connectionStatus: Record<string, 'connected' | 'disconnected' | 'error' | 'fallback'>;
+  outputsBySession: Record<string, { chunks: OutputChunk[]; lastSeq?: number }>;
 }
 
 interface SessionsActions {
   fetchList: () => Promise<void>;
   fetchById: (id: string) => Promise<AiSession | null>;
+  fetchOutputs: (id: string) => Promise<void>;
   connect: (id: string) => Promise<void>;
   disconnect: (id: string) => void;
   updateSessionStatus: (id: string, status: AiSessionStatus) => void;
   startPolling: (id: string) => void;
   stopPolling: (id: string) => void;
   getConnectionStatus: (id: string) => 'connected' | 'disconnected' | 'error' | 'fallback';
+  appendOutputChunk: (id: string, chunk: OutputChunk) => void;
+  clearOutputs: (id: string) => void;
+  getOutputs: (id: string) => OutputChunk[];
 }
 
 interface SessionsContextValue {
@@ -40,6 +52,7 @@ export const SessionsProvider: ParentComponent = props => {
     subscriptions: {},
     pollingTimers: {},
     connectionStatus: {},
+    outputsBySession: {},
   });
 
   const actions: SessionsActions = {
@@ -93,6 +106,25 @@ export const SessionsProvider: ParentComponent = props => {
       }
     },
 
+    fetchOutputs: async (id: string) => {
+      try {
+        const listResp = await apiClient.listAiOutputs(id);
+        const chunks = (listResp.outputs || []).map((o, idx) => ({
+          content: o.content,
+          created_at: o.created_at,
+          seq: idx,
+          stream: 'stdout' as const,
+        }));
+        setStore('outputsBySession', id, { chunks, lastSeq: chunks.length ? chunks[chunks.length - 1].seq : 0 });
+      } catch (err) {
+        console.error('Failed to fetch outputs:', err);
+        // initialize empty container to avoid undefined checks
+        if (!store.outputsBySession[id]) {
+          setStore('outputsBySession', id, { chunks: [], lastSeq: 0 });
+        }
+      }
+    },
+
     connect: async (id: string) => {
       if (store.subscriptions[id]) {
         console.warn(`Already connected to session ${id}`);
@@ -109,14 +141,25 @@ export const SessionsProvider: ParentComponent = props => {
             actions.stopPolling(id);
             setStore('connectionStatus', id, 'connected');
 
-            if (data.type === 'status_update' && data.status) {
-              actions.updateSessionStatus(id, data.status);
+            if ((data.type === 'status_update' || data.type === 'AiSessionStatusChanged') && (data.status || data.payload?.status)) {
+              const newStatus = data.status ?? data.payload?.status;
+              actions.updateSessionStatus(id, newStatus);
             }
             if (data.type === 'session_data' && data.session) {
               setStore('byId', id, data.session);
               const existingIndex = store.list.findIndex(s => s.id === id);
               if (existingIndex >= 0) {
                 setStore('list', existingIndex, data.session);
+              }
+            }
+            if (data.type === 'AiSessionOutputChunk' && data.payload) {
+              const payload = data.payload as { session_id: string; stream?: 'stdout' | 'stderr'; content: string; seq?: number };
+              if (payload.session_id === id) {
+                actions.appendOutputChunk(id, {
+                  stream: payload.stream,
+                  content: payload.content,
+                  seq: payload.seq,
+                });
               }
             }
           },
@@ -179,6 +222,22 @@ export const SessionsProvider: ParentComponent = props => {
         // Ignore errors during cleanup (component might be unmounting)
         console.warn(`Error during session disconnect for ${id}:`, error);
       }
+    },
+
+    appendOutputChunk: (id: string, chunk: OutputChunk) => {
+      const existing = store.outputsBySession[id]?.chunks || [];
+      // Avoid duplicates by seq if provided
+      if (chunk.seq !== undefined) {
+        const exists = existing.some(c => c.seq === chunk.seq);
+        if (exists) return;
+      }
+      const newChunks = [...existing, chunk].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+      const lastSeq = newChunks.length ? newChunks[newChunks.length - 1].seq : store.outputsBySession[id]?.lastSeq;
+      setStore('outputsBySession', id, { chunks: newChunks, lastSeq });
+    },
+
+    clearOutputs: (id: string) => {
+      setStore('outputsBySession', id, { chunks: [], lastSeq: 0 });
     },
 
     updateSessionStatus: (id: string, status: AiSessionStatus) => {
@@ -250,6 +309,10 @@ export const SessionsProvider: ParentComponent = props => {
     getConnectionStatus: (id: string) => {
       return store.connectionStatus[id] || 'disconnected';
     },
+
+    getOutputs: (id: string) => {
+      return store.outputsBySession[id]?.chunks || [];
+    },
   };
 
   onCleanup(() => {
@@ -291,5 +354,12 @@ export const useSession = (id: string) => {
     session: store.byId[id] || null,
     loading: store.loading,
     error: store.error,
+  };
+};
+
+export const useSessionOutputs = (id: string) => {
+  const { actions } = useSessions();
+  return {
+    get: () => actions.getOutputs(id),
   };
 };

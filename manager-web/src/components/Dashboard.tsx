@@ -1,5 +1,5 @@
-import { Component, For, createSignal, onMount } from 'solid-js';
-import { A } from '@solidjs/router';
+import { Component, For, Show, createSignal, onMount, onCleanup } from 'solid-js';
+import { A, useNavigate } from '@solidjs/router';
 import { Project } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
@@ -138,6 +138,220 @@ const ProjectsCard: Component = () => {
   );
 };
 
+// Start AI Session form component (Issue #59)
+const StartAiSessionForm: Component = () => {
+  const navigate = useNavigate();
+  // Known tools
+  const knownTools = ['claude', 'gemini', 'openai', 'qwen'];
+
+  const [projects, setProjects] = createSignal<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
+  const [toolName, setToolName] = createSignal<string>(knownTools[0]);
+  const [customTool, setCustomTool] = createSignal<string>('');
+  const [prompt, setPrompt] = createSignal<string>('');
+  const [submitting, setSubmitting] = createSignal<boolean>(false);
+  const [error, setError] = createSignal<string | null>(null);
+
+  // Dropdown states and refs for project and tool, with click-outside handling
+  const [isProjectOpen, setProjectOpen] = createSignal(false);
+  const [isToolOpen, setToolOpen] = createSignal(false);
+  let projectDdRef: HTMLDivElement | undefined;
+  let toolDdRef: HTMLDivElement | undefined;
+
+  const onDocMouseDown = (e: MouseEvent) => {
+    const target = e.target as Node;
+    if (projectDdRef && !projectDdRef.contains(target)) setProjectOpen(false);
+    if (toolDdRef && !toolDdRef.contains(target)) setToolOpen(false);
+  };
+
+  onMount(async () => {
+    try {
+      const list = await apiClient.fetchProjects();
+      setProjects(list);
+    } catch (e) {
+      console.error('Failed to load projects for session form', e);
+    }
+
+    document.addEventListener('mousedown', onDocMouseDown);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener('mousedown', onDocMouseDown);
+  });
+
+  const effectiveTool = () => (customTool().trim() ? customTool().trim() : toolName());
+
+  const isValid = () => prompt().trim().length > 0 && effectiveTool().trim().length > 0;
+
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
+    if (!isValid()) {
+      setError('Please provide a prompt and tool name');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const payload: any = {
+        tool_name: effectiveTool(),
+        prompt: prompt().trim(),
+      };
+      const pid = selectedProjectId().trim();
+      if (pid) payload.project_id = pid;
+      const resp = await apiClient.createAiSession(payload);
+      const id = resp.session.id;
+      // Navigate to detail page
+      navigate(`/ai/sessions/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start AI session');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
+      <h3 class='text-lg font-semibold text-gray-900 mb-4'>Start AI Session</h3>
+      <form onSubmit={handleSubmit} class='space-y-4'>
+        <div>
+          <label for='project' class='block text-sm font-medium text-gray-700'>Project (optional)</label>
+          <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
+            <button
+              type='button'
+              class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+              onClick={() => setProjectOpen(!isProjectOpen())}
+              aria-haspopup='listbox'
+              aria-expanded={isProjectOpen()}
+            >
+              <span class='truncate'>
+                {selectedProjectId()
+                  ? (projects().find(p => p.id === selectedProjectId())?.name || `Project ${selectedProjectId()}`)
+                  : 'No Project'}
+              </span>
+              <svg class='w-4 h-4 ml-2 text-gray-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M19 9l-7 7-7-7' />
+              </svg>
+            </button>
+            {isProjectOpen() && (
+              <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
+                <div class='py-1 max-h-60 overflow-auto' role='listbox'>
+                  <div
+                    role='option'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer'
+                    onClick={() => {
+                      setSelectedProjectId('');
+                      setProjectOpen(false);
+                    }}
+                  >
+                    No Project
+                  </div>
+                  <For each={projects()}>
+                    {p => (
+                      <div
+                        role='option'
+                        class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer'
+                        onClick={() => {
+                          setSelectedProjectId(p.id);
+                          setProjectOpen(false);
+                        }}
+                      >
+                        <div class='font-medium'>{p.name}</div>
+                        <div class='text-xs text-gray-500 truncate'>{p.language || ''}</div>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div class='grid grid-cols-1 md:grid-cols-2 gap-4'>
+          <div>
+            <label for='tool' class='block text-sm font-medium text-gray-700'>Tool</label>
+            <div class='mt-1 relative' ref={(el: HTMLDivElement) => (toolDdRef = el)}>
+              <button
+                type='button'
+                class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+                onClick={() => setToolOpen(!isToolOpen())}
+                aria-haspopup='listbox'
+                aria-expanded={isToolOpen()}
+              >
+                <span class='truncate'>{toolName()}</span>
+                <svg class='w-4 h-4 ml-2 text-gray-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M19 9l-7 7-7-7' />
+                </svg>
+              </button>
+              {isToolOpen() && (
+                <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
+                  <div class='py-1' role='listbox'>
+                    <For each={knownTools}>
+                      {t => (
+                        <div
+                          role='option'
+                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer'
+                          onClick={() => {
+                            setToolName(t);
+                            setToolOpen(false);
+                          }}
+                        >
+                          {t}
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              )}
+            </div>
+            <p class='mt-1 text-xs text-gray-500'>Select a tool or enter a custom one below</p>
+          </div>
+          <div>
+            <label for='customTool' class='block text-sm font-medium text-gray-700'>Custom Tool (optional)</label>
+            <input
+              id='customTool'
+              type='text'
+              placeholder='e.g., my-tool'
+              class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              value={customTool()}
+              onInput={e => setCustomTool(e.currentTarget.value)}
+            />
+            <p class='mt-1 text-xs text-gray-500'>If provided, this will override the selected tool</p>
+          </div>
+        </div>
+
+        <div>
+          <label for='prompt' class='block text-sm font-medium text-gray-700'>Prompt</label>
+          <textarea
+            id='prompt'
+            required
+            rows={3}
+            class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            placeholder='Describe what you want the AI tool to do...'
+            value={prompt()}
+            onInput={e => setPrompt(e.currentTarget.value)}
+          />
+        </div>
+
+        <Show when={error()}>
+          <div class='text-sm text-red-600'>{error()}</div>
+        </Show>
+
+        <div class='flex justify-end'>
+          <button
+            type='submit'
+            disabled={submitting() || !isValid()}
+            class={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white ${
+              submitting() || !isValid() ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {submitting() ? 'Starting...' : 'Start Session'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 // AI Sessions card component
 const SessionsCard: Component = () => {
   const { store, actions } = useSessions();
@@ -247,6 +461,9 @@ const Dashboard: Component = () => {
         <ProjectsCard />
         <SessionsCard />
       </div>
+
+      {/* Start AI Session */}
+      <StartAiSessionForm />
 
       {/* Quick actions */}
       <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
