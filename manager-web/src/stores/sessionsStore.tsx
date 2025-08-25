@@ -141,8 +141,9 @@ export const SessionsProvider: ParentComponent = props => {
             actions.stopPolling(id);
             setStore('connectionStatus', id, 'connected');
 
-            if (data.type === 'status_update' && data.status) {
-              actions.updateSessionStatus(id, data.status);
+            if ((data.type === 'status_update' || data.type === 'AiSessionStatusChanged') && (data.status || data.payload?.status)) {
+              const newStatus = data.status ?? data.payload?.status;
+              actions.updateSessionStatus(id, newStatus);
             }
             if (data.type === 'session_data' && data.session) {
               setStore('byId', id, data.session);

@@ -214,8 +214,10 @@ const AiSessionDetail: Component = () => {
         // Seed outputs via HTTP, then connect for live chunks
         await actions.fetchOutputs(params.id);
 
-        // Connect to live updates for running sessions
-        if (sessionData.status === 'running') {
+        // Connect to live updates for active sessions
+        const st = sessionData.status;
+        const isFinished = st === 'completed' || st === 'failed' || st === 'cancelled';
+        if (!isFinished) {
           actions.connect(params.id);
           setIsConnected(true);
         }
@@ -325,7 +327,7 @@ const AiSessionDetail: Component = () => {
                       </code>
                     </p>
                   </div>
-                  <Show when={session()!.status === 'running'}>
+                  <Show when={session()!.status !== 'completed' && session()!.status !== 'failed' && session()!.status !== 'cancelled'}>
                     <LiveStatusIndicator
                       connectionStatus={actions.getConnectionStatus(params.id)}
                     />

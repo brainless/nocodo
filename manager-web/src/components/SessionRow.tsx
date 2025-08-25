@@ -99,6 +99,7 @@ const StatusBadge: Component<{
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'running':
+      case 'started':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'failed':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -116,6 +117,7 @@ const StatusBadge: Component<{
       case 'completed':
         return '✅';
       case 'running':
+      case 'started':
         return '⟳';
       case 'failed':
         return '❌';
@@ -240,8 +242,8 @@ const SessionRow: Component<SessionRowProps> = props => {
           </Show>
 
           {/* Visual indicator for running sessions */}
-          <Show when={session().status === 'running'}>
-            <div class='mt-2 flex items-center text-xs text-blue-600'>
+      <Show when={session().status === 'running' || session().status === 'started'}>
+        <div class='mt-2 flex items-center text-xs text-blue-600'>
               <div
                 class='w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse mr-2'
                 aria-hidden='true'
