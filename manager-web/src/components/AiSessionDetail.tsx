@@ -1,8 +1,8 @@
-import { Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
+import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useParams } from '@solidjs/router';
 import { AiSessionStatus, Project } from '../types';
-import { useSessions, useSessionOutputs } from '../stores/sessionsStore';
 import { apiClient } from '../api';
+import { useSessionOutputs, useSessions } from '../stores/sessionsStore';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 import SessionTimeline from './SessionTimeline';
 
@@ -155,10 +155,13 @@ const OutputPanel: Component<{ sessionId: string }> = props => {
         class='px-6 py-4 font-mono text-sm whitespace-pre-wrap h-72 overflow-auto bg-black text-gray-100'
         aria-live='polite'
       >
-        <Show when={outputs.get().length > 0} fallback={<div class='text-gray-400'>No output yet</div>}>
-          {outputs.get().map(chunk => (
+        <Show
+          when={outputs.get().length > 0}
+          fallback={<div class='text-gray-400'>No output yet</div>}
+        >
+          <For each={outputs.get()}>{chunk => (
             <div class={chunk.stream === 'stderr' ? 'text-red-400' : ''}>{chunk.content}</div>
-          ))}
+          )}</For>
         </Show>
       </div>
     </div>
@@ -327,7 +330,13 @@ const AiSessionDetail: Component = () => {
                       </code>
                     </p>
                   </div>
-                  <Show when={session()!.status !== 'completed' && session()!.status !== 'failed' && session()!.status !== 'cancelled'}>
+                  <Show
+                    when={
+                      session()!.status !== 'completed' &&
+                      session()!.status !== 'failed' &&
+                      session()!.status !== 'cancelled'
+                    }
+                  >
                     <LiveStatusIndicator
                       connectionStatus={actions.getConnectionStatus(params.id)}
                     />
@@ -401,11 +410,11 @@ const AiSessionDetail: Component = () => {
               </div>
             </div>
 
-          {/* Output panel */}
-          <OutputPanel sessionId={params.id} />
+            {/* Output panel */}
+            <OutputPanel sessionId={params.id} />
 
-          {/* Prompt Section */}
-          <Show when={session()!.prompt}>
+            {/* Prompt Section */}
+            <Show when={session()!.prompt}>
               <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
                 <div class='px-6 py-4 border-b border-gray-200 bg-gray-50'>
                   <h3 class='text-lg font-medium text-gray-900'>Session Prompt</h3>
@@ -505,7 +514,9 @@ const SessionInputBox: Component<{ sessionId: string }> = props => {
   return (
     <div class='bg-white rounded-lg border border-gray-200 p-4'>
       <h3 class='text-md font-medium text-gray-900 mb-2'>Send Input</h3>
-      <p class='text-sm text-gray-600 mb-3'>Send a follow-up message to the running session (tool must read stdin).</p>
+      <p class='text-sm text-gray-600 mb-3'>
+        Send a follow-up message to the running session (tool must read stdin).
+      </p>
       <form onSubmit={send} class='space-y-2'>
         <textarea
           rows={3}
