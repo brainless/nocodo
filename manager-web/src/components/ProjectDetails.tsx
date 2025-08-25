@@ -3,6 +3,7 @@ import { Component, For, Show, createSignal, onMount } from 'solid-js';
 import { AiSession, Project } from '../types';
 import { apiClient } from '../api';
 import FileBrowser from './FileBrowser';
+import FileEditor from './FileEditor';
 
 interface ProjectComponentInfo {
   id: string;
@@ -44,6 +45,7 @@ const ProjectDetails: Component = () => {
   const [project, setProject] = createSignal<Project | null>(null);
   const [components, setComponents] = createSignal<ProjectComponentInfo[]>([]);
   const [sessions, setSessions] = createSignal<AiSession[]>([]);
+  const [selectedFile, setSelectedFile] = createSignal<any>(null);
 
   const projectId = () => params.id;
 
@@ -136,9 +138,18 @@ const ProjectDetails: Component = () => {
 
           {/* Code Tab */}
           <Show when={currentTab() === 'code'}>
-            <div class="border border-gray-200 rounded-lg p-2">
-              {/* Use existing FileBrowser; compactness handled by container padding */}
-              <FileBrowser projectId={projectId()} projectName={project()?.name} />
+            <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+              {/* Narrow file list */}
+              <div class="border border-gray-200 rounded-lg p-2 w-full max-w-[320px]">
+                <FileBrowser projectId={projectId()} projectName={project()?.name} hideDelete={true} />
+              </div>
+
+              {/* File content viewer/editor */}
+              <div class="border border-gray-200 rounded-lg p-2 min-h-[400px]">
+                <Show when={selectedFile()} fallback={<div class="text-gray-500 flex items-center justify-center h-full">Select a file to view</div>}>
+                  <FileEditor project={project()!} file={selectedFile()!} onClose={() => setSelectedFile(null)} />
+                </Show>
+              </div>
             </div>
           </Show>
 
