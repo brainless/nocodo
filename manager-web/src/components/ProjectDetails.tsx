@@ -30,9 +30,16 @@ const ProjectDetails: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = createSignal<TabKey>('work');
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+
+  // current tab from URL
+  const currentTab = () => {
+    const raw = (params as unknown as { tab?: string }).tab || 'work';
+    return (['work', 'code', 'project', 'automation', 'about'] as const).includes(raw as any)
+      ? (raw as TabKey)
+      : 'work';
+  };
 
   const [project, setProject] = createSignal<Project | null>(null);
   const [components, setComponents] = createSignal<ProjectComponentInfo[]>([]);
@@ -68,7 +75,7 @@ const ProjectDetails: Component = () => {
 
   onMount(loadData);
 
-  const isActive = (k: TabKey) => (activeTab() === k ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-800');
+  const isActive = (k: TabKey) => (currentTab() === k ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-800');
 
   return (
     <div class="space-y-6">
@@ -90,12 +97,12 @@ const ProjectDetails: Component = () => {
         <nav class="-mb-px flex space-x-6" aria-label="Tabs">
           <For each={Tabs as unknown as TabKey[]}>
             {key => (
-              <button
+              <A
+                href={`/projects/${projectId()}/${key}`}
                 class={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${isActive(key)}`}
-                onClick={() => setActiveTab(key)}
               >
                 {TabLabel[key]}
-              </button>
+              </A>
             )}
           </For>
         </nav>
@@ -105,7 +112,7 @@ const ProjectDetails: Component = () => {
       <Show when={!loading()} fallback={<div class="text-gray-500">Loading...</div>}>
         <Show when={!error()} fallback={<div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{error()}</div>}>
           {/* Work Tab */}
-          <Show when={activeTab() === 'work'}>
+          <Show when={currentTab() === 'work'}>
             <div class="space-y-3">
               <Show when={sessions().length > 0} fallback={<div class="text-gray-500">No sessions found for this project.</div>}>
                 <div class="space-y-2">
@@ -128,7 +135,7 @@ const ProjectDetails: Component = () => {
           </Show>
 
           {/* Code Tab */}
-          <Show when={activeTab() === 'code'}>
+          <Show when={currentTab() === 'code'}>
             <div class="border border-gray-200 rounded-lg p-2">
               {/* Use existing FileBrowser; compactness handled by container padding */}
               <FileBrowser projectId={projectId()} projectName={project()?.name} />
@@ -136,17 +143,17 @@ const ProjectDetails: Component = () => {
           </Show>
 
           {/* Project Management Tab */}
-          <Show when={activeTab() === 'project'}>
+          <Show when={currentTab() === 'project'}>
             <div class="text-gray-600 text-sm">Coming soon</div>
           </Show>
 
           {/* Automation Tab */}
-          <Show when={activeTab() === 'automation'}>
+          <Show when={currentTab() === 'automation'}>
             <div class="text-gray-600 text-sm">Coming soon</div>
           </Show>
 
           {/* About Tab */}
-          <Show when={activeTab() === 'about'}>
+          <Show when={currentTab() === 'about'}>
             <div class="space-y-4">
               <div class="bg-white border border-gray-200 rounded p-4">
                 <h3 class="text-lg font-semibold mb-2">Project</h3>

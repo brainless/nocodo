@@ -117,7 +117,7 @@ const ProjectsCard: Component = () => {
                   </div>
                 </div>
                 <A
-                  href={`/projects/${project.id}`}
+                  href={`/projects/${project.id}/work`}
                   class='ml-3 text-sm text-blue-600 hover:text-blue-800 font-medium'
                 >
                   Open
