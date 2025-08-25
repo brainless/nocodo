@@ -186,6 +186,11 @@ impl Runner {
             return Ok((cmd, vec!["--print".to_string(), prompt.to_string()], None));
         }
 
+        // Qwen Code expects --prompt <text>
+        if cmd == "qwen" {
+            return Ok((cmd, vec!["--prompt".to_string(), prompt.to_string()], None));
+        }
+
         // Generic: pass prompt as a single arg
         Ok((cmd, vec![prompt.to_string()], None))
     }
