@@ -1,7 +1,7 @@
 import { Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useParams } from '@solidjs/router';
 import { AiSessionStatus, Project } from '../types';
-import { useSessions } from '../stores/sessionsStore';
+import { useSessions, useSessionOutputs } from '../stores/sessionsStore';
 import { apiClient } from '../api';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 import SessionTimeline from './SessionTimeline';

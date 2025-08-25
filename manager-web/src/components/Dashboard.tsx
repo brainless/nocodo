@@ -1,4 +1,4 @@
-import { Component, For, createSignal, onMount } from 'solid-js';
+import { Component, For, Show, createSignal, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
 import { Project } from '../types';
 import { apiClient } from '../api';
@@ -240,7 +240,7 @@ const StartAiSessionForm: Component = () => {
         </div>
 
         <div>
-          <label htmlFor='prompt' class='block text-sm font-medium text-gray-700'>Prompt</label>
+          <label for='prompt' class='block text-sm font-medium text-gray-700'>Prompt</label>
           <textarea
             id='prompt'
             required
