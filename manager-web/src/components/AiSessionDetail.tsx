@@ -83,6 +83,88 @@ const LiveStatusIndicator: Component<{
   );
 };
 
+// Output panel component (Issue #59)
+const OutputPanel: Component<{ sessionId: string }> = props => {
+  const { actions } = useSessions();
+  const outputs = useSessionOutputs(props.sessionId);
+  const [autoScroll, setAutoScroll] = createSignal(true);
+  let containerRef: HTMLDivElement | undefined;
+
+  const scrollToBottom = () => {
+    if (containerRef && autoScroll()) {
+      containerRef.scrollTop = containerRef.scrollHeight;
+    }
+  };
+
+  const copyAll = async () => {
+    try {
+      const text = outputs
+        .get()
+        .map(c => `${c.stream === 'stderr' ? '[stderr] ' : ''}${c.content}`)
+        .join('');
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.error('Failed to copy outputs', e);
+    }
+  };
+
+  const clearAll = () => actions.clearOutputs(props.sessionId);
+
+  // Scroll on new outputs
+  const observer = new MutationObserver(scrollToBottom);
+  onMount(() => {
+    if (containerRef) {
+      observer.observe(containerRef, { childList: true, subtree: true });
+    }
+  });
+  onCleanup(() => observer.disconnect());
+
+  return (
+    <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
+      <div class='px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between'>
+        <div>
+          <h3 class='text-lg font-medium text-gray-900'>Live Output</h3>
+          <p class='text-sm text-gray-600'>Real-time stdout/stderr from the AI tool</p>
+        </div>
+        <div class='flex items-center gap-2'>
+          <label class='inline-flex items-center text-sm text-gray-700'>
+            <input
+              type='checkbox'
+              checked={autoScroll()}
+              onInput={e => setAutoScroll(e.currentTarget.checked)}
+              class='mr-2'
+            />
+            Auto-scroll
+          </label>
+          <button
+            onClick={copyAll}
+            class='px-3 py-1.5 text-sm bg-gray-100 border border-gray-300 rounded hover:bg-gray-200'
+          >
+            Copy all
+          </button>
+          <button
+            onClick={clearAll}
+            class='px-3 py-1.5 text-sm bg-gray-100 border border-gray-300 rounded hover:bg-gray-200'
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+      <div
+        ref={el => (containerRef = el)}
+        class='px-6 py-4 font-mono text-sm whitespace-pre-wrap h-72 overflow-auto bg-black text-gray-100'
+        aria-live='polite'
+      >
+        <Show when={outputs.get().length > 0} fallback={<div class='text-gray-400'>No output yet</div>}>
+          {outputs.get().map(chunk => (
+            <div class={chunk.stream === 'stderr' ? 'text-red-400' : ''}>{chunk.content}</div>
+          ))}
+        </Show>
+      </div>
+    </div>
+  );
+};
+
 const AiSessionDetail: Component = () => {
   const params = useParams<{ id: string }>();
   const { store, actions } = useSessions();
@@ -128,6 +210,9 @@ const AiSessionDetail: Component = () => {
         if (sessionData.project_id) {
           fetchProject(sessionData.project_id).catch(console.error);
         }
+
+        // Seed outputs via HTTP, then connect for live chunks
+        await actions.fetchOutputs(params.id);
 
         // Connect to live updates for running sessions
         if (sessionData.status === 'running') {
@@ -314,8 +399,11 @@ const AiSessionDetail: Component = () => {
               </div>
             </div>
 
-            {/* Prompt Section */}
-            <Show when={session()!.prompt}>
+          {/* Output panel */}
+          <OutputPanel sessionId={params.id} />
+
+          {/* Prompt Section */}
+          <Show when={session()!.prompt}>
               <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
                 <div class='px-6 py-4 border-b border-gray-200 bg-gray-50'>
                   <h3 class='text-lg font-medium text-gray-900'>Session Prompt</h3>
@@ -355,6 +443,11 @@ const AiSessionDetail: Component = () => {
           <div class='lg:col-span-1 space-y-6'>
             {/* Timeline */}
             <SessionTimeline session={session()!} />
+
+            {/* Optional input box to send content to running session */}
+            <Show when={session()!.status === 'running'}>
+              <SessionInputBox sessionId={params.id} />
+            </Show>
           </div>
         </div>
       </Show>
@@ -382,6 +475,58 @@ const AiSessionDetail: Component = () => {
           </A>
         </Show>
       </div>
+    </div>
+  );
+};
+
+// Session input box component (Issue #59)
+const SessionInputBox: Component<{ sessionId: string }> = props => {
+  const [content, setContent] = createSignal('');
+  const [sending, setSending] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+
+  const send = async (e: Event) => {
+    e.preventDefault();
+    if (!content().trim()) return;
+    setSending(true);
+    setError(null);
+    try {
+      await apiClient.sendAiInput(props.sessionId, content().trim());
+      setContent('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send input');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div class='bg-white rounded-lg border border-gray-200 p-4'>
+      <h3 class='text-md font-medium text-gray-900 mb-2'>Send Input</h3>
+      <p class='text-sm text-gray-600 mb-3'>Send a follow-up message to the running session (tool must read stdin).</p>
+      <form onSubmit={send} class='space-y-2'>
+        <textarea
+          rows={3}
+          class='w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+          placeholder='Type your message...'
+          value={content()}
+          onInput={e => setContent(e.currentTarget.value)}
+        />
+        <Show when={error()}>
+          <div class='text-sm text-red-600'>{error()}</div>
+        </Show>
+        <div class='flex justify-end'>
+          <button
+            type='submit'
+            disabled={sending() || !content().trim()}
+            class={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white ${
+              sending() || !content().trim() ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {sending() ? 'Sending...' : 'Send'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

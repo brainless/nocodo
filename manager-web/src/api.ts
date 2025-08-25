@@ -133,6 +133,14 @@ class ApiClient {
     return this.request(`/ai/sessions/${id}/outputs`);
   }
 
+  // Issue #59: Send input to a running AI session (stdin)
+  async sendAiInput(id: string, content: string): Promise<{ ok: boolean }> {
+    return this.request(`/ai/sessions/${id}/input`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
   // New methods for issue #32
   /**
    * List all AI sessions

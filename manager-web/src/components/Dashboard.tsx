@@ -1,5 +1,5 @@
 import { Component, For, createSignal, onMount } from 'solid-js';
-import { A } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import { Project } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
@@ -138,6 +138,140 @@ const ProjectsCard: Component = () => {
   );
 };
 
+// Start AI Session form component (Issue #59)
+const StartAiSessionForm: Component = () => {
+  const navigate = useNavigate();
+  // Known tools
+  const knownTools = ['claude', 'gemini', 'openai', 'qwen-code'];
+
+  const [projects, setProjects] = createSignal<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
+  const [toolName, setToolName] = createSignal<string>(knownTools[0]);
+  const [customTool, setCustomTool] = createSignal<string>('');
+  const [prompt, setPrompt] = createSignal<string>('');
+  const [submitting, setSubmitting] = createSignal<boolean>(false);
+  const [error, setError] = createSignal<string | null>(null);
+
+  onMount(async () => {
+    try {
+      const list = await apiClient.fetchProjects();
+      setProjects(list);
+    } catch (e) {
+      console.error('Failed to load projects for session form', e);
+    }
+  });
+
+  const effectiveTool = () => (customTool().trim() ? customTool().trim() : toolName());
+
+  const isValid = () => prompt().trim().length > 0 && effectiveTool().trim().length > 0;
+
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
+    if (!isValid()) {
+      setError('Please provide a prompt and tool name');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const payload: any = {
+        tool_name: effectiveTool(),
+        prompt: prompt().trim(),
+      };
+      const pid = selectedProjectId().trim();
+      if (pid) payload.project_id = pid;
+      const resp = await apiClient.createAiSession(payload);
+      const id = resp.session.id;
+      // Navigate to detail page
+      navigate(`/ai/sessions/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start AI session');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
+      <h3 class='text-lg font-semibold text-gray-900 mb-4'>Start AI Session</h3>
+      <form onSubmit={handleSubmit} class='space-y-4'>
+        <div>
+          <label for='project' class='block text-sm font-medium text-gray-700'>Project (optional)</label>
+          <select
+            id='project'
+            class='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            value={selectedProjectId()}
+            onInput={e => setSelectedProjectId(e.currentTarget.value)}
+          >
+            <option value=''>No Project</option>
+            <For each={projects()}>
+              {p => (
+                <option value={p.id}>{p.name}</option>
+              )}
+            </For>
+          </select>
+        </div>
+
+        <div class='grid grid-cols-1 md:grid-cols-2 gap-4'>
+          <div>
+            <label for='tool' class='block text-sm font-medium text-gray-700'>Tool</label>
+            <select
+              id='tool'
+              class='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+              value={toolName()}
+              onInput={e => setToolName(e.currentTarget.value)}
+            >
+              <For each={knownTools}>{t => <option value={t}>{t}</option>}</For>
+            </select>
+            <p class='mt-1 text-xs text-gray-500'>Select a tool or enter a custom one below</p>
+          </div>
+          <div>
+            <label for='customTool' class='block text-sm font-medium text-gray-700'>Custom Tool (optional)</label>
+            <input
+              id='customTool'
+              type='text'
+              placeholder='e.g., my-tool'
+              class='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+              value={customTool()}
+              onInput={e => setCustomTool(e.currentTarget.value)}
+            />
+            <p class='mt-1 text-xs text-gray-500'>If provided, this will override the selected tool</p>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor='prompt' class='block text-sm font-medium text-gray-700'>Prompt</label>
+          <textarea
+            id='prompt'
+            required
+            rows={3}
+            class='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'
+            placeholder='Describe what you want the AI tool to do...'
+            value={prompt()}
+            onInput={e => setPrompt(e.currentTarget.value)}
+          />
+        </div>
+
+        <Show when={error()}>
+          <div class='text-sm text-red-600'>{error()}</div>
+        </Show>
+
+        <div class='flex justify-end'>
+          <button
+            type='submit'
+            disabled={submitting() || !isValid()}
+            class={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white ${
+              submitting() || !isValid() ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {submitting() ? 'Starting...' : 'Start Session'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 // AI Sessions card component
 const SessionsCard: Component = () => {
   const { store, actions } = useSessions();
@@ -247,6 +381,9 @@ const Dashboard: Component = () => {
         <ProjectsCard />
         <SessionsCard />
       </div>
+
+      {/* Start AI Session */}
+      <StartAiSessionForm />
 
       {/* Quick actions */}
       <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
