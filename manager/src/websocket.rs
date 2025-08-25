@@ -33,6 +33,15 @@ pub enum WebSocketMessage {
     AiSessionCompleted { session_id: String },
     AiSessionFailed { session_id: String },
 
+    // Streaming output chunks for sessions (stdout/stderr)
+    AiSessionOutputChunk {
+        session_id: String,
+        stream: String, // "stdout" | "stderr"
+        content: String,
+        #[serde(default)]
+        seq: u64,
+    },
+
     // Error handling
     Error { message: String },
 
@@ -385,6 +394,24 @@ impl WebSocketBroadcaster {
     pub fn broadcast_ai_session_failed(&self, session_id: String) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::AiSessionFailed { session_id },
+        });
+    }
+
+    /// Broadcast a single output chunk for a session
+    pub fn broadcast_ai_output_chunk(
+        &self,
+        session_id: String,
+        stream: &str,
+        content: &str,
+        seq: u64,
+    ) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::AiSessionOutputChunk {
+                session_id,
+                stream: stream.to_string(),
+                content: content.to_string(),
+                seq,
+            },
         });
     }
 }
