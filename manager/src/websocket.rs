@@ -16,22 +16,44 @@ use uuid::Uuid;
 #[rtype(result = "()")]
 pub enum WebSocketMessage {
     // System messages
-    Connected { client_id: String },
-    Disconnected { client_id: String },
+    Connected {
+        client_id: String,
+    },
+    Disconnected {
+        client_id: String,
+    },
 
     // Project updates
-    ProjectCreated { project: Project },
-    ProjectUpdated { project: Project },
-    ProjectDeleted { project_id: String },
+    ProjectCreated {
+        project: Project,
+    },
+    ProjectUpdated {
+        project: Project,
+    },
+    ProjectDeleted {
+        project_id: String,
+    },
 
     // Status updates
-    ProjectStatusChanged { project_id: String, status: String },
+    ProjectStatusChanged {
+        project_id: String,
+        status: String,
+    },
 
     // AI session updates
-    AiSessionCreated { session: AiSession },
-    AiSessionStatusChanged { session_id: String, status: String },
-    AiSessionCompleted { session_id: String },
-    AiSessionFailed { session_id: String },
+    AiSessionCreated {
+        session: AiSession,
+    },
+    AiSessionStatusChanged {
+        session_id: String,
+        status: String,
+    },
+    AiSessionCompleted {
+        session_id: String,
+    },
+    AiSessionFailed {
+        session_id: String,
+    },
 
     // Streaming output chunks for sessions (stdout/stderr)
     AiSessionOutputChunk {
@@ -43,7 +65,9 @@ pub enum WebSocketMessage {
     },
 
     // Error handling
-    Error { message: String },
+    Error {
+        message: String,
+    },
 
     // Ping/Pong for connection keep-alive
     Ping,

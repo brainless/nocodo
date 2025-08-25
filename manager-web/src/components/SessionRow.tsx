@@ -242,8 +242,8 @@ const SessionRow: Component<SessionRowProps> = props => {
           </Show>
 
           {/* Visual indicator for running sessions */}
-      <Show when={session().status === 'running' || session().status === 'started'}>
-        <div class='mt-2 flex items-center text-xs text-blue-600'>
+          <Show when={session().status === 'running' || session().status === 'started'}>
+            <div class='mt-2 flex items-center text-xs text-blue-600'>
               <div
                 class='w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse mr-2'
                 aria-hidden='true'
