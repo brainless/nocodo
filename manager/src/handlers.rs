@@ -161,7 +161,10 @@ pub async fn get_project_details(
     let project_id = path.into_inner();
     let project = data.database.get_project_by_id(&project_id)?;
     let components = data.database.get_components_for_project(&project_id)?;
-    let response = crate::models::ProjectDetailsResponse { project, components };
+    let response = crate::models::ProjectDetailsResponse {
+        project,
+        components,
+    };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -410,7 +413,9 @@ pub async fn add_existing_project(
         updated_project.path
     );
 
-    let response = ProjectResponse { project: updated_project };
+    let response = ProjectResponse {
+        project: updated_project,
+    };
     Ok(HttpResponse::Created().json(response))
 }
 
@@ -978,7 +983,8 @@ pub async fn check_project_path_conflicts(
 struct PackageJson {
     name: Option<String>,
     dependencies: Option<serde_json::Map<String, serde_json::Value>>,
-    devDependencies: Option<serde_json::Map<String, serde_json::Value>>,
+    #[serde(rename = "devDependencies")]
+    dev_dependencies: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 struct ProjectAnalysisResult {
@@ -1021,20 +1027,23 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
                         .map(|m| m.contains_key(name))
                         .unwrap_or(false)
                         || pkg
-                            .devDependencies
+                            .dev_dependencies
                             .as_ref()
                             .map(|m| m.contains_key(name))
                             .unwrap_or(false)
                 };
-                if has_dep("react") { primary_framework = Some("react".to_string()); }
-                else if has_dep("solid-js") { primary_framework = Some("solidjs".to_string()); }
-                else if has_dep("express") { primary_framework = Some("express".to_string()); }
+                if has_dep("react") {
+                    primary_framework = Some("react".to_string());
+                } else if has_dep("solid-js") {
+                    primary_framework = Some("solidjs".to_string());
+                } else if has_dep("express") {
+                    primary_framework = Some("express".to_string());
+                }
             }
         }
     }
 
     // Scan for component apps (Node and Rust) within depth 3
-    let project_id: Option<String> = None; // placeholder; components get project_id during persist
     let walker = walkdir::WalkDir::new(project_path)
         .max_depth(4)
         .into_iter()
@@ -1042,7 +1051,10 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
             let path = e.path();
             let p = path.to_string_lossy();
             // Skip hidden and common build dirs
-            !(p.contains("/node_modules/") || p.contains("/.git/") || p.contains("/dist/") || p.contains("/build/"))
+            !(p.contains("/node_modules/")
+                || p.contains("/.git/")
+                || p.contains("/dist/")
+                || p.contains("/build/"))
         });
 
     // We'll collect candidate package.json and Cargo.toml files not at root
@@ -1051,7 +1063,9 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
 
     for entry in walker.flatten() {
         let path = entry.path();
-        if path == project_path { continue; }
+        if path == project_path {
+            continue;
+        }
         if path.file_name().and_then(|n| n.to_str()) == Some("package.json") {
             node_dirs.push(path.parent().unwrap_or(project_path).to_path_buf());
         } else if path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml") {
@@ -1074,17 +1088,35 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         let pkg_path = dir.join("package.json");
         if let Ok(content) = fs::read_to_string(&pkg_path) {
             if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
-                let name = pkg.name.clone().unwrap_or_else(|| dir.file_name().and_then(|n| n.to_str()).unwrap_or("node-app").to_string());
+                let name = pkg.name.clone().unwrap_or_else(|| {
+                    dir.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("node-app")
+                        .to_string()
+                });
                 let mut language = "javascript".to_string();
                 let mut framework: Option<String> = None;
                 let has = |n: &str| -> bool {
-                    pkg.dependencies.as_ref().map(|m| m.contains_key(n)).unwrap_or(false) ||
-                    pkg.devDependencies.as_ref().map(|m| m.contains_key(n)).unwrap_or(false)
+                    pkg.dependencies
+                        .as_ref()
+                        .map(|m| m.contains_key(n))
+                        .unwrap_or(false)
+                        || pkg
+                            .dev_dependencies
+                            .as_ref()
+                            .map(|m| m.contains_key(n))
+                            .unwrap_or(false)
                 };
-                if has("typescript") { language = "typescript".to_string(); }
-                if has("react") { framework = Some("react".to_string()); }
-                else if has("solid-js") { framework = Some("solidjs".to_string()); }
-                else if has("express") { framework = Some("express".to_string()); }
+                if has("typescript") {
+                    language = "typescript".to_string();
+                }
+                if has("react") {
+                    framework = Some("react".to_string());
+                } else if has("solid-js") {
+                    framework = Some("solidjs".to_string());
+                } else if has("express") {
+                    framework = Some("express".to_string());
+                }
 
                 // placeholder project_id will be replaced by caller
                 let component = crate::models::ProjectComponent::new(
@@ -1104,16 +1136,33 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         let cargo_path = dir.join("Cargo.toml");
         if let Ok(content) = fs::read_to_string(&cargo_path) {
             // try to parse package name
-            let name = content.lines().find_map(|l| {
-                let lt = l.trim();
-                if lt.starts_with("name = ") {
-                    Some(lt.trim_start_matches("name = ").trim_matches('"').to_string())
-                } else { None }
-            }).unwrap_or_else(|| dir.file_name().and_then(|n| n.to_str()).unwrap_or("rust-app").to_string());
+            let name = content
+                .lines()
+                .find_map(|l| {
+                    let lt = l.trim();
+                    if lt.starts_with("name = ") {
+                        Some(
+                            lt.trim_start_matches("name = ")
+                                .trim_matches('"')
+                                .to_string(),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    dir.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("rust-app")
+                        .to_string()
+                });
 
             let mut framework: Option<String> = None;
-            if content.contains("actix-web") { framework = Some("actix-web".to_string()); }
-            else if content.contains("axum") { framework = Some("axum".to_string()); }
+            if content.contains("actix-web") {
+                framework = Some("actix-web".to_string());
+            } else if content.contains("axum") {
+                framework = Some("axum".to_string());
+            }
 
             let component = crate::models::ProjectComponent::new(
                 "".to_string(),
@@ -1126,7 +1175,11 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         }
     }
 
-    Ok(ProjectAnalysisResult { primary_language, primary_framework, components })
+    Ok(ProjectAnalysisResult {
+        primary_language,
+        primary_framework,
+        components,
+    })
 }
 
 /// Extract project name from Git repository remote URL if available
