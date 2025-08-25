@@ -9,6 +9,7 @@ use crate::models::{
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
+use crate::runner::Runner;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
 use std::path::Path;
@@ -20,6 +21,7 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
+    pub runner: Option<Arc<Runner>>, // Enabled via env flag
 }
 
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
@@ -802,6 +804,22 @@ pub async fn create_ai_session(
     let response = AiSessionResponse {
         session: session.clone(),
     };
+
+    // If runner is enabled, start streaming execution for this session in background
+    if let Some(runner) = &data.runner {
+        // Build a simple enhanced prompt similar to CLI
+        let enhanced_prompt = if let Some(ctx) = &session.project_context {
+            format!(
+                "Project Context:\n{}\n\nUser Request:\n{}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes.",
+                ctx, session.prompt
+            )
+        } else {
+            session.prompt.clone()
+        };
+        // Fire-and-forget
+        let _ = runner.start_session(session.clone(), enhanced_prompt).await;
+    }
+
     Ok(HttpResponse::Created().json(response))
 }
 
@@ -851,6 +869,31 @@ pub async fn list_ai_outputs(
     let outputs = data.database.get_ai_session_outputs(&id)?;
     let response = AiSessionOutputListResponse { outputs };
     Ok(HttpResponse::Ok().json(response))
+}
+
+// Send interactive input to a running session
+pub async fn send_ai_input(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+    request: web::Json<crate::models::AiSessionInputRequest>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let req = request.into_inner();
+
+    if req.content.trim().is_empty() {
+        return Err(AppError::InvalidRequest("content is required".into()));
+    }
+
+    if let Some(runner) = &data.runner {
+        match runner.send_input(&id, req.content.clone()).await {
+            Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"ok": true}))),
+            Err(e) => Err(AppError::Internal(format!("Failed to send input: {e}"))),
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Runner not enabled on Manager".to_string(),
+        ))
+    }
 }
 
 /// Check for project path conflicts - ensure the requested path is not inside an existing project

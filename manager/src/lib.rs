@@ -3,6 +3,7 @@ pub mod database;
 pub mod error;
 pub mod handlers;
 pub mod models;
+pub mod runner;
 pub mod socket;
 pub mod templates;
 pub mod websocket;

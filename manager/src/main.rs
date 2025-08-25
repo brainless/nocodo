@@ -3,6 +3,7 @@ mod database;
 mod error;
 mod handlers;
 mod models;
+mod runner;
 mod socket;
 mod templates;
 mod websocket;
@@ -19,6 +20,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use websocket::{WebSocketBroadcaster, WebSocketServer};
+use runner::Runner;
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
@@ -58,10 +60,19 @@ async fn main() -> AppResult<()> {
     });
 
     // Create application state with WebSocket broadcaster
+    // Optionally enable in-Manager runner via env flag
+    let runner_enabled = std::env::var("NOCODO_RUNNER_ENABLED").ok().map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let runner = if runner_enabled {
+        Some(Arc::new(Runner::new(Arc::clone(&database), Arc::clone(&broadcaster))))
+    } else {
+        None
+    };
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
+        runner,
     });
 
     // Start HTTP server
@@ -106,6 +117,11 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/ai/sessions/{id}/outputs",
                             web::get().to(handlers::list_ai_outputs),
+                        )
+                        // Interactive input endpoint (Phase 1 streaming)
+                        .route(
+                            "/ai/sessions/{id}/input",
+                            web::post().to(handlers::send_ai_input),
                         ),
                 )
                 // WebSocket endpoints
