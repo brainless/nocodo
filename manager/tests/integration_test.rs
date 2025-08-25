@@ -20,6 +20,7 @@ async fn test_project_creation_workflow() {
         database: database.clone(),
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     // Initialize the test app
@@ -136,6 +137,7 @@ async fn test_project_creation_error_handling() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(
