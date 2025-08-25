@@ -15,12 +15,12 @@ use config::AppConfig;
 use database::Database;
 use error::AppResult;
 use handlers::AppState;
+use runner::Runner;
 use socket::SocketServer;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use websocket::{WebSocketBroadcaster, WebSocketServer};
-use runner::Runner;
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
@@ -61,9 +61,15 @@ async fn main() -> AppResult<()> {
 
     // Create application state with WebSocket broadcaster
     // Optionally enable in-Manager runner via env flag
-    let runner_enabled = std::env::var("NOCODO_RUNNER_ENABLED").ok().map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let runner_enabled = std::env::var("NOCODO_RUNNER_ENABLED")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
     let runner = if runner_enabled {
-        Some(Arc::new(Runner::new(Arc::clone(&database), Arc::clone(&broadcaster))))
+        Some(Arc::new(Runner::new(
+            Arc::clone(&database),
+            Arc::clone(&broadcaster),
+        )))
     } else {
         None
     };

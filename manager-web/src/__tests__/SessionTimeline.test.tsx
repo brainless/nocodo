@@ -153,7 +153,7 @@ describe('SessionTimeline Component', () => {
 
   test('applies custom className', () => {
     const { container } = render(() => (
-      <SessionTimeline session={mockCompletedSession} className='custom-timeline' />
+      <SessionTimeline session={mockCompletedSession} class='custom-timeline' />
     ));
 
     expect(container.firstChild).toHaveClass('custom-timeline');

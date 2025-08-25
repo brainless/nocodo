@@ -115,7 +115,10 @@ export const SessionsProvider: ParentComponent = props => {
           seq: idx,
           stream: 'stdout' as const,
         }));
-        setStore('outputsBySession', id, { chunks, lastSeq: chunks.length ? chunks[chunks.length - 1].seq : 0 });
+        setStore('outputsBySession', id, {
+          chunks,
+          lastSeq: chunks.length ? chunks[chunks.length - 1].seq : 0,
+        });
       } catch (err) {
         console.error('Failed to fetch outputs:', err);
         // initialize empty container to avoid undefined checks
@@ -141,7 +144,10 @@ export const SessionsProvider: ParentComponent = props => {
             actions.stopPolling(id);
             setStore('connectionStatus', id, 'connected');
 
-            if ((data.type === 'status_update' || data.type === 'AiSessionStatusChanged') && (data.status || data.payload?.status)) {
+            if (
+              (data.type === 'status_update' || data.type === 'AiSessionStatusChanged') &&
+              (data.status || data.payload?.status)
+            ) {
               const newStatus = data.status ?? data.payload?.status;
               actions.updateSessionStatus(id, newStatus);
             }
@@ -153,7 +159,12 @@ export const SessionsProvider: ParentComponent = props => {
               }
             }
             if (data.type === 'AiSessionOutputChunk' && data.payload) {
-              const payload = data.payload as { session_id: string; stream?: 'stdout' | 'stderr'; content: string; seq?: number };
+              const payload = data.payload as {
+                session_id: string;
+                stream?: 'stdout' | 'stderr';
+                content: string;
+                seq?: number;
+              };
               if (payload.session_id === id) {
                 actions.appendOutputChunk(id, {
                   stream: payload.stream,
@@ -232,7 +243,9 @@ export const SessionsProvider: ParentComponent = props => {
         if (exists) return;
       }
       const newChunks = [...existing, chunk].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
-      const lastSeq = newChunks.length ? newChunks[newChunks.length - 1].seq : store.outputsBySession[id]?.lastSeq;
+      const lastSeq = newChunks.length
+        ? newChunks[newChunks.length - 1].seq
+        : store.outputsBySession[id]?.lastSeq;
       setStore('outputsBySession', id, { chunks: newChunks, lastSeq });
     },
 
