@@ -1,4 +1,4 @@
-import { Component, createSignal, createEffect, onMount } from 'solid-js';
+import { Component, For, createSignal, onMount } from 'solid-js';
 import { A, Route, Router } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
@@ -126,15 +126,17 @@ const TopNavigation: Component = () => {
                   {projects().length > 0 && (
                     <>
                       <div class='border-t border-gray-200 my-1'></div>
-                      {projects().map(project => (
-                        <A
-                          href={`/projects/${project.id}/files`}
-                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
-                        >
-                          <div class='font-medium'>{project.name}</div>
-                          <div class='text-xs text-gray-500'>{project.language || 'Unknown'}</div>
-                        </A>
-                      ))}
+                      <For each={projects()}>
+                        {project => (
+                          <A
+                            href={`/projects/${project.id}/files`}
+                            class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                          >
+                            <div class='font-medium'>{project.name}</div>
+                            <div class='text-xs text-gray-500'>{project.language || 'Unknown'}</div>
+                          </A>
+                        )}
+                      </For>
                     </>
                   )}
                 </div>

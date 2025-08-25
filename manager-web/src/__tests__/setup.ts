@@ -53,7 +53,7 @@ if (!globalThis.URL) {
     search: string;
     hash: string;
 
-    constructor(url: string, base?: string) {
+    constructor(url: string) {
       this.href = url;
       this.origin = 'http://localhost:3000';
       this.protocol = 'http:';
