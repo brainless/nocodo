@@ -168,7 +168,8 @@ impl Runner {
             "claude" | "claude-code" => "claude".to_string(),
             "gemini" | "gemini-cli" => "gemini".to_string(),
             "openai" | "openai-cli" => "openai".to_string(),
-            "qwen" | "qwen-code" => "qwen-code".to_string(),
+            // Qwen Code CLI binary is `qwen`
+            "qwen" | "qwen-code" => "qwen".to_string(),
             _ => t,
         };
 

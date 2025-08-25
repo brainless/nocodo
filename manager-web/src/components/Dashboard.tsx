@@ -142,7 +142,7 @@ const ProjectsCard: Component = () => {
 const StartAiSessionForm: Component = () => {
   const navigate = useNavigate();
   // Known tools
-  const knownTools = ['claude', 'gemini', 'openai', 'qwen-code'];
+  const knownTools = ['claude', 'gemini', 'openai', 'qwen'];
 
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
