@@ -3,7 +3,6 @@
 use crate::{
     cli::ProjectCommands,
     client::{AddExistingProjectRequest, ManagerClient},
-    commands::analyze::ProjectAnalyzer,
     error::CliError,
 };
 use std::path::{Path, PathBuf};
@@ -49,30 +48,16 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
         )));
     }
 
-    // Analyze the project to extract metadata
-    let analyzer = ProjectAnalyzer::new();
-    let analysis = analyzer.analyze(&absolute_path).await?;
+    // Let manager analyze: skip local analysis to keep CLI thin
+    // Extract project name from Git or directory name
+    let project_name = extract_project_name_minimal(&absolute_path)?;
 
-    // Check if this looks like a valid project
-    if analysis.file_count == 0 {
-        warn!("No files found in directory - this may not be a valid project");
-    }
-
-    // Extract project name from Git repository, project files, or directory name
-    let project_name = extract_project_name(&absolute_path, &analysis)?;
-
-    // Determine primary language and framework
-    let language = if !analysis.primary_language.is_empty() {
-        Some(analysis.primary_language.clone())
-    } else {
-        None
-    };
-
-    let framework = detect_framework(&analysis);
+    let language: Option<String> = None;
+    let framework: Option<String> = None;
 
     info!(
-        "Detected project: name='{}', language={:?}, framework={:?}",
-        project_name, language, framework
+        "Registering project: name='{}' (language/framework will be detected by manager)",
+        project_name
     );
 
     // Create manager client
@@ -132,25 +117,8 @@ async fn add_project(path: &Option<PathBuf>) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Extract project name from path and analysis
-fn extract_project_name(
-    path: &Path,
-    analysis: &crate::commands::analyze::ProjectAnalysis,
-) -> Result<String, CliError> {
-    // Try to get name from Rust project
-    if let Some(rust_info) = &analysis.rust_info {
-        if let Some(package_name) = &rust_info.package_name {
-            return Ok(package_name.clone());
-        }
-    }
-
-    // Try to get name from Node.js project
-    if let Some(node_info) = &analysis.node_info {
-        if let Some(package_name) = &node_info.package_name {
-            return Ok(package_name.clone());
-        }
-    }
-
+/// Extract project name from path (minimal, no deep analysis)
+fn extract_project_name_minimal(path: &Path) -> Result<String, CliError> {
     // Try to get name from Git repository remote URL
     if let Some(git_name) = extract_git_repo_name(path) {
         info!("Using Git repository name: {}", git_name);
@@ -165,6 +133,7 @@ fn extract_project_name(
 }
 
 /// Detect framework from project analysis
+#[cfg(test)]
 fn detect_framework(analysis: &crate::commands::analyze::ProjectAnalysis) -> Option<String> {
     // Check if it's a Rust project
     if let Some(_rust_info) = &analysis.rust_info {
@@ -278,78 +247,13 @@ fn extract_git_repo_name(project_path: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::analyze::{
-        NodeProjectInfo, PackageManager, ProjectAnalysis, ProjectType, RustProjectInfo,
-    };
+    use crate::commands::analyze::{NodeProjectInfo, PackageManager, ProjectAnalysis, ProjectType};
     use std::collections::HashMap;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_extract_project_name_from_rust_project() {
-        let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path();
+    // Removed: project-name-from-analysis tests because CLI now defers analysis to manager
 
-        let rust_info = RustProjectInfo {
-            cargo_toml_path: path.join("Cargo.toml"),
-            is_workspace: false,
-            workspace_members: vec![],
-            package_name: Some("my-rust-app".to_string()),
-            dependencies: vec![],
-            dev_dependencies: vec![],
-            bin_targets: vec![],
-            lib_target: false,
-        };
-
-        let analysis = ProjectAnalysis {
-            project_path: path.to_path_buf(),
-            project_type: ProjectType::RustApplication,
-            rust_info: Some(rust_info),
-            node_info: None,
-            node_projects: vec![],
-            file_count: 5,
-            total_lines: 100,
-            primary_language: "rust".to_string(),
-            languages: HashMap::new(),
-            recommendations: vec![],
-        };
-
-        let name = extract_project_name(path, &analysis).unwrap();
-        assert_eq!(name, "my-rust-app");
-    }
-
-    #[test]
-    fn test_extract_project_name_from_node_project() {
-        let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path();
-
-        let node_info = NodeProjectInfo {
-            package_json_path: path.join("package.json"),
-            package_manager: PackageManager::Npm,
-            package_name: Some("my-node-app".to_string()),
-            version: Some("1.0.0".to_string()),
-            dependencies: vec![],
-            dev_dependencies: vec![],
-            scripts: HashMap::new(),
-            main_entry: Some("index.js".to_string()),
-            has_typescript: false,
-        };
-
-        let analysis = ProjectAnalysis {
-            project_path: path.to_path_buf(),
-            project_type: ProjectType::NodeApplication,
-            rust_info: None,
-            node_info: Some(node_info.clone()),
-            node_projects: vec![node_info],
-            file_count: 5,
-            total_lines: 100,
-            primary_language: "javascript".to_string(),
-            languages: HashMap::new(),
-            recommendations: vec![],
-        };
-
-        let name = extract_project_name(path, &analysis).unwrap();
-        assert_eq!(name, "my-node-app");
-    }
+    // Removed: project-name-from-analysis tests because CLI now defers analysis to manager
 
     #[test]
     fn test_extract_project_name_fallback_to_directory_name() {
@@ -360,20 +264,7 @@ mod tests {
         let project_path = path.join("my-project");
         std::fs::create_dir(&project_path).unwrap();
 
-        let analysis = ProjectAnalysis {
-            project_path: project_path.clone(),
-            project_type: ProjectType::Unknown,
-            rust_info: None,
-            node_info: None,
-            node_projects: vec![],
-            file_count: 1,
-            total_lines: 10,
-            primary_language: "".to_string(),
-            languages: HashMap::new(),
-            recommendations: vec![],
-        };
-
-        let name = extract_project_name(&project_path, &analysis).unwrap();
+        let name = extract_project_name_minimal(&project_path).unwrap();
         assert_eq!(name, "my-project");
     }
 

@@ -117,7 +117,7 @@ const ProjectsCard: Component = () => {
                   </div>
                 </div>
                 <A
-                  href={`/projects/${project.id}/files`}
+                  href={`/projects/${project.id}/work`}
                   class='ml-3 text-sm text-blue-600 hover:text-blue-800 font-medium'
                 >
                   Open
@@ -495,31 +495,6 @@ const Dashboard: Component = () => {
 
       {/* Start AI Session */}
       <StartAiSessionForm />
-
-      {/* Quick actions */}
-      <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-        <h3 class='text-lg font-semibold text-gray-900 mb-4'>Quick Actions</h3>
-        <div class='flex flex-wrap gap-3'>
-          <A
-            href='/projects/create'
-            class='inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700'
-          >
-            Create Project
-          </A>
-          <A
-            href='/projects'
-            class='inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50'
-          >
-            Browse Projects
-          </A>
-          <A
-            href='/ai/sessions'
-            class='inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50'
-          >
-            View AI Sessions
-          </A>
-        </div>
-      </div>
     </div>
   );
 };

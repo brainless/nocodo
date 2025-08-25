@@ -1610,6 +1610,7 @@ dependencies = [
  "tracing-subscriber",
  "ts-rs",
  "uuid",
+ "walkdir",
 ]
 
 [[package]]

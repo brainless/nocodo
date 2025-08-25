@@ -27,7 +27,11 @@ impl Runner {
     }
 
     /// Start executing a session in the background. Returns Ok(()) when spawned successfully.
-    pub async fn start_session(&self, session: AiSession, enhanced_prompt: String) -> anyhow::Result<()> {
+    pub async fn start_session(
+        &self,
+        session: AiSession,
+        enhanced_prompt: String,
+    ) -> anyhow::Result<()> {
         let session_id = session.id.clone();
         let tool = session.tool_name.clone();
 
@@ -48,8 +52,8 @@ impl Runner {
                     let _ = self.db.create_ai_session_output(
                         &session_id,
                         &format!(
-                            "[nocodo runner] Warning: Project directory not found: {}. Running in Manager's CWD.",
-                            project.path
+                            "[nocodo runner] Warning: Project directory not found: {path}. Running in Manager's CWD.",
+                            path = project.path
                         ),
                     );
                 }
@@ -57,8 +61,7 @@ impl Runner {
                 let _ = self.db.create_ai_session_output(
                     &session_id,
                     &format!(
-                        "[nocodo runner] Warning: Unable to load project for id {}. Running in Manager's CWD.",
-                        project_id
+                        "[nocodo runner] Warning: Unable to load project for id {project_id}. Running in Manager's CWD."
                     ),
                 );
             }
@@ -71,9 +74,10 @@ impl Runner {
         let mut child = match cmd.spawn() {
             Ok(child) => child,
             Err(e) => {
-                let _ = self
-                    .db
-                    .create_ai_session_output(&session_id, &format!("Failed to start tool '{cmd_name}': {e}"));
+                let _ = self.db.create_ai_session_output(
+                    &session_id,
+                    &format!("Failed to start tool '{cmd_name}': {e}"),
+                );
                 self.mark_failed(&session_id).await.ok();
                 return Err(anyhow::anyhow!(e));
             }
@@ -162,7 +166,10 @@ impl Runner {
         }
     }
 
-    fn build_command_args(tool: &str, prompt: &str) -> anyhow::Result<(String, Vec<String>, Option<PathBuf>)> {
+    fn build_command_args(
+        tool: &str,
+        prompt: &str,
+    ) -> anyhow::Result<(String, Vec<String>, Option<PathBuf>)> {
         let t = tool.to_lowercase();
         let cmd = match t.as_str() {
             "claude" | "claude-code" => "claude".to_string(),
@@ -178,7 +185,11 @@ impl Runner {
             let mut path = std::env::temp_dir();
             path.push(format!("nocodo_prompt_{}.txt", std::process::id()));
             std::fs::write(&path, prompt)?;
-            return Ok((cmd, vec!["--input".to_string(), path.to_string_lossy().to_string()], Some(path)));
+            return Ok((
+                cmd,
+                vec!["--input".to_string(), path.to_string_lossy().to_string()],
+                Some(path),
+            ));
         }
 
         // Claude generally supports --print with inline prompt
@@ -199,7 +210,11 @@ impl Runner {
         Self::mark_failed_static(&self.db, &self.ws, session_id).await
     }
 
-    async fn mark_completed_static(db: &Arc<Database>, ws: &Arc<WebSocketBroadcaster>, session_id: &str) -> anyhow::Result<()> {
+    async fn mark_completed_static(
+        db: &Arc<Database>,
+        ws: &Arc<WebSocketBroadcaster>,
+        session_id: &str,
+    ) -> anyhow::Result<()> {
         let mut session = db.get_ai_session_by_id(session_id)?;
         session.complete();
         db.update_ai_session(&session)?;
@@ -207,7 +222,11 @@ impl Runner {
         Ok(())
     }
 
-    async fn mark_failed_static(db: &Arc<Database>, ws: &Arc<WebSocketBroadcaster>, session_id: &str) -> anyhow::Result<()> {
+    async fn mark_failed_static(
+        db: &Arc<Database>,
+        ws: &Arc<WebSocketBroadcaster>,
+        session_id: &str,
+    ) -> anyhow::Result<()> {
         let mut session = db.get_ai_session_by_id(session_id)?;
         session.fail();
         db.update_ai_session(&session)?;
@@ -215,4 +234,3 @@ impl Runner {
         Ok(())
     }
 }
-

@@ -39,6 +39,49 @@ impl Project {
     }
 }
 
+/// Component app within a project (e.g., backend API, web frontend, mobile app)
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ProjectComponent {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    /// Path relative to project root
+    pub path: String,
+    pub language: String,
+    pub framework: Option<String>,
+    #[ts(type = "number")]
+    pub created_at: i64,
+}
+
+impl ProjectComponent {
+    pub fn new(
+        project_id: String,
+        name: String,
+        path: String,
+        language: String,
+        framework: Option<String>,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            project_id,
+            name,
+            path,
+            language,
+            framework,
+            created_at: now,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ProjectDetailsResponse {
+    pub project: Project,
+    pub components: Vec<ProjectComponent>,
+}
+
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct CreateProjectRequest {

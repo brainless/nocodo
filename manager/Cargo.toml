@@ -35,6 +35,7 @@ ts-rs = "7.1"
 home = "0.5"
 tokio-stream = { version = "0.1", features = ["net"] }
 handlebars = "4.4"
+walkdir = "2.5"
 
 [dev-dependencies]
 actix-rt = "2.9"
