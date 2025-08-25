@@ -21,6 +21,7 @@ async fn test_health_check() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(
@@ -52,6 +53,7 @@ async fn test_get_projects_empty() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(
@@ -81,6 +83,7 @@ async fn test_create_project() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(
@@ -148,6 +151,7 @@ async fn test_create_project_with_default_path() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(
@@ -215,6 +219,7 @@ async fn test_create_project_invalid_name() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(
@@ -259,6 +264,7 @@ async fn test_get_projects_after_creation() {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
     });
 
     let app = test::init_service(

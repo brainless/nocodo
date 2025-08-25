@@ -131,7 +131,7 @@ impl Runner {
     }
 
     pub async fn send_input(&self, session_id: &str, content: String) -> anyhow::Result<()> {
-        let mut map = self.inputs.lock().await;
+        let map = self.inputs.lock().await;
         if let Some(tx) = map.get(session_id) {
             tx.send(content).await.map_err(|e| anyhow::anyhow!(e))
         } else {
