@@ -128,9 +128,9 @@ describe('AiSessionsList Component', () => {
 
     await waitFor(() => {
       // Use a more flexible matcher for the session count
-      expect(screen.getByText((content, element) => 
-        content.includes('3') && content.includes('session')
-      )).toBeInTheDocument();
+      expect(
+        screen.getByText(content => content.includes('3') && content.includes('session'))
+      ).toBeInTheDocument();
     });
   });
 
