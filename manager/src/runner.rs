@@ -73,7 +73,7 @@ impl Runner {
             Err(e) => {
                 let _ = self
                     .db
-                    .create_ai_session_output(&session_id, &format!("Failed to start tool '{}': {}", cmd_name, e));
+                    .create_ai_session_output(&session_id, &format!("Failed to start tool '{cmd_name}': {e}"));
                 self.mark_failed(&session_id).await.ok();
                 return Err(anyhow::anyhow!(e));
             }
