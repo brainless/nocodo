@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
-import { MemoryRouter, Route, Router } from '@solidjs/router';
+import type { Component } from 'solid-js';
 import AiSessionDetail from '../components/AiSessionDetail';
 import { SessionsProvider } from '../stores/sessionsStore';
 import { apiClient } from '../api';
@@ -54,18 +54,11 @@ const mockSessionWithoutProject: AiSession = {
 };
 
 // Test wrapper component with router
-const TestWrapper = (props: { sessionId?: string }) => {
-  const sessionId = props.sessionId || 'session-123';
-  const initialPath = `/ai/sessions/${sessionId}`;
-
+const TestWrapper: Component<{ sessionId?: string }> = _props => {
   return (
-    <Router>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <SessionsProvider>
-          <Route path='/ai/sessions/:id' component={AiSessionDetail} />
-        </SessionsProvider>
-      </MemoryRouter>
-    </Router>
+    <SessionsProvider>
+      <AiSessionDetail />
+    </SessionsProvider>
   );
 };
 
@@ -114,9 +107,7 @@ describe.skip('AiSessionDetail Component', () => {
     const errorMessage = 'Failed to fetch session';
     (apiClient.getSession as any).mockRejectedValue(new Error(errorMessage));
 
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(screen.getByText('Error')).toBeInTheDocument();
@@ -127,11 +118,7 @@ describe.skip('AiSessionDetail Component', () => {
   test('shows session not found state', async () => {
     (apiClient.getSession as any).mockResolvedValue(null);
 
-    render(() => <AiSessionDetail />, {
-      wrapper: props => (
-        <TestWrapper initialPath='/ai/sessions/nonexistent'>{props.children}</TestWrapper>
-      ),
-    });
+    render(() => <TestWrapper sessionId='nonexistent' />);
 
     await waitFor(() => {
       expect(screen.getByText('Session not found')).toBeInTheDocument();
@@ -140,9 +127,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('renders all session information fields', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       // Check all the information sections
@@ -157,9 +142,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('displays prompt and context correctly', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(screen.getByText('This is a test prompt for the AI session')).toBeInTheDocument();
@@ -168,9 +151,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('shows live status indicator for running sessions', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(screen.getByText('Live updates')).toBeInTheDocument();
@@ -180,11 +161,7 @@ describe.skip('AiSessionDetail Component', () => {
   test('does not show live indicator for completed sessions', async () => {
     (apiClient.getSession as any).mockResolvedValue(mockCompletedSession);
 
-    render(() => <AiSessionDetail />, {
-      wrapper: props => (
-        <TestWrapper initialPath='/ai/sessions/session-456'>{props.children}</TestWrapper>
-      ),
-    });
+    render(() => <TestWrapper sessionId='session-456' />);
 
     await waitFor(() => {
       expect(screen.getByText('completed')).toBeInTheDocument();
@@ -197,11 +174,7 @@ describe.skip('AiSessionDetail Component', () => {
   test('handles session without project', async () => {
     (apiClient.getSession as any).mockResolvedValue(mockSessionWithoutProject);
 
-    render(() => <AiSessionDetail />, {
-      wrapper: props => (
-        <TestWrapper initialPath='/ai/sessions/session-789'>{props.children}</TestWrapper>
-      ),
-    });
+    render(() => <TestWrapper sessionId='session-789' />);
 
     await waitFor(() => {
       expect(screen.getByText('No Project')).toBeInTheDocument();
@@ -212,11 +185,7 @@ describe.skip('AiSessionDetail Component', () => {
   test('shows ended timestamp for completed sessions', async () => {
     (apiClient.getSession as any).mockResolvedValue(mockCompletedSession);
 
-    render(() => <AiSessionDetail />, {
-      wrapper: props => (
-        <TestWrapper initialPath='/ai/sessions/session-456'>{props.children}</TestWrapper>
-      ),
-    });
+    render(() => <TestWrapper sessionId='session-456' />);
 
     await waitFor(() => {
       expect(screen.getByText('Ended')).toBeInTheDocument();
@@ -224,9 +193,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('does not show ended timestamp for running sessions', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(screen.getByText('running')).toBeInTheDocument();
@@ -236,9 +203,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('shows duration with ongoing indicator for running sessions', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(screen.getByText('(ongoing)')).toBeInTheDocument();
@@ -246,9 +211,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('renders status badge with correct styling', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       const statusBadge = screen.getByText('running');
@@ -258,9 +221,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('renders project link when project is available', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       const projectLink = screen.getByRole('link', { name: 'Test Project' });
@@ -270,9 +231,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('renders breadcrumb navigation', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(screen.getByText('AI Sessions')).toBeInTheDocument();
@@ -282,9 +241,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('renders back to sessions link', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       const backLink = screen.getByRole('link', { name: '← Back to Sessions' });
@@ -294,9 +251,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('makes correct API calls on mount', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     // Should call getSession and fetchProject
     await waitFor(() => {
@@ -305,9 +260,7 @@ describe.skip('AiSessionDetail Component', () => {
   });
 
   test('subscribes to live updates for running sessions', async () => {
-    render(() => <AiSessionDetail />, {
-      wrapper: props => <TestWrapper>{props.children}</TestWrapper>,
-    });
+    render(() => <TestWrapper />);
 
     await waitFor(() => {
       expect(apiClient.subscribeSession).toHaveBeenCalledWith(
