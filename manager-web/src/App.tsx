@@ -129,7 +129,7 @@ const TopNavigation: Component = () => {
                       <For each={projects()}>
                         {project => (
                           <A
-                            href={`/projects/${project.id}/files`}
+                            href={`/projects/${project.id}/work`}
                             class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
                           >
                             <div class='font-medium'>{project.name}</div>
@@ -210,6 +210,16 @@ const FilesPageWrapper: Component = () => {
   );
 };
 
+// Project Details Page
+import ProjectDetails from './components/ProjectDetails';
+const ProjectDetailsWrapper: Component = () => {
+  return (
+    <Layout>
+      <ProjectDetails />
+    </Layout>
+  );
+};
+
 // AI Sessions Pages
 const AiSessionsPage: Component = () => {
   return (
@@ -236,6 +246,8 @@ const App: Component = () => {
           <Route path='/' component={DashboardPage} />
           <Route path='/projects' component={ProjectsPage} />
           <Route path='/projects/create' component={CreateProjectPage} />
+          <Route path='/projects/:id' component={ProjectDetailsWrapper} />
+          <Route path='/projects/:id/:tab' component={ProjectDetailsWrapper} />
           <Route path='/projects/:id/files' component={FilesPageWrapper} />
           <Route path='/ai/sessions' component={AiSessionsPage} />
           <Route path='/ai/sessions/:id' component={AiSessionDetailPage} />

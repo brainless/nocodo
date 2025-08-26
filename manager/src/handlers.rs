@@ -12,7 +12,9 @@ use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
-use std::path::Path;
+use serde::Deserialize;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -148,6 +150,21 @@ pub async fn get_project(
     let project_id = path.into_inner();
     let project = data.database.get_project_by_id(&project_id)?;
     let response = ProjectResponse { project };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Detailed project info including detected component apps
+pub async fn get_project_details(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let project_id = path.into_inner();
+    let project = data.database.get_project_by_id(&project_id)?;
+    let components = data.database.get_components_for_project(&project_id)?;
+    let response = crate::models::ProjectDetailsResponse {
+        project,
+        components,
+    };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -359,17 +376,46 @@ pub async fn add_existing_project(
     // Save to database
     data.database.create_project(&project)?;
 
+    // Analyze project to detect language/framework and components
+    let analysis = analyze_project_path(&absolute_path).map_err(AppError::Internal)?;
+
+    // Update project metadata if detected
+    let mut updated_project = project.clone();
+    if updated_project.language.is_none() {
+        updated_project.language = analysis.primary_language;
+    }
+    if updated_project.framework.is_none() {
+        updated_project.framework = analysis.primary_framework;
+    }
+    updated_project.update_timestamp();
+    data.database.update_project(&updated_project)?;
+
+    // Store detected components
+    for comp in analysis.components {
+        // Attach project_id
+        let component = crate::models::ProjectComponent::new(
+            updated_project.id.clone(),
+            comp.name,
+            comp.path,
+            comp.language,
+            comp.framework,
+        );
+        data.database.create_project_component(&component)?;
+    }
+
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
-        .broadcast_project_created(project.clone());
+        .broadcast_project_created(updated_project.clone());
 
     tracing::info!(
         "Successfully registered existing project '{}' at {}",
-        project.name,
-        project.path
+        updated_project.name,
+        updated_project.path
     );
 
-    let response = ProjectResponse { project };
+    let response = ProjectResponse {
+        project: updated_project,
+    };
     Ok(HttpResponse::Created().json(response))
 }
 
@@ -930,6 +976,210 @@ pub async fn check_project_path_conflicts(
     }
 
     Ok(())
+}
+
+/// Simple analysis utilities
+#[derive(Debug, Deserialize)]
+struct PackageJson {
+    name: Option<String>,
+    dependencies: Option<serde_json::Map<String, serde_json::Value>>,
+    #[serde(rename = "devDependencies")]
+    dev_dependencies: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+struct ProjectAnalysisResult {
+    primary_language: Option<String>,
+    primary_framework: Option<String>,
+    components: Vec<crate::models::ProjectComponent>,
+}
+
+fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, String> {
+    // Primary language detection
+    let mut primary_language: Option<String> = None;
+    let mut primary_framework: Option<String> = None;
+    let mut components: Vec<crate::models::ProjectComponent> = Vec::new();
+
+    // Rust detection at root
+    let cargo_root = project_path.join("Cargo.toml");
+    if cargo_root.exists() {
+        primary_language = Some("rust".to_string());
+        // Try to detect Actix, Axum, etc.
+        if let Ok(content) = fs::read_to_string(&cargo_root) {
+            if content.contains("actix-web") {
+                primary_framework = Some("actix-web".to_string());
+            } else if content.contains("axum") {
+                primary_framework = Some("axum".to_string());
+            }
+        }
+    }
+
+    // Node.js detection at root
+    let package_root = project_path.join("package.json");
+    if package_root.exists() {
+        if primary_language.is_none() {
+            primary_language = Some("javascript".to_string());
+        }
+        if let Ok(content) = fs::read_to_string(&package_root) {
+            if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
+                let has_dep = |name: &str| -> bool {
+                    pkg.dependencies
+                        .as_ref()
+                        .map(|m| m.contains_key(name))
+                        .unwrap_or(false)
+                        || pkg
+                            .dev_dependencies
+                            .as_ref()
+                            .map(|m| m.contains_key(name))
+                            .unwrap_or(false)
+                };
+                if has_dep("react") {
+                    primary_framework = Some("react".to_string());
+                } else if has_dep("solid-js") {
+                    primary_framework = Some("solidjs".to_string());
+                } else if has_dep("express") {
+                    primary_framework = Some("express".to_string());
+                }
+            }
+        }
+    }
+
+    // Scan for component apps (Node and Rust) within depth 3
+    let walker = walkdir::WalkDir::new(project_path)
+        .max_depth(4)
+        .into_iter()
+        .filter_entry(|e| {
+            let path = e.path();
+            let p = path.to_string_lossy();
+            // Skip hidden and common build dirs
+            !(p.contains("/node_modules/")
+                || p.contains("/.git/")
+                || p.contains("/dist/")
+                || p.contains("/build/"))
+        });
+
+    // We'll collect candidate package.json and Cargo.toml files not at root
+    let mut node_dirs: Vec<PathBuf> = Vec::new();
+    let mut rust_dirs: Vec<PathBuf> = Vec::new();
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if path == project_path {
+            continue;
+        }
+        if path.file_name().and_then(|n| n.to_str()) == Some("package.json") {
+            node_dirs.push(path.parent().unwrap_or(project_path).to_path_buf());
+        } else if path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml") {
+            rust_dirs.push(path.parent().unwrap_or(project_path).to_path_buf());
+        }
+    }
+
+    // Helper to make relative path
+    let rel = |p: &Path| -> String {
+        p.strip_prefix(project_path)
+            .unwrap_or(p)
+            .to_string_lossy()
+            .trim_start_matches('.')
+            .trim_start_matches('/')
+            .to_string()
+    };
+
+    // Create components for Node projects
+    for dir in node_dirs {
+        let pkg_path = dir.join("package.json");
+        if let Ok(content) = fs::read_to_string(&pkg_path) {
+            if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
+                let name = pkg.name.clone().unwrap_or_else(|| {
+                    dir.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("node-app")
+                        .to_string()
+                });
+                let mut language = "javascript".to_string();
+                let mut framework: Option<String> = None;
+                let has = |n: &str| -> bool {
+                    pkg.dependencies
+                        .as_ref()
+                        .map(|m| m.contains_key(n))
+                        .unwrap_or(false)
+                        || pkg
+                            .dev_dependencies
+                            .as_ref()
+                            .map(|m| m.contains_key(n))
+                            .unwrap_or(false)
+                };
+                if has("typescript") {
+                    language = "typescript".to_string();
+                }
+                if has("react") {
+                    framework = Some("react".to_string());
+                } else if has("solid-js") {
+                    framework = Some("solidjs".to_string());
+                } else if has("express") {
+                    framework = Some("express".to_string());
+                }
+
+                // placeholder project_id will be replaced by caller
+                let component = crate::models::ProjectComponent::new(
+                    "".to_string(),
+                    name,
+                    rel(&dir),
+                    language,
+                    framework,
+                );
+                components.push(component);
+            }
+        }
+    }
+
+    // Create components for Rust projects
+    for dir in rust_dirs {
+        let cargo_path = dir.join("Cargo.toml");
+        if let Ok(content) = fs::read_to_string(&cargo_path) {
+            // try to parse package name
+            let name = content
+                .lines()
+                .find_map(|l| {
+                    let lt = l.trim();
+                    if lt.starts_with("name = ") {
+                        Some(
+                            lt.trim_start_matches("name = ")
+                                .trim_matches('"')
+                                .to_string(),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    dir.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("rust-app")
+                        .to_string()
+                });
+
+            let mut framework: Option<String> = None;
+            if content.contains("actix-web") {
+                framework = Some("actix-web".to_string());
+            } else if content.contains("axum") {
+                framework = Some("axum".to_string());
+            }
+
+            let component = crate::models::ProjectComponent::new(
+                "".to_string(),
+                name,
+                rel(&dir),
+                "rust".to_string(),
+                framework,
+            );
+            components.push(component);
+        }
+    }
+
+    Ok(ProjectAnalysisResult {
+        primary_language,
+        primary_framework,
+        components,
+    })
 }
 
 /// Extract project name from Git repository remote URL if available

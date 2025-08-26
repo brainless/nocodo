@@ -1,5 +1,5 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{AiSession, AiSessionOutput, Project};
+use crate::models::{AiSession, AiSessionOutput, Project, ProjectComponent};
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -73,6 +73,27 @@ impl Database {
                 ended_at INTEGER,
                 FOREIGN KEY (project_id) REFERENCES projects (id)
             )",
+            [],
+        )?;
+
+        // Create project components table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_components (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                path TEXT NOT NULL,
+                language TEXT NOT NULL,
+                framework TEXT,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES projects (id)
+            )",
+            [],
+        )?;
+
+        // Index for project components by project
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_components_project_id ON project_components(project_id)",
             [],
         )?;
 
@@ -262,6 +283,9 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        // First delete components
+        conn.execute("DELETE FROM project_components WHERE project_id = ?", [id])?;
+
         let rows_affected = conn.execute("DELETE FROM projects WHERE id = ?", [id])?;
 
         if rows_affected == 0 {
@@ -270,6 +294,60 @@ impl Database {
 
         tracing::info!("Deleted project: {}", id);
         Ok(())
+    }
+
+    // Project components methods
+    pub fn create_project_component(&self, component: &ProjectComponent) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO project_components (id, project_id, name, path, language, framework, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![
+                component.id,
+                component.project_id,
+                component.name,
+                component.path,
+                component.language,
+                component.framework,
+                component.created_at
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn get_components_for_project(&self, project_id: &str) -> AppResult<Vec<ProjectComponent>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, name, path, language, framework, created_at
+             FROM project_components WHERE project_id = ? ORDER BY created_at ASC",
+        )?;
+
+        let iter = stmt.query_map([project_id], |row| {
+            Ok(ProjectComponent {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                name: row.get(2)?,
+                path: row.get(3)?,
+                language: row.get(4)?,
+                framework: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+
+        let mut components = Vec::new();
+        for item in iter {
+            components.push(item?);
+        }
+        Ok(components)
     }
 
     // AI Session methods
