@@ -128,7 +128,7 @@ Features:
 - Unix socket server for CLI communication
 - RESTful API server for Web app communication
 
-See [MANAGER.md](specs/MANAGER.md) for detailed technical specifications.
+See [MANAGER.md](./MANAGER.md) for detailed technical specifications.
 
 ## nocodo CLI
 
@@ -147,7 +147,7 @@ Features:
 - Code review and validation prompts
 - Testing strategy recommendations
 
-See [NOCODO_CLI.md](specs/NOCODO_CLI.md) for detailed technical specifications.
+See [NOCODO_CLI.md](./NOCODO_CLI.md) for detailed technical specifications.
 
 ## Manager Web app
 
@@ -166,7 +166,7 @@ Features:
 - Version control integration
 - Collaborative project sharing
 
-See [MANAGER_WEB.md](specs/MANAGER_WEB.md) for detailed technical specifications.
+See [MANAGER_WEB.md](./MANAGER_WEB.md) for detailed technical specifications.
 
 ## Overall technical stack preferences
 
