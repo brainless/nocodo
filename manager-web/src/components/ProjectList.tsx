@@ -2,6 +2,7 @@ import { Component, For, createSignal, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
 import { Project } from '../types';
 import { apiClient } from '../api';
+import ProjectCard from './ProjectCard';
 
 interface ProjectListProps {
   onRefresh?: () => void;
@@ -93,83 +94,59 @@ const ProjectList: Component<ProjectListProps> = props => {
 
   return (
     <div class='w-full'>
-      <div class='flex items-center justify-between mb-4'>
-        <h2 class='text-xl font-semibold'>Projects</h2>
+      {/* Action bar without duplicate heading */}
+      <div class='flex justify-between items-center mb-6'>
         <button
           onClick={loadProjects}
-          class='px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600'
+          class='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors'
           disabled={loading()}
         >
           {loading() ? 'Loading...' : 'Refresh'}
         </button>
+        
+        <A
+          href='/projects/create'
+          class='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors'
+        >
+          Create Project
+        </A>
       </div>
 
       {error() && (
-        <div class='mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded'>{error()}</div>
+        <div class='mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg'>{error()}</div>
       )}
 
       {loading() ? (
-        <div class='flex items-center justify-center py-8'>
-          <div class='text-gray-500'>Loading projects...</div>
+        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div class='animate-pulse'>
+              <div class='bg-gray-200 rounded-lg h-48'></div>
+            </div>
+          ))}
         </div>
       ) : projects().length === 0 ? (
-        <div class='text-center py-8 text-gray-500'>
-          <p>No projects found.</p>
-          <p class='text-sm mt-2'>Create your first project to get started!</p>
+        <div class='text-center py-12'>
+          <div class='mx-auto max-w-md'>
+            <div class='text-gray-400 text-6xl mb-4'>📁</div>
+            <h3 class='text-lg font-medium text-gray-900 mb-2'>No projects yet</h3>
+            <p class='text-gray-500 mb-4'>Create your first project to get started with nocodo!</p>
+            <A
+              href='/projects/create'
+              class='inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700'
+            >
+              Create Project
+            </A>
+          </div>
         </div>
       ) : (
-        <div class='space-y-3'>
+        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           <For each={projects()}>
             {project => (
-              <div class='p-4 border border-gray-200 rounded-lg bg-white shadow-sm'>
-                <div class='flex items-start justify-between'>
-                  <div>
-                    <h3 class='font-medium text-lg'>{project.name}</h3>
-                    <p class='text-sm text-gray-600 mt-1'>{project.path}</p>
-                    <div class='flex items-center gap-4 mt-2 text-sm text-gray-500'>
-                      {project.language && (
-                        <span class='bg-blue-100 text-blue-800 px-2 py-1 rounded'>
-                          {project.language}
-                        </span>
-                      )}
-                      {project.framework && (
-                        <span class='bg-green-100 text-green-800 px-2 py-1 rounded'>
-                          {project.framework}
-                        </span>
-                      )}
-                      <span
-                        class={`px-2 py-1 rounded text-xs uppercase font-medium ${
-                          project.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : project.status === 'inactive'
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {project.status}
-                      </span>
-                    </div>
-                    <p class='text-xs text-gray-400 mt-2'>
-                      Created: {new Date(project.created_at * 1000).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div class='flex flex-col space-y-2'>
-                    <A
-                      href={`/projects/${project.id}/work`}
-                      class='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-center'
-                    >
-                      Open
-                    </A>
-                    <button
-                      onClick={() => deleteProject(project.id)}
-                      class='px-3 py-1 text-sm text-red-500 hover:text-red-700 border border-red-500 hover:border-red-700 rounded transition-colors'
-                      title='Delete project'
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ProjectCard 
+                project={project} 
+                showActions={true} 
+                onDelete={deleteProject}
+              />
             )}
           </For>
         </div>

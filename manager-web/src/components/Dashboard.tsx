@@ -3,6 +3,8 @@ import { A, useNavigate } from '@solidjs/router';
 import { Project } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
+import ProjectCard from './ProjectCard';
+import AiSessionCard from './AiSessionCard';
 
 // Utility function to format timestamps
 const formatTimestamp = (timestamp: number): string => {
@@ -15,29 +17,6 @@ const formatTimestamp = (timestamp: number): string => {
   });
 };
 
-// Status badge component for sessions
-const SessionStatusBadge: Component<{ status: string }> = props => {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'running':
-        return 'bg-blue-100 text-blue-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-yellow-100 text-yellow-800';
-    }
-  };
-
-  return (
-    <span class={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(props.status)}`}>
-      {props.status}
-    </span>
-  );
-};
 
 // Projects card component
 const ProjectsCard: Component = () => {
@@ -64,18 +43,23 @@ const ProjectsCard: Component = () => {
   const recentProjects = () => projects().slice(0, 5);
 
   return (
-    <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-      <div class='flex items-center justify-between mb-4'>
-        <h3 class='text-lg font-semibold text-gray-900'>Recent Projects</h3>
+    <div>
+      {/* Section header outside the white box */}
+      <div class='flex items-center justify-between mb-6'>
+        <h2 class='text-xl font-semibold text-gray-900'>Recent Projects</h2>
         <A href='/projects' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
           View all →
         </A>
       </div>
-
+      
+      {/* Project cards grid - no outer container */}
       {loading() ? (
-        <div class='flex items-center justify-center py-8'>
-          <div class='animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500'></div>
-          <span class='ml-2 text-gray-500'>Loading...</span>
+        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+          {[1, 2, 3].map(i => (
+            <div class='animate-pulse'>
+              <div class='bg-gray-200 rounded-xl h-48'></div>
+            </div>
+          ))}
         </div>
       ) : error() ? (
         <div class='text-center py-8'>
@@ -92,43 +76,24 @@ const ProjectsCard: Component = () => {
           </A>
         </div>
       ) : (
-        <div class='space-y-3'>
+        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           <For each={recentProjects()}>
             {project => (
-              <div class='flex items-center justify-between p-3 bg-gray-50 rounded-lg'>
-                <div class='flex-1 min-w-0'>
-                  <p class='font-medium text-gray-900 truncate'>{project.name}</p>
-                  <p class='text-sm text-gray-500 truncate'>{project.path}</p>
-                  <div class='flex items-center space-x-2 mt-1'>
-                    {project.language && (
-                      <span class='text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded'>
-                        {project.language}
-                      </span>
-                    )}
-                    <span
-                      class={`text-xs px-2 py-0.5 rounded ${
-                        project.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {project.status}
-                    </span>
-                  </div>
-                </div>
-                <A
-                  href={`/projects/${project.id}/work`}
-                  class='ml-3 text-sm text-blue-600 hover:text-blue-800 font-medium'
-                >
-                  Open
-                </A>
-              </div>
+              <ProjectCard project={project} />
             )}
           </For>
+          
+          {/* Show more projects if there are more than 5 */}
           {projects().length > 5 && (
-            <div class='text-center pt-2'>
-              <A href='/projects' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
-                +{projects().length - 5} more projects
+            <div class='flex items-center justify-center'>
+              <A 
+                href='/projects' 
+                class='p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-center'
+              >
+                <div class='text-gray-500'>
+                  <span class='text-sm font-medium'>+{projects().length - 5} more projects</span>
+                  <p class='text-xs mt-1'>View all projects</p>
+                </div>
               </A>
             </div>
           )}
@@ -220,7 +185,7 @@ const StartAiSessionForm: Component = () => {
           <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
             <button
               type='button'
-              class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+              class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
               onClick={() => setProjectOpen(!isProjectOpen())}
               aria-haspopup='listbox'
               aria-expanded={isProjectOpen()}
@@ -250,7 +215,7 @@ const StartAiSessionForm: Component = () => {
                 <div class='py-1 max-h-60 overflow-auto' role='listbox'>
                   <div
                     role='option'
-                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
                     onClick={() => {
                       setSelectedProjectId('');
                       setProjectOpen(false);
@@ -262,7 +227,7 @@ const StartAiSessionForm: Component = () => {
                     {p => (
                       <div
                         role='option'
-                        class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer'
+                        class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
                         onClick={() => {
                           setSelectedProjectId(p.id);
                           setProjectOpen(false);
@@ -287,7 +252,7 @@ const StartAiSessionForm: Component = () => {
             <div class='mt-1 relative' ref={(el: HTMLDivElement) => (toolDdRef = el)}>
               <button
                 type='button'
-                class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+                class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
                 onClick={() => setToolOpen(!isToolOpen())}
                 aria-haspopup='listbox'
                 aria-expanded={isToolOpen()}
@@ -314,7 +279,7 @@ const StartAiSessionForm: Component = () => {
                       {t => (
                         <div
                           role='option'
-                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer'
+                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
                           onClick={() => {
                             setToolName(t);
                             setToolOpen(false);
@@ -356,7 +321,7 @@ const StartAiSessionForm: Component = () => {
             id='prompt'
             required
             rows={3}
-            class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-border rounded-md hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring'
             placeholder='Describe what you want the AI tool to do...'
             value={prompt()}
             onInput={e => setPrompt(e.currentTarget.value)}
@@ -413,18 +378,23 @@ const SessionsCard: Component = () => {
   });
 
   return (
-    <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-      <div class='flex items-center justify-between mb-4'>
-        <h3 class='text-lg font-semibold text-gray-900'>Recent AI Sessions</h3>
+    <div>
+      {/* Section header outside the white box */}
+      <div class='flex items-center justify-between mb-6'>
+        <h2 class='text-xl font-semibold text-gray-900'>Recent AI Sessions</h2>
         <A href='/ai/sessions' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
           View all →
         </A>
       </div>
-
+      
+      {/* AI Sessions cards grid - no outer container */}
       {store.loading ? (
-        <div class='flex items-center justify-center py-8'>
-          <div class='animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500'></div>
-          <span class='ml-2 text-gray-500'>Loading...</span>
+        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+          {[1, 2, 3].map(i => (
+            <div class='animate-pulse'>
+              <div class='bg-gray-200 rounded-lg h-48'></div>
+            </div>
+          ))}
         </div>
       ) : store.error ? (
         <div class='text-center py-8'>
@@ -432,38 +402,38 @@ const SessionsCard: Component = () => {
         </div>
       ) : store.list.length === 0 ? (
         <div class='text-center py-8'>
-          <p class='text-gray-500 text-sm mb-3'>No AI sessions yet</p>
-          <p class='text-xs text-gray-400'>Start your first session using the nocodo CLI</p>
+          <div class='mx-auto max-w-md'>
+            <div class='text-gray-400 text-6xl mb-4'>🤖</div>
+            <h3 class='text-lg font-medium text-gray-900 mb-2'>No AI sessions yet</h3>
+            <p class='text-gray-500 mb-4'>Start your first session using the nocodo CLI</p>
+          </div>
         </div>
       ) : (
-        <div class='space-y-3'>
+        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           <For each={recentSessions()}>
-            {session => (
-              <A
-                href={`/ai/sessions/${session.id}`}
-                class='block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors'
-              >
-                <div class='flex items-start justify-between'>
-                  <div class='flex-1 min-w-0'>
-                    <div class='flex items-center space-x-2 mb-1'>
-                      <span class='text-sm font-medium text-gray-900'>{session.tool_name}</span>
-                      <SessionStatusBadge status={session.status} />
-                    </div>
-                    <p class='text-sm text-gray-600 truncate mb-1'>{session.prompt}</p>
-                    <div class='flex items-center space-x-3 text-xs text-gray-500'>
-                      <span>{getProjectName(session.project_id ?? undefined)}</span>
-                      <span>•</span>
-                      <span>{formatTimestamp(session.started_at)}</span>
-                    </div>
-                  </div>
-                </div>
-              </A>
-            )}
+            {session => {
+              const project = projects().find(p => p.id === session.project_id);
+              return (
+                <AiSessionCard 
+                  session={session} 
+                  project={project} 
+                  showPrompt={true} 
+                />
+              );
+            }}
           </For>
+          
+          {/* Show more sessions if there are more than 5 */}
           {store.list.length > 5 && (
-            <div class='text-center pt-2'>
-              <A href='/ai/sessions' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
-                +{store.list.length - 5} more sessions
+            <div class='flex items-center justify-center'>
+              <A 
+                href='/ai/sessions' 
+                class='p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-center'
+              >
+                <div class='text-gray-500'>
+                  <span class='text-sm font-medium'>+{store.list.length - 5} more sessions</span>
+                  <p class='text-xs mt-1'>View all sessions</p>
+                </div>
               </A>
             </div>
           )}
@@ -476,22 +446,12 @@ const SessionsCard: Component = () => {
 // Main Dashboard component
 const Dashboard: Component = () => {
   return (
-    <div class='space-y-6'>
-      {/* Welcome header */}
-      <div class='bg-white border-b border-gray-200 -mx-6 -mt-6 px-6 pt-6 pb-4'>
-        <div class='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-          <div>
-            <h1 class='text-3xl font-bold text-gray-900'>Dashboard</h1>
-            <p class='mt-1 text-sm text-gray-600'>Overview of your projects and AI sessions</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Dashboard cards */}
-      <div class='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-        <ProjectsCard />
-        <SessionsCard />
-      </div>
+    <div class='space-y-8'>
+      {/* Recent Projects - stacked vertically */}
+      <ProjectsCard />
+      
+      {/* Recent AI Sessions - stacked vertically */}
+      <SessionsCard />
 
       {/* Start AI Session */}
       <StartAiSessionForm />
