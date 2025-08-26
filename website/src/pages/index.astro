@@ -6,37 +6,37 @@ import Card from '../components/UI/Card.astro';
 const solutionPoints = [
   {
     title: "Free AI Coding Agents",
-    description: "Uses Claude Code, OpenAI Codex, Gemini or similar - use free tiers automatically!",
+    description: "Automatically use free tiers from Claude Code, OpenAI Codex, Gemini and similar tools",
     icon: "🤖",
     color: "blue"
   },
   {
     title: "Your Cloud Infrastructure",
-    description: "Your development setup is managed by nocodo on your cloud infra",
+    description: "Development setup managed on your own cloud infrastructure",
     icon: "☁️",
     color: "purple"
   },
   {
     title: "No Lock-in",
-    description: "Your API keys for coding agents and cloud infra (DigitalOcean, Scaleway, CloudFlare) - no lock-in!",
+    description: "Keep your API keys for coding agents and cloud providers (DigitalOcean, Scaleway, CloudFlare)",
     icon: "🔓",
     color: "green"
   },
   {
     title: "Idea to Live App",
-    description: "Takes your idea (voice notes or written text) to live full-stack app on your domain",
+    description: "Transform voice notes or written text into live full-stack apps on your domain",
     icon: "🚀",
     color: "orange"
   },
   {
     title: "GitHub Integration",
-    description: "Uses your GitHub account to setup a project, tickets, automation, tests",
+    description: "Automated project setup with tickets, automation, and comprehensive testing",
     icon: "📱",
     color: "indigo"
   },
   {
     title: "Unlimited Changes",
-    description: "Unlimited change requests - use your API credits or subscriptions",
+    description: "Make endless modifications using your own API credits or subscriptions",
     icon: "♾️",
     color: "red"
   }
@@ -128,13 +128,14 @@ const solutionPoints = [
       <div class="grid lg:grid-cols-3 gap-8">
         {solutionPoints.map((point) => (
           <Card 
-            title={point.title}
-            description={point.description}
             hover={true}
-            class={`border-t-4 border-${point.color}-500`}
+            class={`border-t-4 border-${point.color}-500 text-center`}
           >
-            <!-- Icon -->
-            <div class="text-4xl mb-4">{point.icon}</div>
+            <!-- Icon centered above title -->
+            <div class="text-5xl mb-4">{point.icon}</div>
+            
+            <!-- Title -->
+            <h3 class="text-xl font-bold text-gray-900 mb-4">{point.title}</h3>
             
             <!-- Description -->
             <div class="mb-6">
