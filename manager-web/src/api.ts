@@ -50,6 +50,10 @@ class ApiClient {
     return response.project;
   }
 
+  async fetchProjectDetails(id: string): Promise<{ project: Project; components: any[] }> {
+    return this.request(`/projects/${id}/details`);
+  }
+
   async createProject(data: CreateProjectRequest): Promise<Project> {
     return this.request('/projects', {
       method: 'POST',

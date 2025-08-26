@@ -36,9 +36,9 @@ const CreateProjectForm: Component<CreateProjectFormProps> = props => {
 
       const projectData: CreateProjectRequest = {
         name: data.name.trim(),
-        path: null, // Let backend determine path
-        language: data.language || null,
-        framework: data.framework || null,
+        path: data.path && data.path.trim() ? data.path.trim() : null,
+        language: null, // manager will detect
+        framework: null,
         template: null,
       };
 
@@ -79,37 +79,19 @@ const CreateProjectForm: Component<CreateProjectFormProps> = props => {
         </div>
 
         <div>
-          <label class='block text-sm font-medium text-gray-700 mb-1'>Language (Optional)</label>
-          <select
-            value={formData().language || ''}
-            onChange={e => updateFormData('language', e.currentTarget.value)}
+          <label class='block text-sm font-medium text-gray-700 mb-1'>
+            Project Path (Full path)
+          </label>
+          <input
+            type='text'
+            value={formData().path || ''}
+            onInput={e => updateFormData('path', e.currentTarget.value)}
             class='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-          >
-            <option value=''>Select language...</option>
-            <option value='rust'>Rust</option>
-            <option value='typescript'>TypeScript</option>
-            <option value='python'>Python</option>
-            <option value='go'>Go</option>
-            <option value='javascript'>JavaScript</option>
-          </select>
-        </div>
-
-        <div>
-          <label class='block text-sm font-medium text-gray-700 mb-1'>Framework (Optional)</label>
-          <select
-            value={formData().framework || ''}
-            onChange={e => updateFormData('framework', e.currentTarget.value)}
-            class='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-          >
-            <option value=''>Select framework...</option>
-            <option value='actix-web'>Actix Web</option>
-            <option value='solidjs'>SolidJS</option>
-            <option value='fastapi'>FastAPI</option>
-            <option value='gin'>Gin</option>
-            <option value='express'>Express</option>
-            <option value='react'>React</option>
-            <option value='vue'>Vue</option>
-          </select>
+            placeholder='/home/me/Projects/my-awesome-project'
+          />
+          <p class='text-xs text-gray-500 mt-1'>
+            Leave blank to let manager choose a default path.
+          </p>
         </div>
 
         {error() && (

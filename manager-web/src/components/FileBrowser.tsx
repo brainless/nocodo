@@ -6,6 +6,7 @@ interface FileBrowserProps {
   projectId: string;
   projectName?: string;
   onFileSelect?: (file: FileInfo) => void;
+  hideDelete?: boolean; // hide actions column (delete)
 }
 
 const FileBrowser: Component<FileBrowserProps> = props => {
@@ -207,9 +208,11 @@ const FileBrowser: Component<FileBrowserProps> = props => {
                 <th class='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase'>
                   Modified
                 </th>
-                <th class='px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase'>
-                  Actions
-                </th>
+                {!props.hideDelete && (
+                  <th class='px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase'>
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody class='divide-y divide-gray-200'>
@@ -233,14 +236,16 @@ const FileBrowser: Component<FileBrowserProps> = props => {
                     <td class='px-4 py-2 text-sm text-gray-600'>
                       {formatDate(file.modified_at ?? Date.now() / 1000)}
                     </td>
-                    <td class='px-4 py-2 text-right'>
-                      <button
-                        onClick={() => deleteFile(file)}
-                        class='text-sm text-red-600 hover:text-red-800 transition-colors'
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {!props.hideDelete && (
+                      <td class='px-4 py-2 text-right'>
+                        <button
+                          onClick={() => deleteFile(file)}
+                          class='text-sm text-red-600 hover:text-red-800 transition-colors'
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 )}
               </For>

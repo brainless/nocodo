@@ -159,9 +159,11 @@ const OutputPanel: Component<{ sessionId: string }> = props => {
           when={outputs.get().length > 0}
           fallback={<div class='text-gray-400'>No output yet</div>}
         >
-          <For each={outputs.get()}>{chunk => (
-            <div class={chunk.stream === 'stderr' ? 'text-red-400' : ''}>{chunk.content}</div>
-          )}</For>
+          <For each={outputs.get()}>
+            {chunk => (
+              <div class={chunk.stream === 'stderr' ? 'text-red-400' : ''}>{chunk.content}</div>
+            )}
+          </For>
         </Show>
       </div>
     </div>
