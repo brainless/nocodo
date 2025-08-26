@@ -111,10 +111,7 @@ const TopNavigation: Component = () => {
             {isDropdownOpen() && (
               <div class='absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-10'>
                 <div class='py-1'>
-                  <A
-                    href='/projects'
-                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted'
-                  >
+                  <A href='/projects' class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted'>
                     All Projects
                   </A>
                   <A
@@ -176,15 +173,11 @@ const Layout: Component<LayoutProps> = props => {
         {/* Page heading outside the white content box */}
         {(props.title || props.subtitle) && (
           <div class='mb-8'>
-            {props.title && (
-              <h1 class='text-3xl font-bold text-gray-900 mb-2'>{props.title}</h1>
-            )}
-            {props.subtitle && (
-              <p class='text-gray-600'>{props.subtitle}</p>
-            )}
+            {props.title && <h1 class='text-3xl font-bold text-gray-900 mb-2'>{props.title}</h1>}
+            {props.subtitle && <p class='text-gray-600'>{props.subtitle}</p>}
           </div>
         )}
-        
+
         {/* Conditional white content box */}
         {props.noBox ? (
           props.children
@@ -240,7 +233,7 @@ import ProjectDetails from './components/ProjectDetails';
 const ProjectDetailsWrapper: Component = () => {
   const params = useParams();
   const [project, setProject] = createSignal<Project | null>(null);
-  
+
   // Load project data to get the title
   onMount(async () => {
     try {
@@ -255,10 +248,7 @@ const ProjectDetailsWrapper: Component = () => {
   });
 
   return (
-    <Layout 
-      title={project()?.name || 'Project'} 
-      subtitle='Project Dashboard'
-    >
+    <Layout title={project()?.name || 'Project'} subtitle='Project Dashboard'>
       <ProjectDetails />
     </Layout>
   );

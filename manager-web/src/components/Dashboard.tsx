@@ -6,18 +6,6 @@ import { useSessions } from '../stores/sessionsStore';
 import ProjectCard from './ProjectCard';
 import AiSessionCard from './AiSessionCard';
 
-// Utility function to format timestamps
-const formatTimestamp = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-
 // Projects card component
 const ProjectsCard: Component = () => {
   const [projects, setProjects] = createSignal<Project[]>([]);
@@ -51,11 +39,11 @@ const ProjectsCard: Component = () => {
           View all →
         </A>
       </div>
-      
+
       {/* Project cards grid - no outer container */}
       {loading() ? (
         <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3].map(() => (
             <div class='animate-pulse'>
               <div class='bg-gray-200 rounded-xl h-48'></div>
             </div>
@@ -77,17 +65,13 @@ const ProjectsCard: Component = () => {
         </div>
       ) : (
         <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          <For each={recentProjects()}>
-            {project => (
-              <ProjectCard project={project} />
-            )}
-          </For>
-          
+          <For each={recentProjects()}>{project => <ProjectCard project={project} />}</For>
+
           {/* Show more projects if there are more than 5 */}
           {projects().length > 5 && (
             <div class='flex items-center justify-center'>
-              <A 
-                href='/projects' 
+              <A
+                href='/projects'
                 class='p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-center'
               >
                 <div class='text-gray-500'>
@@ -362,12 +346,6 @@ const SessionsCard: Component = () => {
     }
   };
 
-  const getProjectName = (projectId?: string) => {
-    if (!projectId) return 'No Project';
-    const project = projects().find(p => p.id === projectId);
-    return project?.name || `Project ${projectId}`;
-  };
-
   const recentSessions = () => {
     return [...store.list].sort((a, b) => b.started_at - a.started_at).slice(0, 5);
   };
@@ -386,11 +364,11 @@ const SessionsCard: Component = () => {
           View all →
         </A>
       </div>
-      
+
       {/* AI Sessions cards grid - no outer container */}
       {store.loading ? (
         <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3].map(() => (
             <div class='animate-pulse'>
               <div class='bg-gray-200 rounded-lg h-48'></div>
             </div>
@@ -413,21 +391,15 @@ const SessionsCard: Component = () => {
           <For each={recentSessions()}>
             {session => {
               const project = projects().find(p => p.id === session.project_id);
-              return (
-                <AiSessionCard 
-                  session={session} 
-                  project={project} 
-                  showPrompt={true} 
-                />
-              );
+              return <AiSessionCard session={session} project={project} showPrompt={true} />;
             }}
           </For>
-          
+
           {/* Show more sessions if there are more than 5 */}
           {store.list.length > 5 && (
             <div class='flex items-center justify-center'>
-              <A 
-                href='/ai/sessions' 
+              <A
+                href='/ai/sessions'
                 class='p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-center'
               >
                 <div class='text-gray-500'>
@@ -449,7 +421,7 @@ const Dashboard: Component = () => {
     <div class='space-y-8'>
       {/* Recent Projects - stacked vertically */}
       <ProjectsCard />
-      
+
       {/* Recent AI Sessions - stacked vertically */}
       <SessionsCard />
 

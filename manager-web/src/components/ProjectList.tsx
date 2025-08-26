@@ -103,7 +103,7 @@ const ProjectList: Component<ProjectListProps> = props => {
         >
           {loading() ? 'Loading...' : 'Refresh'}
         </button>
-        
+
         <A
           href='/projects/create'
           class='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors'
@@ -113,12 +113,14 @@ const ProjectList: Component<ProjectListProps> = props => {
       </div>
 
       {error() && (
-        <div class='mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg'>{error()}</div>
+        <div class='mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg'>
+          {error()}
+        </div>
       )}
 
       {loading() ? (
         <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          {[1, 2, 3, 4, 5, 6].map(i => (
+          {[1, 2, 3, 4, 5, 6].map(() => (
             <div class='animate-pulse'>
               <div class='bg-gray-200 rounded-lg h-48'></div>
             </div>
@@ -142,11 +144,7 @@ const ProjectList: Component<ProjectListProps> = props => {
         <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           <For each={projects()}>
             {project => (
-              <ProjectCard 
-                project={project} 
-                showActions={true} 
-                onDelete={deleteProject}
-              />
+              <ProjectCard project={project} showActions={true} onDelete={deleteProject} />
             )}
           </For>
         </div>

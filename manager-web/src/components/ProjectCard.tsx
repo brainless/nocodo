@@ -8,7 +8,7 @@ interface ProjectCardProps {
   onDelete?: (id: string) => void;
 }
 
-const ProjectCard: Component<ProjectCardProps> = (props) => {
+const ProjectCard: Component<ProjectCardProps> = props => {
   // Icon color based on language/status
   const getProjectIconColor = (language?: string | null) => {
     switch (language) {
@@ -45,13 +45,25 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
       <A href={`/projects/${props.project.id}/work`} class='block'>
         <div class='flex items-start justify-between mb-4'>
           {/* Project icon */}
-          <div class={`w-10 h-10 bg-gradient-to-br ${getProjectIconColor(props.project.language)} rounded-lg flex items-center justify-center`}>
+          <div
+            class={`w-10 h-10 bg-gradient-to-br ${getProjectIconColor(props.project.language)} rounded-lg flex items-center justify-center`}
+          >
             <svg class='h-5 w-5 text-white' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-              <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z' />
-              <path stroke-linecap='round' stroke-linejoin='round' stroke-width={2} d='M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z' />
+              <path
+                stroke-linecap='round'
+                stroke-linejoin='round'
+                stroke-width={2}
+                d='M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z'
+              />
+              <path
+                stroke-linecap='round'
+                stroke-linejoin='round'
+                stroke-width={2}
+                d='M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z'
+              />
             </svg>
           </div>
-          
+
           <div class='flex items-center space-x-2'>
             {/* Language badge */}
             {props.project.language && (
@@ -59,7 +71,7 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
                 {props.project.language}
               </span>
             )}
-            
+
             {/* Framework badge */}
             {props.project.framework && (
               <span class='px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium'>
@@ -68,17 +80,15 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
             )}
           </div>
         </div>
-        
+
         {/* Project name */}
-        <h3 class='font-semibold text-gray-900 mb-2'>
-          {props.project.name}
-        </h3>
-        
+        <h3 class='font-semibold text-gray-900 mb-2'>{props.project.name}</h3>
+
         {/* Project path (as description) */}
         <p class='text-sm text-gray-600 mb-4 truncate' title={props.project.path}>
           {props.project.path}
         </p>
-        
+
         {/* Project metadata */}
         <div class='flex items-center justify-between text-xs text-gray-500'>
           <span>Modified {formatDate(props.project.updated_at)}</span>
