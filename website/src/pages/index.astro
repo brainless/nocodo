@@ -3,40 +3,49 @@ import Layout from '../layouts/Layout.astro';
 import Button from '../components/UI/Button.astro';
 import Card from '../components/UI/Card.astro';
 
-const learningPaths = [
+const solutionPoints = [
   {
-    title: "Software Engineering Fundamentals",
-    description: "Master the core concepts before diving into AI-assisted development",
-    topics: ["Git & Version Control", "CI/CD Pipelines", "Testing", "Code Quality"],
-    href: "/fundamentals",
-    icon: "⚡",
-    color: "blue",
-    order: 1
-  },
-  {
-    title: "AI-Assisted Development", 
-    description: "Learn to leverage AI tools effectively in your development workflow",
-    topics: ["AI Agents Overview", "Documentation Workflows", "Project Management"],
-    href: "/ai-development",
+    title: "Free AI Coding Agents",
+    description: "Automatically use free tiers from Claude Code, OpenAI Codex, Gemini and similar tools",
     icon: "🤖",
-    color: "purple", 
-    order: 2
+    color: "blue"
   },
   {
-    title: "AI Coding Agents",
-    description: "Master Claude Code and other AI coding agents for maximum productivity",
-    topics: ["Claude Code", "GitHub Copilot", "Workflow Optimization"],
-    href: "/coding-agents", 
+    title: "Your Cloud Infrastructure",
+    description: "Development setup managed on your own cloud infrastructure",
+    icon: "☁️",
+    color: "purple"
+  },
+  {
+    title: "No Lock-in",
+    description: "Keep your API keys for coding agents and cloud providers (DigitalOcean, Scaleway, CloudFlare)",
+    icon: "🔓",
+    color: "green"
+  },
+  {
+    title: "Idea to Live App",
+    description: "Transform voice notes or written text into live full-stack apps on your domain",
     icon: "🚀",
-    color: "indigo",
-    order: 3
+    color: "orange"
+  },
+  {
+    title: "GitHub Integration",
+    description: "Automated project setup with tickets, automation, and comprehensive testing",
+    icon: "📱",
+    color: "indigo"
+  },
+  {
+    title: "Unlimited Changes",
+    description: "Make endless modifications using your own API credits or subscriptions",
+    icon: "♾️",
+    color: "red"
   }
 ];
 ---
 
 <Layout 
-  title="nocodo - Learn Software Engineering Fundamentals Before AI" 
-  description="Master software engineering fundamentals before leveraging AI coding agents. Learn Git, CI/CD, testing, and AI-assisted development through structured modules."
+  title="nocodo - A platform that takes you from idea to live full-stack MVP (no lock-in)" 
+  description="nocodo is a platform that takes you from idea to live full-stack MVP with no lock-in. Use free AI coding agents, your cloud infrastructure, and unlimited change requests."
 >
   <!-- Hero Section -->
   <section class="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -63,12 +72,92 @@ const learningPaths = [
         
         <!-- Tagline -->
         <p class="text-xl sm:text-2xl text-gray-600 max-w-4xl mx-auto mb-8 leading-relaxed">
-          A structured approach to software engineering with 
-          <strong class="text-gray-900">AI coding agents</strong>
+          A platform that takes you from idea to live full-stack MVP 
+          <strong class="text-gray-900">(no lock-in)</strong>
         </p>
         
         <!-- Call to Action -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+          <Button 
+            href="/playbook"
+            variant="primary"
+            size="lg"
+          >
+            Get Started
+            <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </Button>
+          <Button 
+            href="/fundamentals"
+            variant="secondary"
+            size="lg"
+          >
+            Learn Fundamentals
+          </Button>
+        </div>
+        
+        <!-- Product Screenshot -->
+        <div class="max-w-5xl mx-auto">
+          <div class="relative">
+            <img 
+              src="/src/assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png" 
+              alt="nocodo AI Session Details - Live output from AI coding session showing project analysis and development workflow"
+              class="w-full rounded-lg shadow-2xl border border-gray-200"
+            />
+            <!-- Optional overlay for better visual effect -->
+            <div class="absolute inset-0 rounded-lg ring-1 ring-inset ring-black/10"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What are we solving Section -->
+  <section class="py-24 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          What are we solving?
+        </h2>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+          Transform your development workflow with AI coding agents and seamless infrastructure management
+        </p>
+      </div>
+      
+      <div class="grid lg:grid-cols-3 gap-8">
+        {solutionPoints.map((point) => (
+          <Card 
+            hover={true}
+            class={`border-t-4 border-${point.color}-500 text-center`}
+          >
+            <!-- Icon centered above title -->
+            <div class="text-5xl mb-4">{point.icon}</div>
+            
+            <!-- Title -->
+            <h3 class="text-xl font-bold text-gray-900 mb-4">{point.title}</h3>
+            
+            <!-- Description -->
+            <div class="mb-6">
+              <p class="text-gray-600">{point.description}</p>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Our Vibe Coding Playbook Section -->
+  <section class="py-24 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="text-4xl font-bold text-gray-900 mb-6">
+          Our Vibe Coding Playbook
+        </h2>
+        <p class="text-xl text-gray-600 mb-8">
+          A comprehensive guide to building MVP web applications using terminal-based coding tools and structured prompting flows. Learn our proven methodology for vibe coding where you become the Product Owner and Project Manager.
+        </p>
+        <div class="inline-flex">
           <Button 
             href="/playbook"
             variant="primary"
@@ -79,102 +168,20 @@ const learningPaths = [
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
             </svg>
           </Button>
-          <Button 
-            href="/fundamentals"
-            variant="secondary"
-            size="lg"
-          >
-            Start Learning
-          </Button>
-        </div>
-        
-        <!-- Quick Stats -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-3xl mx-auto">
-          <div class="text-center">
-            <div class="text-3xl font-bold text-blue-600 mb-2">3</div>
-            <div class="text-gray-600">Learning Modules</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl font-bold text-purple-600 mb-2">10+</div>
-            <div class="text-gray-600">Comprehensive Topics</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl font-bold text-indigo-600 mb-2">∞</div>
-            <div class="text-gray-600">AI-Enhanced Productivity</div>
-          </div>
         </div>
       </div>
     </div>
   </section>
-
-  <!-- Fundamentals Section -->
-  <section class="py-24 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold text-gray-900 mb-4">
-          Fundamentals
-        </h2>
-        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          Build your foundation from software engineering fundamentals to AI-powered development mastery
-        </p>
-      </div>
-      
-      <div class="grid lg:grid-cols-3 gap-8">
-        {learningPaths.map((path) => (
-          <Card 
-            title={path.title}
-            description={path.description}
-            hover={true}
-            class={`border-t-4 border-${path.color}-500`}
-          >
-            <!-- Order Badge -->
-            <div class={`absolute -top-4 left-8 w-8 h-8 bg-${path.color}-500 text-white rounded-full flex items-center justify-center text-sm font-bold`}>
-              {path.order}
-            </div>
-            
-            <!-- Icon -->
-            <div class="text-4xl mb-4">{path.icon}</div>
-            
-            <!-- Topics Preview -->
-            <div class="mb-6">
-              <h4 class="text-sm font-semibold text-gray-900 mb-3">Key Topics:</h4>
-              <div class="flex flex-wrap gap-2">
-                {path.topics.map(topic => (
-                  <span class={`px-3 py-1 text-xs font-medium bg-${path.color}-100 text-${path.color}-800 rounded-full`}>
-                    {topic}
-                  </span>
-                ))}
-              </div>
-            </div>
-            
-            <div slot="footer">
-              <Button 
-                href={path.href}
-                variant="primary"
-                class="w-full"
-              >
-                Start Module
-                <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  </section>
-
 
   <!-- Getting Started Section -->
   <section class="py-24 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16">
         <h2 class="text-4xl font-bold text-gray-900 mb-4">
-          Ready to Start Your Journey?
+          Vibe Coding Fundamentals
         </h2>
         <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          Join thousands of developers transforming their workflow with AI while maintaining the highest standards of software craftsmanship
+          Master the essential fundamentals for AI-powered development and build a solid foundation for your coding journey
         </p>
       </div>
       
@@ -228,21 +235,21 @@ const learningPaths = [
             variant="primary"
             size="lg"
           >
-            Begin Your Journey
+            Learn Fundamentals
             <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
             </svg>
           </Button>
           <Button 
-            href="/resources"
+            href="/playbook"
             variant="secondary"
             size="lg"
           >
-            Browse Resources
+            Read Playbook
           </Button>
         </div>
         <p class="mt-4 text-sm text-gray-500">
-          Free to learn • No signup required • Community-driven
+          Free to learn • Community-driven • No lock-in
         </p>
       </div>
     </div>
