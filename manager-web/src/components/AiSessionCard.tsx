@@ -1,7 +1,7 @@
 import { Component, Show } from 'solid-js';
 import { A } from '@solidjs/router';
 import { AiSession, AiSessionStatus, Project } from '../types';
-import { StatusBadge, ToolIcon, ProjectBadge } from './SessionRow';
+import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 
 interface AiSessionCardProps {
   session: AiSession;
@@ -45,17 +45,17 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
   return `${seconds}s`;
 };
 
-const AiSessionCard: Component<AiSessionCardProps> = (props) => {
+const AiSessionCard: Component<AiSessionCardProps> = props => {
   return (
     <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow'>
       <A href={`/ai/sessions/${props.session.id}`} class='block'>
         {/* Header row with status and tool */}
         <div class='flex items-center justify-between mb-4'>
           <div class='flex items-center space-x-3'>
-            <StatusBadge 
-              status={props.session.status as AiSessionStatus} 
-              size='sm' 
-              showIcon={true} 
+            <StatusBadge
+              status={props.session.status as AiSessionStatus}
+              size='sm'
+              showIcon={true}
             />
             <ToolIcon toolName={props.session.tool_name} />
           </div>
@@ -77,7 +77,8 @@ const AiSessionCard: Component<AiSessionCardProps> = (props) => {
           />
           <div class='text-xs text-gray-500'>
             <span title='Session duration'>
-              Duration: {formatDuration(props.session.started_at, props.session.ended_at ?? undefined)}
+              Duration:{' '}
+              {formatDuration(props.session.started_at, props.session.ended_at ?? undefined)}
               <Show when={!props.session.ended_at}>
                 <span class='text-blue-600'> (ongoing)</span>
               </Show>

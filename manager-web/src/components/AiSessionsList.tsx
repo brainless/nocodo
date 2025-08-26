@@ -213,13 +213,7 @@ const AiSessionsList: Component = () => {
           <For each={filteredSessions()}>
             {session => {
               const project = projects().find(p => p.id === session.project_id);
-              return (
-                <AiSessionCard 
-                  session={session} 
-                  project={project} 
-                  showPrompt={true} 
-                />
-              );
+              return <AiSessionCard session={session} project={project} showPrompt={true} />;
             }}
           </For>
         </div>

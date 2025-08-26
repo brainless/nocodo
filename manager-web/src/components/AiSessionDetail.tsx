@@ -6,12 +6,6 @@ import { useSessionOutputs, useSessions } from '../stores/sessionsStore';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 import SessionTimeline from './SessionTimeline';
 
-// Utility function to format timestamps
-const formatTimestamp = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleString();
-};
-
 // Utility function to format duration
 const formatDuration = (startedAt: number, endedAt?: number): string => {
   const start = new Date(startedAt * 1000);
