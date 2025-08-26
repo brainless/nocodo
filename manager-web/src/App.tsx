@@ -1,5 +1,5 @@
 import { Component, For, createSignal, onMount } from 'solid-js';
-import { A, Route, Router } from '@solidjs/router';
+import { A, Route, Router, useParams } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
 import ProjectFilesPage from './components/ProjectFilesPage';
@@ -94,7 +94,7 @@ const TopNavigation: Component = () => {
           {/* Project dropdown */}
           <div class='relative' ref={dropdownRef}>
             <button
-              class='flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+              class='flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
               onClick={() => setIsDropdownOpen(!isDropdownOpen())}
             >
               <span>Projects</span>
@@ -113,13 +113,13 @@ const TopNavigation: Component = () => {
                 <div class='py-1'>
                   <A
                     href='/projects'
-                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted'
                   >
                     All Projects
                   </A>
                   <A
                     href='/projects/create'
-                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted'
                   >
                     Create New Project
                   </A>
@@ -130,7 +130,7 @@ const TopNavigation: Component = () => {
                         {project => (
                           <A
                             href={`/projects/${project.id}/work`}
-                            class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                            class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted'
                           >
                             <div class='font-medium'>{project.name}</div>
                             <div class='text-xs text-gray-500'>{project.language || 'Unknown'}</div>
@@ -149,7 +149,7 @@ const TopNavigation: Component = () => {
         <div class='flex items-center'>
           <A
             href='/ai/sessions'
-            class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md border border-gray-300'
+            class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
           >
             Sessions
           </A>
@@ -159,15 +159,40 @@ const TopNavigation: Component = () => {
   );
 };
 
-// Layout component with new navigation structure
-const Layout: Component<{ children: any }> = props => {
+// Layout component with page heading support outside white content box
+interface LayoutProps {
+  children: any;
+  title?: string;
+  subtitle?: string;
+  noBox?: boolean; // Skip the outer white content box
+}
+
+const Layout: Component<LayoutProps> = props => {
   return (
-    <div class='min-h-screen bg-gray-50 pb-12'>
-      {' '}
+    <div class='min-h-screen bg-background pb-12'>
       {/* pb-12 for status bar space */}
       <TopNavigation />
       <main class='container mx-auto px-4 py-8'>
-        <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>{props.children}</div>
+        {/* Page heading outside the white content box */}
+        {(props.title || props.subtitle) && (
+          <div class='mb-8'>
+            {props.title && (
+              <h1 class='text-3xl font-bold text-gray-900 mb-2'>{props.title}</h1>
+            )}
+            {props.subtitle && (
+              <p class='text-gray-600'>{props.subtitle}</p>
+            )}
+          </div>
+        )}
+        
+        {/* Conditional white content box */}
+        {props.noBox ? (
+          props.children
+        ) : (
+          <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
+            {props.children}
+          </div>
+        )}
       </main>
       <StatusBar />
     </div>
@@ -177,7 +202,7 @@ const Layout: Component<{ children: any }> = props => {
 // Dashboard Page
 const DashboardPage: Component = () => {
   return (
-    <Layout>
+    <Layout title='Welcome back!' subtitle='Manage your AI coding projects and sessions' noBox>
       <Dashboard />
     </Layout>
   );
@@ -186,7 +211,7 @@ const DashboardPage: Component = () => {
 // Projects Page
 const ProjectsPage: Component = () => {
   return (
-    <Layout>
+    <Layout title='Projects' subtitle='Manage your development projects' noBox>
       <ProjectList />
     </Layout>
   );
@@ -195,7 +220,7 @@ const ProjectsPage: Component = () => {
 // Create Project Page
 const CreateProjectPage: Component = () => {
   return (
-    <Layout>
+    <Layout title='Create New Project' subtitle='Set up a new development project'>
       <CreateProjectForm />
     </Layout>
   );
@@ -213,8 +238,27 @@ const FilesPageWrapper: Component = () => {
 // Project Details Page
 import ProjectDetails from './components/ProjectDetails';
 const ProjectDetailsWrapper: Component = () => {
+  const params = useParams();
+  const [project, setProject] = createSignal<Project | null>(null);
+  
+  // Load project data to get the title
+  onMount(async () => {
+    try {
+      const projectId = (params as any).id;
+      if (projectId) {
+        const details = await apiClient.fetchProjectDetails(projectId);
+        setProject(details.project);
+      }
+    } catch (e) {
+      console.error('Failed to load project for title:', e);
+    }
+  });
+
   return (
-    <Layout>
+    <Layout 
+      title={project()?.name || 'Project'} 
+      subtitle='Project Dashboard'
+    >
       <ProjectDetails />
     </Layout>
   );
@@ -223,7 +267,7 @@ const ProjectDetailsWrapper: Component = () => {
 // AI Sessions Pages
 const AiSessionsPage: Component = () => {
   return (
-    <Layout>
+    <Layout title='AI Sessions' subtitle='View and manage your AI coding sessions' noBox>
       <AiSessionsList />
     </Layout>
   );
@@ -231,7 +275,7 @@ const AiSessionsPage: Component = () => {
 
 const AiSessionDetailPage: Component = () => {
   return (
-    <Layout>
+    <Layout title='AI Session Details' subtitle='View session information and live output' noBox>
       <AiSessionDetail />
     </Layout>
   );

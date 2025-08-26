@@ -84,20 +84,14 @@ const ProjectDetails: Component = () => {
 
   return (
     <div class='space-y-6'>
-      {/* Header */}
-      <div class='flex items-center justify-between'>
-        <div>
-          <h1 class='text-2xl font-bold text-gray-900'>{project()?.name ?? 'Project'}</h1>
-          <p class='text-sm text-gray-600 mt-1'>Project Dashboard</p>
-        </div>
-        <div class='flex items-center gap-2'>
-          <A
-            href='/projects'
-            class='px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors'
-          >
-            ← Back to Projects
-          </A>
-        </div>
+      {/* Back to Projects link */}
+      <div class='flex justify-end'>
+        <A
+          href='/projects'
+          class='px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors'
+        >
+          ← Back to Projects
+        </A>
       </div>
 
       {/* Tabs */}
