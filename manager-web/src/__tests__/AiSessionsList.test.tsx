@@ -124,12 +124,12 @@ describe('AiSessionsList Component', () => {
     await waitFor(() => {
       // Check for count in the main display area, not filter dropdowns
       expect(screen.getByText('3')).toBeInTheDocument();
-      
+
       // Find the specific element in the top-right count display
-      const countElements = screen.getAllByText((content, element) => {
+      const countElements = screen.getAllByText((_, element) => {
         return element?.textContent?.includes('3 work items') || false;
       });
-      
+
       // Should have the count display (might have multiple due to filters, but at least one)
       expect(countElements.length).toBeGreaterThanOrEqual(1);
     });

@@ -167,9 +167,7 @@ describe('API Client - AI Sessions', () => {
 
       apiClient.subscribeSession(sessionId, onMessage);
 
-      expect(global.WebSocket).toHaveBeenCalledWith(
-        'ws://localhost:8081/ws/work/session-123'
-      );
+      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8081/ws/work/session-123');
     });
 
     test('should use wss protocol for https', () => {

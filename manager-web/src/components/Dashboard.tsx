@@ -127,7 +127,6 @@ const StartAiSessionForm: Component = () => {
     document.removeEventListener('mousedown', onDocMouseDown);
   });
 
-
   const isValid = () => prompt().trim().length > 0 && toolName().trim().length > 0;
 
   const handleSubmit = async (e: Event) => {
@@ -291,7 +290,6 @@ const StartAiSessionForm: Component = () => {
             </div>
           </div>
         </div>
-
 
         <Show when={error()}>
           <div class='text-sm text-red-600'>{error()}</div>
