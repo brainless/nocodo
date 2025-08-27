@@ -121,6 +121,43 @@ impl Database {
             [],
         )?;
 
+        // Create works table (sessions/conversations)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS works (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                project_id TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES projects (id)
+            )",
+            [],
+        )?;
+
+        // Create work messages with content types and history
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS work_messages (
+                id TEXT PRIMARY KEY,
+                work_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                content_type TEXT NOT NULL CHECK (content_type IN ('text', 'markdown', 'json', 'code')),
+                code_language TEXT, -- Only for code content type
+                author_type TEXT NOT NULL CHECK (author_type IN ('user', 'ai')),
+                author_id TEXT, -- User ID or AI tool identifier
+                sequence_order INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (work_id) REFERENCES works (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Index for efficient history retrieval
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_messages_work_sequence ON work_messages(work_id, sequence_order)",
+            [],
+        )?;
+
         tracing::info!("Database migrations completed");
         Ok(())
     }
@@ -517,5 +554,224 @@ impl Database {
             outputs.push(item?);
         }
         Ok(outputs)
+    }
+
+    // Work management methods
+    pub fn create_work(&self, work: &crate::models::Work) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO works (id, title, project_id, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            params![
+                work.id,
+                work.title,
+                work.project_id,
+                work.status,
+                work.created_at,
+                work.updated_at
+            ],
+        )?;
+
+        tracing::info!("Created work: {} ({})", work.title, work.id);
+        Ok(())
+    }
+
+    pub fn get_work_by_id(&self, id: &str) -> AppResult<crate::models::Work> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, title, project_id, status, created_at, updated_at
+             FROM works WHERE id = ?"
+        )?;
+
+        let work = stmt
+            .query_row([id], |row| {
+                Ok(crate::models::Work {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    project_id: row.get(2)?,
+                    status: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            })
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => AppError::Internal(format!("Work not found: {id}")),
+                _ => AppError::Database(e),
+            })?;
+
+        Ok(work)
+    }
+
+    pub fn get_all_works(&self) -> AppResult<Vec<crate::models::Work>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, title, project_id, status, created_at, updated_at
+             FROM works ORDER BY created_at DESC"
+        )?;
+
+        let work_iter = stmt.query_map([], |row| {
+            Ok(crate::models::Work {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                project_id: row.get(2)?,
+                status: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })?;
+
+        let mut works = Vec::new();
+        for work in work_iter {
+            works.push(work?);
+        }
+
+        Ok(works)
+    }
+
+    pub fn delete_work(&self, id: &str) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let rows_affected = conn.execute("DELETE FROM works WHERE id = ?", [id])?;
+
+        if rows_affected == 0 {
+            return Err(AppError::Internal(format!("Work not found: {id}")));
+        }
+
+        tracing::info!("Deleted work: {}", id);
+        Ok(())
+    }
+
+    // Work message management methods
+    pub fn create_work_message(&self, message: &crate::models::WorkMessage) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // For code content type, extract language from the enum variant
+        let (content_type_str, code_language) = match &message.content_type {
+            crate::models::MessageContentType::Code { language } => ("code", Some(language.clone())),
+            crate::models::MessageContentType::Text => ("text", None),
+            crate::models::MessageContentType::Markdown => ("markdown", None),
+            crate::models::MessageContentType::Json => ("json", None),
+        };
+
+        conn.execute(
+            "INSERT INTO work_messages (id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                message.id,
+                message.work_id,
+                message.content,
+                content_type_str,
+                code_language,
+                match &message.author_type {
+                    crate::models::MessageAuthorType::User => "user",
+                    crate::models::MessageAuthorType::Ai => "ai",
+                },
+                message.author_id,
+                message.sequence_order,
+                message.created_at
+            ],
+        )?;
+
+        tracing::info!(
+            "Created work message: {} for work {}",
+            message.id,
+            message.work_id
+        );
+        Ok(())
+    }
+
+    pub fn get_work_messages(&self, work_id: &str) -> AppResult<Vec<crate::models::WorkMessage>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at
+             FROM work_messages WHERE work_id = ? ORDER BY sequence_order ASC"
+        )?;
+
+        let iter = stmt.query_map([work_id], |row| {
+            let content_type_str: String = row.get(3)?;
+            let code_language: Option<String> = row.get(4)?;
+            let author_type_str: String = row.get(5)?;
+            
+            let content_type = match content_type_str.as_str() {
+                "text" => crate::models::MessageContentType::Text,
+                "markdown" => crate::models::MessageContentType::Markdown,
+                "json" => crate::models::MessageContentType::Json,
+                "code" => crate::models::MessageContentType::Code { 
+                    language: code_language.unwrap_or_default() 
+                },
+                _ => crate::models::MessageContentType::Text, // fallback
+            };
+            
+            let author_type = match author_type_str.as_str() {
+                "user" => crate::models::MessageAuthorType::User,
+                "ai" => crate::models::MessageAuthorType::Ai,
+                _ => crate::models::MessageAuthorType::User, // fallback
+            };
+
+            Ok(crate::models::WorkMessage {
+                id: row.get(0)?,
+                work_id: row.get(1)?,
+                content: row.get(2)?,
+                content_type,
+                author_type,
+                author_id: row.get(6)?,
+                sequence_order: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })?;
+
+        let mut messages = Vec::new();
+        for item in iter {
+            messages.push(item?);
+        }
+        Ok(messages)
+    }
+
+    pub fn get_work_with_messages(&self, work_id: &str) -> AppResult<crate::models::WorkWithHistory> {
+        let work = self.get_work_by_id(work_id)?;
+        let messages = self.get_work_messages(work_id)?;
+        let total_messages = messages.len() as i32;
+
+        Ok(crate::models::WorkWithHistory {
+            work,
+            messages,
+            total_messages,
+        })
+    }
+
+    pub fn get_next_message_sequence(&self, work_id: &str) -> AppResult<i32> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT COALESCE(MAX(sequence_order), -1) + 1 FROM work_messages WHERE work_id = ?"
+        )?;
+
+        let sequence: i32 = stmt.query_row([work_id], |row| row.get(0))?;
+        Ok(sequence)
     }
 }

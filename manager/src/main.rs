@@ -132,7 +132,15 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/ai/sessions/{id}/input",
                             web::post().to(handlers::send_ai_input),
-                        ),
+                        )
+                        // Work management endpoints
+                        .route("/works", web::post().to(handlers::create_work))
+                        .route("/works", web::get().to(handlers::list_works))
+                        .route("/works/{id}", web::get().to(handlers::get_work))
+                        .route("/works/{id}", web::delete().to(handlers::delete_work))
+                        // Work message endpoints
+                        .route("/works/{id}/messages", web::post().to(handlers::add_message_to_work))
+                        .route("/works/{id}/messages", web::get().to(handlers::get_work_messages)),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))

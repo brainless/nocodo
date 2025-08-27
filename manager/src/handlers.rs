@@ -5,7 +5,8 @@ use crate::models::{
     AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest, FileContentResponse,
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
     FileUpdateRequest, Project, ProjectListResponse, ProjectResponse, RecordAiOutputRequest,
-    ServerStatus,
+    ServerStatus, CreateWorkRequest, WorkResponse, WorkListResponse, AddMessageRequest,
+    WorkMessageResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -1226,4 +1227,148 @@ fn extract_git_repo_name(project_path: &std::path::Path) -> Option<String> {
     }
 
     Some(repo_name.to_string())
+}
+
+// Work management handlers
+pub async fn create_work(
+    data: web::Data<AppState>,
+    request: web::Json<CreateWorkRequest>,
+) -> Result<HttpResponse, AppError> {
+    let req = request.into_inner();
+
+    // Validate work title
+    if req.title.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Work title cannot be empty".to_string(),
+        ));
+    }
+
+    // Create the work object
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| AppError::Internal(format!("Failed to get timestamp: {e}")))?
+        .as_secs() as i64;
+
+    let work = crate::models::Work {
+        id: uuid::Uuid::new_v4().to_string(),
+        title: req.title,
+        project_id: req.project_id,
+        status: "active".to_string(),
+        created_at: now,
+        updated_at: now,
+    };
+
+    // Save to database
+    data.database.create_work(&work)?;
+
+    // Broadcast work creation via WebSocket
+    data.ws_broadcaster
+        .broadcast_project_created(Project {
+            id: work.id.clone(),
+            name: work.title.clone(),
+            path: "".to_string(), // Works don't have a path like projects
+            language: None,
+            framework: None,
+            status: work.status.clone(),
+            created_at: work.created_at,
+            updated_at: work.updated_at,
+        });
+
+    tracing::info!(
+        "Successfully created work '{}' with ID {}",
+        work.title,
+        work.id
+    );
+
+    let response = WorkResponse { work };
+    Ok(HttpResponse::Created().json(response))
+}
+
+pub async fn get_work(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+    let work_with_history = data.database.get_work_with_messages(&work_id)?;
+    Ok(HttpResponse::Ok().json(work_with_history))
+}
+
+pub async fn list_works(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let works = data.database.get_all_works()?;
+    let response = WorkListResponse { works };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn delete_work(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+
+    // Delete from database
+    data.database.delete_work(&work_id)?;
+
+    // Broadcast work deletion via WebSocket
+    data.ws_broadcaster.broadcast_project_deleted(work_id.clone());
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// Work message handlers
+pub async fn add_message_to_work(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+    request: web::Json<AddMessageRequest>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+    let req = request.into_inner();
+
+    // Verify work exists
+    let _work = data.database.get_work_by_id(&work_id)?;
+
+    // Get next sequence number
+    let sequence_order = data.database.get_next_message_sequence(&work_id)?;
+
+    // Create the message object
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| AppError::Internal(format!("Failed to get timestamp: {e}")))?
+        .as_secs() as i64;
+
+    let message = crate::models::WorkMessage {
+        id: uuid::Uuid::new_v4().to_string(),
+        work_id: work_id.clone(),
+        content: req.content,
+        content_type: req.content_type,
+        author_type: req.author_type,
+        author_id: req.author_id,
+        sequence_order,
+        created_at: now,
+    };
+
+    // Save to database
+    data.database.create_work_message(&message)?;
+
+    tracing::info!(
+        "Successfully added message {} to work {}",
+        message.id,
+        work_id
+    );
+
+    let response = WorkMessageResponse { message };
+    Ok(HttpResponse::Created().json(response))
+}
+
+pub async fn get_work_messages(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+    
+    // Verify work exists
+    let _work = data.database.get_work_by_id(&work_id)?;
+    
+    let messages = data.database.get_work_messages(&work_id)?;
+    let response = crate::models::WorkMessageListResponse { messages };
+    Ok(HttpResponse::Ok().json(response))
 }
