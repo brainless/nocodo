@@ -339,7 +339,7 @@ impl ManagerClient {
             "prompt": prompt
         });
 
-        let url = format!("{}/api/ai/sessions", self.manager_url);
+        let url = format!("{}/api/work", self.manager_url);
         debug!("POST {}", url);
 
         let response = self

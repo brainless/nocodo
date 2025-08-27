@@ -70,14 +70,14 @@ describe('StatusBadge Component', () => {
   test('renders completed status correctly', () => {
     render(() => <StatusBadge status='completed' />, { wrapper: TestWrapper });
 
-    expect(screen.getByLabelText('Session status: completed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Work status: completed')).toBeInTheDocument();
     expect(screen.getByText('completed')).toBeInTheDocument();
   });
 
   test('renders running status with animation', () => {
     render(() => <StatusBadge status='running' showIcon={true} />, { wrapper: TestWrapper });
 
-    const badge = screen.getByLabelText('Session status: running');
+    const badge = screen.getByLabelText('Work status: running');
     expect(badge).toBeInTheDocument();
     expect(badge.querySelector('.animate-spin')).toBeInTheDocument();
   });
@@ -94,14 +94,14 @@ describe('StatusBadge Component', () => {
     );
 
     // Both badges should be rendered
-    const badges = screen.getAllByLabelText('Session status: completed');
+    const badges = screen.getAllByLabelText('Work status: completed');
     expect(badges).toHaveLength(2);
   });
 
   test('hides icon when showIcon is false', () => {
     render(() => <StatusBadge status='completed' showIcon={false} />, { wrapper: TestWrapper });
 
-    const badge = screen.getByLabelText('Session status: completed');
+    const badge = screen.getByLabelText('Work status: completed');
     expect(badge).toBeInTheDocument();
     // Icon should not be present when showIcon is false
     expect(badge.textContent).toBe('completed');
@@ -174,7 +174,7 @@ describe('SessionRow Component', () => {
     expect(screen.getByText('claude')).toBeInTheDocument();
     expect(screen.getByText('Test Project')).toBeInTheDocument();
     expect(screen.getByText('Create a new React component')).toBeInTheDocument();
-    expect(screen.getByLabelText('Session status: running')).toBeInTheDocument();
+    expect(screen.getByLabelText('Work status: running')).toBeInTheDocument();
   });
 
   test('renders completed session correctly', () => {
@@ -185,10 +185,10 @@ describe('SessionRow Component', () => {
 
     expect(screen.getByText('gpt-4')).toBeInTheDocument();
     expect(screen.getByText('Fix bug in authentication')).toBeInTheDocument();
-    expect(screen.getByLabelText('Session status: completed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Work status: completed')).toBeInTheDocument();
 
     // Should not show running indicator for completed sessions
-    expect(screen.queryByText('Session is actively running')).not.toBeInTheDocument();
+    expect(screen.queryByText('Work is actively running')).not.toBeInTheDocument();
   });
 
   test('renders session without project', () => {
@@ -222,7 +222,7 @@ describe('SessionRow Component', () => {
       { wrapper: TestWrapper }
     );
 
-    expect(screen.getByText('Session is actively running')).toBeInTheDocument();
+    expect(screen.getByText('Work is actively running')).toBeInTheDocument();
   });
 
   test('shows duration with ongoing indicator for running sessions', () => {
@@ -241,7 +241,7 @@ describe('SessionRow Component', () => {
     );
 
     const link = screen.getByRole('article');
-    expect(link).toHaveAttribute('href', '/ai/sessions/session-123');
+    expect(link).toHaveAttribute('href', '/work/session-123');
   });
 
   test('has proper accessibility attributes', () => {
@@ -251,7 +251,7 @@ describe('SessionRow Component', () => {
     );
 
     const link = screen.getByRole('article');
-    expect(link).toHaveAttribute('aria-label', 'View details for claude session');
+    expect(link).toHaveAttribute('aria-label', 'View details for claude work');
 
     // Check for time elements with proper datetime attributes
     const timeElement = screen.getByRole('time');
@@ -265,7 +265,7 @@ describe('SessionRow Component', () => {
           session={mockRunningSession}
           project={mockProject}
           showPrompt={true}
-          class='custom-class'
+          className='custom-class'
         />
       ),
       { wrapper: TestWrapper }

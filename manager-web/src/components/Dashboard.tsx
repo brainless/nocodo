@@ -96,7 +96,6 @@ const StartAiSessionForm: Component = () => {
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
   const [toolName, setToolName] = createSignal<string>(knownTools[0]);
-  const [customTool, setCustomTool] = createSignal<string>('');
   const [prompt, setPrompt] = createSignal<string>('');
   const [submitting, setSubmitting] = createSignal<boolean>(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -128,9 +127,8 @@ const StartAiSessionForm: Component = () => {
     document.removeEventListener('mousedown', onDocMouseDown);
   });
 
-  const effectiveTool = () => (customTool().trim() ? customTool().trim() : toolName());
 
-  const isValid = () => prompt().trim().length > 0 && effectiveTool().trim().length > 0;
+  const isValid = () => prompt().trim().length > 0 && toolName().trim().length > 0;
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -142,7 +140,7 @@ const StartAiSessionForm: Component = () => {
     setError(null);
     try {
       const payload: any = {
-        tool_name: effectiveTool(),
+        tool_name: toolName(),
         prompt: prompt().trim(),
       };
       const pid = selectedProjectId().trim();
@@ -150,7 +148,7 @@ const StartAiSessionForm: Component = () => {
       const resp = await apiClient.createAiSession(payload);
       const id = resp.session.id;
       // Navigate to detail page
-      navigate(`/ai/sessions/${id}`);
+      navigate(`/work/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start AI session');
     } finally {
@@ -160,75 +158,89 @@ const StartAiSessionForm: Component = () => {
 
   return (
     <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-      <h3 class='text-lg font-semibold text-gray-900 mb-4'>Start AI Session</h3>
+      <h3 class='text-lg font-semibold text-gray-900 mb-4'>What would you like to Work on?</h3>
       <form onSubmit={handleSubmit} class='space-y-4'>
         <div>
-          <label for='project' class='block text-sm font-medium text-gray-700'>
-            Project (optional)
+          <label for='prompt' class='block text-sm font-medium text-gray-700'>
+            Prompt
           </label>
-          <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
-            <button
-              type='button'
-              class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
-              onClick={() => setProjectOpen(!isProjectOpen())}
-              aria-haspopup='listbox'
-              aria-expanded={isProjectOpen()}
-            >
-              <span class='truncate'>
-                {selectedProjectId()
-                  ? projects().find(p => p.id === selectedProjectId())?.name ||
-                    `Project ${selectedProjectId()}`
-                  : 'No Project'}
-              </span>
-              <svg
-                class='w-4 h-4 ml-2 text-gray-500'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  stroke-linecap='round'
-                  stroke-linejoin='round'
-                  stroke-width={2}
-                  d='M19 9l-7 7-7-7'
-                />
-              </svg>
-            </button>
-            {isProjectOpen() && (
-              <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
-                <div class='py-1 max-h-60 overflow-auto' role='listbox'>
-                  <div
-                    role='option'
-                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
-                    onClick={() => {
-                      setSelectedProjectId('');
-                      setProjectOpen(false);
-                    }}
-                  >
-                    No Project
-                  </div>
-                  <For each={projects()}>
-                    {p => (
-                      <div
-                        role='option'
-                        class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
-                        onClick={() => {
-                          setSelectedProjectId(p.id);
-                          setProjectOpen(false);
-                        }}
-                      >
-                        <div class='font-medium'>{p.name}</div>
-                        <div class='text-xs text-gray-500 truncate'>{p.language || ''}</div>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </div>
-            )}
-          </div>
+          <textarea
+            id='prompt'
+            required
+            rows={3}
+            class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-border rounded-md hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring'
+            placeholder='Describe what you want to work on...'
+            value={prompt()}
+            onInput={e => setPrompt(e.currentTarget.value)}
+          />
         </div>
 
         <div class='grid grid-cols-1 md:grid-cols-2 gap-4'>
+          <div>
+            <label for='project' class='block text-sm font-medium text-gray-700'>
+              Project (optional)
+            </label>
+            <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
+              <button
+                type='button'
+                class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
+                onClick={() => setProjectOpen(!isProjectOpen())}
+                aria-haspopup='listbox'
+                aria-expanded={isProjectOpen()}
+              >
+                <span class='truncate'>
+                  {selectedProjectId()
+                    ? projects().find(p => p.id === selectedProjectId())?.name ||
+                      `Project ${selectedProjectId()}`
+                    : 'No Project'}
+                </span>
+                <svg
+                  class='w-4 h-4 ml-2 text-gray-500'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    stroke-linecap='round'
+                    stroke-linejoin='round'
+                    stroke-width={2}
+                    d='M19 9l-7 7-7-7'
+                  />
+                </svg>
+              </button>
+              {isProjectOpen() && (
+                <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
+                  <div class='py-1 max-h-60 overflow-auto' role='listbox'>
+                    <div
+                      role='option'
+                      class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
+                      onClick={() => {
+                        setSelectedProjectId('');
+                        setProjectOpen(false);
+                      }}
+                    >
+                      No Project
+                    </div>
+                    <For each={projects()}>
+                      {p => (
+                        <div
+                          role='option'
+                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
+                          onClick={() => {
+                            setSelectedProjectId(p.id);
+                            setProjectOpen(false);
+                          }}
+                        >
+                          <div class='font-medium'>{p.name}</div>
+                          <div class='text-xs text-gray-500 truncate'>{p.language || ''}</div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           <div>
             <label for='tool' class='block text-sm font-medium text-gray-700'>
               Tool
@@ -277,40 +289,9 @@ const StartAiSessionForm: Component = () => {
                 </div>
               )}
             </div>
-            <p class='mt-1 text-xs text-gray-500'>Select a tool or enter a custom one below</p>
-          </div>
-          <div>
-            <label for='customTool' class='block text-sm font-medium text-gray-700'>
-              Custom Tool (optional)
-            </label>
-            <input
-              id='customTool'
-              type='text'
-              placeholder='e.g., my-tool'
-              class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              value={customTool()}
-              onInput={e => setCustomTool(e.currentTarget.value)}
-            />
-            <p class='mt-1 text-xs text-gray-500'>
-              If provided, this will override the selected tool
-            </p>
           </div>
         </div>
 
-        <div>
-          <label for='prompt' class='block text-sm font-medium text-gray-700'>
-            Prompt
-          </label>
-          <textarea
-            id='prompt'
-            required
-            rows={3}
-            class='mt-1 block w-full px-3 py-2 text-sm text-gray-700 placeholder-gray-400 bg-white border border-border rounded-md hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring'
-            placeholder='Describe what you want the AI tool to do...'
-            value={prompt()}
-            onInput={e => setPrompt(e.currentTarget.value)}
-          />
-        </div>
 
         <Show when={error()}>
           <div class='text-sm text-red-600'>{error()}</div>
@@ -324,7 +305,7 @@ const StartAiSessionForm: Component = () => {
               submitting() || !isValid() ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {submitting() ? 'Starting...' : 'Start Session'}
+            {submitting() ? 'Starting...' : 'Start Work Session'}
           </button>
         </div>
       </form>
@@ -332,7 +313,7 @@ const StartAiSessionForm: Component = () => {
   );
 };
 
-// AI Sessions card component
+// Work card component
 const SessionsCard: Component = () => {
   const { store, actions } = useSessions();
   const [projects, setProjects] = createSignal<Project[]>([]);
@@ -359,13 +340,13 @@ const SessionsCard: Component = () => {
     <div>
       {/* Section header outside the white box */}
       <div class='flex items-center justify-between mb-6'>
-        <h2 class='text-xl font-semibold text-gray-900'>Recent AI Sessions</h2>
-        <A href='/ai/sessions' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
+        <h2 class='text-xl font-semibold text-gray-900'>Recent Work</h2>
+        <A href='/work' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
           View all →
         </A>
       </div>
 
-      {/* AI Sessions cards grid - no outer container */}
+      {/* Work cards grid - no outer container */}
       {store.loading ? (
         <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           {[1, 2, 3].map(() => (
@@ -382,8 +363,8 @@ const SessionsCard: Component = () => {
         <div class='text-center py-8'>
           <div class='mx-auto max-w-md'>
             <div class='text-gray-400 text-6xl mb-4'>🤖</div>
-            <h3 class='text-lg font-medium text-gray-900 mb-2'>No AI sessions yet</h3>
-            <p class='text-gray-500 mb-4'>Start your first session using the nocodo CLI</p>
+            <h3 class='text-lg font-medium text-gray-900 mb-2'>No work yet</h3>
+            <p class='text-gray-500 mb-4'>Start your first work session using the nocodo CLI</p>
           </div>
         </div>
       ) : (
@@ -399,12 +380,12 @@ const SessionsCard: Component = () => {
           {store.list.length > 5 && (
             <div class='flex items-center justify-center'>
               <A
-                href='/ai/sessions'
+                href='/work'
                 class='p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-center'
               >
                 <div class='text-gray-500'>
-                  <span class='text-sm font-medium'>+{store.list.length - 5} more sessions</span>
-                  <p class='text-xs mt-1'>View all sessions</p>
+                  <span class='text-sm font-medium'>+{store.list.length - 5} more work items</span>
+                  <p class='text-xs mt-1'>View all work</p>
                 </div>
               </A>
             </div>
@@ -422,10 +403,10 @@ const Dashboard: Component = () => {
       {/* Recent Projects - stacked vertically */}
       <ProjectsCard />
 
-      {/* Recent AI Sessions - stacked vertically */}
+      {/* Recent Work - stacked vertically */}
       <SessionsCard />
 
-      {/* Start AI Session */}
+      {/* Start Work Session */}
       <StartAiSessionForm />
     </div>
   );

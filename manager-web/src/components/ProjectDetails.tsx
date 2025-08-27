@@ -131,7 +131,7 @@ const ProjectDetails: Component = () => {
                   <For each={sessions()}>
                     {s => (
                       <A
-                        href={`/ai/sessions/${s.id}`}
+                        href={`/work/${s.id}`}
                         class='block p-3 bg-white border border-gray-200 rounded hover:bg-gray-50'
                       >
                         <div class='flex items-center justify-between'>
