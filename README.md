@@ -1,23 +1,21 @@
-# 🚀 [**Visit nocodo.com →**](https://nocodo.com)
+# nocodo 🤖
+
+**A platform that takes you from idea to live full-stack MVP (no lock-in)**
+
+🚀 [**nocodo.com →**](https://nocodo.com)
 
 > ⚠️ **Under Active Development** - This product is actively being developed. Please ⭐ star and 👀 watch this repository for updates!
 
----
-
-# nocodo 🤖
-
-**A platform that takes you from idea to live full-stack MVP (no lock-in)** 
-
 Transform your ideas into production-ready applications using AI coding agents, your own cloud infrastructure, and unlimited development iterations.
 
-![nocodo AI Session Details](./specs/website/src/assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png)
+![nocodo AI Session Details](./website/src/assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png)
 
 ## ✨ What We're Solving
 
 ### 🤖 **Free AI Coding Agents**
 Automatically use free tiers from Claude Code, OpenAI Codex, Gemini and similar tools - no vendor lock-in!
 
-### ☁️ **Your Cloud Infrastructure** 
+### ☁️ **Your Cloud Infrastructure**
 Your development setup is managed by nocodo on your own cloud infrastructure. You own everything.
 
 ### 🔓 **Complete Ownership**
@@ -109,7 +107,7 @@ Learn our proven methodology for building MVP web applications using terminal-ba
 Master the essential fundamentals for AI-powered development:
 
 - **📖 Learn**: Master fundamentals and AI tools through structured modules
-- **🧪 Practice**: Apply concepts with hands-on projects and real-world scenarios  
+- **🧪 Practice**: Apply concepts with hands-on projects and real-world scenarios
 - **⚡ Optimize**: Fine-tune your AI-assisted development workflow
 - **🤝 Share**: Contribute to the vibe coding community
 
@@ -131,10 +129,10 @@ Master the essential fundamentals for AI-powered development:
 
 ## 🤝 Contributing
 
-We're preparing for launch with early adopters! 
+We're preparing for launch with early adopters!
 
 - 🐛 **Found a bug?** Open an issue
-- 💡 **Have an idea?** Start a discussion  
+- 💡 **Have an idea?** Start a discussion
 - 🔧 **Want to contribute?** Check our development workflow
 - ⭐ **Support us** by starring this repository
 
