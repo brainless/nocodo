@@ -111,6 +111,64 @@ pub struct TemplateFile {
     pub executable: bool,
 }
 
+// Work history models
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum MessageContentType {
+    Text,
+    Markdown,
+    Json,
+    Code { language: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum MessageAuthorType {
+    User,
+    Ai,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorkMessage {
+    pub id: String,
+    pub work_id: String,
+    pub content: String,
+    pub content_type: MessageContentType,
+    pub author_type: MessageAuthorType,
+    pub author_id: Option<String>,
+    pub sequence_order: i32,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Work {
+    pub id: String,
+    pub title: String,
+    pub project_id: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorkWithHistory {
+    pub work: Work,
+    pub messages: Vec<WorkMessage>,
+    pub total_messages: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateWorkRequest {
+    pub title: String,
+    pub project_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddMessageRequest {
+    pub content: String,
+    pub content_type: MessageContentType,
+    pub author_type: MessageAuthorType,
+    pub author_id: Option<String>,
+}
+
 pub struct ManagerClient {
     socket_path: String,
     http_client: reqwest::Client,
@@ -552,5 +610,162 @@ impl ManagerClient {
                 Ok(false)
             }
         }
+    }
+
+    // Work management HTTP methods
+    pub async fn create_work(&self, title: String, project_id: Option<String>) -> Result<Work, CliError> {
+        info!("Creating work '{}' via HTTP API", title);
+
+        let request_body = CreateWorkRequest { title, project_id };
+
+        let url = format!("{}/api/works", self.manager_url);
+        debug!("POST {}", url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let work_response: Work = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        info!("Work '{}' created successfully with ID: {}", work_response.title, work_response.id);
+        Ok(work_response)
+    }
+
+    pub async fn list_works(&self) -> Result<Vec<Work>, CliError> {
+        info!("Fetching works via HTTP API");
+
+        let url = format!("{}/api/works", self.manager_url);
+        debug!("GET {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let works_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        let works: Vec<Work> = serde_json::from_value(works_response["works"].clone())
+            .map_err(|e| CliError::Communication(format!("Failed to parse works data: {e}")))?;
+
+        info!("Fetched {} works", works.len());
+        Ok(works)
+    }
+
+    pub async fn get_work_with_history(&self, work_id: &str) -> Result<WorkWithHistory, CliError> {
+        info!("Fetching work with history via HTTP API for work ID: {}", work_id);
+
+        let url = format!("{}/api/works/{}", self.manager_url, work_id);
+        debug!("GET {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let work_with_history: WorkWithHistory = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        info!("Fetched work with history for work ID: {}", work_id);
+        Ok(work_with_history)
+    }
+
+    pub async fn add_message_to_work(
+        &self,
+        work_id: String,
+        content: String,
+        content_type: MessageContentType,
+        author_type: MessageAuthorType,
+        author_id: Option<String>,
+    ) -> Result<WorkMessage, CliError> {
+        info!("Adding message to work via HTTP API for work ID: {}", work_id);
+
+        let request_body = AddMessageRequest {
+            content,
+            content_type,
+            author_type,
+            author_id,
+        };
+
+        let url = format!("{}/api/works/{}/messages", self.manager_url, work_id);
+        debug!("POST {}", url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| CliError::Communication(format!("HTTP request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(CliError::Communication(format!(
+                "HTTP {status} error: {error_text}"
+            )));
+        }
+
+        let message_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
+
+        let message: WorkMessage = serde_json::from_value(message_response["message"].clone())
+            .map_err(|e| CliError::Communication(format!("Failed to parse message data: {e}")))?;
+
+        info!("Message added to work ID: {}", work_id);
+        Ok(message)
     }
 }
