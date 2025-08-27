@@ -174,7 +174,7 @@ fi
 
 # Get session ID from Manager API (get the most recent session)
 log "Getting session ID from Manager API..."
-sessions_response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions")
+sessions_response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/work")
 SESSION_ID=$(echo "$sessions_response" | jq -r '.[0].id')
 if [[ -z "$SESSION_ID" || "$SESSION_ID" == "null" ]]; then
     error "Failed to get session ID from Manager API"
@@ -185,7 +185,7 @@ success "AI session created with ID: $SESSION_ID"
 
 # Step 6: Verify session persistence in Manager API
 log "Verifying session persistence via Manager API..."
-response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID")
+response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID")
 api_session_id=$(echo "$response" | jq -r '.id')
 if [[ "$api_session_id" != "$SESSION_ID" ]]; then
     error "Session not found in Manager API"
@@ -280,12 +280,12 @@ fi
 log "Testing session status updates..."
 
 # Update session to running status
-curl -s -X PUT "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID" \
+curl -s -X PUT "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID" \
     -H "Content-Type: application/json" \
     -d '{"status": "running"}' > /dev/null
 
 # Verify status update
-response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID")
+response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID")
 status=$(echo "$response" | jq -r '.status')
 if [[ "$status" != "running" ]]; then
     error "Failed to update session status to running"
@@ -297,12 +297,12 @@ success "Session status updated to running"
 sleep 2
 
 # Update session to completed status
-curl -s -X PUT "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID" \
+curl -s -X PUT "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID" \
     -H "Content-Type: application/json" \
     -d '{"status": "completed"}' > /dev/null
 
 # Verify final status
-response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID")
+response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID")
 status=$(echo "$response" | jq -r '.status')
 if [[ "$status" != "completed" ]]; then
     error "Failed to update session status to completed"
@@ -312,7 +312,7 @@ success "Session status updated to completed"
 
 # Step 9: Test session outputs
 log "Testing AI session outputs..."
-output_response=$(curl -s -X POST "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID/outputs" \
+output_response=$(curl -s -X POST "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID/outputs" \
     -H "Content-Type: application/json" \
     -d '{
         "content": "This is a test output from the AI session",
@@ -328,7 +328,7 @@ fi
 success "AI session output created with ID: $output_id"
 
 # Verify outputs list
-outputs_response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/ai/sessions/$SESSION_ID/outputs")
+outputs_response=$(curl -s "http://127.0.0.1:$MANAGER_PORT/api/work/$SESSION_ID/outputs")
 outputs_count=$(echo "$outputs_response" | jq '. | length')
 if [[ "$outputs_count" -lt 1 ]]; then
     error "No outputs found for AI session"
@@ -341,7 +341,7 @@ success "AI session outputs verified ($outputs_count outputs found)"
 log "Testing web UI API endpoints..."
 
 # Test sessions list endpoint
-sessions_response=$(curl -s "http://127.0.0.1:$WEB_PORT/api/ai/sessions")
+sessions_response=$(curl -s "http://127.0.0.1:$WEB_PORT/api/work")
 sessions_count=$(echo "$sessions_response" | jq '. | length')
 if [[ "$sessions_count" -lt 1 ]]; then
     error "No sessions found via web API"
@@ -351,7 +351,7 @@ fi
 success "Sessions list retrieved via web API ($sessions_count sessions found)"
 
 # Test specific session endpoint
-session_response=$(curl -s "http://127.0.0.1:$WEB_PORT/api/ai/sessions/$SESSION_ID")
+session_response=$(curl -s "http://127.0.0.1:$WEB_PORT/api/work/$SESSION_ID")
 web_session_id=$(echo "$session_response" | jq -r '.id')
 if [[ "$web_session_id" != "$SESSION_ID" ]]; then
     error "Session not accessible via web API"
