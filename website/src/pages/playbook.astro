@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Button from "../components/UI/Button.astro";
 import Terminal from "../components/UI/Terminal.astro";
 import Prompt from "../components/UI/Prompt.astro";
+import WorkflowList from "../components/UI/WorkflowList.astro";
 ---
 
 <Layout
@@ -501,47 +502,7 @@ import Prompt from "../components/UI/Prompt.astro";
                             >
                         </p>
 
-                        <p>Create a new branch for each task</p>
-
-                        <p>
-                            Branch names should start with <code>feature/</code
-                            >, <code>chore/</code>, or <code>fix/</code>
-                        </p>
-
-                        <p>
-                            Add tests for any new features added, particularly
-                            integration or end-to-end tests
-                        </p>
-
-                        <p>
-                            Run formatters, linters, and tests before committing
-                            changes
-                        </p>
-
-                        <p>
-                            When finished, please commit and push to the new
-                            branch
-                        </p>
-
-                        <p>Please mention the GitHub issue if provided</p>
-
-                        <p>Commit small chunks</p>
-
-                        <p>
-                            Selectively add files to git; maintain <code
-                                >.gitignore</code
-                            >
-                        </p>
-
-                        <p>
-                            If working on a GitHub issue: create a PR, update
-                            the task in the end
-                        </p>
-
-                        <p>
-                            If working on a GitHub issue: do not close the issue
-                            until I manually test
-                        </p>
+                        <WorkflowList title="Development Workflow" />
                     </div>
                 </article>
 
@@ -644,6 +605,11 @@ import Prompt from "../components/UI/Prompt.astro";
     /* Add consistent spacing between elements */
     .content-prose > *:not(:last-child) {
         margin-bottom: 1rem !important;
+    }
+
+    /* Override for workflow list items to use light gray text */
+    .content-prose .workflow-list li {
+        color: #d1d5db !important; /* text-gray-300 */
     }
 
     .content-prose strong {

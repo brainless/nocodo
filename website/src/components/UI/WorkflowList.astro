@@ -1,0 +1,31 @@
+---
+const { title } = Astro.props;
+const items = [
+  'Create a new branch for each task',
+  'Branch names should start with feature/, chore/, or fix/',
+  'Add tests for any new features added, particularly integration or end-to-end tests',
+  'Run formatters, linters, and tests before committing changes',
+  'When finished, please commit and push to the new branch',
+  'Please mention the GitHub issue if provided',
+  'Commit small chunks',
+  'Selectively add files to git; maintain .gitignore',
+  'If working on a GitHub issue: create a PR, update the task in the end',
+  'If working on a GitHub issue: do not close the issue until I manually test'
+];
+---
+
+<div class="workflow-list">
+  <div class="list-header flex items-center mb-2">
+    <h3 class="text-gray-100 font-medium">{title}</h3>
+  </div>
+  <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+    <ul class="space-y-2">
+      {items.map((item, index) => (
+        <li class="text-gray-300 text-sm flex items-start">
+          <span class="text-green-400 mr-2">•</span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</div>
