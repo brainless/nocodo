@@ -149,12 +149,17 @@ async fn main() -> AppResult<()> {
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
                 // Serve static files from ./web/dist if it exists
-                .service(
-                    fs::Files::new("/", "./web/dist")
-                        .index_file("index.html")
-                        .use_etag(true)
-                        .use_last_modified(true),
-                )
+                .configure(|cfg| {
+                    if std::path::Path::new("./web/dist").exists() {
+                        cfg.service(
+                            fs::Files::new("/", "./web/dist")
+                                .index_file("index.html")
+                                .use_etag(true)
+                                .use_last_modified(true)
+                                .prefer_utf8(true),
+                        );
+                    }
+                })
         })
         .bind(&server_addr)
         .expect("Failed to bind HTTP server")
