@@ -1,12 +1,12 @@
 use crate::database::Database;
 use crate::error::AppError;
 use crate::models::{
-    AddExistingProjectRequest, AiSessionListResponse, AiSessionOutputListResponse,
-    AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest, FileContentResponse,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
-    FileUpdateRequest, Project, ProjectListResponse, ProjectResponse, RecordAiOutputRequest,
-    ServerStatus, CreateWorkRequest, WorkResponse, WorkListResponse, AddMessageRequest,
-    WorkMessageResponse,
+    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
+    AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
+    CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
+    FileListResponse, FileResponse, FileUpdateRequest, Project, ProjectListResponse,
+    ProjectResponse, RecordAiOutputRequest, ServerStatus, WorkListResponse, WorkMessageResponse,
+    WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -1262,17 +1262,16 @@ pub async fn create_work(
     data.database.create_work(&work)?;
 
     // Broadcast work creation via WebSocket
-    data.ws_broadcaster
-        .broadcast_project_created(Project {
-            id: work.id.clone(),
-            name: work.title.clone(),
-            path: "".to_string(), // Works don't have a path like projects
-            language: None,
-            framework: None,
-            status: work.status.clone(),
-            created_at: work.created_at,
-            updated_at: work.updated_at,
-        });
+    data.ws_broadcaster.broadcast_project_created(Project {
+        id: work.id.clone(),
+        name: work.title.clone(),
+        path: "".to_string(), // Works don't have a path like projects
+        language: None,
+        framework: None,
+        status: work.status.clone(),
+        created_at: work.created_at,
+        updated_at: work.updated_at,
+    });
 
     tracing::info!(
         "Successfully created work '{}' with ID {}",
@@ -1309,7 +1308,8 @@ pub async fn delete_work(
     data.database.delete_work(&work_id)?;
 
     // Broadcast work deletion via WebSocket
-    data.ws_broadcaster.broadcast_project_deleted(work_id.clone());
+    data.ws_broadcaster
+        .broadcast_project_deleted(work_id.clone());
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1364,10 +1364,10 @@ pub async fn get_work_messages(
     path: web::Path<String>,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    
+
     // Verify work exists
     let _work = data.database.get_work_by_id(&work_id)?;
-    
+
     let messages = data.database.get_work_messages(&work_id)?;
     let response = crate::models::WorkMessageListResponse { messages };
     Ok(HttpResponse::Ok().json(response))

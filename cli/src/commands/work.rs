@@ -43,7 +43,9 @@ impl WorkCommands {
     pub async fn execute(&self, client: &ManagerClient) -> Result<(), CliError> {
         match self {
             WorkCommands::List => self.list_works(client).await,
-            WorkCommands::Create { title, project_id } => self.create_work(client, title, project_id.clone()).await,
+            WorkCommands::Create { title, project_id } => {
+                self.create_work(client, title, project_id.clone()).await
+            }
             WorkCommands::History { work_id, format } => {
                 let format = format.clone().unwrap_or(OutputFormat::Text);
                 self.show_work_history(client, work_id, format).await
@@ -63,22 +65,18 @@ impl WorkCommands {
                     },
                     _ => crate::client::MessageContentType::Text,
                 };
-                
-                self.add_message(
-                    client,
-                    work_id,
-                    content,
-                    content_type_enum,
-                ).await
+
+                self.add_message(client, work_id, content, content_type_enum)
+                    .await
             }
         }
     }
 
     async fn list_works(&self, client: &ManagerClient) -> Result<(), CliError> {
         info!("Listing all works");
-        
+
         let works = client.list_works().await?;
-        
+
         if works.is_empty() {
             println!("No works found.");
         } else {
@@ -87,7 +85,7 @@ impl WorkCommands {
                 println!("  {} - {} (Status: {})", work.id, work.title, work.status);
             }
         }
-        
+
         Ok(())
     }
 
@@ -98,9 +96,9 @@ impl WorkCommands {
         project_id: Option<String>,
     ) -> Result<(), CliError> {
         info!("Creating work with title: {}", title);
-        
+
         let work = client.create_work(title.to_string(), project_id).await?;
-        
+
         println!("Created work '{}' with ID: {}", work.title, work.id);
         Ok(())
     }
@@ -112,9 +110,9 @@ impl WorkCommands {
         format: OutputFormat,
     ) -> Result<(), CliError> {
         info!("Showing work history for work ID: {}", work_id);
-        
+
         let work_with_history = client.get_work_with_history(work_id).await?;
-        
+
         match format {
             OutputFormat::Text => self.display_history_text(&work_with_history),
             OutputFormat::Json => self.display_history_json(&work_with_history),
@@ -130,31 +128,39 @@ impl WorkCommands {
         content_type: crate::client::MessageContentType,
     ) -> Result<(), CliError> {
         info!("Adding message to work ID: {}", work_id);
-        
-        let message = client.add_message_to_work(
-            work_id.to_string(),
-            content.to_string(),
-            content_type,
-            crate::client::MessageAuthorType::User,
-            None, // For CLI, we don't have a specific user ID
-        ).await?;
-        
+
+        let message = client
+            .add_message_to_work(
+                work_id.to_string(),
+                content.to_string(),
+                content_type,
+                crate::client::MessageAuthorType::User,
+                None, // For CLI, we don't have a specific user ID
+            )
+            .await?;
+
         println!("Added message to work. Message ID: {}", message.id);
         Ok(())
     }
 
-    fn display_history_text(&self, work_with_history: &crate::client::WorkWithHistory) -> Result<(), CliError> {
-        println!("Work: {} ({})", work_with_history.work.title, work_with_history.work.id);
+    fn display_history_text(
+        &self,
+        work_with_history: &crate::client::WorkWithHistory,
+    ) -> Result<(), CliError> {
+        println!(
+            "Work: {} ({})",
+            work_with_history.work.title, work_with_history.work.id
+        );
         println!("Status: {}", work_with_history.work.status);
         println!("Created: {}", work_with_history.work.created_at);
         println!("\nMessages ({} total):", work_with_history.total_messages);
-        
+
         for message in &work_with_history.messages {
             let author = match &message.author_type {
                 crate::client::MessageAuthorType::User => "User",
                 crate::client::MessageAuthorType::Ai => "AI",
             };
-            
+
             let content_type = match &message.content_type {
                 crate::client::MessageContentType::Text => "text",
                 crate::client::MessageContentType::Markdown => "markdown",
@@ -167,33 +173,45 @@ impl WorkCommands {
                     }
                 }
             };
-            
-            println!("\n[{}] {} ({}):", message.sequence_order, author, content_type);
+
+            println!(
+                "\n[{}] {} ({}):",
+                message.sequence_order, author, content_type
+            );
             println!("{}", message.content);
         }
-        
+
         Ok(())
     }
 
-    fn display_history_json(&self, work_with_history: &crate::client::WorkWithHistory) -> Result<(), CliError> {
+    fn display_history_json(
+        &self,
+        work_with_history: &crate::client::WorkWithHistory,
+    ) -> Result<(), CliError> {
         let json = serde_json::to_string_pretty(work_with_history)
             .map_err(|e| CliError::Command(format!("Failed to serialize to JSON: {e}")))?;
         println!("{json}");
         Ok(())
     }
 
-    fn display_history_markdown(&self, work_with_history: &crate::client::WorkWithHistory) -> Result<(), CliError> {
-        println!("# Work: {} ({})", work_with_history.work.title, work_with_history.work.id);
+    fn display_history_markdown(
+        &self,
+        work_with_history: &crate::client::WorkWithHistory,
+    ) -> Result<(), CliError> {
+        println!(
+            "# Work: {} ({})",
+            work_with_history.work.title, work_with_history.work.id
+        );
         println!("**Status**: {}", work_with_history.work.status);
         println!("**Created**: {}", work_with_history.work.created_at);
         println!("\n## Messages ({} total)", work_with_history.total_messages);
-        
+
         for message in &work_with_history.messages {
             let author = match &message.author_type {
                 crate::client::MessageAuthorType::User => "User",
                 crate::client::MessageAuthorType::Ai => "AI",
             };
-            
+
             let content_type = match &message.content_type {
                 crate::client::MessageContentType::Text => "text",
                 crate::client::MessageContentType::Markdown => "markdown",
@@ -206,9 +224,12 @@ impl WorkCommands {
                     }
                 }
             };
-            
-            println!("\n### Message {} - {} ({})", message.sequence_order, author, content_type);
-            
+
+            println!(
+                "\n### Message {} - {} ({})",
+                message.sequence_order, author, content_type
+            );
+
             match &message.content_type {
                 crate::client::MessageContentType::Markdown => {
                     println!("{}", message.content);
@@ -223,7 +244,7 @@ impl WorkCommands {
                 }
             }
         }
-        
+
         Ok(())
     }
 }

@@ -110,9 +110,9 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('AI Sessions')).toBeInTheDocument();
+      expect(screen.getByText('Filter Sessions')).toBeInTheDocument();
       expect(
-        screen.getByText('Monitor and manage your AI-assisted development sessions')
+        screen.getByText('Filter sessions by AI tool')
       ).toBeInTheDocument();
     });
 

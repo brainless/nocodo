@@ -139,8 +139,14 @@ async fn main() -> AppResult<()> {
                         .route("/works/{id}", web::get().to(handlers::get_work))
                         .route("/works/{id}", web::delete().to(handlers::delete_work))
                         // Work message endpoints
-                        .route("/works/{id}/messages", web::post().to(handlers::add_message_to_work))
-                        .route("/works/{id}/messages", web::get().to(handlers::get_work_messages)),
+                        .route(
+                            "/works/{id}/messages",
+                            web::post().to(handlers::add_message_to_work),
+                        )
+                        .route(
+                            "/works/{id}/messages",
+                            web::get().to(handlers::get_work_messages),
+                        ),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
