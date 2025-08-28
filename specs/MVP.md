@@ -10,8 +10,7 @@ This MVP specification defines the minimal viable product for nocodo running ent
 
 1. **Manager Daemon** - Core orchestration service running locally
 2. **Manager Web App** - Chat-based interface for AI interaction
-3. **nocodo CLI** - Command-line companion for AI coding tools
-4. **Local Development Environment** - Complete setup on your CachyOS Linux laptop
+3. **Local Development Environment** - Complete setup on your CachyOS Linux laptop
 
 
 ## System Architecture
@@ -19,25 +18,17 @@ This MVP specification defines the minimal viable product for nocodo running ent
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                 Linux Laptop (CachyOS)                  │
-├─────────────────┬─────────────────┬────────────────────┤
-│   nocodo CLI    │  Manager Daemon │   Manager Web      │
-│   (Rust)        │  (Rust + Actix) │   (SolidJS)        │
-├─────────────────┼─────────────────┼────────────────────┤
-│                 │                 │                    │
-│   AI Tools      │   Unix Socket   │   HTTP Server      │
-│   Claude Code   │   Server        │   localhost:8081   │
-│   Gemini CLI    │   SQLite DB     │   Static Files     │
-│   etc.          │   File System   │   WebSocket        │
-│                 │                 │                    │
-└─────────────────┴─────────────────┴────────────────────┘
+├─────────────────────────────────┬────────────────────┤
+│          Manager Daemon         │   Manager Web      │
+│       (Rust + Actix)           │   (SolidJS)        │
+└─────────────────────────────────┴────────────────────┘
 ```
 
 ### Communication Flow
 
 1. **User** ↔ **Manager Web** (HTTP/WebSocket on localhost:8081)
-2. **nocodo CLI** ↔ **Manager Daemon** (Unix socket at `/tmp/nocodo-manager.sock`)
-3. **AI Tools** → **nocodo CLI** → **Manager Daemon**
-4. **Manager Web** ↔ **Manager Daemon** (Internal API calls)
+2. **AI Tools** → **Manager Daemon** (via Web interface)
+3. **Manager Web** ↔ **Manager Daemon** (Internal API calls)
 
 ## Core Components
 
@@ -250,10 +241,10 @@ cargo build --release --bin nocodo-manager
 sudo cp target/release/nocodo-manager /usr/local/bin/
 ```
 
-2. **Build and Install CLI:**
+2. **Build Manager:**
 ```bash
-cargo build --release --bin nocodo-cli
-sudo cp target/release/nocodo-cli /usr/local/bin/nocodo
+cargo build --release --bin nocodo-manager
+sudo cp target/release/nocodo-manager /usr/local/bin/nocodo-manager
 ```
 
 3. **Build Web App:**
