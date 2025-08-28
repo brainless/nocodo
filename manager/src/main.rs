@@ -116,23 +116,20 @@ async fn main() -> AppResult<()> {
                         )
                         .route("/files/{path:.*}", web::put().to(handlers::update_file))
                         .route("/files/{path:.*}", web::delete().to(handlers::delete_file))
-                        // AI session endpoints
-                        .route("/ai/sessions", web::post().to(handlers::create_ai_session))
-                        .route("/ai/sessions", web::get().to(handlers::list_ai_sessions))
-                        .route("/ai/sessions/{id}", web::get().to(handlers::get_ai_session))
+                        // Work endpoints (formerly AI sessions)
+                        .route("/work", web::post().to(handlers::create_ai_session))
+                        .route("/work", web::get().to(handlers::list_ai_sessions))
+                        .route("/work/{id}", web::get().to(handlers::get_ai_session))
                         .route(
-                            "/ai/sessions/{id}/outputs",
+                            "/work/{id}/outputs",
                             web::post().to(handlers::record_ai_output),
                         )
                         .route(
-                            "/ai/sessions/{id}/outputs",
+                            "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_outputs),
                         )
                         // Interactive input endpoint (Phase 1 streaming)
-                        .route(
-                            "/ai/sessions/{id}/input",
-                            web::post().to(handlers::send_ai_input),
-                        )
+                        .route("/work/{id}/input", web::post().to(handlers::send_ai_input))
                         // Work management endpoints
                         .route("/works", web::post().to(handlers::create_work))
                         .route("/works", web::get().to(handlers::list_works))
@@ -151,7 +148,7 @@ async fn main() -> AppResult<()> {
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
                 .route(
-                    "/ws/ai-sessions/{id}",
+                    "/ws/work/{id}",
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
                 // Serve static files from ./web/dist if it exists

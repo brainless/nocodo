@@ -52,7 +52,7 @@ describe('API Client - AI Sessions', () => {
 
       const result = await apiClient.listSessions();
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/ai/sessions', {
+      expect(global.fetch).toHaveBeenCalledWith('/api/work', {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -98,7 +98,7 @@ describe('API Client - AI Sessions', () => {
 
       const result = await apiClient.getSession('session-123');
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/ai/sessions/session-123', {
+      expect(global.fetch).toHaveBeenCalledWith('/api/work/session-123', {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -167,9 +167,7 @@ describe('API Client - AI Sessions', () => {
 
       apiClient.subscribeSession(sessionId, onMessage);
 
-      expect(global.WebSocket).toHaveBeenCalledWith(
-        'ws://localhost:8081/ws/ai-sessions/session-123'
-      );
+      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8081/ws/work/session-123');
     });
 
     test('should use wss protocol for https', () => {
@@ -186,7 +184,7 @@ describe('API Client - AI Sessions', () => {
 
       apiClient.subscribeSession(sessionId, onMessage);
 
-      expect(global.WebSocket).toHaveBeenCalledWith('wss://example.com/ws/ai-sessions/session-123');
+      expect(global.WebSocket).toHaveBeenCalledWith('wss://example.com/ws/work/session-123');
     });
 
     test('should handle WebSocket open event', () => {

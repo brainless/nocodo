@@ -110,36 +110,36 @@ class ApiClient {
     });
   }
 
-  // AI session endpoints
+  // Work endpoints (formerly AI sessions)
   async createAiSession(data: CreateAiSessionRequest): Promise<AiSessionResponse> {
-    return this.request('/ai/sessions', {
+    return this.request('/work', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async listAiSessions(): Promise<AiSessionListResponse> {
-    return this.request('/ai/sessions');
+    return this.request('/work');
   }
 
   async getAiSession(id: string): Promise<AiSessionResponse> {
-    return this.request(`/ai/sessions/${id}`);
+    return this.request(`/work/${id}`);
   }
 
   async recordAiOutput(id: string, content: string): Promise<{ ok: boolean }> {
-    return this.request(`/ai/sessions/${id}/outputs`, {
+    return this.request(`/work/${id}/outputs`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
   }
 
   async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
-    return this.request(`/ai/sessions/${id}/outputs`);
+    return this.request(`/work/${id}/outputs`);
   }
 
   // Issue #59: Send input to a running AI session (stdin)
   async sendAiInput(id: string, content: string): Promise<{ ok: boolean }> {
-    return this.request(`/ai/sessions/${id}/input`, {
+    return this.request(`/work/${id}/input`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
@@ -184,7 +184,7 @@ class ApiClient {
     // Create WebSocket URL for AI session updates
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/ai-sessions/${id}`;
+    const wsUrl = `${protocol}//${host}/ws/work/${id}`;
 
     // Create WebSocket connection
     const ws = new WebSocket(wsUrl);
