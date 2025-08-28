@@ -246,7 +246,7 @@ describe.skip('AiSessionDetail Component', () => {
     await waitFor(() => {
       const backLink = screen.getByRole('link', { name: '← Back to Sessions' });
       expect(backLink).toBeInTheDocument();
-      expect(backLink).toHaveAttribute('href', '/ai/sessions');
+      expect(backLink).toHaveAttribute('href', '/work');
     });
   });
 

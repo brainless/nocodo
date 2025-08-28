@@ -25,7 +25,7 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
   return `${seconds}s`;
 };
 
-// Live status indicator for running sessions
+// Live status indicator for running work
 const LiveStatusIndicator: Component<{
   connectionStatus: 'connected' | 'disconnected' | 'error' | 'fallback';
 }> = props => {
@@ -196,7 +196,7 @@ const AiSessionDetail: Component = () => {
         if (!sessionData && isMounted) {
           const fetchedData = await actions.fetchById(params.id);
           if (!fetchedData) {
-            console.error('Session not found');
+            console.error('Work not found');
             return;
           }
           sessionData = fetchedData;
@@ -221,7 +221,7 @@ const AiSessionDetail: Component = () => {
           setIsConnected(true);
         }
       } catch (error) {
-        console.error('Failed to load session data:', error);
+        console.error('Failed to load work data:', error);
       }
     };
 
@@ -252,10 +252,10 @@ const AiSessionDetail: Component = () => {
         <ol role='list' class='flex items-center space-x-2 text-sm'>
           <li>
             <A
-              href='/ai/sessions'
+              href='/work'
               class='text-gray-500 hover:text-gray-700 focus:outline-none focus:underline cursor-pointer'
             >
-              AI Sessions
+              Work Management
             </A>
           </li>
           <li>
@@ -265,7 +265,7 @@ const AiSessionDetail: Component = () => {
           </li>
           <li>
             <span class='text-gray-900 font-medium' aria-current='page'>
-              Session Details
+              Work Details
             </span>
           </li>
         </ol>
@@ -274,7 +274,7 @@ const AiSessionDetail: Component = () => {
       <Show when={store.loading && !session()}>
         <div class='flex justify-center items-center py-8'>
           <div class='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500'></div>
-          <span class='ml-2 text-gray-600'>Loading session...</span>
+          <span class='ml-2 text-gray-600'>Loading work...</span>
         </div>
       </Show>
 
@@ -291,12 +291,12 @@ const AiSessionDetail: Component = () => {
 
       <Show when={!store.loading && !session()}>
         <div class='text-center py-8'>
-          <div class='text-gray-400 text-lg mb-2'>Session not found</div>
+          <div class='text-gray-400 text-lg mb-2'>Work not found</div>
           <A
-            href='/ai/sessions'
+            href='/work'
             class='text-blue-600 hover:text-blue-800 cursor-pointer focus:outline-none focus:underline'
           >
-            ← Back to sessions
+            ← Back to work
           </A>
         </div>
       </Show>
@@ -309,7 +309,7 @@ const AiSessionDetail: Component = () => {
             <Show when={session()!.prompt}>
               <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
                 <div class='px-6 py-4 border-b border-gray-200 bg-gray-50'>
-                  <h3 class='text-lg font-medium text-gray-900'>Session Prompt</h3>
+                  <h3 class='text-lg font-medium text-gray-900'>Work Prompt</h3>
                   <p class='text-sm text-gray-600 mt-1'>The original request sent to the AI tool</p>
                 </div>
                 <div class='px-6 py-4'>
@@ -347,11 +347,11 @@ const AiSessionDetail: Component = () => {
 
           {/* Sidebar */}
           <div class='lg:col-span-1 space-y-6'>
-            {/* Session Summary */}
+            {/* Work Summary */}
             <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
               <div class='px-6 py-4 border-b border-gray-200 bg-gray-50'>
-                <h3 class='text-lg font-medium text-gray-900'>Session Summary</h3>
-                <p class='text-sm text-gray-600 mt-1'>Overview of session details</p>
+                <h3 class='text-lg font-medium text-gray-900'>Work Summary</h3>
+                <p class='text-sm text-gray-600 mt-1'>Overview of work details</p>
               </div>
               <div class='px-6 py-4 space-y-4'>
                 {/* Status and Tool */}
@@ -364,9 +364,9 @@ const AiSessionDetail: Component = () => {
                   <ToolIcon toolName={session()!.tool_name} />
                 </div>
 
-                {/* Session ID */}
+                {/* Work ID */}
                 <div>
-                  <dt class='text-xs font-medium text-gray-500 mb-1'>Session ID</dt>
+                  <dt class='text-xs font-medium text-gray-500 mb-1'>Work ID</dt>
                   <dd>
                     <code class='bg-gray-100 px-2 py-1 rounded font-mono text-xs text-gray-900'>
                       {session()!.id}
@@ -414,7 +414,7 @@ const AiSessionDetail: Component = () => {
                   </dd>
                 </div>
 
-                {/* Live Status for running sessions */}
+                {/* Live Status for running work */}
                 <Show
                   when={
                     session()!.status !== 'completed' &&
@@ -445,13 +445,13 @@ const AiSessionDetail: Component = () => {
       {/* Action buttons */}
       <div class='flex justify-between items-center pt-6 border-t border-gray-200'>
         <A
-          href='/ai/sessions'
+          href='/work'
           class='inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer'
         >
           <span class='mr-2' aria-hidden='true'>
             ←
           </span>
-          Back to Sessions
+          Back to Work Management
         </A>
         <Show when={session() && session()!.project_id}>
           <A
@@ -469,7 +469,7 @@ const AiSessionDetail: Component = () => {
   );
 };
 
-// Session input box component (Issue #59)
+// Work input box component (Issue #59)
 const SessionInputBox: Component<{ sessionId: string }> = props => {
   const [content, setContent] = createSignal('');
   const [sending, setSending] = createSignal(false);

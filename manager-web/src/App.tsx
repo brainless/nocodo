@@ -142,13 +142,13 @@ const TopNavigation: Component = () => {
           </div>
         </div>
 
-        {/* Right side - Sessions link */}
+        {/* Right side - Work Management link */}
         <div class='flex items-center'>
           <A
-            href='/ai/sessions'
+            href='/work'
             class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
           >
-            Sessions
+            Work Management
           </A>
         </div>
       </div>
@@ -195,7 +195,7 @@ const Layout: Component<LayoutProps> = props => {
 // Dashboard Page
 const DashboardPage: Component = () => {
   return (
-    <Layout title='Welcome back!' subtitle='Manage your AI coding projects and sessions' noBox>
+    <Layout title='Welcome back!' subtitle='Manage your AI coding projects and work' noBox>
       <Dashboard />
     </Layout>
   );
@@ -254,10 +254,10 @@ const ProjectDetailsWrapper: Component = () => {
   );
 };
 
-// AI Sessions Pages
+// Work Management Pages
 const AiSessionsPage: Component = () => {
   return (
-    <Layout title='AI Sessions' subtitle='View and manage your AI coding sessions' noBox>
+    <Layout title='Work Management' subtitle='View and manage your AI coding work' noBox>
       <AiSessionsList />
     </Layout>
   );
@@ -265,7 +265,7 @@ const AiSessionsPage: Component = () => {
 
 const AiSessionDetailPage: Component = () => {
   return (
-    <Layout title='AI Session Details' subtitle='View session information and live output' noBox>
+    <Layout title='Work Details' subtitle='View work information and live output' noBox>
       <AiSessionDetail />
     </Layout>
   );
@@ -283,8 +283,8 @@ const App: Component = () => {
           <Route path='/projects/:id' component={ProjectDetailsWrapper} />
           <Route path='/projects/:id/:tab' component={ProjectDetailsWrapper} />
           <Route path='/projects/:id/files' component={FilesPageWrapper} />
-          <Route path='/ai/sessions' component={AiSessionsPage} />
-          <Route path='/ai/sessions/:id' component={AiSessionDetailPage} />
+          <Route path='/work' component={AiSessionsPage} />
+          <Route path='/work/:id' component={AiSessionDetailPage} />
         </Router>
       </SessionsProvider>
     </WebSocketProvider>

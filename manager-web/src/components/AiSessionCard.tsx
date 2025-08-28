@@ -48,7 +48,7 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
 const AiSessionCard: Component<AiSessionCardProps> = props => {
   return (
     <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow'>
-      <A href={`/ai/sessions/${props.session.id}`} class='block'>
+      <A href={`/work/${props.session.id}`} class='block'>
         {/* Header row with status and tool */}
         <div class='flex items-center justify-between mb-4'>
           <div class='flex items-center space-x-3'>
@@ -105,7 +105,7 @@ const AiSessionCard: Component<AiSessionCardProps> = props => {
               class='w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse mr-2'
               aria-hidden='true'
             ></div>
-            <span>Session is actively running</span>
+            <span>Work is actively running</span>
           </div>
         </Show>
       </A>
