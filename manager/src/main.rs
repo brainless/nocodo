@@ -129,10 +129,7 @@ async fn main() -> AppResult<()> {
                             web::get().to(handlers::list_ai_outputs),
                         )
                         // Interactive input endpoint (Phase 1 streaming)
-                        .route(
-                            "/work/{id}/input",
-                            web::post().to(handlers::send_ai_input),
-                        )
+                        .route("/work/{id}/input", web::post().to(handlers::send_ai_input))
                         // Work management endpoints
                         .route("/works", web::post().to(handlers::create_work))
                         .route("/works", web::get().to(handlers::list_works))
