@@ -36,10 +36,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: integration-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            .
-            cli
-            manager
 
       - name: Setup npm cache
         uses: actions/cache@v4
@@ -63,12 +59,7 @@ jobs:
           npm run test:run
           npm run build
 
-      - name: Verify all binaries exist
-        run: |
-          ls -la target/release/
-          test -f target/release/nocodo-cli
-          test -f target/release/nocodo-manager
-          echo "All Rust binaries built successfully"
+
 
       - name: Verify Web build
         run: |
@@ -142,13 +133,7 @@ jobs:
           npm run build
           cd ..
 
-      - name: Test binary execution
-        run: |
-          # Test CLI help command
-          ./target/release/nocodo-cli --help || echo "CLI help command executed"
-          
-          # Test Manager help command  
-          ./target/release/nocodo-manager --help || echo "Manager help command executed"
+
 
       - name: Validate configuration files
         run: |
