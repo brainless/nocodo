@@ -32,27 +32,23 @@ Make endless change requests using your own API credits or subscriptions.
 
 ## 🏗️ Architecture
 
-The nocodo MVP consists of three core components running locally on your Linux machine:
+The nocodo MVP consists of two core components running locally on your Linux machine:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                 Linux Laptop (Local)                    │
-├─────────────────┬─────────────────┬────────────────────┤
-│   nocodo CLI    │  Manager Daemon │   Manager Web      │
-│   (Rust) 🦀     │  (Rust + Actix) │   (SolidJS) ⚡     │
-├─────────────────┼─────────────────┼────────────────────┤
-│   AI Tools 🤖   │   Unix Socket   │   HTTP Server      │
-│   Claude Code   │   Server 🔌     │   localhost:8081   │
-│   Gemini CLI    │   SQLite DB 📊  │   Static Files 📁  │
-│   etc. 🛠️       │   File System   │   WebSocket 🔄     │
-└─────────────────┴─────────────────┴────────────────────┘
+├─────────────────────────────────┬────────────────────┤
+│          Manager Daemon         │   Manager Web      │
+│       (Rust + Actix)           │   (SolidJS) ⚡     │
+└─────────────────────────────────┴────────────────────┘
 ```
 
 ### 🎯 **Core Components**
 
 - **🖥️ Manager Daemon**: Local orchestration service managing projects, APIs, and coordination
 - **💻 Manager Web App**: Chat-based interface for AI interaction at `localhost:8081`
-- **⚡ nocodo CLI**: Command-line companion providing guardrails and repository-level operations
+
+> ⚠️ **Note**: The CLI component has been removed as part of issue #80. The nocodo CLI is no longer included in this repository.
 
 ## 🚀 Quick Start
 
@@ -68,10 +64,6 @@ The nocodo MVP consists of three core components running locally on your Linux m
 cargo build --release --bin nocodo-manager
 sudo cp target/release/nocodo-manager /usr/local/bin/
 
-# Build CLI
-cargo build --release --bin nocodo-cli
-sudo cp target/release/nocodo-cli /usr/local/bin/nocodo
-
 # Build Web app
 cd manager-web
 npm install && npm run build
@@ -82,18 +74,10 @@ nocodo-manager --config ~/.config/nocodo/manager.toml
 
 ### 💡 Usage
 ```bash
-# 🔍 Analyze a project
-nocodo analyze
-
-# 🤖 Start AI session with Claude Code
-nocodo session claude "add authentication to this project"
-
-# 🌟 Start AI session with other tools
-nocodo session gemini "refactor the user service"
-nocodo session openai "add unit tests for the API"
-
 # 🌐 Access web interface
 # Navigate to http://localhost:8081
+
+# Note: The nocodo CLI has been removed as part of issue #80
 ```
 
 ## 📖 Vibe Coding Playbook
