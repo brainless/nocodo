@@ -93,11 +93,11 @@ POST   /api/projects                    // Create new project
 GET    /api/projects/{id}               // Get project details
 DELETE /api/projects/{id}               // Delete project
 
-// AI Integration
-POST   /api/ai/sessions                 // Start AI session
-GET    /api/ai/sessions/{id}            // Get session status
-POST   /api/ai/sessions/{id}/message    // Send message to AI
-DELETE /api/ai/sessions/{id}            // End AI session
+// Work Management (formerly AI Integration)
+POST   /api/work                        // Start work session
+GET    /api/work/{id}                   // Get work session status
+POST   /api/work/{id}/message           // Send message to work session
+DELETE /api/work/{id}                   // End work session
 
 // File System
 GET    /api/files                       // Browse project files

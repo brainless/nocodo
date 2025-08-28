@@ -136,7 +136,7 @@ const StatusBadge: Component<{
     <span
       class={`${sizeClasses} font-medium rounded-full border ${getStatusColor()} inline-flex items-center gap-1`}
       title={`Status: ${props.status}`}
-      aria-label={`Session status: ${props.status}`}
+      aria-label={`Work status: ${props.status}`}
     >
       <Show when={props.showIcon !== false}>
         <span class={props.status === 'running' ? 'animate-spin' : ''} aria-hidden='true'>
@@ -191,10 +191,10 @@ const SessionRow: Component<SessionRowProps> = props => {
   return (
     <li class={props.className}>
       <A
-        href={`/ai/sessions/${session().id}`}
+        href={`/work/${session().id}`}
         class='block hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset transition-colors duration-200'
         role='article'
-        aria-label={`View details for ${session().tool_name} session`}
+        aria-label={`View details for ${session().tool_name} work`}
       >
         <div class='px-4 py-4 sm:px-6'>
           {/* Header row with status and tool */}
@@ -220,7 +220,7 @@ const SessionRow: Component<SessionRowProps> = props => {
               projectId={session().project_id ?? undefined}
             />
             <div class='text-xs text-gray-500'>
-              <span title='Session duration'>
+              <span title='Work duration'>
                 Duration: {formatDuration(session().started_at, session().ended_at ?? undefined)}
                 <Show when={!session().ended_at}>
                   <span class='text-blue-600'> (ongoing)</span>
@@ -248,7 +248,7 @@ const SessionRow: Component<SessionRowProps> = props => {
                 class='w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse mr-2'
                 aria-hidden='true'
               ></div>
-              <span>Session is actively running</span>
+              <span>Work is actively running</span>
             </div>
           </Show>
         </div>
