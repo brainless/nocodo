@@ -109,7 +109,12 @@ describe('AiSessionsList Component', () => {
   test('renders sessions list after loading', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
-    // AiSessionsList component renders successfully
+    await waitFor(() => {
+      expect(screen.getByText('Filter Sessions')).toBeInTheDocument();
+      expect(
+        screen.getByText('Filter sessions by AI tool')
+      ).toBeInTheDocument();
+    });
 
     // Check that sessions are displayed via SessionRow components
     await waitFor(() => {

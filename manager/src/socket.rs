@@ -1,6 +1,8 @@
 use crate::database::Database;
 use crate::error::{AppError, AppResult};
-use crate::models::{AiSession, CreateAiSessionRequest, Project};
+use crate::models::{
+    AddMessageRequest, AiSession, CreateAiSessionRequest, CreateWorkRequest, Project,
+};
 use crate::websocket::WebSocketBroadcaster;
 use serde::{Deserialize, Serialize};
 use std::fs::Permissions;
@@ -41,6 +43,14 @@ pub enum SocketRequest {
         session_id: String,
         output: String,
     },
+
+    // Work history management
+    CreateWork(CreateWorkRequest),
+    GetWorkWithHistory {
+        work_id: String,
+    },
+    ListWorks,
+    AddMessageToWork(AddMessageRequest),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -338,6 +348,84 @@ impl SocketServer {
                             message: format!("Session not found: {session_id}"),
                         }
                     }
+                }
+            }
+
+            // Work history management requests
+            SocketRequest::CreateWork(req) => {
+                info!("Creating work: {}", req.title);
+
+                // Create the work object
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| AppError::Internal(format!("Failed to get timestamp: {e}")))
+                    .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+                    .as_secs() as i64;
+
+                let work = crate::models::Work {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    title: req.title,
+                    project_id: req.project_id,
+                    status: "active".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                };
+
+                match database.create_work(&work) {
+                    Ok(()) => {
+                        let data = serde_json::to_value(&work).unwrap_or_default();
+                        SocketResponse::Success { data }
+                    }
+                    Err(e) => {
+                        error!("Failed to create work: {}", e);
+                        SocketResponse::Error {
+                            message: format!("Failed to create work: {e}"),
+                        }
+                    }
+                }
+            }
+
+            SocketRequest::GetWorkWithHistory { work_id } => {
+                info!("Getting work with history: {}", work_id);
+
+                match database.get_work_with_messages(&work_id) {
+                    Ok(work_with_history) => {
+                        let data = serde_json::to_value(&work_with_history).unwrap_or_default();
+                        SocketResponse::Success { data }
+                    }
+                    Err(e) => {
+                        error!("Failed to get work with history: {}", e);
+                        SocketResponse::Error {
+                            message: format!("Failed to get work: {e}"),
+                        }
+                    }
+                }
+            }
+
+            SocketRequest::ListWorks => {
+                info!("Listing all works");
+
+                match database.get_all_works() {
+                    Ok(works) => {
+                        let data = serde_json::json!({ "works": works });
+                        SocketResponse::Success { data }
+                    }
+                    Err(e) => {
+                        error!("Failed to list works: {}", e);
+                        SocketResponse::Error {
+                            message: format!("Failed to list works: {e}"),
+                        }
+                    }
+                }
+            }
+
+            SocketRequest::AddMessageToWork(_req) => {
+                info!("Adding message to work");
+
+                // For now, we'll need to determine the work_id from context or add it to the request
+                // This is a simplified implementation - in a real scenario, we'd need the work_id
+                SocketResponse::Error {
+                    message: "AddMessageToWork via socket not fully implemented".to_string(),
                 }
             }
         }

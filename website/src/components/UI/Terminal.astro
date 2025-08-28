@@ -1,0 +1,17 @@
+---
+const { command, message } = Astro.props;
+---
+
+<div class="terminal-component">
+    {message && <p class="text-gray-100 mb-1" set:html={message} />}
+    <div class="bg-gray-800 rounded-lg p-2 my-1 border border-gray-700">
+        <div class="flex items-center mb-1 p-2">
+            <span class="h-3 w-3 bg-red-500 rounded-full mr-2"></span>
+            <span class="h-3 w-3 bg-yellow-500 rounded-full mr-2"></span>
+            <span class="h-3 w-3 bg-green-500 rounded-full"></span>
+            <span class="ml-2 text-gray-300 text-sm">Command</span>
+        </div>
+        <pre
+            class="text-gray-100 text-sm whitespace-pre-wrap p-4 terminal-box"><code class="bg-transparent text-gray-100">{command}</code></pre>
+    </div>
+</div>
