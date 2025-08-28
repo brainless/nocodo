@@ -52,9 +52,9 @@ describe('SessionTimeline Component', () => {
   test('renders timeline header correctly', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
 
-    expect(screen.getByText('Session Timeline')).toBeInTheDocument();
+    expect(screen.getByText('Work Timeline')).toBeInTheDocument();
     expect(
-      screen.getByText('Track the progress and key events of this AI session')
+      screen.getByText('Track the progress and key events of this AI work')
     ).toBeInTheDocument();
   });
 
@@ -62,21 +62,21 @@ describe('SessionTimeline Component', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
 
     // Should show created and started events
-    expect(screen.getByText('Session Created')).toBeInTheDocument();
-    expect(screen.getByText('Session Started')).toBeInTheDocument();
-    expect(screen.getByText('Session Completed')).toBeInTheDocument();
+    expect(screen.getByText('Work Created')).toBeInTheDocument();
+    expect(screen.getByText('Work Started')).toBeInTheDocument();
+    expect(screen.getByText('Work Completed')).toBeInTheDocument();
 
     // Should show tool name in description
-    expect(screen.getByText('gpt-4 session initialized')).toBeInTheDocument();
+    expect(screen.getByText('gpt-4 work initialized')).toBeInTheDocument();
     expect(screen.getByText('Began processing with gpt-4')).toBeInTheDocument();
   });
 
   test('renders timeline events for failed session', () => {
     render(() => <SessionTimeline session={mockFailedSession} />);
 
-    expect(screen.getByText('Session Created')).toBeInTheDocument();
-    expect(screen.getByText('Session Started')).toBeInTheDocument();
-    expect(screen.getByText('Session Failed')).toBeInTheDocument();
+    expect(screen.getByText('Work Created')).toBeInTheDocument();
+    expect(screen.getByText('Work Started')).toBeInTheDocument();
+    expect(screen.getByText('Work Failed')).toBeInTheDocument();
 
     // Should show error message
     expect(screen.getByText(/Ended with error after/)).toBeInTheDocument();
@@ -85,9 +85,9 @@ describe('SessionTimeline Component', () => {
   test('renders timeline events for cancelled session', () => {
     render(() => <SessionTimeline session={mockCancelledSession} />);
 
-    expect(screen.getByText('Session Created')).toBeInTheDocument();
-    expect(screen.getByText('Session Started')).toBeInTheDocument();
-    expect(screen.getByText('Session Cancelled')).toBeInTheDocument();
+    expect(screen.getByText('Work Created')).toBeInTheDocument();
+    expect(screen.getByText('Work Started')).toBeInTheDocument();
+    expect(screen.getByText('Work Cancelled')).toBeInTheDocument();
 
     // Should show cancellation message
     expect(screen.getByText(/Cancelled by user after/)).toBeInTheDocument();
@@ -96,9 +96,9 @@ describe('SessionTimeline Component', () => {
   test('renders live indicator for running session', () => {
     render(() => <SessionTimeline session={mockRunningSession} />);
 
-    expect(screen.getByText('Session Created')).toBeInTheDocument();
-    expect(screen.getByText('Session Started')).toBeInTheDocument();
-    expect(screen.getByText('Session Running')).toBeInTheDocument();
+    expect(screen.getByText('Work Created')).toBeInTheDocument();
+    expect(screen.getByText('Work Started')).toBeInTheDocument();
+    expect(screen.getByText('Work Running')).toBeInTheDocument();
     expect(screen.getByText('Processing your request...')).toBeInTheDocument();
     expect(screen.getByText('Live')).toBeInTheDocument();
   });
@@ -106,7 +106,7 @@ describe('SessionTimeline Component', () => {
   test('does not show live indicator for completed session', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
 
-    expect(screen.queryByText('Session Running')).not.toBeInTheDocument();
+    expect(screen.queryByText('Work Running')).not.toBeInTheDocument();
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
   });
 
@@ -114,7 +114,7 @@ describe('SessionTimeline Component', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
 
     expect(screen.getByText('Total Events:')).toBeInTheDocument();
-    expect(screen.getByText('Session Status:')).toBeInTheDocument();
+    expect(screen.getByText('Work Status:')).toBeInTheDocument();
     expect(screen.getByText('completed')).toBeInTheDocument();
 
     // Should show number of events (created + started + completed = 3)
@@ -126,9 +126,9 @@ describe('SessionTimeline Component', () => {
 
     const eventTitles = screen.getAllByRole('listitem');
     // Events should be in order: created, started, completed
-    expect(eventTitles[0]).toHaveTextContent('Session Created');
-    expect(eventTitles[1]).toHaveTextContent('Session Started');
-    expect(eventTitles[2]).toHaveTextContent('Session Completed');
+    expect(eventTitles[0]).toHaveTextContent('Work Created');
+    expect(eventTitles[1]).toHaveTextContent('Work Started');
+    expect(eventTitles[2]).toHaveTextContent('Work Completed');
   });
 
   test('shows proper time formatting', () => {
@@ -163,7 +163,7 @@ describe('SessionTimeline Component', () => {
     render(() => <SessionTimeline session={mockCompletedSession} />);
 
     // Timeline should have proper list semantics
-    const timelineList = screen.getByRole('list', { name: 'Session timeline events' });
+    const timelineList = screen.getByRole('list', { name: 'Work timeline events' });
     expect(timelineList).toBeInTheDocument();
 
     const listItems = screen.getAllByRole('listitem');
@@ -194,11 +194,11 @@ describe('SessionTimeline Component', () => {
     render(() => <SessionTimeline session={mockRunningSession} />);
 
     // Should not show completion event
-    expect(screen.queryByText('Session Completed')).not.toBeInTheDocument();
-    expect(screen.queryByText('Session Failed')).not.toBeInTheDocument();
-    expect(screen.queryByText('Session Cancelled')).not.toBeInTheDocument();
+    expect(screen.queryByText('Work Completed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Work Failed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Work Cancelled')).not.toBeInTheDocument();
 
     // Should show running indicator
-    expect(screen.getByText('Session Running')).toBeInTheDocument();
+    expect(screen.getByText('Work Running')).toBeInTheDocument();
   });
 });

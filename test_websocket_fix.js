@@ -51,7 +51,7 @@ async function testWebSocketPersistence() {
     await page.waitForTimeout(2000);
     
     console.log('📱 Navigating to AI Sessions...');
-    await page.click('a[href="/ai/sessions"]');
+    await page.click('a[href="/work"]');
     await page.waitForTimeout(2000);
     
     console.log('📱 Navigating back to Dashboard...');

@@ -19,7 +19,7 @@ const Filters: Component<FiltersProps> = props => {
 
   return (
     <div class='bg-white border border-gray-200 rounded-lg p-4 mb-6 shadow-sm'>
-      <h2 class='text-lg font-medium text-gray-900 mb-4'>Filter Sessions</h2>
+      <h2 class='text-lg font-medium text-gray-900 mb-4'>Filter Work</h2>
       <div class='flex flex-wrap gap-6'>
         <div class='flex flex-col min-w-0 flex-1'>
           <label for='tool-filter' class='text-sm font-medium text-gray-700 mb-2'>
@@ -42,7 +42,7 @@ const Filters: Component<FiltersProps> = props => {
             </For>
           </select>
           <span id='tool-filter-description' class='text-xs text-gray-500 mt-1'>
-            Filter sessions by AI tool
+            Filter work by AI tool
           </span>
         </div>
 
@@ -67,7 +67,7 @@ const Filters: Component<FiltersProps> = props => {
             </For>
           </select>
           <span id='status-filter-description' class='text-xs text-gray-500 mt-1'>
-            Filter sessions by completion status
+            Filter work by completion status
           </span>
         </div>
       </div>
@@ -122,7 +122,7 @@ const AiSessionsList: Component = () => {
       {/* Session count display */}
       <div class='flex justify-end'>
         <div class='text-sm text-gray-500'>
-          <span class='font-medium text-gray-900'>{filteredSessions().length}</span> session
+          <span class='font-medium text-gray-900'>{filteredSessions().length}</span> work item
           {filteredSessions().length !== 1 ? 's' : ''}
           {(toolFilter() || statusFilter()) && (
             <span class='ml-2'>(filtered from {store.list.length})</span>
@@ -145,8 +145,8 @@ const AiSessionsList: Component = () => {
             class='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500'
             aria-hidden='true'
           ></div>
-          <span class='ml-3 text-gray-600'>Loading sessions...</span>
-          <span class='sr-only'>Loading AI sessions data</span>
+          <span class='ml-3 text-gray-600'>Loading work...</span>
+          <span class='sr-only'>Loading AI work data</span>
         </div>
       </Show>
 
@@ -163,7 +163,7 @@ const AiSessionsList: Component = () => {
               </span>
             </div>
             <div class='ml-3'>
-              <h3 class='text-sm font-medium text-red-800'>Error Loading Sessions</h3>
+              <h3 class='text-sm font-medium text-red-800'>Error Loading Work</h3>
               <div class='mt-2 text-sm text-red-700'>{store.error}</div>
               <button
                 onClick={() => actions.fetchList()}
@@ -183,12 +183,12 @@ const AiSessionsList: Component = () => {
               🤖
             </div>
             <h3 class='text-lg font-medium text-gray-900 mb-2'>
-              {toolFilter() || statusFilter() ? 'No matching sessions' : 'No AI sessions yet'}
+              {toolFilter() || statusFilter() ? 'No matching work' : 'No AI work yet'}
             </h3>
             <p class='text-gray-500 mb-4'>
               {toolFilter() || statusFilter()
-                ? 'Try adjusting your filters to see more sessions.'
-                : 'Start your first AI session using the nocodo CLI.'}
+                ? 'Try adjusting your filters to see more work.'
+                : 'Start your first AI work session using the nocodo CLI.'}
             </p>
             <Show when={toolFilter() || statusFilter()}>
               <button

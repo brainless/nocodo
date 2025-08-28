@@ -27,29 +27,29 @@ const formatTimelineTimestamp = (timestamp: number): string => {
 const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
   const events: TimelineEvent[] = [];
 
-  // Session created event
+  // Work created event
   events.push({
     id: 'created',
     type: 'created',
     timestamp: session.started_at,
-    title: 'Session Created',
-    description: `${session.tool_name} session initialized`,
+    title: 'Work Created',
+    description: `${session.tool_name} work initialized`,
     icon: '🚀',
     iconColor: 'bg-blue-500',
   });
 
-  // Session started event (for now, same as created)
+  // Work started event (for now, same as created)
   events.push({
     id: 'started',
     type: 'started',
     timestamp: session.started_at,
-    title: 'Session Started',
+    title: 'Work Started',
     description: `Began processing with ${session.tool_name}`,
     icon: '▶️',
     iconColor: 'bg-green-500',
   });
 
-  // Session end event (if completed)
+  // Work end event (if completed)
   if (session.ended_at) {
     const duration = Math.floor(session.ended_at - session.started_at);
     const durationText =
@@ -61,7 +61,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
           id: 'completed',
           type: 'completed',
           timestamp: session.ended_at,
-          title: 'Session Completed',
+          title: 'Work Completed',
           description: `Finished successfully in ${durationText}`,
           icon: '✅',
           iconColor: 'bg-green-500',
@@ -72,7 +72,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
           id: 'failed',
           type: 'failed',
           timestamp: session.ended_at,
-          title: 'Session Failed',
+          title: 'Work Failed',
           description: `Ended with error after ${durationText}`,
           icon: '❌',
           iconColor: 'bg-red-500',
@@ -83,7 +83,7 @@ const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
           id: 'cancelled',
           type: 'cancelled',
           timestamp: session.ended_at,
-          title: 'Session Cancelled',
+          title: 'Work Cancelled',
           description: `Cancelled by user after ${durationText}`,
           icon: '⚪',
           iconColor: 'bg-gray-500',
@@ -157,7 +157,7 @@ const LiveProgressIndicator: Component<{ session: AiSession }> = props => {
       {/* Live content */}
       <div class='ml-4 flex-1 min-w-0'>
         <div class='flex items-center justify-between'>
-          <h4 class='text-sm font-medium text-blue-900'>Session Running</h4>
+          <h4 class='text-sm font-medium text-blue-900'>Work Running</h4>
           <div class='flex items-center text-xs text-blue-600'>
             <div
               class='w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2'
@@ -194,12 +194,12 @@ const SessionTimeline: Component<SessionTimelineProps> = props => {
     <div class={`bg-white rounded-lg border border-gray-200 p-6 ${props.className || ''}`}>
       {/* Timeline header */}
       <div class='mb-6'>
-        <h3 class='text-lg font-medium text-gray-900 mb-2'>Session Timeline</h3>
-        <p class='text-sm text-gray-600'>Track the progress and key events of this AI session</p>
+        <h3 class='text-lg font-medium text-gray-900 mb-2'>Work Timeline</h3>
+        <p class='text-sm text-gray-600'>Track the progress and key events of this AI work</p>
       </div>
 
       {/* Timeline content */}
-      <div class='space-y-6' role='list' aria-label='Session timeline events'>
+      <div class='space-y-6' role='list' aria-label='Work timeline events'>
         <For each={timelineEvents()}>
           {(event, index) => (
             <div role='listitem'>
@@ -227,7 +227,7 @@ const SessionTimeline: Component<SessionTimelineProps> = props => {
             <span class='ml-2 font-medium text-gray-900'>{timelineEvents().length}</span>
           </div>
           <div>
-            <span class='text-gray-500'>Session Status:</span>
+            <span class='text-gray-500'>Work Status:</span>
             <span class='ml-2 font-medium text-gray-900 capitalize'>{session().status}</span>
           </div>
         </div>

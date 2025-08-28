@@ -103,17 +103,15 @@ describe('AiSessionsList Component', () => {
 
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
-    expect(screen.getByText('Loading sessions...')).toBeInTheDocument();
+    expect(screen.getByText('Loading work...')).toBeInTheDocument();
   });
 
   test('renders sessions list after loading', async () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('Filter Sessions')).toBeInTheDocument();
-      expect(
-        screen.getByText('Filter sessions by AI tool')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Filter Work')).toBeInTheDocument();
+      expect(screen.getByText('Filter work by AI tool')).toBeInTheDocument();
     });
 
     // Check that sessions are displayed via SessionRow components
@@ -127,10 +125,16 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      // Use a more flexible matcher for the session count
-      expect(
-        screen.getByText(content => content.includes('3') && content.includes('session'))
-      ).toBeInTheDocument();
+      // Check for count in the main display area, not filter dropdowns
+      expect(screen.getByText('3')).toBeInTheDocument();
+
+      // Find the specific element in the top-right count display
+      const countElements = screen.getAllByText((_, element) => {
+        return element?.textContent?.includes('3 work items') || false;
+      });
+
+      // Should have the count display (might have multiple due to filters, but at least one)
+      expect(countElements.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -140,9 +144,9 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('No AI sessions yet')).toBeInTheDocument();
+      expect(screen.getByText('No AI work yet')).toBeInTheDocument();
       expect(
-        screen.getByText('Start your first AI session using the nocodo CLI.')
+        screen.getByText('Start your first AI work session using the nocodo CLI.')
       ).toBeInTheDocument();
     });
   });
@@ -154,7 +158,7 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('Error Loading Sessions')).toBeInTheDocument();
+      expect(screen.getByText('Error Loading Work')).toBeInTheDocument();
       expect(screen.getByText(errorMessage)).toBeInTheDocument();
       expect(screen.getByText('Try Again')).toBeInTheDocument();
     });
@@ -164,9 +168,9 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Session status: running')).toBeInTheDocument();
-      expect(screen.getByLabelText('Session status: completed')).toBeInTheDocument();
-      expect(screen.getByLabelText('Session status: failed')).toBeInTheDocument();
+      expect(screen.getByLabelText('Work status: running')).toBeInTheDocument();
+      expect(screen.getByLabelText('Work status: completed')).toBeInTheDocument();
+      expect(screen.getByLabelText('Work status: failed')).toBeInTheDocument();
     });
   });
 
@@ -214,11 +218,11 @@ describe('AiSessionsList Filters', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('Filter Sessions')).toBeInTheDocument();
+      expect(screen.getByText('Filter Work')).toBeInTheDocument();
       expect(screen.getByLabelText('Tool')).toBeInTheDocument();
       expect(screen.getByLabelText('Status')).toBeInTheDocument();
-      expect(screen.getByText('Filter sessions by AI tool')).toBeInTheDocument();
-      expect(screen.getByText('Filter sessions by completion status')).toBeInTheDocument();
+      expect(screen.getByText('Filter work by AI tool')).toBeInTheDocument();
+      expect(screen.getByText('Filter work by completion status')).toBeInTheDocument();
     });
   });
 
