@@ -132,6 +132,20 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/ai/sessions/{id}/input",
                             web::post().to(handlers::send_ai_input),
+                        )
+                        // Work management endpoints
+                        .route("/works", web::post().to(handlers::create_work))
+                        .route("/works", web::get().to(handlers::list_works))
+                        .route("/works/{id}", web::get().to(handlers::get_work))
+                        .route("/works/{id}", web::delete().to(handlers::delete_work))
+                        // Work message endpoints
+                        .route(
+                            "/works/{id}/messages",
+                            web::post().to(handlers::add_message_to_work),
+                        )
+                        .route(
+                            "/works/{id}/messages",
+                            web::get().to(handlers::get_work_messages),
                         ),
                 )
                 // WebSocket endpoints
@@ -141,12 +155,17 @@ async fn main() -> AppResult<()> {
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
                 // Serve static files from ./web/dist if it exists
-                .service(
-                    fs::Files::new("/", "./web/dist")
-                        .index_file("index.html")
-                        .use_etag(true)
-                        .use_last_modified(true),
-                )
+                .configure(|cfg| {
+                    if std::path::Path::new("./web/dist").exists() {
+                        cfg.service(
+                            fs::Files::new("/", "./web/dist")
+                                .index_file("index.html")
+                                .use_etag(true)
+                                .use_last_modified(true)
+                                .prefer_utf8(true),
+                        );
+                    }
+                })
         })
         .bind(&server_addr)
         .expect("Failed to bind HTTP server")

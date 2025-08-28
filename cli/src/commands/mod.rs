@@ -11,6 +11,7 @@ pub mod prompt;
 pub mod session;
 pub mod structure;
 pub mod validate;
+pub mod work;
 
 // Re-export command implementations for easier access
 pub use analyze::*;
@@ -21,3 +22,4 @@ pub use prompt::*;
 pub use session::*;
 pub use structure::*;
 pub use validate::*;
+// Note: WorkCommands is used directly via work::WorkCommands

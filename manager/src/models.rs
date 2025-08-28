@@ -276,3 +276,103 @@ pub struct FileContentResponse {
 pub struct FileResponse {
     pub file: FileInfo,
 }
+
+// Work history models
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum MessageContentType {
+    #[serde(rename = "text")]
+    Text,
+    #[serde(rename = "markdown")]
+    Markdown,
+    #[serde(rename = "json")]
+    Json,
+    #[serde(rename = "code")]
+    Code { language: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum MessageAuthorType {
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "ai")]
+    Ai,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkMessage {
+    pub id: String,
+    pub work_id: String,
+    pub content: String,
+    pub content_type: MessageContentType,
+    pub author_type: MessageAuthorType,
+    pub author_id: Option<String>,
+    #[ts(type = "number")]
+    pub sequence_order: i32,
+    #[ts(type = "number")]
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Work {
+    pub id: String,
+    pub title: String,
+    pub project_id: Option<String>,
+    pub status: String,
+    #[ts(type = "number")]
+    pub created_at: i64,
+    #[ts(type = "number")]
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkWithHistory {
+    pub work: Work,
+    pub messages: Vec<WorkMessage>,
+    #[ts(type = "number")]
+    pub total_messages: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AddMessageRequest {
+    pub content: String,
+    pub content_type: MessageContentType,
+    pub author_type: MessageAuthorType,
+    pub author_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateWorkRequest {
+    pub title: String,
+    pub project_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkResponse {
+    pub work: Work,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkListResponse {
+    pub works: Vec<Work>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkMessageResponse {
+    pub message: WorkMessage,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkMessageListResponse {
+    pub messages: Vec<WorkMessage>,
+}

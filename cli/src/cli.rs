@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 use crate::{commands, error::CliError};
 use commands::*;
 
+// Also import WorkCommands specifically since it's in a separate module
+use commands::work::WorkCommands;
+
 #[derive(Debug, Parser)]
 #[command(name = "nocodo")]
 #[command(about = "AI-powered development assistant CLI with guardrails")]
@@ -102,6 +105,12 @@ pub enum Commands {
         action: ProjectCommands,
     },
 
+    /// Work history management operations
+    Work {
+        #[command(subcommand)]
+        action: WorkCommands,
+    },
+
     /// Show version information
     Version,
 }
@@ -179,6 +188,7 @@ impl Cli {
             Some(Commands::Config { action }) => self.handle_config(action).await,
             Some(Commands::Session { tool, prompt }) => self.handle_session(tool, prompt).await,
             Some(Commands::Project { action }) => self.handle_project(action).await,
+            Some(Commands::Work { action }) => self.handle_work(action).await,
             Some(Commands::Version) => self.handle_version().await,
             None => {
                 // No subcommand provided, show help
@@ -227,6 +237,14 @@ impl Cli {
 
     async fn handle_project(&self, action: &ProjectCommands) -> Result<(), CliError> {
         handle_project_command(action).await
+    }
+
+    async fn handle_work(&self, action: &WorkCommands) -> Result<(), CliError> {
+        // Use default socket path for now - could be made configurable
+        let socket_path = "/tmp/nocodo-manager.sock".to_string();
+        let client = crate::client::ManagerClient::new(socket_path, None);
+
+        action.execute(&client).await
     }
 
     async fn handle_version(&self) -> Result<(), CliError> {
