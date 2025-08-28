@@ -13,18 +13,6 @@ tab_spaces = 4
 reorder_imports = true
 reorder_modules = true
 
-# Function and struct formatting
-fn_single_line = false
-where_single_line = false
-
-# Control flow formatting
-control_brace_style = "AlwaysSameLine"
-brace_style = "SameLineWhere"
-
-# Trailing elements
-trailing_comma = "Vertical"
-trailing_semicolon = true
-
 # Miscellaneous
 use_small_heuristics = "Default"
 chain_width = 60

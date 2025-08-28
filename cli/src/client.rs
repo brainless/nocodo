@@ -613,7 +613,11 @@ impl ManagerClient {
     }
 
     // Work management HTTP methods
-    pub async fn create_work(&self, title: String, project_id: Option<String>) -> Result<Work, CliError> {
+    pub async fn create_work(
+        &self,
+        title: String,
+        project_id: Option<String>,
+    ) -> Result<Work, CliError> {
         info!("Creating work '{}' via HTTP API", title);
 
         let request_body = CreateWorkRequest { title, project_id };
@@ -645,7 +649,10 @@ impl ManagerClient {
             .await
             .map_err(|e| CliError::Communication(format!("Failed to parse response: {e}")))?;
 
-        info!("Work '{}' created successfully with ID: {}", work_response.title, work_response.id);
+        info!(
+            "Work '{}' created successfully with ID: {}",
+            work_response.title, work_response.id
+        );
         Ok(work_response)
     }
 
@@ -686,7 +693,10 @@ impl ManagerClient {
     }
 
     pub async fn get_work_with_history(&self, work_id: &str) -> Result<WorkWithHistory, CliError> {
-        info!("Fetching work with history via HTTP API for work ID: {}", work_id);
+        info!(
+            "Fetching work with history via HTTP API for work ID: {}",
+            work_id
+        );
 
         let url = format!("{}/api/works/{}", self.manager_url, work_id);
         debug!("GET {}", url);
@@ -726,7 +736,10 @@ impl ManagerClient {
         author_type: MessageAuthorType,
         author_id: Option<String>,
     ) -> Result<WorkMessage, CliError> {
-        info!("Adding message to work via HTTP API for work ID: {}", work_id);
+        info!(
+            "Adding message to work via HTTP API for work ID: {}",
+            work_id
+        );
 
         let request_body = AddMessageRequest {
             content,

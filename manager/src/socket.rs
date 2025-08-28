@@ -1,6 +1,8 @@
 use crate::database::Database;
 use crate::error::{AppError, AppResult};
-use crate::models::{AiSession, CreateAiSessionRequest, Project, CreateWorkRequest, AddMessageRequest};
+use crate::models::{
+    AddMessageRequest, AiSession, CreateAiSessionRequest, CreateWorkRequest, Project,
+};
 use crate::websocket::WebSocketBroadcaster;
 use serde::{Deserialize, Serialize};
 use std::fs::Permissions;
@@ -41,7 +43,7 @@ pub enum SocketRequest {
         session_id: String,
         output: String,
     },
-    
+
     // Work history management
     CreateWork(CreateWorkRequest),
     GetWorkWithHistory {
@@ -348,11 +350,11 @@ impl SocketServer {
                     }
                 }
             }
-            
+
             // Work history management requests
             SocketRequest::CreateWork(req) => {
                 info!("Creating work: {}", req.title);
-                
+
                 // Create the work object
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -382,10 +384,10 @@ impl SocketServer {
                     }
                 }
             }
-            
+
             SocketRequest::GetWorkWithHistory { work_id } => {
                 info!("Getting work with history: {}", work_id);
-                
+
                 match database.get_work_with_messages(&work_id) {
                     Ok(work_with_history) => {
                         let data = serde_json::to_value(&work_with_history).unwrap_or_default();
@@ -399,10 +401,10 @@ impl SocketServer {
                     }
                 }
             }
-            
+
             SocketRequest::ListWorks => {
                 info!("Listing all works");
-                
+
                 match database.get_all_works() {
                     Ok(works) => {
                         let data = serde_json::json!({ "works": works });
@@ -416,10 +418,10 @@ impl SocketServer {
                     }
                 }
             }
-            
+
             SocketRequest::AddMessageToWork(_req) => {
                 info!("Adding message to work");
-                
+
                 // For now, we'll need to determine the work_id from context or add it to the request
                 // This is a simplified implementation - in a real scenario, we'd need the work_id
                 SocketResponse::Error {

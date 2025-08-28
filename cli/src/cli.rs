@@ -243,7 +243,7 @@ impl Cli {
         // Use default socket path for now - could be made configurable
         let socket_path = "/tmp/nocodo-manager.sock".to_string();
         let client = crate::client::ManagerClient::new(socket_path, None);
-        
+
         action.execute(&client).await
     }
 

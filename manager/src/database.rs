@@ -588,7 +588,7 @@ impl Database {
 
         let mut stmt = conn.prepare(
             "SELECT id, title, project_id, status, created_at, updated_at
-             FROM works WHERE id = ?"
+             FROM works WHERE id = ?",
         )?;
 
         let work = stmt
@@ -603,7 +603,9 @@ impl Database {
                 })
             })
             .map_err(|e| match e {
-                rusqlite::Error::QueryReturnedNoRows => AppError::Internal(format!("Work not found: {id}")),
+                rusqlite::Error::QueryReturnedNoRows => {
+                    AppError::Internal(format!("Work not found: {id}"))
+                }
                 _ => AppError::Database(e),
             })?;
 
@@ -618,7 +620,7 @@ impl Database {
 
         let mut stmt = conn.prepare(
             "SELECT id, title, project_id, status, created_at, updated_at
-             FROM works ORDER BY created_at DESC"
+             FROM works ORDER BY created_at DESC",
         )?;
 
         let work_iter = stmt.query_map([], |row| {
@@ -665,7 +667,9 @@ impl Database {
 
         // For code content type, extract language from the enum variant
         let (content_type_str, code_language) = match &message.content_type {
-            crate::models::MessageContentType::Code { language } => ("code", Some(language.clone())),
+            crate::models::MessageContentType::Code { language } => {
+                ("code", Some(language.clone()))
+            }
             crate::models::MessageContentType::Text => ("text", None),
             crate::models::MessageContentType::Markdown => ("markdown", None),
             crate::models::MessageContentType::Json => ("json", None),
@@ -713,17 +717,17 @@ impl Database {
             let content_type_str: String = row.get(3)?;
             let code_language: Option<String> = row.get(4)?;
             let author_type_str: String = row.get(5)?;
-            
+
             let content_type = match content_type_str.as_str() {
                 "text" => crate::models::MessageContentType::Text,
                 "markdown" => crate::models::MessageContentType::Markdown,
                 "json" => crate::models::MessageContentType::Json,
-                "code" => crate::models::MessageContentType::Code { 
-                    language: code_language.unwrap_or_default() 
+                "code" => crate::models::MessageContentType::Code {
+                    language: code_language.unwrap_or_default(),
                 },
                 _ => crate::models::MessageContentType::Text, // fallback
             };
-            
+
             let author_type = match author_type_str.as_str() {
                 "user" => crate::models::MessageAuthorType::User,
                 "ai" => crate::models::MessageAuthorType::Ai,
@@ -749,7 +753,10 @@ impl Database {
         Ok(messages)
     }
 
-    pub fn get_work_with_messages(&self, work_id: &str) -> AppResult<crate::models::WorkWithHistory> {
+    pub fn get_work_with_messages(
+        &self,
+        work_id: &str,
+    ) -> AppResult<crate::models::WorkWithHistory> {
         let work = self.get_work_by_id(work_id)?;
         let messages = self.get_work_messages(work_id)?;
         let total_messages = messages.len() as i32;
@@ -768,7 +775,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT COALESCE(MAX(sequence_order), -1) + 1 FROM work_messages WHERE work_id = ?"
+            "SELECT COALESCE(MAX(sequence_order), -1) + 1 FROM work_messages WHERE work_id = ?",
         )?;
 
         let sequence: i32 = stmt.query_row([work_id], |row| row.get(0))?;
