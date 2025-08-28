@@ -57,10 +57,6 @@ The nocodo MVP consists of three core components running locally on your Linux l
 cargo build --release --bin nocodo-manager
 sudo cp target/release/nocodo-manager /usr/local/bin/
 
-# Build CLI
-cargo build --release --bin nocodo-cli
-sudo cp target/release/nocodo-cli /usr/local/bin/nocodo
-
 # Build Web app
 cd manager-web
 npm install && npm run build

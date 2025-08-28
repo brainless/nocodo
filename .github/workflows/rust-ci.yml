@@ -49,7 +49,6 @@ jobs:
           # Cache workspace and registry
           workspaces: |
             .
-            cli
             manager
 
       - name: Check workspace
@@ -88,7 +87,6 @@ jobs:
           key: clippy-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             .
-            cli
             manager
 
       - name: Run Clippy
@@ -115,7 +113,6 @@ jobs:
           key: test-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             .
-            cli
             manager
 
       - name: Run tests
@@ -159,21 +156,10 @@ jobs:
           key: build-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             .
-            cli
             manager
-
-      - name: Build CLI in release mode
-        run: cargo build --release --bin nocodo-cli --verbose
 
       - name: Build Manager in release mode
         run: cargo build --release --bin nocodo-manager --verbose
-
-      - name: Upload CLI binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: nocodo-cli-${{ github.sha }}
-          path: target/release/nocodo-cli
-          retention-days: 7
 
       - name: Upload Manager binary
         uses: actions/upload-artifact@v4
@@ -182,25 +168,7 @@ jobs:
           path: target/release/nocodo-manager
           retention-days: 7
 
-  # Component-specific tests
-  cli-tests:
-    runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'cli/') || github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: cli-test-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Test CLI component
-        working-directory: cli
-        run: cargo test --verbose
 
   manager-tests:
     runs-on: ubuntu-latest
