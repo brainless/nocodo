@@ -817,16 +817,26 @@ pub async fn create_ai_session(
 ) -> Result<HttpResponse, AppError> {
     let req = request.into_inner();
 
-    // Optional: Validate tool_name/prompt
+    // Validate required fields
     if req.tool_name.trim().is_empty() {
         return Err(AppError::InvalidRequest("tool_name is required".into()));
     }
-    if req.prompt.trim().is_empty() {
-        return Err(AppError::InvalidRequest("prompt is required".into()));
+    if req.work_id.trim().is_empty() {
+        return Err(AppError::InvalidRequest("work_id is required".into()));
+    }
+    if req.message_id.trim().is_empty() {
+        return Err(AppError::InvalidRequest("message_id is required".into()));
     }
 
-    // Generate simple context if project_id present
-    let project_context = if let Some(ref project_id) = req.project_id {
+    // Validate that work and message exist
+    let work = data.database.get_work_by_id(&req.work_id)?;
+    let messages = data.database.get_work_messages(&req.work_id)?;
+    if !messages.iter().any(|m| m.id == req.message_id) {
+        return Err(AppError::InvalidRequest("message_id not found in work".into()));
+    }
+
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(ref project_id) = work.project_id {
         let project = data.database.get_project_by_id(project_id)?;
         Some(format!("Project: {}\nPath: {}", project.name, project.path))
     } else {
@@ -834,9 +844,9 @@ pub async fn create_ai_session(
     };
 
     let session = crate::models::AiSession::new(
-        req.project_id.clone(),
+        req.work_id,
+        req.message_id,
         req.tool_name,
-        req.prompt,
         project_context,
     );
 
@@ -854,14 +864,18 @@ pub async fn create_ai_session(
 
     // If runner is enabled, start streaming execution for this session in background
     if let Some(runner) = &data.runner {
+        // Get the prompt from the associated message
+        let message = messages.iter().find(|m| m.id == session.message_id)
+            .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
+        
         // Build a simple enhanced prompt similar to CLI
         let enhanced_prompt = if let Some(ctx) = &session.project_context {
             format!(
                 "Project Context:\n{}\n\nUser Request:\n{}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes.",
-                ctx, session.prompt
+                ctx, message.content
             )
         } else {
-            session.prompt.clone()
+            message.content.clone()
         };
         // Fire-and-forget
         let _ = runner.start_session(session.clone(), enhanced_prompt).await;
