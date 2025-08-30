@@ -2,14 +2,14 @@
 
 ## Overview
 
-The Manager app is a Linux daemon that runs on the Operator server, orchestrating the entire software development lifecycle from idea to deployment. It serves as the central coordinator between the nocodo CLI, the Manager Web app, and various development tools. Written in Rust, it provides secure communication channels, system management, and development environment orchestration.
+The Manager app is a Linux daemon that runs on the Operator server, orchestrating the entire software development lifecycle from idea to deployment. It serves as the central coordinator between the Manager Web app and various development tools. Written in Rust, it provides secure communication channels, system management, and development environment orchestration.
 
 ## Architecture
 
 ### Core Components
 
 1. **System Orchestrator** - Manages server state, services, and system configuration
-2. **Communication Hub** - Handles Unix socket and HTTP communication
+2. **Communication Hub** - Handles HTTP communication
 3. **Development Environment Manager** - Installs and manages development tools
 4. **Process Manager** - Manages long-running processes and services
 5. **Project Manager** - Handles project lifecycle and file system operations
@@ -21,7 +21,6 @@ The Manager app is a Linux daemon that runs on the Operator server, orchestratin
 - **Language**: Rust
 - **Async Runtime**: Tokio
 - **Web Framework**: Actix Web (for HTTP API)
-- **Unix Sockets**: Unix domain sockets for CLI communication
 - **Process Management**: tokio-process, systemd integration
 - **File System**: tokio-fs, inotify for file watching
 - **Configuration**: serde with TOML/YAML support
@@ -35,12 +34,12 @@ The Manager app is a Linux daemon that runs on the Operator server, orchestratin
 ┌─────────────────────────────────────────────────────────┐
 │                    Manager Daemon                       │
 ├─────────────────┬─────────────────┬────────────────────┤
-│   Unix Socket   │   HTTP Server   │   System Services  │
-│   Server        │   (Web API)     │   Manager          │
+│   HTTP Server   │   System Services  │   Development      │
+│   (Web API)     │   Manager          │   Tools & Processes│
 ├─────────────────┼─────────────────┼────────────────────┤
 │                 │                 │                    │
-│   nocodo CLI    │  Manager Web    │   Development      │
-│   ←→ Socket     │  ←→ HTTP/WS     │   Tools & Processes│
+│  Manager Web    │   Development      │   Development      │
+│  ←→ HTTP/WS     │   Tools & Processes│   Tools & Processes│
 │                 │                 │                    │
 └─────────────────┴─────────────────┴────────────────────┘
 ```
@@ -80,28 +79,6 @@ impl SystemOrchestrator {
 ```
 
 ### 2. Communication Hub
-
-**Unix Socket Server** (for nocodo CLI):
-```rust
-#[derive(Debug, Serialize, Deserialize)]
-pub enum CliMessage {
-    ProjectAnalysis { path: String },
-    GeneratePrompt { request: PromptRequest },
-    ValidateCode { code: String, language: String },
-    GetProjectStructure { path: String },
-    ExecuteCommand { command: String, args: Vec<String> },
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum CliResponse {
-    Analysis(ProjectAnalysis),
-    Prompt(GeneratedPrompt),
-    Validation(ValidationResult),
-    Structure(ProjectStructure),
-    CommandResult(CommandOutput),
-    Error(String),
-}
-```
 
 **HTTP API Server** (for Manager Web App):
 ```rust
@@ -313,7 +290,6 @@ impl SecurityManager {
 # /etc/nocodo/manager.toml
 
 [server]
-unix_socket_path = "/var/run/nocodo/manager.sock"
 http_port = 8081
 https_port = 8443
 max_connections = 1000
@@ -410,7 +386,7 @@ DELETE /api/projects/{id}               // Delete project
 GET    /api/projects/{id}/status        // Get project status
 POST   /api/projects/{id}/analyze       // Analyze project structure
 
-// Work Management (formerly AI Integration)
+// Work Management
 POST   /api/work                        // Start work session
 GET    /api/work/{id}                   // Get work session status
 POST   /api/work/{id}/query             // Send query to work session
