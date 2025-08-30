@@ -313,3 +313,66 @@ async fn test_get_projects_after_creation() {
     assert_eq!(project["language"], "python");
     assert_eq!(project["framework"], "django");
 }
+
+#[actix_rt::test]
+async fn test_technology_detection_for_rust_project() {
+    let temp_dir = tempdir().unwrap();
+    let db_path = temp_dir.path().join("test.db");
+    let database = Arc::new(Database::new(&db_path).unwrap());
+
+    let ws_server = WebSocketServer::default().start();
+    let app_state = web::Data::new(AppState {
+        database,
+        start_time: SystemTime::now(),
+        ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
+        runner: None,
+    });
+
+    let app = test::init_service(
+        App::new()
+            .app_data(app_state)
+            .route("/api/projects", web::post().to(create_project)),
+    )
+    .await;
+
+    // Create a project without specifying language/framework to trigger detection
+    let project_path = temp_dir.path().join("rust-detection-test");
+    let create_request = CreateProjectRequest {
+        name: "rust-detection-test".to_string(),
+        path: Some(project_path.to_string_lossy().to_string()),
+        language: None,
+        framework: None,
+        template: Some("rust-web-api".to_string()),
+    };
+
+    let req = test::TestRequest::post()
+        .uri("/api/projects")
+        .set_json(&create_request)
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success());
+
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let project = &body["project"];
+    
+    // Verify detection worked
+    assert_eq!(project["name"], "rust-detection-test");
+    assert_eq!(project["language"], "rust");
+    assert_eq!(project["framework"], "actix-web");
+    // Technologies field should be present
+    assert!(project["technologies"].is_string() || project["technologies"].is_null());
+    
+    // If technologies is a string, parse it to verify structure
+    if project["technologies"].is_string() {
+        let technologies_str = project["technologies"].as_str().unwrap();
+        let detection_result: serde_json::Value = serde_json::from_str(technologies_str).unwrap();
+        
+        // Verify the detection result has the expected fields
+        assert!(detection_result["primary_language"].is_string());
+        assert!(detection_result["technologies"].is_array());
+        assert!(detection_result["build_tools"].is_array());
+        assert!(detection_result["package_managers"].is_array());
+        assert!(detection_result["deployment_configs"].is_array());
+    }
+}
