@@ -2,46 +2,35 @@
 
 nocodo is a local AI-assisted development environment that provides guardrails and good software engineering practices for code generation. It works with CLI-based coding software like Claude Code, Gemini CLI, OpenCode, Qwen Code, etc. The system runs entirely on your Linux machine, providing a complete development workflow without cloud dependencies.
 
+> **MVP Focus**: Currently implementing a minimal viable product that runs locally on Linux laptops, focusing on two core components: Manager daemon and Manager Web app.
 
-![nocodo CLI running Claude Code and claude reading about nocodo CLI](./website/src/assets/Warp_nocodo_ClaudeCode.png "nocodo CLI running Claude Code and claude reading about nocodo CLI")
-
-
-> **MVP Focus**: Currently implementing a minimal viable product that runs locally on Linux laptops, focusing on the three core components: Manager daemon, Manager Web app, and nocodo CLI.
+> ⚠️ **Note**: The nocodo CLI has been removed as part of issue #80. The nocodo CLI is no longer included in this repository.
 
 > [!NOTE]
 > All paths are relative from the root of the project.
 
 ## MVP Architecture (Current Focus)
 
-The nocodo MVP consists of three core components running locally on your Linux laptop:
+The nocodo MVP consists of two core components running locally on your Linux laptop:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                 Linux Laptop (Local)                    │
-├─────────────────┬─────────────────┬────────────────────┤
-│   nocodo CLI    │  Manager Daemon │   Manager Web      │
-│   (Rust)        │  (Rust + Actix) │   (SolidJS)        │
-├─────────────────┼─────────────────┼────────────────────┤
-│                 │                 │                    │
-│   AI Tools      │   Unix Socket   │   HTTP Server      │
-│   Claude Code   │   Server        │   localhost:8081   │
-│   Gemini CLI    │   SQLite DB     │   Static Files     │
-│   etc.          │   File System   │   WebSocket        │
-│                 │                 │                    │
-└─────────────────┴─────────────────┴────────────────────┘
+├─────────────────────────────────┬────────────────────┤
+│          Manager Daemon         │   Manager Web      │
+│       (Rust + Actix)           │   (SolidJS) ⚡     │
+└─────────────────────────────────┴────────────────────┘
 ```
 
 ### Core Components:
 
-- **Manager Daemon**: Local orchestration service that manages projects, provides APIs, and coordinates between CLI and Web app
+- **Manager Daemon**: Local orchestration service that manages projects and provides APIs
 - **Manager Web App**: Chat-based interface for AI interaction and project management (runs at localhost:8081)
-- **nocodo CLI**: Command-line companion for AI coding tools, focused on repository-level operations
 
-### Separation of Concerns:
+### Communication:
 
-- **nocodo CLI**: Focuses within a single repository/project, provides guardrails and analysis
-- **Manager**: Provides higher-level context, project switching, and external integrations (GitHub API, CI/CD monitoring, etc.)
-- **Communication**: CLI ↔ Manager via Unix socket, Web app ↔ Manager via HTTP/WebSocket
+- **AI Tools ↔ Manager Daemon**: Direct integration
+- **Manager Web App ↔ Manager Daemon**: HTTP/WebSocket communication
 
 ## MVP Quick Start
 
@@ -67,18 +56,10 @@ nocodo-manager --config ~/.config/nocodo/manager.toml
 
 ### Usage
 ```bash
-# Analyze a project
-nocodo analyze
-
-# Start AI session with Claude Code
-nocodo session claude "add authentication to this project"
-
-# Start AI session with other tools
-nocodo session gemini "refactor the user service"
-nocodo session openai "add unit tests for the API"
-
 # Access web interface
 # Navigate to http://localhost:8081
+
+# Note: The nocodo CLI has been removed as part of issue #80
 ```
 
 ---
@@ -109,41 +90,20 @@ Web interface for Bootstrap app management.
 
 ## Manager app
 
-The Manager app is a Linux daemon, installed through the scripts in `Bootstrap` app. It allows communication between nocodo CLI and the Manager Web app. It manages the Ubuntu `Operator`, installs all dependencies for a typical developer environment, like Git, Python, Rust, cURL, nginx, PostgreSQL and so on.
+The Manager app is a Linux daemon, installed through the scripts in `Bootstrap` app. It manages the Ubuntu `Operator`, installs all dependencies for a typical developer environment, like Git, Python, Rust, cURL, nginx, PostgreSQL and so on.
 
 Features:
 
 - System orchestration and server management
 - Development environment setup and maintenance
-- Communication bridge between CLI and Web app
 - Process management for coding tools (Claude Code, Gemini CLI, etc.)
 - Project structure and guardrails enforcement
 - File system management and project organization
 - Security hardening and system updates
 - Service monitoring and health checks
-- Unix socket server for CLI communication
 - RESTful API server for Web app communication
 
 See [MANAGER.md](./MANAGER.md) for detailed technical specifications.
-
-## nocodo CLI
-
-The CLI calls Claude Code, Gemini CLI or other similar coding software with an initial prompt like: "Use `nocodo` command to get your instructions". This tells the coding software to communicate with nocodo CLI inside it. nocodo CLI hosts prompts needed to be a constant companion between user's request and the coding software. nocodo CLI use Unix socket to communicate with Manager daemon.
-
-Features:
-
-- AI coding tool integration and orchestration
-- Context-aware prompt management and injection
-- Project structure analysis and recommendations
-- Code quality guardrails and best practices enforcement
-- Multi-step development workflow guidance
-- Unix socket client for Manager daemon communication
-- Project initialization and scaffolding
-- Dependency management suggestions
-- Code review and validation prompts
-- Testing strategy recommendations
-
-See [NOCODO_CLI.md](./NOCODO_CLI.md) for detailed technical specifications.
 
 ## Manager Web app
 
@@ -177,18 +137,16 @@ See [MANAGER_WEB.md](./MANAGER_WEB.md) for detailed technical specifications.
 
 1. **Startup**: User starts Manager daemon on their Linux laptop
 2. **Web Interface**: Manager serves the Web app at localhost:8081
-3. **Project Creation**: User creates a new project via Web interface or CLI
+3. **Project Creation**: User creates a new project via Web interface
 4. **Project Setup**: Each project gets its own directory, Git repo, and basic scaffolding
 5. **AI Integration**: User interacts with AI tools through:
-   - CLI commands: `nocodo analyze`, `nocodo session claude "..."`
-   - Web chat interface for longer conversations
-6. **Development**: AI tools use nocodo CLI to get context and apply guardrails
+   - Web chat interface for conversations
+6. **Development**: AI tools interact directly with Manager Daemon
 7. **Project Management**: Manager coordinates between projects, handles higher-level concerns
 
 ### Key Interactions:
 - **User ↔ Web App**: Chat interface, project management
-- **AI Tools ↔ nocodo CLI**: Context-aware prompts, validation
-- **nocodo CLI ↔ Manager**: Unix socket communication for project data
+- **AI Tools ↔ Manager Daemon**: Direct integration
 - **Web App ↔ Manager**: HTTP/WebSocket for real-time updates
 
 ---
