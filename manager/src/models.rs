@@ -16,6 +16,8 @@ pub struct Project {
     pub created_at: i64,
     #[ts(type = "number")]
     pub updated_at: i64,
+    /// Enhanced technology detection - JSON serialized list of technologies
+    pub technologies: Option<String>,
 }
 
 impl Project {
@@ -30,6 +32,7 @@ impl Project {
             status: "created".to_string(),
             created_at: now,
             updated_at: now,
+            technologies: None,
         }
     }
 
@@ -73,6 +76,26 @@ impl ProjectComponent {
             created_at: now,
         }
     }
+}
+
+/// Enhanced technology information for a project
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ProjectTechnology {
+    pub language: String,
+    pub framework: Option<String>,
+    pub file_count: u32,
+    pub confidence: f32, // 0.0 - 1.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ProjectDetectionResult {
+    pub primary_language: String,
+    pub technologies: Vec<ProjectTechnology>,
+    pub build_tools: Vec<String>,
+    pub package_managers: Vec<String>,
+    pub deployment_configs: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
