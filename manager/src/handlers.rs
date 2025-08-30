@@ -813,24 +813,23 @@ pub async fn delete_file(
 // AI session HTTP handlers
 pub async fn create_ai_session(
     data: web::Data<AppState>,
+    path: web::Path<String>,
     request: web::Json<CreateAiSessionRequest>,
 ) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
     let req = request.into_inner();
 
     // Validate required fields
     if req.tool_name.trim().is_empty() {
         return Err(AppError::InvalidRequest("tool_name is required".into()));
     }
-    if req.work_id.trim().is_empty() {
-        return Err(AppError::InvalidRequest("work_id is required".into()));
-    }
     if req.message_id.trim().is_empty() {
         return Err(AppError::InvalidRequest("message_id is required".into()));
     }
 
     // Validate that work and message exist
-    let work = data.database.get_work_by_id(&req.work_id)?;
-    let messages = data.database.get_work_messages(&req.work_id)?;
+    let work = data.database.get_work_by_id(&work_id)?;
+    let messages = data.database.get_work_messages(&work_id)?;
     if !messages.iter().any(|m| m.id == req.message_id) {
         return Err(AppError::InvalidRequest(
             "message_id not found in work".into(),
@@ -846,7 +845,7 @@ pub async fn create_ai_session(
     };
 
     let session =
-        crate::models::AiSession::new(req.work_id, req.message_id, req.tool_name, project_context);
+        crate::models::AiSession::new(work_id, req.message_id, req.tool_name, project_context);
 
     // Persist
     data.database.create_ai_session(&session)?;

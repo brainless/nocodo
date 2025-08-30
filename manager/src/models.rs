@@ -161,7 +161,6 @@ impl AiSession {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct CreateAiSessionRequest {
-    pub work_id: String,
     pub message_id: String,
     pub tool_name: String,
 }
