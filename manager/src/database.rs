@@ -103,7 +103,7 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_sessions_work_id ON ai_sessions(work_id)",
             [],
         )?;
-        
+
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_sessions_message_id ON ai_sessions(message_id)",
             [],
@@ -810,6 +810,7 @@ impl Database {
     }
 
     // AI Session Result methods
+    #[allow(dead_code)]
     pub fn create_ai_session_result(&self, result: &AiSessionResult) -> AppResult<()> {
         let conn = self
             .connection
@@ -837,6 +838,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn update_ai_session_result(&self, result: &AiSessionResult) -> AppResult<()> {
         let conn = self
             .connection
@@ -863,7 +865,11 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_ai_session_result_by_session(&self, session_id: &str) -> AppResult<Option<AiSessionResult>> {
+    #[allow(dead_code)]
+    pub fn get_ai_session_result_by_session(
+        &self,
+        session_id: &str,
+    ) -> AppResult<Option<AiSessionResult>> {
         let conn = self
             .connection
             .lock()

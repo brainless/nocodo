@@ -832,7 +832,9 @@ pub async fn create_ai_session(
     let work = data.database.get_work_by_id(&req.work_id)?;
     let messages = data.database.get_work_messages(&req.work_id)?;
     if !messages.iter().any(|m| m.id == req.message_id) {
-        return Err(AppError::InvalidRequest("message_id not found in work".into()));
+        return Err(AppError::InvalidRequest(
+            "message_id not found in work".into(),
+        ));
     }
 
     // Generate project context if work is associated with a project
@@ -843,12 +845,8 @@ pub async fn create_ai_session(
         None
     };
 
-    let session = crate::models::AiSession::new(
-        req.work_id,
-        req.message_id,
-        req.tool_name,
-        project_context,
-    );
+    let session =
+        crate::models::AiSession::new(req.work_id, req.message_id, req.tool_name, project_context);
 
     // Persist
     data.database.create_ai_session(&session)?;
@@ -865,9 +863,11 @@ pub async fn create_ai_session(
     // If runner is enabled, start streaming execution for this session in background
     if let Some(runner) = &data.runner {
         // Get the prompt from the associated message
-        let message = messages.iter().find(|m| m.id == session.message_id)
+        let message = messages
+            .iter()
+            .find(|m| m.id == session.message_id)
             .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
-        
+
         // Build a simple enhanced prompt similar to CLI
         let enhanced_prompt = if let Some(ctx) = &session.project_context {
             format!(

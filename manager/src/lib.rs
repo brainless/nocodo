@@ -49,7 +49,8 @@ mod ts_bindings_tests {
         WorkResponse::export().expect("Failed to export WorkResponse bindings");
         WorkListResponse::export().expect("Failed to export WorkListResponse bindings");
         WorkMessageResponse::export().expect("Failed to export WorkMessageResponse bindings");
-        WorkMessageListResponse::export().expect("Failed to export WorkMessageListResponse bindings");
+        WorkMessageListResponse::export()
+            .expect("Failed to export WorkMessageListResponse bindings");
         AddMessageRequest::export().expect("Failed to export AddMessageRequest bindings");
     }
 }
