@@ -1,4 +1,5 @@
 import {
+  AddMessageRequest,
   AiSession,
   AiSessionListResponse,
   AiSessionOutputListResponse,
@@ -6,6 +7,7 @@ import {
   ApiError,
   CreateAiSessionRequest,
   CreateProjectRequest,
+  CreateWorkRequest,
   FileContentResponse,
   FileCreateRequest,
   FileListRequest,
@@ -13,6 +15,8 @@ import {
   FileResponse,
   FileUpdateRequest,
   Project,
+  WorkMessageResponse,
+  WorkResponse,
 } from './types';
 
 class ApiClient {
@@ -110,9 +114,26 @@ class ApiClient {
     });
   }
 
+  async addMessageToWork(
+    workId: string,
+    data: AddMessageRequest
+  ): Promise<WorkMessageResponse> {
+    return this.request(`/work/${workId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Work endpoints (formerly AI sessions)
-  async createAiSession(data: CreateAiSessionRequest): Promise<AiSessionResponse> {
+  async createWork(data: CreateWorkRequest): Promise<WorkResponse> {
     return this.request('/work', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createAiSession(workId: string, data: CreateAiSessionRequest): Promise<AiSessionResponse> {
+    return this.request(`/work/${workId}/sessions`, {
       method: 'POST',
       body: JSON.stringify(data),
     });

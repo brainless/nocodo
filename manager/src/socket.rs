@@ -1,8 +1,6 @@
 use crate::database::Database;
 use crate::error::{AppError, AppResult};
-use crate::models::{
-    AddMessageRequest, AiSession, CreateAiSessionRequest, CreateWorkRequest, Project,
-};
+use crate::models::{AddMessageRequest, CreateWorkRequest};
 use crate::websocket::WebSocketBroadcaster;
 use serde::{Deserialize, Serialize};
 use std::fs::Permissions;
@@ -25,7 +23,6 @@ pub enum SocketRequest {
     },
 
     // Sessions and project context
-    CreateAiSession(CreateAiSessionRequest),
     GetProjectContext {
         project_path: String,
     },
@@ -179,74 +176,6 @@ impl SocketServer {
                     "authenticated": token.is_some(),
                 });
                 SocketResponse::Success { data }
-            }
-
-            SocketRequest::CreateAiSession(req) => {
-                info!("Creating AI session for tool: {}", req.tool_name);
-
-                // Validate that work and message exist
-                let work = match database.get_work_by_id(&req.work_id) {
-                    Ok(work) => work,
-                    Err(e) => {
-                        error!("Failed to get work {}: {}", req.work_id, e);
-                        let message = format!("Failed to get work: {e}");
-                        return SocketResponse::Error { message };
-                    }
-                };
-
-                let messages = match database.get_work_messages(&req.work_id) {
-                    Ok(messages) => messages,
-                    Err(e) => {
-                        error!("Failed to get messages for work {}: {}", req.work_id, e);
-                        let message = format!("Failed to get messages: {e}");
-                        return SocketResponse::Error { message };
-                    }
-                };
-
-                if !messages.iter().any(|m| m.id == req.message_id) {
-                    error!(
-                        "Message {} not found in work {}",
-                        req.message_id, req.work_id
-                    );
-                    let message = "Message not found in work".to_string();
-                    return SocketResponse::Error { message };
-                }
-
-                // Get project context if work is associated with a project
-                let project_context = if let Some(ref project_id) = work.project_id {
-                    match database.get_project_by_id(project_id) {
-                        Ok(project) => Some(Self::generate_project_context(&project)),
-                        Err(e) => {
-                            warn!("Failed to get project context for {}: {}", project_id, e);
-                            None
-                        }
-                    }
-                } else {
-                    None
-                };
-
-                let session = AiSession::new(
-                    req.work_id.clone(),
-                    req.message_id.clone(),
-                    req.tool_name.clone(),
-                    project_context,
-                );
-
-                match database.create_ai_session(&session) {
-                    Ok(()) => {
-                        // Broadcast AI session creation via WebSocket
-                        ws_broadcaster.broadcast_ai_session_created(session.clone());
-
-                        let data = serde_json::to_value(&session).unwrap_or_default();
-                        SocketResponse::Success { data }
-                    }
-                    Err(e) => {
-                        error!("Failed to create AI session: {}", e);
-                        SocketResponse::Error {
-                            message: format!("Failed to create AI session: {e}"),
-                        }
-                    }
-                }
             }
 
             SocketRequest::GetProjectContext { project_path } => {
@@ -457,17 +386,6 @@ impl SocketServer {
                 }
             }
         }
-    }
-
-    fn generate_project_context(project: &Project) -> String {
-        format!(
-            "Project: {}\nPath: {}\nLanguage: {}\nFramework: {}\nStatus: {}",
-            project.name,
-            project.path,
-            project.language.as_deref().unwrap_or("Unknown"),
-            project.framework.as_deref().unwrap_or("None"),
-            project.status
-        )
     }
 
     fn generate_path_context(project_path: &str) -> String {

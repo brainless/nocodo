@@ -1,6 +1,6 @@
 import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
-import { Project } from '../types';
+import { MessageAuthorType, MessageContentType, Project } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
 import ProjectCard from './ProjectCard';
@@ -138,16 +138,30 @@ const StartAiSessionForm: Component = () => {
     setSubmitting(true);
     setError(null);
     try {
-      const payload: any = {
+      // 1. Create the work
+      const workResp = await apiClient.createWork({
+        title: prompt().trim(),
+        project_id: selectedProjectId().trim() || null,
+      });
+      const workId = workResp.work.id;
+
+      // 2. Add the initial message
+      const messageResp = await apiClient.addMessageToWork(workId, {
+        content: prompt().trim(),
+        content_type: MessageContentType.Text,
+        author_type: MessageAuthorType.User,
+        author_id: null, // Assuming user is not logged in
+      });
+      const messageId = messageResp.message.id;
+
+      // 3. Create the AI session
+      const sessionResp = await apiClient.createAiSession(workId, {
+        message_id: messageId,
         tool_name: toolName(),
-        prompt: prompt().trim(),
-      };
-      const pid = selectedProjectId().trim();
-      if (pid) payload.project_id = pid;
-      const resp = await apiClient.createAiSession(payload);
-      const id = resp.session.id;
-      // Navigate to detail page
-      navigate(`/work/${id}`);
+      });
+
+      // Navigate to the new work's detail page
+      navigate(`/work/${workId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start AI session');
     } finally {
