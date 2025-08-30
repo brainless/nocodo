@@ -27,6 +27,7 @@ mod ts_bindings_tests {
         AiSessionResponse::export().expect("Failed to export AiSessionResponse bindings");
         AiSessionListResponse::export().expect("Failed to export AiSessionListResponse bindings");
         AiSessionOutput::export().expect("Failed to export AiSessionOutput bindings");
+        AiSessionResult::export().expect("Failed to export AiSessionResult bindings");
         AiSessionOutputListResponse::export()
             .expect("Failed to export AiSessionOutputListResponse bindings");
         RecordAiOutputRequest::export().expect("Failed to export RecordAiOutputRequest bindings");
@@ -39,5 +40,17 @@ mod ts_bindings_tests {
         FileUpdateRequest::export().expect("Failed to export FileUpdateRequest bindings");
         FileContentResponse::export().expect("Failed to export FileContentResponse bindings");
         FileResponse::export().expect("Failed to export FileResponse bindings");
+        Work::export().expect("Failed to export Work bindings");
+        WorkMessage::export().expect("Failed to export WorkMessage bindings");
+        WorkWithHistory::export().expect("Failed to export WorkWithHistory bindings");
+        MessageContentType::export().expect("Failed to export MessageContentType bindings");
+        MessageAuthorType::export().expect("Failed to export MessageAuthorType bindings");
+        CreateWorkRequest::export().expect("Failed to export CreateWorkRequest bindings");
+        WorkResponse::export().expect("Failed to export WorkResponse bindings");
+        WorkListResponse::export().expect("Failed to export WorkListResponse bindings");
+        WorkMessageResponse::export().expect("Failed to export WorkMessageResponse bindings");
+        WorkMessageListResponse::export()
+            .expect("Failed to export WorkMessageListResponse bindings");
+        AddMessageRequest::export().expect("Failed to export AddMessageRequest bindings");
     }
 }
