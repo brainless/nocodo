@@ -41,29 +41,31 @@ impl Runner {
         let mut cmd = Command::new(&cmd_name);
         cmd.args(args);
 
-        // If this session is associated with a project, run the tool in that project's directory
-        if let Some(ref project_id) = session.project_id {
-            if let Ok(project) = self.db.get_project_by_id(project_id) {
-                let project_dir = std::path::Path::new(&project.path);
-                if project_dir.exists() {
-                    cmd.current_dir(project_dir);
+        // If this session is associated with a project via its work, run the tool in that project's directory
+        if let Ok(work) = self.db.get_work_by_id(&session.work_id) {
+            if let Some(ref project_id) = work.project_id {
+                if let Ok(project) = self.db.get_project_by_id(project_id) {
+                    let project_dir = std::path::Path::new(&project.path);
+                    if project_dir.exists() {
+                        cmd.current_dir(project_dir);
+                    } else {
+                        // Best-effort: record a hint in outputs to help diagnostics
+                        let _ = self.db.create_ai_session_output(
+                            &session_id,
+                            &format!(
+                                "[nocodo runner] Warning: Project directory not found: {path}. Running in Manager's CWD.",
+                                path = project.path
+                            ),
+                        );
+                    }
                 } else {
-                    // Best-effort: record a hint in outputs to help diagnostics
                     let _ = self.db.create_ai_session_output(
                         &session_id,
                         &format!(
-                            "[nocodo runner] Warning: Project directory not found: {path}. Running in Manager's CWD.",
-                            path = project.path
+                            "[nocodo runner] Warning: Unable to load project for id {project_id}. Running in Manager's CWD."
                         ),
                     );
                 }
-            } else {
-                let _ = self.db.create_ai_session_output(
-                    &session_id,
-                    &format!(
-                        "[nocodo runner] Warning: Unable to load project for id {project_id}. Running in Manager's CWD."
-                    ),
-                );
             }
         }
 

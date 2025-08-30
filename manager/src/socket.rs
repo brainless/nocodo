@@ -184,8 +184,33 @@ impl SocketServer {
             SocketRequest::CreateAiSession(req) => {
                 info!("Creating AI session for tool: {}", req.tool_name);
 
-                // Get project context if project_id is provided
-                let project_context = if let Some(ref project_id) = req.project_id {
+                // Validate that work and message exist
+                let work = match database.get_work_by_id(&req.work_id) {
+                    Ok(work) => work,
+                    Err(e) => {
+                        error!("Failed to get work {}: {}", req.work_id, e);
+                        let message = format!("Failed to get work: {}", e);
+                        return SocketResponse::Error { message };
+                    }
+                };
+
+                let messages = match database.get_work_messages(&req.work_id) {
+                    Ok(messages) => messages,
+                    Err(e) => {
+                        error!("Failed to get messages for work {}: {}", req.work_id, e);
+                        let message = format!("Failed to get messages: {}", e);
+                        return SocketResponse::Error { message };
+                    }
+                };
+
+                if !messages.iter().any(|m| m.id == req.message_id) {
+                    error!("Message {} not found in work {}", req.message_id, req.work_id);
+                    let message = "Message not found in work".to_string();
+                    return SocketResponse::Error { message };
+                }
+
+                // Get project context if work is associated with a project
+                let project_context = if let Some(ref project_id) = work.project_id {
                     match database.get_project_by_id(project_id) {
                         Ok(project) => Some(Self::generate_project_context(&project)),
                         Err(e) => {
@@ -198,9 +223,9 @@ impl SocketServer {
                 };
 
                 let session = AiSession::new(
-                    req.project_id.clone(),
+                    req.work_id.clone(),
+                    req.message_id.clone(),
                     req.tool_name.clone(),
-                    req.prompt.clone(),
                     project_context,
                 );
 

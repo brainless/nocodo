@@ -116,10 +116,10 @@ pub struct ServerStatus {
 #[ts(export)]
 pub struct AiSession {
     pub id: String,
-    pub project_id: Option<String>,
+    pub work_id: String,
+    pub message_id: String,
     pub tool_name: String,
     pub status: String,
-    pub prompt: String,
     pub project_context: Option<String>,
     #[ts(type = "number")]
     pub started_at: i64,
@@ -129,18 +129,18 @@ pub struct AiSession {
 
 impl AiSession {
     pub fn new(
-        project_id: Option<String>,
+        work_id: String,
+        message_id: String,
         tool_name: String,
-        prompt: String,
         project_context: Option<String>,
     ) -> Self {
         let now = Utc::now().timestamp();
         Self {
             id: Uuid::new_v4().to_string(),
-            project_id,
+            work_id,
+            message_id,
             tool_name,
             status: "started".to_string(),
-            prompt,
             project_context,
             started_at: now,
             ended_at: None,
@@ -161,9 +161,9 @@ impl AiSession {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct CreateAiSessionRequest {
-    pub project_id: Option<String>,
+    pub work_id: String,
+    pub message_id: String,
     pub tool_name: String,
-    pub prompt: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -187,6 +187,44 @@ pub struct AiSessionOutput {
     pub content: String,
     #[ts(type = "number")]
     pub created_at: i64,
+}
+
+/// Represents an AI session result that stores the response in a WorkMessage
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiSessionResult {
+    pub id: String,
+    pub session_id: String,
+    pub response_message_id: String,
+    pub status: String,
+    #[ts(type = "number")]
+    pub created_at: i64,
+    #[ts(type = "number | null")]
+    pub completed_at: Option<i64>,
+}
+
+impl AiSessionResult {
+    pub fn new(session_id: String, response_message_id: String) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            session_id,
+            response_message_id,
+            status: "processing".to_string(),
+            created_at: now,
+            completed_at: None,
+        }
+    }
+
+    pub fn complete(&mut self) {
+        self.status = "completed".to_string();
+        self.completed_at = Some(Utc::now().timestamp());
+    }
+
+    pub fn fail(&mut self) {
+        self.status = "failed".to_string();
+        self.completed_at = Some(Utc::now().timestamp());
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
