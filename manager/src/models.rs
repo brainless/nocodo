@@ -204,6 +204,7 @@ pub struct AiSessionResult {
 }
 
 impl AiSessionResult {
+    #[allow(dead_code)]
     pub fn new(session_id: String, response_message_id: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
@@ -216,11 +217,13 @@ impl AiSessionResult {
         }
     }
 
+    #[allow(dead_code)]
     pub fn complete(&mut self) {
         self.status = "completed".to_string();
         self.completed_at = Some(Utc::now().timestamp());
     }
 
+    #[allow(dead_code)]
     pub fn fail(&mut self) {
         self.status = "failed".to_string();
         self.completed_at = Some(Utc::now().timestamp());

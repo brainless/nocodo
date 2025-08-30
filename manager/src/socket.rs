@@ -189,7 +189,7 @@ impl SocketServer {
                     Ok(work) => work,
                     Err(e) => {
                         error!("Failed to get work {}: {}", req.work_id, e);
-                        let message = format!("Failed to get work: {}", e);
+                        let message = format!("Failed to get work: {e}");
                         return SocketResponse::Error { message };
                     }
                 };
@@ -198,13 +198,16 @@ impl SocketServer {
                     Ok(messages) => messages,
                     Err(e) => {
                         error!("Failed to get messages for work {}: {}", req.work_id, e);
-                        let message = format!("Failed to get messages: {}", e);
+                        let message = format!("Failed to get messages: {e}");
                         return SocketResponse::Error { message };
                     }
                 };
 
                 if !messages.iter().any(|m| m.id == req.message_id) {
-                    error!("Message {} not found in work {}", req.message_id, req.work_id);
+                    error!(
+                        "Message {} not found in work {}",
+                        req.message_id, req.work_id
+                    );
                     let message = "Message not found in work".to_string();
                     return SocketResponse::Error { message };
                 }
