@@ -141,7 +141,7 @@ A new project created with nocodo.
     if updated_project.framework.is_none() {
         updated_project.framework = analysis.primary_framework.clone();
     }
-    
+
     // Store enhanced technology information as JSON
     let detection_result = crate::models::ProjectDetectionResult {
         primary_language: analysis.primary_language.clone().unwrap_or_default(),
@@ -150,11 +150,11 @@ A new project created with nocodo.
         package_managers: analysis.package_managers.clone(),
         deployment_configs: analysis.deployment_configs.clone(),
     };
-    
+
     let technologies_json = serde_json::to_string(&detection_result)
         .map_err(|e| AppError::Internal(format!("Failed to serialize technologies: {e}")))?;
     updated_project.technologies = Some(technologies_json);
-    
+
     updated_project.update_timestamp();
     data.database.update_project(&updated_project)?;
 
@@ -419,7 +419,7 @@ pub async fn add_existing_project(
     if updated_project.framework.is_none() {
         updated_project.framework = analysis.primary_framework.clone();
     }
-    
+
     // Store enhanced technology information as JSON
     let detection_result = crate::models::ProjectDetectionResult {
         primary_language: analysis.primary_language.clone().unwrap_or_default(),
@@ -428,11 +428,11 @@ pub async fn add_existing_project(
         package_managers: analysis.package_managers.clone(),
         deployment_configs: analysis.deployment_configs.clone(),
     };
-    
+
     let technologies_json = serde_json::to_string(&detection_result)
         .map_err(|e| AppError::Internal(format!("Failed to serialize technologies: {e}")))?;
     updated_project.technologies = Some(technologies_json);
-    
+
     updated_project.update_timestamp();
     data.database.update_project(&updated_project)?;
 
@@ -1068,7 +1068,10 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         ("yaml", vec![".yml", ".yaml"]),
         ("json", vec![".json"]),
         ("toml", vec![".toml"]),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     // Framework detection patterns
     let _framework_patterns: HashMap<&str, Vec<&str>> = [
@@ -1083,7 +1086,10 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         ("flask", vec!["flask"]),
         ("actix-web", vec!["actix-web"]),
         ("axum", vec!["axum"]),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     // Build tool patterns
     let build_tool_patterns: HashMap<&str, Vec<&str>> = [
@@ -1097,17 +1103,26 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         ("webpack", vec!["webpack.config.js", "webpack.config.ts"]),
         ("vite", vec!["vite.config.js", "vite.config.ts"]),
         ("rollup", vec!["rollup.config.js"]),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     // Deployment configuration patterns
     let deployment_patterns: HashMap<&str, Vec<&str>> = [
-        ("docker", vec!["Dockerfile", "docker-compose.yml", "docker-compose.yaml"]),
+        (
+            "docker",
+            vec!["Dockerfile", "docker-compose.yml", "docker-compose.yaml"],
+        ),
         ("github-actions", vec![".github/workflows/"]),
         ("gitlab-ci", vec![".gitlab-ci.yml"]),
         ("jenkins", vec!["Jenkinsfile"]),
         ("kubernetes", vec!["k8s/", "kube/", "*.yaml", "*.yml"]),
         ("terraform", vec!["*.tf"]),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     // Helper function to get relative path from project root
     let rel = |p: &Path| -> String {
@@ -1239,11 +1254,11 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
                             .as_ref()
                             .map(|m| m.contains_key(name))
                             .unwrap_or(false)
-                        || pkg
-                            .dev_dependencies
-                            .as_ref()
-                            .map(|m| m.contains_key(name))
-                            .unwrap_or(false)
+                            || pkg
+                                .dev_dependencies
+                                .as_ref()
+                                .map(|m| m.contains_key(name))
+                                .unwrap_or(false)
                     };
 
                     let framework = if has_dep("react") {
@@ -1346,7 +1361,7 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
     // Detect build tools from files
     for (path, _) in files_found.iter() {
         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        
+
         for (tool, patterns) in &build_tool_patterns {
             if patterns.contains(&filename) || filename.starts_with(tool) {
                 build_tools.push(tool.to_string());
@@ -1357,7 +1372,7 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
     // Detect package managers from files
     for (path, _) in files_found.iter() {
         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        
+
         if filename == "package.json" {
             package_managers.push("npm".to_string());
         } else if filename == "yarn.lock" {
@@ -1370,7 +1385,7 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
     // Detect deployment configurations
     for (path, _) in files_found.iter() {
         let path_str = path.to_string_lossy();
-        
+
         for (config, patterns) in &deployment_patterns {
             if patterns.iter().any(|&p| path_str.contains(p)) {
                 deployment_configs.push(config.to_string());
@@ -1381,16 +1396,16 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
     // Determine primary language and framework
     let mut primary_language: Option<String> = None;
     let mut primary_framework: Option<String> = None;
-    
+
     // Find the language with the highest file count
     if !technologies.is_empty() {
         let max_lang = technologies
             .values()
             .max_by_key(|tech| tech.file_count)
             .unwrap();
-            
+
         primary_language = Some(max_lang.language.clone());
-        
+
         // If we found a framework for this language, set it
         if let Some(framework) = detected_frameworks.values().next() {
             primary_framework = Some(framework.clone());
@@ -1529,9 +1544,8 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
     }
 
     // Convert technologies map to vector
-    let technologies_vec: Vec<crate::models::ProjectTechnology> = technologies
-        .into_values()
-        .collect();
+    let technologies_vec: Vec<crate::models::ProjectTechnology> =
+        technologies.into_values().collect();
 
     Ok(ProjectAnalysisResult {
         primary_language,
