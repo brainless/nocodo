@@ -159,15 +159,6 @@ impl Runner {
         Ok(())
     }
 
-    pub async fn send_input(&self, session_id: &str, content: String) -> anyhow::Result<()> {
-        let map = self.inputs.lock().await;
-        if let Some(tx) = map.get(session_id) {
-            tx.send(content).await.map_err(|e| anyhow::anyhow!(e))
-        } else {
-            Err(anyhow::anyhow!("no live stdin for session"))
-        }
-    }
-
     fn build_command_args(
         tool: &str,
         prompt: &str,

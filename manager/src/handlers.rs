@@ -1,12 +1,11 @@
 use crate::database::Database;
 use crate::error::AppError;
 use crate::models::{
-    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
-    AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
-    CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
-    FileListResponse, FileResponse, FileUpdateRequest, Project, ProjectListResponse,
-    ProjectResponse, RecordAiOutputRequest, ServerStatus, WorkListResponse, WorkMessageResponse,
-    WorkResponse,
+    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionResponse,
+    CreateAiSessionRequest, CreateProjectRequest, CreateWorkRequest, FileContentResponse,
+    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
+    FileUpdateRequest, Project, ProjectListResponse, ProjectResponse, ServerStatus,
+    WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -889,75 +888,6 @@ pub async fn list_ai_sessions(data: web::Data<AppState>) -> Result<HttpResponse,
     Ok(HttpResponse::Ok().json(response))
 }
 
-pub async fn get_ai_session(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let session = data.database.get_ai_session_by_id(&id)?;
-    let response = AiSessionResponse { session };
-    Ok(HttpResponse::Ok().json(response))
-}
-
-pub async fn record_ai_output(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-    request: web::Json<RecordAiOutputRequest>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let req = request.into_inner();
-
-    if req.content.trim().is_empty() {
-        return Err(AppError::InvalidRequest("content is required".into()));
-    }
-
-    // Ensure session exists
-    let _ = data.database.get_ai_session_by_id(&id)?;
-
-    data.database.create_ai_session_output(&id, &req.content)?;
-    Ok(HttpResponse::Created().json(serde_json::json!({"ok": true})))
-}
-
-pub async fn list_ai_outputs(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    // Ensure session exists
-    let _ = data.database.get_ai_session_by_id(&id)?;
-
-    let outputs = data.database.get_ai_session_outputs(&id)?;
-    let response = AiSessionOutputListResponse { outputs };
-    Ok(HttpResponse::Ok().json(response))
-}
-
-// Send interactive input to a running session
-pub async fn send_ai_input(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-    request: web::Json<crate::models::AiSessionInputRequest>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let req = request.into_inner();
-
-    if req.content.trim().is_empty() {
-        return Err(AppError::InvalidRequest("content is required".into()));
-    }
-
-    if let Some(runner) = &data.runner {
-        match runner.send_input(&id, req.content.clone()).await {
-            Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"ok": true}))),
-            Err(e) => Err(AppError::Internal(format!("Failed to send input: {e}"))),
-        }
-    } else {
-        Err(AppError::InvalidRequest(
-            "Runner not enabled on Manager".to_string(),
-        ))
-    }
-}
-
-/// Check for project path conflicts - ensure the requested path is not inside an existing project
-/// or that an existing project is not inside the requested path
 pub async fn check_project_path_conflicts(
     database: &Database,
     requested_path: &std::path::Path,

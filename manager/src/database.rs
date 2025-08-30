@@ -1,5 +1,5 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{AiSession, AiSessionOutput, AiSessionResult, Project, ProjectComponent};
+use crate::models::{AiSession, AiSessionResult, Project, ProjectComponent};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -554,33 +554,6 @@ impl Database {
             content.len()
         );
         Ok(())
-    }
-
-    // Retrieve outputs for a given AI session
-    pub fn get_ai_session_outputs(&self, session_id: &str) -> AppResult<Vec<AiSessionOutput>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, session_id, content, created_at FROM ai_session_outputs WHERE session_id = ? ORDER BY id ASC",
-        )?;
-
-        let iter = stmt.query_map([session_id], |row| {
-            Ok(AiSessionOutput {
-                id: row.get(0)?,
-                session_id: row.get(1)?,
-                content: row.get(2)?,
-                created_at: row.get(3)?,
-            })
-        })?;
-
-        let mut outputs = Vec::new();
-        for item in iter {
-            outputs.push(item?);
-        }
-        Ok(outputs)
     }
 
     // Work management methods
