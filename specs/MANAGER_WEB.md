@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Manager Web app is a single-page application that provides a Lovable-like chat interface for users to build software. It communicates with the Manager daemon on the Operator server via a RESTful API and WebSockets. Built with SolidJS, TypeScript, and Tailwind CSS, it offers a real-time, interactive environment for AI-assisted development.
+The Manager Web app is a single-page application that provides a Lovable-like chat interface for users to build software. It communicates with the Manager daemon via a RESTful API and WebSockets. Built with SolidJS, TypeScript, and Tailwind CSS, it offers a real-time, interactive environment for AI-assisted development.
 
 ## Architecture
 
