@@ -3,6 +3,8 @@
 ## Project Overview
 nocodo is a local AI-assisted development environment that provides guardrails and good software engineering practices for code generation. It runs entirely on Linux machines without cloud dependencies.
 
+> ⚠️ **Note**: The nocodo CLI has been removed as part of issue #80. The nocodo CLI is no longer included in this repository.
+
 ## Development Workflow
 
 * Create a new branch for each task
@@ -18,7 +20,6 @@ nocodo is a local AI-assisted development environment that provides guardrails a
 
 ## Core Components (MVP)
 1. **Manager Daemon** (Rust + Actix): Local orchestration service with:
-   - Unix socket server for CLI communication
    - HTTP API server (localhost:8081) for Web app
    - SQLite database for project metadata
    - AI session management
@@ -28,33 +29,25 @@ nocodo is a local AI-assisted development environment that provides guardrails a
    - Real-time WebSocket communication
    - Code editing capabilities
 
-3. **nocodo CLI** (Rust): Command-line companion for AI coding tools with:
-   - Project analysis and validation
-   - Context-aware prompt generation
-   - AI tool integration (Claude Code, Gemini CLI, etc.)
-
 ## Key Technologies
 - **Backend**: Rust, Actix Web, SQLite, ts-rs (TypeScript type generation)
 - **Frontend**: SolidJS, TypeScript, Vite, Tailwind CSS
-- **Infrastructure**: Unix sockets for CLI↔Manager, HTTP/WebSocket for Web↔Manager
+- **Infrastructure**: HTTP/WebSocket for Web↔Manager
 
 ## Communication Flow
 1. User ↔ Manager Web (HTTP/WebSocket on localhost:8081)
-2. nocodo CLI ↔ Manager Daemon (Unix socket at `/tmp/nocodo-manager.sock`)
-3. AI Tools → nocodo CLI → Manager Daemon
-4. Manager Web ↔ Manager Daemon (Internal API calls)
+2. AI Tools ↔ Manager Daemon (Direct integration)
+3. Manager Web ↔ Manager Daemon (Internal API calls)
 
 ## How to use nocodo MVP
 1. Start Manager daemon: `nocodo-manager --config ~/.config/nocodo/manager.toml`
 2. Access Web interface at http://localhost:8081
-3. Use CLI commands like `nocodo analyze` or `nocodo session claude "add authentication"`
-4. AI tools interact with nocodo CLI for context and guardrails
+3. AI tools interact directly with Manager Daemon
 
 ## File Structure
 ```
 nocodo/
 ├── manager/       # Manager daemon (Rust)
-├── cli/           # nocodo CLI (Rust)
 ├── manager-web/   # Web app (SolidJS/TypeScript)
 ├── specs/         # Technical specifications
 └── configs/       # Configuration templates
