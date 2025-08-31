@@ -1,6 +1,5 @@
 // Re-export all generated types from ts-rs
 export * from './types/generated/AiSession';
-export * from './types/generated/Project';
 export * from './types/generated/AiSessionListResponse';
 export * from './types/generated/AiSessionResponse';
 export * from './types/generated/CreateAiSessionRequest';
@@ -72,3 +71,4 @@ export interface WebSocketClient {
   onStateChange(callback: (state: WebSocketConnectionState) => void): void;
   getState(): WebSocketConnectionState;
 }
+export type { Project } from './types/Project';

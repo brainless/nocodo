@@ -236,15 +236,19 @@ const ProjectDetails: Component = () => {
                 <div class='bg-white border border-gray-200 rounded p-4'>
                   <h3 class='text-lg font-semibold mb-3'>Technologies Detected</h3>
                   <div class='space-y-2'>
-                    <For each={(() => {
-                      try {
-                        const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                        return detection.technologies.sort((a, b) => b.file_count - a.file_count);
-                      } catch (e) {
-                        console.error('Failed to parse technologies:', e);
-                        return [];
-                      }
-                    })()}>
+                    <For
+                      each={(() => {
+                        try {
+                          const detection = JSON.parse(
+                            project()!.technologies!
+                          ) as ProjectDetectionResult;
+                          return detection.technologies.sort((a, b) => b.file_count - a.file_count);
+                        } catch (e) {
+                          console.error('Failed to parse technologies:', e);
+                          return [];
+                        }
+                      })()}
+                    >
                       {tech => (
                         <div class='p-3 border border-gray-200 rounded flex items-center justify-between'>
                           <div>
@@ -255,7 +259,8 @@ const ProjectDetails: Component = () => {
                               )}
                             </div>
                             <div class='text-xs text-gray-500'>
-                              {tech.file_count} files • {Math.round(tech.confidence * 100)}% confidence
+                              {tech.file_count} files • {Math.round(tech.confidence * 100)}%
+                              confidence
                             </div>
                           </div>
                         </div>
@@ -272,28 +277,34 @@ const ProjectDetails: Component = () => {
                   <div class='bg-white border border-gray-200 rounded p-4'>
                     <h3 class='text-lg font-semibold mb-3'>Build Tools</h3>
                     <div class='space-y-2'>
-                      <For each={(() => {
-                        try {
-                          const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                          return detection.build_tools || [];
-                        } catch (e) {
-                          return [];
-                        }
-                      })()}>
+                      <For
+                        each={(() => {
+                          try {
+                            const detection = JSON.parse(
+                              project()!.technologies!
+                            ) as ProjectDetectionResult;
+                            return detection.build_tools || [];
+                          } catch (e) {
+                            return [];
+                          }
+                        })()}
+                      >
                         {tool => (
-                          <div class='p-2 bg-gray-50 rounded text-sm text-gray-700'>
-                            {tool}
-                          </div>
+                          <div class='p-2 bg-gray-50 rounded text-sm text-gray-700'>{tool}</div>
                         )}
                       </For>
-                      <Show when={(() => {
-                        try {
-                          const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                          return !detection.build_tools || detection.build_tools.length === 0;
-                        } catch (e) {
-                          return true;
-                        }
-                      })()}>
+                      <Show
+                        when={(() => {
+                          try {
+                            const detection = JSON.parse(
+                              project()!.technologies!
+                            ) as ProjectDetectionResult;
+                            return !detection.build_tools || detection.build_tools.length === 0;
+                          } catch (e) {
+                            return true;
+                          }
+                        })()}
+                      >
                         <div class='text-sm text-gray-500'>No build tools detected</div>
                       </Show>
                     </div>
@@ -303,28 +314,36 @@ const ProjectDetails: Component = () => {
                   <div class='bg-white border border-gray-200 rounded p-4'>
                     <h3 class='text-lg font-semibold mb-3'>Package Managers</h3>
                     <div class='space-y-2'>
-                      <For each={(() => {
-                        try {
-                          const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                          return detection.package_managers || [];
-                        } catch (e) {
-                          return [];
-                        }
-                      })()}>
+                      <For
+                        each={(() => {
+                          try {
+                            const detection = JSON.parse(
+                              project()!.technologies!
+                            ) as ProjectDetectionResult;
+                            return detection.package_managers || [];
+                          } catch (e) {
+                            return [];
+                          }
+                        })()}
+                      >
                         {manager => (
-                          <div class='p-2 bg-gray-50 rounded text-sm text-gray-700'>
-                            {manager}
-                          </div>
+                          <div class='p-2 bg-gray-50 rounded text-sm text-gray-700'>{manager}</div>
                         )}
                       </For>
-                      <Show when={(() => {
-                        try {
-                          const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                          return !detection.package_managers || detection.package_managers.length === 0;
-                        } catch (e) {
-                          return true;
-                        }
-                      })()}>
+                      <Show
+                        when={(() => {
+                          try {
+                            const detection = JSON.parse(
+                              project()!.technologies!
+                            ) as ProjectDetectionResult;
+                            return (
+                              !detection.package_managers || detection.package_managers.length === 0
+                            );
+                          } catch (e) {
+                            return true;
+                          }
+                        })()}
+                      >
                         <div class='text-sm text-gray-500'>No package managers detected</div>
                       </Show>
                     </div>
@@ -334,28 +353,37 @@ const ProjectDetails: Component = () => {
                   <div class='bg-white border border-gray-200 rounded p-4'>
                     <h3 class='text-lg font-semibold mb-3'>Deployment Configs</h3>
                     <div class='space-y-2'>
-                      <For each={(() => {
-                        try {
-                          const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                          return detection.deployment_configs || [];
-                        } catch (e) {
-                          return [];
-                        }
-                      })()}>
+                      <For
+                        each={(() => {
+                          try {
+                            const detection = JSON.parse(
+                              project()!.technologies!
+                            ) as ProjectDetectionResult;
+                            return detection.deployment_configs || [];
+                          } catch (e) {
+                            return [];
+                          }
+                        })()}
+                      >
                         {config => (
-                          <div class='p-2 bg-gray-50 rounded text-sm text-gray-700'>
-                            {config}
-                          </div>
+                          <div class='p-2 bg-gray-50 rounded text-sm text-gray-700'>{config}</div>
                         )}
                       </For>
-                      <Show when={(() => {
-                        try {
-                          const detection = JSON.parse(project()!.technologies!) as ProjectDetectionResult;
-                          return !detection.deployment_configs || detection.deployment_configs.length === 0;
-                        } catch (e) {
-                          return true;
-                        }
-                      })()}>
+                      <Show
+                        when={(() => {
+                          try {
+                            const detection = JSON.parse(
+                              project()!.technologies!
+                            ) as ProjectDetectionResult;
+                            return (
+                              !detection.deployment_configs ||
+                              detection.deployment_configs.length === 0
+                            );
+                          } catch (e) {
+                            return true;
+                          }
+                        })()}
+                      >
                         <div class='text-sm text-gray-500'>No deployment configs detected</div>
                       </Show>
                     </div>
