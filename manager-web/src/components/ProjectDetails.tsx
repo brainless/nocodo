@@ -67,7 +67,7 @@ const ProjectDetails: Component = () => {
 
       // Fetch sessions and filter by project
       const all = await apiClient.listSessions();
-      setSessions(all.filter(s => s.project_id === pid));
+      setSessions(Array.isArray(all) ? all.filter(s => s.project_id === pid) : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load project details');
     } finally {

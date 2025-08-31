@@ -1,6 +1,7 @@
 import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
-import { MessageAuthorType, MessageContentType, Project } from '../types';
+import { Project } from '../types';
+import type { MessageAuthorType, MessageContentType } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
 import ProjectCard from './ProjectCard';
@@ -148,8 +149,8 @@ const StartAiSessionForm: Component = () => {
       // 2. Add the initial message
       const messageResp = await apiClient.addMessageToWork(workId, {
         content: prompt().trim(),
-        content_type: MessageContentType.Text,
-        author_type: MessageAuthorType.User,
+        content_type: "text" as MessageContentType,
+        author_type: "user" as MessageAuthorType,
         author_id: null, // Assuming user is not logged in
       });
       const messageId = messageResp.message.id;

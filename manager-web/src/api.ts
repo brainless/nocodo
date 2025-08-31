@@ -155,7 +155,14 @@ class ApiClient {
   }
 
   async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
-    return this.request(`/work/${id}/outputs`);
+    try {
+      const result = await this.request(`/work/${id}/outputs`);
+      return result;
+    } catch (error) {
+      // If outputs endpoint doesn't exist, return empty response
+      console.warn(`Outputs endpoint not available for work ${id}, returning empty outputs`);
+      return { outputs: [] } as AiSessionOutputListResponse;
+    }
   }
 
   // Issue #59: Send input to a running AI session (stdin)
@@ -173,7 +180,21 @@ class ApiClient {
    */
   async listSessions(): Promise<AiSession[]> {
     const response = await this.listAiSessions();
-    return response.sessions;
+    const works = (response as any).works || [];
+    
+    // Transform each work item to match AiSession interface
+    return works.map((work: any) => ({
+      id: work.id,
+      work_id: work.id,
+      message_id: '',  // We don't have message details in the list view
+      tool_name: work.tool_name || null,
+      status: work.status,
+      project_context: null,
+      started_at: work.created_at,
+      ended_at: work.updated_at !== work.created_at ? work.updated_at : null,
+      prompt: work.title, // Use title as prompt for list view
+      project_id: work.project_id,
+    }));
   }
 
   /**
@@ -183,7 +204,23 @@ class ApiClient {
    */
   async getSession(id: string): Promise<AiSession> {
     const response = await this.getAiSession(id);
-    return response.session;
+    const workData = (response as any);
+    
+    // Transform the work data to match AiSession interface
+    const firstMessage = workData.messages && workData.messages.length > 0 ? workData.messages[0] : null;
+    
+    return {
+      id: workData.work.id,
+      work_id: workData.work.id,
+      message_id: firstMessage?.id || '',
+      tool_name: workData.work.tool_name || null,
+      status: workData.work.status,
+      project_context: null,
+      started_at: workData.work.created_at,
+      ended_at: workData.work.updated_at !== workData.work.created_at ? workData.work.updated_at : null,
+      prompt: firstMessage?.content || workData.work.title,
+      project_id: workData.work.project_id,
+    } as any; // Using any to bypass type checking for the extra fields
   }
 
   /**

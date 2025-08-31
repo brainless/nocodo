@@ -10,8 +10,16 @@ interface AiSessionCardProps {
 }
 
 // Utility function to format timestamps
-const formatTimestamp = (timestamp: number): string => {
+const formatTimestamp = (timestamp: number | null | undefined): string => {
+  if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
+    return 'Unknown';
+  }
+  
   const date = new Date(timestamp * 1000);
+  if (isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+  
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
@@ -31,9 +39,21 @@ const formatTimestamp = (timestamp: number): string => {
 };
 
 // Utility function to format duration
-const formatDuration = (startedAt: number, endedAt?: number): string => {
+const formatDuration = (startedAt: number | null | undefined, endedAt?: number | null): string => {
+  if (!startedAt || typeof startedAt !== 'number' || startedAt <= 0) {
+    return 'Unknown';
+  }
+  
   const start = new Date(startedAt * 1000);
-  const end = endedAt ? new Date(endedAt * 1000) : new Date();
+  if (isNaN(start.getTime())) {
+    return 'Unknown';
+  }
+  
+  const end = endedAt && endedAt > 0 ? new Date(endedAt * 1000) : new Date();
+  if (isNaN(end.getTime())) {
+    return 'Unknown';
+  }
+  
   const durationMs = end.getTime() - start.getTime();
 
   const minutes = Math.floor(durationMs / 60000);
@@ -61,8 +81,16 @@ const AiSessionCard: Component<AiSessionCardProps> = props => {
           </div>
           <div class='text-sm text-gray-500'>
             <time
-              dateTime={new Date(props.session.started_at * 1000).toISOString()}
-              title={new Date(props.session.started_at * 1000).toLocaleString()}
+              dateTime={
+                props.session.started_at && props.session.started_at > 0
+                  ? new Date(props.session.started_at * 1000).toISOString()
+                  : ''
+              }
+              title={
+                props.session.started_at && props.session.started_at > 0
+                  ? new Date(props.session.started_at * 1000).toLocaleString()
+                  : 'Unknown timestamp'
+              }
             >
               {formatTimestamp(props.session.started_at)}
             </time>

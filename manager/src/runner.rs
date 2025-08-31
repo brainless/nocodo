@@ -34,12 +34,18 @@ impl Runner {
     ) -> anyhow::Result<()> {
         let session_id = session.id.clone();
         let tool = session.tool_name.clone();
+        
+        tracing::info!("Runner: Starting session {} with tool '{}'", session_id, tool);
 
         // Prepare command mapping and args
         let (cmd_name, args, prompt_file) = Self::build_command_args(&tool, &enhanced_prompt)?;
+        
+        tracing::info!("Runner: Command to execute: {} {:?}", cmd_name, args);
 
         let mut cmd = Command::new(&cmd_name);
         cmd.args(args);
+            
+        tracing::info!("Runner: Command configured for session {}", session_id);
 
         // If this session is associated with a project via its work, run the tool in that project's directory
         if let Ok(work) = self.db.get_work_by_id(&session.work_id) {
@@ -69,7 +75,9 @@ impl Runner {
             }
         }
 
-        cmd.stdin(std::process::Stdio::piped())
+        // Configure stdio - Claude --print doesn't need stdin, other tools might
+        let needs_stdin = tool != "claude" || (cmd_name == "sh");  // sh for multi-line prompts needs stdin
+        cmd.stdin(if needs_stdin { std::process::Stdio::piped() } else { std::process::Stdio::null() })
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
 
@@ -87,18 +95,24 @@ impl Runner {
 
         // Stdout reader
         if let Some(stdout) = child.stdout.take() {
+            tracing::info!("Runner: Setting up stdout reader for session {}", session_id);
             let ws = Arc::clone(&self.ws);
             let db = Arc::clone(&self.db);
             let sid = session_id.clone();
             tokio::spawn(async move {
                 let mut lines = BufReader::new(stdout).lines();
                 let mut seq: u64 = 0;
+                tracing::info!("Runner: Started stdout reader for session {}", sid);
                 while let Ok(Some(line)) = lines.next_line().await {
+                    tracing::info!("Runner: Got stdout line for session {}: {}", sid, line);
                     ws.broadcast_ai_output_chunk(sid.clone(), "stdout", &line, seq);
                     let _ = db.create_ai_session_output(&sid, &line);
                     seq = seq.saturating_add(1);
                 }
+                tracing::info!("Runner: Stdout reader finished for session {}", sid);
             });
+        } else {
+            tracing::warn!("Runner: No stdout available for session {}", session_id);
         }
 
         // Stderr reader
@@ -185,9 +199,25 @@ impl Runner {
             ));
         }
 
-        // Claude generally supports --print with inline prompt
+        // Claude supports --print with inline prompt, but use file for multi-line prompts
         if cmd == "claude" {
-            return Ok((cmd, vec!["--print".to_string(), prompt.to_string()], None));
+            // If prompt contains newlines, use a temp file approach to avoid shell escaping issues
+            if prompt.contains('\n') {
+                let mut path = std::env::temp_dir();
+                path.push(format!("nocodo_claude_prompt_{}.txt", std::process::id()));
+                std::fs::write(&path, prompt)?;
+                // Use stdin approach: claude --print < prompt_file
+                return Ok((
+                    "sh".to_string(),
+                    vec![
+                        "-c".to_string(),
+                        format!("claude --print < {}", path.to_string_lossy()),
+                    ],
+                    Some(path),
+                ));
+            } else {
+                return Ok((cmd, vec!["--print".to_string(), prompt.to_string()], None));
+            }
         }
 
         // Qwen Code expects --prompt <text>
