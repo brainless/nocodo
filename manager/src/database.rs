@@ -565,7 +565,11 @@ impl Database {
             sessions.push(session?);
         }
 
-        tracing::debug!("Retrieved {} AI sessions for work {}", sessions.len(), work_id);
+        tracing::debug!(
+            "Retrieved {} AI sessions for work {}",
+            sessions.len(),
+            work_id
+        );
         Ok(sessions)
     }
 
@@ -589,7 +593,10 @@ impl Database {
         Ok(())
     }
 
-    pub fn list_ai_session_outputs(&self, session_id: &str) -> AppResult<Vec<crate::models::AiSessionOutput>> {
+    pub fn list_ai_session_outputs(
+        &self,
+        session_id: &str,
+    ) -> AppResult<Vec<crate::models::AiSessionOutput>> {
         let conn = self
             .connection
             .lock()

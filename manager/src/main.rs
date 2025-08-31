@@ -65,9 +65,9 @@ async fn main() -> AppResult<()> {
         .ok()
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
-    
+
     tracing::info!("Runner enabled: {}", runner_enabled);
-    
+
     let runner = if runner_enabled {
         tracing::info!("Initializing in-process AI runner");
         Some(Arc::new(Runner::new(
@@ -147,7 +147,7 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
-                        )
+                        ),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))

@@ -1,11 +1,11 @@
 use crate::database::Database;
 use crate::error::AppError;
 use crate::models::{
-    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutputListResponse, AiSessionResponse,
-    CreateAiSessionRequest, CreateProjectRequest, CreateWorkRequest, FileContentResponse,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
-    FileUpdateRequest, Project, ProjectListResponse, ProjectResponse, ServerStatus,
-    WorkListResponse, WorkMessageResponse, WorkResponse,
+    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
+    AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
+    CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
+    FileListResponse, FileResponse, FileUpdateRequest, Project, ProjectListResponse,
+    ProjectResponse, ServerStatus, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -860,8 +860,11 @@ pub async fn create_ai_session(
 
     // If runner is enabled, start streaming execution for this session in background
     if let Some(runner) = &data.runner {
-        tracing::info!("Runner is available, starting AI session execution for session {}", session.id);
-        
+        tracing::info!(
+            "Runner is available, starting AI session execution for session {}",
+            session.id
+        );
+
         // Get the prompt from the associated message
         let message = messages
             .iter()
@@ -877,16 +880,30 @@ pub async fn create_ai_session(
         } else {
             message.content.clone()
         };
-        
-        tracing::info!("Starting runner with tool: {} for session: {}", session.tool_name, session.id);
-        
+
+        tracing::info!(
+            "Starting runner with tool: {} for session: {}",
+            session.tool_name,
+            session.id
+        );
+
         // Fire-and-forget - but log any errors
         match runner.start_session(session.clone(), enhanced_prompt).await {
-            Ok(_) => tracing::info!("Successfully started runner execution for session {}", session.id),
-            Err(e) => tracing::error!("Failed to start runner execution for session {}: {}", session.id, e),
+            Ok(_) => tracing::info!(
+                "Successfully started runner execution for session {}",
+                session.id
+            ),
+            Err(e) => tracing::error!(
+                "Failed to start runner execution for session {}: {}",
+                session.id,
+                e
+            ),
         }
     } else {
-        tracing::warn!("Runner is not available - AI session {} will not be executed", session.id);
+        tracing::warn!(
+            "Runner is not available - AI session {} will not be executed",
+            session.id
+        );
     }
 
     Ok(HttpResponse::Created().json(response))
@@ -898,28 +915,33 @@ pub async fn list_ai_sessions(data: web::Data<AppState>) -> Result<HttpResponse,
     Ok(HttpResponse::Ok().json(response))
 }
 
-pub async fn list_ai_session_outputs(path: web::Path<String>, data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+pub async fn list_ai_session_outputs(
+    path: web::Path<String>,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    
+
     // First, get the AI session for this work
     let sessions = data.database.get_ai_sessions_by_work_id(&work_id)?;
-    
+
     if sessions.is_empty() {
         // No AI session found for this work, return empty outputs
         let response = AiSessionOutputListResponse { outputs: vec![] };
         return Ok(HttpResponse::Ok().json(response));
     }
-    
+
     // Get the most recent AI session (in case there are multiple)
-    let session = sessions.into_iter()
-        .max_by_key(|s| s.started_at)
-        .unwrap();
-    
+    let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
+
     // Get outputs for this session
     let outputs = data.database.list_ai_session_outputs(&session.id)?;
     let response = AiSessionOutputListResponse { outputs };
-    
-    tracing::debug!("Retrieved {} outputs for work {}", response.outputs.len(), work_id);
+
+    tracing::debug!(
+        "Retrieved {} outputs for work {}",
+        response.outputs.len(),
+        work_id
+    );
     Ok(HttpResponse::Ok().json(response))
 }
 
