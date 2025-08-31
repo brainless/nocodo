@@ -34,17 +34,21 @@ impl Runner {
     ) -> anyhow::Result<()> {
         let session_id = session.id.clone();
         let tool = session.tool_name.clone();
-        
-        tracing::info!("Runner: Starting session {} with tool '{}'", session_id, tool);
+
+        tracing::info!(
+            "Runner: Starting session {} with tool '{}'",
+            session_id,
+            tool
+        );
 
         // Prepare command mapping and args
         let (cmd_name, args, prompt_file) = Self::build_command_args(&tool, &enhanced_prompt)?;
-        
+
         tracing::info!("Runner: Command to execute: {} {:?}", cmd_name, args);
 
         let mut cmd = Command::new(&cmd_name);
         cmd.args(args);
-            
+
         tracing::info!("Runner: Command configured for session {}", session_id);
 
         // If this session is associated with a project via its work, run the tool in that project's directory
@@ -76,10 +80,14 @@ impl Runner {
         }
 
         // Configure stdio - Claude --print doesn't need stdin, other tools might
-        let needs_stdin = tool != "claude" || (cmd_name == "sh");  // sh for multi-line prompts needs stdin
-        cmd.stdin(if needs_stdin { std::process::Stdio::piped() } else { std::process::Stdio::null() })
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped());
+        let needs_stdin = tool != "claude" || (cmd_name == "sh"); // sh for multi-line prompts needs stdin
+        cmd.stdin(if needs_stdin {
+            std::process::Stdio::piped()
+        } else {
+            std::process::Stdio::null()
+        })
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
 
         let mut child = match cmd.spawn() {
             Ok(child) => child,
@@ -95,7 +103,10 @@ impl Runner {
 
         // Stdout reader
         if let Some(stdout) = child.stdout.take() {
-            tracing::info!("Runner: Setting up stdout reader for session {}", session_id);
+            tracing::info!(
+                "Runner: Setting up stdout reader for session {}",
+                session_id
+            );
             let ws = Arc::clone(&self.ws);
             let db = Arc::clone(&self.db);
             let sid = session_id.clone();
