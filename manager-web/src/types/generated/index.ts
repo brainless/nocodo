@@ -6,6 +6,7 @@ export * from './AiSessionListResponse';
 export * from './AiSessionOutput';
 export * from './AiSessionOutputListResponse';
 export * from './AiSessionResponse';
+export * from './AiSessionResult';
 export * from './CreateAiSessionRequest';
 export * from './CreateProjectRequest';
 export * from './CreateWorkRequest';
