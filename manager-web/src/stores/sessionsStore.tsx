@@ -63,9 +63,11 @@ export const SessionsProvider: ParentComponent = props => {
 
         const sessions = await apiClient.listSessions();
 
-        setStore('list', sessions);
+        // Defensive check: ensure sessions is an array
+        const sessionsList = Array.isArray(sessions) ? sessions : [];
+        setStore('list', sessionsList);
 
-        const byId = sessions.reduce(
+        const byId = sessionsList.reduce(
           (acc, session) => {
             acc[session.id] = session;
             return acc;
@@ -108,6 +110,7 @@ export const SessionsProvider: ParentComponent = props => {
 
     fetchOutputs: async (id: string) => {
       try {
+        console.debug(`Fetching outputs for work ${id}`);
         const listResp = await apiClient.listAiOutputs(id);
         const chunks = (listResp.outputs || []).map((o, idx) => ({
           content: o.content,
@@ -117,10 +120,11 @@ export const SessionsProvider: ParentComponent = props => {
         }));
         setStore('outputsBySession', id, {
           chunks,
-          lastSeq: chunks.length ? chunks[chunks.length - 1].seq : 0,
+          lastSeq: chunks.length ? chunks.length - 1 : 0,
         });
+        console.debug(`Loaded ${chunks.length} output chunks for work ${id}`);
       } catch (err) {
-        console.error('Failed to fetch outputs:', err);
+        console.warn(`Outputs not available for work ${id}:`, err);
         // initialize empty container to avoid undefined checks
         if (!store.outputsBySession[id]) {
           setStore('outputsBySession', id, { chunks: [], lastSeq: 0 });

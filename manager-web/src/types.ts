@@ -28,6 +28,8 @@ export * from './types/generated/WorkMessageListResponse';
 export * from './types/generated/WorkMessageResponse';
 export * from './types/generated/WorkResponse';
 export * from './types/generated/WorkWithHistory';
+export * from './types/generated/CreateWorkRequest';
+export * from './types/generated/AddMessageRequest';
 
 // Additional types not generated from Rust
 export type AiSessionStatus =

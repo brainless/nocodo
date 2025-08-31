@@ -536,6 +536,39 @@ impl Database {
         Ok(sessions)
     }
 
+    pub fn get_ai_sessions_by_work_id(&self, work_id: &str) -> AppResult<Vec<AiSession>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, work_id, message_id, tool_name, status, project_context, started_at, ended_at
+             FROM ai_sessions WHERE work_id = ? ORDER BY started_at DESC"
+        )?;
+
+        let session_iter = stmt.query_map([work_id], |row| {
+            Ok(AiSession {
+                id: row.get(0)?,
+                work_id: row.get(1)?,
+                message_id: row.get(2)?,
+                tool_name: row.get(3)?,
+                status: row.get(4)?,
+                project_context: row.get(5)?,
+                started_at: row.get(6)?,
+                ended_at: row.get(7)?,
+            })
+        })?;
+
+        let mut sessions = Vec::new();
+        for session in session_iter {
+            sessions.push(session?);
+        }
+
+        tracing::debug!("Retrieved {} AI sessions for work {}", sessions.len(), work_id);
+        Ok(sessions)
+    }
+
     // Store one-shot AI output content for a session
     pub fn create_ai_session_output(&self, session_id: &str, content: &str) -> AppResult<()> {
         let conn = self
@@ -554,6 +587,38 @@ impl Database {
             content.len()
         );
         Ok(())
+    }
+
+    pub fn list_ai_session_outputs(&self, session_id: &str) -> AppResult<Vec<crate::models::AiSessionOutput>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, content, created_at FROM ai_session_outputs WHERE session_id = ? ORDER BY id ASC"
+        )?;
+
+        let output_iter = stmt.query_map(params![session_id], |row| {
+            Ok(crate::models::AiSessionOutput {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                content: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        let mut outputs = Vec::new();
+        for output in output_iter {
+            outputs.push(output?);
+        }
+
+        tracing::debug!(
+            "Retrieved {} outputs for session: {}",
+            outputs.len(),
+            session_id
+        );
+        Ok(outputs)
     }
 
     // Work management methods
