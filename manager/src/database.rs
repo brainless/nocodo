@@ -1,6 +1,6 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{AiSession, AiSessionOutput, Project, ProjectComponent};
-use rusqlite::{params, Connection};
+use crate::models::{AiSession, AiSessionResult, Project, ProjectComponent};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -60,18 +60,19 @@ impl Database {
             [],
         )?;
 
-        // Create AI sessions table
+        // Create AI sessions table - now links to Work and Message instead of storing prompt directly
         conn.execute(
             "CREATE TABLE IF NOT EXISTS ai_sessions (
                 id TEXT PRIMARY KEY,
-                project_id TEXT,
+                work_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
                 tool_name TEXT NOT NULL,
                 status TEXT NOT NULL,
-                prompt TEXT NOT NULL,
                 project_context TEXT,
                 started_at INTEGER NOT NULL,
                 ended_at INTEGER,
-                FOREIGN KEY (project_id) REFERENCES projects (id)
+                FOREIGN KEY (work_id) REFERENCES works (id),
+                FOREIGN KEY (message_id) REFERENCES work_messages (id)
             )",
             [],
         )?;
@@ -97,9 +98,35 @@ impl Database {
             [],
         )?;
 
-        // Create an index on the project_id for faster lookups
+        // Create an index on work_id and message_id for faster lookups
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON ai_sessions(project_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sessions_work_id ON ai_sessions(work_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_message_id ON ai_sessions(message_id)",
+            [],
+        )?;
+
+        // Create AI session results table to track AI responses
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS ai_session_results (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                response_message_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                completed_at INTEGER,
+                FOREIGN KEY (session_id) REFERENCES ai_sessions (id),
+                FOREIGN KEY (response_message_id) REFERENCES work_messages (id)
+            )",
+            [],
+        )?;
+
+        // Index for results by session
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_session_results_session_id ON ai_session_results(session_id)",
             [],
         )?;
 
@@ -395,14 +422,14 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
-            "INSERT INTO ai_sessions (id, project_id, tool_name, status, prompt, project_context, started_at, ended_at)
+            "INSERT INTO ai_sessions (id, work_id, message_id, tool_name, status, project_context, started_at, ended_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 session.id,
-                session.project_id,
+                session.work_id,
+                session.message_id,
                 session.tool_name,
                 session.status,
-                session.prompt,
                 session.project_context,
                 session.started_at,
                 session.ended_at
@@ -424,7 +451,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, tool_name, status, prompt, project_context, started_at, ended_at
+            "SELECT id, work_id, message_id, tool_name, status, project_context, started_at, ended_at
              FROM ai_sessions WHERE id = ?"
         )?;
 
@@ -432,10 +459,10 @@ impl Database {
             .query_row([id], |row| {
                 Ok(AiSession {
                     id: row.get(0)?,
-                    project_id: row.get(1)?,
-                    tool_name: row.get(2)?,
-                    status: row.get(3)?,
-                    prompt: row.get(4)?,
+                    work_id: row.get(1)?,
+                    message_id: row.get(2)?,
+                    tool_name: row.get(3)?,
+                    status: row.get(4)?,
                     project_context: row.get(5)?,
                     started_at: row.get(6)?,
                     ended_at: row.get(7)?,
@@ -484,17 +511,17 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, tool_name, status, prompt, project_context, started_at, ended_at
+            "SELECT id, work_id, message_id, tool_name, status, project_context, started_at, ended_at
              FROM ai_sessions ORDER BY started_at DESC"
         )?;
 
         let session_iter = stmt.query_map([], |row| {
             Ok(AiSession {
                 id: row.get(0)?,
-                project_id: row.get(1)?,
-                tool_name: row.get(2)?,
-                status: row.get(3)?,
-                prompt: row.get(4)?,
+                work_id: row.get(1)?,
+                message_id: row.get(2)?,
+                tool_name: row.get(3)?,
+                status: row.get(4)?,
                 project_context: row.get(5)?,
                 started_at: row.get(6)?,
                 ended_at: row.get(7)?,
@@ -506,6 +533,43 @@ impl Database {
             sessions.push(session?);
         }
 
+        Ok(sessions)
+    }
+
+    pub fn get_ai_sessions_by_work_id(&self, work_id: &str) -> AppResult<Vec<AiSession>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, work_id, message_id, tool_name, status, project_context, started_at, ended_at
+             FROM ai_sessions WHERE work_id = ? ORDER BY started_at DESC"
+        )?;
+
+        let session_iter = stmt.query_map([work_id], |row| {
+            Ok(AiSession {
+                id: row.get(0)?,
+                work_id: row.get(1)?,
+                message_id: row.get(2)?,
+                tool_name: row.get(3)?,
+                status: row.get(4)?,
+                project_context: row.get(5)?,
+                started_at: row.get(6)?,
+                ended_at: row.get(7)?,
+            })
+        })?;
+
+        let mut sessions = Vec::new();
+        for session in session_iter {
+            sessions.push(session?);
+        }
+
+        tracing::debug!(
+            "Retrieved {} AI sessions for work {}",
+            sessions.len(),
+            work_id
+        );
         Ok(sessions)
     }
 
@@ -529,19 +593,21 @@ impl Database {
         Ok(())
     }
 
-    // Retrieve outputs for a given AI session
-    pub fn get_ai_session_outputs(&self, session_id: &str) -> AppResult<Vec<AiSessionOutput>> {
+    pub fn list_ai_session_outputs(
+        &self,
+        session_id: &str,
+    ) -> AppResult<Vec<crate::models::AiSessionOutput>> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, content, created_at FROM ai_session_outputs WHERE session_id = ? ORDER BY id ASC",
+            "SELECT id, session_id, content, created_at FROM ai_session_outputs WHERE session_id = ? ORDER BY id ASC"
         )?;
 
-        let iter = stmt.query_map([session_id], |row| {
-            Ok(AiSessionOutput {
+        let output_iter = stmt.query_map(params![session_id], |row| {
+            Ok(crate::models::AiSessionOutput {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
                 content: row.get(2)?,
@@ -550,9 +616,15 @@ impl Database {
         })?;
 
         let mut outputs = Vec::new();
-        for item in iter {
-            outputs.push(item?);
+        for output in output_iter {
+            outputs.push(output?);
         }
+
+        tracing::debug!(
+            "Retrieved {} outputs for session: {}",
+            outputs.len(),
+            session_id
+        );
         Ok(outputs)
     }
 
@@ -780,5 +852,92 @@ impl Database {
 
         let sequence: i32 = stmt.query_row([work_id], |row| row.get(0))?;
         Ok(sequence)
+    }
+
+    // AI Session Result methods
+    #[allow(dead_code)]
+    pub fn create_ai_session_result(&self, result: &AiSessionResult) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO ai_session_results (id, session_id, response_message_id, status, created_at, completed_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            params![
+                result.id,
+                result.session_id,
+                result.response_message_id,
+                result.status,
+                result.created_at,
+                result.completed_at
+            ],
+        )?;
+
+        tracing::info!(
+            "Created AI session result: {} for session {}",
+            result.id,
+            result.session_id
+        );
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn update_ai_session_result(&self, result: &AiSessionResult) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let rows_affected = conn.execute(
+            "UPDATE ai_session_results SET status = ?, completed_at = ? WHERE id = ?",
+            params![result.status, result.completed_at, result.id],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(AppError::Internal(format!(
+                "AI session result not found: {}",
+                result.id
+            )));
+        }
+
+        tracing::info!(
+            "Updated AI session result: {} status to {}",
+            result.id,
+            result.status
+        );
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn get_ai_session_result_by_session(
+        &self,
+        session_id: &str,
+    ) -> AppResult<Option<AiSessionResult>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, response_message_id, status, created_at, completed_at
+             FROM ai_session_results WHERE session_id = ?",
+        )?;
+
+        let result = stmt
+            .query_row([session_id], |row| {
+                Ok(AiSessionResult {
+                    id: row.get(0)?,
+                    session_id: row.get(1)?,
+                    response_message_id: row.get(2)?,
+                    status: row.get(3)?,
+                    created_at: row.get(4)?,
+                    completed_at: row.get(5)?,
+                })
+            })
+            .optional()?;
+
+        Ok(result)
     }
 }

@@ -65,12 +65,17 @@ async fn main() -> AppResult<()> {
         .ok()
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
+
+    tracing::info!("Runner enabled: {}", runner_enabled);
+
     let runner = if runner_enabled {
+        tracing::info!("Initializing in-process AI runner");
         Some(Arc::new(Runner::new(
             Arc::clone(&database),
             Arc::clone(&broadcaster),
         )))
     } else {
+        tracing::warn!("AI runner disabled - set NOCODO_RUNNER_ENABLED=1 to enable");
         None
     };
 
@@ -116,33 +121,32 @@ async fn main() -> AppResult<()> {
                         )
                         .route("/files/{path:.*}", web::put().to(handlers::update_file))
                         .route("/files/{path:.*}", web::delete().to(handlers::delete_file))
-                        // Work endpoints (formerly AI sessions)
-                        .route("/work", web::post().to(handlers::create_ai_session))
-                        .route("/work", web::get().to(handlers::list_ai_sessions))
-                        .route("/work/{id}", web::get().to(handlers::get_ai_session))
-                        .route(
-                            "/work/{id}/outputs",
-                            web::post().to(handlers::record_ai_output),
-                        )
-                        .route(
-                            "/work/{id}/outputs",
-                            web::get().to(handlers::list_ai_outputs),
-                        )
-                        // Interactive input endpoint (Phase 1 streaming)
-                        .route("/work/{id}/input", web::post().to(handlers::send_ai_input))
                         // Work management endpoints
-                        .route("/works", web::post().to(handlers::create_work))
-                        .route("/works", web::get().to(handlers::list_works))
-                        .route("/works/{id}", web::get().to(handlers::get_work))
-                        .route("/works/{id}", web::delete().to(handlers::delete_work))
+                        .route("/work", web::post().to(handlers::create_work))
+                        .route("/work", web::get().to(handlers::list_works))
+                        .route("/work/{id}", web::get().to(handlers::get_work))
+                        .route("/work/{id}", web::delete().to(handlers::delete_work))
                         // Work message endpoints
                         .route(
-                            "/works/{id}/messages",
+                            "/work/{id}/messages",
                             web::post().to(handlers::add_message_to_work),
                         )
                         .route(
-                            "/works/{id}/messages",
+                            "/work/{id}/messages",
                             web::get().to(handlers::get_work_messages),
+                        )
+                        // AI session endpoints
+                        .route(
+                            "/work/{id}/sessions",
+                            web::post().to(handlers::create_ai_session),
+                        )
+                        .route(
+                            "/work/{id}/sessions",
+                            web::get().to(handlers::list_ai_sessions),
+                        )
+                        .route(
+                            "/work/{id}/outputs",
+                            web::get().to(handlers::list_ai_session_outputs),
                         ),
                 )
                 // WebSocket endpoints
@@ -153,9 +157,9 @@ async fn main() -> AppResult<()> {
                 )
                 // Serve static files from ./web/dist if it exists
                 .configure(|cfg| {
-                    if std::path::Path::new("./web/dist").exists() {
+                    if std::path::Path::new("manager-web/dist").exists() {
                         cfg.service(
-                            fs::Files::new("/", "./web/dist")
+                            fs::Files::new("/", "manager-web/dist")
                                 .index_file("index.html")
                                 .use_etag(true)
                                 .use_last_modified(true)

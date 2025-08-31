@@ -13,8 +13,16 @@ interface TimelineEvent {
 }
 
 // Utility function to format timestamp for timeline
-const formatTimelineTimestamp = (timestamp: number): string => {
+const formatTimelineTimestamp = (timestamp: number | null | undefined): string => {
+  if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
+    return 'Unknown';
+  }
+  
   const date = new Date(timestamp * 1000);
+  if (isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+  
   return date.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -27,30 +35,33 @@ const formatTimelineTimestamp = (timestamp: number): string => {
 const generateTimelineEvents = (session: AiSession): TimelineEvent[] => {
   const events: TimelineEvent[] = [];
 
-  // Work created event
-  events.push({
-    id: 'created',
-    type: 'created',
-    timestamp: session.started_at,
-    title: 'Work Created',
-    description: `${session.tool_name} work initialized`,
-    icon: '🚀',
-    iconColor: 'bg-blue-500',
-  });
+  // Only add events if we have a valid started_at timestamp
+  if (session.started_at && session.started_at > 0) {
+    // Work created event
+    events.push({
+      id: 'created',
+      type: 'created',
+      timestamp: session.started_at,
+      title: 'Work Created',
+      description: `${session.tool_name || 'AI tool'} work initialized`,
+      icon: '🚀',
+      iconColor: 'bg-blue-500',
+    });
 
-  // Work started event (for now, same as created)
-  events.push({
-    id: 'started',
-    type: 'started',
-    timestamp: session.started_at,
-    title: 'Work Started',
-    description: `Began processing with ${session.tool_name}`,
-    icon: '▶️',
-    iconColor: 'bg-green-500',
-  });
+    // Work started event (for now, same as created)
+    events.push({
+      id: 'started',
+      type: 'started',
+      timestamp: session.started_at,
+      title: 'Work Started',
+      description: `Began processing with ${session.tool_name || 'AI tool'}`,
+      icon: '▶️',
+      iconColor: 'bg-green-500',
+    });
+  }
 
   // Work end event (if completed)
-  if (session.ended_at) {
+  if (session.ended_at && session.ended_at > 0 && session.started_at && session.started_at > 0) {
     const duration = Math.floor(session.ended_at - session.started_at);
     const durationText =
       duration > 60 ? `${Math.floor(duration / 60)}m ${duration % 60}s` : `${duration}s`;
@@ -121,8 +132,16 @@ const TimelineEventItem: Component<{
           <h4 class='text-sm font-medium text-gray-900'>{props.event.title}</h4>
           <time
             class='text-xs text-gray-500'
-            dateTime={new Date(props.event.timestamp * 1000).toISOString()}
-            title={new Date(props.event.timestamp * 1000).toLocaleString()}
+            dateTime={
+              props.event.timestamp && props.event.timestamp > 0
+                ? new Date(props.event.timestamp * 1000).toISOString()
+                : ''
+            }
+            title={
+              props.event.timestamp && props.event.timestamp > 0
+                ? new Date(props.event.timestamp * 1000).toLocaleString()
+                : 'Unknown timestamp'
+            }
           >
             {formatTimelineTimestamp(props.event.timestamp)}
           </time>

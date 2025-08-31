@@ -19,6 +19,17 @@ export * from './types/generated/ProjectResponse';
 export * from './types/generated/AddExistingProjectRequest';
 export * from './types/generated/RecordAiOutputRequest';
 export * from './types/generated/ServerStatus';
+export * from './types/generated/MessageAuthorType';
+export * from './types/generated/MessageContentType';
+export * from './types/generated/Work';
+export * from './types/generated/WorkListResponse';
+export * from './types/generated/WorkMessage';
+export * from './types/generated/WorkMessageListResponse';
+export * from './types/generated/WorkMessageResponse';
+export * from './types/generated/WorkResponse';
+export * from './types/generated/WorkWithHistory';
+export * from './types/generated/CreateWorkRequest';
+export * from './types/generated/AddMessageRequest';
 
 // Additional types not generated from Rust
 export type AiSessionStatus =

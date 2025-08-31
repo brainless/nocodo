@@ -5,8 +5,7 @@ use crate::models::{
     AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
     CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
     FileListResponse, FileResponse, FileUpdateRequest, Project, ProjectListResponse,
-    ProjectResponse, RecordAiOutputRequest, ServerStatus, WorkListResponse, WorkMessageResponse,
-    WorkResponse,
+    ProjectResponse, ServerStatus, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -813,32 +812,39 @@ pub async fn delete_file(
 // AI session HTTP handlers
 pub async fn create_ai_session(
     data: web::Data<AppState>,
+    path: web::Path<String>,
     request: web::Json<CreateAiSessionRequest>,
 ) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
     let req = request.into_inner();
 
-    // Optional: Validate tool_name/prompt
+    // Validate required fields
     if req.tool_name.trim().is_empty() {
         return Err(AppError::InvalidRequest("tool_name is required".into()));
     }
-    if req.prompt.trim().is_empty() {
-        return Err(AppError::InvalidRequest("prompt is required".into()));
+    if req.message_id.trim().is_empty() {
+        return Err(AppError::InvalidRequest("message_id is required".into()));
     }
 
-    // Generate simple context if project_id present
-    let project_context = if let Some(ref project_id) = req.project_id {
+    // Validate that work and message exist
+    let work = data.database.get_work_by_id(&work_id)?;
+    let messages = data.database.get_work_messages(&work_id)?;
+    if !messages.iter().any(|m| m.id == req.message_id) {
+        return Err(AppError::InvalidRequest(
+            "message_id not found in work".into(),
+        ));
+    }
+
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(ref project_id) = work.project_id {
         let project = data.database.get_project_by_id(project_id)?;
         Some(format!("Project: {}\nPath: {}", project.name, project.path))
     } else {
         None
     };
 
-    let session = crate::models::AiSession::new(
-        req.project_id.clone(),
-        req.tool_name,
-        req.prompt,
-        project_context,
-    );
+    let session =
+        crate::models::AiSession::new(work_id, req.message_id, req.tool_name, project_context);
 
     // Persist
     data.database.create_ai_session(&session)?;
@@ -854,17 +860,50 @@ pub async fn create_ai_session(
 
     // If runner is enabled, start streaming execution for this session in background
     if let Some(runner) = &data.runner {
+        tracing::info!(
+            "Runner is available, starting AI session execution for session {}",
+            session.id
+        );
+
+        // Get the prompt from the associated message
+        let message = messages
+            .iter()
+            .find(|m| m.id == session.message_id)
+            .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
+
         // Build a simple enhanced prompt similar to CLI
         let enhanced_prompt = if let Some(ctx) = &session.project_context {
             format!(
                 "Project Context:\n{}\n\nUser Request:\n{}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes.",
-                ctx, session.prompt
+                ctx, message.content
             )
         } else {
-            session.prompt.clone()
+            message.content.clone()
         };
-        // Fire-and-forget
-        let _ = runner.start_session(session.clone(), enhanced_prompt).await;
+
+        tracing::info!(
+            "Starting runner with tool: {} for session: {}",
+            session.tool_name,
+            session.id
+        );
+
+        // Fire-and-forget - but log any errors
+        match runner.start_session(session.clone(), enhanced_prompt).await {
+            Ok(_) => tracing::info!(
+                "Successfully started runner execution for session {}",
+                session.id
+            ),
+            Err(e) => tracing::error!(
+                "Failed to start runner execution for session {}: {}",
+                session.id,
+                e
+            ),
+        }
+    } else {
+        tracing::warn!(
+            "Runner is not available - AI session {} will not be executed",
+            session.id
+        );
     }
 
     Ok(HttpResponse::Created().json(response))
@@ -876,75 +915,36 @@ pub async fn list_ai_sessions(data: web::Data<AppState>) -> Result<HttpResponse,
     Ok(HttpResponse::Ok().json(response))
 }
 
-pub async fn get_ai_session(
-    data: web::Data<AppState>,
+pub async fn list_ai_session_outputs(
     path: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let session = data.database.get_ai_session_by_id(&id)?;
-    let response = AiSessionResponse { session };
-    Ok(HttpResponse::Ok().json(response))
-}
-
-pub async fn record_ai_output(
     data: web::Data<AppState>,
-    path: web::Path<String>,
-    request: web::Json<RecordAiOutputRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let req = request.into_inner();
+    let work_id = path.into_inner();
 
-    if req.content.trim().is_empty() {
-        return Err(AppError::InvalidRequest("content is required".into()));
+    // First, get the AI session for this work
+    let sessions = data.database.get_ai_sessions_by_work_id(&work_id)?;
+
+    if sessions.is_empty() {
+        // No AI session found for this work, return empty outputs
+        let response = AiSessionOutputListResponse { outputs: vec![] };
+        return Ok(HttpResponse::Ok().json(response));
     }
 
-    // Ensure session exists
-    let _ = data.database.get_ai_session_by_id(&id)?;
+    // Get the most recent AI session (in case there are multiple)
+    let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
 
-    data.database.create_ai_session_output(&id, &req.content)?;
-    Ok(HttpResponse::Created().json(serde_json::json!({"ok": true})))
-}
-
-pub async fn list_ai_outputs(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    // Ensure session exists
-    let _ = data.database.get_ai_session_by_id(&id)?;
-
-    let outputs = data.database.get_ai_session_outputs(&id)?;
+    // Get outputs for this session
+    let outputs = data.database.list_ai_session_outputs(&session.id)?;
     let response = AiSessionOutputListResponse { outputs };
+
+    tracing::debug!(
+        "Retrieved {} outputs for work {}",
+        response.outputs.len(),
+        work_id
+    );
     Ok(HttpResponse::Ok().json(response))
 }
 
-// Send interactive input to a running session
-pub async fn send_ai_input(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-    request: web::Json<crate::models::AiSessionInputRequest>,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let req = request.into_inner();
-
-    if req.content.trim().is_empty() {
-        return Err(AppError::InvalidRequest("content is required".into()));
-    }
-
-    if let Some(runner) = &data.runner {
-        match runner.send_input(&id, req.content.clone()).await {
-            Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"ok": true}))),
-            Err(e) => Err(AppError::Internal(format!("Failed to send input: {e}"))),
-        }
-    } else {
-        Err(AppError::InvalidRequest(
-            "Runner not enabled on Manager".to_string(),
-        ))
-    }
-}
-
-/// Check for project path conflicts - ensure the requested path is not inside an existing project
-/// or that an existing project is not inside the requested path
 pub async fn check_project_path_conflicts(
     database: &Database,
     requested_path: &std::path::Path,

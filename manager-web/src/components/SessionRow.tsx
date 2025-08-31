@@ -39,8 +39,9 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
 };
 
 // Tool icon component with support for different AI tools
-const ToolIcon: Component<{ toolName: string; className?: string }> = props => {
+const ToolIcon: Component<{ toolName: string | null | undefined; className?: string }> = props => {
   const getToolIcon = (tool: string) => {
+    if (!tool) return '🔧'; // Default icon for undefined/null tools
     const toolLower = tool.toLowerCase();
     if (toolLower.includes('claude')) {
       return '🤖'; // Claude icon
@@ -57,7 +58,8 @@ const ToolIcon: Component<{ toolName: string; className?: string }> = props => {
     return '⚡'; // Default AI icon
   };
 
-  const getToolColor = (tool: string) => {
+  const getToolColor = (tool: string | null | undefined) => {
+    if (!tool) return 'bg-gray-100 text-gray-800 border-gray-200';
     const toolLower = tool.toLowerCase();
     if (toolLower.includes('claude')) {
       return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -77,13 +79,13 @@ const ToolIcon: Component<{ toolName: string; className?: string }> = props => {
   return (
     <div
       class={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getToolColor(props.toolName)} ${props.className || ''}`}
-      title={`AI Tool: ${props.toolName}`}
-      aria-label={`AI Tool: ${props.toolName}`}
+      title={`AI Tool: ${props.toolName || 'Unknown'}`}
+      aria-label={`AI Tool: ${props.toolName || 'Unknown'}`}
     >
       <span class='mr-1' aria-hidden='true'>
         {getToolIcon(props.toolName)}
       </span>
-      <span class='truncate max-w-24'>{props.toolName}</span>
+      <span class='truncate max-w-24'>{props.toolName || 'Unknown'}</span>
     </div>
   );
 };
