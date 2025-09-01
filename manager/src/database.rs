@@ -49,7 +49,8 @@ impl Database {
                 framework TEXT,
                 status TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
+                updated_at INTEGER NOT NULL,
+                technologies TEXT
             )",
             [],
         )?;
@@ -196,7 +197,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, language, framework, status, created_at, updated_at 
+            "SELECT id, name, path, language, framework, status, created_at, updated_at, technologies 
              FROM projects ORDER BY created_at DESC",
         )?;
 
@@ -210,6 +211,7 @@ impl Database {
                 status: row.get(5)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
+                technologies: row.get(8)?,
             })
         })?;
 
@@ -228,7 +230,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, language, framework, status, created_at, updated_at 
+            "SELECT id, name, path, language, framework, status, created_at, updated_at, technologies 
              FROM projects WHERE id = ?",
         )?;
 
@@ -243,6 +245,7 @@ impl Database {
                     status: row.get(5)?,
                     created_at: row.get(6)?,
                     updated_at: row.get(7)?,
+                    technologies: row.get(8)?,
                 })
             })
             .map_err(|e| match e {
@@ -260,7 +263,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, language, framework, status, created_at, updated_at 
+            "SELECT id, name, path, language, framework, status, created_at, updated_at, technologies 
              FROM projects WHERE path = ?",
         )?;
 
@@ -275,6 +278,7 @@ impl Database {
                     status: row.get(5)?,
                     created_at: row.get(6)?,
                     updated_at: row.get(7)?,
+                    technologies: row.get(8)?,
                 })
             })
             .map_err(|e| match e {
@@ -294,8 +298,8 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
-            "INSERT INTO projects (id, name, path, language, framework, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, name, path, language, framework, status, created_at, updated_at, technologies)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 project.id,
                 project.name,
@@ -304,7 +308,8 @@ impl Database {
                 project.framework,
                 project.status,
                 project.created_at,
-                project.updated_at
+                project.updated_at,
+                project.technologies,
             ],
         )?;
 
@@ -321,7 +326,7 @@ impl Database {
 
         let rows_affected = conn.execute(
             "UPDATE projects SET name = ?, path = ?, language = ?, framework = ?, 
-             status = ?, updated_at = ? WHERE id = ?",
+             status = ?, updated_at = ?, technologies = ? WHERE id = ?",
             params![
                 project.name,
                 project.path,
@@ -329,6 +334,7 @@ impl Database {
                 project.framework,
                 project.status,
                 project.updated_at,
+                project.technologies,
                 project.id
             ],
         )?;

@@ -13,6 +13,7 @@ use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -128,6 +129,34 @@ A new project created with nocodo.
 
     // Save to database
     data.database.create_project(&project)?;
+
+    // Analyze project to detect language/framework and components
+    let analysis = analyze_project_path(&absolute_project_path).map_err(AppError::Internal)?;
+
+    // Update project metadata if detected
+    let mut updated_project = project.clone();
+    if updated_project.language.is_none() {
+        updated_project.language = analysis.primary_language.clone();
+    }
+    if updated_project.framework.is_none() {
+        updated_project.framework = analysis.primary_framework.clone();
+    }
+
+    // Store enhanced technology information as JSON
+    let detection_result = crate::models::ProjectDetectionResult {
+        primary_language: analysis.primary_language.clone().unwrap_or_default(),
+        technologies: analysis.technologies.clone(),
+        build_tools: analysis.build_tools.clone(),
+        package_managers: analysis.package_managers.clone(),
+        deployment_configs: analysis.deployment_configs.clone(),
+    };
+
+    let technologies_json = serde_json::to_string(&detection_result)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize technologies: {e}")))?;
+    updated_project.technologies = Some(technologies_json);
+
+    updated_project.update_timestamp();
+    data.database.update_project(&updated_project)?;
 
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
@@ -376,17 +405,34 @@ pub async fn add_existing_project(
     // Save to database
     data.database.create_project(&project)?;
 
+    // Save to database
+    data.database.create_project(&project)?;
+
     // Analyze project to detect language/framework and components
     let analysis = analyze_project_path(&absolute_path).map_err(AppError::Internal)?;
 
     // Update project metadata if detected
     let mut updated_project = project.clone();
     if updated_project.language.is_none() {
-        updated_project.language = analysis.primary_language;
+        updated_project.language = analysis.primary_language.clone();
     }
     if updated_project.framework.is_none() {
-        updated_project.framework = analysis.primary_framework;
+        updated_project.framework = analysis.primary_framework.clone();
     }
+
+    // Store enhanced technology information as JSON
+    let detection_result = crate::models::ProjectDetectionResult {
+        primary_language: analysis.primary_language.clone().unwrap_or_default(),
+        technologies: analysis.technologies.clone(),
+        build_tools: analysis.build_tools.clone(),
+        package_managers: analysis.package_managers.clone(),
+        deployment_configs: analysis.deployment_configs.clone(),
+    };
+
+    let technologies_json = serde_json::to_string(&detection_result)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize technologies: {e}")))?;
+    updated_project.technologies = Some(technologies_json);
+
     updated_project.update_timestamp();
     data.database.update_project(&updated_project)?;
 
@@ -992,59 +1038,186 @@ struct ProjectAnalysisResult {
     primary_language: Option<String>,
     primary_framework: Option<String>,
     components: Vec<crate::models::ProjectComponent>,
+    technologies: Vec<crate::models::ProjectTechnology>,
+    build_tools: Vec<String>,
+    package_managers: Vec<String>,
+    deployment_configs: Vec<String>,
 }
 
 fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, String> {
-    // Primary language detection
-    let mut primary_language: Option<String> = None;
-    let mut primary_framework: Option<String> = None;
+    // Enhanced detection logic that scans entire project tree
+    let mut technologies: HashMap<String, crate::models::ProjectTechnology> = HashMap::new();
+    let mut build_tools: Vec<String> = Vec::new();
+    let mut package_managers: Vec<String> = Vec::new();
+    let mut deployment_configs: Vec<String> = Vec::new();
     let mut components: Vec<crate::models::ProjectComponent> = Vec::new();
 
-    // Rust detection at root
-    let cargo_root = project_path.join("Cargo.toml");
-    if cargo_root.exists() {
-        primary_language = Some("rust".to_string());
-        // Try to detect Actix, Axum, etc.
-        if let Ok(content) = fs::read_to_string(&cargo_root) {
-            if content.contains("actix-web") {
-                primary_framework = Some("actix-web".to_string());
-            } else if content.contains("axum") {
-                primary_framework = Some("axum".to_string());
+    // File extension patterns for different technologies
+    let _language_extensions: HashMap<&str, Vec<&str>> = [
+        ("rust", vec![".rs"]),
+        ("typescript", vec![".ts", ".tsx"]),
+        ("javascript", vec![".js", ".jsx"]),
+        ("python", vec![".py"]),
+        ("go", vec![".go"]),
+        ("java", vec![".java"]),
+        ("cpp", vec![".cpp", ".cc", ".cxx", ".c++"]),
+        ("c", vec![".c"]),
+        ("html", vec![".html", ".htm"]),
+        ("css", vec![".css"]),
+        ("shell", vec![".sh", ".bash"]),
+        ("yaml", vec![".yml", ".yaml"]),
+        ("json", vec![".json"]),
+        ("toml", vec![".toml"]),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    // Framework detection patterns
+    let _framework_patterns: HashMap<&str, Vec<&str>> = [
+        ("react", vec!["react", "react-dom"]),
+        ("solidjs", vec!["solid-js"]),
+        ("vue", vec!["vue"]),
+        ("angular", vec!["@angular/core"]),
+        ("express", vec!["express"]),
+        ("nestjs", vec!["@nestjs/core"]),
+        ("spring", vec!["spring-boot"]),
+        ("django", vec!["django"]),
+        ("flask", vec!["flask"]),
+        ("actix-web", vec!["actix-web"]),
+        ("axum", vec!["axum"]),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    // Build tool patterns
+    let build_tool_patterns: HashMap<&str, Vec<&str>> = [
+        ("cargo", vec!["Cargo.toml"]),
+        ("npm", vec!["package.json"]),
+        ("yarn", vec!["package.json", "yarn.lock"]),
+        ("pnpm", vec!["package.json", "pnpm-lock.yaml"]),
+        ("gradle", vec!["build.gradle", "build.gradle.kts"]),
+        ("maven", vec!["pom.xml"]),
+        ("make", vec!["Makefile"]),
+        ("webpack", vec!["webpack.config.js", "webpack.config.ts"]),
+        ("vite", vec!["vite.config.js", "vite.config.ts"]),
+        ("rollup", vec!["rollup.config.js"]),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    // Deployment configuration patterns
+    let deployment_patterns: HashMap<&str, Vec<&str>> = [
+        (
+            "docker",
+            vec!["Dockerfile", "docker-compose.yml", "docker-compose.yaml"],
+        ),
+        ("github-actions", vec![".github/workflows/"]),
+        ("gitlab-ci", vec![".gitlab-ci.yml"]),
+        ("jenkins", vec!["Jenkinsfile"]),
+        ("kubernetes", vec!["k8s/", "kube/", "*.yaml", "*.yml"]),
+        ("terraform", vec!["*.tf"]),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    // Helper function to get relative path from project root
+    let rel = |p: &Path| -> String {
+        p.strip_prefix(project_path)
+            .unwrap_or(p)
+            .to_string_lossy()
+            .trim_start_matches('.')
+            .trim_start_matches('/')
+            .to_string()
+    };
+
+    // Helper function to increment file count for language
+    let mut increment_language_count = |lang: &str, file_count: u32| {
+        let tech = technologies.entry(lang.to_lowercase()).or_insert_with(|| {
+            crate::models::ProjectTechnology {
+                language: lang.to_lowercase(),
+                framework: None,
+                file_count: 0,
+                confidence: 0.0,
+            }
+        });
+        tech.file_count += file_count;
+    };
+
+    // Scan the entire project directory recursively
+    let walker = walkdir::WalkDir::new(project_path)
+        .max_depth(5) // Limit depth to prevent performance issues
+        .into_iter()
+        .filter_entry(|e| {
+            let path = e.path();
+            let p = path.to_string_lossy();
+            // Skip hidden and common build dirs
+            !(p.contains("/node_modules/")
+                || p.contains("/.git/")
+                || p.contains("/target/")
+                || p.contains("/build/")
+                || p.contains("/dist/")
+                || p.contains("/.cache/"))
+        });
+
+    // Collect all files and their extensions for analysis
+    let mut file_extensions: Vec<String> = Vec::new();
+    let mut files_found: Vec<(PathBuf, String)> = Vec::new(); // (path, extension)
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if path == project_path {
+            continue;
+        }
+
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                let ext_str = ext.to_string_lossy().to_string();
+                file_extensions.push(ext_str.clone());
+                files_found.push((path.to_path_buf(), ext_str));
             }
         }
     }
 
-    // Node.js detection at root
-    let package_root = project_path.join("package.json");
-    if package_root.exists() {
-        if primary_language.is_none() {
-            primary_language = Some("javascript".to_string());
-        }
-        if let Ok(content) = fs::read_to_string(&package_root) {
-            if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
-                let has_dep = |name: &str| -> bool {
-                    pkg.dependencies
-                        .as_ref()
-                        .map(|m| m.contains_key(name))
-                        .unwrap_or(false)
-                        || pkg
-                            .dev_dependencies
-                            .as_ref()
-                            .map(|m| m.contains_key(name))
-                            .unwrap_or(false)
-                };
-                if has_dep("react") {
-                    primary_framework = Some("react".to_string());
-                } else if has_dep("solid-js") {
-                    primary_framework = Some("solidjs".to_string());
-                } else if has_dep("express") {
-                    primary_framework = Some("express".to_string());
-                }
-            }
-        }
+    // Detect languages based on file extensions
+    for (_path, extension) in files_found.iter() {
+        // Map extension to language
+        let language = match extension.as_str() {
+            // Rust files
+            "rs" => "rust",
+            // JavaScript/TypeScript files
+            "js" | "jsx" => "javascript",
+            "ts" | "tsx" => "typescript",
+            // Python files
+            "py" => "python",
+            // Go files
+            "go" => "go",
+            // Java files
+            "java" => "java",
+            // C/C++ files
+            "c" | "cc" | "cxx" | "c++" => "cpp",
+            // HTML/CSS files
+            "html" | "htm" => "html",
+            "css" => "css",
+            // Shell scripts
+            "sh" | "bash" => "shell",
+            // Configuration files
+            "yml" | "yaml" => "yaml",
+            "json" => "json",
+            "toml" => "toml",
+            _ => continue, // Skip unknown extensions
+        };
+
+        increment_language_count(language, 1);
     }
 
-    // Scan for component apps (Node and Rust) within depth 3
+    // Detect frameworks from package.json or Cargo.toml
+    let mut detected_frameworks: HashMap<String, String> = HashMap::new();
+
+    // Look for package.json files to detect JS/TS frameworks
     let walker = walkdir::WalkDir::new(project_path)
         .max_depth(4)
         .into_iter()
@@ -1058,7 +1231,211 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
                 || p.contains("/build/"))
         });
 
-    // We'll collect candidate package.json and Cargo.toml files not at root
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if path == project_path {
+            continue;
+        }
+
+        if path.file_name().and_then(|n| n.to_str()) == Some("package.json") {
+            if let Ok(content) = fs::read_to_string(path) {
+                if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
+                    let name = pkg.name.clone().unwrap_or_else(|| {
+                        path.parent()
+                            .and_then(|p| p.file_name())
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("unknown")
+                            .to_string()
+                    });
+
+                    // Detect framework from dependencies
+                    let has_dep = |name: &str| -> bool {
+                        pkg.dependencies
+                            .as_ref()
+                            .map(|m| m.contains_key(name))
+                            .unwrap_or(false)
+                            || pkg
+                                .dev_dependencies
+                                .as_ref()
+                                .map(|m| m.contains_key(name))
+                                .unwrap_or(false)
+                    };
+
+                    let framework = if has_dep("react") {
+                        Some("react".to_string())
+                    } else if has_dep("solid-js") {
+                        Some("solidjs".to_string())
+                    } else if has_dep("vue") {
+                        Some("vue".to_string())
+                    } else if has_dep("@angular/core") {
+                        Some("angular".to_string())
+                    } else if has_dep("express") {
+                        Some("express".to_string())
+                    } else if has_dep("@nestjs/core") {
+                        Some("nestjs".to_string())
+                    } else {
+                        None
+                    };
+
+                    // Add framework to detected frameworks map
+                    if let Some(framework_name) = &framework {
+                        detected_frameworks.insert(name, framework_name.clone());
+                    }
+
+                    // Also update technology detection
+                    if let Some(lang) = pkg.dependencies.as_ref().map(|_| "javascript") {
+                        increment_language_count(lang, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    // Look for Cargo.toml files to detect Rust frameworks
+    let walker = walkdir::WalkDir::new(project_path)
+        .max_depth(4)
+        .into_iter()
+        .filter_entry(|e| {
+            let path = e.path();
+            let p = path.to_string_lossy();
+            // Skip hidden and common build dirs
+            !(p.contains("/target/")
+                || p.contains("/.git/")
+                || p.contains("/dist/")
+                || p.contains("/build/"))
+        });
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if path == project_path {
+            continue;
+        }
+
+        if path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml") {
+            if let Ok(content) = fs::read_to_string(path) {
+                // Try to detect framework from Cargo.toml
+                let framework = if content.contains("actix-web") {
+                    Some("actix-web".to_string())
+                } else if content.contains("axum") {
+                    Some("axum".to_string())
+                } else if content.contains("rocket") {
+                    Some("rocket".to_string())
+                } else {
+                    None
+                };
+
+                // Try to get package name
+                let name = content
+                    .lines()
+                    .find_map(|l| {
+                        let lt = l.trim();
+                        if lt.starts_with("name = ") {
+                            Some(
+                                lt.trim_start_matches("name = ")
+                                    .trim_matches('"')
+                                    .to_string(),
+                            )
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| {
+                        path.parent()
+                            .and_then(|p| p.file_name())
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("rust-app")
+                            .to_string()
+                    });
+
+                // Add framework to detected frameworks map
+                if let Some(framework_name) = &framework {
+                    detected_frameworks.insert(name, framework_name.clone());
+                }
+
+                // Update technology detection
+                increment_language_count("rust", 1);
+            }
+        }
+    }
+
+    // Detect build tools from files
+    for (path, _) in files_found.iter() {
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+        for (tool, patterns) in &build_tool_patterns {
+            if patterns.contains(&filename) || filename.starts_with(tool) {
+                build_tools.push(tool.to_string());
+            }
+        }
+    }
+
+    // Detect package managers from files
+    for (path, _) in files_found.iter() {
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+        if filename == "package.json" {
+            package_managers.push("npm".to_string());
+        } else if filename == "yarn.lock" {
+            package_managers.push("yarn".to_string());
+        } else if filename == "pnpm-lock.yaml" {
+            package_managers.push("pnpm".to_string());
+        }
+    }
+
+    // Detect deployment configurations
+    for (path, _) in files_found.iter() {
+        let path_str = path.to_string_lossy();
+
+        for (config, patterns) in &deployment_patterns {
+            if patterns.iter().any(|&p| path_str.contains(p)) {
+                deployment_configs.push(config.to_string());
+            }
+        }
+    }
+
+    // Determine primary language and framework
+    let mut primary_language: Option<String> = None;
+    let mut primary_framework: Option<String> = None;
+
+    // Find the language with the highest file count
+    if !technologies.is_empty() {
+        let max_lang = technologies
+            .values()
+            .max_by_key(|tech| tech.file_count)
+            .unwrap();
+
+        primary_language = Some(max_lang.language.clone());
+
+        // If we found a framework for this language, set it
+        if let Some(framework) = detected_frameworks.values().next() {
+            primary_framework = Some(framework.clone());
+        }
+    }
+
+    // Calculate confidence scores (higher file counts = higher confidence)
+    let total_files: u32 = technologies.values().map(|t| t.file_count).sum();
+    for tech in technologies.values_mut() {
+        if total_files > 0 {
+            tech.confidence = tech.file_count as f32 / total_files as f32;
+        } else {
+            tech.confidence = 0.0;
+        }
+    }
+
+    // Create components for Node projects
+    let walker = walkdir::WalkDir::new(project_path)
+        .max_depth(4)
+        .into_iter()
+        .filter_entry(|e| {
+            let path = e.path();
+            let p = path.to_string_lossy();
+            // Skip hidden and common build dirs
+            !(p.contains("/node_modules/")
+                || p.contains("/.git/")
+                || p.contains("/dist/")
+                || p.contains("/build/"))
+        });
+
     let mut node_dirs: Vec<PathBuf> = Vec::new();
     let mut rust_dirs: Vec<PathBuf> = Vec::new();
 
@@ -1073,16 +1450,6 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
             rust_dirs.push(path.parent().unwrap_or(project_path).to_path_buf());
         }
     }
-
-    // Helper to make relative path
-    let rel = |p: &Path| -> String {
-        p.strip_prefix(project_path)
-            .unwrap_or(p)
-            .to_string_lossy()
-            .trim_start_matches('.')
-            .trim_start_matches('/')
-            .to_string()
-    };
 
     // Create components for Node projects
     for dir in node_dirs {
@@ -1176,10 +1543,18 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
         }
     }
 
+    // Convert technologies map to vector
+    let technologies_vec: Vec<crate::models::ProjectTechnology> =
+        technologies.into_values().collect();
+
     Ok(ProjectAnalysisResult {
         primary_language,
         primary_framework,
         components,
+        technologies: technologies_vec,
+        build_tools,
+        package_managers,
+        deployment_configs,
     })
 }
 
@@ -1271,6 +1646,7 @@ pub async fn create_work(
         status: work.status.clone(),
         created_at: work.created_at,
         updated_at: work.updated_at,
+        technologies: None,
     });
 
     tracing::info!(
