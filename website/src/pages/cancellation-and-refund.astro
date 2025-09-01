@@ -1,0 +1,14 @@
+---
+import PolicyLayout from '../layouts/PolicyLayout.astro';
+import { getEntry } from 'astro:content';
+
+const entry = await getEntry('about', 'cancellation-and-refund');
+const { Content } = await entry.render();
+---
+
+<PolicyLayout 
+  title="Cancellation and Refund" 
+  description="Cancellation and refund policy for nocodo services"
+>
+  <Content />
+</PolicyLayout>
