@@ -3,6 +3,7 @@ import PolicyLayout from '../layouts/PolicyLayout.astro';
 import { getEntry } from 'astro:content';
 
 const entry = await getEntry('about', 'terms-and-conditions');
+if (!entry) throw new Error('Terms and conditions content not found');
 const { Content } = await entry.render();
 ---
 
