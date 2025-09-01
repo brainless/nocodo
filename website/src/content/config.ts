@@ -45,10 +45,20 @@ const blog = defineCollection({
   }),
 });
 
+const about = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string().optional(),
+    description: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  }),
+});
+
 export const collections = {
   playbook,
   fundamentals,
   'ai-development': aiDevelopment,
   'coding-agents': codingAgents,
   blog,
+  about,
 };
