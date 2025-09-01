@@ -14,12 +14,12 @@ const formatTimestamp = (timestamp: number | null | undefined): string => {
   if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
     return 'Unknown';
   }
-  
+
   const date = new Date(timestamp * 1000);
   if (isNaN(date.getTime())) {
     return 'Unknown';
   }
-  
+
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
@@ -43,17 +43,17 @@ const formatDuration = (startedAt: number | null | undefined, endedAt?: number |
   if (!startedAt || typeof startedAt !== 'number' || startedAt <= 0) {
     return 'Unknown';
   }
-  
+
   const start = new Date(startedAt * 1000);
   if (isNaN(start.getTime())) {
     return 'Unknown';
   }
-  
+
   const end = endedAt && endedAt > 0 ? new Date(endedAt * 1000) : new Date();
   if (isNaN(end.getTime())) {
     return 'Unknown';
   }
-  
+
   const durationMs = end.getTime() - start.getTime();
 
   const minutes = Math.floor(durationMs / 60000);

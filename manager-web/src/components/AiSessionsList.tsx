@@ -108,9 +108,7 @@ const AiSessionsList: Component = () => {
 
   // Get unique tools for filter dropdown
   const uniqueTools = () => {
-    const tools = store.list
-      .map(session => session.tool_name)
-      .filter(toolName => toolName != null); // Filter out null/undefined values
+    const tools = store.list.map(session => session.tool_name).filter(toolName => toolName != null); // Filter out null/undefined values
     return [...new Set(tools)];
   };
 
