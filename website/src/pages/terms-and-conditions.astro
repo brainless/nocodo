@@ -1,0 +1,14 @@
+---
+import PolicyLayout from '../layouts/PolicyLayout.astro';
+import { getEntry } from 'astro:content';
+
+const entry = await getEntry('about', 'terms-and-conditions');
+const { Content } = await entry.render();
+---
+
+<PolicyLayout 
+  title="Terms and Conditions" 
+  description="Terms and conditions for using nocodo - Local AI-assisted development environment"
+>
+  <Content />
+</PolicyLayout>
