@@ -46,4 +46,4 @@ You may choose to restrict the collection or use of your personal information in
 
 We will not sell, distribute or lease your personal information to third parties unless we have your permission or are required by law to do so. We may use your personal information to send you promotional information about third parties which we think you may find interesting if you tell us that you wish this to happen.
 
-If you believe that any information we are holding on you is incorrect or incomplete, please write to 103 Kamalapur East, Dum Dum Kolkata WEST BENGAL 700028 . or contact us at 8884888427 or nocodo@pixlie.com as soon as possible. We will promptly correct any information found to be incorrect.
+If you believe that any information we are holding on you is incorrect or incomplete, please write to 103 Kamalapur East, Dum Dum Kolkata WEST BENGAL 700028 or contact us at nocodo@pixlie.com as soon as possible. We will promptly correct any information found to be incorrect.
