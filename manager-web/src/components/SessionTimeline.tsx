@@ -17,12 +17,12 @@ const formatTimelineTimestamp = (timestamp: number | null | undefined): string =
   if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
     return 'Unknown';
   }
-  
+
   const date = new Date(timestamp * 1000);
   if (isNaN(date.getTime())) {
     return 'Unknown';
   }
-  
+
   return date.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
