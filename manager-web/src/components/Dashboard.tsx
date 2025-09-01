@@ -149,8 +149,8 @@ const StartAiSessionForm: Component = () => {
       // 2. Add the initial message
       const messageResp = await apiClient.addMessageToWork(workId, {
         content: prompt().trim(),
-        content_type: "text" as MessageContentType,
-        author_type: "user" as MessageAuthorType,
+        content_type: 'text' as MessageContentType,
+        author_type: 'user' as MessageAuthorType,
         author_id: null, // Assuming user is not logged in
       });
       const messageId = messageResp.message.id;

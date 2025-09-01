@@ -114,10 +114,7 @@ class ApiClient {
     });
   }
 
-  async addMessageToWork(
-    workId: string,
-    data: AddMessageRequest
-  ): Promise<WorkMessageResponse> {
+  async addMessageToWork(workId: string, data: AddMessageRequest): Promise<WorkMessageResponse> {
     return this.request(`/work/${workId}/messages`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -181,12 +178,12 @@ class ApiClient {
   async listSessions(): Promise<AiSession[]> {
     const response = await this.listAiSessions();
     const works = (response as any).works || [];
-    
+
     // Transform each work item to match AiSession interface
     return works.map((work: any) => ({
       id: work.id,
       work_id: work.id,
-      message_id: '',  // We don't have message details in the list view
+      message_id: '', // We don't have message details in the list view
       tool_name: work.tool_name || null,
       status: work.status,
       project_context: null,
@@ -204,11 +201,12 @@ class ApiClient {
    */
   async getSession(id: string): Promise<AiSession> {
     const response = await this.getAiSession(id);
-    const workData = (response as any);
-    
+    const workData = response as any;
+
     // Transform the work data to match AiSession interface
-    const firstMessage = workData.messages && workData.messages.length > 0 ? workData.messages[0] : null;
-    
+    const firstMessage =
+      workData.messages && workData.messages.length > 0 ? workData.messages[0] : null;
+
     return {
       id: workData.work.id,
       work_id: workData.work.id,
@@ -217,7 +215,8 @@ class ApiClient {
       status: workData.work.status,
       project_context: null,
       started_at: workData.work.created_at,
-      ended_at: workData.work.updated_at !== workData.work.created_at ? workData.work.updated_at : null,
+      ended_at:
+        workData.work.updated_at !== workData.work.created_at ? workData.work.updated_at : null,
       prompt: firstMessage?.content || workData.work.title,
       project_id: workData.work.project_id,
     } as any; // Using any to bypass type checking for the extra fields
