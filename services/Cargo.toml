@@ -1,0 +1,33 @@
+[package]
+name = "nocodo-services"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "nocodo-services"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Services-specific dependencies
+actix-web.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+ts-rs.workspace = true
+config.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "manager",
+    "services",
 ]
 exclude = [
     "manager-web"
@@ -11,10 +12,17 @@ exclude = [
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-clap = { version = "4.0", features = ["derive"] }
-anyhow = "1.0"
+actix-web = "4"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+ts-rs = "7.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+config = "0.13"
+anyhow = "1.0"
+thiserror = "1.0"
+clap = { version = "4.0", features = ["derive"] }
 
 [workspace.package]
 version = "0.1.0"
