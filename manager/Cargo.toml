@@ -36,6 +36,8 @@ home = "0.5"
 tokio-stream = { version = "0.1", features = ["net"] }
 handlebars = "4.4"
 walkdir = "2.5"
+portable-pty = "0.8"
+base64 = "0.22"
 
 [dev-dependencies]
 actix-rt = "2.9"

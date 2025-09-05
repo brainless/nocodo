@@ -1,4 +1,4 @@
-use crate::models::{AiSession, Project};
+use crate::models::{AiSession, Project, TerminalControlMessage};
 use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
@@ -62,6 +62,27 @@ pub enum WebSocketMessage {
         content: String,
         #[serde(default)]
         seq: u64,
+    },
+
+    // Terminal session messages
+    TerminalSessionStarted {
+        session_id: String,
+    },
+    TerminalSessionEnded {
+        session_id: String,
+        exit_code: Option<i32>,
+    },
+    
+    // Terminal output (binary data as base64)
+    TerminalOutput {
+        session_id: String,
+        data: String, // base64 encoded binary data
+    },
+    
+    // Terminal control messages (JSON)
+    TerminalControl {
+        session_id: String,
+        message: TerminalControlMessage,
     },
 
     // Error handling
@@ -352,6 +373,201 @@ pub async fn ai_session_websocket_handler(
     resp
 }
 
+/// Terminal WebSocket connection actor for PTY sessions
+pub struct TerminalWebSocketConnection {
+    /// Session ID for this terminal
+    session_id: String,
+    /// Client ID for this connection
+    client_id: String,
+    /// Last heartbeat time
+    hb: Instant,
+    /// WebSocket server reference
+    server: Addr<WebSocketServer>,
+}
+
+impl TerminalWebSocketConnection {
+    pub fn new(session_id: String, server: Addr<WebSocketServer>) -> Self {
+        Self {
+            session_id,
+            client_id: Uuid::new_v4().to_string(),
+            hb: Instant::now(),
+            server,
+        }
+    }
+
+    /// Send heartbeat ping to client
+    fn hb(&self, ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(Duration::from_secs(30), |act, ctx| {
+            // Check if client has sent pong back within 10 seconds
+            if Instant::now().duration_since(act.hb) > Duration::from_secs(10) {
+                // Client hasn't responded, disconnect
+                tracing::warn!(
+                    "Terminal WebSocket client {} failed heartbeat, disconnecting",
+                    act.client_id
+                );
+                ctx.stop();
+                return;
+            }
+
+            // Send ping
+            ctx.ping(b"");
+        });
+    }
+}
+
+impl Actor for TerminalWebSocketConnection {
+    type Context = ws::WebsocketContext<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        tracing::info!("Terminal WebSocket connection started: {} for session {}", self.client_id, self.session_id);
+
+        // Start heartbeat
+        self.hb(ctx);
+
+        // Register this connection with the server
+        self.server.do_send(Connect {
+            client_id: self.client_id.clone(),
+            addr: ctx.address(),
+        });
+
+        // Send connection confirmation
+        let msg = WebSocketMessage::Connected {
+            client_id: self.client_id.clone(),
+        };
+
+        if let Ok(json) = serde_json::to_string(&msg) {
+            ctx.text(json);
+        }
+    }
+
+    fn stopping(&mut self, _: &mut Self::Context) -> Running {
+        tracing::info!("Terminal WebSocket connection stopping: {}", self.client_id);
+
+        // Unregister from server
+        self.server.do_send(Disconnect {
+            client_id: self.client_id.clone(),
+        });
+
+        Running::Stop
+    }
+}
+
+/// Handle incoming terminal WebSocket messages (both text and binary)
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalWebSocketConnection {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+        match msg {
+            Ok(ws::Message::Ping(msg)) => {
+                self.hb = Instant::now();
+                ctx.pong(&msg);
+            }
+            Ok(ws::Message::Pong(_)) => {
+                self.hb = Instant::now();
+            }
+            Ok(ws::Message::Text(text)) => {
+                let text_str = text.to_string();
+                tracing::debug!("Terminal WebSocket control message received: {}", text_str);
+
+                // Parse incoming terminal control message
+                match serde_json::from_str::<TerminalControlMessage>(&text_str) {
+                    Ok(control_msg) => {
+                        tracing::debug!("Received terminal control message: {:?}", control_msg);
+                        
+                        // Handle terminal control message
+                        // This should be forwarded to the terminal runner
+                        // For now, we'll broadcast it back (echo)
+                        let broadcast_msg = WebSocketMessage::TerminalControl {
+                            session_id: self.session_id.clone(),
+                            message: control_msg,
+                        };
+                        
+                        self.server.do_send(Broadcast {
+                            message: broadcast_msg,
+                        });
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse terminal control message: {}", e);
+                        let error_msg = WebSocketMessage::Error {
+                            message: format!("Invalid control message format: {e}"),
+                        };
+                        if let Ok(json) = serde_json::to_string(&error_msg) {
+                            ctx.text(json);
+                        }
+                    }
+                }
+            }
+            Ok(ws::Message::Binary(data)) => {
+                tracing::debug!("Terminal WebSocket binary data received: {} bytes", data.len());
+                // Binary data should be sent to the terminal as input
+                // For now, we'll echo it back as terminal output
+                let base64_data = base64::engine::general_purpose::STANDARD.encode(&data);
+                let output_msg = WebSocketMessage::TerminalOutput {
+                    session_id: self.session_id.clone(),
+                    data: base64_data,
+                };
+                
+                self.server.do_send(Broadcast {
+                    message: output_msg,
+                });
+            }
+            Ok(ws::Message::Close(reason)) => {
+                tracing::info!("Terminal WebSocket connection closed: {:?}", reason);
+                ctx.close(reason);
+                ctx.stop();
+            }
+            _ => {
+                ctx.stop();
+            }
+        }
+    }
+}
+
+impl Handler<WebSocketMessage> for TerminalWebSocketConnection {
+    type Result = ();
+
+    fn handle(&mut self, msg: WebSocketMessage, ctx: &mut Self::Context) {
+        match msg {
+            WebSocketMessage::TerminalOutput { session_id, data } => {
+                // Only handle output for our session
+                if session_id == self.session_id {
+                    // Send binary data to client
+                    if let Ok(binary_data) = base64::engine::general_purpose::STANDARD.decode(&data) {
+                        ctx.binary(binary_data);
+                    }
+                }
+            }
+            _ => {
+                // Send other messages as JSON text
+                if let Ok(json) = serde_json::to_string(&msg) {
+                    ctx.text(json);
+                }
+            }
+        }
+    }
+}
+
+/// Terminal WebSocket endpoint handler for PTY sessions
+pub async fn terminal_websocket_handler(
+    req: HttpRequest,
+    stream: web::Payload,
+    srv: web::Data<Addr<WebSocketServer>>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let session_id = session_id.into_inner();
+    tracing::debug!(
+        "Terminal WebSocket connection request received for session: {}",
+        session_id
+    );
+
+    let resp = ws::start(
+        TerminalWebSocketConnection::new(session_id, srv.get_ref().clone()),
+        &req,
+        stream,
+    );
+
+    tracing::debug!("Terminal WebSocket connection established");
+    resp
+}
+
 /// Utility functions for broadcasting messages
 pub struct WebSocketBroadcaster {
     server: Arc<Addr<WebSocketServer>>,
@@ -436,6 +652,42 @@ impl WebSocketBroadcaster {
                 content: content.to_string(),
                 seq,
             },
+        });
+    }
+
+    /// Broadcast terminal session started
+    pub async fn broadcast_terminal_session_started(&self, session_id: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::TerminalSessionStarted { session_id },
+        });
+    }
+
+    /// Broadcast terminal session ended
+    pub async fn broadcast_terminal_session_ended(&self, session_id: String, exit_code: Option<i32>) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::TerminalSessionEnded { session_id, exit_code },
+        });
+    }
+
+    /// Broadcast terminal output as binary data (base64 encoded)
+    pub async fn broadcast_terminal_output(&self, session_id: String, data: Vec<u8>) {
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(data);
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::TerminalOutput {
+                session_id,
+                data: base64_data,
+            },
+        });
+    }
+
+    /// Broadcast terminal control message
+    pub async fn broadcast_terminal_control_message(
+        &self,
+        session_id: String,
+        message: TerminalControlMessage,
+    ) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::TerminalControl { session_id, message },
         });
     }
 }

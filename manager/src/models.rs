@@ -271,6 +271,147 @@ pub struct AiSessionInputRequest {
     pub content: String,
 }
 
+/// Control message types for PTY-based terminal sessions
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(tag = "type")]
+pub enum TerminalControlMessage {
+    /// Send input to the PTY (base64 encoded bytes)
+    #[serde(rename = "input")]
+    Input { data: String },
+    /// Resize the PTY window
+    #[serde(rename = "resize")]
+    Resize { cols: u16, rows: u16 },
+    /// Heartbeat ping
+    #[serde(rename = "ping")]
+    Ping,
+    /// Heartbeat pong
+    #[serde(rename = "pong")]  
+    Pong,
+    /// Session status update
+    #[serde(rename = "status")]
+    Status {
+        status: String, // "running"|"completed"|"failed"
+        #[serde(skip_serializing_if = "Option::is_none")]
+        exit_code: Option<i32>,
+    },
+}
+
+/// Request to create an interactive terminal session
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateTerminalSessionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    pub tool_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    pub interactive: bool,
+    pub requires_pty: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<std::collections::HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cols: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rows: Option<u16>,
+}
+
+/// Terminal session model for PTY-based sessions
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TerminalSession {
+    pub id: String,
+    pub work_id: String,
+    pub message_id: String,
+    pub tool_name: String,
+    pub status: String,
+    pub project_context: Option<String>,
+    pub requires_pty: bool,
+    pub interactive: bool,
+    pub cols: u16,
+    pub rows: u16,
+    #[ts(type = "number")]
+    pub started_at: i64,
+    #[ts(type = "number | null")]
+    pub ended_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+}
+
+impl TerminalSession {
+    pub fn new(
+        work_id: String,
+        message_id: String,
+        tool_name: String,
+        project_context: Option<String>,
+        requires_pty: bool,
+        interactive: bool,
+        cols: u16,
+        rows: u16,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            work_id,
+            message_id,
+            tool_name,
+            status: "running".to_string(),
+            project_context,
+            requires_pty,
+            interactive,
+            cols,
+            rows,
+            started_at: now,
+            ended_at: None,
+            exit_code: None,
+        }
+    }
+
+    pub fn complete(&mut self, exit_code: Option<i32>) {
+        self.status = "completed".to_string();
+        self.ended_at = Some(Utc::now().timestamp());
+        self.exit_code = exit_code;
+    }
+
+    pub fn fail(&mut self, exit_code: Option<i32>) {
+        self.status = "failed".to_string();
+        self.ended_at = Some(Utc::now().timestamp());
+        self.exit_code = exit_code;
+    }
+
+    pub fn resize(&mut self, cols: u16, rows: u16) {
+        self.cols = cols;
+        self.rows = rows;
+    }
+}
+
+/// Response for terminal session creation
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TerminalSessionResponse {
+    pub session: TerminalSession,
+}
+
+/// Tool registry entry for configuring CLI tools
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ToolConfig {
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub requires_pty: bool,
+    pub working_dir: String, // "project" | "manager"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Tool registry response
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ToolRegistryResponse {
+    pub tools: Vec<ToolConfig>,
+}
+
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AddExistingProjectRequest {
