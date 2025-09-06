@@ -143,7 +143,7 @@ pub async fn wait_for_server(url: &str, max_attempts: u32) -> bool {
 
 /// Simple health check for the server
 async fn check_server_health(base_url: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let health_url = format!("{}/api/health", base_url);
+    let _health_url = format!("{}/api/health", base_url);
     
     // Use a simple TCP connection test instead of HTTP to avoid additional dependencies
     let uri: Vec<&str> = base_url.split("://").collect();

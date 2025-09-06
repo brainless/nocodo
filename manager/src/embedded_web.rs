@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 /// Embedded web assets from manager-web/dist
 #[derive(RustEmbed)]
-#[folder = "manager-web/dist/"]
+#[folder = "../manager-web/dist/"]
 #[include = "*.html"]
 #[include = "*.js"]
 #[include = "*.css"]
