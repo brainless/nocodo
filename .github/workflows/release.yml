@@ -29,9 +29,6 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             name: nocodo-manager-macos-arm64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: nocodo-manager-windows-x64.exe
 
     steps:
       - name: Checkout code
@@ -94,10 +91,6 @@ jobs:
           chmod +x ${{ matrix.name }}
           file ${{ matrix.name }}
 
-      - name: Prepare release artifact (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cp target/${{ matrix.target }}/release/nocodo-manager.exe ${{ matrix.name }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -118,7 +111,7 @@ jobs:
           - 🚀 Single executable with embedded manager-web UI
           - 🌐 Auto-launch browser on startup (use --no-browser to disable)  
           - 📊 Complete API server with WebSocket support
-          - 🔧 Cross-platform support (Linux, macOS, Windows)
+          - 🔧 Cross-platform support (Linux, macOS, Windows via WSL)
 
           ### Usage
           \`\`\`bash
@@ -190,7 +183,7 @@ jobs:
             ### Features
             - Complete nocodo-manager daemon with embedded manager-web UI
             - Auto-launch browser on startup (use `--no-browser` to disable)
-            - Cross-platform support (Linux, macOS, Windows)  
+            - Cross-platform support (Linux, macOS, Windows via WSL)  
             - No external dependencies or web files required
             
             ### Quick Start
@@ -206,10 +199,13 @@ jobs:
             - **Built**: ${{ github.run_started_at }}
             
             ### Platform Binaries
-            - `nocodo-manager-linux-x64` - Linux x86_64
+            - `nocodo-manager-linux-x64` - Linux x86_64 (also works in WSL on Windows)
             - `nocodo-manager-macos-x64` - macOS Intel  
             - `nocodo-manager-macos-arm64` - macOS Apple Silicon
-            - `nocodo-manager-windows-x64.exe` - Windows x86_64
+            
+            ### Windows Users
+            Use the Linux binary (`nocodo-manager-linux-x64`) in WSL (Windows Subsystem for Linux).
+            Native Windows support is not available due to PTY dependencies.
             
             ---
             🤖 Generated with [Claude Code](https://claude.ai/code)
@@ -217,7 +213,6 @@ jobs:
             artifacts/nocodo-manager-linux-x64/nocodo-manager-linux-x64
             artifacts/nocodo-manager-macos-x64/nocodo-manager-macos-x64
             artifacts/nocodo-manager-macos-arm64/nocodo-manager-macos-arm64
-            artifacts/nocodo-manager-windows-x64.exe/nocodo-manager-windows-x64.exe
           draft: false
           prerelease: true
           generate_release_notes: true
