@@ -36,6 +36,12 @@ home = "0.5"
 tokio-stream = { version = "0.1", features = ["net"] }
 handlebars = "4.4"
 walkdir = "2.5"
+portable-pty = "0.8"
+base64 = "0.22"
+rust-embed = { version = "8.4", features = ["include-exclude"] }
+webbrowser = "0.8"
+mime_guess = "2.0"
+clap = { version = "4.4", features = ["derive"] }
 
 [dev-dependencies]
 actix-rt = "2.9"

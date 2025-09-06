@@ -22,6 +22,7 @@ async fn test_health_check() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
@@ -54,6 +55,7 @@ async fn test_get_projects_empty() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
@@ -84,6 +86,7 @@ async fn test_create_project() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
@@ -152,6 +155,7 @@ async fn test_create_project_with_default_path() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
@@ -220,6 +224,7 @@ async fn test_create_project_invalid_name() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
@@ -265,6 +270,7 @@ async fn test_get_projects_after_creation() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
@@ -326,6 +332,7 @@ async fn test_technology_detection_for_rust_project() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
+        terminal_runner: None,
     });
 
     let app = test::init_service(
