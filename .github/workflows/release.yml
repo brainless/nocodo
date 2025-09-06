@@ -253,7 +253,7 @@ jobs:
           
           # Build and check binary size
           cargo build --release
-          ls -lh target/release/nocodo-manager
+          ls -lh ../target/release/nocodo-manager
           
           # Basic smoke test (server should start and validate assets)
-          timeout 10 ./target/release/nocodo-manager --no-browser || echo "Server startup test completed"
+          timeout 10 ../target/release/nocodo-manager --no-browser || echo "Server startup test completed"
