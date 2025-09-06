@@ -3,12 +3,15 @@ use crate::error::AppError;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
     AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
-    CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
-    FileListResponse, FileResponse, FileUpdateRequest, Project, ProjectListResponse,
-    ProjectResponse, ServerStatus, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateTerminalSessionRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest,
+    FileInfo, FileListRequest, FileListResponse, FileResponse, FileUpdateRequest, Project,
+    ProjectListResponse, ProjectResponse, ServerStatus, TerminalControlMessage, TerminalSession,
+    TerminalSessionResponse, ToolRegistryResponse, WorkListResponse, WorkMessageResponse,
+    WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
+use crate::terminal_runner::TerminalRunner;
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
@@ -25,6 +28,7 @@ pub struct AppState {
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
     pub runner: Option<Arc<Runner>>, // Enabled via env flag
+    pub terminal_runner: Option<Arc<TerminalRunner>>, // PTY-based runner
 }
 
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
@@ -1747,4 +1751,239 @@ pub async fn get_work_messages(
     let messages = data.database.get_work_messages(&work_id)?;
     let response = crate::models::WorkMessageListResponse { messages };
     Ok(HttpResponse::Ok().json(response))
+}
+
+// Terminal session HTTP handlers for PTY-based interactive sessions
+
+/// Get available tools from the tool registry
+pub async fn get_tool_registry(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let tools = terminal_runner.get_tool_registry().await;
+        let response = ToolRegistryResponse { tools };
+        Ok(HttpResponse::Ok().json(response))
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
+}
+
+/// Create a new interactive terminal session
+pub async fn create_terminal_session(
+    data: web::Data<AppState>,
+    request: web::Json<CreateTerminalSessionRequest>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let req = request.into_inner();
+
+        // Validate required fields
+        if req.tool_name.trim().is_empty() {
+            return Err(AppError::InvalidRequest(
+                "tool_name is required".to_string(),
+            ));
+        }
+
+        // For now, create a dummy work and message to satisfy the terminal session requirements
+        // In a real implementation, this would come from an existing work/message context
+        let work_id = "demo-work".to_string();
+        let message_id = "demo-message".to_string();
+
+        // Generate project context if project_id is provided
+        let project_context = if let Some(ref project_id) = req.project_id {
+            match data.database.get_project_by_id(project_id) {
+                Ok(project) => Some(format!("Project: {}\nPath: {}", project.name, project.path)),
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
+
+        // Create terminal session
+        let terminal_session = TerminalSession::new(
+            work_id,
+            message_id,
+            req.tool_name.clone(),
+            project_context,
+            req.requires_pty,
+            req.interactive,
+            req.cols.unwrap_or(80),
+            req.rows.unwrap_or(24),
+        );
+
+        // Persist the session
+        data.database.create_terminal_session(&terminal_session)?;
+
+        // Start the terminal session
+        let session_id = terminal_session.id.clone();
+        let initial_prompt = req.prompt.clone();
+
+        match terminal_runner
+            .start_session(terminal_session.clone(), initial_prompt)
+            .await
+        {
+            Ok(_) => {
+                tracing::info!("Successfully started terminal session: {}", session_id);
+
+                // Broadcast session started
+                data.ws_broadcaster
+                    .broadcast_terminal_session_started(session_id)
+                    .await;
+
+                let response = TerminalSessionResponse {
+                    session: terminal_session,
+                };
+                Ok(HttpResponse::Created().json(response))
+            }
+            Err(e) => {
+                tracing::error!("Failed to start terminal session {}: {}", session_id, e);
+                Err(AppError::Internal(format!(
+                    "Failed to start terminal session: {}",
+                    e
+                )))
+            }
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
+}
+
+/// Send input to a terminal session
+pub async fn send_terminal_input(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+    control_msg: web::Json<TerminalControlMessage>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let session_id = session_id.into_inner();
+        let message = control_msg.into_inner();
+
+        match terminal_runner.send_input(&session_id, message).await {
+            Ok(_) => Ok(HttpResponse::Ok().finish()),
+            Err(e) => {
+                tracing::error!("Failed to send input to session {}: {}", session_id, e);
+                Err(AppError::Internal(format!("Failed to send input: {}", e)))
+            }
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
+}
+
+/// Resize a terminal session
+pub async fn resize_terminal_session(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+    resize_req: web::Json<TerminalControlMessage>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let session_id = session_id.into_inner();
+        let message = resize_req.into_inner();
+
+        match terminal_runner.send_input(&session_id, message).await {
+            Ok(_) => Ok(HttpResponse::Ok().finish()),
+            Err(e) => {
+                tracing::error!("Failed to resize session {}: {}", session_id, e);
+                Err(AppError::Internal(format!(
+                    "Failed to resize session: {}",
+                    e
+                )))
+            }
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
+}
+
+/// Get terminal session info
+pub async fn get_terminal_session(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let session_id = session_id.into_inner();
+
+        if let Some(session) = terminal_runner.get_session(&session_id).await {
+            let response = TerminalSessionResponse { session };
+            Ok(HttpResponse::Ok().json(response))
+        } else {
+            // Try to get from database
+            match data.database.get_terminal_session_by_id(&session_id) {
+                Ok(session) => {
+                    let response = TerminalSessionResponse { session };
+                    Ok(HttpResponse::Ok().json(response))
+                }
+                Err(_) => Err(AppError::InvalidRequest("Session not found".to_string())),
+            }
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
+}
+
+/// Get terminal session transcript
+pub async fn get_terminal_transcript(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let session_id = session_id.into_inner();
+
+        // Try to get live transcript first
+        if let Some(transcript) = terminal_runner.get_transcript(&session_id).await {
+            return Ok(HttpResponse::Ok()
+                .content_type("application/octet-stream")
+                .body(transcript));
+        }
+
+        // Fall back to database
+        match data.database.get_terminal_transcript(&session_id)? {
+            Some(transcript) => Ok(HttpResponse::Ok()
+                .content_type("application/octet-stream")
+                .body(transcript)),
+            None => Err(AppError::InvalidRequest("Transcript not found".to_string())),
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
+}
+
+/// Terminate a terminal session
+pub async fn terminate_terminal_session(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref terminal_runner) = data.terminal_runner {
+        let session_id = session_id.into_inner();
+
+        match terminal_runner.terminate_session(&session_id).await {
+            Ok(_) => {
+                // Broadcast session ended
+                data.ws_broadcaster
+                    .broadcast_terminal_session_ended(session_id, None)
+                    .await;
+                Ok(HttpResponse::Ok().finish())
+            }
+            Err(e) => {
+                tracing::error!("Failed to terminate session {}: {}", session_id, e);
+                Err(AppError::Internal(format!(
+                    "Failed to terminate session: {}",
+                    e
+                )))
+            }
+        }
+    } else {
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
+    }
 }
