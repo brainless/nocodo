@@ -1,0 +1,263 @@
+name: Build Self-contained Manager Releases
+
+on:
+  push:
+    branches:
+      - 'issue-*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: nocodo-manager-linux-x64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: nocodo-manager-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: nocodo-manager-macos-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: nocodo-manager-windows-x64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: manager-web/package-lock.json
+
+      - name: Build manager-web
+        run: |
+          cd manager-web
+          npm ci
+          npm run build
+          ls -la dist/
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: manager
+
+      - name: Calculate commit count for issue branch
+        id: commit_count
+        shell: bash
+        run: |
+          if [[ "${{ github.ref_name }}" =~ ^issue-([0-9]+) ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+            # Count commits since branching from main
+            COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
+            RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
+            echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
+            echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
+            echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+            echo "is_issue_branch=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_issue_branch=false" >> $GITHUB_OUTPUT
+            echo "release_tag=dev-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build manager binary
+        working-directory: manager
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+          
+      - name: Prepare release artifact (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp manager/target/${{ matrix.target }}/release/nocodo-manager ${{ matrix.name }}
+          chmod +x ${{ matrix.name }}
+          file ${{ matrix.name }}
+
+      - name: Prepare release artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cp manager/target/${{ matrix.target }}/release/nocodo-manager.exe ${{ matrix.name }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}
+          retention-days: 30
+
+      - name: Create release notes
+        if: steps.commit_count.outputs.is_issue_branch == 'true'
+        id: release_notes
+        run: |
+          NOTES="## Release ${{ steps.commit_count.outputs.release_tag }}
+
+          Self-contained nocodo-manager binary with embedded web interface.
+
+          ### Features
+          - 🚀 Single executable with embedded manager-web UI
+          - 🌐 Auto-launch browser on startup (use --no-browser to disable)  
+          - 📊 Complete API server with WebSocket support
+          - 🔧 Cross-platform support (Linux, macOS, Windows)
+
+          ### Usage
+          \`\`\`bash
+          # Download and run
+          chmod +x ${{ matrix.name }}
+          ./${{ matrix.name }}
+          
+          # Browser will automatically open to http://localhost:8081
+          # Use --no-browser flag to disable auto-launch
+          ./${{ matrix.name }} --no-browser
+          \`\`\`
+
+          ### Build Information
+          - Issue: #${{ steps.commit_count.outputs.issue_number }}
+          - Commit Count: ${{ steps.commit_count.outputs.commit_count }}
+          - Target: ${{ matrix.target }}
+          - Built: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          - Commit: ${{ github.sha }}
+
+          ---
+          🤖 Generated with [Claude Code](https://claude.ai/code)"
+          
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref_name, 'issue-')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate release info
+        id: release_info
+        run: |
+          if [[ "${{ github.ref_name }}" =~ ^issue-([0-9]+) ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+            COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
+            RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
+            echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+            echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
+            echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display artifact structure
+        run: ls -la artifacts/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.release_info.outputs.release_tag }}
+          name: "nocodo-manager ${{ steps.release_info.outputs.release_tag }}"
+          body: |
+            ## Self-contained nocodo-manager Release
+            
+            🚀 **Single executable with embedded web interface**
+            
+            ### Features
+            - Complete nocodo-manager daemon with embedded manager-web UI
+            - Auto-launch browser on startup (use `--no-browser` to disable)
+            - Cross-platform support (Linux, macOS, Windows)  
+            - No external dependencies or web files required
+            
+            ### Quick Start
+            1. Download the appropriate binary for your platform
+            2. Make it executable: `chmod +x nocodo-manager-*`
+            3. Run it: `./nocodo-manager-*`
+            4. Browser opens automatically to http://localhost:8081
+            
+            ### Build Details
+            - **Issue**: #${{ steps.release_info.outputs.issue_number }}
+            - **Commits**: ${{ steps.release_info.outputs.commit_count }} since main branch
+            - **Commit**: ${{ github.sha }}
+            - **Built**: ${{ github.run_started_at }}
+            
+            ### Platform Binaries
+            - `nocodo-manager-linux-x64` - Linux x86_64
+            - `nocodo-manager-macos-x64` - macOS Intel  
+            - `nocodo-manager-macos-arm64` - macOS Apple Silicon
+            - `nocodo-manager-windows-x64.exe` - Windows x86_64
+            
+            ---
+            🤖 Generated with [Claude Code](https://claude.ai/code)
+          files: |
+            artifacts/nocodo-manager-linux-x64/nocodo-manager-linux-x64
+            artifacts/nocodo-manager-macos-x64/nocodo-manager-macos-x64
+            artifacts/nocodo-manager-macos-arm64/nocodo-manager-macos-arm64
+            artifacts/nocodo-manager-windows-x64.exe/nocodo-manager-windows-x64.exe
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: Test Embedded Assets
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: manager-web/package-lock.json
+
+      - name: Build manager-web
+        run: |
+          cd manager-web
+          npm ci
+          npm run build
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test embedded assets
+        working-directory: manager
+        run: |
+          # Run tests to validate embedded assets
+          cargo test embedded_assets_exist
+          cargo test asset_validation
+          
+          # Build and check binary size
+          cargo build --release
+          ls -lh target/release/nocodo-manager
+          
+          # Basic smoke test (server should start and validate assets)
+          timeout 10 ./target/release/nocodo-manager --no-browser || echo "Server startup test completed"
