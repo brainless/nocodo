@@ -14,18 +14,18 @@ mod websocket;
 use actix::Actor;
 use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use browser_launcher::{BrowserConfig, print_startup_banner, launch_browser, wait_for_server};
+use browser_launcher::{launch_browser, print_startup_banner, wait_for_server, BrowserConfig};
 use clap::{Arg, Command};
 use config::AppConfig;
 use database::Database;
-use embedded_web::{configure_embedded_routes, validate_embedded_assets, get_embedded_assets_size};
+use embedded_web::{configure_embedded_routes, get_embedded_assets_size, validate_embedded_assets};
 use error::AppResult;
 use handlers::AppState;
 use runner::Runner;
-use terminal_runner::TerminalRunner;
 use socket::SocketServer;
 use std::sync::Arc;
 use std::time::SystemTime;
+use terminal_runner::TerminalRunner;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use websocket::{WebSocketBroadcaster, WebSocketServer};
 
@@ -218,7 +218,10 @@ async fn main() -> AppResult<()> {
                         )
                         // Terminal session endpoints for PTY-based interactive sessions
                         .route("/tools", web::get().to(handlers::get_tool_registry))
-                        .route("/terminals", web::post().to(handlers::create_terminal_session))
+                        .route(
+                            "/terminals",
+                            web::post().to(handlers::create_terminal_session),
+                        )
                         .route(
                             "/terminals/{id}",
                             web::get().to(handlers::get_terminal_session),
@@ -285,7 +288,7 @@ async fn main() -> AppResult<()> {
         async move {
             // Wait for server to be ready
             wait_for_server(&server_url, 10).await;
-            
+
             // Launch browser
             launch_browser(&browser_config).await;
         }

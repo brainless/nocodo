@@ -24,7 +24,10 @@ fn main() {
     let is_ci = env::var("CI").is_ok();
     let is_release = env::var("PROFILE").unwrap_or_default() == "release";
 
-    println!("cargo:warning=Build environment: CI={}, RELEASE={}", is_ci, is_release);
+    println!(
+        "cargo:warning=Build environment: CI={}, RELEASE={}",
+        is_ci, is_release
+    );
 
     // Always try to build web assets for release builds or CI
     if is_release || is_ci {
@@ -38,7 +41,7 @@ fn main() {
         // Install dependencies
         let npm_install = Command::new("npm")
             .args(["ci"])
-            .current_dir(&manager_web_dir)
+            .current_dir(manager_web_dir)
             .status();
 
         match npm_install {
@@ -53,7 +56,10 @@ fn main() {
                 return;
             }
             Err(e) => {
-                println!("cargo:warning=npm ci error: {}. Ensure Node.js and npm are installed.", e);
+                println!(
+                    "cargo:warning=npm ci error: {}. Ensure Node.js and npm are installed.",
+                    e
+                );
                 if is_release {
                     panic!("npm not available for release build: {}", e);
                 }
@@ -64,13 +70,13 @@ fn main() {
         // Build the web app
         let npm_build = Command::new("npm")
             .args(["run", "build"])
-            .current_dir(&manager_web_dir)
+            .current_dir(manager_web_dir)
             .status();
 
         match npm_build {
             Ok(status) if status.success() => {
                 println!("cargo:warning=Web build completed successfully");
-                
+
                 // Verify dist directory exists and has files
                 if dist_dir.exists() {
                     let dist_files = std::fs::read_dir(&dist_dir)
@@ -107,10 +113,10 @@ fn main() {
     // Set environment variables for the embedded assets
     if dist_dir.exists() {
         println!("cargo:rustc-env=WEB_ASSETS_AVAILABLE=1");
-        
+
         // Calculate total size for logging
         let total_size = calculate_dir_size(&dist_dir).unwrap_or(0);
-        
+
         println!("cargo:rustc-env=WEB_ASSETS_SIZE={}", total_size);
         println!("cargo:warning=Web assets total size: {} bytes", total_size);
     } else {
@@ -121,12 +127,12 @@ fn main() {
 
 fn calculate_dir_size(dir: &Path) -> Result<u64, std::io::Error> {
     let mut total_size = 0;
-    
+
     fn visit_dir(dir: &Path, total_size: &mut u64) -> Result<(), std::io::Error> {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_dir() {
                 visit_dir(&path, total_size)?;
             } else {
@@ -136,7 +142,7 @@ fn calculate_dir_size(dir: &Path) -> Result<u64, std::io::Error> {
         }
         Ok(())
     }
-    
+
     visit_dir(dir, &mut total_size)?;
     Ok(total_size)
 }

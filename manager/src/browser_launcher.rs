@@ -2,6 +2,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 /// Configuration for browser launching
+#[derive(Clone)]
 pub struct BrowserConfig {
     pub auto_launch: bool,
     pub url: String,
@@ -31,8 +32,12 @@ pub async fn launch_browser(config: &BrowserConfig) {
     sleep(Duration::from_millis(config.delay_ms)).await;
 
     for attempt in 1..=config.max_retries {
-        tracing::info!("Attempting to launch browser (attempt {}/{})", attempt, config.max_retries);
-        
+        tracing::info!(
+            "Attempting to launch browser (attempt {}/{})",
+            attempt,
+            config.max_retries
+        );
+
         match launch_browser_impl(&config.url) {
             Ok(_) => {
                 tracing::info!("Successfully launched browser for {}", config.url);
@@ -40,7 +45,7 @@ pub async fn launch_browser(config: &BrowserConfig) {
             }
             Err(e) => {
                 tracing::warn!("Failed to launch browser (attempt {}): {}", attempt, e);
-                
+
                 if attempt < config.max_retries {
                     sleep(Duration::from_millis(1000)).await;
                 }
@@ -53,7 +58,7 @@ pub async fn launch_browser(config: &BrowserConfig) {
         config.max_retries,
         config.url
     );
-    
+
     // Print user-friendly message
     println!("\n🌐 nocodo Manager is running!");
     println!("   Open your browser to: {}", config.url);
@@ -81,25 +86,20 @@ fn launch_browser_impl(url: &str) -> Result<(), Box<dyn std::error::Error + Send
     #[cfg(target_os = "linux")]
     {
         // Try xdg-open first (most reliable)
-        let result = std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn();
+        let result = std::process::Command::new("xdg-open").arg(url).spawn();
 
         if result.is_err() {
             // Fallback to common browsers
             let browsers = ["firefox", "google-chrome", "chromium", "brave-browser"];
             let mut success = false;
-            
+
             for browser in &browsers {
-                if let Ok(_) = std::process::Command::new(browser)
-                    .arg(url)
-                    .spawn()
-                {
+                if std::process::Command::new(browser).arg(url).spawn().is_ok() {
                     success = true;
                     break;
                 }
             }
-            
+
             if !success {
                 return Err("No suitable browser found on Linux".into());
             }
@@ -117,8 +117,12 @@ fn launch_browser_impl(url: &str) -> Result<(), Box<dyn std::error::Error + Send
 /// Check if the server is responding before launching browser
 pub async fn wait_for_server(url: &str, max_attempts: u32) -> bool {
     for attempt in 1..=max_attempts {
-        tracing::debug!("Checking if server is ready (attempt {}/{})", attempt, max_attempts);
-        
+        tracing::debug!(
+            "Checking if server is ready (attempt {}/{})",
+            attempt,
+            max_attempts
+        );
+
         match check_server_health(url).await {
             Ok(true) => {
                 tracing::info!("Server is ready at {}", url);
@@ -131,34 +135,36 @@ pub async fn wait_for_server(url: &str, max_attempts: u32) -> bool {
                 tracing::debug!("Server health check failed: {}", e);
             }
         }
-        
+
         if attempt < max_attempts {
             sleep(Duration::from_millis(500)).await;
         }
     }
-    
+
     tracing::warn!("Server readiness check timed out, launching browser anyway");
     false
 }
 
 /// Simple health check for the server
-async fn check_server_health(base_url: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+async fn check_server_health(
+    base_url: &str,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let _health_url = format!("{}/api/health", base_url);
-    
+
     // Use a simple TCP connection test instead of HTTP to avoid additional dependencies
     let uri: Vec<&str> = base_url.split("://").collect();
     if uri.len() != 2 {
         return Err("Invalid URL format".into());
     }
-    
+
     let host_port: Vec<&str> = uri[1].split(':').collect();
     if host_port.len() != 2 {
         return Err("Invalid host:port format".into());
     }
-    
+
     let host = host_port[0];
     let port: u16 = host_port[1].parse().map_err(|_| "Invalid port number")?;
-    
+
     // Try to connect to the server port
     match std::net::TcpStream::connect((host, port)) {
         Ok(_) => Ok(true),
@@ -169,13 +175,13 @@ async fn check_server_health(base_url: &str) -> Result<bool, Box<dyn std::error:
 /// Print startup banner with browser launch info
 pub fn print_startup_banner(config: &BrowserConfig) {
     println!("\n🚀 nocodo Manager starting...");
-    
+
     if config.auto_launch {
         println!("   🌐 Browser will auto-launch: {}", config.url);
     } else {
         println!("   🌐 Open manually: {}", config.url);
     }
-    
+
     println!("   📊 Web interface with embedded assets");
     println!("   🔧 API server with WebSocket support");
     println!();

@@ -2,6 +2,7 @@ use crate::models::{AiSession, Project, TerminalControlMessage};
 use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
+use base64::{self, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -72,13 +73,13 @@ pub enum WebSocketMessage {
         session_id: String,
         exit_code: Option<i32>,
     },
-    
+
     // Terminal output (binary data as base64)
     TerminalOutput {
         session_id: String,
         data: String, // base64 encoded binary data
     },
-    
+
     // Terminal control messages (JSON)
     TerminalControl {
         session_id: String,
@@ -243,6 +244,16 @@ pub struct Connect {
     pub addr: Addr<WebSocketConnection>,
 }
 
+/// Message to connect a terminal WebSocket client
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct TerminalConnect {
+    pub client_id: String,
+    pub session_id: String,
+    #[allow(dead_code)]
+    pub addr: Addr<TerminalWebSocketConnection>,
+}
+
 /// Message to disconnect a WebSocket client
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -271,6 +282,21 @@ impl Handler<Connect> for WebSocketServer {
     fn handle(&mut self, msg: Connect, _: &mut Self::Context) {
         tracing::info!("WebSocket client connected: {}", msg.client_id);
         self.connections.insert(msg.client_id.clone(), msg.addr);
+    }
+}
+
+impl Handler<TerminalConnect> for WebSocketServer {
+    type Result = ();
+
+    fn handle(&mut self, msg: TerminalConnect, _: &mut Self::Context) {
+        tracing::info!(
+            "Terminal WebSocket client connected: {} for session {}",
+            msg.client_id,
+            msg.session_id
+        );
+        // For now, we'll treat terminal connections the same as regular connections
+        // TODO: Add separate tracking for terminal connections if needed
+        // self.connections.insert(msg.client_id.clone(), msg.addr);
     }
 }
 
@@ -419,14 +445,19 @@ impl Actor for TerminalWebSocketConnection {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        tracing::info!("Terminal WebSocket connection started: {} for session {}", self.client_id, self.session_id);
+        tracing::info!(
+            "Terminal WebSocket connection started: {} for session {}",
+            self.client_id,
+            self.session_id
+        );
 
         // Start heartbeat
         self.hb(ctx);
 
         // Register this connection with the server
-        self.server.do_send(Connect {
+        self.server.do_send(TerminalConnect {
             client_id: self.client_id.clone(),
+            session_id: self.session_id.clone(),
             addr: ctx.address(),
         });
 
@@ -471,7 +502,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalWebSocket
                 match serde_json::from_str::<TerminalControlMessage>(&text_str) {
                     Ok(control_msg) => {
                         tracing::debug!("Received terminal control message: {:?}", control_msg);
-                        
+
                         // Handle terminal control message
                         // This should be forwarded to the terminal runner
                         // For now, we'll broadcast it back (echo)
@@ -479,7 +510,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalWebSocket
                             session_id: self.session_id.clone(),
                             message: control_msg,
                         };
-                        
+
                         self.server.do_send(Broadcast {
                             message: broadcast_msg,
                         });
@@ -496,7 +527,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalWebSocket
                 }
             }
             Ok(ws::Message::Binary(data)) => {
-                tracing::debug!("Terminal WebSocket binary data received: {} bytes", data.len());
+                tracing::debug!(
+                    "Terminal WebSocket binary data received: {} bytes",
+                    data.len()
+                );
                 // Binary data should be sent to the terminal as input
                 // For now, we'll echo it back as terminal output
                 let base64_data = base64::engine::general_purpose::STANDARD.encode(&data);
@@ -504,7 +538,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalWebSocket
                     session_id: self.session_id.clone(),
                     data: base64_data,
                 };
-                
+
                 self.server.do_send(Broadcast {
                     message: output_msg,
                 });
@@ -530,7 +564,8 @@ impl Handler<WebSocketMessage> for TerminalWebSocketConnection {
                 // Only handle output for our session
                 if session_id == self.session_id {
                     // Send binary data to client
-                    if let Ok(binary_data) = base64::engine::general_purpose::STANDARD.decode(&data) {
+                    if let Ok(binary_data) = base64::engine::general_purpose::STANDARD.decode(&data)
+                    {
                         ctx.binary(binary_data);
                     }
                 }
@@ -663,9 +698,16 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast terminal session ended
-    pub async fn broadcast_terminal_session_ended(&self, session_id: String, exit_code: Option<i32>) {
+    pub async fn broadcast_terminal_session_ended(
+        &self,
+        session_id: String,
+        exit_code: Option<i32>,
+    ) {
         self.server.do_send(Broadcast {
-            message: WebSocketMessage::TerminalSessionEnded { session_id, exit_code },
+            message: WebSocketMessage::TerminalSessionEnded {
+                session_id,
+                exit_code,
+            },
         });
     }
 
@@ -687,7 +729,10 @@ impl WebSocketBroadcaster {
         message: TerminalControlMessage,
     ) {
         self.server.do_send(Broadcast {
-            message: WebSocketMessage::TerminalControl { session_id, message },
+            message: WebSocketMessage::TerminalControl {
+                session_id,
+                message,
+            },
         });
     }
 }

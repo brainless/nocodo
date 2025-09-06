@@ -3,14 +3,15 @@ use crate::error::AppError;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
     AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
-    CreateTerminalSessionRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, 
-    FileInfo, FileListRequest, FileListResponse, FileResponse, FileUpdateRequest, Project, 
+    CreateTerminalSessionRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest,
+    FileInfo, FileListRequest, FileListResponse, FileResponse, FileUpdateRequest, Project,
     ProjectListResponse, ProjectResponse, ServerStatus, TerminalControlMessage, TerminalSession,
-    TerminalSessionResponse, ToolRegistryResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    TerminalSessionResponse, ToolRegistryResponse, WorkListResponse, WorkMessageResponse,
+    WorkResponse,
 };
 use crate::runner::Runner;
-use crate::terminal_runner::TerminalRunner;
 use crate::templates::{ProjectTemplate, TemplateManager};
+use crate::terminal_runner::TerminalRunner;
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
@@ -1761,7 +1762,9 @@ pub async fn get_tool_registry(data: web::Data<AppState>) -> Result<HttpResponse
         let response = ToolRegistryResponse { tools };
         Ok(HttpResponse::Ok().json(response))
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }
 
@@ -1775,7 +1778,9 @@ pub async fn create_terminal_session(
 
         // Validate required fields
         if req.tool_name.trim().is_empty() {
-            return Err(AppError::InvalidRequest("tool_name is required".to_string()));
+            return Err(AppError::InvalidRequest(
+                "tool_name is required".to_string(),
+            ));
         }
 
         // For now, create a dummy work and message to satisfy the terminal session requirements
@@ -1811,24 +1816,36 @@ pub async fn create_terminal_session(
         // Start the terminal session
         let session_id = terminal_session.id.clone();
         let initial_prompt = req.prompt.clone();
-        
-        match terminal_runner.start_session(terminal_session.clone(), initial_prompt).await {
+
+        match terminal_runner
+            .start_session(terminal_session.clone(), initial_prompt)
+            .await
+        {
             Ok(_) => {
                 tracing::info!("Successfully started terminal session: {}", session_id);
-                
+
                 // Broadcast session started
-                data.ws_broadcaster.broadcast_terminal_session_started(session_id).await;
-                
-                let response = TerminalSessionResponse { session: terminal_session };
+                data.ws_broadcaster
+                    .broadcast_terminal_session_started(session_id)
+                    .await;
+
+                let response = TerminalSessionResponse {
+                    session: terminal_session,
+                };
                 Ok(HttpResponse::Created().json(response))
             }
             Err(e) => {
                 tracing::error!("Failed to start terminal session {}: {}", session_id, e);
-                Err(AppError::Internal(format!("Failed to start terminal session: {}", e)))
+                Err(AppError::Internal(format!(
+                    "Failed to start terminal session: {}",
+                    e
+                )))
             }
         }
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }
 
@@ -1850,7 +1867,9 @@ pub async fn send_terminal_input(
             }
         }
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }
 
@@ -1868,11 +1887,16 @@ pub async fn resize_terminal_session(
             Ok(_) => Ok(HttpResponse::Ok().finish()),
             Err(e) => {
                 tracing::error!("Failed to resize session {}: {}", session_id, e);
-                Err(AppError::Internal(format!("Failed to resize session: {}", e)))
+                Err(AppError::Internal(format!(
+                    "Failed to resize session: {}",
+                    e
+                )))
             }
         }
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }
 
@@ -1894,11 +1918,13 @@ pub async fn get_terminal_session(
                     let response = TerminalSessionResponse { session };
                     Ok(HttpResponse::Ok().json(response))
                 }
-                Err(_) => Err(AppError::InvalidRequest("Session not found".to_string()))
+                Err(_) => Err(AppError::InvalidRequest("Session not found".to_string())),
             }
         }
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }
 
@@ -1922,10 +1948,12 @@ pub async fn get_terminal_transcript(
             Some(transcript) => Ok(HttpResponse::Ok()
                 .content_type("application/octet-stream")
                 .body(transcript)),
-            None => Err(AppError::InvalidRequest("Transcript not found".to_string()))
+            None => Err(AppError::InvalidRequest("Transcript not found".to_string())),
         }
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }
 
@@ -1940,15 +1968,22 @@ pub async fn terminate_terminal_session(
         match terminal_runner.terminate_session(&session_id).await {
             Ok(_) => {
                 // Broadcast session ended
-                data.ws_broadcaster.broadcast_terminal_session_ended(session_id, None).await;
+                data.ws_broadcaster
+                    .broadcast_terminal_session_ended(session_id, None)
+                    .await;
                 Ok(HttpResponse::Ok().finish())
             }
             Err(e) => {
                 tracing::error!("Failed to terminate session {}: {}", session_id, e);
-                Err(AppError::Internal(format!("Failed to terminate session: {}", e)))
+                Err(AppError::Internal(format!(
+                    "Failed to terminate session: {}",
+                    e
+                )))
             }
         }
     } else {
-        Err(AppError::InvalidRequest("Terminal runner not available".to_string()))
+        Err(AppError::InvalidRequest(
+            "Terminal runner not available".to_string(),
+        ))
     }
 }

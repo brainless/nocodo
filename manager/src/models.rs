@@ -286,7 +286,7 @@ pub enum TerminalControlMessage {
     #[serde(rename = "ping")]
     Ping,
     /// Heartbeat pong
-    #[serde(rename = "pong")]  
+    #[serde(rename = "pong")]
     Pong,
     /// Session status update
     #[serde(rename = "status")]
@@ -339,6 +339,7 @@ pub struct TerminalSession {
 }
 
 impl TerminalSession {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         work_id: String,
         message_id: String,
@@ -367,18 +368,21 @@ impl TerminalSession {
         }
     }
 
+    #[allow(dead_code)]
     pub fn complete(&mut self, exit_code: Option<i32>) {
         self.status = "completed".to_string();
         self.ended_at = Some(Utc::now().timestamp());
         self.exit_code = exit_code;
     }
 
+    #[allow(dead_code)]
     pub fn fail(&mut self, exit_code: Option<i32>) {
         self.status = "failed".to_string();
         self.ended_at = Some(Utc::now().timestamp());
         self.exit_code = exit_code;
     }
 
+    #[allow(dead_code)]
     pub fn resize(&mut self, cols: u16, rows: u16) {
         self.cols = cols;
         self.rows = rows;
