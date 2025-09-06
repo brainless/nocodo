@@ -4,23 +4,24 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{mpsc, Mutex, RwLock};
-use tokio::time::timeout;
 
 use crate::database::Database;
 use crate::models::{TerminalControlMessage, TerminalSession, ToolConfig};
 use crate::websocket::WebSocketBroadcaster;
 
 /// Maximum transcript size per session (20MB)
+#[allow(dead_code)]
 const MAX_TRANSCRIPT_SIZE: usize = 20 * 1024 * 1024;
 
 /// Maximum session runtime (10 minutes)
+#[allow(dead_code)]
 const MAX_SESSION_RUNTIME: Duration = Duration::from_secs(10 * 60);
 
 /// PTY-based terminal runner for interactive AI tools
 pub struct TerminalRunner {
     db: Arc<Database>,
+    #[allow(dead_code)]
     ws: Arc<WebSocketBroadcaster>,
     sessions: RwLock<HashMap<String, RunningSession>>,
     tool_registry: RwLock<HashMap<String, ToolConfig>>,
@@ -46,7 +47,7 @@ impl TerminalRunner {
     /// Initialize with default tool registry
     fn default_tool_registry() -> HashMap<String, ToolConfig> {
         let mut registry = HashMap::new();
-        
+
         // Claude Code tool
         registry.insert(
             "claude".to_string(),
@@ -93,15 +94,19 @@ impl TerminalRunner {
         self.tool_registry.read().await.values().cloned().collect()
     }
 
+    #[allow(dead_code)]
     pub async fn register_tool(&self, tool: ToolConfig) {
-        self.tool_registry.write().await.insert(tool.name.clone(), tool);
+        self.tool_registry
+            .write()
+            .await
+            .insert(tool.name.clone(), tool);
     }
 
     /// Start a new terminal session
     pub async fn start_session(
         &self,
         session: TerminalSession,
-        initial_prompt: Option<String>,
+        _initial_prompt: Option<String>,
     ) -> anyhow::Result<()> {
         let session_id = session.id.clone();
         let tool_name = session.tool_name.clone();
@@ -122,7 +127,10 @@ impl TerminalRunner {
         };
 
         if !tool_config.requires_pty {
-            return Err(anyhow::anyhow!("Tool '{}' does not support PTY mode", tool_name));
+            return Err(anyhow::anyhow!(
+                "Tool '{}' does not support PTY mode",
+                tool_name
+            ));
         }
 
         // Determine working directory
@@ -145,7 +153,7 @@ impl TerminalRunner {
         };
 
         // Spawn PTY session
-        self.spawn_pty_session(session, tool_config, working_dir, initial_prompt)
+        self.spawn_pty_session(session, tool_config, working_dir, _initial_prompt)
             .await
     }
 
@@ -154,10 +162,10 @@ impl TerminalRunner {
         session: TerminalSession,
         tool_config: ToolConfig,
         working_dir: Option<std::path::PathBuf>,
-        initial_prompt: Option<String>,
+        _initial_prompt: Option<String>,
     ) -> anyhow::Result<()> {
-        let session_id = session.id.clone();
-        
+        let _session_id = session.id.clone();
+
         // Create PTY system
         let pty_system = native_pty_system();
         let pty_pair = pty_system.openpty(PtySize {
@@ -170,7 +178,7 @@ impl TerminalRunner {
         // Build command
         let mut cmd = CommandBuilder::new(&tool_config.command);
         cmd.args(&tool_config.args);
-        
+
         if let Some(dir) = working_dir {
             cmd.cwd(dir);
         }
@@ -183,16 +191,20 @@ impl TerminalRunner {
         }
 
         // Spawn child process
-        let child = pty_pair.slave.spawn_command(cmd)?;
+        let _child = pty_pair.slave.spawn_command(cmd)?;
         drop(pty_pair.slave);
 
-        // For now, let's disable the portable-pty functionality 
+        // For now, let's disable the portable-pty functionality
         // until we can properly test the API
-        return Err(anyhow::anyhow!("PTY functionality temporarily disabled for CI builds"));
-        
+        Err(anyhow::anyhow!(
+            "PTY functionality temporarily disabled for CI builds"
+        ))
+
+        // Commented out code below for when PTY is re-enabled
+        /*
         // Get reader and writer from the master PTY
-        // let reader = pty_pair.master.try_clone_reader()?;
-        // let writer = pty_pair.master.try_clone_writer()?;
+        let reader = pty_pair.master.try_clone_reader()?;
+        let writer = pty_pair.master.try_clone_writer()?;
 
         // Create channels for communication
         let (input_tx, mut input_rx) = mpsc::channel::<TerminalControlMessage>(256);
@@ -233,19 +245,19 @@ impl TerminalRunner {
                                 }
                                 Ok(n) => {
                                     let output_bytes = &output_buffer[0..n];
-                                    
+
                                     // Append to transcript
                                     {
                                         let mut transcript = transcript_clone.lock().await;
                                         transcript.extend_from_slice(output_bytes);
-                                        
+
                                         // Trim transcript if it's too large
                                         if transcript.len() > MAX_TRANSCRIPT_SIZE {
                                             let excess = transcript.len() - MAX_TRANSCRIPT_SIZE;
                                             transcript.drain(0..excess);
                                         }
                                     }
-                                    
+
                                     // Broadcast output as binary WebSocket frame
                                     ws.broadcast_terminal_output(
                                         session_id_clone.clone(),
@@ -258,7 +270,7 @@ impl TerminalRunner {
                                 }
                             }
                         }
-                        
+
                         // Handle control messages
                         msg = input_rx.recv() => {
                             match msg {
@@ -290,7 +302,7 @@ impl TerminalRunner {
                                         session_mut.resize(cols, rows);
                                         // Update session in database
                                         let _ = db.update_terminal_session(&session_mut);
-                                        
+
                                         // Broadcast resize event
                                         ws.broadcast_terminal_control_message(
                                             session_id_clone.clone(),
@@ -308,7 +320,7 @@ impl TerminalRunner {
                                 _ => {} // Ignore other message types
                             }
                         }
-                        
+
                         // Session timeout
                         _ = tokio::time::sleep(MAX_SESSION_RUNTIME) => {
                             tracing::warn!("Session {} timed out", session_id_clone);
@@ -341,16 +353,16 @@ impl TerminalRunner {
                 } else {
                     session_mut.fail(exit_code);
                 }
-                
+
                 let _ = db.update_terminal_session(&session_mut);
-                
+
                 // Persist transcript
                 let transcript_bytes = {
                     let transcript_guard = transcript_clone.lock().await;
                     transcript_guard.clone()
                 };
                 let _ = db.save_terminal_transcript(&session_id_clone, &transcript_bytes);
-                
+
                 // Broadcast session end
                 ws.broadcast_terminal_control_message(
                     session_id_clone.clone(),
@@ -374,6 +386,7 @@ impl TerminalRunner {
 
         tracing::info!("PTY session started successfully");
         Ok(())
+        */
     }
 
     /// Send input to a running session
@@ -401,6 +414,7 @@ impl TerminalRunner {
     }
 
     /// List all active sessions
+    #[allow(dead_code)]
     pub async fn list_sessions(&self) -> Vec<TerminalSession> {
         let sessions = self.sessions.read().await;
         sessions.values().map(|s| s.session.clone()).collect()

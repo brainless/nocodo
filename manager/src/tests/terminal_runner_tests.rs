@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use crate::terminal_runner::TerminalRunner;
     use crate::database::Database;
     use crate::models::TerminalSession;
+    use crate::terminal_runner::TerminalRunner;
     use crate::websocket::{WebSocketBroadcaster, WebSocketServer};
     use actix::Actor;
     use std::sync::Arc;
     use tempfile::tempdir;
 
-    #[tokio::test]
+    #[actix_rt::test]
     async fn test_terminal_runner_creation() {
         // Create temporary database
         let temp_dir = tempdir().unwrap();

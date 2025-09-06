@@ -1024,6 +1024,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn update_terminal_session(&self, session: &TerminalSession) -> AppResult<()> {
         let conn = self
             .connection
@@ -1078,7 +1079,11 @@ impl Database {
         Ok(session)
     }
 
-    pub fn get_terminal_sessions_by_work_id(&self, work_id: &str) -> AppResult<Vec<TerminalSession>> {
+    #[allow(dead_code)]
+    pub fn get_terminal_sessions_by_work_id(
+        &self,
+        work_id: &str,
+    ) -> AppResult<Vec<TerminalSession>> {
         let conn = self
             .connection
             .lock()
@@ -1111,6 +1116,7 @@ impl Database {
         sessions.map_err(AppError::from)
     }
 
+    #[allow(dead_code)]
     pub fn save_terminal_transcript(&self, session_id: &str, transcript: &[u8]) -> AppResult<()> {
         let conn = self
             .connection
@@ -1118,13 +1124,17 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let now = chrono::Utc::now().timestamp();
-        
+
         conn.execute(
             "INSERT OR REPLACE INTO terminal_transcripts (session_id, transcript, created_at) VALUES (?, ?, ?)",
             params![session_id, transcript, now],
         )?;
 
-        tracing::info!("Saved terminal transcript for session: {} ({} bytes)", session_id, transcript.len());
+        tracing::info!(
+            "Saved terminal transcript for session: {} ({} bytes)",
+            session_id,
+            transcript.len()
+        );
         Ok(())
     }
 
