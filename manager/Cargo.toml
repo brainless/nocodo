@@ -38,6 +38,9 @@ handlebars = "4.4"
 walkdir = "2.5"
 portable-pty = "0.8"
 base64 = "0.22"
+rust-embed = "8.4"
+webbrowser = "0.8"
+mime_guess = "2.0"
 
 [dev-dependencies]
 actix-rt = "2.9"
