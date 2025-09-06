@@ -47,6 +47,7 @@ jobs:
           cache-dependency-path: manager-web/package-lock.json
 
       - name: Build manager-web
+        shell: bash
         run: |
           cd manager-web
           npm ci
