@@ -29,7 +29,19 @@ fn main() {
         is_ci, is_release
     );
 
-    // Always try to build web assets for release builds or CI
+    // Check for pre-built assets first (GitHub Actions builds web assets separately)
+    if dist_dir.exists() {
+        let dist_files = std::fs::read_dir(&dist_dir)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
+        
+        if dist_files > 0 {
+            println!("cargo:warning=Using pre-built web assets from manager-web/dist ({} files)", dist_files);
+            return; // Skip npm build since assets already exist
+        }
+    }
+
+    // Always try to build web assets for release builds or CI (when no pre-built assets exist)
     if is_release || is_ci {
         if !package_json.exists() {
             println!("cargo:warning=manager-web/package.json not found, skipping web build");
