@@ -34,9 +34,12 @@ fn main() {
         let dist_files = std::fs::read_dir(&dist_dir)
             .map(|entries| entries.count())
             .unwrap_or(0);
-        
+
         if dist_files > 0 {
-            println!("cargo:warning=Using pre-built web assets from manager-web/dist ({} files)", dist_files);
+            println!(
+                "cargo:warning=Using pre-built web assets from manager-web/dist ({} files)",
+                dist_files
+            );
             return; // Skip npm build since assets already exist
         }
     }
