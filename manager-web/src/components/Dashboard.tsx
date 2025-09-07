@@ -100,6 +100,11 @@ const StartAiSessionForm: Component = () => {
   const [prompt, setPrompt] = createSignal<string>('');
   const [submitting, setSubmitting] = createSignal<boolean>(false);
   const [error, setError] = createSignal<string | null>(null);
+  
+  // PTY options (Issue #58)
+  const [usePty, setUsePty] = createSignal<boolean>(false);
+  const [terminalCols, setTerminalCols] = createSignal<number>(80);
+  const [terminalRows, setTerminalRows] = createSignal<number>(24);
 
   // Dropdown states and refs for project and tool, with click-outside handling
   const [isProjectOpen, setProjectOpen] = createSignal(false);
@@ -139,30 +144,48 @@ const StartAiSessionForm: Component = () => {
     setSubmitting(true);
     setError(null);
     try {
-      // 1. Create the work
-      const workResp = await apiClient.createWork({
-        title: prompt().trim(),
-        project_id: selectedProjectId().trim() || null,
-      });
-      const workId = workResp.work.id;
+      if (usePty()) {
+        // Create PTY terminal session (Issue #58)
+        const terminalSessionResp = await apiClient.createTerminalSession({
+          project_id: selectedProjectId().trim() || undefined,
+          tool_name: toolName(),
+          prompt: prompt().trim(),
+          interactive: true,
+          requires_pty: true,
+          cols: terminalCols(),
+          rows: terminalRows(),
+        });
+        
+        // Navigate to the terminal session detail page
+        // For now, we'll use the same work detail page but it will show terminal UI
+        navigate(`/work/${terminalSessionResp.work.id}`);
+      } else {
+        // Standard work session workflow
+        // 1. Create the work
+        const workResp = await apiClient.createWork({
+          title: prompt().trim(),
+          project_id: selectedProjectId().trim() || null,
+        });
+        const workId = workResp.work.id;
 
-      // 2. Add the initial message
-      const messageResp = await apiClient.addMessageToWork(workId, {
-        content: prompt().trim(),
-        content_type: 'text' as MessageContentType,
-        author_type: 'user' as MessageAuthorType,
-        author_id: null, // Assuming user is not logged in
-      });
-      const messageId = messageResp.message.id;
+        // 2. Add the initial message
+        const messageResp = await apiClient.addMessageToWork(workId, {
+          content: prompt().trim(),
+          content_type: 'text' as MessageContentType,
+          author_type: 'user' as MessageAuthorType,
+          author_id: null, // Assuming user is not logged in
+        });
+        const messageId = messageResp.message.id;
 
-      // 3. Create the AI session
-      const sessionResp = await apiClient.createAiSession(workId, {
-        message_id: messageId,
-        tool_name: toolName(),
-      });
+        // 3. Create the AI session
+        const sessionResp = await apiClient.createAiSession(workId, {
+          message_id: messageId,
+          tool_name: toolName(),
+        });
 
-      // Navigate to the new work's detail page
-      navigate(`/work/${workId}`);
+        // Navigate to the new work's detail page
+        navigate(`/work/${workId}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start AI session');
     } finally {
@@ -304,6 +327,70 @@ const StartAiSessionForm: Component = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* PTY Options (Issue #58) */}
+        <div class='border-t border-gray-200 pt-4'>
+          <div class='flex items-center space-x-3 mb-4'>
+            <input
+              id='use-pty'
+              type='checkbox'
+              checked={usePty()}
+              onInput={e => setUsePty(e.currentTarget.checked)}
+              class='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+            />
+            <label for='use-pty' class='text-sm font-medium text-gray-700'>
+              Use interactive terminal (PTY mode)
+            </label>
+          </div>
+          
+          <Show when={usePty()}>
+            <div class='bg-blue-50 border border-blue-200 rounded-md p-4 mb-4'>
+              <div class='flex items-start'>
+                <svg class='w-5 h-5 text-blue-400 mt-0.5 mr-3' fill='currentColor' viewBox='0 0 20 20'>
+                  <path fill-rule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clip-rule='evenodd'></path>
+                </svg>
+                <div>
+                  <h4 class='text-sm font-medium text-blue-800'>Interactive Terminal Mode</h4>
+                  <p class='text-sm text-blue-700 mt-1'>
+                    This will launch the AI tool in a full interactive terminal with support for ANSI colors, 
+                    cursor positioning, and real-time input/output. Perfect for tools that provide rich terminal interfaces.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div class='grid grid-cols-2 gap-4'>
+              <div>
+                <label for='terminal-cols' class='block text-sm font-medium text-gray-700 mb-1'>
+                  Terminal Width (columns)
+                </label>
+                <input
+                  id='terminal-cols'
+                  type='number'
+                  min='20'
+                  max='200'
+                  value={terminalCols()}
+                  onInput={e => setTerminalCols(parseInt(e.currentTarget.value) || 80)}
+                  class='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                />
+              </div>
+              <div>
+                <label for='terminal-rows' class='block text-sm font-medium text-gray-700 mb-1'>
+                  Terminal Height (rows)
+                </label>
+                <input
+                  id='terminal-rows'
+                  type='number'
+                  min='10'
+                  max='100'
+                  value={terminalRows()}
+                  onInput={e => setTerminalRows(parseInt(e.currentTarget.value) || 24)}
+                  class='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                />
+              </div>
+            </div>
+          </Show>
         </div>
 
         <Show when={error()}>
