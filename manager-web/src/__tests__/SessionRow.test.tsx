@@ -35,10 +35,10 @@ const mockProject: Project = {
 
 const mockRunningSession: AiSession = {
   id: 'session-123',
-  project_id: 'project-123',
+  work_id: 'work-123',
+  message_id: 'msg-123',
   tool_name: 'claude',
   status: 'running',
-  prompt: 'Create a new React component',
   project_context: 'Working on a React app',
   started_at: 1640995200,
   ended_at: null,
@@ -46,10 +46,10 @@ const mockRunningSession: AiSession = {
 
 const mockCompletedSession: AiSession = {
   id: 'session-456',
-  project_id: 'project-123',
+  work_id: 'work-456',
+  message_id: 'msg-456',
   tool_name: 'gpt-4',
   status: 'completed',
-  prompt: 'Fix bug in authentication',
   project_context: 'Authentication system needs debugging',
   started_at: 1640995100,
   ended_at: 1640995300,
@@ -57,10 +57,10 @@ const mockCompletedSession: AiSession = {
 
 const mockSessionWithoutProject: AiSession = {
   id: 'session-789',
-  project_id: null,
+  work_id: 'work-789',
+  message_id: 'msg-789',
   tool_name: 'gemini',
   status: 'failed',
-  prompt: 'Generate documentation',
   project_context: null,
   started_at: 1640994800,
   ended_at: 1640995000,
