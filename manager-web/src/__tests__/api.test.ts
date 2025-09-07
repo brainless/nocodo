@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { apiClient } from '../api';
-import type { AiSession, AiSessionListResponse, AiSessionResponse } from '../types';
+import type { ExtendedAiSession } from '../types';
 
 // Mock data
-const mockSession: AiSession = {
+const mockSession: ExtendedAiSession = {
   id: 'session-123',
+  work_id: 'session-123',
+  message_id: 'msg-123',
   project_id: 'project-456',
   tool_name: 'claude',
   status: 'running',
@@ -13,20 +15,6 @@ const mockSession: AiSession = {
   started_at: 1640995200000,
   ended_at: null,
 };
-
-const mockSessionList: AiSession[] = [
-  mockSession,
-  {
-    id: 'session-456',
-    project_id: 'project-789',
-    tool_name: 'gpt',
-    status: 'completed',
-    prompt: 'Another prompt',
-    project_context: 'Another context',
-    started_at: 1640995100000,
-    ended_at: 1640995300000,
-  },
-];
 
 describe('API Client - AI Sessions', () => {
   beforeEach(() => {
