@@ -6,10 +6,10 @@ import type { AiSession } from '../types';
 // Mock data
 const mockRunningSession: AiSession = {
   id: 'session-123',
-  project_id: 'project-456',
+  work_id: 'work-123',
+  message_id: 'msg-123',
   tool_name: 'claude',
   status: 'running',
-  prompt: 'Create a new component',
   project_context: 'React app development',
   started_at: 1640995200,
   ended_at: null,
@@ -17,10 +17,10 @@ const mockRunningSession: AiSession = {
 
 const mockCompletedSession: AiSession = {
   id: 'session-456',
-  project_id: 'project-456',
+  work_id: 'work-456',
+  message_id: 'msg-456',
   tool_name: 'gpt-4',
   status: 'completed',
-  prompt: 'Fix authentication bug',
   project_context: 'Authentication system',
   started_at: 1640995100,
   ended_at: 1640995300,
@@ -28,10 +28,10 @@ const mockCompletedSession: AiSession = {
 
 const mockFailedSession: AiSession = {
   id: 'session-789',
-  project_id: null,
+  work_id: 'work-789',
+  message_id: 'msg-789',
   tool_name: 'gemini',
   status: 'failed',
-  prompt: 'Generate documentation',
   project_context: null,
   started_at: 1640994800,
   ended_at: 1640995000,
@@ -39,10 +39,10 @@ const mockFailedSession: AiSession = {
 
 const mockCancelledSession: AiSession = {
   id: 'session-101',
-  project_id: 'project-456',
+  work_id: 'work-101',
+  message_id: 'msg-101',
   tool_name: 'claude',
   status: 'cancelled',
-  prompt: 'Refactor code',
   project_context: 'Code improvement task',
   started_at: 1640994500,
   ended_at: 1640994800,

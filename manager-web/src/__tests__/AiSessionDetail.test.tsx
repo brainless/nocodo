@@ -22,10 +22,10 @@ const mockProject: Project = {
 
 const mockRunningSession: AiSession = {
   id: 'session-123',
-  project_id: 'project-456',
+  work_id: 'work-123',
+  message_id: 'msg-123',
   tool_name: 'claude',
   status: 'running',
-  prompt: 'This is a test prompt for the AI session',
   project_context: 'Test project context with some details',
   started_at: 1640995200,
   ended_at: null,
@@ -33,10 +33,10 @@ const mockRunningSession: AiSession = {
 
 const mockCompletedSession: AiSession = {
   id: 'session-456',
-  project_id: 'project-456',
+  work_id: 'work-456',
+  message_id: 'msg-456',
   tool_name: 'gpt-4',
   status: 'completed',
-  prompt: 'This is a completed session prompt',
   project_context: 'Completed session context',
   started_at: 1640995100,
   ended_at: 1640995300,
@@ -44,10 +44,10 @@ const mockCompletedSession: AiSession = {
 
 const mockSessionWithoutProject: AiSession = {
   id: 'session-789',
-  project_id: null,
+  work_id: 'work-789',
+  message_id: 'msg-789',
   tool_name: 'claude',
   status: 'failed',
-  prompt: 'Session without project',
   project_context: null,
   started_at: 1640994800,
   ended_at: 1640995000,

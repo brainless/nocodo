@@ -48,8 +48,8 @@ describe('API Client - AI Sessions', () => {
             updated_at: 1640995300000,
             title: 'Another prompt',
             project_id: 'project-789',
-          }
-        ]
+          },
+        ],
       };
 
       // Mock successful fetch response
@@ -112,9 +112,9 @@ describe('API Client - AI Sessions', () => {
         messages: [
           {
             id: 'msg-123',
-            content: 'Test prompt'
-          }
-        ]
+            content: 'Test prompt',
+          },
+        ],
       };
 
       (global.fetch as any).mockResolvedValueOnce({
