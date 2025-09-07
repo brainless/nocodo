@@ -282,7 +282,7 @@ async fn main() -> AppResult<()> {
     });
 
     // Launch browser after server starts
-    let browser_task = tokio::spawn({
+    let _browser_task = tokio::spawn({
         let browser_config = browser_config.clone();
         let server_url = server_url.clone();
         async move {
@@ -295,10 +295,11 @@ async fn main() -> AppResult<()> {
     });
 
     // Wait for servers (they should run indefinitely)
+    // We don't want to exit when browser launcher completes
+    // Only exit when HTTP or socket server completes
     tokio::select! {
         _ = socket_task => tracing::info!("Socket server completed"),
         _ = http_task => tracing::info!("HTTP server completed"),
-        _ = browser_task => tracing::info!("Browser launcher completed"),
     }
 
     Ok(())

@@ -1,6 +1,6 @@
 import { ParentComponent, createContext, onCleanup, useContext } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { AiSession, AiSessionStatus } from '../types';
+import { AiSessionStatus, ExtendedAiSession } from '../types';
 import { apiClient } from '../api';
 
 interface OutputChunk {
@@ -11,8 +11,8 @@ interface OutputChunk {
 }
 
 interface SessionsStore {
-  list: AiSession[];
-  byId: Record<string, AiSession>;
+  list: ExtendedAiSession[];
+  byId: Record<string, ExtendedAiSession>;
   loading: boolean;
   error: string | null;
   subscriptions: Record<string, { close: () => void }>;
@@ -23,7 +23,7 @@ interface SessionsStore {
 
 interface SessionsActions {
   fetchList: () => Promise<void>;
-  fetchById: (id: string) => Promise<AiSession | null>;
+  fetchById: (id: string) => Promise<ExtendedAiSession | null>;
   fetchOutputs: (id: string) => Promise<void>;
   connect: (id: string) => Promise<void>;
   disconnect: (id: string) => void;
@@ -72,7 +72,7 @@ export const SessionsProvider: ParentComponent = props => {
             acc[session.id] = session;
             return acc;
           },
-          {} as Record<string, AiSession>
+          {} as Record<string, ExtendedAiSession>
         );
         setStore('byId', byId);
       } catch (err) {

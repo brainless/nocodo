@@ -323,6 +323,7 @@ impl SocketServer {
                     id: uuid::Uuid::new_v4().to_string(),
                     title: req.title,
                     project_id: req.project_id,
+                    tool_name: None,
                     status: "active".to_string(),
                     created_at: now,
                     updated_at: now,

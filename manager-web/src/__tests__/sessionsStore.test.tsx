@@ -8,10 +8,10 @@ vi.mock('../api');
 // Mock data
 const mockSession1: AiSession = {
   id: 'session-123',
-  project_id: 'project-456',
+  work_id: 'work-123',
+  message_id: 'msg-123',
   tool_name: 'claude',
   status: 'running',
-  prompt: 'Test prompt 1',
   project_context: 'Test context 1',
   started_at: 1640995200000,
   ended_at: null,
@@ -19,10 +19,10 @@ const mockSession1: AiSession = {
 
 const mockSession2: AiSession = {
   id: 'session-456',
-  project_id: 'project-789',
+  work_id: 'work-456',
+  message_id: 'msg-456',
   tool_name: 'gpt',
   status: 'completed',
-  prompt: 'Test prompt 2',
   project_context: 'Test context 2',
   started_at: 1640995100000,
   ended_at: 1640995300000,

@@ -155,6 +155,7 @@ impl Database {
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 project_id TEXT,
+                tool_name TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
@@ -162,6 +163,19 @@ impl Database {
             )",
             [],
         )?;
+
+        // Add tool_name column if it doesn't exist (migration for existing databases)
+        conn.execute(
+            "ALTER TABLE works ADD COLUMN tool_name TEXT",
+            [],
+        ).or_else(|e| {
+            // Ignore error if column already exists
+            if e.to_string().contains("duplicate column name") {
+                Ok(0)
+            } else {
+                Err(e)
+            }
+        })?;
 
         // Create work messages with content types and history
         conn.execute(
@@ -688,12 +702,13 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
-            "INSERT INTO works (id, title, project_id, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO works (id, title, project_id, tool_name, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             params![
                 work.id,
                 work.title,
                 work.project_id,
+                work.tool_name,
                 work.status,
                 work.created_at,
                 work.updated_at
@@ -711,7 +726,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, status, created_at, updated_at
+            "SELECT id, title, project_id, tool_name, status, created_at, updated_at
              FROM works WHERE id = ?",
         )?;
 
@@ -721,9 +736,10 @@ impl Database {
                     id: row.get(0)?,
                     title: row.get(1)?,
                     project_id: row.get(2)?,
-                    status: row.get(3)?,
-                    created_at: row.get(4)?,
-                    updated_at: row.get(5)?,
+                    tool_name: row.get(3)?,
+                    status: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
                 })
             })
             .map_err(|e| match e {
@@ -743,7 +759,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, status, created_at, updated_at
+            "SELECT id, title, project_id, tool_name, status, created_at, updated_at
              FROM works ORDER BY created_at DESC",
         )?;
 
@@ -752,9 +768,10 @@ impl Database {
                 id: row.get(0)?,
                 title: row.get(1)?,
                 project_id: row.get(2)?,
-                status: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                tool_name: row.get(3)?,
+                status: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         })?;
 

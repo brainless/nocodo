@@ -1632,6 +1632,7 @@ pub async fn create_work(
         id: uuid::Uuid::new_v4().to_string(),
         title: req.title,
         project_id: req.project_id,
+        tool_name: None,
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
@@ -1783,10 +1784,46 @@ pub async fn create_terminal_session(
             ));
         }
 
-        // For now, create a dummy work and message to satisfy the terminal session requirements
-        // In a real implementation, this would come from an existing work/message context
-        let work_id = "demo-work".to_string();
-        let message_id = "demo-message".to_string();
+        // Create a new work session for this terminal session
+        // This ensures each terminal session gets a unique work ID
+        let work_title = match &req.prompt {
+            Some(prompt) if !prompt.trim().is_empty() => prompt.clone(),
+            _ => format!("Terminal Session - {}", req.tool_name),
+        };
+
+        let work = crate::models::Work {
+            id: uuid::Uuid::new_v4().to_string(),
+            title: work_title,
+            project_id: req.project_id.clone(),
+            tool_name: Some(req.tool_name.clone()),
+            status: "active".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+            updated_at: chrono::Utc::now().timestamp(),
+        };
+
+        // Create the work in the database
+        data.database.create_work(&work)?;
+        let work_id = work.id.clone();
+
+        // Create an initial message for this work
+        let message_content = req
+            .prompt
+            .clone()
+            .unwrap_or_else(|| format!("Starting terminal session with {}", req.tool_name));
+
+        let message = crate::models::WorkMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            work_id: work_id.clone(),
+            content: message_content,
+            content_type: crate::models::MessageContentType::Text,
+            author_type: crate::models::MessageAuthorType::User,
+            author_id: None,
+            sequence_order: 0,
+            created_at: chrono::Utc::now().timestamp(),
+        };
+
+        data.database.create_work_message(&message)?;
+        let message_id = message.id.clone();
 
         // Generate project context if project_id is provided
         let project_context = if let Some(ref project_id) = req.project_id {
@@ -1800,8 +1837,8 @@ pub async fn create_terminal_session(
 
         // Create terminal session
         let terminal_session = TerminalSession::new(
-            work_id,
-            message_id,
+            work_id.clone(),
+            message_id.clone(),
             req.tool_name.clone(),
             project_context,
             req.requires_pty,
@@ -1810,6 +1847,8 @@ pub async fn create_terminal_session(
             req.rows.unwrap_or(24),
         );
 
+        // Work and message are already created above - no need for demo data
+
         // Persist the session
         data.database.create_terminal_session(&terminal_session)?;
 
@@ -1817,6 +1856,7 @@ pub async fn create_terminal_session(
         let session_id = terminal_session.id.clone();
         let initial_prompt = req.prompt.clone();
 
+        // Enable PTY functionality - remove the temporary error
         match terminal_runner
             .start_session(terminal_session.clone(), initial_prompt)
             .await

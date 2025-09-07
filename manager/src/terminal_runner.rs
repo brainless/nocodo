@@ -1,10 +1,13 @@
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use base64::Engine;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::time::timeout;
 
 use crate::database::Database;
 use crate::models::{TerminalControlMessage, TerminalSession, ToolConfig};
@@ -162,9 +165,9 @@ impl TerminalRunner {
         session: TerminalSession,
         tool_config: ToolConfig,
         working_dir: Option<std::path::PathBuf>,
-        _initial_prompt: Option<String>,
+        initial_prompt: Option<String>,
     ) -> anyhow::Result<()> {
-        let _session_id = session.id.clone();
+        let session_id = session.id.clone();
 
         // Create PTY system
         let pty_system = native_pty_system();
@@ -191,20 +194,13 @@ impl TerminalRunner {
         }
 
         // Spawn child process
-        let _child = pty_pair.slave.spawn_command(cmd)?;
+        let child = pty_pair.slave.spawn_command(cmd)?;
         drop(pty_pair.slave);
 
-        // For now, let's disable the portable-pty functionality
-        // until we can properly test the API
-        Err(anyhow::anyhow!(
-            "PTY functionality temporarily disabled for CI builds"
-        ))
-
-        // Commented out code below for when PTY is re-enabled
-        /*
-        // Get reader and writer from the master PTY
-        let reader = pty_pair.master.try_clone_reader()?;
-        let writer = pty_pair.master.try_clone_writer()?;
+        // Enable PTY functionality - get separate reader and writer
+        let pty_reader = Arc::new(Mutex::new(pty_pair.master.try_clone_reader()?));
+        let pty_writer = Arc::new(Mutex::new(pty_pair.master.take_writer()?));
+        let pty_master = Arc::new(Mutex::new(pty_pair.master));
 
         // Create channels for communication
         let (input_tx, mut input_rx) = mpsc::channel::<TerminalControlMessage>(256);
@@ -223,28 +219,38 @@ impl TerminalRunner {
             let task = tokio::spawn(async move {
                 // Send initial prompt if provided
                 if let Some(prompt) = initial_prompt {
-                    if let Err(e) = writer.write_all(prompt.as_bytes()).await {
-                        tracing::error!("Failed to send initial prompt: {}", e);
-                    }
-                    if let Err(e) = writer.write_all(b"\n").await {
-                        tracing::error!("Failed to send newline: {}", e);
+                    let prompt_bytes = format!("{}\n", prompt);
+                    let pty_writer_clone = Arc::clone(&pty_writer);
+                    if let Err(e) = tokio::task::spawn_blocking(move || {
+                        let mut writer = pty_writer_clone.blocking_lock();
+                        writer.write_all(prompt_bytes.as_bytes())
+                    })
+                    .await
+                    {
+                        tracing::error!("Failed to send initial prompt: {:?}", e);
                     }
                 }
 
-                let mut output_buffer = vec![0u8; 8192];
                 let mut session_mut = session_clone;
 
                 loop {
                     tokio::select! {
                         // Handle PTY output
-                        result = reader.read(&mut output_buffer) => {
+                        result = {
+                            let pty_reader_clone = Arc::clone(&pty_reader);
+                            let mut buffer = vec![0u8; 8192];
+                            tokio::task::spawn_blocking(move || {
+                                let mut reader = pty_reader_clone.blocking_lock();
+                                reader.read(&mut buffer).map(|n| (n, buffer))
+                            })
+                        } => {
                             match result {
-                                Ok(0) => {
+                                Ok(Ok((0, _))) => {
                                     // EOF - process has exited
                                     break;
                                 }
-                                Ok(n) => {
-                                    let output_bytes = &output_buffer[0..n];
+                                Ok(Ok((n, buffer))) => {
+                                    let output_bytes = &buffer[0..n];
 
                                     // Append to transcript
                                     {
@@ -264,8 +270,12 @@ impl TerminalRunner {
                                         output_bytes.to_vec()
                                     ).await;
                                 }
-                                Err(e) => {
+                                Ok(Err(e)) => {
                                     tracing::error!("PTY read error: {}", e);
+                                    break;
+                                }
+                                Err(e) => {
+                                    tracing::error!("Task join error: {}", e);
                                     break;
                                 }
                             }
@@ -276,10 +286,15 @@ impl TerminalRunner {
                             match msg {
                                 Some(TerminalControlMessage::Input { data }) => {
                                     // Decode base64 input and write to PTY
-                                    match base64::engine::general_purpose::STANDARD.decode(&data) {
-                                        Ok(bytes) => {
-                                            if let Err(e) = writer.write_all(&bytes).await {
-                                                tracing::error!("Failed to write input to PTY: {}", e);
+                                    let mut decoded_data = Vec::new();
+                                    match base64::engine::general_purpose::STANDARD.decode_vec(&data, &mut decoded_data) {
+                                        Ok(_) => {
+                                            let pty_writer_clone = Arc::clone(&pty_writer);
+                                            if let Err(e) = tokio::task::spawn_blocking(move || {
+                                                let mut writer = pty_writer_clone.blocking_lock();
+                                                writer.write_all(&decoded_data)
+                                            }).await {
+                                                tracing::error!("Failed to write input to PTY: {:?}", e);
                                                 break;
                                             }
                                         }
@@ -296,18 +311,25 @@ impl TerminalRunner {
                                         pixel_width: 0,
                                         pixel_height: 0,
                                     };
-                                    if let Err(e) = pty_pair.master.resize(new_size) {
-                                        tracing::error!("Failed to resize PTY: {}", e);
-                                    } else {
-                                        session_mut.resize(cols, rows);
-                                        // Update session in database
-                                        let _ = db.update_terminal_session(&session_mut);
+                                    let pty_master_clone = Arc::clone(&pty_master);
+                                    match tokio::task::spawn_blocking(move || {
+                                        let master = pty_master_clone.blocking_lock();
+                                        master.resize(new_size)
+                                    }).await {
+                                        Ok(Ok(())) => {
+                                            session_mut.resize(cols, rows);
+                                            // Update session in database
+                                            let _ = db.update_terminal_session(&session_mut);
 
-                                        // Broadcast resize event
-                                        ws.broadcast_terminal_control_message(
-                                            session_id_clone.clone(),
-                                            TerminalControlMessage::Resize { cols, rows }
-                                        ).await;
+                                            // Broadcast resize event
+                                            ws.broadcast_terminal_control_message(
+                                                session_id_clone.clone(),
+                                                TerminalControlMessage::Resize { cols, rows }
+                                            ).await;
+                                        }
+                                        _ => {
+                                            tracing::error!("Failed to resize PTY");
+                                        }
                                     }
                                 }
                                 Some(TerminalControlMessage::Ping) => {
@@ -331,16 +353,29 @@ impl TerminalRunner {
 
                 // Session ended - clean up
                 let exit_code = {
-                    let mut child_guard = child_arc.lock().await;
-                    match timeout(Duration::from_secs(5), child_guard.wait()).await {
-                        Ok(Ok(exit_status)) => exit_status.exit_code(),
-                        Ok(Err(e)) => {
+                    let child_arc_clone = Arc::clone(&child_arc);
+                    match timeout(
+                        Duration::from_secs(5),
+                        tokio::task::spawn_blocking(move || {
+                            let mut child_guard = child_arc_clone.blocking_lock();
+                            child_guard.wait()
+                        }),
+                    )
+                    .await
+                    {
+                        Ok(Ok(Ok(exit_status))) => Some(exit_status.exit_code() as i32),
+                        Ok(Ok(Err(e))) => {
                             tracing::error!("Error waiting for child process: {}", e);
+                            None
+                        }
+                        Ok(Err(e)) => {
+                            tracing::error!("Task join error: {}", e);
                             None
                         }
                         Err(_) => {
                             // Timeout - force kill
                             tracing::warn!("Child process didn't exit gracefully, force killing");
+                            let mut child_guard = child_arc.lock().await;
                             let _ = child_guard.kill();
                             None
                         }
@@ -348,10 +383,14 @@ impl TerminalRunner {
                 };
 
                 // Update session status
-                if exit_code == Some(0) {
-                    session_mut.complete(exit_code);
+                if let Some(code) = exit_code {
+                    if code == 0 {
+                        session_mut.complete(Some(code));
+                    } else {
+                        session_mut.fail(Some(code));
+                    }
                 } else {
-                    session_mut.fail(exit_code);
+                    session_mut.fail(None);
                 }
 
                 let _ = db.update_terminal_session(&session_mut);
@@ -369,8 +408,9 @@ impl TerminalRunner {
                     TerminalControlMessage::Status {
                         status: session_mut.status.clone(),
                         exit_code,
-                    }
-                ).await;
+                    },
+                )
+                .await;
             });
 
             RunningSession {
@@ -382,11 +422,13 @@ impl TerminalRunner {
         };
 
         // Store running session
-        self.sessions.write().await.insert(session_id, running_session);
+        self.sessions
+            .write()
+            .await
+            .insert(session_id, running_session);
 
         tracing::info!("PTY session started successfully");
         Ok(())
-        */
     }
 
     /// Send input to a running session

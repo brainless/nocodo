@@ -1,13 +1,14 @@
 import {
   AddMessageRequest,
-  AiSession,
   AiSessionListResponse,
   AiSessionOutputListResponse,
   AiSessionResponse,
   ApiError,
   CreateAiSessionRequest,
   CreateProjectRequest,
+  CreateTerminalSessionRequest,
   CreateWorkRequest,
+  ExtendedAiSession,
   FileContentResponse,
   FileCreateRequest,
   FileListRequest,
@@ -153,7 +154,7 @@ class ApiClient {
 
   async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
     try {
-      const result = await this.request(`/work/${id}/outputs`);
+      const result = await this.request<AiSessionOutputListResponse>(`/work/${id}/outputs`);
       return result;
     } catch (error) {
       // If outputs endpoint doesn't exist, return empty response
@@ -170,12 +171,94 @@ class ApiClient {
     });
   }
 
+  // Issue #58: PTY Terminal session methods
+  async createTerminalSession(data: CreateTerminalSessionRequest): Promise<AiSessionResponse> {
+    return this.request('/terminals', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async sendTerminalInput(sessionId: string, data: string): Promise<{ ok: boolean }> {
+    return this.request(`/terminals/${sessionId}/input`, {
+      method: 'POST',
+      body: JSON.stringify({ data }),
+    });
+  }
+
+  async resizeTerminal(sessionId: string, cols: number, rows: number): Promise<{ ok: boolean }> {
+    return this.request(`/terminals/${sessionId}/resize`, {
+      method: 'POST',
+      body: JSON.stringify({ cols, rows }),
+    });
+  }
+
+  // Subscribe to terminal WebSocket for PTY sessions
+  subscribeTerminal(
+    sessionId: string,
+    onBinaryData: (data: ArrayBuffer) => void,
+    onControlMessage: (message: any) => void,
+    onError?: (error: Error) => void,
+    onOpen?: () => void,
+    onClose?: () => void
+  ): { close: () => void } {
+    // Create WebSocket URL for terminal updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/terminals/${sessionId}`;
+
+    // Create WebSocket connection
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+
+    // Set up event handlers
+    ws.onopen = () => {
+      console.log(`Terminal WebSocket connected for session ${sessionId}`);
+      if (onOpen) onOpen();
+    };
+
+    ws.onmessage = event => {
+      if (event.data instanceof ArrayBuffer) {
+        // Binary frame - terminal output
+        onBinaryData(event.data);
+      } else {
+        // Text frame - control message
+        try {
+          const data = JSON.parse(event.data);
+          onControlMessage(data);
+        } catch (error) {
+          console.error('Failed to parse terminal control message:', error);
+          if (onError) onError(new Error('Failed to parse terminal control message'));
+        }
+      }
+    };
+
+    ws.onerror = event => {
+      console.error(`Terminal WebSocket error for session ${sessionId}:`, event);
+      if (onError) onError(new Error('Terminal WebSocket connection error'));
+    };
+
+    ws.onclose = () => {
+      console.log(`Terminal WebSocket closed for session ${sessionId}`);
+      if (onClose) onClose();
+    };
+
+    // Return close method to allow cleanup
+    return {
+      close: () => {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      },
+    };
+  }
+
   // New methods for issue #32
   /**
    * List all AI sessions
-   * @returns Promise resolving to an array of AiSession objects
+   * @returns Promise resolving to an array of ExtendedAiSession objects
    */
-  async listSessions(): Promise<AiSession[]> {
+  async listSessions(): Promise<ExtendedAiSession[]> {
     const response = await this.listAiSessions();
     const works = (response as any).works || [];
 
@@ -197,9 +280,9 @@ class ApiClient {
   /**
    * Get a specific AI session by ID
    * @param id - The session ID
-   * @returns Promise resolving to an AiSession object
+   * @returns Promise resolving to an ExtendedAiSession object
    */
-  async getSession(id: string): Promise<AiSession> {
+  async getSession(id: string): Promise<ExtendedAiSession> {
     const response = await this.getAiSession(id);
     const workData = response as any;
 
@@ -219,7 +302,7 @@ class ApiClient {
         workData.work.updated_at !== workData.work.created_at ? workData.work.updated_at : null,
       prompt: firstMessage?.content || workData.work.title,
       project_id: workData.work.project_id,
-    } as any; // Using any to bypass type checking for the extra fields
+    } as ExtendedAiSession;
   }
 
   /**

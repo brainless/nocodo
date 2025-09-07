@@ -44,8 +44,8 @@ mod tests {
         );
 
         assert_eq!(session.tool_name, "claude");
-        assert_eq!(session.requires_pty, true);
-        assert_eq!(session.interactive, true);
+        assert!(session.requires_pty);
+        assert!(session.interactive);
         assert_eq!(session.cols, 80);
         assert_eq!(session.rows, 24);
         assert_eq!(session.status, "running");

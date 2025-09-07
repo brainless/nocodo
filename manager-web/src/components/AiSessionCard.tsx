@@ -1,10 +1,10 @@
 import { Component, Show } from 'solid-js';
 import { A } from '@solidjs/router';
-import { AiSession, AiSessionStatus, Project } from '../types';
+import { AiSessionStatus, ExtendedAiSession, Project } from '../types';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 
 interface AiSessionCardProps {
-  session: AiSession;
+  session: ExtendedAiSession;
   project?: Project | null;
   showPrompt?: boolean;
 }
