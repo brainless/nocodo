@@ -1818,30 +1818,30 @@ pub async fn create_terminal_session(
             // Create a minimal work for testing purposes
             let demo_work = crate::models::Work {
                 id: work_id.clone(),
-                title: "Demo Work".to_string(),
+                title: "Demo Work for Terminal Sessions".to_string(),
                 project_id: req.project_id.clone(),
                 status: "active".to_string(),
                 created_at: chrono::Utc::now().timestamp(),
                 updated_at: chrono::Utc::now().timestamp(),
             };
-            data.database.create_work(&demo_work)?;
+            // Try to create the work, ignore if it already exists
+            let _ = data.database.create_work(&demo_work);
         }
 
-        // Create a demo message if it doesn't exist
-        if let Err(_e) = data.database.get_work_messages(&work_id) {
-            // Create a minimal message for testing purposes
-            let demo_message = crate::models::WorkMessage {
-                id: message_id.clone(),
-                work_id: work_id.clone(),
-                content: "Demo message for terminal session".to_string(),
-                content_type: crate::models::MessageContentType::Text,
-                author_type: crate::models::MessageAuthorType::User,
-                author_id: None,
-                sequence_order: 0,
-                created_at: chrono::Utc::now().timestamp(),
-            };
-            data.database.create_work_message(&demo_message)?;
-        }
+        // Create a demo message - always create since we're using hardcoded message_id
+        // In the future, this should use actual message context from the request
+        let demo_message = crate::models::WorkMessage {
+            id: message_id.clone(),
+            work_id: work_id.clone(),
+            content: "Demo message for terminal session".to_string(),
+            content_type: crate::models::MessageContentType::Text,
+            author_type: crate::models::MessageAuthorType::User,
+            author_id: None,
+            sequence_order: data.database.get_next_message_sequence(&work_id)?,
+            created_at: chrono::Utc::now().timestamp(),
+        };
+        // Try to create the message, ignore if it already exists
+        let _ = data.database.create_work_message(&demo_message);
 
         // Persist the session
         data.database.create_terminal_session(&terminal_session)?;
