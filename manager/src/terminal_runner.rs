@@ -224,7 +224,9 @@ impl TerminalRunner {
                     if let Err(e) = tokio::task::spawn_blocking(move || {
                         let mut writer = pty_writer_clone.blocking_lock();
                         writer.write_all(prompt_bytes.as_bytes())
-                    }).await {
+                    })
+                    .await
+                    {
                         tracing::error!("Failed to send initial prompt: {:?}", e);
                     }
                 }
@@ -233,7 +235,7 @@ impl TerminalRunner {
 
                 loop {
                     tokio::select! {
-                        // Handle PTY output  
+                        // Handle PTY output
                         result = {
                             let pty_reader_clone = Arc::clone(&pty_reader);
                             let mut buffer = vec![0u8; 8192];
@@ -357,8 +359,10 @@ impl TerminalRunner {
                         tokio::task::spawn_blocking(move || {
                             let mut child_guard = child_arc_clone.blocking_lock();
                             child_guard.wait()
-                        })
-                    ).await {
+                        }),
+                    )
+                    .await
+                    {
                         Ok(Ok(Ok(exit_status))) => Some(exit_status.exit_code() as i32),
                         Ok(Ok(Err(e))) => {
                             tracing::error!("Error waiting for child process: {}", e);
@@ -404,8 +408,9 @@ impl TerminalRunner {
                     TerminalControlMessage::Status {
                         status: session_mut.status.clone(),
                         exit_code,
-                    }
-                ).await;
+                    },
+                )
+                .await;
             });
 
             RunningSession {
@@ -417,7 +422,10 @@ impl TerminalRunner {
         };
 
         // Store running session
-        self.sessions.write().await.insert(session_id, running_session);
+        self.sessions
+            .write()
+            .await
+            .insert(session_id, running_session);
 
         tracing::info!("PTY session started successfully");
         Ok(())
