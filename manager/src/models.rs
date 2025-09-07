@@ -529,6 +529,7 @@ pub struct Work {
     pub id: String,
     pub title: String,
     pub project_id: Option<String>,
+    pub tool_name: Option<String>,
     pub status: String,
     #[ts(type = "number")]
     pub created_at: i64,
