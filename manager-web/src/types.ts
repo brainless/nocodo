@@ -30,6 +30,25 @@ export * from './types/generated/WorkWithHistory';
 export * from './types/generated/CreateWorkRequest';
 export * from './types/generated/AddMessageRequest';
 
+// PTY Terminal session types (Issue #58)
+export interface CreateTerminalSessionRequest { 
+  project_id?: string; 
+  tool_name: string; 
+  prompt?: string; 
+  interactive: boolean; 
+  requires_pty: boolean; 
+  env?: Record<string, string>; 
+  cols?: number; 
+  rows?: number; 
+}
+
+// Extend AiSession to include PTY information
+export interface PtySessionInfo {
+  is_pty_session?: boolean;
+  terminal_cols?: number;
+  terminal_rows?: number;
+}
+
 // Additional types not generated from Rust
 export type AiSessionStatus =
   | 'pending'
