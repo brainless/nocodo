@@ -1812,7 +1812,7 @@ pub async fn create_terminal_session(
 
         // Instead of immediately failing, we should create the work and message first
         // This prevents the foreign key constraint failure
-        
+
         // Create a demo work if it doesn't exist
         if let Err(_e) = data.database.get_work_by_id(&work_id) {
             // Create a minimal work for testing purposes
