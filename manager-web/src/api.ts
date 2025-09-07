@@ -173,21 +173,21 @@ class ApiClient {
 
   // Issue #58: PTY Terminal session methods
   async createTerminalSession(data: CreateTerminalSessionRequest): Promise<AiSessionResponse> {
-    return this.request('/ai/sessions', {
+    return this.request('/terminals', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async sendTerminalInput(sessionId: string, data: string): Promise<{ ok: boolean }> {
-    return this.request(`/ai/sessions/${sessionId}/input`, {
+    return this.request(`/terminals/${sessionId}/input`, {
       method: 'POST',
       body: JSON.stringify({ data }),
     });
   }
 
   async resizeTerminal(sessionId: string, cols: number, rows: number): Promise<{ ok: boolean }> {
-    return this.request(`/ai/sessions/${sessionId}/resize`, {
+    return this.request(`/terminals/${sessionId}/resize`, {
       method: 'POST',
       body: JSON.stringify({ cols, rows }),
     });
