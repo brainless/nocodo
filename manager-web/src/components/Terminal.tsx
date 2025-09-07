@@ -16,13 +16,12 @@ interface TerminalConnection {
   close: () => void;
 }
 
-const Terminal: Component<TerminalProps> = (props) => {
+const Terminal: Component<TerminalProps> = props => {
   let terminalElement: HTMLDivElement | undefined;
   let terminal: XTerm | undefined;
   let fitAddon: FitAddon | undefined;
   let connection: TerminalConnection | undefined;
 
-  const [isConnected, setIsConnected] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
   // Initialize terminal when component mounts
@@ -37,7 +36,7 @@ const Terminal: Component<TerminalProps> = (props) => {
           background: '#000000',
           foreground: '#ffffff',
           cursor: '#ffffff',
-          selection: '#ffffff40',
+          selectionBackground: '#ffffff40',
           black: '#2e3436',
           red: '#cc0000',
           green: '#4e9a06',
@@ -53,13 +52,13 @@ const Terminal: Component<TerminalProps> = (props) => {
           brightBlue: '#729fcf',
           brightMagenta: '#ad7fa8',
           brightCyan: '#34e2e2',
-          brightWhite: '#eeeeec'
+          brightWhite: '#eeeeec',
         },
         fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
         fontSize: 14,
         lineHeight: 1.2,
         allowTransparency: true,
-        convertEol: true
+        convertEol: true,
       });
 
       // Create and attach addons
@@ -74,7 +73,7 @@ const Terminal: Component<TerminalProps> = (props) => {
       fitAddon.fit();
 
       // Handle input from user
-      terminal.onData((data) => {
+      terminal.onData(data => {
         if (props.onInput) {
           props.onInput(data);
         }
@@ -110,7 +109,6 @@ const Terminal: Component<TerminalProps> = (props) => {
 
       setError(null);
       console.log('Terminal initialized successfully');
-
     } catch (err) {
       console.error('Failed to initialize terminal:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize terminal');
@@ -184,12 +182,12 @@ const Terminal: Component<TerminalProps> = (props) => {
         resize: typeof resize;
         focus: typeof focus;
       };
-      
+
       extendedTerminal.writeData = writeData;
       extendedTerminal.clear = clear;
       extendedTerminal.resize = resize;
       extendedTerminal.focus = focus;
-      
+
       props.onTerminalReady(extendedTerminal);
     }
   });
@@ -197,26 +195,26 @@ const Terminal: Component<TerminalProps> = (props) => {
   return (
     <div class={`terminal-container ${props.className || ''}`}>
       {error() && (
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <strong class="font-bold">Terminal Error: </strong>
-          <span class="block sm:inline">{error()}</span>
+        <div class='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4'>
+          <strong class='font-bold'>Terminal Error: </strong>
+          <span class='block sm:inline'>{error()}</span>
         </div>
       )}
-      
-      <div 
+
+      <div
         ref={(el: HTMLDivElement) => (terminalElement = el)}
         onClick={handleClick}
-        class="terminal-element w-full h-full min-h-[400px] bg-black rounded border border-gray-300 focus-within:border-blue-500"
+        class='terminal-element w-full h-full min-h-[400px] bg-black rounded border border-gray-300 focus-within:border-blue-500'
         style={{
-          cursor: 'text'
+          cursor: 'text',
         }}
       />
-      
-      {!isConnected() && (
-        <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 text-white">
-          <div class="text-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-            <p class="text-sm">Connecting to terminal...</p>
+
+      {false && (
+        <div class='absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 text-white'>
+          <div class='text-center'>
+            <div class='animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4'></div>
+            <p class='text-sm'>Connecting to terminal...</p>
           </div>
         </div>
       )}

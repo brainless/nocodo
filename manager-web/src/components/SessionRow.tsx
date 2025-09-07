@@ -1,6 +1,6 @@
 import { Component, Show } from 'solid-js';
 import { A } from '@solidjs/router';
-import { AiSession, AiSessionStatus, Project } from '../types';
+import { AiSessionStatus, ExtendedAiSession, Project } from '../types';
 
 // Utility function to format timestamps
 const formatTimestamp = (timestamp: number): string => {
@@ -83,7 +83,7 @@ const ToolIcon: Component<{ toolName: string | null | undefined; className?: str
       aria-label={`AI Tool: ${props.toolName || 'Unknown'}`}
     >
       <span class='mr-1' aria-hidden='true'>
-        {getToolIcon(props.toolName)}
+        {getToolIcon(props.toolName || 'unknown')}
       </span>
       <span class='truncate max-w-24'>{props.toolName || 'Unknown'}</span>
     </div>
@@ -180,7 +180,7 @@ const ProjectBadge: Component<{
 
 // Props interface for SessionRow
 interface SessionRowProps {
-  session: AiSession;
+  session: ExtendedAiSession;
   project?: Project | null;
   showPrompt?: boolean;
   className?: string;

@@ -1,6 +1,5 @@
 import {
   AddMessageRequest,
-  AiSession,
   AiSessionListResponse,
   AiSessionOutputListResponse,
   AiSessionResponse,
@@ -9,6 +8,7 @@ import {
   CreateProjectRequest,
   CreateTerminalSessionRequest,
   CreateWorkRequest,
+  ExtendedAiSession,
   FileContentResponse,
   FileCreateRequest,
   FileListRequest,
@@ -154,7 +154,7 @@ class ApiClient {
 
   async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
     try {
-      const result = await this.request(`/work/${id}/outputs`);
+      const result = await this.request<AiSessionOutputListResponse>(`/work/${id}/outputs`);
       return result;
     } catch (error) {
       // If outputs endpoint doesn't exist, return empty response
@@ -256,9 +256,9 @@ class ApiClient {
   // New methods for issue #32
   /**
    * List all AI sessions
-   * @returns Promise resolving to an array of AiSession objects
+   * @returns Promise resolving to an array of ExtendedAiSession objects
    */
-  async listSessions(): Promise<AiSession[]> {
+  async listSessions(): Promise<ExtendedAiSession[]> {
     const response = await this.listAiSessions();
     const works = (response as any).works || [];
 
@@ -280,9 +280,9 @@ class ApiClient {
   /**
    * Get a specific AI session by ID
    * @param id - The session ID
-   * @returns Promise resolving to an AiSession object
+   * @returns Promise resolving to an ExtendedAiSession object
    */
-  async getSession(id: string): Promise<AiSession> {
+  async getSession(id: string): Promise<ExtendedAiSession> {
     const response = await this.getAiSession(id);
     const workData = response as any;
 
@@ -302,7 +302,7 @@ class ApiClient {
         workData.work.updated_at !== workData.work.created_at ? workData.work.updated_at : null,
       prompt: firstMessage?.content || workData.work.title,
       project_id: workData.work.project_id,
-    } as any; // Using any to bypass type checking for the extra fields
+    } as ExtendedAiSession;
   }
 
   /**

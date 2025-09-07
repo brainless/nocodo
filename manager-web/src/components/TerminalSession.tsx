@@ -1,4 +1,4 @@
-import { Component, createSignal, onCleanup, onMount } from 'solid-js';
+import { Component, createSignal, onCleanup } from 'solid-js';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { apiClient } from '../api';
 import Terminal from './Terminal';
@@ -12,11 +12,13 @@ interface TerminalConnection {
   close: () => void;
 }
 
-const TerminalSession: Component<TerminalSessionProps> = (props) => {
+const TerminalSession: Component<TerminalSessionProps> = props => {
   let terminal: XTerm | undefined;
   let connection: TerminalConnection | undefined;
 
-  const [connectionStatus, setConnectionStatus] = createSignal<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+  const [connectionStatus, setConnectionStatus] = createSignal<
+    'connecting' | 'connected' | 'disconnected' | 'error'
+  >('connecting');
   const [error, setError] = createSignal<string | null>(null);
 
   const connectToSession = () => {
@@ -37,7 +39,7 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
         // Control message handler
         (message: any) => {
           console.log('Received control message:', message);
-          
+
           switch (message.type) {
             case 'status':
               console.log(`Session status: ${message.status}`, message.exit_code);
@@ -47,22 +49,24 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
                   terminal.write('\r\n\x1b[32m--- Session completed ---\x1b[0m\r\n');
                 } else if (terminal && message.status === 'failed') {
                   const exitCode = message.exit_code ?? 'unknown';
-                  terminal.write(`\r\n\x1b[31m--- Session failed (exit code: ${exitCode}) ---\x1b[0m\r\n`);
+                  terminal.write(
+                    `\r\n\x1b[31m--- Session failed (exit code: ${exitCode}) ---\x1b[0m\r\n`
+                  );
                 }
               }
               break;
-            
+
             case 'pong':
               // Handle ping/pong for keepalive
               break;
-            
+
             case 'resize':
               // Terminal was resized on server side
               if (terminal && message.cols && message.rows) {
                 terminal.resize(message.cols, message.rows);
               }
               break;
-            
+
             default:
               console.log('Unknown control message type:', message.type);
           }
@@ -72,7 +76,7 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
           console.error('Terminal WebSocket error:', error);
           setConnectionStatus('error');
           setError(error.message);
-          
+
           if (terminal) {
             terminal.write(`\r\n\x1b[31mConnection error: ${error.message}\x1b[0m\r\n`);
           }
@@ -82,7 +86,7 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
           console.log('Terminal WebSocket connected');
           setConnectionStatus('connected');
           setError(null);
-          
+
           if (terminal) {
             terminal.write('\x1b[32m--- Connected to interactive session ---\x1b[0m\r\n');
             terminal.focus();
@@ -92,7 +96,7 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
         () => {
           console.log('Terminal WebSocket disconnected');
           setConnectionStatus('disconnected');
-          
+
           if (terminal) {
             terminal.write('\r\n\x1b[33m--- Connection closed ---\x1b[0m\r\n');
           }
@@ -115,7 +119,7 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
     if (connectionStatus() === 'connected') {
       // Encode input as base64 for the control message
       const encoded = btoa(data);
-      
+
       try {
         // Send input via WebSocket control message
         // This should be handled by the WebSocket connection, but we can fall back to HTTP
@@ -170,26 +174,26 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
   return (
     <div class={`terminal-session ${props.className || ''}`}>
       {/* Connection status bar */}
-      <div class="bg-gray-100 border border-gray-300 rounded-t px-4 py-2 flex items-center justify-between text-sm">
-        <div class="flex items-center space-x-2">
-          <span class="font-medium text-gray-700">Interactive Terminal</span>
-          <span class="text-gray-500">({props.sessionId.slice(-8)})</span>
+      <div class='bg-gray-100 border border-gray-300 rounded-t px-4 py-2 flex items-center justify-between text-sm'>
+        <div class='flex items-center space-x-2'>
+          <span class='font-medium text-gray-700'>Interactive Terminal</span>
+          <span class='text-gray-500'>({props.sessionId.slice(-8)})</span>
         </div>
         <div class={`flex items-center space-x-1 ${statusInfo.color}`}>
           <span>{statusInfo.icon}</span>
-          <span class="font-medium">{statusInfo.text}</span>
+          <span class='font-medium'>{statusInfo.text}</span>
         </div>
       </div>
 
       {/* Error display */}
       {error() && (
-        <div class="bg-red-100 border-l-4 border-red-500 p-4">
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <span class="text-red-500">✗</span>
+        <div class='bg-red-100 border-l-4 border-red-500 p-4'>
+          <div class='flex'>
+            <div class='flex-shrink-0'>
+              <span class='text-red-500'>✗</span>
             </div>
-            <div class="ml-3">
-              <p class="text-sm text-red-700">
+            <div class='ml-3'>
+              <p class='text-sm text-red-700'>
                 <strong>Connection Error:</strong> {error()}
               </p>
             </div>
@@ -198,30 +202,30 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
       )}
 
       {/* Terminal component */}
-      <div class="relative border-l border-r border-b border-gray-300 rounded-b">
-        <Terminal 
+      <div class='relative border-l border-r border-b border-gray-300 rounded-b'>
+        <Terminal
           sessionId={props.sessionId}
           onTerminalReady={handleTerminalReady}
           onInput={handleTerminalInput}
           onResize={handleTerminalResize}
-          className="h-96"
+          className='h-96'
         />
       </div>
 
       {/* Enhanced Terminal toolbar */}
-      <div class="bg-gray-50 border-l border-r border-b border-gray-300 rounded-b px-4 py-2">
-        <div class="flex items-center justify-between text-sm">
-          <div class="flex items-center space-x-4">
-            <span class="text-gray-600">Terminal Controls:</span>
-            <div class="flex items-center space-x-1 text-xs text-gray-500">
-              <kbd class="px-1 py-0.5 bg-gray-200 rounded">Ctrl+C</kbd>
+      <div class='bg-gray-50 border-l border-r border-b border-gray-300 rounded-b px-4 py-2'>
+        <div class='flex items-center justify-between text-sm'>
+          <div class='flex items-center space-x-4'>
+            <span class='text-gray-600'>Terminal Controls:</span>
+            <div class='flex items-center space-x-1 text-xs text-gray-500'>
+              <kbd class='px-1 py-0.5 bg-gray-200 rounded'>Ctrl+C</kbd>
               <span>interrupt</span>
-              <span class="mx-2">•</span>
-              <kbd class="px-1 py-0.5 bg-gray-200 rounded">Ctrl+D</kbd>
+              <span class='mx-2'>•</span>
+              <kbd class='px-1 py-0.5 bg-gray-200 rounded'>Ctrl+D</kbd>
               <span>exit</span>
             </div>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class='flex items-center space-x-2'>
             {/* Copy terminal content */}
             <button
               onClick={async () => {
@@ -236,14 +240,14 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
                   }
                 }
               }}
-              class="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium flex items-center space-x-1"
+              class='px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium flex items-center space-x-1'
               disabled={connectionStatus() !== 'connected'}
-              title="Copy selected text or current line"
+              title='Copy selected text or current line'
             >
               <span>📋</span>
               <span>Copy</span>
             </button>
-            
+
             {/* Paste from clipboard */}
             <button
               onClick={async () => {
@@ -256,25 +260,25 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
                   }
                 }
               }}
-              class="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium flex items-center space-x-1"
+              class='px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium flex items-center space-x-1'
               disabled={connectionStatus() !== 'connected'}
-              title="Paste from clipboard"
+              title='Paste from clipboard'
             >
               <span>📄</span>
               <span>Paste</span>
             </button>
-            
+
             {/* Clear terminal */}
             <button
               onClick={() => terminal?.clear()}
-              class="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium flex items-center space-x-1"
+              class='px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium flex items-center space-x-1'
               disabled={connectionStatus() !== 'connected'}
-              title="Clear terminal screen"
+              title='Clear terminal screen'
             >
               <span>🧹</span>
               <span>Clear</span>
             </button>
-            
+
             {/* Send Ctrl+C */}
             <button
               onClick={() => {
@@ -282,14 +286,14 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
                   handleTerminalInput('\x03');
                 }
               }}
-              class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs font-medium flex items-center space-x-1"
+              class='px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs font-medium flex items-center space-x-1'
               disabled={connectionStatus() !== 'connected'}
-              title="Send interrupt signal (Ctrl+C)"
+              title='Send interrupt signal (Ctrl+C)'
             >
               <span>⚡</span>
               <span>Ctrl+C</span>
             </button>
-            
+
             {/* Send Ctrl+D */}
             <button
               onClick={() => {
@@ -297,37 +301,37 @@ const TerminalSession: Component<TerminalSessionProps> = (props) => {
                   handleTerminalInput('\x04');
                 }
               }}
-              class="px-2 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded text-xs font-medium flex items-center space-x-1"
+              class='px-2 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded text-xs font-medium flex items-center space-x-1'
               disabled={connectionStatus() !== 'connected'}
-              title="Send end-of-file signal (Ctrl+D)"
+              title='Send end-of-file signal (Ctrl+D)'
             >
               <span>🔚</span>
               <span>Ctrl+D</span>
             </button>
-            
+
             {/* Font size controls */}
-            <div class="flex items-center space-x-1">
+            <div class='flex items-center space-x-1'>
               <button
                 onClick={() => {
                   if (terminal) {
-                    const currentSize = terminal.getOption('fontSize') || 14;
-                    terminal.setOption('fontSize', Math.max(8, currentSize - 1));
+                    const currentSize = (terminal.options as any).fontSize || 14;
+                    (terminal.options as any).fontSize = Math.max(8, currentSize - 1);
                   }
                 }}
-                class="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium"
-                title="Decrease font size"
+                class='px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium'
+                title='Decrease font size'
               >
                 A-
               </button>
               <button
                 onClick={() => {
                   if (terminal) {
-                    const currentSize = terminal.getOption('fontSize') || 14;
-                    terminal.setOption('fontSize', Math.min(24, currentSize + 1));
+                    const currentSize = (terminal.options as any).fontSize || 14;
+                    (terminal.options as any).fontSize = Math.min(24, currentSize + 1);
                   }
                 }}
-                class="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium"
-                title="Increase font size"
+                class='px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium'
+                title='Increase font size'
               >
                 A+
               </button>

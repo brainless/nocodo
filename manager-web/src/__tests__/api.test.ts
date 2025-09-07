@@ -40,8 +40,28 @@ describe('API Client - AI Sessions', () => {
 
   describe('listSessions', () => {
     test('should fetch and return list of AI sessions', async () => {
-      const mockResponse: AiSessionListResponse = {
-        sessions: mockSessionList,
+      // The API actually returns works, not sessions (implementation mismatch with generated types)
+      const mockResponse = {
+        works: [
+          {
+            id: 'session-123',
+            tool_name: 'claude',
+            status: 'running',
+            created_at: 1640995200000,
+            updated_at: 1640995200000,
+            title: 'Test prompt',
+            project_id: 'project-456',
+          },
+          {
+            id: 'session-456',
+            tool_name: 'gpt',
+            status: 'completed',
+            created_at: 1640995100000,
+            updated_at: 1640995300000,
+            title: 'Another prompt',
+            project_id: 'project-789',
+          }
+        ]
       };
 
       // Mock successful fetch response
@@ -57,9 +77,12 @@ describe('API Client - AI Sessions', () => {
           'Content-Type': 'application/json',
         },
       });
-      expect(result).toEqual(mockSessionList);
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('session-123');
+      expect(result[0].tool_name).toBe('claude');
+      expect(result[0].status).toBe('running');
+      expect(result[0].prompt).toBe('Test prompt');
+      expect(result[0].project_id).toBe('project-456');
     });
 
     test('should handle API errors', async () => {
@@ -87,8 +110,23 @@ describe('API Client - AI Sessions', () => {
 
   describe('getSession', () => {
     test('should fetch and return specific AI session', async () => {
-      const mockResponse: AiSessionResponse = {
-        session: mockSession,
+      // The API implementation expects work data with messages, not just session
+      const mockResponse = {
+        work: {
+          id: 'session-123',
+          tool_name: 'claude',
+          status: 'running',
+          created_at: 1640995200000,
+          updated_at: 1640995200000,
+          title: 'Test prompt',
+          project_id: 'project-456',
+        },
+        messages: [
+          {
+            id: 'msg-123',
+            content: 'Test prompt'
+          }
+        ]
       };
 
       (global.fetch as any).mockResolvedValueOnce({
@@ -103,8 +141,11 @@ describe('API Client - AI Sessions', () => {
           'Content-Type': 'application/json',
         },
       });
-      expect(result).toEqual(mockSession);
       expect(result.id).toBe('session-123');
+      expect(result.tool_name).toBe('claude');
+      expect(result.status).toBe('running');
+      expect(result.prompt).toBe('Test prompt');
+      expect(result.project_id).toBe('project-456');
     });
 
     test('should handle 404 not found', async () => {

@@ -100,7 +100,7 @@ const StartAiSessionForm: Component = () => {
   const [prompt, setPrompt] = createSignal<string>('');
   const [submitting, setSubmitting] = createSignal<boolean>(false);
   const [error, setError] = createSignal<string | null>(null);
-  
+
   // PTY options (Issue #58)
   const [usePty, setUsePty] = createSignal<boolean>(false);
   const [terminalCols, setTerminalCols] = createSignal<number>(80);
@@ -155,10 +155,17 @@ const StartAiSessionForm: Component = () => {
           cols: terminalCols(),
           rows: terminalRows(),
         });
-        
+
         // Navigate to the terminal session detail page
         // For now, we'll use the same work detail page but it will show terminal UI
-        navigate(`/work/${terminalSessionResp.work.id}`);
+        // The response structure may vary, so we handle it safely
+        const workId = (terminalSessionResp as any)?.work?.id || (terminalSessionResp as any)?.id;
+        if (workId) {
+          navigate(`/work/${workId}`);
+        } else {
+          console.error('No work ID found in terminal session response:', terminalSessionResp);
+          setError('Failed to create terminal session: Invalid response format');
+        }
       } else {
         // Standard work session workflow
         // 1. Create the work
@@ -178,7 +185,7 @@ const StartAiSessionForm: Component = () => {
         const messageId = messageResp.message.id;
 
         // 3. Create the AI session
-        const sessionResp = await apiClient.createAiSession(workId, {
+        await apiClient.createAiSession(workId, {
           message_id: messageId,
           tool_name: toolName(),
         });
@@ -343,23 +350,32 @@ const StartAiSessionForm: Component = () => {
               Use interactive terminal (PTY mode)
             </label>
           </div>
-          
+
           <Show when={usePty()}>
             <div class='bg-blue-50 border border-blue-200 rounded-md p-4 mb-4'>
               <div class='flex items-start'>
-                <svg class='w-5 h-5 text-blue-400 mt-0.5 mr-3' fill='currentColor' viewBox='0 0 20 20'>
-                  <path fill-rule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clip-rule='evenodd'></path>
+                <svg
+                  class='w-5 h-5 text-blue-400 mt-0.5 mr-3'
+                  fill='currentColor'
+                  viewBox='0 0 20 20'
+                >
+                  <path
+                    fill-rule='evenodd'
+                    d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
+                    clip-rule='evenodd'
+                  ></path>
                 </svg>
                 <div>
                   <h4 class='text-sm font-medium text-blue-800'>Interactive Terminal Mode</h4>
                   <p class='text-sm text-blue-700 mt-1'>
-                    This will launch the AI tool in a full interactive terminal with support for ANSI colors, 
-                    cursor positioning, and real-time input/output. Perfect for tools that provide rich terminal interfaces.
+                    This will launch the AI tool in a full interactive terminal with support for
+                    ANSI colors, cursor positioning, and real-time input/output. Perfect for tools
+                    that provide rich terminal interfaces.
                   </p>
                 </div>
               </div>
             </div>
-            
+
             <div class='grid grid-cols-2 gap-4'>
               <div>
                 <label for='terminal-cols' class='block text-sm font-medium text-gray-700 mb-1'>
