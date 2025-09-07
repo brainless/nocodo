@@ -1814,7 +1814,7 @@ pub async fn create_terminal_session(
         // This prevents the foreign key constraint failure
         
         // Create a demo work if it doesn't exist
-        if let Err(e) = data.database.get_work_by_id(&work_id) {
+        if let Err(_e) = data.database.get_work_by_id(&work_id) {
             // Create a minimal work for testing purposes
             let demo_work = crate::models::Work {
                 id: work_id.clone(),
@@ -1828,7 +1828,7 @@ pub async fn create_terminal_session(
         }
 
         // Create a demo message if it doesn't exist
-        if let Err(e) = data.database.get_work_messages(&work_id) {
+        if let Err(_e) = data.database.get_work_messages(&work_id) {
             // Create a minimal message for testing purposes
             let demo_message = crate::models::WorkMessage {
                 id: message_id.clone(),
