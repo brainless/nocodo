@@ -1783,7 +1783,7 @@ pub async fn create_terminal_session(
             ));
         }
 
-        // For now, create a dummy work and message to satisfy the terminal session requirements
+        // For now, create a demo work and message to satisfy the terminal session requirements
         // In a real implementation, this would come from an existing work/message context
         let work_id = "demo-work".to_string();
         let message_id = "demo-message".to_string();
@@ -1800,8 +1800,8 @@ pub async fn create_terminal_session(
 
         // Create terminal session
         let terminal_session = TerminalSession::new(
-            work_id,
-            message_id,
+            work_id.clone(),
+            message_id.clone(),
             req.tool_name.clone(),
             project_context,
             req.requires_pty,
@@ -1810,6 +1810,39 @@ pub async fn create_terminal_session(
             req.rows.unwrap_or(24),
         );
 
+        // Instead of immediately failing, we should create the work and message first
+        // This prevents the foreign key constraint failure
+        
+        // Create a demo work if it doesn't exist
+        if let Err(e) = data.database.get_work_by_id(&work_id) {
+            // Create a minimal work for testing purposes
+            let demo_work = crate::models::Work {
+                id: work_id.clone(),
+                title: "Demo Work".to_string(),
+                project_id: req.project_id.clone(),
+                status: "active".to_string(),
+                created_at: chrono::Utc::now().timestamp(),
+                updated_at: chrono::Utc::now().timestamp(),
+            };
+            data.database.create_work(&demo_work)?;
+        }
+
+        // Create a demo message if it doesn't exist
+        if let Err(e) = data.database.get_work_messages(&work_id) {
+            // Create a minimal message for testing purposes
+            let demo_message = crate::models::WorkMessage {
+                id: message_id.clone(),
+                work_id: work_id.clone(),
+                content: "Demo message for terminal session".to_string(),
+                content_type: crate::models::MessageContentType::Text,
+                author_type: crate::models::MessageAuthorType::User,
+                author_id: None,
+                sequence_order: 0,
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            data.database.create_work_message(&demo_message)?;
+        }
+
         // Persist the session
         data.database.create_terminal_session(&terminal_session)?;
 
@@ -1817,6 +1850,7 @@ pub async fn create_terminal_session(
         let session_id = terminal_session.id.clone();
         let initial_prompt = req.prompt.clone();
 
+        // Enable PTY functionality - remove the temporary error
         match terminal_runner
             .start_session(terminal_session.clone(), initial_prompt)
             .await
