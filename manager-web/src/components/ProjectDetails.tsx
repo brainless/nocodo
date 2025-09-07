@@ -1,6 +1,6 @@
 import { A, useNavigate, useParams } from '@solidjs/router';
 import { Component, For, Show, createSignal, onMount } from 'solid-js';
-import { AiSession, Project } from '../types';
+import { ExtendedAiSession, Project } from '../types';
 import { apiClient } from '../api';
 import FileBrowser from './FileBrowser';
 import FileEditor from './FileEditor';
@@ -59,7 +59,7 @@ const ProjectDetails: Component = () => {
 
   const [project, setProject] = createSignal<Project | null>(null);
   const [components, setComponents] = createSignal<ProjectComponentInfo[]>([]);
-  const [sessions, setSessions] = createSignal<AiSession[]>([]);
+  const [sessions, setSessions] = createSignal<ExtendedAiSession[]>([]);
   const [selectedFile, setSelectedFile] = createSignal<any>(null);
 
   const projectId = () => params.id;
