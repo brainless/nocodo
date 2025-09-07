@@ -158,8 +158,8 @@ const StartAiSessionForm: Component = () => {
 
         // Navigate to the terminal session detail page
         // For now, we'll use the same work detail page but it will show terminal UI
-        // The response structure may vary, so we handle it safely
-        const workId = (terminalSessionResp as any)?.work?.id || (terminalSessionResp as any)?.id;
+        // The response structure is { session: { work_id, ... } }
+        const workId = (terminalSessionResp as any)?.session?.work_id;
         if (workId) {
           navigate(`/work/${workId}`);
         } else {
