@@ -194,14 +194,7 @@ impl TerminalRunner {
         let _child = pty_pair.slave.spawn_command(cmd)?;
         drop(pty_pair.slave);
 
-        // For now, let's disable the portable-pty functionality
-        // until we can properly test the API
-        Err(anyhow::anyhow!(
-            "PTY functionality temporarily disabled for CI builds"
-        ))
-
-        // Commented out code below for when PTY is re-enabled
-        /*
+        // Enable PTY functionality - uncomment the actual implementation
         // Get reader and writer from the master PTY
         let reader = pty_pair.master.try_clone_reader()?;
         let writer = pty_pair.master.try_clone_writer()?;
@@ -386,7 +379,6 @@ impl TerminalRunner {
 
         tracing::info!("PTY session started successfully");
         Ok(())
-        */
     }
 
     /// Send input to a running session
