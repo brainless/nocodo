@@ -1,0 +1,11 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "sqlite://db.sqlite"
+max_connections = 10
+
+[logging]
+level = "info"
+file = "/var/log/nocodo/services.log"

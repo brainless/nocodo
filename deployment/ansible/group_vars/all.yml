@@ -1,0 +1,6 @@
+---
+nocodo_domain: "{{ lookup('env', 'NOCODO_DOMAIN') | default('api.nocodo.com') }}"
+nocodo_server_ip: "{{ lookup('env', 'NOCODO_SERVER_IP') }}"
+nocodo_ssh_user: "{{ lookup('env', 'NOCODO_SSH_USER') }}"
+nocodo_ssh_key_path: "{{ lookup('env', 'NOCODO_SSH_KEY_PATH') }}"
+ssl_enabled: true

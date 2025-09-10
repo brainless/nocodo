@@ -165,17 +165,15 @@ impl Database {
         )?;
 
         // Add tool_name column if it doesn't exist (migration for existing databases)
-        conn.execute(
-            "ALTER TABLE works ADD COLUMN tool_name TEXT",
-            [],
-        ).or_else(|e| {
-            // Ignore error if column already exists
-            if e.to_string().contains("duplicate column name") {
-                Ok(0)
-            } else {
-                Err(e)
-            }
-        })?;
+        conn.execute("ALTER TABLE works ADD COLUMN tool_name TEXT", [])
+            .or_else(|e| {
+                // Ignore error if column already exists
+                if e.to_string().contains("duplicate column name") {
+                    Ok(0)
+                } else {
+                    Err(e)
+                }
+            })?;
 
         // Create work messages with content types and history
         conn.execute(
