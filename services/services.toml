@@ -3,7 +3,7 @@ host = "0.0.0.0"
 port = 8080
 
 [database]
-url = "postgresql://localhost/nocodo_services"
+url = "sqlite://db.sqlite"
 max_connections = 10
 
 [logging]

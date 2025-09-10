@@ -22,7 +22,7 @@ tracing-subscriber.workspace = true
 
 # Services-specific dependencies
 actix-web.workspace = true
-sqlx.workspace = true
+sqlx = { workspace = true, features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
 chrono.workspace = true
 uuid.workspace = true
 ts-rs.workspace = true
