@@ -1,25 +1,21 @@
-name: Rust CI
+name: Services CI
 
 on:
   pull_request:
     paths:
-      - 'cli/**'
-      - 'manager/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.rustfmt.toml'
-      - 'clippy.toml'
-      - '.github/workflows/rust-ci.yml'
+      - 'services/**'
+      - 'services/Cargo.toml'
+      - 'services/Cargo.lock'
+      - 'services/services.toml'
+      - '.github/workflows/services-ci.yml'
   push:
     branches: [main]
     paths:
-      - 'cli/**'
-      - 'manager/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.rustfmt.toml'
-      - 'clippy.toml'
-      - '.github/workflows/rust-ci.yml'
+      - 'services/**'
+      - 'services/Cargo.toml'
+      - 'services/Cargo.lock'
+      - 'services/services.toml'
+      - '.github/workflows/services-ci.yml'
   schedule:
     # Run security audit weekly on Mondays at 08:00 UTC
     - cron: '0 8 * * 1'
@@ -49,7 +45,7 @@ jobs:
           # Cache workspace and registry
           workspaces: |
             .
-            manager
+            services
 
       - name: Check workspace
         run: cargo check --workspace --all-targets --verbose
@@ -87,7 +83,7 @@ jobs:
           key: clippy-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             .
-            manager
+            services
 
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets --all-features -- --deny warnings --verbose
@@ -113,7 +109,7 @@ jobs:
           key: test-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             .
-            manager
+            services
 
       - name: Run tests
         run: cargo test --workspace --all-features --verbose
@@ -156,23 +152,22 @@ jobs:
           key: build-${{ hashFiles('**/Cargo.lock') }}
           workspaces: |
             .
-            manager
+            services
 
-      - name: Build Manager in release mode
-        run: cargo build --release --bin nocodo-manager --verbose
+      - name: Build Services in release mode
+        run: cargo build --release --bin nocodo-services --verbose
 
-      - name: Upload Manager binary
+      - name: Upload Services binary
         uses: actions/upload-artifact@v4
         with:
-          name: nocodo-manager-${{ github.sha }}
-          path: target/release/nocodo-manager
+          name: nocodo-services-${{ github.sha }}
+          path: target/release/nocodo-services
           retention-days: 7
 
-
-
-  manager-tests:
+  # Services tests
+  services-tests:
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'manager/') || github.event_name == 'pull_request'
+    if: contains(github.event.head_commit.modified, 'services/') || github.event_name == 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -183,10 +178,10 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: manager-test-${{ hashFiles('**/Cargo.lock') }}
+          key: services-test-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Test Manager component
-        working-directory: manager
+      - name: Test Services component
+        working-directory: services
         run: |
           cargo test --verbose
           cargo test --doc --verbose
