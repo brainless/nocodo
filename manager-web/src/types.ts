@@ -1,5 +1,7 @@
 // Re-export all generated types from ts-rs
 export * from './types/generated/AiSession';
+// Re-export for convenience
+export type { AiSession } from './types/generated/AiSession';
 export * from './types/generated/AiSessionListResponse';
 export * from './types/generated/AiSessionResponse';
 export * from './types/generated/CreateAiSessionRequest';
@@ -29,6 +31,44 @@ export * from './types/generated/WorkResponse';
 export * from './types/generated/WorkWithHistory';
 export * from './types/generated/CreateWorkRequest';
 export * from './types/generated/AddMessageRequest';
+
+// PTY Terminal session types (Issue #58)
+export interface CreateTerminalSessionRequest {
+  project_id?: string;
+  tool_name: string;
+  prompt?: string;
+  interactive: boolean;
+  requires_pty: boolean;
+  env?: Record<string, string>;
+  cols?: number;
+  rows?: number;
+}
+
+// Extended AiSession that includes all base fields plus additional frontend fields
+export interface ExtendedAiSession {
+  // Base AiSession fields
+  id: string;
+  work_id: string;
+  message_id: string;
+  tool_name: string;
+  status: string;
+  project_context: string | null;
+  started_at: number;
+  ended_at: number | null;
+  // Extended fields for frontend use
+  project_id?: string | null;
+  prompt?: string;
+  is_pty_session?: boolean;
+  terminal_cols?: number;
+  terminal_rows?: number;
+}
+
+// PTY session specific information
+export interface PtySessionInfo {
+  is_pty_session?: boolean;
+  terminal_cols?: number;
+  terminal_rows?: number;
+}
 
 // Additional types not generated from Rust
 export type AiSessionStatus =

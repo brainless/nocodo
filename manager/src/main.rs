@@ -1,40 +1,81 @@
+mod browser_launcher;
 mod config;
 mod database;
+mod embedded_web;
 mod error;
 mod handlers;
 mod models;
 mod runner;
 mod socket;
 mod templates;
+mod terminal_runner;
 mod websocket;
 
 use actix::Actor;
 use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use browser_launcher::{launch_browser, print_startup_banner, wait_for_server, BrowserConfig};
+use clap::{Arg, Command};
 use config::AppConfig;
 use database::Database;
+use embedded_web::{configure_embedded_routes, get_embedded_assets_size, validate_embedded_assets};
 use error::AppResult;
 use handlers::AppState;
 use runner::Runner;
 use socket::SocketServer;
 use std::sync::Arc;
 use std::time::SystemTime;
+use terminal_runner::TerminalRunner;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use websocket::{WebSocketBroadcaster, WebSocketServer};
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
+    // Parse command line arguments
+    let matches = Command::new("nocodo-manager")
+        .version("0.1.0")
+        .about("nocodo Manager - AI-assisted development environment daemon")
+        .arg(
+            Arg::new("no-browser")
+                .long("no-browser")
+                .help("Don't automatically open browser")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("config")
+                .short('c')
+                .long("config")
+                .help("Path to configuration file")
+                .value_name("FILE"),
+        )
+        .get_matches();
+
     // Initialize logging
     tracing_subscriber::registry()
         .with(fmt::layer())
         .with(EnvFilter::from_default_env().add_directive("nocodo_manager=info".parse().unwrap()))
         .init();
 
+    // Configure browser launching
+    let browser_config = BrowserConfig {
+        auto_launch: !matches.get_flag("no-browser"),
+        ..BrowserConfig::default()
+    };
+
+    print_startup_banner(&browser_config);
     tracing::info!("Starting nocodo Manager daemon");
 
     // Load configuration
     let config = AppConfig::load()?;
     tracing::info!("Loaded configuration from ~/.config/nocodo/manager.toml");
+
+    // Validate embedded web assets
+    if validate_embedded_assets() {
+        let asset_size = get_embedded_assets_size();
+        tracing::info!("Embedded web assets loaded: {} bytes", asset_size);
+    } else {
+        tracing::warn!("No embedded web assets found - serving from filesystem as fallback");
+    }
 
     // Initialize database
     let database = Arc::new(Database::new(&config.database.path)?);
@@ -79,16 +120,43 @@ async fn main() -> AppResult<()> {
         None
     };
 
+    // Create terminal runner for PTY-based sessions
+    let terminal_runner_enabled = std::env::var("NOCODO_TERMINAL_RUNNER_ENABLED")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true); // Enabled by default
+
+    tracing::info!("Terminal runner enabled: {}", terminal_runner_enabled);
+
+    let terminal_runner = if terminal_runner_enabled {
+        tracing::info!("Initializing PTY-based terminal runner");
+        Some(Arc::new(TerminalRunner::new(
+            Arc::clone(&database),
+            Arc::clone(&broadcaster),
+        )))
+    } else {
+        tracing::warn!("Terminal runner disabled - set NOCODO_TERMINAL_RUNNER_ENABLED=1 to enable");
+        None
+    };
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
         runner,
+        terminal_runner,
     });
 
     // Start HTTP server
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
+    let server_url = format!("http://{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
+
+    // Update browser config with actual server URL
+    let browser_config = BrowserConfig {
+        url: server_url.clone(),
+        ..browser_config
+    };
 
     let http_task = tokio::spawn(async move {
         HttpServer::new(move || {
@@ -147,6 +215,32 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
+                        )
+                        // Terminal session endpoints for PTY-based interactive sessions
+                        .route("/tools", web::get().to(handlers::get_tool_registry))
+                        .route(
+                            "/terminals",
+                            web::post().to(handlers::create_terminal_session),
+                        )
+                        .route(
+                            "/terminals/{id}",
+                            web::get().to(handlers::get_terminal_session),
+                        )
+                        .route(
+                            "/terminals/{id}/input",
+                            web::post().to(handlers::send_terminal_input),
+                        )
+                        .route(
+                            "/terminals/{id}/resize",
+                            web::post().to(handlers::resize_terminal_session),
+                        )
+                        .route(
+                            "/terminals/{id}/transcript",
+                            web::get().to(handlers::get_terminal_transcript),
+                        )
+                        .route(
+                            "/terminals/{id}/terminate",
+                            web::post().to(handlers::terminate_terminal_session),
                         ),
                 )
                 // WebSocket endpoints
@@ -155,9 +249,19 @@ async fn main() -> AppResult<()> {
                     "/ws/work/{id}",
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
-                // Serve static files from ./web/dist if it exists
+                .route(
+                    "/ws/terminals/{id}",
+                    web::get().to(websocket::terminal_websocket_handler),
+                )
+                // Serve embedded web assets (with filesystem fallback)
                 .configure(|cfg| {
-                    if std::path::Path::new("manager-web/dist").exists() {
+                    if validate_embedded_assets() {
+                        // Use embedded assets
+                        tracing::info!("Configuring embedded web asset routes");
+                        configure_embedded_routes(cfg);
+                    } else if std::path::Path::new("manager-web/dist").exists() {
+                        // Fallback to filesystem (development mode)
+                        tracing::info!("Using filesystem fallback for web assets");
                         cfg.service(
                             fs::Files::new("/", "manager-web/dist")
                                 .index_file("index.html")
@@ -165,6 +269,8 @@ async fn main() -> AppResult<()> {
                                 .use_last_modified(true)
                                 .prefer_utf8(true),
                         );
+                    } else {
+                        tracing::warn!("No web assets available - neither embedded nor filesystem");
                     }
                 })
         })
@@ -175,7 +281,22 @@ async fn main() -> AppResult<()> {
         .expect("HTTP server failed")
     });
 
-    // Wait for either server to complete (they should run indefinitely)
+    // Launch browser after server starts
+    let _browser_task = tokio::spawn({
+        let browser_config = browser_config.clone();
+        let server_url = server_url.clone();
+        async move {
+            // Wait for server to be ready
+            wait_for_server(&server_url, 10).await;
+
+            // Launch browser
+            launch_browser(&browser_config).await;
+        }
+    });
+
+    // Wait for servers (they should run indefinitely)
+    // We don't want to exit when browser launcher completes
+    // Only exit when HTTP or socket server completes
     tokio::select! {
         _ = socket_task => tracing::info!("Socket server completed"),
         _ = http_task => tracing::info!("HTTP server completed"),
