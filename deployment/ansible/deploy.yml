@@ -1,0 +1,71 @@
+---
+- name: Deploy Nocodo Services API
+  hosts: nocodo_servers
+  become: yes
+  vars_files:
+    - group_vars/all.yml
+  
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        update_cache: yes
+
+    - name: Create log directory
+      file:
+        path: /var/log/nocodo-services
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Copy Nginx configuration
+      template:
+        src: nginx.api.nocodo.com.conf.j2
+        dest: /etc/nginx/sites-available/api.nocodo.com
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/api.nocodo.com
+        dest: /etc/nginx/sites-enabled/api.nocodo.com
+        state: link
+
+    - name: Copy systemd service file
+      template:
+        src: nocodo-services.service.j2
+        dest: /etc/systemd/system/nocodo-services.service
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start service
+      systemd:
+        name: nocodo-services.service
+        enabled: yes
+        state: started
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      changed_when: no
+
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Obtain SSL certificate
+      command: >
+        certbot --nginx -d {{ nocodo_domain }} --agree-tos --email admin@{{ nocodo_domain }} --non-interactive
+      args:
+        creates: /etc/letsencrypt/live/{{ nocodo_domain }}/fullchain.pem
+      when: ssl_enabled | default(true)
