@@ -33,7 +33,7 @@ impl Config {
             // Set defaults
             .set_default("server.host", "0.0.0.0")?
             .set_default("server.port", 8080)?
-            .set_default("database.url", "postgresql://localhost/nocodo_services")?
+            .set_default("database.url", "sqlite://db.sqlite")?
             .set_default("database.max_connections", 10)?
             .set_default("logging.level", "info")?;
 
