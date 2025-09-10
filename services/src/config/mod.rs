@@ -9,6 +9,7 @@ pub struct ServerConfig {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct DatabaseConfig {
     pub url: String,
     pub max_connections: u32,
@@ -17,12 +18,14 @@ pub struct DatabaseConfig {
 #[derive(Debug, Deserialize)]
 pub struct LoggingConfig {
     pub level: String,
+    #[allow(dead_code)]
     pub file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
+    #[allow(dead_code)]
     pub database: DatabaseConfig,
     pub logging: LoggingConfig,
 }

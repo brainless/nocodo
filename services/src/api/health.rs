@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{HttpResponse, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
