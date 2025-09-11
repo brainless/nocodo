@@ -4,11 +4,14 @@ mod database;
 mod embedded_web;
 mod error;
 mod handlers;
+mod llm_agent;
+mod llm_client;
 mod models;
 mod runner;
 mod socket;
 mod templates;
 mod terminal_runner;
+mod tools;
 mod websocket;
 
 use actix::Actor;
@@ -21,8 +24,10 @@ use database::Database;
 use embedded_web::{configure_embedded_routes, get_embedded_assets_size, validate_embedded_assets};
 use error::AppResult;
 use handlers::AppState;
+use llm_agent::LlmAgent;
 use runner::Runner;
 use socket::SocketServer;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 use terminal_runner::TerminalRunner;
@@ -139,12 +144,33 @@ async fn main() -> AppResult<()> {
         None
     };
 
+    // Optionally enable LLM agent via env flag
+    let llm_agent_enabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    tracing::info!("LLM agent enabled: {}", llm_agent_enabled);
+
+    let llm_agent = if llm_agent_enabled {
+        tracing::info!("Initializing LLM agent");
+        Some(Arc::new(LlmAgent::new(
+            Arc::clone(&database),
+            Arc::clone(&broadcaster),
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        )))
+    } else {
+        tracing::warn!("LLM agent disabled - set NOCODO_LLM_AGENT_ENABLED=1 to enable");
+        None
+    };
+
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
         runner,
         terminal_runner,
+        llm_agent,
     });
 
     // Start HTTP server
@@ -241,6 +267,27 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/terminals/{id}/terminate",
                             web::post().to(handlers::terminate_terminal_session),
+                        )
+                        // LLM agent endpoints for direct LLM integration
+                        .route(
+                            "/work/{work_id}/llm-agent",
+                            web::post().to(handlers::create_llm_agent_session),
+                        )
+                        .route(
+                            "/work/{work_id}/llm-agent/sessions",
+                            web::get().to(handlers::get_llm_agent_sessions),
+                        )
+                        .route(
+                            "/llm-agent/{session_id}",
+                            web::get().to(handlers::get_llm_agent_session),
+                        )
+                        .route(
+                            "/llm-agent/{session_id}/message",
+                            web::post().to(handlers::send_llm_agent_message),
+                        )
+                        .route(
+                            "/llm-agent/{session_id}/complete",
+                            web::post().to(handlers::complete_llm_agent_session),
                         ),
                 )
                 // WebSocket endpoints

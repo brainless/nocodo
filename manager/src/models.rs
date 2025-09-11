@@ -426,7 +426,7 @@ pub struct AddExistingProjectRequest {
 }
 
 // File operation models
-#[derive(Debug, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct FileInfo {
     pub name: String,
@@ -584,4 +584,206 @@ pub struct WorkMessageResponse {
 #[ts(export)]
 pub struct WorkMessageListResponse {
     pub messages: Vec<WorkMessage>,
+}
+
+// LLM Agent Types for Issue 99
+
+/// Tool request from LLM (typed JSON)
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(tag = "type")]
+pub enum ToolRequest {
+    #[serde(rename = "list_files")]
+    ListFiles(ListFilesRequest),
+    #[serde(rename = "read_file")]
+    ReadFile(ReadFileRequest),
+}
+
+/// List files tool request
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ListFilesRequest {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recursive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_hidden: Option<bool>,
+}
+
+/// Read file tool request
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ReadFileRequest {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_size: Option<u64>,
+}
+
+/// Tool response to LLM (typed JSON)
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(tag = "type")]
+pub enum ToolResponse {
+    #[serde(rename = "list_files")]
+    ListFiles(ListFilesResponse),
+    #[serde(rename = "read_file")]
+    ReadFile(ReadFileResponse),
+    #[serde(rename = "error")]
+    Error(ToolErrorResponse),
+}
+
+/// List files tool response
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ListFilesResponse {
+    pub path: String,
+    pub files: Vec<FileInfo>,
+    pub total_count: u32,
+}
+
+/// Read file tool response
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ReadFileResponse {
+    pub path: String,
+    pub content: String,
+    pub size: u64,
+    pub truncated: bool,
+}
+
+/// Tool error response
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ToolErrorResponse {
+    pub tool: String,
+    pub error: String,
+    pub message: String,
+}
+
+/// LLM provider configuration
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LlmProviderConfig {
+    pub provider: String,
+    pub model: String,
+    pub api_key: String,
+    pub base_url: Option<String>,
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+}
+
+/// LLM agent session
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LlmAgentSession {
+    pub id: String,
+    pub work_id: String,
+    pub provider: String,
+    pub model: String,
+    pub status: String,
+    pub system_prompt: Option<String>,
+    #[ts(type = "number")]
+    pub started_at: i64,
+    #[ts(type = "number | null")]
+    pub ended_at: Option<i64>,
+}
+
+impl LlmAgentSession {
+    pub fn new(work_id: String, provider: String, model: String) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            work_id,
+            provider,
+            model,
+            status: "running".to_string(),
+            system_prompt: None,
+            started_at: now,
+            ended_at: None,
+        }
+    }
+
+    pub fn complete(&mut self) {
+        self.status = "completed".to_string();
+        self.ended_at = Some(Utc::now().timestamp());
+    }
+
+    pub fn fail(&mut self) {
+        self.status = "failed".to_string();
+        self.ended_at = Some(Utc::now().timestamp());
+    }
+}
+
+/// Create LLM agent session request
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateLlmAgentSessionRequest {
+    pub provider: String,
+    pub model: String,
+    pub system_prompt: Option<String>,
+}
+
+/// LLM agent session response
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LlmAgentSessionResponse {
+    pub session: LlmAgentSession,
+}
+
+/// LLM agent message
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LlmAgentMessage {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub session_id: String,
+    pub role: String, // "user" | "assistant" | "system"
+    pub content: String,
+    #[ts(type = "number")]
+    pub created_at: i64,
+}
+
+/// LLM agent tool call
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmAgentToolCall {
+    pub id: i64,
+    pub session_id: String,
+    pub message_id: Option<i64>,
+    pub tool_name: String,
+    pub request: serde_json::Value,
+    pub response: Option<serde_json::Value>,
+    pub status: String, // "pending" | "executing" | "completed" | "failed"
+    pub created_at: i64,
+    pub completed_at: Option<i64>,
+}
+
+impl LlmAgentToolCall {
+    pub fn new(session_id: String, tool_name: String, request: serde_json::Value) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: now, // Simple ID based on timestamp
+            session_id,
+            message_id: None,
+            tool_name,
+            request,
+            response: None,
+            status: "pending".to_string(),
+            created_at: now,
+            completed_at: None,
+        }
+    }
+
+    pub fn complete(&mut self, response: serde_json::Value) {
+        self.response = Some(response);
+        self.status = "completed".to_string();
+        self.completed_at = Some(Utc::now().timestamp());
+    }
+
+    pub fn fail(&mut self, error: String) {
+        self.response = Some(serde_json::json!({
+            "error": error
+        }));
+        self.status = "failed".to_string();
+        self.completed_at = Some(Utc::now().timestamp());
+    }
 }
