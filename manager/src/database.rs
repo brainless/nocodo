@@ -1,5 +1,8 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{AiSession, AiSessionResult, Project, ProjectComponent, TerminalSession};
+use crate::models::{
+    AiSession, AiSessionResult, LlmAgentMessage, LlmAgentSession, LlmAgentToolCall, Project,
+    ProjectComponent, TerminalSession,
+};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -241,6 +244,71 @@ impl Database {
         // Index for transcripts by session_id
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_terminal_transcripts_session_id ON terminal_transcripts(session_id)",
+            [],
+        )?;
+
+        // Create LLM agent sessions table for direct LLM integration
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS llm_agent_sessions (
+                id TEXT PRIMARY KEY,
+                work_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'running',
+                system_prompt TEXT,
+                started_at INTEGER NOT NULL,
+                ended_at INTEGER,
+                FOREIGN KEY (work_id) REFERENCES works (id)
+            )",
+            [],
+        )?;
+
+        // Index for LLM agent sessions by work_id
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_llm_agent_sessions_work_id ON llm_agent_sessions(work_id)",
+            [],
+        )?;
+
+        // Create LLM agent messages table for conversation history
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS llm_agent_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES llm_agent_sessions (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Index for LLM agent messages by session_id and created_at
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_llm_agent_messages_session_created ON llm_agent_messages(session_id, created_at)",
+            [],
+        )?;
+
+        // Create LLM agent tool calls table for tool execution tracking
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS llm_agent_tool_calls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                message_id INTEGER,
+                tool_name TEXT NOT NULL,
+                request TEXT NOT NULL,
+                response TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at INTEGER NOT NULL,
+                completed_at INTEGER,
+                FOREIGN KEY (session_id) REFERENCES llm_agent_sessions (id) ON DELETE CASCADE,
+                FOREIGN KEY (message_id) REFERENCES llm_agent_messages (id) ON DELETE SET NULL
+            )",
+            [],
+        )?;
+
+        // Index for LLM agent tool calls by session_id
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_llm_agent_tool_calls_session_id ON llm_agent_tool_calls(session_id)",
             [],
         )?;
 
@@ -1171,5 +1239,262 @@ impl Database {
             .optional()?;
 
         Ok(result)
+    }
+
+    // LLM Agent Methods
+
+    pub fn create_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO llm_agent_sessions (id, work_id, provider, model, status, system_prompt, started_at, ended_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                session.id,
+                session.work_id,
+                session.provider,
+                session.model,
+                session.status,
+                session.system_prompt,
+                session.started_at,
+                session.ended_at,
+            ],
+        )?;
+
+        tracing::info!("Created LLM agent session: {}", session.id);
+        Ok(())
+    }
+
+    pub fn get_llm_agent_session(&self, session_id: &str) -> AppResult<LlmAgentSession> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let session = conn
+            .query_row(
+                "SELECT id, work_id, provider, model, status, system_prompt, started_at, ended_at 
+                 FROM llm_agent_sessions WHERE id = ?",
+                [session_id],
+                |row| {
+                    Ok(LlmAgentSession {
+                        id: row.get(0)?,
+                        work_id: row.get(1)?,
+                        provider: row.get(2)?,
+                        model: row.get(3)?,
+                        status: row.get(4)?,
+                        system_prompt: row.get(5)?,
+                        started_at: row.get(6)?,
+                        ended_at: row.get(7)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match session {
+            Some(session) => Ok(session),
+            None => Err(AppError::NotFound(format!(
+                "LLM agent session not found: {}",
+                session_id
+            ))),
+        }
+    }
+
+    pub fn update_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "UPDATE llm_agent_sessions 
+             SET work_id = ?, provider = ?, model = ?, status = ?, system_prompt = ?, started_at = ?, ended_at = ? 
+             WHERE id = ?",
+            params![
+                session.work_id,
+                session.provider,
+                session.model,
+                session.status,
+                session.system_prompt,
+                session.started_at,
+                session.ended_at,
+                session.id,
+            ],
+        )?;
+
+        tracing::info!("Updated LLM agent session: {}", session.id);
+        Ok(())
+    }
+
+    pub fn get_llm_agent_sessions_by_work(&self, work_id: &str) -> AppResult<Vec<LlmAgentSession>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, work_id, provider, model, status, system_prompt, started_at, ended_at 
+             FROM llm_agent_sessions WHERE work_id = ? ORDER BY started_at DESC",
+        )?;
+
+        let session_iter = stmt.query_map([work_id], |row| {
+            Ok(LlmAgentSession {
+                id: row.get(0)?,
+                work_id: row.get(1)?,
+                provider: row.get(2)?,
+                model: row.get(3)?,
+                status: row.get(4)?,
+                system_prompt: row.get(5)?,
+                started_at: row.get(6)?,
+                ended_at: row.get(7)?,
+            })
+        })?;
+
+        let sessions: Result<Vec<_>, _> = session_iter.collect();
+        sessions.map_err(AppError::from)
+    }
+
+    pub fn create_llm_agent_message(
+        &self,
+        session_id: &str,
+        role: &str,
+        content: String,
+    ) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        conn.execute(
+            "INSERT INTO llm_agent_messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)",
+            params![session_id, role, content, now],
+        )?;
+
+        let message_id = conn.last_insert_rowid();
+        tracing::info!(
+            "Created LLM agent message: {} for session: {}",
+            message_id,
+            session_id
+        );
+        Ok(message_id)
+    }
+
+    pub fn get_llm_agent_messages(&self, session_id: &str) -> AppResult<Vec<LlmAgentMessage>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, role, content, created_at 
+             FROM llm_agent_messages WHERE session_id = ? ORDER BY created_at ASC",
+        )?;
+
+        let message_iter = stmt.query_map([session_id], |row| {
+            Ok(LlmAgentMessage {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                role: row.get(2)?,
+                content: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })?;
+
+        let messages: Result<Vec<_>, _> = message_iter.collect();
+        messages.map_err(AppError::from)
+    }
+
+    pub fn create_llm_agent_tool_call(&self, tool_call: &LlmAgentToolCall) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO llm_agent_tool_calls (session_id, message_id, tool_name, request, response, status, created_at, completed_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                tool_call.session_id,
+                tool_call.message_id,
+                tool_call.tool_name,
+                serde_json::to_string(&tool_call.request).unwrap_or_default(),
+                tool_call.response.as_ref().map(|r| serde_json::to_string(r).unwrap_or_default()),
+                tool_call.status,
+                tool_call.created_at,
+                tool_call.completed_at,
+            ],
+        )?;
+
+        let tool_call_id = conn.last_insert_rowid();
+        tracing::info!(
+            "Created LLM agent tool call: {} for session: {}",
+            tool_call_id,
+            tool_call.session_id
+        );
+        Ok(tool_call_id)
+    }
+
+    pub fn update_llm_agent_tool_call(&self, tool_call: &LlmAgentToolCall) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "UPDATE llm_agent_tool_calls 
+             SET session_id = ?, message_id = ?, tool_name = ?, request = ?, response = ?, status = ?, created_at = ?, completed_at = ? 
+             WHERE id = ?",
+            params![
+                tool_call.session_id,
+                tool_call.message_id,
+                tool_call.tool_name,
+                serde_json::to_string(&tool_call.request).unwrap_or_default(),
+                tool_call.response.as_ref().map(|r| serde_json::to_string(r).unwrap_or_default()),
+                tool_call.status,
+                tool_call.created_at,
+                tool_call.completed_at,
+                tool_call.id,
+            ],
+        )?;
+
+        tracing::info!("Updated LLM agent tool call: {}", tool_call.id);
+        Ok(())
+    }
+
+    pub fn get_llm_agent_tool_calls(&self, session_id: &str) -> AppResult<Vec<LlmAgentToolCall>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, message_id, tool_name, request, response, status, created_at, completed_at 
+             FROM llm_agent_tool_calls WHERE session_id = ? ORDER BY created_at ASC",
+        )?;
+
+        let tool_call_iter = stmt.query_map([session_id], |row| {
+            let request_str: String = row.get(3)?;
+            let response_str: Option<String> = row.get(4)?;
+
+            Ok(LlmAgentToolCall {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                message_id: row.get(2)?,
+                tool_name: row.get(5)?,
+                request: serde_json::from_str(&request_str).unwrap_or_default(),
+                response: response_str.and_then(|s| serde_json::from_str(&s).ok()),
+                status: row.get(6)?,
+                created_at: row.get(7)?,
+                completed_at: row.get(8)?,
+            })
+        })?;
+
+        let tool_calls: Result<Vec<_>, _> = tool_call_iter.collect();
+        tool_calls.map_err(AppError::from)
     }
 }
