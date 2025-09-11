@@ -43,7 +43,7 @@ export const mockAiSessionResponse = {
   session: {
     id: 'session-123',
     work_id: 'work-123',
-    tool_name: 'claude',
+    tool_name: 'llm-agent',
     status: 'running',
     created_at: '2024-01-01T00:00:00Z',
     started_at: Math.floor(Date.now() / 1000),
