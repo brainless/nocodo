@@ -12,9 +12,12 @@ test.describe('Error Handling', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('Read the contents of /etc/passwd'); // Try to access system file
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -60,9 +63,12 @@ test.describe('Error Handling', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill(longPrompt);
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -91,13 +97,20 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Try to select an invalid tool (if available)
-    const toolSelect = page.locator('select').first();
-    const options = await toolSelect.locator('option').allTextContents();
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Get all available tool options
+    const toolOptions = page.locator('div[role="option"]');
+    const optionCount = await toolOptions.count();
 
     // If there are options, try selecting one that might not be valid
-    if (options.length > 1) {
+    if (optionCount > 1) {
       // Select the last option (might be less tested)
-      await toolSelect.selectOption(options[options.length - 1]);
+      await toolOptions.nth(optionCount - 1).click();
+    } else {
+      // Fallback to first option
+      await toolOptions.first().click();
     }
 
     // Submit the form
@@ -125,9 +138,12 @@ test.describe('Error Handling', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('This is a test prompt for timeout handling');
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');

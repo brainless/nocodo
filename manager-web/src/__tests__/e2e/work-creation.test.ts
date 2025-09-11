@@ -13,8 +13,11 @@ test.describe('Work Creation', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Select a tool (default should be claude)
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -83,9 +86,12 @@ test.describe('Work Creation', () => {
       }
     }
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
