@@ -1,4 +1,4 @@
-import { test, expect } from './setup';
+import { expect, test } from './setup';
 
 test.describe('WebSocket Communication', () => {
   test('should establish WebSocket connection on page load', async ({ page }) => {
@@ -127,13 +127,17 @@ test.describe('WebSocket Communication', () => {
 
     // Monitor for real-time updates
     // Look for status changes or new content appearing
-    const initialContent = await page.locator('[class*="bg-black"], [class*="text-gray-100"]').count();
+    const initialContent = await page
+      .locator('[class*="bg-black"], [class*="text-gray-100"]')
+      .count();
 
     // Wait for processing with proper timeout
     await page.waitForSelector('[class*="bg-black"], [class*="text-gray-100"]', { timeout: 15000 });
 
     // Check if new content appeared (indicating WebSocket messages were processed)
-    const finalContent = await page.locator('[class*="bg-black"], [class*="text-gray-100"]').count();
+    const finalContent = await page
+      .locator('[class*="bg-black"], [class*="text-gray-100"]')
+      .count();
 
     // Should have at least some content after processing
     expect(finalContent).toBeGreaterThanOrEqual(initialContent);

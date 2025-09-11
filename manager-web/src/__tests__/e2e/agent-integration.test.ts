@@ -1,4 +1,4 @@
-import { test, expect } from './setup';
+import { expect, test } from './setup';
 
 test.describe('Agent Integration', () => {
   test('should process file listing request and display results', async ({ page }) => {

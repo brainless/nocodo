@@ -1,4 +1,4 @@
-import { test, expect } from './setup';
+import { expect, test } from './setup';
 
 test.describe('File Operations', () => {
   test('should successfully read and display file contents', async ({ page }) => {
