@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
-import type { AiSession, Project } from '../types';
+import type { AiSession, ExtendedAiSession, Project } from '../types';
 
 // Mock the router components
 vi.mock('@solidjs/router', () => ({
@@ -33,35 +33,38 @@ const mockProject: Project = {
   updated_at: 1640995200000,
 };
 
-const mockRunningSession: AiSession = {
+const mockRunningSession: ExtendedAiSession = {
   id: 'session-123',
   work_id: 'work-123',
   message_id: 'msg-123',
   tool_name: 'claude',
   status: 'running',
   project_context: 'Working on a React app',
+  prompt: 'Create a new React component',
   started_at: 1640995200,
   ended_at: null,
 };
 
-const mockCompletedSession: AiSession = {
+const mockCompletedSession: ExtendedAiSession = {
   id: 'session-456',
   work_id: 'work-456',
   message_id: 'msg-456',
   tool_name: 'gpt-4',
   status: 'completed',
   project_context: 'Authentication system needs debugging',
+  prompt: 'Fix bug in authentication',
   started_at: 1640995100,
   ended_at: 1640995300,
 };
 
-const mockSessionWithoutProject: AiSession = {
+const mockSessionWithoutProject: ExtendedAiSession = {
   id: 'session-789',
   work_id: 'work-789',
   message_id: 'msg-789',
   tool_name: 'gemini',
   status: 'failed',
   project_context: null,
+  prompt: 'Generate documentation',
   started_at: 1640994800,
   ended_at: 1640995000,
 };
