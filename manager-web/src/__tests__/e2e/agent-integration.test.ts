@@ -12,9 +12,12 @@ test.describe('Agent Integration', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
@@ -53,9 +56,12 @@ test.describe('Agent Integration', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('Read the contents of README.md');
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -89,9 +95,12 @@ test.describe('Agent Integration', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select tool
-    const toolSelect = page.locator('select').first();
-    await toolSelect.selectOption('claude');
+    // Select tool using custom dropdown
+    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    await toolButton.click();
+
+    // Wait for dropdown options and select claude
+    await page.locator('div[role="option"]:has-text("claude")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
