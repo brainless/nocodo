@@ -1,4 +1,4 @@
-import { test, expect } from './setup';
+import { expect, test } from './setup';
 
 test.describe('Error Handling', () => {
   test('should handle invalid file reading requests', async ({ page }) => {

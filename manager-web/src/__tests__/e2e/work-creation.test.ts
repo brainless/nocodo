@@ -1,4 +1,4 @@
-import { test, expect } from './setup';
+import { expect, test } from './setup';
 
 test.describe('Work Creation', () => {
   test('should create a new work session with file listing prompt', async ({ page }) => {
