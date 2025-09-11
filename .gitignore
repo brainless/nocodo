@@ -62,3 +62,7 @@ out/
 
 # Logs from manual tests
 test_logs/
+
+# Test results
+test-results/
+manager-web/test-results/
