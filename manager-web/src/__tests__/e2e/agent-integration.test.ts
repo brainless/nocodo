@@ -12,12 +12,15 @@ test.describe('Agent Integration', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select tool using custom dropdown
+    // Select tool using custom dropdown if not already llm-agent
     const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
-    await toolButton.click();
-
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    const currentTool = await toolButton.textContent();
+    
+    if (currentTool?.trim() !== 'llm-agent') {
+      await toolButton.click();
+      // Wait for dropdown options and select llm-agent
+      await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    }
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
@@ -60,8 +63,8 @@ test.describe('Agent Integration', () => {
     const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -99,8 +102,8 @@ test.describe('Agent Integration', () => {
     const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -110,7 +113,7 @@ test.describe('Agent Integration', () => {
     await page.waitForURL(/\/work\/\d+/);
 
     // Verify tool name is displayed
-    await expect(page.locator('text=claude')).toBeVisible();
+    await expect(page.locator('text=llm-agent')).toBeVisible();
 
     // Verify work status indicators are present
     const statusElements = page.locator('[class*="bg-"]');
