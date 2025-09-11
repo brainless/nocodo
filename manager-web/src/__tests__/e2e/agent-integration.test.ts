@@ -17,14 +17,14 @@ test.describe('Agent Integration', () => {
     await toolSelect.selectOption('claude');
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
     await page.waitForURL(/\/work\/\d+/);
 
-    // Wait for agent response (this might take some time)
-    await page.waitForTimeout(5000); // Wait 5 seconds for processing
+    // Wait for agent response with proper conditions
+    await page.waitForSelector('[class*="bg-black"], [class*="text-gray-100"]', { timeout: 10000 });
 
     // Verify we're on the work detail page
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();

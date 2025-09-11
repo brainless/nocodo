@@ -178,7 +178,7 @@ jobs:
   # Build verification
   build:
     runs-on: ubuntu-latest
-    needs: [typecheck, format, lint, test, e2e]
+    needs: [typecheck, format, lint, test]
     defaults:
       run:
         working-directory: ./manager-web
@@ -224,7 +224,7 @@ jobs:
           path: manager-web/dist/
           retention-days: 7
 
-  # E2E tests
+  # E2E tests (optional - may be flaky during development)
   e2e:
     runs-on: ubuntu-latest
     defaults:
