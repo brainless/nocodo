@@ -94,18 +94,15 @@ impl ToolExecutor {
 
         if recursive {
             // Use WalkDir for recursive listing
-            let mut walker = WalkDir::new(&target_path).into_iter();
+            let walker = WalkDir::new(&target_path);
 
-            while let Some(entry) = walker.next() {
+            for entry in walker {
                 let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
 
                 // Skip hidden files if not requested
                 if !include_hidden {
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     if file_name.starts_with('.') {
-                        if entry.path().is_dir() {
-                            walker.skip_current_dir();
-                        }
                         continue;
                     }
                 }
