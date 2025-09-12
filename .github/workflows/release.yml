@@ -147,9 +147,11 @@ jobs:
           ---
           🤖 Generated with [Claude Code](https://claude.ai/code)"
           
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
   release:
     name: Create Release
