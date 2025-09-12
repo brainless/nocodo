@@ -60,8 +60,8 @@ jobs:
 
        - name: Set up Rust
          uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+         with:
+           targets: ${{ matrix.target }}
 
       - name: Cache Rust dependencies
         uses: actions/cache@v4
@@ -75,8 +75,8 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Calculate commit count for issue branch
-        id: commit_count
-        shell: bash
+         id: commit_count
+         shell: bash
          run: |
            if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+).* ]]; then
              ISSUE_NUMBER="${BASH_REMATCH[2]}"
@@ -130,8 +130,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Calculate release info
-        id: release_info
+       - name: Calculate release info
+         id: release_info
          run: |
            if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+).* ]]; then
              ISSUE_NUMBER="${BASH_REMATCH[2]}"
@@ -215,11 +215,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: manager-web/package-lock.json
 
-      - name: Build manager-web
-        run: |
-          cd manager-web
-          npm ci
-          npm run build
+       - name: Build manager-web
+         run: |
+           cd manager-web
+           npm ci
+           npm run build
 
        - name: Set up Rust
          uses: dtolnay/rust-toolchain@stable
