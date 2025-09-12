@@ -109,7 +109,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: manager/${{ matrix.name }}
+          path: ${{ matrix.name }}
           retention-days: 30
 
       - name: Create release notes
