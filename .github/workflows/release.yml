@@ -116,42 +116,7 @@ jobs:
         if: steps.commit_count.outputs.is_issue_branch == 'true'
         id: release_notes
         run: |
-          NOTES="## Release ${{ steps.commit_count.outputs.release_tag }}
-
-          Self-contained nocodo-manager binary with embedded web interface.
-
-          ### Features
-          - 🚀 Single executable with embedded manager-web UI
-          - 🌐 Auto-launch browser on startup (use --no-browser to disable)  
-          - 📊 Complete API server with WebSocket support
-          - 🔧 Cross-platform support (Linux, macOS, Windows via WSL)
-
-          ### Usage
-          \`\`\`bash
-          # Download and run
-          chmod +x ${{ matrix.name }}
-          ./${{ matrix.name }}
-          
-          # Browser will automatically open to http://localhost:8081
-          # Use --no-browser flag to disable auto-launch
-          ./${{ matrix.name }} --no-browser
-          \`\`\`
-
-          ### Build Information
-          - Issue: #${{ steps.commit_count.outputs.issue_number }}
-          - Commit Count: ${{ steps.commit_count.outputs.commit_count }}
-          - Target: ${{ matrix.target }}
-          - Built: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          - Commit: ${{ github.sha }}
-
-          ---
-          🤖 Generated with [Claude Code](https://claude.ai/code)"
-          
-          {
-            echo "notes<<EOF"
-            echo "$NOTES"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          echo "notes=Release ${{ steps.commit_count.outputs.release_tag }} - Self-contained nocodo-manager binary" >> $GITHUB_OUTPUT
 
   release:
     name: Create Release
