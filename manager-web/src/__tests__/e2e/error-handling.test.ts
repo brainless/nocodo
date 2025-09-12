@@ -26,7 +26,7 @@ test.describe('Error Handling', () => {
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Wait for agent processing
     await page.waitForTimeout(8000);
