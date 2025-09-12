@@ -897,7 +897,7 @@ pub async fn create_ai_session(
     };
 
     let session =
-        crate::models::AiSession::new(work_id, req.message_id, req.tool_name, project_context);
+        crate::models::AiSession::new(work_id.clone(), req.message_id, req.tool_name.clone(), project_context);
 
     // Persist
     data.database.create_ai_session(&session)?;
@@ -911,8 +911,58 @@ pub async fn create_ai_session(
         session: session.clone(),
     };
 
+    // Handle LLM agent specially
+    if req.tool_name == "llm-agent" {
+        if let Some(ref llm_agent) = data.llm_agent {
+            tracing::info!(
+                "LLM agent is available, starting LLM agent session for session {}",
+                session.id
+            );
+
+            // Get the prompt from the associated message
+            let message = messages
+                .iter()
+                .find(|m| m.id == session.message_id)
+                .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
+
+            // Get project path for LLM agent
+            let _project_path = if let Some(ref project_id) = work.project_id {
+                let project = data.database.get_project_by_id(project_id)?;
+                std::path::PathBuf::from(project.path)
+            } else {
+                std::env::current_dir().map_err(|e| {
+                    AppError::Internal(format!("Failed to get current directory: {}", e))
+                })?
+            };
+
+            // Create LLM agent session with default provider/model
+            let llm_session = llm_agent
+                .create_session(
+                    work_id.clone(),
+                    "grok".to_string(), // Default provider
+                    "grok-beta".to_string(), // Default model
+                    session.project_context.clone(),
+                )
+                .await?;
+
+            // Process the message
+            let _response = llm_agent
+                .process_message(&llm_session.id, message.content.clone())
+                .await?;
+
+            tracing::info!(
+                "Successfully started LLM agent processing for session {}",
+                session.id
+            );
+        } else {
+            tracing::warn!(
+                "LLM agent not available - AI session {} will not be executed",
+                session.id
+            );
+        }
+    }
     // If runner is enabled, start streaming execution for this session in background
-    if let Some(runner) = &data.runner {
+    else if let Some(runner) = &data.runner {
         tracing::info!(
             "Runner is available, starting AI session execution for session {}",
             session.id

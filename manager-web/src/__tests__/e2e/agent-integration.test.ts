@@ -68,7 +68,7 @@ test.describe('Agent Integration', () => {
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Wait for agent response
     await page.waitForTimeout(5000);
@@ -109,7 +109,7 @@ test.describe('Agent Integration', () => {
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Verify tool name is displayed
     await expect(page.locator('text=llm-agent')).toBeVisible();
