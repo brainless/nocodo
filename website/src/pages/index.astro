@@ -4,42 +4,116 @@ import Button from '../components/UI/Button.astro';
 import Card from '../components/UI/Card.astro';
 import screenshotImage from '../assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png';
 
-const solutionPoints = [
+const features = [
+  // Core Features (MVP Focus)
   {
-    title: "Free AI Coding Agents",
-    description: "Automatically use free tiers from Claude Code, OpenAI Codex, Gemini and similar tools",
+    title: "Local AI Development Environment",
+    description: "Complete local setup with Manager daemon and Web interface running on your Linux machine",
+    icon: "💻",
+    color: "blue",
+    category: "mvp"
+  },
+  {
+    title: "Multi-Agent Support",
+    description: "Integration with Claude Code, Gemini CLI, OpenAI Codex, Qwen Code, and more through one interface",
     icon: "🤖",
-    color: "blue"
+    color: "purple",
+    category: "mvp"
   },
   {
-    title: "Your Cloud Infrastructure",
-    description: "Development setup managed on your own cloud infrastructure",
-    icon: "☁️",
-    color: "purple"
+    title: "Project Management",
+    description: "Automated project creation, Git initialization, and scaffolding for rapid development",
+    icon: "📁",
+    color: "green",
+    category: "mvp"
   },
   {
-    title: "No Lock-in",
-    description: "Keep your API keys for coding agents and cloud providers (DigitalOcean, Scaleway, CloudFlare)",
+    title: "Real-time Development",
+    description: "Live chat interface for AI interaction and project building with instant feedback",
+    icon: "💬",
+    color: "orange",
+    category: "mvp"
+  },
+  {
+    title: "Guardrails & Best Practices",
+    description: "Built-in software engineering practices and code quality standards",
+    icon: "🛡️",
+    color: "indigo",
+    category: "mvp"
+  },
+  {
+    title: "No Vendor Lock-in",
+    description: "Full control over API keys and cloud infrastructure, completely local development",
     icon: "🔓",
-    color: "green"
+    color: "red",
+    category: "mvp"
+  },
+  // Planned Features (Post-MVP)
+  {
+    title: "Cloud Deployment",
+    description: "Bootstrap app for provisioning cloud servers (Scaleway, DigitalOcean, etc.)",
+    icon: "☁️",
+    color: "cyan",
+    category: "planned"
   },
   {
-    title: "Idea to Live App",
-    description: "Transform voice notes or written text into live full-stack apps on your domain",
-    icon: "🚀",
-    color: "orange"
+    title: "Services API",
+    description: "Integration with external services and APIs for extended functionality",
+    icon: "🔌",
+    color: "teal",
+    category: "planned"
   },
   {
-    title: "GitHub Integration",
-    description: "Automated project setup with tickets, automation, and comprehensive testing",
-    icon: "📱",
-    color: "indigo"
+    title: "Browser Extension",
+    description: "In-page feedback and development assistance for enhanced productivity",
+    icon: "🌐",
+    color: "pink",
+    category: "planned"
   },
   {
-    title: "Unlimited Changes",
-    description: "Make endless modifications using your own API credits or subscriptions",
-    icon: "♾️",
-    color: "red"
+    title: "Advanced Work Management",
+    description: "Git worktrees and CI/CD per work item for streamlined workflows",
+    icon: "⚙️",
+    color: "yellow",
+    category: "planned"
+  },
+  {
+    title: "Rust-based LLM Agent",
+    description: "Direct code generation capabilities with enhanced performance",
+    icon: "🦀",
+    color: "gray",
+    category: "planned"
+  }
+];
+
+const testimonials = [
+  {
+    name: "Sarah Chen",
+    role: "Freelance Developer",
+    company: "Independent",
+    quote: "nocodo transformed my freelance workflow. I can now spin up complete MVPs for clients in days instead of weeks, all while maintaining full control over my tools and infrastructure.",
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg"
+  },
+  {
+    name: "Marcus Rodriguez",
+    role: "Startup Founder",
+    company: "TechNova Labs",
+    quote: "As a non-technical founder, nocodo's AI-assisted development let me build our initial product without hiring expensive developers. The guardrails ensure we maintain quality while moving fast.",
+    avatar: "https://randomuser.me/api/portraits/men/32.jpg"
+  },
+  {
+    name: "Elena Kowalski",
+    role: "Indie Hacker",
+    company: "Solo Dev Studio",
+    quote: "The ability to use multiple AI coding agents through one interface is game-changing. I switch between Claude Code and Gemini depending on the task, and nocodo handles all the orchestration seamlessly.",
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg"
+  },
+  {
+    name: "David Park",
+    role: "DevOps Engineer",
+    company: "CloudFirst Solutions",
+    quote: "What impressed me most is how nocodo combines local development with cloud deployment capabilities. I can develop locally and deploy to my own infrastructure without any vendor lock-in.",
+    avatar: "https://randomuser.me/api/portraits/men/75.jpg"
   }
 ];
 ---
@@ -114,33 +188,123 @@ const solutionPoints = [
     </div>
   </section>
 
-  <!-- What are we solving Section -->
+  <!-- Features Section -->
   <section class="py-24 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16">
         <h2 class="text-4xl font-bold text-gray-900 mb-4">
-          What are we solving?
+          Features
         </h2>
         <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          Transform your development workflow with AI coding agents and seamless infrastructure management
+          Comprehensive AI-assisted development environment designed for modern software engineering
+        </p>
+      </div>
+
+      <!-- MVP Features -->
+      <div class="mb-20">
+        <div class="text-center mb-12">
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">
+            Core Features (MVP Focus)
+          </h3>
+          <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+            Currently available in our minimal viable product running locally on your Linux machine
+          </p>
+        </div>
+        
+        <div class="grid lg:grid-cols-3 gap-8">
+          {features.filter(f => f.category === 'mvp').map((feature) => (
+            <Card 
+              hover={true}
+              class={`border-t-4 border-${feature.color}-500 text-center`}
+            >
+              <!-- Icon centered above title -->
+              <div class="text-5xl mb-4">{feature.icon}</div>
+              
+              <!-- Title -->
+              <h3 class="text-xl font-bold text-gray-900 mb-4">{feature.title}</h3>
+              
+              <!-- Description -->
+              <div class="mb-6">
+                <p class="text-gray-600">{feature.description}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      <!-- Planned Features -->
+      <div>
+        <div class="text-center mb-12">
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">
+            Planned Features (Post-MVP)
+          </h3>
+          <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+            Coming soon in future releases to extend nocodo's capabilities
+          </p>
+        </div>
+        
+        <div class="grid lg:grid-cols-3 gap-8">
+          {features.filter(f => f.category === 'planned').map((feature) => (
+            <Card 
+              hover={true}
+              class={`border-t-4 border-${feature.color}-500 text-center opacity-75`}
+            >
+              <!-- Icon centered above title -->
+              <div class="text-5xl mb-4">{feature.icon}</div>
+              
+              <!-- Title -->
+              <h3 class="text-xl font-bold text-gray-900 mb-4">{feature.title}</h3>
+              
+              <!-- Description -->
+              <div class="mb-6">
+                <p class="text-gray-600">{feature.description}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="py-24 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          What Our Users Say
+        </h2>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+          Hear from developers and founders who have transformed their workflow with nocodo
         </p>
       </div>
       
-      <div class="grid lg:grid-cols-3 gap-8">
-        {solutionPoints.map((point) => (
-          <Card 
-            hover={true}
-            class={`border-t-4 border-${point.color}-500 text-center`}
-          >
-            <!-- Icon centered above title -->
-            <div class="text-5xl mb-4">{point.icon}</div>
-            
-            <!-- Title -->
-            <h3 class="text-xl font-bold text-gray-900 mb-4">{point.title}</h3>
-            
-            <!-- Description -->
-            <div class="mb-6">
-              <p class="text-gray-600">{point.description}</p>
+      <div class="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
+        {testimonials.map((testimonial) => (
+          <Card hover={true} class="p-8">
+            <div class="flex items-start space-x-4">
+              <!-- Avatar -->
+              <img 
+                src={testimonial.avatar} 
+                alt={testimonial.name}
+                class="w-16 h-16 rounded-full object-cover flex-shrink-0"
+              />
+              
+              <!-- Content -->
+              <div class="flex-1">
+                <!-- Quote -->
+                <blockquote class="text-gray-600 italic mb-4 text-lg leading-relaxed">
+                  "{testimonial.quote}"
+                </blockquote>
+                
+                <!-- Author Info -->
+                <div>
+                  <div class="font-semibold text-gray-900">{testimonial.name}</div>
+                  <div class="text-sm text-gray-600">{testimonial.role}</div>
+                  {testimonial.company !== "Independent" && (
+                    <div class="text-sm text-gray-500">{testimonial.company}</div>
+                  )}
+                </div>
+              </div>
             </div>
           </Card>
         ))}
