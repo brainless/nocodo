@@ -58,8 +58,8 @@ jobs:
           npm run build
           ls -la dist/
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+       - name: Set up Rust
+         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
@@ -77,11 +77,11 @@ jobs:
       - name: Calculate commit count for issue branch
         id: commit_count
         shell: bash
-        run: |
-          if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+) ]]; then
-            ISSUE_NUMBER="${BASH_REMATCH[2]}"
-            # Count commits since branching from main
-            COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
+         run: |
+           if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+).* ]]; then
+             ISSUE_NUMBER="${BASH_REMATCH[2]}"
+             # Count commits since branching from main
+             COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
             RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
             echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
             echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
@@ -132,10 +132,10 @@ jobs:
 
       - name: Calculate release info
         id: release_info
-        run: |
-          if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+) ]]; then
-            ISSUE_NUMBER="${BASH_REMATCH[2]}"
-            COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
+         run: |
+           if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+).* ]]; then
+             ISSUE_NUMBER="${BASH_REMATCH[2]}"
+             COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
             RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
             echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
             echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
