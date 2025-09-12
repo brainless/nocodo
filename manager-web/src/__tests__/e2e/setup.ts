@@ -43,10 +43,12 @@ export const mockAiSessionResponse = {
   session: {
     id: 'session-123',
     work_id: 'work-123',
+    message_id: 'message-123',
     tool_name: 'llm-agent',
     status: 'running',
-    created_at: '2024-01-01T00:00:00Z',
+    project_context: null,
     started_at: Math.floor(Date.now() / 1000),
+    ended_at: null,
   },
 };
 
@@ -102,7 +104,7 @@ export const test = base.extend({
     });
 
     // Mock AI session creation API
-    await page.route('**/api/work/*/ai-sessions', async route => {
+    await page.route('**/api/work/*/sessions', async route => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
