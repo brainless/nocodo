@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'issue-*'
+      - 'feature/issue-*'
   pull_request:
     branches:
       - main
@@ -77,8 +78,8 @@ jobs:
         id: commit_count
         shell: bash
         run: |
-          if [[ "${{ github.ref_name }}" =~ ^issue-([0-9]+) ]]; then
-            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+          if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+) ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[2]}"
             # Count commits since branching from main
             COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
             RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
@@ -154,7 +155,7 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref_name, 'issue-')
+    if: github.event_name == 'push' && (contains(github.ref_name, 'issue-') || contains(github.ref_name, 'feature/issue-'))
     
     steps:
       - name: Checkout code
@@ -165,8 +166,8 @@ jobs:
       - name: Calculate release info
         id: release_info
         run: |
-          if [[ "${{ github.ref_name }}" =~ ^issue-([0-9]+) ]]; then
-            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+          if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+) ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[2]}"
             COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
             RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
             echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
