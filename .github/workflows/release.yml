@@ -203,7 +203,7 @@ jobs:
     name: Test Embedded Assets
     runs-on: ubuntu-latest
     needs: build
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -222,18 +222,19 @@ jobs:
           npm run build
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
-       - name: Test embedded assets
-         working-directory: manager
-         run: |
-           # Run tests to validate embedded assets (in release mode to access embedded assets)
-           cargo test --release embedded_assets_exist
-           cargo test --release asset_validation
-          
+      - name: Test embedded assets
+        working-directory: manager
+        run: |
+          # Run tests to validate embedded assets
+          cargo test --release embedded_assets_exist
+          cargo test --release asset_validation
+
           # Build and check binary size
           cargo build --release
           ls -lh ../target/release/nocodo-manager
-          
-          # Basic smoke test (server should start and validate assets)
+
+          # Basic smoke test
           timeout 10 ../target/release/nocodo-manager --no-browser || echo "Server startup test completed"
+
