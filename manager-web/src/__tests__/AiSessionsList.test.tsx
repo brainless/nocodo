@@ -54,6 +54,7 @@ const mockSessions: AiSession[] = [
     project_context: 'Test context 1',
     started_at: 1640995200,
     ended_at: null,
+    prompt: 'Test prompt for session 1',
   },
   {
     id: 'session-456',
@@ -64,6 +65,7 @@ const mockSessions: AiSession[] = [
     project_context: 'Test context 2',
     started_at: 1640995100,
     ended_at: 1640995300,
+    prompt: 'Test prompt for session 2',
   },
   {
     id: 'session-789',
@@ -74,6 +76,7 @@ const mockSessions: AiSession[] = [
     project_context: null,
     started_at: 1640994800,
     ended_at: 1640995000,
+    prompt: 'Test prompt for session 3',
   },
 ];
 
@@ -178,8 +181,9 @@ describe('AiSessionsList Component', () => {
     render(() => <AiSessionsList />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      // Just check that the No Project element is present
-      expect(screen.getByText('No Project')).toBeInTheDocument();
+      // Check that No Project elements are present (multiple sessions without projects)
+      const noProjectElements = screen.getAllByText('No Project');
+      expect(noProjectElements.length).toBeGreaterThan(0);
     });
   });
 
