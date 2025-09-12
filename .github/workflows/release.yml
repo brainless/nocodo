@@ -1,62 +1,63 @@
 name: Build Self-contained Manager Releases
+name: Build Self-contained Manager Releases
 
 on:
-  push:
-    branches:
-      - 'issue-*'
-      - 'feature/issue-*'
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+   push:
+     branches:
+       - 'issue-*'
+       - 'feature/issue-*'
+   pull_request:
+     branches:
+       - main
+   workflow_dispatch:
 
-permissions:
-  contents: write
+ permissions:
+   contents: write
 
-env:
-  CARGO_TERM_COLOR: always
+ env:
+   CARGO_TERM_COLOR: always
 
-jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: nocodo-manager-linux-x64
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: nocodo-manager-macos-x64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: nocodo-manager-macos-arm64
+ jobs:
+   build:
+     name: Build ${{ matrix.target }}
+     runs-on: ${{ matrix.os }}
+     strategy:
+       fail-fast: false
+       matrix:
+         include:
+           - target: x86_64-unknown-linux-gnu
+             os: ubuntu-latest
+             name: nocodo-manager-linux-x64
+           - target: x86_64-apple-darwin
+             os: macos-latest
+             name: nocodo-manager-macos-x64
+           - target: aarch64-apple-darwin
+             os: macos-latest
+             name: nocodo-manager-macos-arm64
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
+         with:
+           fetch-depth: 0
 
-      - name: Fetch origin/main
-        run: git fetch origin main
+       - name: Fetch origin/main
+         run: git fetch origin main
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: manager-web/package-lock.json
+       - name: Set up Node.js
+         uses: actions/setup-node@v4
+         with:
+           node-version: '20'
+           cache: 'npm'
+           cache-dependency-path: manager-web/package-lock.json
 
-      - name: Build manager-web
-        shell: bash
-        run: |
-          cd manager-web
-          npm ci
-          npm run build
-          ls -la dist/
+       - name: Build manager-web
+         shell: bash
+         run: |
+           cd manager-web
+           npm ci
+           npm run build
+           ls -la dist/
 
        - name: Set up Rust
          uses: dtolnay/rust-toolchain@stable
