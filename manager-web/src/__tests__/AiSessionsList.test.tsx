@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor } from '@solidjs/testing-library';
 import { SessionsProvider } from '../stores/sessionsStore';
 import { apiClient } from '../api';
-import type { AiSession, Project } from '../types';
+import type { ExtendedAiSession, Project } from '../types';
 
 vi.mock('../api');
 
@@ -44,7 +44,7 @@ const mockProjects: Project[] = [
   },
 ];
 
-const mockSessions: AiSession[] = [
+const mockSessions: ExtendedAiSession[] = [
   {
     id: 'session-123',
     work_id: 'work-123',
