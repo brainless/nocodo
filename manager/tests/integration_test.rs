@@ -22,6 +22,7 @@ async fn test_project_creation_workflow() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         terminal_runner: None,
+        llm_agent: None,
     });
 
     // Initialize the test app

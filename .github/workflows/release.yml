@@ -247,12 +247,12 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test embedded assets
-        working-directory: manager
-        run: |
-          # Run tests to validate embedded assets
-          cargo test embedded_assets_exist
-          cargo test asset_validation
+       - name: Test embedded assets
+         working-directory: manager
+         run: |
+           # Run tests to validate embedded assets (in release mode to access embedded assets)
+           cargo test --release embedded_assets_exist
+           cargo test --release asset_validation
           
           # Build and check binary size
           cargo build --release
