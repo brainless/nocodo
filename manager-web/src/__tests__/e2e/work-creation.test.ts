@@ -13,7 +13,9 @@ test.describe('Work Creation', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Select a tool (default should be llm-agent)
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -24,7 +26,7 @@ test.describe('Work Creation', () => {
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Verify we're on the work detail page
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();
@@ -87,7 +89,9 @@ test.describe('Work Creation', () => {
     }
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -98,7 +102,7 @@ test.describe('Work Creation', () => {
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Verify we're on the work detail page
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();

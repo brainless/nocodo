@@ -13,7 +13,9 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('Read the contents of /etc/passwd'); // Try to access system file
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -64,7 +66,9 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill(longPrompt);
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -97,7 +101,9 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Try to select an invalid tool (if available)
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Get all available tool options
@@ -139,7 +145,9 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('This is a test prompt for timeout handling');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent

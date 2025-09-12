@@ -13,7 +13,9 @@ test.describe('File Operations', () => {
     await promptTextarea.fill('Read the contents of README.md');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -56,7 +58,9 @@ test.describe('File Operations', () => {
     await promptTextarea.fill('Read the contents of package.json');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -97,7 +101,9 @@ test.describe('File Operations', () => {
     await promptTextarea.fill('Read the contents of nonexistent-file.txt');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent

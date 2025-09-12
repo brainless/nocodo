@@ -31,7 +31,9 @@ test.describe('WebSocket Communication', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
@@ -115,7 +117,9 @@ test.describe('WebSocket Communication', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Wait for dropdown options and select llm-agent
