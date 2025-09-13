@@ -939,6 +939,11 @@ pub async fn create_ai_session(
                 })?
             };
 
+            // Update work with tool_name and model info
+            let mut updated_work = work.clone();
+            updated_work.tool_name = Some("LLM Agent (Grok Code Fast 1)".to_string());
+            data.database.update_work(&updated_work)?;
+
             // Create LLM agent session with default provider/model
             let llm_session = llm_agent
                 .create_session(
@@ -1041,7 +1046,32 @@ pub async fn list_ai_session_outputs(
     let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
 
     // Get outputs for this session
-    let outputs = data.database.list_ai_session_outputs(&session.id)?;
+    let mut outputs = data.database.list_ai_session_outputs(&session.id)?;
+
+    // If this is an LLM agent session, also fetch LLM agent messages
+    if session.tool_name == "llm-agent" {
+        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(&work_id) {
+            if let Ok(llm_messages) = data.database.get_llm_agent_messages(&llm_agent_session.id) {
+                // Convert LLM agent messages to AiSessionOutput format
+                for msg in llm_messages {
+                    // Only include assistant messages (responses) and tool messages (results)
+                    if msg.role == "assistant" || msg.role == "tool" {
+                        let output = AiSessionOutput {
+                            id: msg.id,
+                            session_id: session.id.clone(),
+                            content: msg.content,
+                            created_at: msg.created_at,
+                        };
+                        outputs.push(output);
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort outputs by created_at
+    outputs.sort_by_key(|o| o.created_at);
+
     let response = AiSessionOutputListResponse { outputs };
 
     tracing::debug!(
