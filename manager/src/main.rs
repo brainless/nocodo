@@ -38,7 +38,7 @@ use websocket::{WebSocketBroadcaster, WebSocketServer};
 async fn main() -> AppResult<()> {
     // Load .env file if it exists
     dotenvy::dotenv().ok();
-    
+
     // Parse command line arguments
     let matches = Command::new("nocodo-manager")
         .version("0.1.0")

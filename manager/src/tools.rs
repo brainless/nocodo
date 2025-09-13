@@ -14,12 +14,15 @@ use walkdir::WalkDir;
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
     #[error("File not found: {0}")]
+    #[allow(dead_code)]
     FileNotFound(String),
     #[error("Permission denied: {0}")]
+    #[allow(dead_code)]
     PermissionDenied(String),
     #[error("Invalid path: {0}")]
     InvalidPath(String),
     #[error("File too large: {0} bytes (max: {1})")]
+    #[allow(dead_code)]
     FileTooLarge(u64, u64),
     #[error("IO error: {0}")]
     IoError(String),
@@ -53,6 +56,7 @@ impl ToolExecutor {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_max_file_size(mut self, max_size: u64) -> Self {
         self.max_file_size = max_size;
         self
@@ -288,6 +292,7 @@ impl ToolExecutor {
     }
 
     /// Execute tool from JSON value (for LLM integration)
+    #[allow(dead_code)]
     pub async fn execute_from_json(&self, json_request: Value) -> Result<Value> {
         let tool_request: ToolRequest = serde_json::from_value(json_request)?;
         let tool_response = self.execute(tool_request).await?;

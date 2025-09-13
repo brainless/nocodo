@@ -80,6 +80,7 @@ pub struct StreamChunk {
 #[async_trait]
 pub trait LlmClient: Send + Sync {
     /// Complete a prompt without streaming
+    #[allow(dead_code)]
     async fn complete(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse>;
 
     /// Complete a prompt with streaming response
@@ -89,9 +90,11 @@ pub trait LlmClient: Send + Sync {
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>;
 
     /// Get the provider name
+    #[allow(dead_code)]
     fn provider(&self) -> &str;
 
     /// Get the model name
+    #[allow(dead_code)]
     fn model(&self) -> &str;
 }
 
@@ -115,6 +118,7 @@ impl OpenAiCompatibleClient {
         }
     }
 
+    #[allow(dead_code)]
     async fn make_request(&self, request: LlmCompletionRequest) -> Result<reqwest::Response> {
         let mut req = self
             .client

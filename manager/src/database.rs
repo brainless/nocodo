@@ -1466,6 +1466,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_llm_agent_tool_calls(&self, session_id: &str) -> AppResult<Vec<LlmAgentToolCall>> {
         let conn = self
             .connection
