@@ -94,6 +94,12 @@ pub enum WebSocketMessage {
     // Ping/Pong for connection keep-alive
     Ping,
     Pong,
+
+    // LLM Agent messages
+    LlmAgentChunk {
+        session_id: String,
+        content: String,
+    },
 }
 
 /// WebSocket connection actor
@@ -732,6 +738,16 @@ impl WebSocketBroadcaster {
             message: WebSocketMessage::TerminalControl {
                 session_id,
                 message,
+            },
+        });
+    }
+
+    /// Broadcast LLM agent chunk
+    pub async fn broadcast_llm_agent_chunk(&self, session_id: String, content: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::LlmAgentChunk {
+                session_id,
+                content,
             },
         });
     }

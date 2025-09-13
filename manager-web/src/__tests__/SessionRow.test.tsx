@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
-import type { AiSession, ExtendedAiSession, Project } from '../types';
+import type { ExtendedAiSession, Project } from '../types';
 
 // Mock the router components
 vi.mock('@solidjs/router', () => ({

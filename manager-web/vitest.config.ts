@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
+    exclude: ['src/__tests__/e2e/**', 'node_modules/**'],
     transformMode: {
       web: [/\.[jt]sx?$/]
     },

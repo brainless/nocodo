@@ -13,18 +13,20 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('Read the contents of /etc/passwd'); // Try to access system file
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Wait for agent processing
     await page.waitForTimeout(8000);
@@ -64,11 +66,13 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill(longPrompt);
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -97,7 +101,9 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Try to select an invalid tool (if available)
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
     // Get all available tool options
@@ -139,11 +145,13 @@ test.describe('Error Handling', () => {
     await promptTextarea.fill('This is a test prompt for timeout handling');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');

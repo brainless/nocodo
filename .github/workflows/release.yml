@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'issue-*'
+      - 'feature/issue-*'
   pull_request:
     branches:
       - main
@@ -39,6 +40,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch origin/main
+        run: git fetch origin main
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -60,16 +64,22 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: actions/cache@v4
         with:
-          workspaces: manager
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Calculate commit count for issue branch
         id: commit_count
         shell: bash
         run: |
-          if [[ "${{ github.ref_name }}" =~ ^issue-([0-9]+) ]]; then
-            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+          if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+).* ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[2]}"
             # Count commits since branching from main
             COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
             RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
@@ -86,14 +96,13 @@ jobs:
         working-directory: manager
         run: |
           cargo build --release --target ${{ matrix.target }}
-          
+
       - name: Prepare release artifact (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           cp target/${{ matrix.target }}/release/nocodo-manager ${{ matrix.name }}
           chmod +x ${{ matrix.name }}
           file ${{ matrix.name }}
-
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -106,47 +115,14 @@ jobs:
         if: steps.commit_count.outputs.is_issue_branch == 'true'
         id: release_notes
         run: |
-          NOTES="## Release ${{ steps.commit_count.outputs.release_tag }}
-
-          Self-contained nocodo-manager binary with embedded web interface.
-
-          ### Features
-          - 🚀 Single executable with embedded manager-web UI
-          - 🌐 Auto-launch browser on startup (use --no-browser to disable)  
-          - 📊 Complete API server with WebSocket support
-          - 🔧 Cross-platform support (Linux, macOS, Windows via WSL)
-
-          ### Usage
-          \`\`\`bash
-          # Download and run
-          chmod +x ${{ matrix.name }}
-          ./${{ matrix.name }}
-          
-          # Browser will automatically open to http://localhost:8081
-          # Use --no-browser flag to disable auto-launch
-          ./${{ matrix.name }} --no-browser
-          \`\`\`
-
-          ### Build Information
-          - Issue: #${{ steps.commit_count.outputs.issue_number }}
-          - Commit Count: ${{ steps.commit_count.outputs.commit_count }}
-          - Target: ${{ matrix.target }}
-          - Built: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          - Commit: ${{ github.sha }}
-
-          ---
-          🤖 Generated with [Claude Code](https://claude.ai/code)"
-          
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "notes=Release ${{ steps.commit_count.outputs.release_tag }} - Self-contained nocodo-manager binary" >> $GITHUB_OUTPUT
 
   release:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref_name, 'issue-')
-    
+    if: github.event_name == 'push' && (contains(github.ref_name, 'issue-') || contains(github.ref_name, 'feature/issue-'))
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -156,8 +132,8 @@ jobs:
       - name: Calculate release info
         id: release_info
         run: |
-          if [[ "${{ github.ref_name }}" =~ ^issue-([0-9]+) ]]; then
-            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+          if [[ "${{ github.ref_name }}" =~ ^(feature/)?issue-([0-9]+).* ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[2]}"
             COMMIT_COUNT=$(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "1")
             RELEASE_TAG="issue-${ISSUE_NUMBER}-${COMMIT_COUNT}"
             echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
@@ -180,36 +156,36 @@ jobs:
           name: "nocodo-manager ${{ steps.release_info.outputs.release_tag }}"
           body: |
             ## Self-contained nocodo-manager Release
-            
+
             🚀 **Single executable with embedded web interface**
-            
+
             ### Features
             - Complete nocodo-manager daemon with embedded manager-web UI
             - Auto-launch browser on startup (use `--no-browser` to disable)
-            - Cross-platform support (Linux, macOS, Windows via WSL)  
+            - Cross-platform support (Linux, macOS, Windows via WSL)
             - No external dependencies or web files required
-            
+
             ### Quick Start
             1. Download the appropriate binary for your platform
             2. Make it executable: `chmod +x nocodo-manager-*`
             3. Run it: `./nocodo-manager-*`
             4. Browser opens automatically to http://localhost:8081
-            
+
             ### Build Details
             - **Issue**: #${{ steps.release_info.outputs.issue_number }}
             - **Commits**: ${{ steps.release_info.outputs.commit_count }} since main branch
             - **Commit**: ${{ github.sha }}
             - **Built**: ${{ github.run_started_at }}
-            
+
             ### Platform Binaries
             - `nocodo-manager-linux-x64` - Linux x86_64 (also works in WSL on Windows)
-            - `nocodo-manager-macos-x64` - macOS Intel  
+            - `nocodo-manager-macos-x64` - macOS Intel
             - `nocodo-manager-macos-arm64` - macOS Apple Silicon
-            
+
             ### Windows Users
             Use the Linux binary (`nocodo-manager-linux-x64`) in WSL (Windows Subsystem for Linux).
             Native Windows support is not available due to PTY dependencies.
-            
+
             ---
             🤖 Generated with [Claude Code](https://claude.ai/code)
           files: |
@@ -226,7 +202,7 @@ jobs:
     name: Test Embedded Assets
     runs-on: ubuntu-latest
     needs: build
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -251,12 +227,12 @@ jobs:
         working-directory: manager
         run: |
           # Run tests to validate embedded assets
-          cargo test embedded_assets_exist
-          cargo test asset_validation
-          
+          cargo test --release embedded_assets_exist
+          cargo test --release asset_validation
+
           # Build and check binary size
           cargo build --release
           ls -lh ../target/release/nocodo-manager
-          
-          # Basic smoke test (server should start and validate assets)
+
+          # Basic smoke test
           timeout 10 ../target/release/nocodo-manager --no-browser || echo "Server startup test completed"

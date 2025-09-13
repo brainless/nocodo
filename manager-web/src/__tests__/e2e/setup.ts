@@ -23,6 +23,8 @@ export const mockWorkResponse = {
     id: 'work-123',
     title: 'Test Work',
     project_id: null,
+    tool_name: 'llm-agent',
+    status: 'running',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
@@ -43,10 +45,12 @@ export const mockAiSessionResponse = {
   session: {
     id: 'session-123',
     work_id: 'work-123',
-    tool_name: 'claude',
+    message_id: 'message-123',
+    tool_name: 'llm-agent',
     status: 'running',
-    created_at: '2024-01-01T00:00:00Z',
+    project_context: null,
     started_at: Math.floor(Date.now() / 1000),
+    ended_at: null,
   },
 };
 
@@ -102,9 +106,38 @@ export const test = base.extend({
     });
 
     // Mock AI session creation API
-    await page.route('**/api/work/*/ai-sessions', async route => {
+    await page.route('**/api/work/*/sessions', async route => {
       await route.fulfill({
         status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(mockAiSessionResponse),
+      });
+    });
+
+    // Mock individual work fetch API
+    await page.route('**/api/work/work-123', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          work: mockWorkResponse.work,
+          messages: [{
+            id: 'message-123',
+            content: 'List all files in the root directory',
+            content_type: 'text',
+            author_type: 'user',
+            author_id: null,
+            created_at: '2024-01-01T00:00:00Z',
+          }],
+          total_messages: 1,
+        }),
+      });
+    });
+
+    // Mock individual session fetch API
+    await page.route('**/api/work/*/sessions/*', async route => {
+      await route.fulfill({
+        status: 200,
         contentType: 'application/json',
         body: JSON.stringify(mockAiSessionResponse),
       });
@@ -143,17 +176,23 @@ export const test = base.extend({
         send() {
           // Mock sending messages
           setTimeout(() => {
-            // Simulate receiving a response
-            this.dispatchEvent(
-              new MessageEvent('message', {
-                data: JSON.stringify({
-                  type: 'work_update',
-                  work_id: 'work-123',
-                  status: 'completed',
-                  output: 'Mock agent response: Files listed successfully',
-                }),
-              })
-            );
+            // Simulate receiving LLM agent chunks
+            const mockResponse = 'Mock agent response: Files listed successfully';
+            for (let i = 0; i < mockResponse.length; i++) {
+              setTimeout(() => {
+                this.dispatchEvent(
+                  new MessageEvent('message', {
+                    data: JSON.stringify({
+                      type: 'LlmAgentChunk',
+                      payload: {
+                        session_id: 'session-123',
+                        content: mockResponse[i],
+                      },
+                    }),
+                  })
+                );
+              }, 2000 + i * 50); // Stagger the chunks
+            }
           }, 2000);
         }
 

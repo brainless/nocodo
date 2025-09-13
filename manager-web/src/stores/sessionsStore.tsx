@@ -177,6 +177,18 @@ export const SessionsProvider: ParentComponent = props => {
                 });
               }
             }
+            if (data.type === 'LlmAgentChunk' && data.payload) {
+              const payload = data.payload as {
+                session_id: string;
+                content: string;
+              };
+              if (payload.session_id === id) {
+                actions.appendOutputChunk(id, {
+                  stream: 'stdout',
+                  content: payload.content,
+                });
+              }
+            }
           },
           error => {
             console.error(`WebSocket error for session ${id}:`, error);

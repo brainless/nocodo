@@ -16,11 +16,17 @@ pub enum AppError {
     #[error("Project not found: {0}")]
     ProjectNotFound(String),
 
+    #[error("Not found: {0}")]
+    NotFound(String),
+
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
 
     #[error("Internal server error: {0}")]
     Internal(String),
+
+    #[error("LLM agent error: {0}")]
+    LlmAgent(#[from] anyhow::Error),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -37,12 +43,15 @@ impl ResponseError for AppError {
         };
 
         match self {
-            AppError::ProjectNotFound(_) => HttpResponse::NotFound().json(error_response),
+            AppError::ProjectNotFound(_) | AppError::NotFound(_) => {
+                HttpResponse::NotFound().json(error_response)
+            }
             AppError::InvalidRequest(_) => HttpResponse::BadRequest().json(error_response),
             AppError::Database(_)
             | AppError::Config(_)
             | AppError::Io(_)
-            | AppError::Internal(_) => HttpResponse::InternalServerError().json(error_response),
+            | AppError::Internal(_)
+            | AppError::LlmAgent(_) => HttpResponse::InternalServerError().json(error_response),
         }
     }
 }
@@ -54,8 +63,10 @@ impl AppError {
             AppError::Config(_) => "config_error".to_string(),
             AppError::Io(_) => "io_error".to_string(),
             AppError::ProjectNotFound(_) => "project_not_found".to_string(),
+            AppError::NotFound(_) => "not_found".to_string(),
             AppError::InvalidRequest(_) => "invalid_request".to_string(),
             AppError::Internal(_) => "internal_error".to_string(),
+            AppError::LlmAgent(_) => "llm_agent_error".to_string(),
         }
     }
 }

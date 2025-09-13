@@ -4,11 +4,14 @@ pub mod database;
 pub mod embedded_web;
 pub mod error;
 pub mod handlers;
+pub mod llm_agent;
+pub mod llm_client;
 pub mod models;
 pub mod runner;
 pub mod socket;
 pub mod templates;
 pub mod terminal_runner;
+pub mod tools;
 pub mod websocket;
 
 #[cfg(test)]

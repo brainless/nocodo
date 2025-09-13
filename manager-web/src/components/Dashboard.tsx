@@ -91,8 +91,8 @@ const ProjectsCard: Component = () => {
 // Start AI Session form component (Issue #59)
 const StartAiSessionForm: Component = () => {
   const navigate = useNavigate();
-  // Known tools
-  const knownTools = ['claude', 'gemini', 'openai', 'qwen'];
+  // Available tools - LLM agent and external tools
+  const knownTools = ['llm-agent', 'claude', 'gemini', 'openai', 'qwen'];
 
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
