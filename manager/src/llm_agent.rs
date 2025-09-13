@@ -325,6 +325,7 @@ Always analyze the project structure and read relevant files before providing co
     }
 
     /// Fail a session
+    #[allow(dead_code)]
     pub async fn fail_session(&self, session_id: &str) -> Result<()> {
         let mut session = self.db.get_llm_agent_session(session_id)?;
         session.fail();
@@ -340,6 +341,7 @@ Always analyze the project structure and read relevant files before providing co
     }
 
     /// Stream session progress
+    #[allow(dead_code)]
     pub fn stream_session_progress(
         &self,
         session_id: String,
