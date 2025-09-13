@@ -849,6 +849,32 @@ impl Database {
         Ok(works)
     }
 
+    pub fn update_work(&self, work: &crate::models::Work) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}"))?;
+
+        let rows_affected = conn.execute(
+            "UPDATE works SET title = ?, project_id = ?, tool_name = ?, status = ?, updated_at = ? WHERE id = ?",
+            params![
+                work.title,
+                work.project_id,
+                work.tool_name,
+                work.status,
+                work.updated_at,
+                work.id
+            ],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(AppError::Internal(format!("Work not found: {}", work.id)));
+        }
+
+        tracing::info!("Updated work: {} ({})", work.title, work.id);
+        Ok(())
+    }
+
     pub fn delete_work(&self, id: &str) -> AppResult<()> {
         let conn = self
             .connection
@@ -1355,6 +1381,18 @@ impl Database {
 
         let sessions: Result<Vec<_>, _> = session_iter.collect();
         sessions.map_err(AppError::from)
+    }
+
+    pub fn get_llm_agent_session_by_work_id(&self, work_id: &str) -> AppResult<LlmAgentSession> {
+        let sessions = self.get_llm_agent_sessions_by_work(work_id)?;
+        
+        match sessions.first() {
+            Some(session) => Ok(session.clone()),
+            None => Err(AppError::NotFound(format!(
+                "LLM agent session not found for work: {}",
+                work_id
+            ))),
+        }
     }
 
     pub fn create_llm_agent_message(
