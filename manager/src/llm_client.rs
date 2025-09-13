@@ -148,14 +148,40 @@ impl LlmClient for OpenAiCompatibleClient {
             request.temperature = self.config.temperature;
         }
 
-        let response = self.make_request(request).await?;
+        let start_time = std::time::Instant::now();
+        let message_count = request.messages.len();
+        let total_input_tokens: usize = request.messages.iter().map(|m| m.content.len()).sum();
 
-        if !response.status().is_success() {
-            let status = response.status();
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            message_count = %message_count,
+            estimated_input_tokens = %total_input_tokens,
+            max_tokens = ?request.max_tokens,
+            temperature = ?request.temperature,
+            "Sending non-streaming completion request to LLM provider"
+        );
+
+        let response = self.make_request(request.clone()).await?;
+
+        let response_time = start_time.elapsed();
+        let status = response.status();
+
+        if !status.is_success() {
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
+            
+            tracing::error!(
+                provider = %self.config.provider,
+                model = %request.model,
+                status = %status,
+                response_time_ms = %response_time.as_millis(),
+                error = %error_text,
+                "LLM API request failed"
+            );
+            
             return Err(anyhow::anyhow!(
                 "LLM API error: {} - {}",
                 status,
@@ -164,6 +190,19 @@ impl LlmClient for OpenAiCompatibleClient {
         }
 
         let completion: LlmCompletionResponse = response.json().await?;
+        
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            completion_id = %completion.id,
+            created = %completion.created,
+            choices_count = %completion.choices.len(),
+            usage = ?completion.usage,
+            "LLM API request completed successfully"
+        );
+
         Ok(completion)
     }
 
