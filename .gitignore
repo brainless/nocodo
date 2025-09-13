@@ -61,7 +61,7 @@ out/
 .astro/
 
 # Logs from manual tests
-test_logs/
+test-logs/
 
 # Test results
 test-results/
