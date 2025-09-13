@@ -1907,6 +1907,7 @@ dependencies = [
  "chrono",
  "clap",
  "config 0.15.15",
+ "dotenvy",
  "futures-util",
  "handlebars",
  "home",
