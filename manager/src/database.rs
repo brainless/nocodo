@@ -853,9 +853,9 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}"))?;
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")));
 
-        let rows_affected = conn.execute(
+        let rows_affected = conn?.execute(
             "UPDATE works SET title = ?, project_id = ?, tool_name = ?, status = ?, updated_at = ? WHERE id = ?",
             params![
                 work.title,

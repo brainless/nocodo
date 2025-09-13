@@ -2,7 +2,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::llm_agent::LlmAgent;
 use crate::models::{
-    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
+    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest,
     CreateLlmAgentSessionRequest, CreateProjectRequest, CreateTerminalSessionRequest,
     CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
