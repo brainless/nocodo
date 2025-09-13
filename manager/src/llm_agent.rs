@@ -33,31 +33,79 @@ impl LlmAgent {
         model: String,
         system_prompt: Option<String>,
     ) -> Result<LlmAgentSession> {
+        tracing::info!(
+            work_id = %work_id,
+            provider = %provider,
+            model = %model,
+            has_system_prompt = %system_prompt.is_some(),
+            "Creating LLM agent session"
+        );
+
         let session = LlmAgentSession::new(work_id, provider, model);
 
         // Store session in database
         self.db.create_llm_agent_session(&session)?;
+        tracing::debug!(
+            session_id = %session.id,
+            work_id = %session.work_id,
+            "LLM agent session created and stored in database"
+        );
 
         // Create system message if provided
         if let Some(system_prompt) = system_prompt {
             self.db
                 .create_llm_agent_message(&session.id, "system", system_prompt)?;
+            tracing::debug!(
+                session_id = %session.id,
+                "System prompt added to LLM agent session"
+            );
         }
+
+        tracing::info!(
+            session_id = %session.id,
+            work_id = %session.work_id,
+            provider = %session.provider,
+            model = %session.model,
+            "LLM agent session successfully created"
+        );
 
         Ok(session)
     }
 
     /// Process a user message with the LLM agent
     pub async fn process_message(&self, session_id: &str, user_message: String) -> Result<String> {
+        tracing::info!(
+            session_id = %session_id,
+            user_message_length = %user_message.len(),
+            "Processing user message in LLM agent session"
+        );
+
         // Get session
         let session = self.db.get_llm_agent_session(session_id)?;
+        tracing::debug!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            provider = %session.provider,
+            model = %session.model,
+            session_status = %session.status,
+            "Retrieved LLM agent session"
+        );
 
         // Store user message
         self.db
             .create_llm_agent_message(session_id, "user", user_message.clone())?;
+        tracing::debug!(
+            session_id = %session_id,
+            "User message stored in database"
+        );
 
         // Get conversation history
         let history = self.db.get_llm_agent_messages(session_id)?;
+        tracing::debug!(
+            session_id = %session_id,
+            message_count = %history.len(),
+            "Retrieved conversation history"
+        );
 
         // Create LLM client
         let config = LlmProviderConfig {
@@ -69,14 +117,23 @@ impl LlmAgent {
             temperature: Some(0.7),
         };
 
+        tracing::debug!(
+            session_id = %session_id,
+            provider = %config.provider,
+            model = %config.model,
+            max_tokens = ?config.max_tokens,
+            temperature = ?config.temperature,
+            "Creating LLM client"
+        );
+
         let llm_client = create_llm_client(config)?;
 
         // Build conversation for LLM
         let mut messages = Vec::new();
-        for msg in history {
+        for msg in &history {
             messages.push(LlmMessage {
-                role: msg.role,
-                content: msg.content,
+                role: msg.role.clone(),
+                content: msg.content.clone(),
             });
         }
 
@@ -87,6 +144,29 @@ impl LlmAgent {
             content: tool_system_prompt,
         });
 
+        tracing::debug!(
+            session_id = %session_id,
+            total_messages = %messages.len(),
+            "Built conversation for LLM request"
+        );
+
+        // Log the full conversation being sent to LLM (truncated for large messages)
+        for (i, msg) in messages.iter().enumerate() {
+            let content_preview = if msg.content.len() > 200 {
+                format!("{}...", &msg.content[..200])
+            } else {
+                msg.content.clone()
+            };
+            tracing::info!(
+                session_id = %session_id,
+                message_index = %i,
+                message_role = %msg.role,
+                message_content = %content_preview,
+                message_length = %msg.content.len(),
+                "Sending message to LLM"
+            );
+        }
+
         let request = LlmCompletionRequest {
             model: session.model.clone(),
             messages,
@@ -95,46 +175,121 @@ impl LlmAgent {
             stream: Some(true),
         };
 
+        tracing::info!(
+            session_id = %session_id,
+            provider = %session.provider,
+            model = %session.model,
+            "Sending request to LLM provider"
+        );
+
         // Stream the response
         let mut assistant_response = String::new();
+        let mut chunk_count = 0;
         let mut stream = llm_client.stream_complete(request);
 
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result?;
+            chunk_count += 1;
+            
             if !chunk.is_finished {
                 assistant_response.push_str(&chunk.content);
 
                 // Broadcast chunk to WebSocket
                 self.ws
-                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content)
+                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
                     .await;
+
+                tracing::trace!(
+                    session_id = %session_id,
+                    chunk_number = %chunk_count,
+                    chunk_length = %chunk.content.len(),
+                    "Received and broadcasted LLM response chunk"
+                );
             }
         }
+
+        tracing::info!(
+            session_id = %session_id,
+            total_chunks = %chunk_count,
+            response_length = %assistant_response.len(),
+            "Completed LLM response streaming"
+        );
 
         // Store assistant response
         self.db
             .create_llm_agent_message(session_id, "assistant", assistant_response.clone())?;
+        tracing::debug!(
+            session_id = %session_id,
+            response_length = %assistant_response.len(),
+            "Assistant response stored in database"
+        );
 
         // Check if the response contains tool calls (JSON)
         if self.contains_tool_calls(&assistant_response) {
+            tracing::info!(
+                session_id = %session_id,
+                "LLM response contains tool calls, processing them"
+            );
             self.process_tool_calls(session_id, &assistant_response)
                 .await?;
+        } else {
+            tracing::debug!(
+                session_id = %session_id,
+                "LLM response does not contain tool calls"
+            );
         }
+
+        tracing::info!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            "Successfully processed user message with LLM agent"
+        );
 
         Ok(assistant_response)
     }
 
     /// Process tool calls from LLM response
     async fn process_tool_calls(&self, session_id: &str, response: &str) -> Result<()> {
+        tracing::info!(
+            session_id = %session_id,
+            "Processing tool calls from LLM response"
+        );
+
         // Extract JSON tool calls from response
         let tool_calls = self.extract_tool_calls(response)?;
+        tracing::debug!(
+            session_id = %session_id,
+            tool_call_count = %tool_calls.len(),
+            "Extracted tool calls from LLM response"
+        );
 
-        for tool_call_json in tool_calls {
+        for (index, tool_call_json) in tool_calls.into_iter().enumerate() {
+            tracing::info!(
+                session_id = %session_id,
+                tool_index = %index,
+                tool_call_json = %tool_call_json,
+                "Processing tool call"
+            );
+
             // Parse tool request
             let tool_request: ToolRequest = match serde_json::from_value(tool_call_json.clone()) {
-                Ok(request) => request,
+                Ok(request) => {
+                    tracing::debug!(
+                        session_id = %session_id,
+                        tool_index = %index,
+                        tool_request = ?request,
+                        "Successfully parsed tool request"
+                    );
+                    request
+                }
                 Err(e) => {
-                    tracing::warn!("Failed to parse tool request: {}", e);
+                    tracing::error!(
+                        session_id = %session_id,
+                        tool_index = %index,
+                        error = %e,
+                        tool_call_json = %tool_call_json,
+                        "Failed to parse tool request"
+                    );
                     continue;
                 }
             };
@@ -145,6 +300,13 @@ impl LlmAgent {
                 ToolRequest::ReadFile(_) => "read_file",
             };
 
+            tracing::debug!(
+                session_id = %session_id,
+                tool_index = %index,
+                tool_name = %tool_name,
+                "Creating tool call record"
+            );
+
             let mut tool_call = LlmAgentToolCall::new(
                 session_id.to_string(),
                 tool_name.to_string(),
@@ -153,24 +315,57 @@ impl LlmAgent {
 
             // Update tool call status to executing
             tool_call.status = "executing".to_string();
-            let _tool_call_id = self.db.create_llm_agent_tool_call(&tool_call)?;
+            let tool_call_id = self.db.create_llm_agent_tool_call(&tool_call)?;
+            tracing::debug!(
+                session_id = %session_id,
+                tool_call_id = %tool_call_id,
+                tool_name = %tool_name,
+                "Tool call record created with executing status"
+            );
 
             // Execute tool
+            tracing::info!(
+                session_id = %session_id,
+                tool_call_id = %tool_call_id,
+                tool_name = %tool_name,
+                "Executing tool"
+            );
+
             let tool_response = self.tool_executor.execute(tool_request).await;
 
             // Update tool call with response
             let response_value = match tool_response {
                 Ok(response) => {
                     tool_call.complete(serde_json::to_value(response)?);
-                    serde_json::to_value(tool_call.response.clone().unwrap_or_default())?
+                    let response_json = serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                    tracing::info!(
+                        session_id = %session_id,
+                        tool_call_id = %tool_call_id,
+                        tool_name = %tool_name,
+                        "Tool execution completed successfully"
+                    );
+                    response_json
                 }
                 Err(e) => {
                     tool_call.fail(e.to_string());
-                    serde_json::to_value(tool_call.response.clone().unwrap_or_default())?
+                    let response_json = serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                    tracing::error!(
+                        session_id = %session_id,
+                        tool_call_id = %tool_call_id,
+                        tool_name = %tool_name,
+                        error = %e,
+                        "Tool execution failed"
+                    );
+                    response_json
                 }
             };
 
             self.db.update_llm_agent_tool_call(&tool_call)?;
+            tracing::debug!(
+                session_id = %session_id,
+                tool_call_id = %tool_call_id,
+                "Tool call record updated with execution result"
+            );
 
             // Add tool response to conversation
             self.db.create_llm_agent_message(
@@ -178,21 +373,53 @@ impl LlmAgent {
                 "tool",
                 serde_json::to_string(&response_value)?,
             )?;
+            tracing::debug!(
+                session_id = %session_id,
+                tool_call_id = %tool_call_id,
+                "Tool response added to conversation"
+            );
 
             // If there are tool results, follow up with LLM
+            tracing::info!(
+                session_id = %session_id,
+                tool_call_id = %tool_call_id,
+                "Following up with LLM after tool execution"
+            );
             self.follow_up_with_llm(session_id).await?;
         }
+
+        tracing::info!(
+            session_id = %session_id,
+            "Completed processing all tool calls"
+        );
 
         Ok(())
     }
 
     /// Follow up with LLM after tool execution
     async fn follow_up_with_llm(&self, session_id: &str) -> Result<String> {
+        tracing::info!(
+            session_id = %session_id,
+            "Following up with LLM after tool execution"
+        );
+
         // Get updated conversation history
         let history = self.db.get_llm_agent_messages(session_id)?;
+        tracing::debug!(
+            session_id = %session_id,
+            message_count = %history.len(),
+            "Retrieved updated conversation history for follow-up"
+        );
 
         // Get session
         let session = self.db.get_llm_agent_session(session_id)?;
+        tracing::debug!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            provider = %session.provider,
+            model = %session.model,
+            "Retrieved session for follow-up"
+        );
 
         // Create LLM client
         let config = LlmProviderConfig {
@@ -203,6 +430,13 @@ impl LlmAgent {
             max_tokens: Some(4000),
             temperature: Some(0.7),
         };
+
+        tracing::debug!(
+            session_id = %session_id,
+            provider = %config.provider,
+            model = %config.model,
+            "Creating LLM client for follow-up"
+        );
 
         let llm_client = create_llm_client(config)?;
 
@@ -215,6 +449,29 @@ impl LlmAgent {
             })
             .collect();
 
+        tracing::debug!(
+            session_id = %session_id,
+            total_messages = %messages.len(),
+            "Built conversation for LLM follow-up request"
+        );
+
+        // Log the follow-up conversation being sent to LLM (truncated for large messages)
+        for (i, msg) in messages.iter().enumerate() {
+            let content_preview = if msg.content.len() > 200 {
+                format!("{}...", &msg.content[..200])
+            } else {
+                msg.content.clone()
+            };
+            tracing::info!(
+                session_id = %session_id,
+                message_index = %i,
+                message_role = %msg.role,
+                message_content = %content_preview,
+                message_length = %msg.content.len(),
+                "Sending follow-up message to LLM"
+            );
+        }
+
         let request = LlmCompletionRequest {
             model: session.model.clone(),
             messages,
@@ -223,25 +480,60 @@ impl LlmAgent {
             stream: Some(true),
         };
 
+        tracing::info!(
+            session_id = %session_id,
+            provider = %session.provider,
+            model = %session.model,
+            "Sending follow-up request to LLM provider"
+        );
+
         // Stream the response
         let mut assistant_response = String::new();
+        let mut chunk_count = 0;
         let mut stream = llm_client.stream_complete(request);
 
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result?;
+            chunk_count += 1;
+            
             if !chunk.is_finished {
                 assistant_response.push_str(&chunk.content);
 
                 // Broadcast chunk to WebSocket
                 self.ws
-                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content)
+                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
                     .await;
+
+                tracing::trace!(
+                    session_id = %session_id,
+                    chunk_number = %chunk_count,
+                    chunk_length = %chunk.content.len(),
+                    "Received and broadcasted LLM follow-up response chunk"
+                );
             }
         }
+
+        tracing::info!(
+            session_id = %session_id,
+            total_chunks = %chunk_count,
+            response_length = %assistant_response.len(),
+            "Completed LLM follow-up response streaming"
+        );
 
         // Store assistant response
         self.db
             .create_llm_agent_message(session_id, "assistant", assistant_response.clone())?;
+        tracing::debug!(
+            session_id = %session_id,
+            response_length = %assistant_response.len(),
+            "Follow-up assistant response stored in database"
+        );
+
+        tracing::info!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            "Successfully completed LLM follow-up after tool execution"
+        );
 
         Ok(assistant_response)
     }
@@ -318,26 +610,72 @@ Always analyze the project structure and read relevant files before providing co
 
     /// Complete a session
     pub async fn complete_session(&self, session_id: &str) -> Result<()> {
+        tracing::info!(
+            session_id = %session_id,
+            "Completing LLM agent session"
+        );
+
         let mut session = self.db.get_llm_agent_session(session_id)?;
+        let old_status = session.status.clone();
         session.complete();
         self.db.update_llm_agent_session(&session)?;
+        
+        tracing::info!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            old_status = %old_status,
+            new_status = %session.status,
+            "LLM agent session completed successfully"
+        );
+        
         Ok(())
     }
 
     /// Fail a session
     #[allow(dead_code)]
     pub async fn fail_session(&self, session_id: &str) -> Result<()> {
+        tracing::info!(
+            session_id = %session_id,
+            "Failing LLM agent session"
+        );
+
         let mut session = self.db.get_llm_agent_session(session_id)?;
+        let old_status = session.status.clone();
         session.fail();
         self.db.update_llm_agent_session(&session)?;
+        
+        tracing::warn!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            old_status = %old_status,
+            new_status = %session.status,
+            "LLM agent session failed"
+        );
+        
         Ok(())
     }
 
     /// Get session status
     pub async fn get_session_status(&self, session_id: &str) -> Result<LlmAgentSession> {
-        self.db
+        tracing::debug!(
+            session_id = %session_id,
+            "Getting LLM agent session status"
+        );
+
+        let session = self.db
             .get_llm_agent_session(session_id)
-            .map_err(|e| anyhow::anyhow!(e))
+            .map_err(|e| anyhow::anyhow!(e))?;
+            
+        tracing::debug!(
+            session_id = %session_id,
+            work_id = %session.work_id,
+            status = %session.status,
+            provider = %session.provider,
+            model = %session.model,
+            "Retrieved LLM agent session status"
+        );
+        
+        Ok(session)
     }
 
     /// Stream session progress
