@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "manager",
     "services",
+    "manager-runner",
 ]
 exclude = [
     "manager-web"
