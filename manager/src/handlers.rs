@@ -1,10 +1,12 @@
 use crate::database::Database;
 use crate::error::AppError;
+use crate::llm_agent::LlmAgent;
 use crate::models::{
-    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse,
-    AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest, CreateProjectRequest,
-    CreateTerminalSessionRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest,
-    FileInfo, FileListRequest, FileListResponse, FileResponse, FileUpdateRequest, Project,
+    AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
+    AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest,
+    CreateLlmAgentSessionRequest, CreateProjectRequest, CreateTerminalSessionRequest,
+    CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo, FileListRequest,
+    FileListResponse, FileResponse, FileUpdateRequest, LlmAgentSessionResponse, Project,
     ProjectListResponse, ProjectResponse, ServerStatus, TerminalControlMessage, TerminalSession,
     TerminalSessionResponse, ToolRegistryResponse, WorkListResponse, WorkMessageResponse,
     WorkResponse,
@@ -29,6 +31,7 @@ pub struct AppState {
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
     pub runner: Option<Arc<Runner>>, // Enabled via env flag
     pub terminal_runner: Option<Arc<TerminalRunner>>, // PTY-based runner
+    pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
 }
 
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
@@ -893,8 +896,12 @@ pub async fn create_ai_session(
         None
     };
 
-    let session =
-        crate::models::AiSession::new(work_id, req.message_id, req.tool_name, project_context);
+    let session = crate::models::AiSession::new(
+        work_id.clone(),
+        req.message_id,
+        req.tool_name.clone(),
+        project_context,
+    );
 
     // Persist
     data.database.create_ai_session(&session)?;
@@ -908,8 +915,63 @@ pub async fn create_ai_session(
         session: session.clone(),
     };
 
+    // Handle LLM agent specially
+    if req.tool_name == "llm-agent" {
+        if let Some(ref llm_agent) = data.llm_agent {
+            tracing::info!(
+                "LLM agent is available, starting LLM agent session for session {}",
+                session.id
+            );
+
+            // Get the prompt from the associated message
+            let message = messages
+                .iter()
+                .find(|m| m.id == session.message_id)
+                .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
+
+            // Get project path for LLM agent
+            let _project_path = if let Some(ref project_id) = work.project_id {
+                let project = data.database.get_project_by_id(project_id)?;
+                std::path::PathBuf::from(project.path)
+            } else {
+                std::env::current_dir().map_err(|e| {
+                    AppError::Internal(format!("Failed to get current directory: {}", e))
+                })?
+            };
+
+            // Update work with tool_name and model info
+            let mut updated_work = work.clone();
+            updated_work.tool_name = Some("LLM Agent (Grok Code Fast 1)".to_string());
+            data.database.update_work(&updated_work)?;
+
+            // Create LLM agent session with default provider/model
+            let llm_session = llm_agent
+                .create_session(
+                    work_id.clone(),
+                    "grok".to_string(),      // Default provider
+                    "grok-code-fast-1".to_string(), // Default model
+                    session.project_context.clone(),
+                )
+                .await?;
+
+            // Process the message
+            let _response = llm_agent
+                .process_message(&llm_session.id, message.content.clone())
+                .await?;
+
+            tracing::info!(
+                "Successfully started LLM agent processing for session {}",
+                session.id
+            );
+        } else {
+            tracing::warn!(
+                "LLM agent not available - AI session {} will not be executed",
+                session.id
+            );
+        }
+    }
     // If runner is enabled, start streaming execution for this session in background
-    if let Some(runner) = &data.runner {
+    else if let Some(runner) = &data.runner {
         tracing::info!(
             "Runner is available, starting AI session execution for session {}",
             session.id
@@ -984,7 +1046,32 @@ pub async fn list_ai_session_outputs(
     let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
 
     // Get outputs for this session
-    let outputs = data.database.list_ai_session_outputs(&session.id)?;
+    let mut outputs = data.database.list_ai_session_outputs(&session.id)?;
+
+    // If this is an LLM agent session, also fetch LLM agent messages
+    if session.tool_name == "llm-agent" {
+        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(&work_id) {
+            if let Ok(llm_messages) = data.database.get_llm_agent_messages(&llm_agent_session.id) {
+                // Convert LLM agent messages to AiSessionOutput format
+                for msg in llm_messages {
+                    // Only include assistant messages (responses) and tool messages (results)
+                    if msg.role == "assistant" || msg.role == "tool" {
+                        let output = AiSessionOutput {
+                            id: msg.id,
+                            session_id: session.id.clone(),
+                            content: msg.content,
+                            created_at: msg.created_at,
+                        };
+                        outputs.push(output);
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort outputs by created_at
+    outputs.sort_by_key(|o| o.created_at);
+
     let response = AiSessionOutputListResponse { outputs };
 
     tracing::debug!(
@@ -2026,4 +2113,111 @@ pub async fn terminate_terminal_session(
             "Terminal runner not available".to_string(),
         ))
     }
+}
+
+// LLM Agent Endpoints
+
+/// Create a new LLM agent session
+pub async fn create_llm_agent_session(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+    request: web::Json<CreateLlmAgentSessionRequest>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+    let req = request.into_inner();
+
+    if let Some(ref llm_agent) = data.llm_agent {
+        // Get the work to find the project path
+        let work = data.database.get_work_by_id(&work_id)?;
+        let _project_path = if let Some(ref project_id) = work.project_id {
+            let project = data.database.get_project_by_id(project_id)?;
+            PathBuf::from(project.path)
+        } else {
+            // Use current directory if no project is associated
+            std::env::current_dir().map_err(|e| {
+                AppError::Internal(format!("Failed to get current directory: {}", e))
+            })?
+        };
+
+        let session = llm_agent
+            .create_session(work_id, req.provider, req.model, req.system_prompt)
+            .await?;
+
+        Ok(HttpResponse::Ok().json(LlmAgentSessionResponse { session }))
+    } else {
+        Err(AppError::InvalidRequest(
+            "LLM agent not available".to_string(),
+        ))
+    }
+}
+
+/// Get LLM agent session status
+pub async fn get_llm_agent_session(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref llm_agent) = data.llm_agent {
+        let session_id = session_id.into_inner();
+        let session = llm_agent.get_session_status(&session_id).await?;
+        Ok(HttpResponse::Ok().json(LlmAgentSessionResponse { session }))
+    } else {
+        Err(AppError::InvalidRequest(
+            "LLM agent not available".to_string(),
+        ))
+    }
+}
+
+/// Send a message to LLM agent
+pub async fn send_llm_agent_message(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+    request: web::Json<serde_json::Value>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref llm_agent) = data.llm_agent {
+        let session_id = session_id.into_inner();
+
+        // Extract message from request
+        let user_message = request
+            .get("message")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AppError::InvalidRequest("Message field required".to_string()))?
+            .to_string();
+
+        let response = llm_agent.process_message(&session_id, user_message).await?;
+
+        Ok(HttpResponse::Ok().json(serde_json::json!({
+            "response": response
+        })))
+    } else {
+        Err(AppError::InvalidRequest(
+            "LLM agent not available".to_string(),
+        ))
+    }
+}
+
+/// Complete an LLM agent session
+pub async fn complete_llm_agent_session(
+    data: web::Data<AppState>,
+    session_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    if let Some(ref llm_agent) = data.llm_agent {
+        let session_id = session_id.into_inner();
+        llm_agent.complete_session(&session_id).await?;
+        Ok(HttpResponse::Ok().finish())
+    } else {
+        Err(AppError::InvalidRequest(
+            "LLM agent not available".to_string(),
+        ))
+    }
+}
+
+/// Get LLM agent sessions for a work
+pub async fn get_llm_agent_sessions(
+    data: web::Data<AppState>,
+    work_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let sessions = data
+        .database
+        .get_llm_agent_sessions_by_work(&work_id.into_inner())?;
+    Ok(HttpResponse::Ok().json(sessions))
 }

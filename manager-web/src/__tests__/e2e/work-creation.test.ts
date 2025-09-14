@@ -12,19 +12,21 @@ test.describe('Work Creation', () => {
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select a tool (default should be claude)
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    // Select a tool (default should be llm-agent)
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Verify we're on the work detail page
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();
@@ -87,18 +89,20 @@ test.describe('Work Creation', () => {
     }
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
-    await page.waitForURL(/\/work\/\d+/);
+    await page.waitForURL(/\/work\/work-\d+/);
 
     // Verify we're on the work detail page
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();
