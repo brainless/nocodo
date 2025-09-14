@@ -72,8 +72,25 @@ async fn main() -> Result<()> {
 
     info!("Manager started with PID: {:?}", manager_process.id());
 
-    // Wait a moment for manager to start
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    // Wait for manager to be ready by checking if port 8081 is listening
+    info!("Waiting for manager to be ready on port 8081...");
+    let mut attempts = 0;
+    let max_attempts = 30; // 30 seconds max
+    loop {
+        if let Ok(stream) = std::net::TcpStream::connect("127.0.0.1:8081") {
+            drop(stream);
+            info!("Manager is ready on port 8081");
+            break;
+        }
+
+        attempts += 1;
+        if attempts >= max_attempts {
+            error!("Manager failed to start within 30 seconds");
+            return Err(anyhow::anyhow!("Manager startup timeout"));
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    }
 
     // Start manager-web dev server with logging
     info!("Starting manager-web dev server...");
@@ -96,10 +113,14 @@ async fn main() -> Result<()> {
     info!("Manager-web dev server started with PID: {:?}", web_process.id());
     info!("");
     info!("🚀 Both services are running!");
-    info!("📊 Manager: Check test-logs/manager.log for logs");
-    info!("🌐 Manager-web: Check test-logs/manager-web.log for logs");
-    info!("🔗 Access the web interface at: http://localhost:8081");
-    info!("🔑 For SSH port forwarding, use: ssh -L 8081:localhost:8081 <your-server>");
+    info!("📊 Manager API/WebSocket: http://localhost:8081 (logs: test-logs/manager.log)");
+    info!("🌐 Manager-web dev server: http://localhost:3000 (logs: test-logs/manager-web.log)");
+    info!("   └── Proxies API calls to manager on port 8081");
+    info!("");
+    info!("🔗 SSH Testing:");
+    info!("   SSH with: ssh -L 8081:localhost:8081 -L 3000:localhost:3000 <your-server>");
+    info!("   Then access: http://localhost:3000 in your browser");
+    info!("   (The dev server will proxy API calls to the manager)");
     info!("");
     info!("Press Ctrl+C to stop both services");
 
