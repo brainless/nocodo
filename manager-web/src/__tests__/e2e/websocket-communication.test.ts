@@ -31,11 +31,13 @@ test.describe('WebSocket Communication', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
@@ -115,11 +117,13 @@ test.describe('WebSocket Communication', () => {
     await promptTextarea.fill('List all files in the root directory');
 
     // Select tool using custom dropdown
-    const toolButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const toolButton = page
+      .locator('button[aria-haspopup="listbox"]')
+      .filter({ hasText: 'llm-agent' });
     await toolButton.click();
 
-    // Wait for dropdown options and select claude
-    await page.locator('div[role="option"]:has-text("claude")').click();
+    // Wait for dropdown options and select llm-agent
+    await page.locator('div[role="option"]:has-text("llm-agent")').click();
 
     // Submit the form
     const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
