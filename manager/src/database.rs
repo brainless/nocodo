@@ -1385,7 +1385,7 @@ impl Database {
 
     pub fn get_llm_agent_session_by_work_id(&self, work_id: &str) -> AppResult<LlmAgentSession> {
         let sessions = self.get_llm_agent_sessions_by_work(work_id)?;
-        
+
         match sessions.first() {
             Some(session) => Ok(session.clone()),
             None => Err(AppError::NotFound(format!(

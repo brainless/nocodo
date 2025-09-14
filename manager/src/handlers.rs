@@ -948,7 +948,7 @@ pub async fn create_ai_session(
             let llm_session = llm_agent
                 .create_session(
                     work_id.clone(),
-                    "grok".to_string(),      // Default provider
+                    "grok".to_string(),             // Default provider
                     "grok-code-fast-1".to_string(), // Default model
                     session.project_context.clone(),
                 )
