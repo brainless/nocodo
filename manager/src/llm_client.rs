@@ -212,9 +212,23 @@ impl LlmClient for OpenAiCompatibleClient {
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>> {
         request.stream = Some(true);
 
+        let start_time = std::time::Instant::now();
         let client = self.client.clone();
         let config = self.config.clone();
         let api_url = self.get_api_url();
+
+        let message_count = request.messages.len();
+        let total_input_tokens = message_count * 10; // rough estimate
+
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            message_count = %message_count,
+            estimated_input_tokens = %total_input_tokens,
+            max_tokens = ?request.max_tokens,
+            temperature = ?request.temperature,
+            "Sending streaming completion request to LLM provider"
+        );
 
         Box::pin(try_stream! {
             let mut req = client
@@ -241,6 +255,13 @@ impl LlmClient for OpenAiCompatibleClient {
                     let line = line.trim();
                     if let Some(data) = line.strip_prefix("data: ") {
                         if data == "[DONE]" {
+                            let response_time = start_time.elapsed();
+                            tracing::info!(
+                                provider = %config.provider,
+                                model = %request.model,
+                                response_time_ms = %response_time.as_millis(),
+                                "Streaming LLM API request completed successfully"
+                            );
                             yield StreamChunk {
                                 content: String::new(),
                                 is_finished: true,
@@ -253,6 +274,14 @@ impl LlmClient for OpenAiCompatibleClient {
                                 if let Some(choice) = choices.first() {
                                     if let Some(delta) = choice.get("delta") {
                                         if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
+                                            let response_time = start_time.elapsed();
+                                            tracing::trace!(
+                                                provider = %config.provider,
+                                                model = %request.model,
+                                                response_time_ms = %response_time.as_millis(),
+                                                chunk_length = %content.len(),
+                                                "Received streaming chunk"
+                                            );
                                             yield StreamChunk {
                                                 content: content.to_string(),
                                                 is_finished: false,

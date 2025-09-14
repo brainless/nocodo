@@ -949,7 +949,7 @@ pub async fn create_ai_session(
                 .create_session(
                     work_id.clone(),
                     "grok".to_string(),      // Default provider
-                    "grok-beta".to_string(), // Default model
+                    "grok-code-fast-1".to_string(), // Default model
                     session.project_context.clone(),
                 )
                 .await?;
