@@ -248,6 +248,24 @@ impl LlmAgent {
         Ok(assistant_response)
     }
 
+    /// Get the tool executor for a specific session's project
+    async fn get_tool_executor_for_session(&self, session_id: &str) -> Result<ToolExecutor> {
+        // Get session to find work_id
+        let session = self.db.get_llm_agent_session(session_id)?;
+
+        // Get work to find project_id
+        let work = self.db.get_work_by_id(&session.work_id)?;
+
+        if let Some(project_id) = work.project_id {
+            // Get project to find project path
+            let project = self.db.get_project_by_id(&project_id)?;
+            Ok(ToolExecutor::new(PathBuf::from(project.path)))
+        } else {
+            // Fallback to the default tool executor
+            Ok(ToolExecutor::new(self.tool_executor.base_path().clone()))
+        }
+    }
+
     /// Process tool calls from LLM response
     async fn process_tool_calls(&self, session_id: &str, response: &str) -> Result<()> {
         tracing::info!(
@@ -331,7 +349,9 @@ impl LlmAgent {
                 "Executing tool"
             );
 
-            let tool_response = self.tool_executor.execute(tool_request).await;
+            // Get project-specific tool executor
+            let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
+            let tool_response = project_tool_executor.execute(tool_request).await;
 
             // Update tool call with response
             let response_value = match tool_response {
