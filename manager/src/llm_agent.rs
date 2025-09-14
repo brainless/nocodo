@@ -568,27 +568,129 @@ Always analyze the project structure and read relevant files before providing co
 
     /// Check if response contains tool calls
     fn contains_tool_calls(&self, response: &str) -> bool {
-        // Look for JSON objects that might be tool calls
-        response.contains("\"type\":\"list_files\"") || response.contains("\"type\":\"read_file\"")
+        tracing::debug!(
+            response_length = %response.len(),
+            response_preview = %if response.len() > 200 {
+                format!("{}...", &response[..200])
+            } else {
+                response.to_string()
+            },
+            "Checking if response contains tool calls"
+        );
+
+        // Look for JSON objects that might be tool calls - more flexible matching
+        let contains_list_files = response.contains("list_files") && response.contains("type") && response.contains("{");
+        let contains_read_file = response.contains("read_file") && response.contains("type") && response.contains("{");
+
+        let result = contains_list_files || contains_read_file;
+
+        tracing::info!(
+            contains_tool_calls = %result,
+            contains_list_files = %contains_list_files,
+            contains_read_file = %contains_read_file,
+            "Tool call detection result"
+        );
+
+        result
     }
 
     /// Extract tool calls from response
     fn extract_tool_calls(&self, response: &str) -> Result<Vec<serde_json::Value>> {
         let mut tool_calls = Vec::new();
 
-        // Simple JSON extraction (in production, use a more robust parser)
-        for line in response.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with('{') && trimmed.ends_with('}') {
-                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                    if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
-                        if tool_type == "list_files" || tool_type == "read_file" {
-                            tool_calls.push(json_value);
+        tracing::debug!(
+            response_length = %response.len(),
+            "Extracting tool calls from response"
+        );
+
+        // Try parsing the entire response as JSON first
+        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(response.trim()) {
+            if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                if tool_type == "list_files" || tool_type == "read_file" {
+                    tracing::info!(
+                        tool_type = %tool_type,
+                        "Found tool call in full response"
+                    );
+                    tool_calls.push(json_value);
+                }
+            }
+        }
+
+        // If that didn't work, try line-by-line extraction
+        if tool_calls.is_empty() {
+            for (line_num, line) in response.lines().enumerate() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('{') && (trimmed.ends_with('}') || trimmed.contains("list_files") || trimmed.contains("read_file")) {
+                    tracing::debug!(
+                        line_number = %line_num,
+                        line_content = %trimmed,
+                        "Attempting to parse line as JSON tool call"
+                    );
+
+                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                        if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                            if tool_type == "list_files" || tool_type == "read_file" {
+                                tracing::info!(
+                                    line_number = %line_num,
+                                    tool_type = %tool_type,
+                                    "Found tool call in line"
+                                );
+                                tool_calls.push(json_value);
+                            }
                         }
                     }
                 }
             }
         }
+
+        // Try to extract JSON blocks that span multiple lines
+        if tool_calls.is_empty() {
+            let mut brace_count = 0;
+            let mut json_start = None;
+            let chars: Vec<char> = response.chars().collect();
+
+            for (i, &ch) in chars.iter().enumerate() {
+                match ch {
+                    '{' => {
+                        if brace_count == 0 {
+                            json_start = Some(i);
+                        }
+                        brace_count += 1;
+                    }
+                    '}' => {
+                        brace_count -= 1;
+                        if brace_count == 0 {
+                            if let Some(start) = json_start {
+                                let json_str: String = chars[start..=i].iter().collect();
+                                tracing::debug!(
+                                    json_candidate = %json_str,
+                                    "Attempting to parse multi-line JSON block"
+                                );
+
+                                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                                    if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                                        if tool_type == "list_files" || tool_type == "read_file" {
+                                            tracing::info!(
+                                                tool_type = %tool_type,
+                                                "Found tool call in multi-line JSON block"
+                                            );
+                                            tool_calls.push(json_value);
+                                        }
+                                    }
+                                }
+                            }
+                            json_start = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        tracing::info!(
+            extracted_tool_calls = %tool_calls.len(),
+            "Completed tool call extraction"
+        );
 
         Ok(tool_calls)
     }
