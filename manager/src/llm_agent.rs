@@ -190,7 +190,7 @@ impl LlmAgent {
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result?;
             chunk_count += 1;
-            
+
             if !chunk.is_finished {
                 assistant_response.push_str(&chunk.content);
 
@@ -337,7 +337,8 @@ impl LlmAgent {
             let response_value = match tool_response {
                 Ok(response) => {
                     tool_call.complete(serde_json::to_value(response)?);
-                    let response_json = serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                    let response_json =
+                        serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
                     tracing::info!(
                         session_id = %session_id,
                         tool_call_id = %tool_call_id,
@@ -348,7 +349,8 @@ impl LlmAgent {
                 }
                 Err(e) => {
                     tool_call.fail(e.to_string());
-                    let response_json = serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                    let response_json =
+                        serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
                     tracing::error!(
                         session_id = %session_id,
                         tool_call_id = %tool_call_id,
@@ -495,7 +497,7 @@ impl LlmAgent {
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result?;
             chunk_count += 1;
-            
+
             if !chunk.is_finished {
                 assistant_response.push_str(&chunk.content);
 
@@ -619,7 +621,7 @@ Always analyze the project structure and read relevant files before providing co
         let old_status = session.status.clone();
         session.complete();
         self.db.update_llm_agent_session(&session)?;
-        
+
         tracing::info!(
             session_id = %session_id,
             work_id = %session.work_id,
@@ -627,7 +629,7 @@ Always analyze the project structure and read relevant files before providing co
             new_status = %session.status,
             "LLM agent session completed successfully"
         );
-        
+
         Ok(())
     }
 
@@ -643,7 +645,7 @@ Always analyze the project structure and read relevant files before providing co
         let old_status = session.status.clone();
         session.fail();
         self.db.update_llm_agent_session(&session)?;
-        
+
         tracing::warn!(
             session_id = %session_id,
             work_id = %session.work_id,
@@ -651,7 +653,7 @@ Always analyze the project structure and read relevant files before providing co
             new_status = %session.status,
             "LLM agent session failed"
         );
-        
+
         Ok(())
     }
 
@@ -662,10 +664,11 @@ Always analyze the project structure and read relevant files before providing co
             "Getting LLM agent session status"
         );
 
-        let session = self.db
+        let session = self
+            .db
             .get_llm_agent_session(session_id)
             .map_err(|e| anyhow::anyhow!(e))?;
-            
+
         tracing::debug!(
             session_id = %session_id,
             work_id = %session.work_id,
@@ -674,7 +677,7 @@ Always analyze the project structure and read relevant files before providing co
             model = %session.model,
             "Retrieved LLM agent session status"
         );
-        
+
         Ok(session)
     }
 
