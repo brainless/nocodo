@@ -31,7 +31,10 @@ fn main() {
     let is_ci = env::var("CI").is_ok();
     let is_release = env::var("PROFILE").unwrap_or_default() == "release";
 
-    warn(&format!("Build environment: CI={}, RELEASE={}", is_ci, is_release));
+    warn(&format!(
+        "Build environment: CI={}, RELEASE={}",
+        is_ci, is_release
+    ));
 
     // Check for pre-built assets first (GitHub Actions builds web assets separately)
     if dist_dir.exists() {
@@ -40,7 +43,10 @@ fn main() {
             .unwrap_or(0);
 
         if dist_files > 0 {
-            warn(&format!("Using pre-built web assets from manager-web/dist ({} files)", dist_files));
+            warn(&format!(
+                "Using pre-built web assets from manager-web/dist ({} files)",
+                dist_files
+            ));
             return; // Skip npm build since assets already exist
         }
     }
@@ -72,7 +78,10 @@ fn main() {
                 return;
             }
             Err(e) => {
-                warn(&format!("npm ci error: {}. Ensure Node.js and npm are installed.", e));
+                warn(&format!(
+                    "npm ci error: {}. Ensure Node.js and npm are installed.",
+                    e
+                ));
                 if is_release {
                     panic!("npm not available for release build: {}", e);
                 }

@@ -6,11 +6,11 @@ use crate::websocket::WebSocketBroadcaster;
 use anyhow::Result;
 use async_stream::try_stream;
 use futures_util::StreamExt;
-use std::path::PathBuf;
-use std::sync::Arc;
 use std::boxed::Box;
-use std::pin::Pin;
 use std::future::Future;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::sync::Arc;
 
 /// LLM Agent that handles direct communication with LLMs and tool execution
 pub struct LlmAgent {
@@ -271,375 +271,389 @@ impl LlmAgent {
 
     /// Process tool calls from LLM response
     async fn process_tool_calls(&self, session_id: &str, response: &str) -> Result<()> {
-        self.process_tool_calls_with_depth(session_id, response, 0).await
+        self.process_tool_calls_with_depth(session_id, response, 0)
+            .await
     }
 
     /// Process tool calls from LLM response with recursion depth tracking
-    fn process_tool_calls_with_depth<'a>(&'a self, session_id: &'a str, response: &'a str, depth: u32) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
+    fn process_tool_calls_with_depth<'a>(
+        &'a self,
+        session_id: &'a str,
+        response: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(async move {
-        const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
+            const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
-        if depth >= MAX_RECURSION_DEPTH {
-            tracing::warn!(
-                session_id = %session_id,
-                current_depth = %depth,
-                max_depth = %MAX_RECURSION_DEPTH,
-                "Tool call recursion depth limit reached, stopping processing"
-            );
-            return Ok(());
-        }
-        tracing::info!(
-            session_id = %session_id,
-            current_depth = %depth,
-            "Processing tool calls from LLM response"
-        );
-
-        // Extract JSON tool calls from response
-        let tool_calls = self.extract_tool_calls(response)?;
-        tracing::debug!(
-            session_id = %session_id,
-            tool_call_count = %tool_calls.len(),
-            "Extracted tool calls from LLM response"
-        );
-
-        for (index, tool_call_json) in tool_calls.into_iter().enumerate() {
-            tracing::info!(
-                session_id = %session_id,
-                tool_index = %index,
-                tool_call_json = %tool_call_json,
-                "Processing tool call"
-            );
-
-            // Parse tool request
-            let tool_request: ToolRequest = match serde_json::from_value(tool_call_json.clone()) {
-                Ok(request) => {
-                    tracing::debug!(
-                        session_id = %session_id,
-                        tool_index = %index,
-                        tool_request = ?request,
-                        "Successfully parsed tool request"
-                    );
-                    request
-                }
-                Err(e) => {
-                    tracing::error!(
-                        session_id = %session_id,
-                        tool_index = %index,
-                        error = %e,
-                        tool_call_json = %tool_call_json,
-                        "Failed to parse tool request"
-                    );
-                    continue;
-                }
-            };
-
-            // Create tool call record
-            let tool_name = match &tool_request {
-                ToolRequest::ListFiles(_) => "list_files",
-                ToolRequest::ReadFile(_) => "read_file",
-            };
-
-            tracing::debug!(
-                session_id = %session_id,
-                tool_index = %index,
-                tool_name = %tool_name,
-                "Creating tool call record"
-            );
-
-            let mut tool_call = LlmAgentToolCall::new(
-                session_id.to_string(),
-                tool_name.to_string(),
-                tool_call_json,
-            );
-
-            // Update tool call status to executing
-            tool_call.status = "executing".to_string();
-            let tool_call_id = self.db.create_llm_agent_tool_call(&tool_call)?;
-            tracing::debug!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                tool_name = %tool_name,
-                "Tool call record created with executing status"
-            );
-
-            // Execute tool
-            tracing::info!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                tool_name = %tool_name,
-                "Executing tool"
-            );
-
-            // Get project-specific tool executor
-            let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
-            let tool_response = project_tool_executor.execute(tool_request).await;
-
-            // Update tool call with response
-            let response_value = match tool_response {
-                Ok(response) => {
-                    tool_call.complete(serde_json::to_value(response)?);
-                    let response_json =
-                        serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
-                    tracing::info!(
-                        session_id = %session_id,
-                        tool_call_id = %tool_call_id,
-                        tool_name = %tool_name,
-                        "Tool execution completed successfully"
-                    );
-                    response_json
-                }
-                Err(e) => {
-                    tool_call.fail(e.to_string());
-                    let response_json =
-                        serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
-                    tracing::error!(
-                        session_id = %session_id,
-                        tool_call_id = %tool_call_id,
-                        tool_name = %tool_name,
-                        error = %e,
-                        "Tool execution failed"
-                    );
-                    response_json
-                }
-            };
-
-            self.db.update_llm_agent_tool_call(&tool_call)?;
-            tracing::debug!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                "Tool call record updated with execution result"
-            );
-
-            // Add tool response to conversation (with size limiting)
-            let response_json_string = serde_json::to_string(&response_value)?;
-            let truncated_response = if response_json_string.len() > 50000 { // 50KB limit
-                // Truncate large responses to prevent LLM context overflow
+            if depth >= MAX_RECURSION_DEPTH {
                 tracing::warn!(
                     session_id = %session_id,
-                    tool_call_id = %tool_call_id,
-                    original_size = %response_json_string.len(),
-                    "Tool response too large, truncating for LLM follow-up"
+                    current_depth = %depth,
+                    max_depth = %MAX_RECURSION_DEPTH,
+                    "Tool call recursion depth limit reached, stopping processing"
+                );
+                return Ok(());
+            }
+            tracing::info!(
+                session_id = %session_id,
+                current_depth = %depth,
+                "Processing tool calls from LLM response"
+            );
+
+            // Extract JSON tool calls from response
+            let tool_calls = self.extract_tool_calls(response)?;
+            tracing::debug!(
+                session_id = %session_id,
+                tool_call_count = %tool_calls.len(),
+                "Extracted tool calls from LLM response"
+            );
+
+            for (index, tool_call_json) in tool_calls.into_iter().enumerate() {
+                tracing::info!(
+                    session_id = %session_id,
+                    tool_index = %index,
+                    tool_call_json = %tool_call_json,
+                    "Processing tool call"
                 );
 
-                format!(
+                // Parse tool request
+                let tool_request: ToolRequest = match serde_json::from_value(tool_call_json.clone())
+                {
+                    Ok(request) => {
+                        tracing::debug!(
+                            session_id = %session_id,
+                            tool_index = %index,
+                            tool_request = ?request,
+                            "Successfully parsed tool request"
+                        );
+                        request
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            session_id = %session_id,
+                            tool_index = %index,
+                            error = %e,
+                            tool_call_json = %tool_call_json,
+                            "Failed to parse tool request"
+                        );
+                        continue;
+                    }
+                };
+
+                // Create tool call record
+                let tool_name = match &tool_request {
+                    ToolRequest::ListFiles(_) => "list_files",
+                    ToolRequest::ReadFile(_) => "read_file",
+                };
+
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_index = %index,
+                    tool_name = %tool_name,
+                    "Creating tool call record"
+                );
+
+                let mut tool_call = LlmAgentToolCall::new(
+                    session_id.to_string(),
+                    tool_name.to_string(),
+                    tool_call_json,
+                );
+
+                // Update tool call status to executing
+                tool_call.status = "executing".to_string();
+                let tool_call_id = self.db.create_llm_agent_tool_call(&tool_call)?;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    tool_name = %tool_name,
+                    "Tool call record created with executing status"
+                );
+
+                // Execute tool
+                tracing::info!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    tool_name = %tool_name,
+                    "Executing tool"
+                );
+
+                // Get project-specific tool executor
+                let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
+                let tool_response = project_tool_executor.execute(tool_request).await;
+
+                // Update tool call with response
+                let response_value = match tool_response {
+                    Ok(response) => {
+                        tool_call.complete(serde_json::to_value(response)?);
+                        let response_json =
+                            serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                        tracing::info!(
+                            session_id = %session_id,
+                            tool_call_id = %tool_call_id,
+                            tool_name = %tool_name,
+                            "Tool execution completed successfully"
+                        );
+                        response_json
+                    }
+                    Err(e) => {
+                        tool_call.fail(e.to_string());
+                        let response_json =
+                            serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                        tracing::error!(
+                            session_id = %session_id,
+                            tool_call_id = %tool_call_id,
+                            tool_name = %tool_name,
+                            error = %e,
+                            "Tool execution failed"
+                        );
+                        response_json
+                    }
+                };
+
+                self.db.update_llm_agent_tool_call(&tool_call)?;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    "Tool call record updated with execution result"
+                );
+
+                // Add tool response to conversation (with size limiting)
+                let response_json_string = serde_json::to_string(&response_value)?;
+                let truncated_response = if response_json_string.len() > 50000 {
+                    // 50KB limit
+                    // Truncate large responses to prevent LLM context overflow
+                    tracing::warn!(
+                        session_id = %session_id,
+                        tool_call_id = %tool_call_id,
+                        original_size = %response_json_string.len(),
+                        "Tool response too large, truncating for LLM follow-up"
+                    );
+
+                    format!(
                     "{{\"truncated\": true, \"original_size\": {}, \"summary\": \"Response truncated due to size limit. First 1000 chars: {}...\"}}",
                     response_json_string.len(),
                     response_json_string.chars().take(1000).collect::<String>()
                 )
-            } else {
-                response_json_string
-            };
+                } else {
+                    response_json_string
+                };
 
-            self.db.create_llm_agent_message(
-                session_id,
-                "tool",
-                truncated_response,
-            )?;
-            tracing::debug!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                "Tool response added to conversation"
-            );
+                self.db
+                    .create_llm_agent_message(session_id, "tool", truncated_response)?;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    "Tool response added to conversation"
+                );
 
-            // If there are tool results, follow up with LLM
+                // If there are tool results, follow up with LLM
+                tracing::info!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    current_depth = %depth,
+                    "Following up with LLM after tool execution"
+                );
+                self.follow_up_with_llm_with_depth(session_id, depth + 1)
+                    .await?;
+            }
+
             tracing::info!(
                 session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                current_depth = %depth,
-                "Following up with LLM after tool execution"
+                "Completed processing all tool calls"
             );
-            self.follow_up_with_llm_with_depth(session_id, depth + 1).await?;
-        }
 
-        tracing::info!(
-            session_id = %session_id,
-            "Completed processing all tool calls"
-        );
-
-        Ok(())
+            Ok(())
         })
     }
 
     /// Follow up with LLM after tool execution
+    #[allow(dead_code)]
     async fn follow_up_with_llm(&self, session_id: &str) -> Result<String> {
         self.follow_up_with_llm_with_depth(session_id, 0).await
     }
 
     /// Follow up with LLM after tool execution with recursion depth tracking
-    fn follow_up_with_llm_with_depth<'a>(&'a self, session_id: &'a str, depth: u32) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
+    fn follow_up_with_llm_with_depth<'a>(
+        &'a self,
+        session_id: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
         Box::pin(async move {
-        const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
+            const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
-        if depth >= MAX_RECURSION_DEPTH {
-            tracing::warn!(
+            if depth >= MAX_RECURSION_DEPTH {
+                tracing::warn!(
+                    session_id = %session_id,
+                    current_depth = %depth,
+                    max_depth = %MAX_RECURSION_DEPTH,
+                    "Follow-up recursion depth limit reached, stopping processing"
+                );
+                return Ok("Maximum recursion depth reached.".to_string());
+            }
+            tracing::info!(
                 session_id = %session_id,
                 current_depth = %depth,
-                max_depth = %MAX_RECURSION_DEPTH,
-                "Follow-up recursion depth limit reached, stopping processing"
+                "Following up with LLM after tool execution"
             );
-            return Ok("Maximum recursion depth reached.".to_string());
-        }
-        tracing::info!(
-            session_id = %session_id,
-            current_depth = %depth,
-            "Following up with LLM after tool execution"
-        );
 
-        // Get updated conversation history
-        let history = self.db.get_llm_agent_messages(session_id)?;
-        tracing::debug!(
-            session_id = %session_id,
-            message_count = %history.len(),
-            "Retrieved updated conversation history for follow-up"
-        );
-
-        // Get session
-        let session = self.db.get_llm_agent_session(session_id)?;
-        tracing::debug!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            provider = %session.provider,
-            model = %session.model,
-            "Retrieved session for follow-up"
-        );
-
-        // Create LLM client
-        let config = LlmProviderConfig {
-            provider: session.provider.clone(),
-            model: session.model.clone(),
-            api_key: self.get_api_key(&session.provider)?,
-            base_url: self.get_base_url(&session.provider),
-            max_tokens: Some(4000),
-            temperature: Some(0.7),
-        };
-
-        tracing::debug!(
-            session_id = %session_id,
-            provider = %config.provider,
-            model = %config.model,
-            "Creating LLM client for follow-up"
-        );
-
-        let llm_client = create_llm_client(config)?;
-
-        // Build conversation for LLM
-        let mut messages: Vec<_> = history
-            .into_iter()
-            .map(|msg| LlmMessage {
-                role: msg.role,
-                content: msg.content,
-            })
-            .collect();
-
-        // Add tool system prompt for follow-up (same as initial request)
-        let tool_system_prompt = self.create_tool_system_prompt();
-        messages.push(LlmMessage {
-            role: "system".to_string(),
-            content: tool_system_prompt,
-        });
-
-        tracing::debug!(
-            session_id = %session_id,
-            total_messages = %messages.len(),
-            "Built conversation for LLM follow-up request"
-        );
-
-        // Log the follow-up conversation being sent to LLM (truncated for large messages)
-        for (i, msg) in messages.iter().enumerate() {
-            let content_preview = if msg.content.len() > 200 {
-                format!("{}...", &msg.content[..200])
-            } else {
-                msg.content.clone()
-            };
-            tracing::info!(
-                session_id = %session_id,
-                message_index = %i,
-                message_role = %msg.role,
-                message_content = %content_preview,
-                message_length = %msg.content.len(),
-                "Sending follow-up message to LLM"
-            );
-        }
-
-        let request = LlmCompletionRequest {
-            model: session.model.clone(),
-            messages,
-            max_tokens: Some(4000),
-            temperature: Some(0.7),
-            stream: Some(true),
-        };
-
-        tracing::info!(
-            session_id = %session_id,
-            provider = %session.provider,
-            model = %session.model,
-            "Sending follow-up request to LLM provider"
-        );
-
-        // Stream the response
-        let mut assistant_response = String::new();
-        let mut chunk_count = 0;
-        let mut stream = llm_client.stream_complete(request);
-
-        while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result?;
-            chunk_count += 1;
-
-            if !chunk.is_finished {
-                assistant_response.push_str(&chunk.content);
-
-                // Broadcast chunk to WebSocket
-                self.ws
-                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
-                    .await;
-
-                tracing::trace!(
-                    session_id = %session_id,
-                    chunk_number = %chunk_count,
-                    chunk_length = %chunk.content.len(),
-                    "Received and broadcasted LLM follow-up response chunk"
-                );
-            }
-        }
-
-        tracing::info!(
-            session_id = %session_id,
-            total_chunks = %chunk_count,
-            response_length = %assistant_response.len(),
-            "Completed LLM follow-up response streaming"
-        );
-
-        // Store assistant response
-        self.db
-            .create_llm_agent_message(session_id, "assistant", assistant_response.clone())?;
-        tracing::debug!(
-            session_id = %session_id,
-            response_length = %assistant_response.len(),
-            "Follow-up assistant response stored in database"
-        );
-
-        // Check if the follow-up response contains tool calls
-        if self.contains_tool_calls(&assistant_response) {
-            tracing::info!(
-                session_id = %session_id,
-                "LLM follow-up response contains tool calls, processing them recursively"
-            );
-            self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
-                .await?;
-        } else {
+            // Get updated conversation history
+            let history = self.db.get_llm_agent_messages(session_id)?;
             tracing::debug!(
                 session_id = %session_id,
-                "LLM follow-up response does not contain tool calls"
+                message_count = %history.len(),
+                "Retrieved updated conversation history for follow-up"
             );
-        }
 
-        tracing::info!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            "Successfully completed LLM follow-up after tool execution"
-        );
+            // Get session
+            let session = self.db.get_llm_agent_session(session_id)?;
+            tracing::debug!(
+                session_id = %session_id,
+                work_id = %session.work_id,
+                provider = %session.provider,
+                model = %session.model,
+                "Retrieved session for follow-up"
+            );
 
-        Ok(assistant_response)
+            // Create LLM client
+            let config = LlmProviderConfig {
+                provider: session.provider.clone(),
+                model: session.model.clone(),
+                api_key: self.get_api_key(&session.provider)?,
+                base_url: self.get_base_url(&session.provider),
+                max_tokens: Some(4000),
+                temperature: Some(0.7),
+            };
+
+            tracing::debug!(
+                session_id = %session_id,
+                provider = %config.provider,
+                model = %config.model,
+                "Creating LLM client for follow-up"
+            );
+
+            let llm_client = create_llm_client(config)?;
+
+            // Build conversation for LLM
+            let mut messages: Vec<_> = history
+                .into_iter()
+                .map(|msg| LlmMessage {
+                    role: msg.role,
+                    content: msg.content,
+                })
+                .collect();
+
+            // Add tool system prompt for follow-up (same as initial request)
+            let tool_system_prompt = self.create_tool_system_prompt();
+            messages.push(LlmMessage {
+                role: "system".to_string(),
+                content: tool_system_prompt,
+            });
+
+            tracing::debug!(
+                session_id = %session_id,
+                total_messages = %messages.len(),
+                "Built conversation for LLM follow-up request"
+            );
+
+            // Log the follow-up conversation being sent to LLM (truncated for large messages)
+            for (i, msg) in messages.iter().enumerate() {
+                let content_preview = if msg.content.len() > 200 {
+                    format!("{}...", &msg.content[..200])
+                } else {
+                    msg.content.clone()
+                };
+                tracing::info!(
+                    session_id = %session_id,
+                    message_index = %i,
+                    message_role = %msg.role,
+                    message_content = %content_preview,
+                    message_length = %msg.content.len(),
+                    "Sending follow-up message to LLM"
+                );
+            }
+
+            let request = LlmCompletionRequest {
+                model: session.model.clone(),
+                messages,
+                max_tokens: Some(4000),
+                temperature: Some(0.7),
+                stream: Some(true),
+            };
+
+            tracing::info!(
+                session_id = %session_id,
+                provider = %session.provider,
+                model = %session.model,
+                "Sending follow-up request to LLM provider"
+            );
+
+            // Stream the response
+            let mut assistant_response = String::new();
+            let mut chunk_count = 0;
+            let mut stream = llm_client.stream_complete(request);
+
+            while let Some(chunk_result) = stream.next().await {
+                let chunk = chunk_result?;
+                chunk_count += 1;
+
+                if !chunk.is_finished {
+                    assistant_response.push_str(&chunk.content);
+
+                    // Broadcast chunk to WebSocket
+                    self.ws
+                        .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
+                        .await;
+
+                    tracing::trace!(
+                        session_id = %session_id,
+                        chunk_number = %chunk_count,
+                        chunk_length = %chunk.content.len(),
+                        "Received and broadcasted LLM follow-up response chunk"
+                    );
+                }
+            }
+
+            tracing::info!(
+                session_id = %session_id,
+                total_chunks = %chunk_count,
+                response_length = %assistant_response.len(),
+                "Completed LLM follow-up response streaming"
+            );
+
+            // Store assistant response
+            self.db.create_llm_agent_message(
+                session_id,
+                "assistant",
+                assistant_response.clone(),
+            )?;
+            tracing::debug!(
+                session_id = %session_id,
+                response_length = %assistant_response.len(),
+                "Follow-up assistant response stored in database"
+            );
+
+            // Check if the follow-up response contains tool calls
+            if self.contains_tool_calls(&assistant_response) {
+                tracing::info!(
+                    session_id = %session_id,
+                    "LLM follow-up response contains tool calls, processing them recursively"
+                );
+                self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
+                    .await?;
+            } else {
+                tracing::debug!(
+                    session_id = %session_id,
+                    "LLM follow-up response does not contain tool calls"
+                );
+            }
+
+            tracing::info!(
+                session_id = %session_id,
+                work_id = %session.work_id,
+                "Successfully completed LLM follow-up after tool execution"
+            );
+
+            Ok(assistant_response)
         })
     }
 
@@ -675,8 +689,10 @@ Always analyze the project structure and read relevant files before providing co
         );
 
         // Look for JSON objects that might be tool calls - more flexible matching
-        let contains_list_files = response.contains("list_files") && response.contains("type") && response.contains("{");
-        let contains_read_file = response.contains("read_file") && response.contains("type") && response.contains("{");
+        let contains_list_files =
+            response.contains("list_files") && response.contains("type") && response.contains("{");
+        let contains_read_file =
+            response.contains("read_file") && response.contains("type") && response.contains("{");
 
         let result = contains_list_files || contains_read_file;
 
@@ -716,7 +732,11 @@ Always analyze the project structure and read relevant files before providing co
         if tool_calls.is_empty() {
             for (line_num, line) in response.lines().enumerate() {
                 let trimmed = line.trim();
-                if trimmed.starts_with('{') && (trimmed.ends_with('}') || trimmed.contains("list_files") || trimmed.contains("read_file")) {
+                if trimmed.starts_with('{')
+                    && (trimmed.ends_with('}')
+                        || trimmed.contains("list_files")
+                        || trimmed.contains("read_file"))
+                {
                     tracing::debug!(
                         line_number = %line_num,
                         line_content = %trimmed,
@@ -763,8 +783,12 @@ Always analyze the project structure and read relevant files before providing co
                                     "Attempting to parse multi-line JSON block"
                                 );
 
-                                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                                    if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                                if let Ok(json_value) =
+                                    serde_json::from_str::<serde_json::Value>(&json_str)
+                                {
+                                    if let Some(tool_type) =
+                                        json_value.get("type").and_then(|v| v.as_str())
+                                    {
                                         if tool_type == "list_files" || tool_type == "read_file" {
                                             tracing::info!(
                                                 tool_type = %tool_type,
@@ -911,8 +935,11 @@ Always analyze the project structure and read relevant files before providing co
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
+    #[allow(unused_imports)]
     use crate::database::Database;
+    #[allow(unused_imports)]
     use tempfile::TempDir;
 
     #[test]
