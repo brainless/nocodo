@@ -62,6 +62,10 @@ impl ToolExecutor {
         self
     }
 
+    pub fn base_path(&self) -> &PathBuf {
+        &self.base_path
+    }
+
     /// Execute a tool request and return a tool response
     pub async fn execute(&self, request: ToolRequest) -> Result<ToolResponse> {
         match request {
@@ -223,11 +227,41 @@ impl ToolExecutor {
 
     /// Validate and resolve a path relative to the base path
     fn validate_and_resolve_path(&self, path: &str) -> Result<PathBuf> {
+        use std::path::Path;
+
+        let input_path = Path::new(path);
+
+        // Handle absolute paths
+        if input_path.is_absolute() {
+            // If the absolute path equals our base path, allow it
+            let canonical_input = match input_path.canonicalize() {
+                Ok(path) => path,
+                Err(_) => input_path.to_path_buf(), // Fallback if it doesn't exist yet
+            };
+
+            let canonical_base = match self.base_path.canonicalize() {
+                Ok(path) => path,
+                Err(_) => self.base_path.clone(),
+            };
+
+            // Security check: ensure the path is within or equals the base directory
+            if canonical_input == canonical_base || canonical_input.starts_with(&canonical_base) {
+                return Ok(canonical_input);
+            } else {
+                return Err(ToolError::InvalidPath(format!(
+                    "Absolute path '{}' is outside the allowed directory '{}'",
+                    path, self.base_path.display()
+                ))
+                .into());
+            }
+        }
+
+        // Handle relative paths
         // Clean the path to prevent directory traversal
-        let clean_path = path.trim_start_matches('.').trim_start_matches('/');
+        let clean_path = path.trim_start_matches("./");
         let clean_path = clean_path.replace("..", "");
 
-        let target_path = if clean_path.is_empty() {
+        let target_path = if clean_path.is_empty() || clean_path == "." {
             self.base_path.clone()
         } else {
             self.base_path.join(clean_path)
