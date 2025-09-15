@@ -253,20 +253,20 @@ jobs:
       - name: Check binary sizes
         run: |
           echo "Binary sizes:"
-          ls -lh target/release/nocodo-cli target/release/nocodo-manager
+          ls -lh target/release/nocodo-manager target/release/nocodo-services
           
-          CLI_SIZE=$(stat -c%s target/release/nocodo-cli)
           MANAGER_SIZE=$(stat -c%s target/release/nocodo-manager)
+          SERVICES_SIZE=$(stat -c%s target/release/nocodo-services)
           
-          echo "CLI size: $CLI_SIZE bytes"
           echo "Manager size: $MANAGER_SIZE bytes"
+          echo "Services size: $SERVICES_SIZE bytes"
           
           # Warn if binaries are unexpectedly large (>50MB)
-          if [ $CLI_SIZE -gt 52428800 ]; then
-            echo "Warning: CLI binary is larger than 50MB"
-          fi
           if [ $MANAGER_SIZE -gt 52428800 ]; then
             echo "Warning: Manager binary is larger than 50MB" 
+          fi
+          if [ $SERVICES_SIZE -gt 52428800 ]; then
+            echo "Warning: Services binary is larger than 50MB"
           fi
 
       - name: Check Web bundle size
