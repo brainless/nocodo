@@ -1,10 +1,21 @@
 use anyhow::{Context, Result};
+use clap::Parser;
 use std::fs;
 use std::process::{Command, Stdio};
 use tracing::{error, info, warn};
 
+#[derive(Parser)]
+#[command(name = "manager-runner")]
+#[command(about = "Run nocodo manager and web services for testing")]
+struct Args {
+    /// Clean log files before starting services
+    #[arg(short, long)]
+    clean: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let args = Args::parse();
     tracing_subscriber::fmt::init();
 
     info!("Starting nocodo manager-runner");
@@ -12,6 +23,14 @@ async fn main() -> Result<()> {
     // Create test-logs directory
     fs::create_dir_all("test-logs")
         .context("Failed to create test-logs directory")?;
+
+    // Clean log files if requested
+    if args.clean {
+        info!("Cleaning existing log files...");
+        let _ = fs::remove_file("test-logs/manager.log");
+        let _ = fs::remove_file("test-logs/manager-web.log");
+        info!("Log files cleaned");
+    }
 
     // Build manager-web first
     info!("Building manager-web...");
@@ -42,7 +61,7 @@ async fn main() -> Result<()> {
     // Build manager binary
     info!("Building manager...");
     let manager_build_status = Command::new("cargo")
-        .args(&["build", "--release", "--bin", "nocodo-manager"])
+        .args(&["build", "--bin", "nocodo-manager"])
         .status()
         .context("Failed to build manager")?;
 
@@ -63,7 +82,7 @@ async fn main() -> Result<()> {
         .open("test-logs/manager.log")
         .context("Failed to create manager.log")?;
 
-    let mut manager_process = tokio::process::Command::new("./target/release/nocodo-manager")
+    let mut manager_process = tokio::process::Command::new("./target/debug/nocodo-manager")
         .args(&["--config", "~/.config/nocodo/manager.toml"])
         .stdout(Stdio::from(manager_log.try_clone()?))
         .stderr(Stdio::from(manager_log))
