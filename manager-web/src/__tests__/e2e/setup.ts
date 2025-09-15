@@ -121,14 +121,16 @@ export const test = base.extend({
         contentType: 'application/json',
         body: JSON.stringify({
           work: mockWorkResponse.work,
-          messages: [{
-            id: 'message-123',
-            content: 'List all files in the root directory',
-            content_type: 'text',
-            author_type: 'user',
-            author_id: null,
-            created_at: '2024-01-01T00:00:00Z',
-          }],
+          messages: [
+            {
+              id: 'message-123',
+              content: 'List all files in the root directory',
+              content_type: 'text',
+              author_type: 'user',
+              author_id: null,
+              created_at: '2024-01-01T00:00:00Z',
+            },
+          ],
           total_messages: 1,
         }),
       });
@@ -179,19 +181,22 @@ export const test = base.extend({
             // Simulate receiving LLM agent chunks
             const mockResponse = 'Mock agent response: Files listed successfully';
             for (let i = 0; i < mockResponse.length; i++) {
-              setTimeout(() => {
-                this.dispatchEvent(
-                  new MessageEvent('message', {
-                    data: JSON.stringify({
-                      type: 'LlmAgentChunk',
-                      payload: {
-                        session_id: 'session-123',
-                        content: mockResponse[i],
-                      },
-                    }),
-                  })
-                );
-              }, 2000 + i * 50); // Stagger the chunks
+              setTimeout(
+                () => {
+                  this.dispatchEvent(
+                    new MessageEvent('message', {
+                      data: JSON.stringify({
+                        type: 'LlmAgentChunk',
+                        payload: {
+                          session_id: 'session-123',
+                          content: mockResponse[i],
+                        },
+                      }),
+                    })
+                  );
+                },
+                2000 + i * 50
+              ); // Stagger the chunks
             }
           }, 2000);
         }

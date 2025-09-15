@@ -170,7 +170,6 @@ class ApiClient {
     });
   }
 
-
   // New methods for issue #32
   /**
    * List all AI sessions
