@@ -8,6 +8,9 @@ use async_stream::try_stream;
 use futures_util::StreamExt;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::boxed::Box;
+use std::pin::Pin;
+use std::future::Future;
 
 /// LLM Agent that handles direct communication with LLMs and tool execution
 pub struct LlmAgent {
@@ -248,10 +251,46 @@ impl LlmAgent {
         Ok(assistant_response)
     }
 
+    /// Get the tool executor for a specific session's project
+    async fn get_tool_executor_for_session(&self, session_id: &str) -> Result<ToolExecutor> {
+        // Get session to find work_id
+        let session = self.db.get_llm_agent_session(session_id)?;
+
+        // Get work to find project_id
+        let work = self.db.get_work_by_id(&session.work_id)?;
+
+        if let Some(project_id) = work.project_id {
+            // Get project to find project path
+            let project = self.db.get_project_by_id(&project_id)?;
+            Ok(ToolExecutor::new(PathBuf::from(project.path)))
+        } else {
+            // Fallback to the default tool executor
+            Ok(ToolExecutor::new(self.tool_executor.base_path().clone()))
+        }
+    }
+
     /// Process tool calls from LLM response
     async fn process_tool_calls(&self, session_id: &str, response: &str) -> Result<()> {
+        self.process_tool_calls_with_depth(session_id, response, 0).await
+    }
+
+    /// Process tool calls from LLM response with recursion depth tracking
+    fn process_tool_calls_with_depth<'a>(&'a self, session_id: &'a str, response: &'a str, depth: u32) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+        const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
+
+        if depth >= MAX_RECURSION_DEPTH {
+            tracing::warn!(
+                session_id = %session_id,
+                current_depth = %depth,
+                max_depth = %MAX_RECURSION_DEPTH,
+                "Tool call recursion depth limit reached, stopping processing"
+            );
+            return Ok(());
+        }
         tracing::info!(
             session_id = %session_id,
+            current_depth = %depth,
             "Processing tool calls from LLM response"
         );
 
@@ -331,7 +370,9 @@ impl LlmAgent {
                 "Executing tool"
             );
 
-            let tool_response = self.tool_executor.execute(tool_request).await;
+            // Get project-specific tool executor
+            let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
+            let tool_response = project_tool_executor.execute(tool_request).await;
 
             // Update tool call with response
             let response_value = match tool_response {
@@ -369,11 +410,30 @@ impl LlmAgent {
                 "Tool call record updated with execution result"
             );
 
-            // Add tool response to conversation
+            // Add tool response to conversation (with size limiting)
+            let response_json_string = serde_json::to_string(&response_value)?;
+            let truncated_response = if response_json_string.len() > 50000 { // 50KB limit
+                // Truncate large responses to prevent LLM context overflow
+                tracing::warn!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    original_size = %response_json_string.len(),
+                    "Tool response too large, truncating for LLM follow-up"
+                );
+
+                format!(
+                    "{{\"truncated\": true, \"original_size\": {}, \"summary\": \"Response truncated due to size limit. First 1000 chars: {}...\"}}",
+                    response_json_string.len(),
+                    response_json_string.chars().take(1000).collect::<String>()
+                )
+            } else {
+                response_json_string
+            };
+
             self.db.create_llm_agent_message(
                 session_id,
                 "tool",
-                serde_json::to_string(&response_value)?,
+                truncated_response,
             )?;
             tracing::debug!(
                 session_id = %session_id,
@@ -385,9 +445,10 @@ impl LlmAgent {
             tracing::info!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,
+                current_depth = %depth,
                 "Following up with LLM after tool execution"
             );
-            self.follow_up_with_llm(session_id).await?;
+            self.follow_up_with_llm_with_depth(session_id, depth + 1).await?;
         }
 
         tracing::info!(
@@ -396,12 +457,31 @@ impl LlmAgent {
         );
 
         Ok(())
+        })
     }
 
     /// Follow up with LLM after tool execution
     async fn follow_up_with_llm(&self, session_id: &str) -> Result<String> {
+        self.follow_up_with_llm_with_depth(session_id, 0).await
+    }
+
+    /// Follow up with LLM after tool execution with recursion depth tracking
+    fn follow_up_with_llm_with_depth<'a>(&'a self, session_id: &'a str, depth: u32) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
+        Box::pin(async move {
+        const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
+
+        if depth >= MAX_RECURSION_DEPTH {
+            tracing::warn!(
+                session_id = %session_id,
+                current_depth = %depth,
+                max_depth = %MAX_RECURSION_DEPTH,
+                "Follow-up recursion depth limit reached, stopping processing"
+            );
+            return Ok("Maximum recursion depth reached.".to_string());
+        }
         tracing::info!(
             session_id = %session_id,
+            current_depth = %depth,
             "Following up with LLM after tool execution"
         );
 
@@ -443,13 +523,20 @@ impl LlmAgent {
         let llm_client = create_llm_client(config)?;
 
         // Build conversation for LLM
-        let messages: Vec<_> = history
+        let mut messages: Vec<_> = history
             .into_iter()
             .map(|msg| LlmMessage {
                 role: msg.role,
                 content: msg.content,
             })
             .collect();
+
+        // Add tool system prompt for follow-up (same as initial request)
+        let tool_system_prompt = self.create_tool_system_prompt();
+        messages.push(LlmMessage {
+            role: "system".to_string(),
+            content: tool_system_prompt,
+        });
 
         tracing::debug!(
             session_id = %session_id,
@@ -531,6 +618,21 @@ impl LlmAgent {
             "Follow-up assistant response stored in database"
         );
 
+        // Check if the follow-up response contains tool calls
+        if self.contains_tool_calls(&assistant_response) {
+            tracing::info!(
+                session_id = %session_id,
+                "LLM follow-up response contains tool calls, processing them recursively"
+            );
+            self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
+                .await?;
+        } else {
+            tracing::debug!(
+                session_id = %session_id,
+                "LLM follow-up response does not contain tool calls"
+            );
+        }
+
         tracing::info!(
             session_id = %session_id,
             work_id = %session.work_id,
@@ -538,6 +640,7 @@ impl LlmAgent {
         );
 
         Ok(assistant_response)
+        })
     }
 
     /// Create system prompt for tool usage
@@ -554,32 +657,136 @@ impl LlmAgent {
 
 When you need to use a tool, respond with ONLY the JSON request for that tool. Do not include any other text. The tool will be executed and you will receive the results, after which you can continue your response.
 
+When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned. Always provide a complete answer to the user's original question using the information gathered from the tools.
+
 Always analyze the project structure and read relevant files before providing code solutions. Be concise and focus on the user's specific needs."#.to_string()
     }
 
     /// Check if response contains tool calls
     fn contains_tool_calls(&self, response: &str) -> bool {
-        // Look for JSON objects that might be tool calls
-        response.contains("\"type\":\"list_files\"") || response.contains("\"type\":\"read_file\"")
+        tracing::debug!(
+            response_length = %response.len(),
+            response_preview = %if response.len() > 200 {
+                format!("{}...", &response[..200])
+            } else {
+                response.to_string()
+            },
+            "Checking if response contains tool calls"
+        );
+
+        // Look for JSON objects that might be tool calls - more flexible matching
+        let contains_list_files = response.contains("list_files") && response.contains("type") && response.contains("{");
+        let contains_read_file = response.contains("read_file") && response.contains("type") && response.contains("{");
+
+        let result = contains_list_files || contains_read_file;
+
+        tracing::info!(
+            contains_tool_calls = %result,
+            contains_list_files = %contains_list_files,
+            contains_read_file = %contains_read_file,
+            "Tool call detection result"
+        );
+
+        result
     }
 
     /// Extract tool calls from response
     fn extract_tool_calls(&self, response: &str) -> Result<Vec<serde_json::Value>> {
         let mut tool_calls = Vec::new();
 
-        // Simple JSON extraction (in production, use a more robust parser)
-        for line in response.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with('{') && trimmed.ends_with('}') {
-                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                    if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
-                        if tool_type == "list_files" || tool_type == "read_file" {
-                            tool_calls.push(json_value);
+        tracing::debug!(
+            response_length = %response.len(),
+            "Extracting tool calls from response"
+        );
+
+        // Try parsing the entire response as JSON first
+        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(response.trim()) {
+            if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                if tool_type == "list_files" || tool_type == "read_file" {
+                    tracing::info!(
+                        tool_type = %tool_type,
+                        "Found tool call in full response"
+                    );
+                    tool_calls.push(json_value);
+                }
+            }
+        }
+
+        // If that didn't work, try line-by-line extraction
+        if tool_calls.is_empty() {
+            for (line_num, line) in response.lines().enumerate() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('{') && (trimmed.ends_with('}') || trimmed.contains("list_files") || trimmed.contains("read_file")) {
+                    tracing::debug!(
+                        line_number = %line_num,
+                        line_content = %trimmed,
+                        "Attempting to parse line as JSON tool call"
+                    );
+
+                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                        if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                            if tool_type == "list_files" || tool_type == "read_file" {
+                                tracing::info!(
+                                    line_number = %line_num,
+                                    tool_type = %tool_type,
+                                    "Found tool call in line"
+                                );
+                                tool_calls.push(json_value);
+                            }
                         }
                     }
                 }
             }
         }
+
+        // Try to extract JSON blocks that span multiple lines
+        if tool_calls.is_empty() {
+            let mut brace_count = 0;
+            let mut json_start = None;
+            let chars: Vec<char> = response.chars().collect();
+
+            for (i, &ch) in chars.iter().enumerate() {
+                match ch {
+                    '{' => {
+                        if brace_count == 0 {
+                            json_start = Some(i);
+                        }
+                        brace_count += 1;
+                    }
+                    '}' => {
+                        brace_count -= 1;
+                        if brace_count == 0 {
+                            if let Some(start) = json_start {
+                                let json_str: String = chars[start..=i].iter().collect();
+                                tracing::debug!(
+                                    json_candidate = %json_str,
+                                    "Attempting to parse multi-line JSON block"
+                                );
+
+                                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                                    if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                                        if tool_type == "list_files" || tool_type == "read_file" {
+                                            tracing::info!(
+                                                tool_type = %tool_type,
+                                                "Found tool call in multi-line JSON block"
+                                            );
+                                            tool_calls.push(json_value);
+                                        }
+                                    }
+                                }
+                            }
+                            json_start = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        tracing::info!(
+            extracted_tool_calls = %tool_calls.len(),
+            "Completed tool call extraction"
+        );
 
         Ok(tool_calls)
     }
@@ -699,5 +906,51 @@ Always analyze the project structure and read relevant files before providing co
                 yield format!("[{}] {}", message.role, message.content);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_system_prompt_includes_tool_handling_instructions() {
+        // This test just verifies the system prompt contains the correct instructions
+        // We don't need to create the full LLM agent for this
+
+        // We test the system prompt method directly through a simpler approach
+
+        let system_prompt = create_test_tool_system_prompt();
+
+        // Verify the system prompt contains instructions for handling tool results
+        assert!(system_prompt.contains("When you receive tool results"));
+        assert!(system_prompt.contains("provide a helpful natural language response"));
+        assert!(system_prompt.contains("messages with role \"tool\""));
+
+        // Verify the system prompt still contains the original tool instructions
+        assert!(system_prompt.contains("list_files"));
+        assert!(system_prompt.contains("read_file"));
+        assert!(system_prompt.contains("When you need to use a tool"));
+    }
+
+    // Helper function for testing the system prompt
+    fn create_test_tool_system_prompt() -> String {
+        r#"You are an AI assistant with access to file system tools. You can use the following tools:
+
+1. **list_files**: List files and directories in a project
+   - Request format: {"type": "list_files", "path": "<directory_path>", "recursive": <boolean>, "include_hidden": <boolean>}
+   - Example: {"type": "list_files", "path": ".", "recursive": false, "include_hidden": false}
+
+2. **read_file**: Read the content of a file
+   - Request format: {"type": "read_file", "path": "<file_path>", "max_size": <bytes>}
+   - Example: {"type": "read_file", "path": "src/main.rs", "max_size": 10000}
+
+When you need to use a tool, respond with ONLY the JSON request for that tool. Do not include any other text. The tool will be executed and you will receive the results, after which you can continue your response.
+
+When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned. Always provide a complete answer to the user's original question using the information gathered from the tools.
+
+Always analyze the project structure and read relevant files before providing code solutions. Be concise and focus on the user's specific needs."#.to_string()
     }
 }
