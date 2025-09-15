@@ -1,11 +1,10 @@
 import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useParams } from '@solidjs/router';
-import { AiSessionStatus, Project, PtySessionInfo } from '../types';
+import { AiSessionStatus, Project } from '../types';
 import { apiClient } from '../api';
 import { useSessionOutputs, useSessions } from '../stores/sessionsStore';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 import SessionTimeline from './SessionTimeline';
-import TerminalSession from './TerminalSession';
 
 // Utility function to format duration
 const formatDuration = (startedAt: number, endedAt?: number): string => {
@@ -173,23 +172,6 @@ const AiSessionDetail: Component = () => {
 
   const session = () => store.byId[params.id];
 
-  // Check if this is a PTY session (Issue #58)
-  // For now, we'll detect PTY sessions by checking if the tool supports it
-  // In the future, this information should come from the backend
-  const isPtySession = () => {
-    const currentSession = session();
-    if (!currentSession) return false;
-
-    // Check if the session has PTY-related metadata
-    const sessionWithPty = currentSession as typeof currentSession & PtySessionInfo;
-    if (sessionWithPty.is_pty_session !== undefined) {
-      return sessionWithPty.is_pty_session;
-    }
-
-    // Fallback: detect by tool name (tools that typically support PTY)
-    const ptyTools = ['claude', 'gemini', 'qwen'];
-    return currentSession.tool_name ? ptyTools.includes(currentSession.tool_name) : false;
-  };
 
   // Fetch project details when session is loaded
   const fetchProject = async (projectId: string) => {
@@ -341,20 +323,8 @@ const AiSessionDetail: Component = () => {
               </div>
             </Show>
 
-            {/* Output panel or Terminal - conditionally rendered based on session type (Issue #58) */}
-            <Show when={isPtySession()} fallback={<OutputPanel sessionId={params.id} />}>
-              <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
-                <div class='px-6 py-4 border-b border-gray-200 bg-gray-50'>
-                  <h3 class='text-lg font-medium text-gray-900'>Interactive Terminal</h3>
-                  <p class='text-sm text-gray-600 mt-1'>
-                    Live terminal interface with the AI tool running in PTY mode
-                  </p>
-                </div>
-                <div class='p-6'>
-                  <TerminalSession sessionId={params.id} />
-                </div>
-              </div>
-            </Show>
+            {/* Output panel - shows live output from LLM agent */}
+            <OutputPanel sessionId={params.id} />
 
             {/* Project Context - remains last */}
             <Show when={session()!.project_context}>
@@ -393,12 +363,6 @@ const AiSessionDetail: Component = () => {
                       size='md'
                       showIcon={true}
                     />
-                    <Show when={isPtySession()}>
-                      <div class='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
-                        <span class='mr-1'>🖥️</span>
-                        Interactive Terminal
-                      </div>
-                    </Show>
                   </div>
                   <ToolIcon toolName={session()!.tool_name} />
                 </div>
@@ -473,8 +437,8 @@ const AiSessionDetail: Component = () => {
             {/* Timeline */}
             <SessionTimeline session={session()!} />
 
-            {/* Optional input box to send content to running session (not for PTY sessions) */}
-            <Show when={session()!.status === 'running' && !isPtySession()}>
+            {/* Optional input box to send content to running session */}
+            <Show when={session()!.status === 'running'}>
               <SessionInputBox sessionId={params.id} />
             </Show>
           </div>
