@@ -260,8 +260,6 @@ impl Handler<Connect> for WebSocketServer {
     }
 }
 
-
-
 impl Handler<Disconnect> for WebSocketServer {
     type Result = ();
 
@@ -361,8 +359,6 @@ pub async fn ai_session_websocket_handler(
     resp
 }
 
-
-
 /// Utility functions for broadcasting messages
 pub struct WebSocketBroadcaster {
     server: Arc<Addr<WebSocketServer>>,
@@ -449,8 +445,6 @@ impl WebSocketBroadcaster {
             },
         });
     }
-
-
 
     /// Broadcast LLM agent chunk
     pub async fn broadcast_llm_agent_chunk(&self, session_id: String, content: String) {

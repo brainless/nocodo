@@ -271,10 +271,6 @@ pub struct AiSessionInputRequest {
     pub content: String,
 }
 
-
-
-
-
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AddExistingProjectRequest {

@@ -201,8 +201,6 @@ impl Database {
             [],
         )?;
 
-
-
         // Create LLM agent sessions table for direct LLM integration
         conn.execute(
             "CREATE TABLE IF NOT EXISTS llm_agent_sessions (
@@ -1058,8 +1056,6 @@ impl Database {
         Ok(result)
     }
 
-
-
     // LLM Agent Methods
 
     pub fn create_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<()> {
@@ -1178,7 +1174,7 @@ impl Database {
 
     pub fn get_llm_agent_session_by_work_id(&self, work_id: &str) -> AppResult<LlmAgentSession> {
         let sessions = self.get_llm_agent_sessions_by_work(work_id)?;
-        
+
         match sessions.first() {
             Some(session) => Ok(session.clone()),
             None => Err(AppError::NotFound(format!(
