@@ -166,13 +166,13 @@ export const test = base.extend({
     // Mock WebSocket connection (simulate successful connection)
     await page.addInitScript(() => {
       // Mock WebSocket for testing
-      window.WebSocket = class extends EventTarget {
+      const MockWebSocket = class extends EventTarget {
         constructor(_url: string) {
           super();
-          // Simulate successful connection
+          // Simulate successful connection immediately
           setTimeout(() => {
             this.dispatchEvent(new Event('open'));
-          }, 100);
+          }, 10);
         }
 
         send() {
@@ -204,6 +204,22 @@ export const test = base.extend({
         close() {
           this.dispatchEvent(new Event('close'));
         }
+      };
+
+      // Override the WebSocket constructor
+      window.WebSocket = MockWebSocket as any;
+
+      // Also mock the WebSocket client state for the provider
+      // This ensures the status indicator shows connected
+      const originalWebSocket = window.WebSocket;
+      window.WebSocket = function(url: string) {
+        const ws = new originalWebSocket(url);
+        // Force the readyState to OPEN immediately
+        Object.defineProperty(ws, 'readyState', {
+          value: WebSocket.OPEN,
+          writable: false
+        });
+        return ws;
       } as any;
     });
 
