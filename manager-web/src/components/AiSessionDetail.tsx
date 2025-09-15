@@ -172,7 +172,6 @@ const AiSessionDetail: Component = () => {
 
   const session = () => store.byId[params.id];
 
-
   // Fetch project details when session is loaded
   const fetchProject = async (projectId: string) => {
     try {

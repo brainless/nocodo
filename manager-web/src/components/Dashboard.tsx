@@ -252,7 +252,6 @@ const StartAiSessionForm: Component = () => {
           </div>
         </div>
 
-
         <Show when={error()}>
           <div class='text-sm text-red-600'>{error()}</div>
         </Show>
