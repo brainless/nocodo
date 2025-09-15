@@ -10,7 +10,6 @@ pub mod models;
 pub mod runner;
 pub mod socket;
 pub mod templates;
-pub mod terminal_runner;
 pub mod tools;
 pub mod websocket;
 
@@ -61,13 +60,5 @@ mod ts_bindings_tests {
         WorkMessageListResponse::export()
             .expect("Failed to export WorkMessageListResponse bindings");
         AddMessageRequest::export().expect("Failed to export AddMessageRequest bindings");
-        TerminalControlMessage::export().expect("Failed to export TerminalControlMessage bindings");
-        CreateTerminalSessionRequest::export()
-            .expect("Failed to export CreateTerminalSessionRequest bindings");
-        TerminalSession::export().expect("Failed to export TerminalSession bindings");
-        TerminalSessionResponse::export()
-            .expect("Failed to export TerminalSessionResponse bindings");
-        ToolConfig::export().expect("Failed to export ToolConfig bindings");
-        ToolRegistryResponse::export().expect("Failed to export ToolRegistryResponse bindings");
     }
 }

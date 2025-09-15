@@ -1,7 +1,7 @@
 use crate::error::{AppError, AppResult};
 use crate::models::{
     AiSession, AiSessionResult, LlmAgentMessage, LlmAgentSession, LlmAgentToolCall, Project,
-    ProjectComponent, TerminalSession,
+    ProjectComponent,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
@@ -201,51 +201,7 @@ impl Database {
             [],
         )?;
 
-        // Create terminal sessions table for PTY-based interactive sessions
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS terminal_sessions (
-                id TEXT PRIMARY KEY,
-                work_id TEXT NOT NULL,
-                message_id TEXT NOT NULL,
-                tool_name TEXT NOT NULL,
-                status TEXT NOT NULL,
-                project_context TEXT,
-                requires_pty BOOLEAN NOT NULL DEFAULT 1,
-                interactive BOOLEAN NOT NULL DEFAULT 1,
-                cols INTEGER NOT NULL DEFAULT 80,
-                rows INTEGER NOT NULL DEFAULT 24,
-                started_at INTEGER NOT NULL,
-                ended_at INTEGER,
-                exit_code INTEGER,
-                FOREIGN KEY (work_id) REFERENCES works (id),
-                FOREIGN KEY (message_id) REFERENCES work_messages (id)
-            )",
-            [],
-        )?;
 
-        // Index for terminal sessions by work_id
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_terminal_sessions_work_id ON terminal_sessions(work_id)",
-            [],
-        )?;
-
-        // Create terminal transcripts table for PTY session output storage
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS terminal_transcripts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                transcript BLOB NOT NULL,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES terminal_sessions (id)
-            )",
-            [],
-        )?;
-
-        // Index for transcripts by session_id
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_terminal_transcripts_session_id ON terminal_transcripts(session_id)",
-            [],
-        )?;
 
         // Create LLM agent sessions table for direct LLM integration
         conn.execute(
@@ -1102,170 +1058,7 @@ impl Database {
         Ok(result)
     }
 
-    // Terminal session management methods
-    pub fn create_terminal_session(&self, session: &TerminalSession) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        conn.execute(
-            "INSERT INTO terminal_sessions (id, work_id, message_id, tool_name, status, project_context, requires_pty, interactive, cols, rows, started_at, ended_at, exit_code) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            params![
-                session.id,
-                session.work_id,
-                session.message_id,
-                session.tool_name,
-                session.status,
-                session.project_context,
-                session.requires_pty,
-                session.interactive,
-                session.cols,
-                session.rows,
-                session.started_at,
-                session.ended_at,
-                session.exit_code
-            ],
-        )?;
-
-        tracing::info!("Created terminal session: {}", session.id);
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub fn update_terminal_session(&self, session: &TerminalSession) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let rows_affected = conn.execute(
-            "UPDATE terminal_sessions SET status = ?, cols = ?, rows = ?, ended_at = ?, exit_code = ? WHERE id = ?",
-            params![session.status, session.cols, session.rows, session.ended_at, session.exit_code, session.id],
-        )?;
-
-        if rows_affected == 0 {
-            return Err(AppError::Internal(format!(
-                "Terminal session not found: {}",
-                session.id
-            )));
-        }
-
-        tracing::info!("Updated terminal session: {}", session.id);
-        Ok(())
-    }
-
-    pub fn get_terminal_session_by_id(&self, session_id: &str) -> AppResult<TerminalSession> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, work_id, message_id, tool_name, status, project_context, requires_pty, interactive, cols, rows, started_at, ended_at, exit_code
-             FROM terminal_sessions WHERE id = ?",
-        )?;
-
-        let session = stmt.query_row([session_id], |row| {
-            Ok(TerminalSession {
-                id: row.get(0)?,
-                work_id: row.get(1)?,
-                message_id: row.get(2)?,
-                tool_name: row.get(3)?,
-                status: row.get(4)?,
-                project_context: row.get(5)?,
-                requires_pty: row.get(6)?,
-                interactive: row.get(7)?,
-                cols: row.get(8)?,
-                rows: row.get(9)?,
-                started_at: row.get(10)?,
-                ended_at: row.get(11)?,
-                exit_code: row.get(12)?,
-            })
-        })?;
-
-        Ok(session)
-    }
-
-    #[allow(dead_code)]
-    pub fn get_terminal_sessions_by_work_id(
-        &self,
-        work_id: &str,
-    ) -> AppResult<Vec<TerminalSession>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, work_id, message_id, tool_name, status, project_context, requires_pty, interactive, cols, rows, started_at, ended_at, exit_code
-             FROM terminal_sessions WHERE work_id = ? ORDER BY started_at DESC",
-        )?;
-
-        let session_iter = stmt.query_map([work_id], |row| {
-            Ok(TerminalSession {
-                id: row.get(0)?,
-                work_id: row.get(1)?,
-                message_id: row.get(2)?,
-                tool_name: row.get(3)?,
-                status: row.get(4)?,
-                project_context: row.get(5)?,
-                requires_pty: row.get(6)?,
-                interactive: row.get(7)?,
-                cols: row.get(8)?,
-                rows: row.get(9)?,
-                started_at: row.get(10)?,
-                ended_at: row.get(11)?,
-                exit_code: row.get(12)?,
-            })
-        })?;
-
-        let sessions: Result<Vec<_>, _> = session_iter.collect();
-        sessions.map_err(AppError::from)
-    }
-
-    #[allow(dead_code)]
-    pub fn save_terminal_transcript(&self, session_id: &str, transcript: &[u8]) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let now = chrono::Utc::now().timestamp();
-
-        conn.execute(
-            "INSERT OR REPLACE INTO terminal_transcripts (session_id, transcript, created_at) VALUES (?, ?, ?)",
-            params![session_id, transcript, now],
-        )?;
-
-        tracing::info!(
-            "Saved terminal transcript for session: {} ({} bytes)",
-            session_id,
-            transcript.len()
-        );
-        Ok(())
-    }
-
-    pub fn get_terminal_transcript(&self, session_id: &str) -> AppResult<Option<Vec<u8>>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT transcript FROM terminal_transcripts WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
-        )?;
-
-        let result = stmt
-            .query_row([session_id], |row| {
-                let transcript_blob: Vec<u8> = row.get(0)?;
-                Ok(transcript_blob)
-            })
-            .optional()?;
-
-        Ok(result)
-    }
 
     // LLM Agent Methods
 

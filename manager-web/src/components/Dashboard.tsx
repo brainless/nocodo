@@ -91,31 +91,22 @@ const ProjectsCard: Component = () => {
 // Start AI Session form component (Issue #59)
 const StartAiSessionForm: Component = () => {
   const navigate = useNavigate();
-  // Available tools - LLM agent and external tools
-  const knownTools = ['llm-agent', 'claude', 'gemini', 'openai', 'qwen'];
+  // Only use LLM agent as per issue #110 - no tool selection needed
+  const toolName = 'llm-agent';
 
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
-  const [toolName, setToolName] = createSignal<string>(knownTools[0]);
   const [prompt, setPrompt] = createSignal<string>('');
   const [submitting, setSubmitting] = createSignal<boolean>(false);
   const [error, setError] = createSignal<string | null>(null);
 
-  // PTY options (Issue #58)
-  const [usePty, setUsePty] = createSignal<boolean>(false);
-  const [terminalCols, setTerminalCols] = createSignal<number>(80);
-  const [terminalRows, setTerminalRows] = createSignal<number>(24);
-
-  // Dropdown states and refs for project and tool, with click-outside handling
+  // Dropdown states and refs for project, with click-outside handling
   const [isProjectOpen, setProjectOpen] = createSignal(false);
-  const [isToolOpen, setToolOpen] = createSignal(false);
   let projectDdRef: HTMLDivElement | undefined;
-  let toolDdRef: HTMLDivElement | undefined;
 
   const onDocMouseDown = (e: MouseEvent) => {
     const target = e.target as Node;
     if (projectDdRef && !projectDdRef.contains(target)) setProjectOpen(false);
-    if (toolDdRef && !toolDdRef.contains(target)) setToolOpen(false);
   };
 
   onMount(async () => {
@@ -133,66 +124,42 @@ const StartAiSessionForm: Component = () => {
     document.removeEventListener('mousedown', onDocMouseDown);
   });
 
-  const isValid = () => prompt().trim().length > 0 && toolName().trim().length > 0;
+  const isValid = () => prompt().trim().length > 0;
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     if (!isValid()) {
-      setError('Please provide a prompt and tool name');
+      setError('Please provide a prompt');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      if (usePty()) {
-        // Create PTY terminal session (Issue #58)
-        const terminalSessionResp = await apiClient.createTerminalSession({
-          project_id: selectedProjectId().trim() || undefined,
-          tool_name: toolName(),
-          prompt: prompt().trim(),
-          interactive: true,
-          requires_pty: true,
-          cols: terminalCols(),
-          rows: terminalRows(),
-        });
+      // Standard work session workflow with LLM agent only
+      // 1. Create the work
+      const workResp = await apiClient.createWork({
+        title: prompt().trim(),
+        project_id: selectedProjectId().trim() || null,
+      });
+      const workId = workResp.work.id;
 
-        // Navigate to the terminal session detail page
-        // For now, we'll use the same work detail page but it will show terminal UI
-        // The response structure is { session: { work_id, ... } }
-        const workId = (terminalSessionResp as any)?.session?.work_id;
-        if (workId) {
-          navigate(`/work/${workId}`);
-        } else {
-          console.error('No work ID found in terminal session response:', terminalSessionResp);
-          setError('Failed to create terminal session: Invalid response format');
-        }
-      } else {
-        // Standard work session workflow
-        // 1. Create the work
-        const workResp = await apiClient.createWork({
-          title: prompt().trim(),
-          project_id: selectedProjectId().trim() || null,
-        });
-        const workId = workResp.work.id;
+      // 2. Add the initial message
+      const messageResp = await apiClient.addMessageToWork(workId, {
+        content: prompt().trim(),
+        content_type: 'text' as MessageContentType,
+        author_type: 'user' as MessageAuthorType,
+        author_id: null, // Assuming user is not logged in
+      });
+      const messageId = messageResp.message.id;
 
-        // 2. Add the initial message
-        const messageResp = await apiClient.addMessageToWork(workId, {
-          content: prompt().trim(),
-          content_type: 'text' as MessageContentType,
-          author_type: 'user' as MessageAuthorType,
-          author_id: null, // Assuming user is not logged in
-        });
-        const messageId = messageResp.message.id;
+      // 3. Create the AI session with LLM agent
+      await apiClient.createAiSession(workId, {
+        message_id: messageId,
+        tool_name: toolName,
+      });
 
-        // 3. Create the AI session
-        await apiClient.createAiSession(workId, {
-          message_id: messageId,
-          tool_name: toolName(),
-        });
-
-        // Navigate to the new work's detail page
-        navigate(`/work/${workId}`);
-      }
+      // Navigate to the new work's detail page
+      navigate(`/work/${workId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start AI session');
     } finally {
@@ -219,195 +186,72 @@ const StartAiSessionForm: Component = () => {
           />
         </div>
 
-        <div class='grid grid-cols-1 md:grid-cols-2 gap-4'>
-          <div>
-            <label for='project' class='block text-sm font-medium text-gray-700'>
-              Project (optional)
-            </label>
-            <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
-              <button
-                type='button'
-                class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
-                onClick={() => setProjectOpen(!isProjectOpen())}
-                aria-haspopup='listbox'
-                aria-expanded={isProjectOpen()}
+        <div>
+          <label for='project' class='block text-sm font-medium text-gray-700'>
+            Project (optional)
+          </label>
+          <div class='mt-1 relative' ref={(el: HTMLDivElement) => (projectDdRef = el)}>
+            <button
+              type='button'
+              class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
+              onClick={() => setProjectOpen(!isProjectOpen())}
+              aria-haspopup='listbox'
+              aria-expanded={isProjectOpen()}
+            >
+              <span class='truncate'>
+                {selectedProjectId()
+                  ? projects().find(p => p.id === selectedProjectId())?.name ||
+                    `Project ${selectedProjectId()}`
+                  : 'No Project'}
+              </span>
+              <svg
+                class='w-4 h-4 ml-2 text-gray-500'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
               >
-                <span class='truncate'>
-                  {selectedProjectId()
-                    ? projects().find(p => p.id === selectedProjectId())?.name ||
-                      `Project ${selectedProjectId()}`
-                    : 'No Project'}
-                </span>
-                <svg
-                  class='w-4 h-4 ml-2 text-gray-500'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    stroke-linecap='round'
-                    stroke-linejoin='round'
-                    stroke-width={2}
-                    d='M19 9l-7 7-7-7'
-                  />
-                </svg>
-              </button>
-              {isProjectOpen() && (
-                <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
-                  <div class='py-1 max-h-60 overflow-auto' role='listbox'>
-                    <div
-                      role='option'
-                      class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
-                      onClick={() => {
-                        setSelectedProjectId('');
-                        setProjectOpen(false);
-                      }}
-                    >
-                      No Project
-                    </div>
-                    <For each={projects()}>
-                      {p => (
-                        <div
-                          role='option'
-                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
-                          onClick={() => {
-                            setSelectedProjectId(p.id);
-                            setProjectOpen(false);
-                          }}
-                        >
-                          <div class='font-medium'>{p.name}</div>
-                          <div class='text-xs text-gray-500 truncate'>{p.language || ''}</div>
-                        </div>
-                      )}
-                    </For>
+                <path
+                  stroke-linecap='round'
+                  stroke-linejoin='round'
+                  stroke-width={2}
+                  d='M19 9l-7 7-7-7'
+                />
+              </svg>
+            </button>
+            {isProjectOpen() && (
+              <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
+                <div class='py-1 max-h-60 overflow-auto' role='listbox'>
+                  <div
+                    role='option'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
+                    onClick={() => {
+                      setSelectedProjectId('');
+                      setProjectOpen(false);
+                    }}
+                  >
+                    No Project
                   </div>
+                  <For each={projects()}>
+                    {p => (
+                      <div
+                        role='option'
+                        class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
+                        onClick={() => {
+                          setSelectedProjectId(p.id);
+                          setProjectOpen(false);
+                        }}
+                      >
+                        <div class='font-medium'>{p.name}</div>
+                        <div class='text-xs text-gray-500 truncate'>{p.language || ''}</div>
+                      </div>
+                    )}
+                  </For>
                 </div>
-              )}
-            </div>
-          </div>
-          <div>
-            <label for='tool' class='block text-sm font-medium text-gray-700'>
-              Tool
-            </label>
-            <div class='mt-1 relative' ref={(el: HTMLDivElement) => (toolDdRef = el)}>
-              <button
-                type='button'
-                class='flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
-                onClick={() => setToolOpen(!isToolOpen())}
-                aria-haspopup='listbox'
-                aria-expanded={isToolOpen()}
-              >
-                <span class='truncate'>{toolName()}</span>
-                <svg
-                  class='w-4 h-4 ml-2 text-gray-500'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    stroke-linecap='round'
-                    stroke-linejoin='round'
-                    stroke-width={2}
-                    d='M19 9l-7 7-7-7'
-                  />
-                </svg>
-              </button>
-              {isToolOpen() && (
-                <div class='absolute left-0 mt-2 w-full bg-white rounded-md shadow-lg border border-gray-200 z-10'>
-                  <div class='py-1' role='listbox'>
-                    <For each={knownTools}>
-                      {t => (
-                        <div
-                          role='option'
-                          class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
-                          onClick={() => {
-                            setToolName(t);
-                            setToolOpen(false);
-                          }}
-                        >
-                          {t}
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* PTY Options (Issue #58) */}
-        <div class='border-t border-gray-200 pt-4'>
-          <div class='flex items-center space-x-3 mb-4'>
-            <input
-              id='use-pty'
-              type='checkbox'
-              checked={usePty()}
-              onInput={e => setUsePty(e.currentTarget.checked)}
-              class='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
-            />
-            <label for='use-pty' class='text-sm font-medium text-gray-700'>
-              Use interactive terminal (PTY mode)
-            </label>
-          </div>
-
-          <Show when={usePty()}>
-            <div class='bg-blue-50 border border-blue-200 rounded-md p-4 mb-4'>
-              <div class='flex items-start'>
-                <svg
-                  class='w-5 h-5 text-blue-400 mt-0.5 mr-3'
-                  fill='currentColor'
-                  viewBox='0 0 20 20'
-                >
-                  <path
-                    fill-rule='evenodd'
-                    d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
-                    clip-rule='evenodd'
-                  ></path>
-                </svg>
-                <div>
-                  <h4 class='text-sm font-medium text-blue-800'>Interactive Terminal Mode</h4>
-                  <p class='text-sm text-blue-700 mt-1'>
-                    This will launch the AI tool in a full interactive terminal with support for
-                    ANSI colors, cursor positioning, and real-time input/output. Perfect for tools
-                    that provide rich terminal interfaces.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class='grid grid-cols-2 gap-4'>
-              <div>
-                <label for='terminal-cols' class='block text-sm font-medium text-gray-700 mb-1'>
-                  Terminal Width (columns)
-                </label>
-                <input
-                  id='terminal-cols'
-                  type='number'
-                  min='20'
-                  max='200'
-                  value={terminalCols()}
-                  onInput={e => setTerminalCols(parseInt(e.currentTarget.value) || 80)}
-                  class='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                />
-              </div>
-              <div>
-                <label for='terminal-rows' class='block text-sm font-medium text-gray-700 mb-1'>
-                  Terminal Height (rows)
-                </label>
-                <input
-                  id='terminal-rows'
-                  type='number'
-                  min='10'
-                  max='100'
-                  value={terminalRows()}
-                  onInput={e => setTerminalRows(parseInt(e.currentTarget.value) || 24)}
-                  class='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                />
-              </div>
-            </div>
-          </Show>
-        </div>
 
         <Show when={error()}>
           <div class='text-sm text-red-600'>{error()}</div>
