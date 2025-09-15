@@ -15,140 +15,155 @@ env:
   NODE_VERSION: 'lts/*'
 
 jobs:
-  # Full workspace build and integration
-  full-build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+   # Full workspace build and integration
+   full-build:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
+         with:
+           components: rustfmt, clippy
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: integration-${{ hashFiles('**/Cargo.lock') }}
+       - name: Setup Node.js
+         uses: actions/setup-node@v4
+         with:
+           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Setup npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+         with:
+           key: integration-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build Rust workspace
-        run: |
-          cargo build --release --workspace --verbose
-          cargo test --workspace --verbose
+       - name: Setup npm cache
+         uses: actions/cache@v4
+         with:
+           path: ~/.npm
+           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+           restore-keys: |
+             ${{ runner.os }}-node-
 
-      - name: Build Web application
-        working-directory: manager-web
-        run: |
-          npm ci
-          npm run typecheck
-          npm run lint
-          npm run test:run
-          npm run build
+       - name: Build Rust workspace
+         run: |
+           cargo build --release --workspace --verbose
+           cargo test --workspace --verbose
 
-
-
-      - name: Verify Web build
-        run: |
-          test -d manager-web/dist
-          test -f manager-web/dist/index.html
-          echo "Web application built successfully"
-
-  # Cross-component validation
-  component-integration:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: component-integration-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Check workspace dependencies
-        run: |
-          cargo tree --workspace
-          cargo check --workspace --verbose
-
-      - name: Validate shared types between components
-        run: |
-          # Check if ts-rs generated types are up to date
-          cargo test --workspace --verbose
-          echo "Type generation validation passed"
-
-      - name: Check for circular dependencies
-        run: |
-          # Verify no circular dependencies in Cargo workspace
-          cargo check --workspace --all-features --verbose
-
-  # End-to-end simulation
-  e2e-simulation:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Setup npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Build all components
-        run: |
-          # Build Rust components
-          cargo build --release --workspace
-          
-          # Build Web app
-          cd manager-web
-          npm ci
-          npm run build
-          cd ..
+       - name: Build Web application
+         working-directory: manager-web
+         run: |
+           npm ci
+           npm run typecheck
+           npm run lint
+           npm run test:run
+           npm run build
 
 
 
-      - name: Validate configuration files
-        run: |
-          # Test Rust formatting
-          cargo fmt --all --check
-          
-          # Test clippy
-          cargo clippy --workspace --all-targets -- --deny warnings
-          
-          # Test Web linting (if dependencies are installed)
-          cd manager-web
-          if [ -f node_modules/.bin/eslint ]; then
-            npm run lint
-          fi
-          cd ..
+       - name: Verify Web build
+         run: |
+           test -d manager-web/dist
+           test -f manager-web/dist/index.html
+           echo "Web application built successfully"
+
+   # Cross-component validation
+   component-integration:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
+
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
+
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
+
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+         with:
+           key: component-integration-${{ hashFiles('**/Cargo.lock') }}
+
+       - name: Check workspace dependencies
+         run: |
+           cargo tree --workspace
+           cargo check --workspace --verbose
+
+       - name: Validate shared types between components
+         run: |
+           # Check if ts-rs generated types are up to date
+           cargo test --workspace --verbose
+           echo "Type generation validation passed"
+
+       - name: Check for circular dependencies
+         run: |
+           # Verify no circular dependencies in Cargo workspace
+           cargo check --workspace --all-features --verbose
+
+   # End-to-end simulation
+   e2e-simulation:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
+
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
+
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
+
+       - name: Setup Node.js
+         uses: actions/setup-node@v4
+         with:
+           node-version: ${{ env.NODE_VERSION }}
+
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+
+       - name: Setup npm cache
+         uses: actions/cache@v4
+         with:
+           path: ~/.npm
+           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+       - name: Build all components
+         run: |
+           # Build Rust components
+           cargo build --release --workspace
+
+           # Build Web app
+           cd manager-web
+           npm ci
+           npm run build
+           cd ..
+
+
+
+       - name: Validate configuration files
+         run: |
+           # Test Rust formatting
+           cargo fmt --all --check
+
+           # Test clippy
+           cargo clippy --workspace --all-targets -- --deny warnings
+
+           # Test Web linting (if dependencies are installed)
+           cd manager-web
+           if [ -f node_modules/.bin/eslint ]; then
+             npm run lint
+           fi
+           cd ..
 
   # Security and compliance check
   security-check:
@@ -208,27 +223,32 @@ jobs:
           npm ci
           npm audit --audit-level high || echo "Web security audit completed"
 
-  # Performance and size check
-  performance-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+   # Performance and size check
+   performance-check:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+       - name: Setup Node.js
+         uses: actions/setup-node@v4
+         with:
+           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Build optimized release
-        run: |
-          cargo build --release --workspace
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+
+       - name: Build optimized release
+         run: |
+           cargo build --release --workspace
 
       - name: Check binary sizes
         run: |

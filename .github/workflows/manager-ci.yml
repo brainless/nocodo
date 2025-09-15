@@ -29,30 +29,35 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # Fast compilation check
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+   # Fast compilation check
+   check:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
+         with:
+           components: rustfmt, clippy
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          # Cache key differentiation
-          key: check-${{ hashFiles('**/Cargo.lock') }}
-          # Cache workspace and registry
-          workspaces: |
-            .
-            manager
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
 
-      - name: Check workspace
-        run: cargo check --workspace --all-targets --verbose
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+         with:
+           # Cache key differentiation
+           key: check-${{ hashFiles('**/Cargo.lock') }}
+           # Cache workspace and registry
+           workspaces: |
+             .
+             manager
+
+       - name: Check workspace
+         run: cargo check --workspace --all-targets --verbose
 
   # Code formatting verification
   format:
@@ -69,57 +74,67 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check --verbose
 
-  # Linting with Clippy
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+   # Linting with Clippy
+   lint:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
+         with:
+           components: clippy
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: clippy-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            .
-            manager
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
 
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- --deny warnings --verbose
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+         with:
+           key: clippy-${{ hashFiles('**/Cargo.lock') }}
+           workspaces: |
+             .
+             manager
 
-  # Unit and integration tests
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust-version: [stable, beta]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+       - name: Run Clippy
+         run: cargo clippy --workspace --all-targets --all-features -- --deny warnings --verbose
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust-version }}
+   # Unit and integration tests
+   test:
+     runs-on: ubuntu-latest
+     strategy:
+       matrix:
+         rust-version: [stable, beta]
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: test-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            .
-            manager
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@master
+         with:
+           toolchain: ${{ matrix.rust-version }}
 
-      - name: Run tests
-        run: cargo test --workspace --all-features --verbose
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
 
-      - name: Run doctests
-        run: cargo test --workspace --doc --verbose
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+         with:
+           key: test-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
+           workspaces: |
+             .
+             manager
+
+       - name: Run tests
+         run: cargo test --workspace --all-features --verbose
+
+       - name: Run doctests
+         run: cargo test --workspace --doc --verbose
 
   # Security vulnerability audit
   audit:
@@ -170,23 +185,28 @@ jobs:
 
 
 
-  manager-tests:
-    runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'manager/') || github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+   manager-tests:
+     runs-on: ubuntu-latest
+     if: contains(github.event.head_commit.modified, 'manager/') || github.event_name == 'pull_request'
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+       - name: Setup Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: manager-test-${{ hashFiles('**/Cargo.lock') }}
+       - name: Install mold linker
+         run: |
+           sudo apt-get update
+           sudo apt-get install -y mold
 
-      - name: Test Manager component
-        working-directory: manager
-        run: |
-          cargo test --verbose
-          cargo test --doc --verbose
+       - name: Setup Rust cache
+         uses: Swatinem/rust-cache@v2
+         with:
+           key: manager-test-${{ hashFiles('**/Cargo.lock') }}
+
+       - name: Test Manager component
+         working-directory: manager
+         run: |
+           cargo test --verbose
+           cargo test --doc --verbose
