@@ -8,6 +8,9 @@ use async_stream::try_stream;
 use futures_util::StreamExt;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::boxed::Box;
+use std::pin::Pin;
+use std::future::Future;
 
 /// LLM Agent that handles direct communication with LLMs and tool execution
 pub struct LlmAgent {
@@ -268,8 +271,26 @@ impl LlmAgent {
 
     /// Process tool calls from LLM response
     async fn process_tool_calls(&self, session_id: &str, response: &str) -> Result<()> {
+        self.process_tool_calls_with_depth(session_id, response, 0).await
+    }
+
+    /// Process tool calls from LLM response with recursion depth tracking
+    fn process_tool_calls_with_depth<'a>(&'a self, session_id: &'a str, response: &'a str, depth: u32) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+        const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
+
+        if depth >= MAX_RECURSION_DEPTH {
+            tracing::warn!(
+                session_id = %session_id,
+                current_depth = %depth,
+                max_depth = %MAX_RECURSION_DEPTH,
+                "Tool call recursion depth limit reached, stopping processing"
+            );
+            return Ok(());
+        }
         tracing::info!(
             session_id = %session_id,
+            current_depth = %depth,
             "Processing tool calls from LLM response"
         );
 
@@ -389,11 +410,30 @@ impl LlmAgent {
                 "Tool call record updated with execution result"
             );
 
-            // Add tool response to conversation
+            // Add tool response to conversation (with size limiting)
+            let response_json_string = serde_json::to_string(&response_value)?;
+            let truncated_response = if response_json_string.len() > 50000 { // 50KB limit
+                // Truncate large responses to prevent LLM context overflow
+                tracing::warn!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    original_size = %response_json_string.len(),
+                    "Tool response too large, truncating for LLM follow-up"
+                );
+
+                format!(
+                    "{{\"truncated\": true, \"original_size\": {}, \"summary\": \"Response truncated due to size limit. First 1000 chars: {}...\"}}",
+                    response_json_string.len(),
+                    response_json_string.chars().take(1000).collect::<String>()
+                )
+            } else {
+                response_json_string
+            };
+
             self.db.create_llm_agent_message(
                 session_id,
                 "tool",
-                serde_json::to_string(&response_value)?,
+                truncated_response,
             )?;
             tracing::debug!(
                 session_id = %session_id,
@@ -405,9 +445,10 @@ impl LlmAgent {
             tracing::info!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,
+                current_depth = %depth,
                 "Following up with LLM after tool execution"
             );
-            self.follow_up_with_llm(session_id).await?;
+            self.follow_up_with_llm_with_depth(session_id, depth + 1).await?;
         }
 
         tracing::info!(
@@ -416,12 +457,31 @@ impl LlmAgent {
         );
 
         Ok(())
+        })
     }
 
     /// Follow up with LLM after tool execution
     async fn follow_up_with_llm(&self, session_id: &str) -> Result<String> {
+        self.follow_up_with_llm_with_depth(session_id, 0).await
+    }
+
+    /// Follow up with LLM after tool execution with recursion depth tracking
+    fn follow_up_with_llm_with_depth<'a>(&'a self, session_id: &'a str, depth: u32) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
+        Box::pin(async move {
+        const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
+
+        if depth >= MAX_RECURSION_DEPTH {
+            tracing::warn!(
+                session_id = %session_id,
+                current_depth = %depth,
+                max_depth = %MAX_RECURSION_DEPTH,
+                "Follow-up recursion depth limit reached, stopping processing"
+            );
+            return Ok("Maximum recursion depth reached.".to_string());
+        }
         tracing::info!(
             session_id = %session_id,
+            current_depth = %depth,
             "Following up with LLM after tool execution"
         );
 
@@ -558,6 +618,21 @@ impl LlmAgent {
             "Follow-up assistant response stored in database"
         );
 
+        // Check if the follow-up response contains tool calls
+        if self.contains_tool_calls(&assistant_response) {
+            tracing::info!(
+                session_id = %session_id,
+                "LLM follow-up response contains tool calls, processing them recursively"
+            );
+            self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
+                .await?;
+        } else {
+            tracing::debug!(
+                session_id = %session_id,
+                "LLM follow-up response does not contain tool calls"
+            );
+        }
+
         tracing::info!(
             session_id = %session_id,
             work_id = %session.work_id,
@@ -565,6 +640,7 @@ impl LlmAgent {
         );
 
         Ok(assistant_response)
+        })
     }
 
     /// Create system prompt for tool usage
