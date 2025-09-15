@@ -3,6 +3,13 @@ use std::path::Path;
 use std::process::Command;
 
 fn main() {
+    // Helper function to print warnings only in development (not CI)
+    let warn = |message: &str| {
+        let is_ci = env::var("CI").is_ok();
+        if !is_ci {
+            println!("cargo:warning={}", message);
+        }
+    };
     // Tell Cargo to re-run this build script if manager-web files change
     println!("cargo:rerun-if-changed=../manager-web/src");
     println!("cargo:rerun-if-changed=../manager-web/package.json");
@@ -16,7 +23,7 @@ fn main() {
 
     // Skip web build in docs.rs builds or when explicitly disabled
     if env::var("DOCS_RS").is_ok() || env::var("SKIP_WEB_BUILD").is_ok() {
-        println!("cargo:warning=Skipping web build for docs.rs or explicit skip");
+        warn("Skipping web build for docs.rs or explicit skip");
         return;
     }
 
@@ -24,10 +31,7 @@ fn main() {
     let is_ci = env::var("CI").is_ok();
     let is_release = env::var("PROFILE").unwrap_or_default() == "release";
 
-    println!(
-        "cargo:warning=Build environment: CI={}, RELEASE={}",
-        is_ci, is_release
-    );
+    warn(&format!("Build environment: CI={}, RELEASE={}", is_ci, is_release));
 
     // Check for pre-built assets first (GitHub Actions builds web assets separately)
     if dist_dir.exists() {
@@ -36,10 +40,7 @@ fn main() {
             .unwrap_or(0);
 
         if dist_files > 0 {
-            println!(
-                "cargo:warning=Using pre-built web assets from manager-web/dist ({} files)",
-                dist_files
-            );
+            warn(&format!("Using pre-built web assets from manager-web/dist ({} files)", dist_files));
             return; // Skip npm build since assets already exist
         }
     }
@@ -47,11 +48,11 @@ fn main() {
     // Always try to build web assets for release builds or CI (when no pre-built assets exist)
     if is_release || is_ci {
         if !package_json.exists() {
-            println!("cargo:warning=manager-web/package.json not found, skipping web build");
+            warn("manager-web/package.json not found, skipping web build");
             return;
         }
 
-        println!("cargo:warning=Building manager-web assets...");
+        warn("Building manager-web assets...");
 
         // Install dependencies
         let npm_install = Command::new("npm")
@@ -61,20 +62,17 @@ fn main() {
 
         match npm_install {
             Ok(status) if status.success() => {
-                println!("cargo:warning=npm ci completed successfully");
+                warn("npm ci completed successfully");
             }
             Ok(status) => {
-                println!("cargo:warning=npm ci failed with status: {}", status);
+                warn(&format!("npm ci failed with status: {}", status));
                 if is_release {
                     panic!("Failed to install npm dependencies in release build");
                 }
                 return;
             }
             Err(e) => {
-                println!(
-                    "cargo:warning=npm ci error: {}. Ensure Node.js and npm are installed.",
-                    e
-                );
+                warn(&format!("npm ci error: {}. Ensure Node.js and npm are installed.", e));
                 if is_release {
                     panic!("npm not available for release build: {}", e);
                 }
@@ -90,26 +88,26 @@ fn main() {
 
         match npm_build {
             Ok(status) if status.success() => {
-                println!("cargo:warning=Web build completed successfully");
+                warn("Web build completed successfully");
 
                 // Verify dist directory exists and has files
                 if dist_dir.exists() {
                     let dist_files = std::fs::read_dir(&dist_dir)
                         .map(|entries| entries.count())
                         .unwrap_or(0);
-                    println!("cargo:warning=Generated {} files in dist/", dist_files);
+                    warn(&format!("Generated {} files in dist/", dist_files));
                 } else {
-                    println!("cargo:warning=Warning: dist/ directory not created");
+                    warn("Warning: dist/ directory not created");
                 }
             }
             Ok(status) => {
-                println!("cargo:warning=npm run build failed with status: {}", status);
+                warn(&format!("npm run build failed with status: {}", status));
                 if is_release {
                     panic!("Failed to build web assets in release build");
                 }
             }
             Err(e) => {
-                println!("cargo:warning=npm run build error: {}", e);
+                warn(&format!("npm run build error: {}", e));
                 if is_release {
                     panic!("Failed to execute npm build: {}", e);
                 }
@@ -118,10 +116,10 @@ fn main() {
     } else {
         // In development, just warn if assets don't exist
         if !dist_dir.exists() {
-            println!("cargo:warning=manager-web/dist not found. Run 'cd manager-web && npm run build' to enable embedded assets.");
-            println!("cargo:warning=The server will use filesystem fallback in development mode.");
+            warn("manager-web/dist not found. Run 'cd manager-web && npm run build' to enable embedded assets.");
+            warn("The server will use filesystem fallback in development mode.");
         } else {
-            println!("cargo:warning=Using existing web assets from manager-web/dist");
+            warn("Using existing web assets from manager-web/dist");
         }
     }
 
@@ -133,7 +131,7 @@ fn main() {
         let total_size = calculate_dir_size(&dist_dir).unwrap_or(0);
 
         println!("cargo:rustc-env=WEB_ASSETS_SIZE={}", total_size);
-        println!("cargo:warning=Web assets total size: {} bytes", total_size);
+        warn(&format!("Web assets total size: {} bytes", total_size));
     } else {
         println!("cargo:rustc-env=WEB_ASSETS_AVAILABLE=0");
         println!("cargo:rustc-env=WEB_ASSETS_SIZE=0");
