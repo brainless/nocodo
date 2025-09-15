@@ -5,9 +5,9 @@ use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest,
     CreateLlmAgentSessionRequest, CreateProjectRequest, CreateWorkRequest, FileContentResponse,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileUpdateRequest,
-    LlmAgentSessionResponse, Project, ProjectListResponse, ProjectResponse, ServerStatus,
-    WorkListResponse, WorkMessageResponse, WorkResponse,
+    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
+    FileUpdateRequest, LlmAgentSessionResponse, Project, ProjectListResponse, ProjectResponse,
+    ServerStatus, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -26,7 +26,7 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
-    pub runner: Option<Arc<Runner>>, // Enabled via env flag
+    pub runner: Option<Arc<Runner>>,      // Enabled via env flag
     pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
 }
 
@@ -944,7 +944,7 @@ pub async fn create_ai_session(
             let llm_session = llm_agent
                 .create_session(
                     work_id.clone(),
-                    "grok".to_string(),      // Default provider
+                    "grok".to_string(),             // Default provider
                     "grok-code-fast-1".to_string(), // Default model
                     session.project_context.clone(),
                 )
@@ -1838,10 +1838,6 @@ pub async fn get_work_messages(
 }
 
 // Terminal session HTTP handlers for PTY-based interactive sessions
-
-
-
-
 
 // LLM Agent Endpoints
 

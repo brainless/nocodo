@@ -126,8 +126,6 @@ async fn main() -> AppResult<()> {
         None
     };
 
-
-
     // Optionally enable LLM agent via env flag
     let llm_agent_enabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
         .ok()
@@ -225,7 +223,6 @@ async fn main() -> AppResult<()> {
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
                         )
-
                         // LLM agent endpoints for direct LLM integration
                         .route(
                             "/work/{work_id}/llm-agent",

@@ -172,7 +172,7 @@ impl LlmClient for OpenAiCompatibleClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            
+
             tracing::error!(
                 provider = %self.config.provider,
                 model = %request.model,
@@ -181,7 +181,7 @@ impl LlmClient for OpenAiCompatibleClient {
                 error = %error_text,
                 "LLM API request failed"
             );
-            
+
             return Err(anyhow::anyhow!(
                 "LLM API error: {} - {}",
                 status,
@@ -190,7 +190,7 @@ impl LlmClient for OpenAiCompatibleClient {
         }
 
         let completion: LlmCompletionResponse = response.json().await?;
-        
+
         tracing::info!(
             provider = %self.config.provider,
             model = %request.model,
