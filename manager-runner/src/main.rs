@@ -26,8 +26,7 @@ fn kill_existing_instances() -> Result<()> {
         .output()
         .context("Failed to run ps command")?;
 
-    let output_str = String::from_utf8(output.stdout)
-        .context("Failed to parse ps output")?;
+    let output_str = String::from_utf8(output.stdout).context("Failed to parse ps output")?;
 
     let mut killed_count = 0;
 
@@ -63,9 +62,8 @@ fn kill_existing_instances() -> Result<()> {
                                 std::thread::sleep(std::time::Duration::from_millis(500));
 
                                 // Check if it's still running and force kill if needed
-                                let check_result = Command::new("kill")
-                                    .args(["-0", &pid.to_string()])
-                                    .status();
+                                let check_result =
+                                    Command::new("kill").args(["-0", &pid.to_string()]).status();
 
                                 if check_result.is_ok() {
                                     warn!("Process {} still running, force killing...", pid);
