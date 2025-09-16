@@ -21,7 +21,6 @@ async fn test_project_creation_workflow() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
-        terminal_runner: None,
         llm_agent: None,
     });
 
@@ -140,7 +139,6 @@ async fn test_project_creation_error_handling() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
-        terminal_runner: None,
         llm_agent: None,
     });
 

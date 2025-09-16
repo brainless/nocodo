@@ -250,7 +250,8 @@ impl ToolExecutor {
             } else {
                 return Err(ToolError::InvalidPath(format!(
                     "Absolute path '{}' is outside the allowed directory '{}'",
-                    path, self.base_path.display()
+                    path,
+                    self.base_path.display()
                 ))
                 .into());
             }

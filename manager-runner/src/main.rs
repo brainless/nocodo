@@ -13,6 +13,82 @@ struct Args {
     clean: bool,
 }
 
+/// Kill any existing manager-runner instances
+fn kill_existing_instances() -> Result<()> {
+    info!("Checking for existing manager-runner instances...");
+
+    // Get current process ID to avoid killing ourselves
+    let current_pid = std::process::id();
+
+    // Find all manager-runner processes
+    let output = Command::new("ps")
+        .args(["aux"])
+        .output()
+        .context("Failed to run ps command")?;
+
+    let output_str = String::from_utf8(output.stdout)
+        .context("Failed to parse ps output")?;
+
+    let mut killed_count = 0;
+
+    for line in output_str.lines() {
+        if line.contains("manager-runner") && !line.contains("grep") {
+            // Extract PID (second column in ps aux output)
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                if let Ok(pid) = parts[1].parse::<u32>() {
+                    if pid != current_pid {
+                        info!("Found existing manager-runner instance with PID: {}", pid);
+
+                        // Try to kill the process gracefully first (SIGTERM)
+                        let kill_result = Command::new("kill")
+                            .args(["-TERM", &pid.to_string()])
+                            .status();
+
+                        match kill_result {
+                            Ok(status) if status.success() => {
+                                info!("Successfully terminated manager-runner process {}", pid);
+                                killed_count += 1;
+
+                                // Give it a moment to terminate gracefully
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+
+                                // Check if it's still running and force kill if needed
+                                let check_result = Command::new("kill")
+                                    .args(["-0", &pid.to_string()])
+                                    .status();
+
+                                if check_result.is_ok() {
+                                    warn!("Process {} still running, force killing...", pid);
+                                    let _ = Command::new("kill")
+                                        .args(["-KILL", &pid.to_string()])
+                                        .status();
+                                }
+                            }
+                            Ok(_) => {
+                                warn!("Failed to terminate manager-runner process {} (may have already been dead)", pid);
+                            }
+                            Err(e) => {
+                                warn!("Error killing process {}: {}", pid, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if killed_count > 0 {
+        info!("Killed {} existing manager-runner instance(s)", killed_count);
+        // Give processes time to fully clean up
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+    } else {
+        info!("No existing manager-runner instances found");
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -20,9 +96,14 @@ async fn main() -> Result<()> {
 
     info!("Starting nocodo manager-runner");
 
+    // Kill any existing manager-runner instances before starting
+    if let Err(e) = kill_existing_instances() {
+        warn!("Failed to clean up existing instances: {}", e);
+        // Continue anyway - this is not a fatal error
+    }
+
     // Create test-logs directory
-    fs::create_dir_all("test-logs")
-        .context("Failed to create test-logs directory")?;
+    fs::create_dir_all("test-logs").context("Failed to create test-logs directory")?;
 
     // Clean log files if requested
     if args.clean {
@@ -35,7 +116,7 @@ async fn main() -> Result<()> {
     // Build manager-web first
     info!("Building manager-web...");
     let web_build_status = Command::new("npm")
-        .args(&["install"])
+        .args(["install"])
         .current_dir("manager-web")
         .status()
         .context("Failed to run npm install")?;
@@ -46,7 +127,7 @@ async fn main() -> Result<()> {
     }
 
     let web_build_status = Command::new("npm")
-        .args(&["run", "build"])
+        .args(["run", "build"])
         .current_dir("manager-web")
         .status()
         .context("Failed to build manager-web")?;
@@ -61,7 +142,7 @@ async fn main() -> Result<()> {
     // Build manager binary
     info!("Building manager...");
     let manager_build_status = Command::new("cargo")
-        .args(&["build", "--bin", "nocodo-manager"])
+        .args(["build", "--bin", "nocodo-manager"])
         .status()
         .context("Failed to build manager")?;
 
@@ -83,7 +164,7 @@ async fn main() -> Result<()> {
         .context("Failed to create manager.log")?;
 
     let mut manager_process = tokio::process::Command::new("./target/debug/nocodo-manager")
-        .args(&["--config", "~/.config/nocodo/manager.toml"])
+        .args(["--config", "~/.config/nocodo/manager.toml"])
         .stdout(Stdio::from(manager_log.try_clone()?))
         .stderr(Stdio::from(manager_log))
         .spawn()
@@ -122,14 +203,17 @@ async fn main() -> Result<()> {
         .context("Failed to create manager-web.log")?;
 
     let mut web_process = tokio::process::Command::new("npm")
-        .args(&["run", "dev"])
+        .args(["run", "dev"])
         .current_dir("manager-web")
         .stdout(Stdio::from(web_log.try_clone()?))
         .stderr(Stdio::from(web_log))
         .spawn()
         .context("Failed to start manager-web dev server")?;
 
-    info!("Manager-web dev server started with PID: {:?}", web_process.id());
+    info!(
+        "Manager-web dev server started with PID: {:?}",
+        web_process.id()
+    );
     info!("");
     info!("🚀 Both services are running!");
     info!("📊 Manager API/WebSocket: http://localhost:8081 (logs: test-logs/manager.log)");
@@ -164,12 +248,12 @@ async fn main() -> Result<()> {
 
     // Cleanup: kill any remaining processes
     info!("Stopping manager...");
-    let _ = manager_process.kill();
-    let _ = manager_process.wait();
+    drop(manager_process.kill());
+    drop(manager_process.wait());
 
     info!("Stopping manager-web...");
-    let _ = web_process.kill();
-    let _ = web_process.wait();
+    drop(web_process.kill());
+    drop(web_process.wait());
 
     info!("All services stopped");
     Ok(())

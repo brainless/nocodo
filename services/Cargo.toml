@@ -20,14 +20,12 @@ anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-# Services-specific dependencies
-actix-web.workspace = true
-sqlx = { workspace = true, features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
-chrono.workspace = true
-uuid.workspace = true
-ts-rs.workspace = true
-config.workspace = true
-thiserror.workspace = true
+ # Services-specific dependencies
+ actix-web.workspace = true
+ chrono.workspace = true
+ ts-rs.workspace = true
+ config.workspace = true
+ thiserror.workspace = true
 
 [dev-dependencies]
 tokio-test = "0.4"

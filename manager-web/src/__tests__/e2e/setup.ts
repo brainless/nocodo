@@ -121,14 +121,16 @@ export const test = base.extend({
         contentType: 'application/json',
         body: JSON.stringify({
           work: mockWorkResponse.work,
-          messages: [{
-            id: 'message-123',
-            content: 'List all files in the root directory',
-            content_type: 'text',
-            author_type: 'user',
-            author_id: null,
-            created_at: '2024-01-01T00:00:00Z',
-          }],
+          messages: [
+            {
+              id: 'message-123',
+              content: 'List all files in the root directory',
+              content_type: 'text',
+              author_type: 'user',
+              author_id: null,
+              created_at: '2024-01-01T00:00:00Z',
+            },
+          ],
           total_messages: 1,
         }),
       });
@@ -164,13 +166,13 @@ export const test = base.extend({
     // Mock WebSocket connection (simulate successful connection)
     await page.addInitScript(() => {
       // Mock WebSocket for testing
-      window.WebSocket = class extends EventTarget {
+      const MockWebSocket = class extends EventTarget {
         constructor(_url: string) {
           super();
-          // Simulate successful connection
+          // Simulate successful connection immediately
           setTimeout(() => {
             this.dispatchEvent(new Event('open'));
-          }, 100);
+          }, 10);
         }
 
         send() {
@@ -179,19 +181,22 @@ export const test = base.extend({
             // Simulate receiving LLM agent chunks
             const mockResponse = 'Mock agent response: Files listed successfully';
             for (let i = 0; i < mockResponse.length; i++) {
-              setTimeout(() => {
-                this.dispatchEvent(
-                  new MessageEvent('message', {
-                    data: JSON.stringify({
-                      type: 'LlmAgentChunk',
-                      payload: {
-                        session_id: 'session-123',
-                        content: mockResponse[i],
-                      },
-                    }),
-                  })
-                );
-              }, 2000 + i * 50); // Stagger the chunks
+              setTimeout(
+                () => {
+                  this.dispatchEvent(
+                    new MessageEvent('message', {
+                      data: JSON.stringify({
+                        type: 'LlmAgentChunk',
+                        payload: {
+                          session_id: 'session-123',
+                          content: mockResponse[i],
+                        },
+                      }),
+                    })
+                  );
+                },
+                2000 + i * 50
+              ); // Stagger the chunks
             }
           }, 2000);
         }
@@ -199,6 +204,22 @@ export const test = base.extend({
         close() {
           this.dispatchEvent(new Event('close'));
         }
+      };
+
+      // Override the WebSocket constructor
+      window.WebSocket = MockWebSocket as any;
+
+      // Also mock the WebSocket client state for the provider
+      // This ensures the status indicator shows connected
+      const originalWebSocket = window.WebSocket;
+      window.WebSocket = function (url: string) {
+        const ws = new originalWebSocket(url);
+        // Force the readyState to OPEN immediately
+        Object.defineProperty(ws, 'readyState', {
+          value: WebSocket.OPEN,
+          writable: false,
+        });
+        return ws;
       } as any;
     });
 
