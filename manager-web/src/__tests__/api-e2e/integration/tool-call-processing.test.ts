@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -56,7 +56,10 @@ describe('Tool Call Processing - API Only', () => {
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Simulate LLM agent processing the list_dir tool call
-      await testApiClient.recordAiOutput(testWorkId, 'I need to list the contents of the root directory.');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'I need to list the contents of the root directory.'
+      );
 
       // Execute the actual tool call (list files)
       const fileList = await testApiClient.listFiles({ project_id: testProjectId });
@@ -66,7 +69,8 @@ describe('Tool Call Processing - API Only', () => {
       expect(Array.isArray(fileList.files)).toBe(true);
 
       // Record tool call result
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         `Directory listing complete. Found ${fileList.files.length} items.`
       );
 
@@ -84,7 +88,8 @@ describe('Tool Call Processing - API Only', () => {
       const testFile = testDataGenerator.generateFileData({
         project_id: testProjectId,
         path: 'tool-call-test.txt',
-        content: 'This is a test file for tool call processing verification.\nIt contains multiple lines.\nEnd of file.',
+        content:
+          'This is a test file for tool call processing verification.\nIt contains multiple lines.\nEnd of file.',
       });
       await testApiClient.createFile(testFile);
 
@@ -100,7 +105,10 @@ describe('Tool Call Processing - API Only', () => {
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Simulate LLM agent processing the read_file tool call
-      await testApiClient.recordAiOutput(testWorkId, 'I need to read the contents of tool-call-test.txt.');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'I need to read the contents of tool-call-test.txt.'
+      );
 
       // Execute the actual tool call (read file)
       const fileContent = await testApiClient.getFileContent(testFile.path, testProjectId);
@@ -112,7 +120,8 @@ describe('Tool Call Processing - API Only', () => {
 
       // Record tool call result with content summary
       const contentPreview = fileContent.content.substring(0, 100);
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         `File reading complete. Content preview: ${contentPreview}${fileContent.content.length > 100 ? '...' : ''}`
       );
 
@@ -137,7 +146,10 @@ describe('Tool Call Processing - API Only', () => {
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Simulate LLM agent processing the create_file tool call
-      await testApiClient.recordAiOutput(testWorkId, 'I need to create a new file called analysis.md.');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'I need to create a new file called analysis.md.'
+      );
 
       // Execute the actual tool call (create file)
       const newFileContent = `# Project Analysis
@@ -166,7 +178,8 @@ The testing framework successfully validates LLM agent tool call processing with
       expect(createdFile.path).toBe('analysis.md');
 
       // Record tool call result
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         'File creation complete. Created analysis.md with project analysis content.'
       );
 
@@ -205,7 +218,10 @@ The testing framework successfully validates LLM agent tool call processing with
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Simulate LLM agent processing the update_file tool call
-      await testApiClient.recordAiOutput(testWorkId, 'I need to update update-test.txt with additional content.');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'I need to update update-test.txt with additional content.'
+      );
 
       // Execute the actual tool call (update file)
       const updatedContent = `${initialContent}\n\nAdditional Analysis:\n- Performance metrics added\n- Error handling improved\n- Documentation enhanced`;
@@ -217,7 +233,8 @@ The testing framework successfully validates LLM agent tool call processing with
       });
 
       // Record tool call result
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         'File update complete. Added additional analysis information to update-test.txt.'
       );
 
@@ -258,7 +275,8 @@ The testing framework successfully validates LLM agent tool call processing with
         expect.fail('Should have thrown error for non-existent file');
       } catch (error) {
         // Expected error - record error handling
-        await testApiClient.recordAiOutput(testWorkId,
+        await testApiClient.recordAiOutput(
+          testWorkId,
           'Tool call failed: File not found. Error handled gracefully.'
         );
       }
@@ -285,7 +303,8 @@ The testing framework successfully validates LLM agent tool call processing with
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Simulate LLM agent recognizing invalid operation
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         'Operation rejected: Cannot delete entire project directory. This would be destructive.'
       );
 
@@ -314,7 +333,8 @@ The testing framework successfully validates LLM agent tool call processing with
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Simulate LLM agent detecting malformed parameters
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         'Tool call rejected: Invalid file path. Path traversal not allowed.'
       );
 
@@ -325,7 +345,8 @@ The testing framework successfully validates LLM agent tool call processing with
         expect.fail('Should have rejected invalid file creation');
       } catch (error) {
         // Expected rejection
-        await testApiClient.recordAiOutput(testWorkId,
+        await testApiClient.recordAiOutput(
+          testWorkId,
           'Invalid file creation rejected by API validation.'
         );
       }
@@ -352,7 +373,8 @@ The testing framework successfully validates LLM agent tool call processing with
       // Step 1: List directory contents
       await testApiClient.recordAiOutput(testWorkId, 'Step 1: Analyzing project structure...');
       const fileList = await testApiClient.listFiles({ project_id: testProjectId });
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         `Found ${fileList.files.length} items in project root.`
       );
 
@@ -360,9 +382,7 @@ The testing framework successfully validates LLM agent tool call processing with
       const readmeExists = fileList.files.some(f => f.name === 'README.md');
       if (readmeExists) {
         const readmeContent = await testApiClient.getFileContent('README.md', testProjectId);
-        await testApiClient.recordAiOutput(testWorkId,
-          'Step 2: Read existing README for context.'
-        );
+        await testApiClient.recordAiOutput(testWorkId, 'Step 2: Read existing README for context.');
       }
 
       // Step 3: Create analysis report
@@ -386,7 +406,10 @@ This appears to be a well-structured project with ${fileList.files.filter(f => f
         content: analysisContent,
       });
       await testApiClient.createFile(analysisFile);
-      await testApiClient.recordAiOutput(testWorkId, 'Step 3: Created detailed project analysis report.');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'Step 3: Created detailed project analysis report.'
+      );
 
       // Step 4: Update README with analysis reference
       const updatedReadmeContent = `# Test Project
@@ -407,7 +430,10 @@ See [structure-analysis.md](./structure-analysis.md) for detailed project struct
         encoding: 'utf-8',
         project_id: testProjectId,
       });
-      await testApiClient.recordAiOutput(testWorkId, 'Step 4: Updated README with analysis reference.');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'Step 4: Updated README with analysis reference.'
+      );
 
       // Verify all steps completed successfully
       const finalFileList = await testApiClient.listFiles({ project_id: testProjectId });
@@ -437,14 +463,18 @@ See [structure-analysis.md](./structure-analysis.md) for detailed project struct
       await testApiClient.addMessageToWork(testWorkId, userMessage);
 
       // Step 1: Check if config file exists
-      await testApiClient.recordAiOutput(testWorkId, 'Step 1: Checking for existing config file...');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'Step 1: Checking for existing config file...'
+      );
       const fileList = await testApiClient.listFiles({ project_id: testProjectId });
       const configExists = fileList.files.some(f => f.name === 'config.toml');
 
       if (configExists) {
         // Read existing config
         const configContent = await testApiClient.getFileContent('config.toml', testProjectId);
-        await testApiClient.recordAiOutput(testWorkId,
+        await testApiClient.recordAiOutput(
+          testWorkId,
           'Config file found. Reading existing configuration.'
         );
       } else {
@@ -463,7 +493,8 @@ log_level = "info"`;
           content: defaultConfig,
         });
         await testApiClient.createFile(configFile);
-        await testApiClient.recordAiOutput(testWorkId,
+        await testApiClient.recordAiOutput(
+          testWorkId,
           'Config file not found. Created default configuration file.'
         );
       }
@@ -513,7 +544,8 @@ log_level = "info"`;
       const endTime = Date.now();
       const duration = endTime - startTime;
 
-      await testApiClient.recordAiOutput(testWorkId,
+      await testApiClient.recordAiOutput(
+        testWorkId,
         `Rapid file creation complete. Created 10 files in ${duration}ms.`
       );
 
@@ -580,7 +612,10 @@ log_level = "info"`;
 
       // 6. Verify deletion
       await expect(testApiClient.getFileContent(testFilePath, testProjectId)).rejects.toThrow();
-      await testApiClient.recordAiOutput(testWorkId, 'Step 6: Deletion verified - state consistency maintained');
+      await testApiClient.recordAiOutput(
+        testWorkId,
+        'Step 6: Deletion verified - state consistency maintained'
+      );
 
       // Verify complete workflow recorded
       const outputs = await testApiClient.listAiOutputs(testWorkId);

@@ -58,7 +58,7 @@ export class TestServerManager {
       }
 
       // Set up output handling
-      this.serverProcess.stdout?.on('data', (data) => {
+      this.serverProcess.stdout?.on('data', data => {
         const output = data.toString();
         console.log(`[SERVER] ${output.trim()}`);
 
@@ -68,12 +68,12 @@ export class TestServerManager {
         }
       });
 
-      this.serverProcess.stderr?.on('data', (data) => {
+      this.serverProcess.stderr?.on('data', data => {
         const output = data.toString();
         console.error(`[SERVER ERROR] ${output.trim()}`);
       });
 
-      this.serverProcess.on('error', (error) => {
+      this.serverProcess.on('error', error => {
         console.error('Server process error:', error);
         reject(error);
       });
@@ -104,7 +104,7 @@ export class TestServerManager {
       return;
     }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       console.log('Stopping manager daemon...');
 
       // Send SIGTERM first
@@ -153,9 +153,7 @@ export class TestServerManager {
       const client = new TestApiClient(this.baseURL);
       await Promise.race([
         client.healthCheck(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), timeoutMs)
-        )
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
       ]);
       return true;
     } catch (error) {

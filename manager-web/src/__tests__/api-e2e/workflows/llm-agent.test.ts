@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -263,11 +263,17 @@ describe('LLM Agent Integration - API Only', () => {
 
       // Step 3: LLM agent lists files (tool call 1)
       const fileList = await testApiClient.listFiles({ project_id: testProjectId });
-      await testApiClient.recordAiOutput(workflowWorkId, `Found ${fileList.files.length} items in project root`);
+      await testApiClient.recordAiOutput(
+        workflowWorkId,
+        `Found ${fileList.files.length} items in project root`
+      );
 
       // Step 4: LLM agent reads key files (tool call 2)
       const readmeContent = await testApiClient.getFileContent('README.md', testProjectId);
-      await testApiClient.recordAiOutput(workflowWorkId, `README content: ${readmeContent.content.substring(0, 100)}...`);
+      await testApiClient.recordAiOutput(
+        workflowWorkId,
+        `README content: ${readmeContent.content.substring(0, 100)}...`
+      );
 
       // Step 5: LLM agent creates analysis report (tool call 3)
       const reportContent = `# Project Analysis Report
@@ -332,7 +338,10 @@ The project structure indicates this is a Rust project with standard documentati
       ).rejects.toThrow();
 
       // LLM agent should still be able to record error handling
-      await testApiClient.recordAiOutput(errorWorkId, 'Error: File not found. Unable to complete requested operation.');
+      await testApiClient.recordAiOutput(
+        errorWorkId,
+        'Error: File not found. Unable to complete requested operation.'
+      );
 
       // Verify error was recorded
       const outputs = await testApiClient.listAiOutputs(errorWorkId);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -32,9 +32,7 @@ describe('Error Handling and Edge Cases - API Only', () => {
       expect(() => JSON.parse(invalidRequest)).toThrow();
 
       // Test with valid client but invalid API calls
-      await expect(
-        testApiClient.fetchProject('invalid-id-format')
-      ).rejects.toThrow();
+      await expect(testApiClient.fetchProject('invalid-id-format')).rejects.toThrow();
     });
 
     it('should handle network timeouts gracefully', async () => {
@@ -42,9 +40,7 @@ describe('Error Handling and Edge Cases - API Only', () => {
       // For now, test with invalid server endpoint
       const invalidClient = new testApiClient.constructor('http://invalid-server:9999');
 
-      await expect(
-        invalidClient.healthCheck()
-      ).rejects.toThrow();
+      await expect(invalidClient.healthCheck()).rejects.toThrow();
     });
 
     it('should handle server errors (5xx) appropriately', async () => {
@@ -52,36 +48,26 @@ describe('Error Handling and Edge Cases - API Only', () => {
       // Since we don't have intentional error endpoints, test with invalid operations
 
       // Try to access non-existent work session
-      await expect(
-        testApiClient.getWork('non-existent-work-id')
-      ).rejects.toThrow();
+      await expect(testApiClient.getWork('non-existent-work-id')).rejects.toThrow();
 
       // Try to create work with invalid data
       const invalidWorkData = testDataGenerator.generateErrorScenarios().invalidWork;
-      await expect(
-        testApiClient.createWork(invalidWorkData)
-      ).rejects.toThrow();
+      await expect(testApiClient.createWork(invalidWorkData)).rejects.toThrow();
     });
 
     it('should handle client errors (4xx) with proper messages', async () => {
       // Test various 4xx scenarios
 
       // 404 - Not Found
-      await expect(
-        testApiClient.fetchProject('non-existent-project')
-      ).rejects.toThrow();
+      await expect(testApiClient.fetchProject('non-existent-project')).rejects.toThrow();
 
       // 400 - Bad Request (invalid work data)
       const invalidWork = testDataGenerator.generateErrorScenarios().invalidWork;
-      await expect(
-        testApiClient.createWork(invalidWork)
-      ).rejects.toThrow();
+      await expect(testApiClient.createWork(invalidWork)).rejects.toThrow();
 
       // 400 - Bad Request (invalid file data)
       const invalidFile = testDataGenerator.generateErrorScenarios().invalidFile;
-      await expect(
-        testApiClient.createFile(invalidFile)
-      ).rejects.toThrow();
+      await expect(testApiClient.createFile(invalidFile)).rejects.toThrow();
     });
   });
 
@@ -89,9 +75,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
     let testProjectId: string;
 
     beforeAll(async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Error Handling Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Error Handling Test Project',
+        })
+      );
       testProjectId = project.id;
     });
 
@@ -102,9 +90,7 @@ describe('Error Handling and Edge Cases - API Only', () => {
         content: 'test content',
       });
 
-      await expect(
-        testApiClient.createFile(fileData)
-      ).rejects.toThrow();
+      await expect(testApiClient.createFile(fileData)).rejects.toThrow();
     });
 
     it('should handle reading non-existent files', async () => {
@@ -194,7 +180,8 @@ describe('Error Handling and Edge Cases - API Only', () => {
 
     it('should handle binary-like content', async () => {
       // Create content with various characters including potential binary data
-      const binaryLikeContent = 'Normal text\nWith newlines\nAnd special chars: áéíóú\nAnd control chars: \t\r\nAnd high chars: 🚀⭐💻';
+      const binaryLikeContent =
+        'Normal text\nWith newlines\nAnd special chars: áéíóú\nAnd control chars: \t\r\nAnd high chars: 🚀⭐💻';
 
       const binaryFile = testDataGenerator.generateFileData({
         project_id: testProjectId,
@@ -235,9 +222,7 @@ describe('Error Handling and Edge Cases - API Only', () => {
         content: '',
       });
 
-      await expect(
-        testApiClient.addMessageToWork(work.work.id, emptyMessage)
-      ).rejects.toThrow();
+      await expect(testApiClient.addMessageToWork(work.work.id, emptyMessage)).rejects.toThrow();
     });
 
     it('should handle concurrent AI session creation', async () => {
@@ -288,13 +273,16 @@ describe('Error Handling and Edge Cases - API Only', () => {
       const workData = testDataGenerator.generateWorkData();
       const work = await testApiClient.createWork(workData);
 
-      const aiSession = await testApiClient.createAiSession(work.work.id, testDataGenerator.generateAiSessionData());
+      const aiSession = await testApiClient.createAiSession(
+        work.work.id,
+        testDataGenerator.generateAiSessionData()
+      );
 
       const testOutputs = [
         'Simple text output',
         'Output with\nnewlines\nand\nmultiple\nlines',
         'Output with special characters: áéíóú 🚀 ⭐ 💻',
-        'Very long output: ' + 'x'.repeat(10000),
+        `Very long output: ${'x'.repeat(10000)}`,
         'Output with JSON: {"key": "value", "array": [1, 2, 3]}',
         '', // Empty output
       ];
@@ -315,9 +303,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
     it('should handle state manager with corrupted data', async () => {
       // Create some valid state
       const project = await testStateManager.addProject(testDataGenerator.generateProjectData());
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          project_id: project.id,
+        })
+      );
 
       // Verify initial state is valid
       let validation = testStateManager.validateStateConsistency();
@@ -328,9 +318,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
       if (projects.length > 0) {
         // This would be internal corruption, hard to simulate safely
         // Instead, test with invalid project references
-        const invalidWork = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-          project_id: 'non-existent-project-id',
-        }));
+        const invalidWork = await testStateManager.addWorkSession(
+          testDataGenerator.generateWorkData({
+            project_id: 'non-existent-project-id',
+          })
+        );
 
         validation = testStateManager.validateStateConsistency();
         expect(validation.valid).toBe(false);
@@ -353,7 +345,9 @@ describe('Error Handling and Edge Cases - API Only', () => {
 
     it('should handle listener management edge cases', async () => {
       let callCount = 0;
-      const listener = () => { callCount++; };
+      const listener = () => {
+        callCount++;
+      };
 
       // Subscribe to an event
       const unsubscribe = testStateManager.subscribe('test-event', listener);
@@ -378,8 +372,12 @@ describe('Error Handling and Edge Cases - API Only', () => {
       let callCount1 = 0;
       let callCount2 = 0;
 
-      const listener1 = () => { callCount1++; };
-      const listener2 = () => { callCount2++; };
+      const listener1 = () => {
+        callCount1++;
+      };
+      const listener2 = () => {
+        callCount2++;
+      };
 
       testStateManager.subscribe('multi-event', listener1);
       testStateManager.subscribe('multi-event', listener2);
@@ -394,9 +392,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
   describe('Resource Exhaustion Scenarios', () => {
     it('should handle memory pressure from large responses', async () => {
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Memory Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Memory Test Project',
+        })
+      );
 
       // Create many files with large content
       const fileCount = 10;
@@ -427,9 +427,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
 
     it('should handle high concurrency without race conditions', async () => {
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Concurrency Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Concurrency Test Project',
+        })
+      );
 
       const operationCount = 50;
       const operations = [];
@@ -481,9 +483,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
 
     it('should handle cleanup after error scenarios', async () => {
       // Create project and some resources
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Cleanup Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Cleanup Test Project',
+        })
+      );
 
       // Create some files
       const filePromises = [];
@@ -509,10 +513,10 @@ describe('Error Handling and Edge Cases - API Only', () => {
       await Promise.all(workPromises);
 
       // Verify resources exist
-      let fileList = await testApiClient.listFiles({ project_id: project.id });
+      const fileList = await testApiClient.listFiles({ project_id: project.id });
       expect(fileList.files.filter(f => f.name.startsWith('cleanup-test-')).length).toBe(5);
 
-      let workList = await testApiClient.listWork();
+      const workList = await testApiClient.listWork();
       expect(workList.works.filter(w => w.title.startsWith('Cleanup work')).length).toBe(3);
 
       // Simulate cleanup (delete project - this may cascade delete resources)
@@ -532,9 +536,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
       const maxTitle = 'A'.repeat(500); // Very long title
       const maxContent = 'B'.repeat(100000); // 100KB content
 
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Boundary Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Boundary Test Project',
+        })
+      );
 
       // Test long work title
       const workData = testDataGenerator.generateWorkData({
@@ -557,9 +563,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
     });
 
     it('should handle zero-length and near-zero inputs', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Zero Length Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Zero Length Test Project',
+        })
+      );
 
       // Test minimal valid inputs
       const minimalWork = testDataGenerator.generateWorkData({
@@ -582,11 +590,14 @@ describe('Error Handling and Edge Cases - API Only', () => {
     });
 
     it('should handle special Unicode characters', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Unicode Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Unicode Test Project',
+        })
+      );
 
-      const unicodeContent = '🚀 Hello 🌟 世界 🌍\nUnicode: áéíóú\nEmojis: 😀🎉🎊\nMath: ∑∫√∆\nCurrency: €£¥$';
+      const unicodeContent =
+        '🚀 Hello 🌟 世界 🌍\nUnicode: áéíóú\nEmojis: 😀🎉🎊\nMath: ∑∫√∆\nCurrency: €£¥$';
 
       const unicodeFile = testDataGenerator.generateFileData({
         project_id: project.id,
@@ -608,9 +619,11 @@ describe('Error Handling and Edge Cases - API Only', () => {
     });
 
     it('should handle rapid state changes', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Rapid State Change Test',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Rapid State Change Test',
+        })
+      );
 
       // Rapidly create and delete resources
       const cycles = 10;

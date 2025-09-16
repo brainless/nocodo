@@ -10,7 +10,7 @@ export class TestWebSocketClient {
   private messageHandlers: Map<string, (data: any) => void> = new Map();
   private eventHandlers: Map<string, (() => void)[]> = new Map();
   private receivedMessages: any[] = [];
-  private isConnected = false;
+  private connected = false;
 
   constructor(baseURL: string = 'ws://localhost:8081') {
     this.url = baseURL;
@@ -26,12 +26,12 @@ export class TestWebSocketClient {
       this.ws = new WebSocket(fullUrl);
 
       this.ws.onopen = () => {
-        this.isConnected = true;
+        this.connected = true;
         this.triggerEvent('open');
         resolve();
       };
 
-      this.ws.onmessage = (event) => {
+      this.ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data.toString());
           this.receivedMessages.push(data);
@@ -42,11 +42,11 @@ export class TestWebSocketClient {
       };
 
       this.ws.onclose = () => {
-        this.isConnected = false;
+        this.connected = false;
         this.triggerEvent('close');
       };
 
-      this.ws.onerror = (error) => {
+      this.ws.onerror = error => {
         console.error('WebSocket error:', error);
         this.triggerEvent('error');
         reject(error);
@@ -54,7 +54,7 @@ export class TestWebSocketClient {
 
       // Timeout after 10 seconds
       setTimeout(() => {
-        if (!this.isConnected) {
+        if (!this.connected) {
           reject(new Error('WebSocket connection timeout'));
         }
       }, 10000);
@@ -65,10 +65,10 @@ export class TestWebSocketClient {
    * Disconnect from WebSocket server
    */
   async disconnect(): Promise<void> {
-    if (this.ws && this.isConnected) {
-      return new Promise((resolve) => {
+    if (this.ws && this.connected) {
+      return new Promise(resolve => {
         this.ws!.onclose = () => {
-          this.isConnected = false;
+          this.connected = false;
           this.triggerEvent('close');
           resolve();
         };
@@ -81,7 +81,7 @@ export class TestWebSocketClient {
    * Send a message through WebSocket
    */
   send(message: any): void {
-    if (this.ws && this.isConnected) {
+    if (this.ws && this.connected) {
       const messageString = JSON.stringify(message);
       this.ws.send(messageString);
     } else {
@@ -140,7 +140,7 @@ export class TestWebSocketClient {
    * Wait for connection to be established
    */
   async waitForConnection(timeoutMs: number = 5000): Promise<void> {
-    if (this.isConnected) {
+    if (this.connected) {
       return Promise.resolve();
     }
 
@@ -181,7 +181,7 @@ export class TestWebSocketClient {
    * Check if client is connected
    */
   isConnected(): boolean {
-    return this.isConnected;
+    return this.connected;
   }
 
   /**
@@ -250,12 +250,10 @@ export class WebSocketTestManager {
    * Disconnect all clients
    */
   async disconnectAll(): Promise<void> {
-    const disconnectPromises = Array.from(this.clients.entries()).map(
-      async ([id, client]) => {
-        await client.disconnect();
-        this.clients.delete(id);
-      }
-    );
+    const disconnectPromises = Array.from(this.clients.entries()).map(async ([id, client]) => {
+      await client.disconnect();
+      this.clients.delete(id);
+    });
 
     await Promise.all(disconnectPromises);
   }

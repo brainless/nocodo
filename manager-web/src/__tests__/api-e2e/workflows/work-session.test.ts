@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -250,11 +250,14 @@ describe('Work Session - API Only', () => {
     });
 
     it('should handle multiple concurrent work sessions', async () => {
-      const workPromises = testDataGenerator.generateProjectBatch(3).map((_, index) =>
-        testDataGenerator.generateWorkData({
-          title: `Concurrent work session ${index + 1}`,
-        })
-      ).map(workData => testApiClient.createWork(workData));
+      const workPromises = testDataGenerator
+        .generateProjectBatch(3)
+        .map((_, index) =>
+          testDataGenerator.generateWorkData({
+            title: `Concurrent work session ${index + 1}`,
+          })
+        )
+        .map(workData => testApiClient.createWork(workData));
 
       const works = await Promise.all(workPromises);
 

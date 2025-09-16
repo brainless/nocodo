@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -136,7 +136,7 @@ describe('WebSocket Communication - API Only', () => {
       const client = new TestWebSocketClient();
 
       let receivedMessage: any = null;
-      client.onMessage('TestMessage', (data) => {
+      client.onMessage('TestMessage', data => {
         receivedMessage = data;
       });
 
@@ -155,8 +155,12 @@ describe('WebSocket Communication - API Only', () => {
       let openCalled = false;
       let closeCalled = false;
 
-      client.onEvent('open', () => { openCalled = true; });
-      client.onEvent('close', () => { closeCalled = true; });
+      client.onEvent('open', () => {
+        openCalled = true;
+      });
+      client.onEvent('close', () => {
+        closeCalled = true;
+      });
 
       await client.connect('/ws/work');
       expect(openCalled).toBe(true);
@@ -170,9 +174,9 @@ describe('WebSocket Communication - API Only', () => {
       await client.connect('/ws/work');
 
       // Test timeout scenario
-      await expect(
-        client.waitForMessage('NonExistentMessage', 1000)
-      ).rejects.toThrow('Timeout waiting for message type: NonExistentMessage');
+      await expect(client.waitForMessage('NonExistentMessage', 1000)).rejects.toThrow(
+        'Timeout waiting for message type: NonExistentMessage'
+      );
 
       await client.disconnect();
     });
@@ -253,7 +257,9 @@ describe('WebSocket Communication - API Only', () => {
 
       // Test with malformed message handler
       let errorHandled = false;
-      client.onEvent('error', () => { errorHandled = true; });
+      client.onEvent('error', () => {
+        errorHandled = true;
+      });
 
       // In a real scenario, invalid messages would trigger error events
       // For now, we verify the error handler registration works

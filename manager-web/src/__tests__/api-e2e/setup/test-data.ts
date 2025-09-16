@@ -1,9 +1,9 @@
 import {
-  CreateProjectRequest,
-  CreateWorkRequest,
   AddMessageRequest,
   CreateAiSessionRequest,
   CreateLlmAgentSessionRequest,
+  CreateProjectRequest,
+  CreateWorkRequest,
   FileCreateRequest,
   FileUpdateRequest,
 } from '../../types';
@@ -21,15 +21,17 @@ export class TestDataGenerator {
    */
   private generateId(prefix = 'test'): string {
     this.idCounter++;
-    return `${prefix}-${this.idCounter}-${Date.now()}`;
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    return `${prefix}-${this.idCounter}-${Date.now()}-${randomSuffix}`;
   }
 
   /**
    * Generate mock project creation data
    */
   generateProjectData(overrides: Partial<CreateProjectRequest> = {}): CreateProjectRequest {
+    const projectId = this.generateId('project');
     const defaultData: CreateProjectRequest = {
-      name: `Test Project ${this.generateId('project')}`,
+      name: `API-E2E-${projectId}`,
       language: 'rust',
       description: 'Test project for API e2e testing',
     };
@@ -44,6 +46,7 @@ export class TestDataGenerator {
     const defaultData: CreateWorkRequest = {
       title: `Test Work ${this.generateId('work')}`,
       project_id: null,
+      tool_name: 'llm-agent',
     };
 
     return { ...defaultData, ...overrides };
@@ -63,8 +66,8 @@ export class TestDataGenerator {
   }
 
   /**
-    * Generate mock AI session data
-    */
+   * Generate mock AI session data
+   */
   generateAiSessionData(overrides: Partial<CreateAiSessionRequest> = {}): CreateAiSessionRequest {
     const defaultData: CreateAiSessionRequest = {
       message_id: this.generateId('message'),
@@ -75,9 +78,11 @@ export class TestDataGenerator {
   }
 
   /**
-    * Generate mock LLM agent session data
-    */
-  generateLlmAgentSessionData(overrides: Partial<CreateLlmAgentSessionRequest> = {}): CreateLlmAgentSessionRequest {
+   * Generate mock LLM agent session data
+   */
+  generateLlmAgentSessionData(
+    overrides: Partial<CreateLlmAgentSessionRequest> = {}
+  ): CreateLlmAgentSessionRequest {
     const defaultData: CreateLlmAgentSessionRequest = {
       provider: 'openai',
       model: 'gpt-4',
@@ -96,6 +101,7 @@ export class TestDataGenerator {
       path: `test-file-${this.generateId('file')}.txt`,
       content: 'This is test file content for API e2e testing',
       is_directory: false,
+      encoding: 'utf-8',
     };
 
     return { ...defaultData, ...overrides };
@@ -121,8 +127,8 @@ export class TestDataGenerator {
   }
 
   /**
-    * Generate a complete test scenario with related entities
-    */
+   * Generate a complete test scenario with related entities
+   */
   generateTestScenario(): {
     project: CreateProjectRequest;
     work: CreateWorkRequest;
