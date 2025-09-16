@@ -99,7 +99,10 @@ test.describe('Work Creation', () => {
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();
 
     // Verify the prompt appears (may be formatted differently by LLM agent)
-    const promptText = await page.locator('text').filter({ hasText: /Read.*README\.md/ }).first();
+    const promptText = await page
+      .locator('text')
+      .filter({ hasText: /Read.*README\.md/ })
+      .first();
     await expect(promptText).toBeVisible();
   });
 });

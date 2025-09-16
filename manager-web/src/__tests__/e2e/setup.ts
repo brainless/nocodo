@@ -212,12 +212,12 @@ export const test = base.extend({
       // Also mock the WebSocket client state for the provider
       // This ensures the status indicator shows connected
       const originalWebSocket = window.WebSocket;
-      window.WebSocket = function(url: string) {
+      window.WebSocket = function (url: string) {
         const ws = new originalWebSocket(url);
         // Force the readyState to OPEN immediately
         Object.defineProperty(ws, 'readyState', {
           value: WebSocket.OPEN,
-          writable: false
+          writable: false,
         });
         return ws;
       } as any;
