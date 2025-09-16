@@ -6,23 +6,17 @@ test.describe('Work Creation', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select a tool (default should be llm-agent)
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
@@ -44,15 +38,20 @@ test.describe('Work Creation', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
-    // Try to submit without filling the prompt
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
-    await submitButton.click();
+    // Check that submit button is disabled when prompt is empty
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
+    await expect(submitButton).toBeDisabled();
 
-    // Should show validation error or prevent submission
-    // The form should either show an error or the submit button should be disabled
-    const errorMessage = page.locator('text=Please provide a prompt');
+    // Fill in a prompt and verify button becomes enabled
+    const promptTextarea = page.locator('textarea#prompt');
+    await promptTextarea.fill('Test prompt');
+    await expect(submitButton).toBeEnabled();
+
+    // Check for any error messages that might appear
+    const errorMessage = page.locator('[class*="text-red"], [class*="bg-red"]');
     const isErrorVisible = await errorMessage.isVisible();
 
     if (isErrorVisible) {
@@ -68,6 +67,7 @@ test.describe('Work Creation', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt
@@ -75,30 +75,21 @@ test.describe('Work Creation', () => {
     await promptTextarea.fill('Read the contents of README.md');
 
     // Try to select a project if available
-    const projectButton = page
-      .locator('button:has-text("No Project")')
-      .or(page.locator('button').filter({ hasText: /Project/ }));
+    const projectButton = page.locator('button[aria-haspopup="listbox"]:has-text("No Project")');
     if (await projectButton.isVisible()) {
       await projectButton.click();
 
       // Select first available project if dropdown appears
-      const projectOption = page.locator('text=/Project/').first();
+      const projectOption = page.locator('div[role="option"]').first();
       if (await projectOption.isVisible()) {
         await projectOption.click();
       }
     }
 
-    // Select tool using custom dropdown
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
@@ -107,7 +98,11 @@ test.describe('Work Creation', () => {
     // Verify we're on the work detail page
     await expect(page.locator('h1:has-text("Work Details")')).toBeVisible();
 
-    // Verify the prompt appears
-    await expect(page.locator('text=Read the contents of README.md')).toBeVisible();
+    // Verify the prompt appears (may be formatted differently by LLM agent)
+    const promptText = await page
+      .locator('text')
+      .filter({ hasText: /Read.*README\.md/ })
+      .first();
+    await expect(promptText).toBeVisible();
   });
 });

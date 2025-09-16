@@ -6,7 +6,10 @@ use crate::websocket::WebSocketBroadcaster;
 use anyhow::Result;
 use async_stream::try_stream;
 use futures_util::StreamExt;
+use std::boxed::Box;
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 
 /// LLM Agent that handles direct communication with LLMs and tool execution
@@ -268,322 +271,446 @@ impl LlmAgent {
 
     /// Process tool calls from LLM response
     async fn process_tool_calls(&self, session_id: &str, response: &str) -> Result<()> {
-        tracing::info!(
-            session_id = %session_id,
-            "Processing tool calls from LLM response"
-        );
+        self.process_tool_calls_with_depth(session_id, response, 0)
+            .await
+    }
 
-        // Extract JSON tool calls from response
-        let tool_calls = self.extract_tool_calls(response)?;
-        tracing::debug!(
-            session_id = %session_id,
-            tool_call_count = %tool_calls.len(),
-            "Extracted tool calls from LLM response"
-        );
+    /// Process tool calls from LLM response with recursion depth tracking
+    fn process_tool_calls_with_depth<'a>(
+        &'a self,
+        session_id: &'a str,
+        response: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
-        for (index, tool_call_json) in tool_calls.into_iter().enumerate() {
+            if depth >= MAX_RECURSION_DEPTH {
+                tracing::warn!(
+                    session_id = %session_id,
+                    current_depth = %depth,
+                    max_depth = %MAX_RECURSION_DEPTH,
+                    "Tool call recursion depth limit reached, stopping processing"
+                );
+                return Ok(());
+            }
             tracing::info!(
                 session_id = %session_id,
-                tool_index = %index,
-                tool_call_json = %tool_call_json,
-                "Processing tool call"
+                current_depth = %depth,
+                "Processing tool calls from LLM response"
             );
 
-            // Parse tool request
-            let tool_request: ToolRequest = match serde_json::from_value(tool_call_json.clone()) {
-                Ok(request) => {
-                    tracing::debug!(
-                        session_id = %session_id,
-                        tool_index = %index,
-                        tool_request = ?request,
-                        "Successfully parsed tool request"
-                    );
-                    request
-                }
-                Err(e) => {
-                    tracing::error!(
-                        session_id = %session_id,
-                        tool_index = %index,
-                        error = %e,
-                        tool_call_json = %tool_call_json,
-                        "Failed to parse tool request"
-                    );
-                    continue;
-                }
-            };
-
-            // Create tool call record
-            let tool_name = match &tool_request {
-                ToolRequest::ListFiles(_) => "list_files",
-                ToolRequest::ReadFile(_) => "read_file",
-            };
-
+            // Extract JSON tool calls from response with retry mechanism
+            let tool_calls = self.extract_tool_calls_with_retry(session_id, response, depth).await?;
             tracing::debug!(
                 session_id = %session_id,
-                tool_index = %index,
-                tool_name = %tool_name,
-                "Creating tool call record"
+                tool_call_count = %tool_calls.len(),
+                "Extracted tool calls from LLM response"
             );
 
-            let mut tool_call = LlmAgentToolCall::new(
-                session_id.to_string(),
-                tool_name.to_string(),
-                tool_call_json,
-            );
+            for (index, tool_call_json) in tool_calls.into_iter().enumerate() {
+                tracing::info!(
+                    session_id = %session_id,
+                    tool_index = %index,
+                    tool_call_json = %tool_call_json,
+                    "Processing tool call"
+                );
 
-            // Update tool call status to executing
-            tool_call.status = "executing".to_string();
-            let tool_call_id = self.db.create_llm_agent_tool_call(&tool_call)?;
-            tracing::debug!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                tool_name = %tool_name,
-                "Tool call record created with executing status"
-            );
+                // Parse tool request
+                let tool_request: ToolRequest = match serde_json::from_value(tool_call_json.clone())
+                {
+                    Ok(request) => {
+                        tracing::debug!(
+                            session_id = %session_id,
+                            tool_index = %index,
+                            tool_request = ?request,
+                            "Successfully parsed tool request"
+                        );
+                        request
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            session_id = %session_id,
+                            tool_index = %index,
+                            error = %e,
+                            tool_call_json = %tool_call_json,
+                            "Failed to parse tool request"
+                        );
+                        continue;
+                    }
+                };
 
-            // Execute tool
-            tracing::info!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                tool_name = %tool_name,
-                "Executing tool"
-            );
+                // Create tool call record
+                let tool_name = match &tool_request {
+                    ToolRequest::ListFiles(_) => "list_files",
+                    ToolRequest::ReadFile(_) => "read_file",
+                };
 
-            // Get project-specific tool executor
-            let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
-            let tool_response = project_tool_executor.execute(tool_request).await;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_index = %index,
+                    tool_name = %tool_name,
+                    "Creating tool call record"
+                );
 
-            // Update tool call with response
-            let response_value = match tool_response {
-                Ok(response) => {
-                    tool_call.complete(serde_json::to_value(response)?);
-                    let response_json =
-                        serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
-                    tracing::info!(
+                let mut tool_call = LlmAgentToolCall::new(
+                    session_id.to_string(),
+                    tool_name.to_string(),
+                    tool_call_json,
+                );
+
+                // Update tool call status to executing
+                tool_call.status = "executing".to_string();
+                let tool_call_id = self.db.create_llm_agent_tool_call(&tool_call)?;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    tool_name = %tool_name,
+                    "Tool call record created with executing status"
+                );
+
+                // Execute tool
+                tracing::info!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    tool_name = %tool_name,
+                    "Executing tool"
+                );
+
+                // Get project-specific tool executor
+                let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
+                let tool_response = project_tool_executor.execute(tool_request).await;
+
+                // Update tool call with response
+                let response_value = match tool_response {
+                    Ok(response) => {
+                        tool_call.complete(serde_json::to_value(response)?);
+                        let response_json =
+                            serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                        tracing::info!(
+                            session_id = %session_id,
+                            tool_call_id = %tool_call_id,
+                            tool_name = %tool_name,
+                            "Tool execution completed successfully"
+                        );
+                        response_json
+                    }
+                    Err(e) => {
+                        tool_call.fail(e.to_string());
+                        let response_json =
+                            serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                        tracing::error!(
+                            session_id = %session_id,
+                            tool_call_id = %tool_call_id,
+                            tool_name = %tool_name,
+                            error = %e,
+                            "Tool execution failed"
+                        );
+                        response_json
+                    }
+                };
+
+                self.db.update_llm_agent_tool_call(&tool_call)?;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    "Tool call record updated with execution result"
+                );
+
+                // Add tool response to conversation (with size limiting)
+                let response_json_string = serde_json::to_string(&response_value)?;
+                let truncated_response = if response_json_string.len() > 50000 {
+                    // 50KB limit
+                    // Truncate large responses to prevent LLM context overflow
+                    tracing::warn!(
                         session_id = %session_id,
                         tool_call_id = %tool_call_id,
-                        tool_name = %tool_name,
-                        "Tool execution completed successfully"
+                        original_size = %response_json_string.len(),
+                        "Tool response too large, truncating for LLM follow-up"
                     );
-                    response_json
-                }
-                Err(e) => {
-                    tool_call.fail(e.to_string());
-                    let response_json =
-                        serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
-                    tracing::error!(
-                        session_id = %session_id,
-                        tool_call_id = %tool_call_id,
-                        tool_name = %tool_name,
-                        error = %e,
-                        "Tool execution failed"
-                    );
-                    response_json
-                }
-            };
 
-            self.db.update_llm_agent_tool_call(&tool_call)?;
-            tracing::debug!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                "Tool call record updated with execution result"
-            );
+                    format!(
+                    "{{\"truncated\": true, \"original_size\": {}, \"summary\": \"Response truncated due to size limit. First 1000 chars: {}...\"}}",
+                    response_json_string.len(),
+                    response_json_string.chars().take(1000).collect::<String>()
+                )
+                } else {
+                    response_json_string
+                };
 
-            // Add tool response to conversation
-            self.db.create_llm_agent_message(
-                session_id,
-                "tool",
-                serde_json::to_string(&response_value)?,
-            )?;
-            tracing::debug!(
-                session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                "Tool response added to conversation"
-            );
+                self.db
+                    .create_llm_agent_message(session_id, "tool", truncated_response)?;
+                tracing::debug!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    "Tool response added to conversation"
+                );
 
-            // If there are tool results, follow up with LLM
+                // If there are tool results, follow up with LLM
+                tracing::info!(
+                    session_id = %session_id,
+                    tool_call_id = %tool_call_id,
+                    current_depth = %depth,
+                    "Following up with LLM after tool execution"
+                );
+                self.follow_up_with_llm_with_depth(session_id, depth + 1)
+                    .await?;
+            }
+
             tracing::info!(
                 session_id = %session_id,
-                tool_call_id = %tool_call_id,
-                "Following up with LLM after tool execution"
+                "Completed processing all tool calls"
             );
-            self.follow_up_with_llm(session_id).await?;
-        }
 
-        tracing::info!(
-            session_id = %session_id,
-            "Completed processing all tool calls"
-        );
-
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Follow up with LLM after tool execution
+    #[allow(dead_code)]
     async fn follow_up_with_llm(&self, session_id: &str) -> Result<String> {
-        tracing::info!(
-            session_id = %session_id,
-            "Following up with LLM after tool execution"
-        );
+        self.follow_up_with_llm_with_depth(session_id, 0).await
+    }
 
-        // Get updated conversation history
-        let history = self.db.get_llm_agent_messages(session_id)?;
-        tracing::debug!(
-            session_id = %session_id,
-            message_count = %history.len(),
-            "Retrieved updated conversation history for follow-up"
-        );
+    /// Follow up with LLM after tool execution with recursion depth tracking
+    fn follow_up_with_llm_with_depth<'a>(
+        &'a self,
+        session_id: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
+        Box::pin(async move {
+            const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
-        // Get session
-        let session = self.db.get_llm_agent_session(session_id)?;
-        tracing::debug!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            provider = %session.provider,
-            model = %session.model,
-            "Retrieved session for follow-up"
-        );
-
-        // Create LLM client
-        let config = LlmProviderConfig {
-            provider: session.provider.clone(),
-            model: session.model.clone(),
-            api_key: self.get_api_key(&session.provider)?,
-            base_url: self.get_base_url(&session.provider),
-            max_tokens: Some(4000),
-            temperature: Some(0.7),
-        };
-
-        tracing::debug!(
-            session_id = %session_id,
-            provider = %config.provider,
-            model = %config.model,
-            "Creating LLM client for follow-up"
-        );
-
-        let llm_client = create_llm_client(config)?;
-
-        // Build conversation for LLM
-        let mut messages: Vec<_> = history
-            .into_iter()
-            .map(|msg| LlmMessage {
-                role: msg.role,
-                content: msg.content,
-            })
-            .collect();
-
-        // Add tool system prompt for follow-up (same as initial request)
-        let tool_system_prompt = self.create_tool_system_prompt();
-        messages.push(LlmMessage {
-            role: "system".to_string(),
-            content: tool_system_prompt,
-        });
-
-        tracing::debug!(
-            session_id = %session_id,
-            total_messages = %messages.len(),
-            "Built conversation for LLM follow-up request"
-        );
-
-        // Log the follow-up conversation being sent to LLM (truncated for large messages)
-        for (i, msg) in messages.iter().enumerate() {
-            let content_preview = if msg.content.len() > 200 {
-                format!("{}...", &msg.content[..200])
-            } else {
-                msg.content.clone()
-            };
+            if depth >= MAX_RECURSION_DEPTH {
+                tracing::warn!(
+                    session_id = %session_id,
+                    current_depth = %depth,
+                    max_depth = %MAX_RECURSION_DEPTH,
+                    "Follow-up recursion depth limit reached, stopping processing"
+                );
+                return Ok("Maximum recursion depth reached.".to_string());
+            }
             tracing::info!(
                 session_id = %session_id,
-                message_index = %i,
-                message_role = %msg.role,
-                message_content = %content_preview,
-                message_length = %msg.content.len(),
-                "Sending follow-up message to LLM"
+                current_depth = %depth,
+                "Following up with LLM after tool execution"
             );
-        }
 
-        let request = LlmCompletionRequest {
-            model: session.model.clone(),
-            messages,
-            max_tokens: Some(4000),
-            temperature: Some(0.7),
-            stream: Some(true),
-        };
+            // Get updated conversation history
+            let history = self.db.get_llm_agent_messages(session_id)?;
+            tracing::debug!(
+                session_id = %session_id,
+                message_count = %history.len(),
+                "Retrieved updated conversation history for follow-up"
+            );
 
-        tracing::info!(
-            session_id = %session_id,
-            provider = %session.provider,
-            model = %session.model,
-            "Sending follow-up request to LLM provider"
-        );
+            // Get session
+            let session = self.db.get_llm_agent_session(session_id)?;
+            tracing::debug!(
+                session_id = %session_id,
+                work_id = %session.work_id,
+                provider = %session.provider,
+                model = %session.model,
+                "Retrieved session for follow-up"
+            );
 
-        // Stream the response
-        let mut assistant_response = String::new();
-        let mut chunk_count = 0;
-        let mut stream = llm_client.stream_complete(request);
+            // Create LLM client
+            let config = LlmProviderConfig {
+                provider: session.provider.clone(),
+                model: session.model.clone(),
+                api_key: self.get_api_key(&session.provider)?,
+                base_url: self.get_base_url(&session.provider),
+                max_tokens: Some(4000),
+                temperature: Some(0.7),
+            };
 
-        while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result?;
-            chunk_count += 1;
+            tracing::debug!(
+                session_id = %session_id,
+                provider = %config.provider,
+                model = %config.model,
+                "Creating LLM client for follow-up"
+            );
 
-            if !chunk.is_finished {
-                assistant_response.push_str(&chunk.content);
+            let llm_client = create_llm_client(config)?;
 
-                // Broadcast chunk to WebSocket
-                self.ws
-                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
-                    .await;
+            // Build conversation for LLM
+            let mut messages: Vec<_> = history
+                .into_iter()
+                .map(|msg| LlmMessage {
+                    role: msg.role,
+                    content: msg.content,
+                })
+                .collect();
 
-                tracing::trace!(
+            // Add tool system prompt for follow-up (same as initial request)
+            let tool_system_prompt = self.create_tool_system_prompt();
+            messages.push(LlmMessage {
+                role: "system".to_string(),
+                content: tool_system_prompt,
+            });
+
+            tracing::debug!(
+                session_id = %session_id,
+                total_messages = %messages.len(),
+                "Built conversation for LLM follow-up request"
+            );
+
+            // Log the follow-up conversation being sent to LLM (truncated for large messages)
+            for (i, msg) in messages.iter().enumerate() {
+                let content_preview = if msg.content.len() > 200 {
+                    format!("{}...", &msg.content[..200])
+                } else {
+                    msg.content.clone()
+                };
+                tracing::info!(
                     session_id = %session_id,
-                    chunk_number = %chunk_count,
-                    chunk_length = %chunk.content.len(),
-                    "Received and broadcasted LLM follow-up response chunk"
+                    message_index = %i,
+                    message_role = %msg.role,
+                    message_content = %content_preview,
+                    message_length = %msg.content.len(),
+                    "Sending follow-up message to LLM"
                 );
             }
-        }
 
-        tracing::info!(
-            session_id = %session_id,
-            total_chunks = %chunk_count,
-            response_length = %assistant_response.len(),
-            "Completed LLM follow-up response streaming"
-        );
+            let request = LlmCompletionRequest {
+                model: session.model.clone(),
+                messages,
+                max_tokens: Some(4000),
+                temperature: Some(0.7),
+                stream: Some(true),
+            };
 
-        // Store assistant response
-        self.db
-            .create_llm_agent_message(session_id, "assistant", assistant_response.clone())?;
-        tracing::debug!(
-            session_id = %session_id,
-            response_length = %assistant_response.len(),
-            "Follow-up assistant response stored in database"
-        );
+            tracing::info!(
+                session_id = %session_id,
+                provider = %session.provider,
+                model = %session.model,
+                "Sending follow-up request to LLM provider"
+            );
 
-        tracing::info!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            "Successfully completed LLM follow-up after tool execution"
-        );
+            // Stream the response
+            let mut assistant_response = String::new();
+            let mut chunk_count = 0;
+            let mut stream = llm_client.stream_complete(request);
 
-        Ok(assistant_response)
+            while let Some(chunk_result) = stream.next().await {
+                let chunk = chunk_result?;
+                chunk_count += 1;
+
+                if !chunk.is_finished {
+                    assistant_response.push_str(&chunk.content);
+
+                    // Broadcast chunk to WebSocket
+                    self.ws
+                        .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
+                        .await;
+
+                    tracing::trace!(
+                        session_id = %session_id,
+                        chunk_number = %chunk_count,
+                        chunk_length = %chunk.content.len(),
+                        "Received and broadcasted LLM follow-up response chunk"
+                    );
+                }
+            }
+
+            tracing::info!(
+                session_id = %session_id,
+                total_chunks = %chunk_count,
+                response_length = %assistant_response.len(),
+                "Completed LLM follow-up response streaming"
+            );
+
+            // Store assistant response
+            self.db.create_llm_agent_message(
+                session_id,
+                "assistant",
+                assistant_response.clone(),
+            )?;
+            tracing::debug!(
+                session_id = %session_id,
+                response_length = %assistant_response.len(),
+                "Follow-up assistant response stored in database"
+            );
+
+            // Check if the follow-up response contains tool calls
+            if self.contains_tool_calls(&assistant_response) {
+                tracing::info!(
+                    session_id = %session_id,
+                    "LLM follow-up response contains tool calls, processing them recursively"
+                );
+                self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
+                    .await?;
+            } else {
+                tracing::debug!(
+                    session_id = %session_id,
+                    "LLM follow-up response does not contain tool calls"
+                );
+            }
+
+            tracing::info!(
+                session_id = %session_id,
+                work_id = %session.work_id,
+                "Successfully completed LLM follow-up after tool execution"
+            );
+
+            Ok(assistant_response)
+        })
     }
 
     /// Create system prompt for tool usage
     fn create_tool_system_prompt(&self) -> String {
-        r#"You are an AI assistant with access to file system tools. You can use the following tools:
+        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use ts_rs::TS;
 
-1. **list_files**: List files and directories in a project
-   - Request format: {"type": "list_files", "path": "<directory_path>", "recursive": <boolean>, "include_hidden": <boolean>}
-   - Example: {"type": "list_files", "path": ".", "recursive": false, "include_hidden": false}
+        // Generate TypeScript types for tools
+        let tool_request_ts = ToolRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ToolRequest type".to_string()
+        });
+        let list_files_request_ts = ListFilesRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ListFilesRequest type".to_string()
+        });
+        let read_file_request_ts = ReadFileRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ReadFileRequest type".to_string()
+        });
 
-2. **read_file**: Read the content of a file
-   - Request format: {"type": "read_file", "path": "<file_path>", "max_size": <bytes>}
-   - Example: {"type": "read_file", "path": "src/main.rs", "max_size": 10000}
+        format!(r#"You are an AI assistant with access to file system tools. You can use the following tools:
+
+## Available Tools
+
+The tools are defined using TypeScript types. When calling a tool, use the exact format shown below:
+
+### Type Definitions
+
+```typescript
+// Individual tool request types
+{list_files_request_ts}
+
+{read_file_request_ts}
+
+// Union type for all tool requests
+{tool_request_ts}
+```
+
+### Tool Usage
 
 When you need to use a tool, respond with ONLY the JSON request for that tool. Do not include any other text. The tool will be executed and you will receive the results, after which you can continue your response.
 
-When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned. Always provide a complete answer to the user's original question using the information gathered from the tools.
+Examples:
+- List files: {{"type": "list_files", "path": ".", "recursive": false}}
+- Read file: {{"type": "read_file", "path": "src/main.rs", "max_size": 10000}}
 
-Always analyze the project structure and read relevant files before providing code solutions. Be concise and focus on the user's specific needs."#.to_string()
+### Guidelines
+
+1. When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned.
+2. Always provide a complete answer to the user's original question using the information gathered from the tools.
+3. Always analyze the project structure and read relevant files before providing code solutions.
+4. Be concise and focus on the user's specific needs.
+
+The tool request MUST exactly match the TypeScript interface defined above."#,
+            list_files_request_ts = list_files_request_ts,
+            read_file_request_ts = read_file_request_ts,
+            tool_request_ts = tool_request_ts
+        )
     }
 
     /// Check if response contains tool calls
@@ -599,71 +726,183 @@ Always analyze the project structure and read relevant files before providing co
         );
 
         // Look for JSON objects that might be tool calls - more flexible matching
-        let contains_list_files =
-            response.contains("list_files") && response.contains("type") && response.contains("{");
-        let contains_read_file =
-            response.contains("read_file") && response.contains("type") && response.contains("{");
+        let contains_tool_keywords = response.contains("list_files") || response.contains("read_file");
+        let contains_json_structure = response.contains("type") && response.contains("{");
 
-        let result = contains_list_files || contains_read_file;
+        let result = contains_tool_keywords && contains_json_structure;
 
         tracing::info!(
             contains_tool_calls = %result,
-            contains_list_files = %contains_list_files,
-            contains_read_file = %contains_read_file,
+            contains_tool_keywords = %contains_tool_keywords,
+            contains_json_structure = %contains_json_structure,
             "Tool call detection result"
         );
 
         result
     }
 
-    /// Extract tool calls from response
+    /// Extract tool calls from response with JSON error retry
+    fn extract_tool_calls_with_retry<'a>(
+        &'a self,
+        session_id: &'a str,
+        response: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<serde_json::Value>>> + Send + 'a>> {
+        Box::pin(async move {
+        const MAX_JSON_RETRY_DEPTH: u32 = 3; // Maximum retries for JSON parsing errors
+
+        let tool_calls = self.extract_tool_calls(response)?;
+
+        // If we successfully extracted tool calls, return them
+        if !tool_calls.is_empty() {
+            return Ok(tool_calls);
+        }
+
+        // If we have no tool calls but the response contains tool keywords and JSON structure,
+        // it might be malformed JSON that we should ask the LLM to fix
+        if self.contains_tool_calls(response) && depth < MAX_JSON_RETRY_DEPTH {
+            tracing::warn!(
+                session_id = %session_id,
+                retry_depth = %depth,
+                max_depth = %MAX_JSON_RETRY_DEPTH,
+                "No tool calls extracted but tool call detected - attempting JSON correction retry"
+            );
+
+            return self.retry_json_parsing(session_id, response, depth).await;
+        }
+
+        // No tool calls found and no retry needed
+        Ok(tool_calls)
+        })
+    }
+
+    /// Ask LLM to fix malformed JSON and retry parsing
+    fn retry_json_parsing<'a>(
+        &'a self,
+        session_id: &'a str,
+        malformed_response: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<serde_json::Value>>> + Send + 'a>> {
+        Box::pin(async move {
+        use crate::models::ToolRequest;
+
+        // Try to identify specific JSON parsing errors
+        let mut error_details = Vec::new();
+
+        // Test common JSON patterns to find specific errors
+        if let Err(e) = serde_json::from_str::<ToolRequest>(malformed_response.trim()) {
+            error_details.push(format!("Full response parse error: {}", e));
+        }
+
+        // Look for JSON-like structures and test them
+        for line in malformed_response.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') && trimmed.contains("type") {
+                if let Err(e) = serde_json::from_str::<ToolRequest>(trimmed) {
+                    error_details.push(format!("Line '{}' parse error: {}", trimmed, e));
+                }
+            }
+        }
+
+        let error_message = if error_details.is_empty() {
+            "Could not identify specific JSON parsing errors".to_string()
+        } else {
+            error_details.join("; ")
+        };
+
+        tracing::info!(
+            session_id = %session_id,
+            retry_depth = %depth,
+            error_details = %error_message,
+            "Asking LLM to fix malformed JSON"
+        );
+
+        // Create a message asking the LLM to fix the JSON
+        let fix_request = format!(
+            r#"The previous response contained malformed JSON that could not be parsed. Please fix the JSON and provide a valid tool call.
+
+Original response:
+{}
+
+Parsing errors:
+{}
+
+Please provide a corrected JSON tool call that follows the exact TypeScript interface format. The JSON must be valid and properly formatted with all required commas and quotation marks."#,
+            malformed_response, error_message
+        );
+
+        // Add the error correction request to the session
+        self.db.create_llm_agent_message(
+            session_id,
+            "user",
+            fix_request,
+        )?;
+
+        // Get corrected response from LLM using the same mechanism as follow-up
+        let corrected_response = self.follow_up_with_llm_with_depth(session_id, depth).await?;
+
+        // Try to extract tool calls from the corrected response
+        self.extract_tool_calls_with_retry(session_id, &corrected_response, depth + 1)
+            .await
+        })
+    }
+
+    /// Extract tool calls from response (internal method)
     fn extract_tool_calls(&self, response: &str) -> Result<Vec<serde_json::Value>> {
+        use crate::models::ToolRequest;
         let mut tool_calls = Vec::new();
+        let mut json_parsing_errors = Vec::new();
 
         tracing::debug!(
             response_length = %response.len(),
             "Extracting tool calls from response"
         );
 
-        // Try parsing the entire response as JSON first
-        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(response.trim()) {
-            if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
-                if tool_type == "list_files" || tool_type == "read_file" {
-                    tracing::info!(
-                        tool_type = %tool_type,
-                        "Found tool call in full response"
-                    );
-                    tool_calls.push(json_value);
-                }
+        // Try parsing the entire response as a ToolRequest first
+        match serde_json::from_str::<ToolRequest>(response.trim()) {
+            Ok(tool_request) => {
+                let json_value = serde_json::to_value(tool_request)?;
+                tracing::info!(
+                    "Successfully parsed full response as ToolRequest"
+                );
+                tool_calls.push(json_value);
+                return Ok(tool_calls);
+            }
+            Err(e) => {
+                tracing::debug!(
+                    error = %e,
+                    "Failed to parse full response as ToolRequest, trying line-by-line"
+                );
+                json_parsing_errors.push((response.trim().to_string(), e.to_string()));
             }
         }
 
         // If that didn't work, try line-by-line extraction
-        if tool_calls.is_empty() {
-            for (line_num, line) in response.lines().enumerate() {
-                let trimmed = line.trim();
-                if trimmed.starts_with('{')
-                    && (trimmed.ends_with('}')
-                        || trimmed.contains("list_files")
-                        || trimmed.contains("read_file"))
-                {
-                    tracing::debug!(
-                        line_number = %line_num,
-                        line_content = %trimmed,
-                        "Attempting to parse line as JSON tool call"
-                    );
+        for (line_num, line) in response.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') && trimmed.ends_with('}') {
+                tracing::debug!(
+                    line_number = %line_num,
+                    line_content = %trimmed,
+                    "Attempting to parse line as ToolRequest"
+                );
 
-                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                        if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
-                            if tool_type == "list_files" || tool_type == "read_file" {
-                                tracing::info!(
-                                    line_number = %line_num,
-                                    tool_type = %tool_type,
-                                    "Found tool call in line"
-                                );
-                                tool_calls.push(json_value);
-                            }
-                        }
+                match serde_json::from_str::<ToolRequest>(trimmed) {
+                    Ok(tool_request) => {
+                        let json_value = serde_json::to_value(tool_request)?;
+                        tracing::info!(
+                            line_number = %line_num,
+                            "Successfully parsed line as ToolRequest"
+                        );
+                        tool_calls.push(json_value);
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            line_number = %line_num,
+                            error = %e,
+                            "Failed to parse line as ToolRequest"
+                        );
+                        json_parsing_errors.push((trimmed.to_string(), e.to_string()));
                     }
                 }
             }
@@ -690,22 +929,23 @@ Always analyze the project structure and read relevant files before providing co
                                 let json_str: String = chars[start..=i].iter().collect();
                                 tracing::debug!(
                                     json_candidate = %json_str,
-                                    "Attempting to parse multi-line JSON block"
+                                    "Attempting to parse multi-line JSON block as ToolRequest"
                                 );
 
-                                if let Ok(json_value) =
-                                    serde_json::from_str::<serde_json::Value>(&json_str)
-                                {
-                                    if let Some(tool_type) =
-                                        json_value.get("type").and_then(|v| v.as_str())
-                                    {
-                                        if tool_type == "list_files" || tool_type == "read_file" {
-                                            tracing::info!(
-                                                tool_type = %tool_type,
-                                                "Found tool call in multi-line JSON block"
-                                            );
-                                            tool_calls.push(json_value);
-                                        }
+                                match serde_json::from_str::<ToolRequest>(&json_str) {
+                                    Ok(tool_request) => {
+                                        let json_value = serde_json::to_value(tool_request)?;
+                                        tracing::info!(
+                                            "Successfully parsed multi-line JSON block as ToolRequest"
+                                        );
+                                        tool_calls.push(json_value);
+                                    }
+                                    Err(e) => {
+                                        tracing::debug!(
+                                            error = %e,
+                                            "Failed to parse multi-line JSON block as ToolRequest"
+                                        );
+                                        json_parsing_errors.push((json_str, e.to_string()));
                                     }
                                 }
                             }
@@ -717,8 +957,25 @@ Always analyze the project structure and read relevant files before providing co
             }
         }
 
+        // If we have no tool calls but we have parsing errors, store them for potential retry
+        if tool_calls.is_empty() && !json_parsing_errors.is_empty() {
+            tracing::warn!(
+                error_count = %json_parsing_errors.len(),
+                "Failed to extract any tool calls due to JSON parsing errors"
+            );
+
+            for (json_str, error) in &json_parsing_errors {
+                tracing::error!(
+                    malformed_json = %json_str,
+                    parse_error = %error,
+                    "JSON parsing error detected"
+                );
+            }
+        }
+
         tracing::info!(
             extracted_tool_calls = %tool_calls.len(),
+            parsing_errors = %json_parsing_errors.len(),
             "Completed tool call extraction"
         );
 
@@ -845,43 +1102,349 @@ Always analyze the project structure and read relevant files before providing co
 
 #[cfg(test)]
 mod tests {
+    use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+    use ts_rs::TS;
 
     #[test]
-    fn test_system_prompt_includes_tool_handling_instructions() {
-        // This test just verifies the system prompt contains the correct instructions
-        // We don't need to create the full LLM agent for this
+    fn test_typescript_generation_for_list_files_request() {
+        let ts_type = ListFilesRequest::export_to_string().expect("Failed to generate TypeScript for ListFilesRequest");
 
-        // We test the system prompt method directly through a simpler approach
+        // Verify the generated TypeScript contains the expected structure
+        assert!(ts_type.contains("export interface ListFilesRequest"));
+        assert!(ts_type.contains("path: string"));
+        assert!(ts_type.contains("recursive?: boolean"));
+        assert!(ts_type.contains("include_hidden?: boolean"));
 
-        let system_prompt = create_test_tool_system_prompt();
+        // Ensure optional fields are marked correctly
+        assert!(ts_type.contains("recursive?"));
+        assert!(ts_type.contains("include_hidden?"));
 
-        // Verify the system prompt contains instructions for handling tool results
-        assert!(system_prompt.contains("When you receive tool results"));
-        assert!(system_prompt.contains("provide a helpful natural language response"));
-        assert!(system_prompt.contains("messages with role \"tool\""));
-
-        // Verify the system prompt still contains the original tool instructions
-        assert!(system_prompt.contains("list_files"));
-        assert!(system_prompt.contains("read_file"));
-        assert!(system_prompt.contains("When you need to use a tool"));
+        println!("Generated ListFilesRequest TypeScript:\n{}", ts_type);
     }
 
-    // Helper function for testing the system prompt
-    fn create_test_tool_system_prompt() -> String {
-        r#"You are an AI assistant with access to file system tools. You can use the following tools:
+    #[test]
+    fn test_typescript_generation_for_read_file_request() {
+        let ts_type = ReadFileRequest::export_to_string().expect("Failed to generate TypeScript for ReadFileRequest");
 
-1. **list_files**: List files and directories in a project
-   - Request format: {"type": "list_files", "path": "<directory_path>", "recursive": <boolean>, "include_hidden": <boolean>}
-   - Example: {"type": "list_files", "path": ".", "recursive": false, "include_hidden": false}
+        // Verify the generated TypeScript contains the expected structure
+        assert!(ts_type.contains("export interface ReadFileRequest"));
+        assert!(ts_type.contains("path: string"));
+        // Note: u64 maps to bigint in TypeScript, which is correct for large numbers
+        assert!(ts_type.contains("max_size?"));
+        // Should contain either bigint or number, depending on ts-rs version
+        assert!(ts_type.contains("max_size?: bigint") || ts_type.contains("max_size?: number"));
 
-2. **read_file**: Read the content of a file
-   - Request format: {"type": "read_file", "path": "<file_path>", "max_size": <bytes>}
-   - Example: {"type": "read_file", "path": "src/main.rs", "max_size": 10000}
+        println!("Generated ReadFileRequest TypeScript:\n{}", ts_type);
+    }
+
+    #[test]
+    fn test_typescript_generation_for_tool_request_union() {
+        let ts_type = ToolRequest::export_to_string().expect("Failed to generate TypeScript for ToolRequest");
+
+        // Verify the generated TypeScript contains the expected union structure
+        assert!(ts_type.contains("ToolRequest"));
+        assert!(ts_type.contains("list_files"));
+        assert!(ts_type.contains("read_file"));
+        assert!(ts_type.contains("ListFilesRequest"));
+        assert!(ts_type.contains("ReadFileRequest"));
+
+        println!("Generated ToolRequest TypeScript:\n{}", ts_type);
+    }
+
+    #[test]
+    fn test_system_prompt_contains_generated_typescript() {
+        // Test the system prompt generation directly without creating full LlmAgent
+        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use ts_rs::TS;
+
+        // Generate TypeScript types for tools
+        let tool_request_ts = ToolRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ToolRequest type".to_string()
+        });
+        let list_files_request_ts = ListFilesRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ListFilesRequest type".to_string()
+        });
+        let read_file_request_ts = ReadFileRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ReadFileRequest type".to_string()
+        });
+
+        let system_prompt = format!(r#"You are an AI assistant with access to file system tools. You can use the following tools:
+
+## Available Tools
+
+The tools are defined using TypeScript types. When calling a tool, use the exact format shown below:
+
+### Type Definitions
+
+```typescript
+// Individual tool request types
+{list_files_request_ts}
+
+{read_file_request_ts}
+
+// Union type for all tool requests
+{tool_request_ts}
+```
+
+### Tool Usage
 
 When you need to use a tool, respond with ONLY the JSON request for that tool. Do not include any other text. The tool will be executed and you will receive the results, after which you can continue your response.
 
-When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned. Always provide a complete answer to the user's original question using the information gathered from the tools.
+Examples:
+- List files: {{"type": "list_files", "path": ".", "recursive": false}}
+- Read file: {{"type": "read_file", "path": "src/main.rs", "max_size": 10000}}
 
-Always analyze the project structure and read relevant files before providing code solutions. Be concise and focus on the user's specific needs."#.to_string()
+### Guidelines
+
+1. When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned.
+2. Always provide a complete answer to the user's original question using the information gathered from the tools.
+3. Always analyze the project structure and read relevant files before providing code solutions.
+4. Be concise and focus on the user's specific needs.
+
+The tool request MUST exactly match the TypeScript interface defined above."#,
+            list_files_request_ts = list_files_request_ts,
+            read_file_request_ts = read_file_request_ts,
+            tool_request_ts = tool_request_ts
+        );
+
+        // Verify the system prompt contains TypeScript type definitions
+        assert!(system_prompt.contains("TypeScript types"));
+        assert!(system_prompt.contains("```typescript"));
+        assert!(system_prompt.contains("ListFilesRequest"));
+        assert!(system_prompt.contains("ReadFileRequest"));
+        assert!(system_prompt.contains("ToolRequest"));
+
+        // Verify it contains usage guidelines
+        assert!(system_prompt.contains("When you need to use a tool"));
+        assert!(system_prompt.contains("ONLY the JSON request"));
+        assert!(system_prompt.contains("MUST exactly match the TypeScript interface"));
+
+        println!("Generated system prompt:\n{}", system_prompt);
+    }
+
+    #[test]
+    fn test_tool_call_extraction_logic() {
+        use crate::models::ToolRequest;
+
+        // Test direct parsing of valid tool requests
+        let response1 = r#"{"type": "list_files", "path": ".", "recursive": true}"#;
+        let parsed1 = serde_json::from_str::<ToolRequest>(response1);
+        assert!(parsed1.is_ok());
+
+        let response2 = r#"{"type": "read_file", "path": "src/main.rs", "max_size": 10000}"#;
+        let parsed2 = serde_json::from_str::<ToolRequest>(response2);
+        assert!(parsed2.is_ok());
+
+        // Test invalid requests
+        let invalid1 = r#"{"type": "invalid_tool", "path": "."}"#;
+        let parsed_invalid1 = serde_json::from_str::<ToolRequest>(invalid1);
+        assert!(parsed_invalid1.is_err());
+
+        let invalid2 = r#"{"type": "list_files"}"#; // missing required path
+        let parsed_invalid2 = serde_json::from_str::<ToolRequest>(invalid2);
+        assert!(parsed_invalid2.is_err());
+    }
+
+    #[test]
+    fn test_tool_request_serialization_roundtrip() {
+        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+
+        // Test ListFilesRequest
+        let list_request = ToolRequest::ListFiles(ListFilesRequest {
+            path: "src".to_string(),
+            recursive: Some(true),
+            include_hidden: Some(false),
+        });
+
+        let json_str = serde_json::to_string(&list_request).expect("Failed to serialize");
+        let parsed = serde_json::from_str::<ToolRequest>(&json_str).expect("Failed to deserialize");
+
+        match parsed {
+            ToolRequest::ListFiles(req) => {
+                assert_eq!(req.path, "src");
+                assert_eq!(req.recursive, Some(true));
+                assert_eq!(req.include_hidden, Some(false));
+            }
+            _ => panic!("Wrong tool request type"),
+        }
+
+        // Test ReadFileRequest
+        let read_request = ToolRequest::ReadFile(ReadFileRequest {
+            path: "README.md".to_string(),
+            max_size: Some(5000),
+        });
+
+        let json_str = serde_json::to_string(&read_request).expect("Failed to serialize");
+        let parsed = serde_json::from_str::<ToolRequest>(&json_str).expect("Failed to deserialize");
+
+        match parsed {
+            ToolRequest::ReadFile(req) => {
+                assert_eq!(req.path, "README.md");
+                assert_eq!(req.max_size, Some(5000));
+            }
+            _ => panic!("Wrong tool request type"),
+        }
+    }
+
+    #[test]
+    fn test_malformed_json_from_llm() {
+        use crate::models::ToolRequest;
+
+        // Test the exact malformed JSON you saw in the output
+        let malformed_json = r#"{"type": "read_file "path": "/home/noc/Projects/rust-ui-test/README.md","max_size": 5000}"#;
+
+        println!("Testing malformed JSON: {}", malformed_json);
+
+        let result = serde_json::from_str::<ToolRequest>(malformed_json);
+
+        match result {
+            Ok(_) => {
+                println!("Unexpectedly parsed successfully!");
+                panic!("This JSON should have failed to parse");
+            }
+            Err(e) => {
+                println!("JSON parsing error (as expected): {}", e);
+                println!("Error kind: {:?}", e.classify());
+
+                // This is actually a data error, not syntax - the JSON is valid but the enum variant is wrong
+                assert!(e.is_data());
+
+                // The error message should mention the unknown variant
+                assert!(e.to_string().contains("unknown variant"));
+                assert!(e.to_string().contains("read_file "));
+            }
+        }
+
+        // Test a true syntax error - missing comma between fields
+        let syntax_error_json = r#"{"type": "read_file", "path": "/test" "max_size": 1000}"#;
+        println!("Testing syntax error JSON: {}", syntax_error_json);
+
+        let result2 = serde_json::from_str::<ToolRequest>(syntax_error_json);
+
+        match result2 {
+            Ok(_) => panic!("This JSON should have failed to parse"),
+            Err(e) => {
+                println!("Syntax error (as expected): {}", e);
+                println!("Error kind: {:?}", e.classify());
+                assert!(e.is_syntax());
+            }
+        }
+
+        // Test the missing comma at the beginning - the actual issue you observed
+        let missing_comma_json = r#"{"type": "read_file" "path": "/home/noc/Projects/rust-ui-test/README.md","max_size": 5000}"#;
+        println!("Testing missing comma JSON: {}", missing_comma_json);
+
+        let result3 = serde_json::from_str::<ToolRequest>(missing_comma_json);
+
+        match result3 {
+            Ok(_) => panic!("This JSON should have failed to parse"),
+            Err(e) => {
+                println!("Missing comma error: {}", e);
+                println!("Error kind: {:?}", e.classify());
+                // This should be a syntax error
+                assert!(e.is_syntax());
+            }
+        }
+    }
+
+    #[test]
+    fn test_json_error_detection_and_messaging() {
+        use crate::models::ToolRequest;
+
+        // Test various malformed JSON scenarios and verify error messages
+        let test_cases = vec![
+            (
+                r#"{"type": "read_file" "path": "/test.txt"}"#,
+                "expected `,` or `}` at line 1 column 22",
+                true, // is_syntax
+            ),
+            (
+                r#"{"type": "invalid_tool", "path": "/test.txt"}"#,
+                "unknown variant `invalid_tool`",
+                false, // is_data, not syntax
+            ),
+            (
+                r#"{"type": "list_files"}"#,
+                "missing field `path`",
+                false, // is_data, not syntax
+            ),
+            (
+                r#"{"type": "read_file", "path": "/test.txt", "max_size": "not_a_number"}"#,
+                "invalid type",
+                false, // is_data, not syntax
+            ),
+        ];
+
+        for (json_str, expected_error_fragment, should_be_syntax) in test_cases {
+            println!("Testing JSON: {}", json_str);
+
+            let result = serde_json::from_str::<ToolRequest>(json_str);
+
+            match result {
+                Ok(_) => panic!("Expected parsing to fail for: {}", json_str),
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    println!("Error: {}", error_msg);
+
+                    // Check if the error message contains expected fragment
+                    assert!(
+                        error_msg.to_lowercase().contains(&expected_error_fragment.to_lowercase()),
+                        "Error '{}' should contain '{}'", error_msg, expected_error_fragment
+                    );
+
+                    // Check error classification
+                    if should_be_syntax {
+                        assert!(e.is_syntax(), "Error should be syntax error: {}", error_msg);
+                    } else {
+                        assert!(e.is_data(), "Error should be data error: {}", error_msg);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_json_retry_message_generation() {
+        // Test that we can generate helpful error messages for the LLM
+        let malformed_json = r#"{"type": "read_file" "path": "/home/noc/Projects/rust-ui-test/README.md","max_size": 5000}"#;
+
+        // This simulates what our retry_json_parsing method would do
+        let mut error_details = Vec::new();
+
+        if let Err(e) = serde_json::from_str::<crate::models::ToolRequest>(malformed_json.trim()) {
+            error_details.push(format!("Full response parse error: {}", e));
+        }
+
+        let error_message = error_details.join("; ");
+
+        println!("Generated error message for LLM: {}", error_message);
+
+        // Verify the error message contains useful information
+        assert!(error_message.contains("expected `,` or `}`"));
+        assert!(error_message.contains("line 1 column"));
+
+        // Test that the fix request message is helpful
+        let fix_request = format!(
+            r#"The previous response contained malformed JSON that could not be parsed. Please fix the JSON and provide a valid tool call.
+
+Original response:
+{}
+
+Parsing errors:
+{}
+
+Please provide a corrected JSON tool call that follows the exact TypeScript interface format. The JSON must be valid and properly formatted with all required commas and quotation marks."#,
+            malformed_json, error_message
+        );
+
+        println!("Generated fix request:\n{}", fix_request);
+
+        // Verify the fix request contains all necessary components
+        assert!(fix_request.contains("malformed JSON"));
+        assert!(fix_request.contains("Original response:"));
+        assert!(fix_request.contains("Parsing errors:"));
+        assert!(fix_request.contains("TypeScript interface format"));
+        assert!(fix_request.contains(malformed_json));
+        assert!(fix_request.contains(&error_message));
     }
 }

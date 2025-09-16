@@ -6,23 +6,17 @@ test.describe('File Operations', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt for reading README
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('Read the contents of README.md');
 
-    // Select tool using custom dropdown
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
@@ -51,23 +45,17 @@ test.describe('File Operations', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt for reading package.json
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('Read the contents of package.json');
 
-    // Select tool using custom dropdown
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
@@ -83,12 +71,12 @@ test.describe('File Operations', () => {
     const responseContent = page.locator('[class*="bg-black"], [class*="text-gray-100"]');
     await page.waitForSelector('[class*="bg-black"], [class*="text-gray-100"]', { timeout: 15000 });
 
-    // Verify some content is present (in mock environment, exact content may vary)
+    // Verify JSON content is present (LLM agent may format differently)
     const contentText = await responseContent.textContent();
-    expect(contentText).toBeDefined();
-    expect(contentText?.length || 0).toBeGreaterThan(0);
-    // In a real scenario, this would contain JSON, but in mock it might be different
-    expect(contentText).not.toBe('No output yet');
+    expect(contentText).toBeTruthy();
+    expect(contentText!.length).toBeGreaterThan(5); // Should have some content
+    // Check for common JSON indicators rather than specific content
+    expect(contentText!.toLowerCase()).toMatch(/(package|json|name|version|\{|\}|\[|\])/);
   });
 
   test('should handle file reading errors gracefully', async ({ page }) => {
@@ -96,23 +84,17 @@ test.describe('File Operations', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt for reading non-existent file
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('Read the contents of nonexistent-file.txt');
 
-    // Select tool using custom dropdown
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
