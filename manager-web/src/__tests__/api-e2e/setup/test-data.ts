@@ -3,6 +3,7 @@ import {
   CreateWorkRequest,
   AddMessageRequest,
   CreateAiSessionRequest,
+  CreateLlmAgentSessionRequest,
   FileCreateRequest,
   FileUpdateRequest,
 } from '../../types';
@@ -42,7 +43,6 @@ export class TestDataGenerator {
   generateWorkData(overrides: Partial<CreateWorkRequest> = {}): CreateWorkRequest {
     const defaultData: CreateWorkRequest = {
       title: `Test Work ${this.generateId('work')}`,
-      tool_name: 'llm-agent',
       project_id: null,
     };
 
@@ -63,12 +63,25 @@ export class TestDataGenerator {
   }
 
   /**
-   * Generate mock AI session data
-   */
+    * Generate mock AI session data
+    */
   generateAiSessionData(overrides: Partial<CreateAiSessionRequest> = {}): CreateAiSessionRequest {
     const defaultData: CreateAiSessionRequest = {
+      message_id: this.generateId('message'),
       tool_name: 'llm-agent',
-      project_context: null,
+    };
+
+    return { ...defaultData, ...overrides };
+  }
+
+  /**
+    * Generate mock LLM agent session data
+    */
+  generateLlmAgentSessionData(overrides: Partial<CreateLlmAgentSessionRequest> = {}): CreateLlmAgentSessionRequest {
+    const defaultData: CreateLlmAgentSessionRequest = {
+      provider: 'openai',
+      model: 'gpt-4',
+      system_prompt: 'You are a helpful AI assistant with access to file system tools.',
     };
 
     return { ...defaultData, ...overrides };
@@ -82,7 +95,7 @@ export class TestDataGenerator {
       project_id: this.generateId('project'),
       path: `test-file-${this.generateId('file')}.txt`,
       content: 'This is test file content for API e2e testing',
-      encoding: 'utf-8',
+      is_directory: false,
     };
 
     return { ...defaultData, ...overrides };
@@ -108,19 +121,21 @@ export class TestDataGenerator {
   }
 
   /**
-   * Generate a complete test scenario with related entities
-   */
+    * Generate a complete test scenario with related entities
+    */
   generateTestScenario(): {
     project: CreateProjectRequest;
     work: CreateWorkRequest;
     message: AddMessageRequest;
     aiSession: CreateAiSessionRequest;
+    llmAgentSession: CreateLlmAgentSessionRequest;
     files: FileCreateRequest[];
   } {
     const project = this.generateProjectData();
     const work = this.generateWorkData({ project_id: 'project-1' }); // Will be set after creation
     const message = this.generateMessageData();
     const aiSession = this.generateAiSessionData();
+    const llmAgentSession = this.generateLlmAgentSessionData();
     const files = [
       this.generateFileData({ project_id: 'project-1', path: 'README.md' }),
       this.generateFileData({ project_id: 'project-1', path: 'src/main.rs' }),
@@ -131,6 +146,7 @@ export class TestDataGenerator {
       work,
       message,
       aiSession,
+      llmAgentSession,
       files,
     };
   }

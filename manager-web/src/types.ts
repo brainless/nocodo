@@ -31,6 +31,10 @@ export * from './types/generated/WorkResponse';
 export * from './types/generated/WorkWithHistory';
 export * from './types/generated/CreateWorkRequest';
 export * from './types/generated/AddMessageRequest';
+export * from './types/generated/CreateLlmAgentSessionRequest';
+export * from './types/generated/LlmAgentSession';
+export * from './types/generated/LlmAgentSessionResponse';
+export * from './types/generated/LlmAgentMessage';
 
 // Extended AiSession that includes all base fields plus additional frontend fields
 export interface ExtendedAiSession {
