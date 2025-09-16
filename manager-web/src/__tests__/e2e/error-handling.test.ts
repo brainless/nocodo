@@ -202,7 +202,9 @@ test.describe('Error Handling', () => {
 
     // Fill in the prompt with invalid parameters
     const promptTextarea = page.locator('textarea#prompt');
-    await promptTextarea.fill('List files in a directory that does not exist: /invalid/path/that/does/not/exist');
+    await promptTextarea.fill(
+      'List files in a directory that does not exist: /invalid/path/that/does/not/exist'
+    );
 
     // Select tool using custom dropdown
     const toolButton = page

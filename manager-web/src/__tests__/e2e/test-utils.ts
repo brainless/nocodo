@@ -58,12 +58,13 @@ export async function waitForToolCall(
       // Check if work has messages that indicate tool usage
       if (data.messages && data.messages.length > 0) {
         // Look for tool-related content in messages
-        const toolMessage = data.messages.find((msg: any) =>
-          msg.content.includes(toolType) ||
-          msg.content.includes('tool_call') ||
-          msg.content.includes('function_call') ||
-          msg.content_type === 'tool_execution' ||
-          (msg.content.includes('Executing') && msg.content.includes('tool'))
+        const toolMessage = data.messages.find(
+          (msg: any) =>
+            msg.content.includes(toolType) ||
+            msg.content.includes('tool_call') ||
+            msg.content.includes('function_call') ||
+            msg.content_type === 'tool_execution' ||
+            (msg.content.includes('Executing') && msg.content.includes('tool'))
         );
 
         if (toolMessage) {
@@ -72,7 +73,7 @@ export async function waitForToolCall(
             toolType,
             status: 'completed',
             message: toolMessage,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
 
@@ -84,7 +85,7 @@ export async function waitForToolCall(
             toolType,
             status: 'completed',
             message: data.messages[1], // Return the second message as tool execution
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
 
@@ -95,7 +96,7 @@ export async function waitForToolCall(
             toolType,
             status: 'completed',
             message: data.messages[1],
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
       }
@@ -127,17 +128,18 @@ export async function waitForLLMResponse(
 
       // Look for LLM response messages (assistant role)
       if (data.messages && data.messages.length > 1) {
-        const llmResponse = data.messages.find((msg: any) =>
-          msg.author_type === 'assistant' ||
-          msg.content_type === 'llm_response' ||
-          (msg.content && msg.content.length > 20) // Lower threshold for mock responses
+        const llmResponse = data.messages.find(
+          (msg: any) =>
+            msg.author_type === 'assistant' ||
+            msg.content_type === 'llm_response' ||
+            (msg.content && msg.content.length > 20) // Lower threshold for mock responses
         );
 
         if (llmResponse) {
           return {
             workId,
             content: llmResponse.content,
-            timestamp: llmResponse.created_at
+            timestamp: llmResponse.created_at,
           };
         }
 
@@ -147,7 +149,7 @@ export async function waitForLLMResponse(
           return {
             workId,
             content: lastMessage.content,
-            timestamp: lastMessage.created_at
+            timestamp: lastMessage.created_at,
           };
         }
       }
@@ -216,28 +218,28 @@ export function createToolExecutionMocks() {
         { name: 'src', type: 'directory', size: 0 },
         { name: 'package.json', type: 'file', size: 512 },
         { name: 'Cargo.toml', type: 'file', size: 256 },
-      ]
+      ],
     },
 
     readFileResponse: {
       type: 'read_file',
       content: '# Test README\n\nThis is a test file for E2E testing.',
-      encoding: 'utf-8'
+      encoding: 'utf-8',
     },
 
     toolErrorResponse: {
       type: 'error',
       error: 'File not found',
-      message: 'The requested file does not exist'
+      message: 'The requested file does not exist',
     },
 
     llmAgentChunk: {
       type: 'LlmAgentChunk',
       payload: {
         session_id: 'session-123',
-        content: 'Processing your request...'
-      }
-    }
+        content: 'Processing your request...',
+      },
+    },
   };
 }
 
@@ -286,13 +288,15 @@ export async function extractToolCallsFromWork(
   if (data.messages) {
     for (const message of data.messages) {
       // Look for tool call patterns in message content
-      if (message.content.includes('list_files') ||
-          message.content.includes('read_file') ||
-          message.content.includes('tool_call')) {
+      if (
+        message.content.includes('list_files') ||
+        message.content.includes('read_file') ||
+        message.content.includes('tool_call')
+      ) {
         toolCalls.push({
           messageId: message.id,
           content: message.content,
-          timestamp: message.created_at
+          timestamp: message.created_at,
         });
       }
     }

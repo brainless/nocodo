@@ -3,7 +3,7 @@ import {
   extractToolCallsFromWork,
   startLLMAgentWork,
   waitForLLMResponse,
-  waitForToolCall
+  waitForToolCall,
 } from './test-utils';
 
 test.describe('Tool Execution API Tests', () => {

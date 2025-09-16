@@ -129,7 +129,7 @@ export const test = base.extend({
               author_type: 'user',
               author_id: null,
               created_at: '2024-01-01T00:00:00Z',
-            }
+            },
           ],
           total_messages: 1,
         }),
@@ -175,7 +175,7 @@ export const test = base.extend({
             tool_name: 'list_files',
             status: 'completed',
             result: mockFileListResponse,
-            execution_time: 1500
+            execution_time: 1500,
           }),
         });
       } else if (requestData.tool_name === 'read_file') {
@@ -186,7 +186,7 @@ export const test = base.extend({
             tool_name: 'read_file',
             status: 'completed',
             result: mockFileContentResponse,
-            execution_time: 800
+            execution_time: 800,
           }),
         });
       } else {
@@ -195,7 +195,7 @@ export const test = base.extend({
           contentType: 'application/json',
           body: JSON.stringify({
             error: 'Unknown tool',
-            message: `Tool '${requestData.tool_name}' is not supported`
+            message: `Tool '${requestData.tool_name}' is not supported`,
           }),
         });
       }
@@ -215,10 +215,11 @@ export const test = base.extend({
               tool_name: 'list_files',
               parameters: { path: '.' },
               result: mockFileListResponse,
-              executed_at: new Date().toISOString()
-            }
+              executed_at: new Date().toISOString(),
+            },
           ],
-          response: 'I found 4 files in the root directory: README.md, src/, package.json, and Cargo.toml.'
+          response:
+            'I found 4 files in the root directory: README.md, src/, package.json, and Cargo.toml.',
         }),
       });
     });
@@ -226,13 +227,9 @@ export const test = base.extend({
     // Mock WebSocket connection with enhanced tool execution simulation
     await page.addInitScript(() => {
       // Mock WebSocket for testing
-<<<<<<< HEAD
-      window.WebSocket = class extends EventTarget {
+      const MockWebSocket = class extends EventTarget {
         private isConnected = false;
 
-=======
-      const MockWebSocket = class extends EventTarget {
->>>>>>> origin/main
         constructor(_url: string) {
           super();
           // Simulate successful connection immediately
@@ -266,11 +263,20 @@ export const test = base.extend({
             events = [
               // Initial processing
               { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your request...' },
-              { delay: 1000, type: 'LlmAgentChunk', content: 'I need to list files in the directory.' },
+              {
+                delay: 1000,
+                type: 'LlmAgentChunk',
+                content: 'I need to list files in the directory.',
+              },
               { delay: 1500, type: 'LlmAgentChunk', content: 'Executing list_files tool...' },
 
               // Tool execution start
-              { delay: 2000, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'running' },
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
 
               // Tool results
               { delay: 2500, type: 'LlmAgentChunk', content: 'Found 4 files:' },
@@ -280,13 +286,24 @@ export const test = base.extend({
               { delay: 2900, type: 'LlmAgentChunk', content: '- Cargo.toml (file)' },
 
               // Follow-up response
-              { delay: 3500, type: 'LlmAgentChunk', content: 'Here are the files in your root directory.' },
-              { delay: 4000, type: 'LlmAgentChunk', content: 'Is there anything specific you\'d like me to help you with?' },
+              {
+                delay: 3500,
+                type: 'LlmAgentChunk',
+                content: 'Here are the files in your root directory.',
+              },
+              {
+                delay: 4000,
+                type: 'LlmAgentChunk',
+                content: "Is there anything specific you'd like me to help you with?",
+              },
 
               // Completion
               { delay: 4500, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
-          } else if (prompt.toLowerCase().includes('read') && prompt.toLowerCase().includes('readme')) {
+          } else if (
+            prompt.toLowerCase().includes('read') &&
+            prompt.toLowerCase().includes('readme')
+          ) {
             // Simulate read_file tool execution for README
             events = [
               // Initial processing
@@ -295,31 +312,64 @@ export const test = base.extend({
               { delay: 1500, type: 'LlmAgentChunk', content: 'Executing read_file tool...' },
 
               // Tool execution start
-              { delay: 2000, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'running' },
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
 
               // Tool results
               { delay: 2500, type: 'LlmAgentChunk', content: 'Reading file contents...' },
               { delay: 3000, type: 'LlmAgentChunk', content: '# Test README' },
               { delay: 3200, type: 'LlmAgentChunk', content: '' },
-              { delay: 3400, type: 'LlmAgentChunk', content: 'This is a test file for E2E testing.' },
+              {
+                delay: 3400,
+                type: 'LlmAgentChunk',
+                content: 'This is a test file for E2E testing.',
+              },
 
               // Follow-up response
-              { delay: 4000, type: 'LlmAgentChunk', content: 'I\'ve read the README.md file for you.' },
-              { delay: 4500, type: 'LlmAgentChunk', content: 'It contains test content for E2E testing.' },
+              {
+                delay: 4000,
+                type: 'LlmAgentChunk',
+                content: "I've read the README.md file for you.",
+              },
+              {
+                delay: 4500,
+                type: 'LlmAgentChunk',
+                content: 'It contains test content for E2E testing.',
+              },
 
               // Completion
               { delay: 5000, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
-          } else if (prompt.toLowerCase().includes('list') && prompt.toLowerCase().includes('read')) {
+          } else if (
+            prompt.toLowerCase().includes('list') &&
+            prompt.toLowerCase().includes('read')
+          ) {
             // Simulate multiple tool calls
             events = [
               // Initial processing
               { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your request...' },
-              { delay: 1000, type: 'LlmAgentChunk', content: 'I need to perform multiple operations.' },
-              { delay: 1500, type: 'LlmAgentChunk', content: 'First, executing list_files tool...' },
+              {
+                delay: 1000,
+                type: 'LlmAgentChunk',
+                content: 'I need to perform multiple operations.',
+              },
+              {
+                delay: 1500,
+                type: 'LlmAgentChunk',
+                content: 'First, executing list_files tool...',
+              },
 
               // First tool execution
-              { delay: 2000, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'running' },
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
               { delay: 2500, type: 'LlmAgentChunk', content: 'Found 4 files:' },
               { delay: 2600, type: 'LlmAgentChunk', content: '- README.md (file)' },
               { delay: 2700, type: 'LlmAgentChunk', content: '- src (directory)' },
@@ -331,51 +381,101 @@ export const test = base.extend({
               { delay: 4000, type: 'LlmAgentChunk', content: 'Executing read_file tool...' },
               { delay: 4500, type: 'LlmAgentChunk', content: '# Test README' },
               { delay: 4700, type: 'LlmAgentChunk', content: '' },
-              { delay: 4900, type: 'LlmAgentChunk', content: 'This is a test file for E2E testing.' },
+              {
+                delay: 4900,
+                type: 'LlmAgentChunk',
+                content: 'This is a test file for E2E testing.',
+              },
 
               // Follow-up response
-              { delay: 5500, type: 'LlmAgentChunk', content: 'I\'ve completed both operations.' },
-              { delay: 6000, type: 'LlmAgentChunk', content: 'The directory contains 4 files, and I\'ve read the README.md content.' },
+              { delay: 5500, type: 'LlmAgentChunk', content: "I've completed both operations." },
+              {
+                delay: 6000,
+                type: 'LlmAgentChunk',
+                content: "The directory contains 4 files, and I've read the README.md content.",
+              },
 
               // Completion
               { delay: 6500, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
-          } else if (prompt.toLowerCase().includes('nonexistent') || prompt.toLowerCase().includes('invalid')) {
+          } else if (
+            prompt.toLowerCase().includes('nonexistent') ||
+            prompt.toLowerCase().includes('invalid')
+          ) {
             // Simulate tool execution error
             events = [
               // Initial processing
               { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your request...' },
-              { delay: 1000, type: 'LlmAgentChunk', content: 'I need to access the specified path.' },
+              {
+                delay: 1000,
+                type: 'LlmAgentChunk',
+                content: 'I need to access the specified path.',
+              },
               { delay: 1500, type: 'LlmAgentChunk', content: 'Executing tool...' },
 
               // Tool execution start
-              { delay: 2000, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'running' },
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
 
               // Error during execution
-              { delay: 3000, type: 'LlmAgentChunk', content: 'Error: Path does not exist or is not accessible.' },
-              { delay: 3500, type: 'LlmAgentChunk', content: 'The requested file or directory was not found.' },
+              {
+                delay: 3000,
+                type: 'LlmAgentChunk',
+                content: 'Error: Path does not exist or is not accessible.',
+              },
+              {
+                delay: 3500,
+                type: 'LlmAgentChunk',
+                content: 'The requested file or directory was not found.',
+              },
 
               // Error completion
-              { delay: 4000, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'failed' },
+              {
+                delay: 4000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'failed',
+              },
               { delay: 4500, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
-          } else if (prompt.toLowerCase().includes('passwd') || prompt.toLowerCase().includes('system')) {
+          } else if (
+            prompt.toLowerCase().includes('passwd') ||
+            prompt.toLowerCase().includes('system')
+          ) {
             // Simulate permission/access error
             events = [
               // Initial processing
               { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your request...' },
-              { delay: 1000, type: 'LlmAgentChunk', content: 'I cannot access system files for security reasons.' },
+              {
+                delay: 1000,
+                type: 'LlmAgentChunk',
+                content: 'I cannot access system files for security reasons.',
+              },
               { delay: 1500, type: 'LlmAgentChunk', content: 'Access denied: Permission error.' },
 
               // Error completion
-              { delay: 2000, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'failed' },
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'failed',
+              },
               { delay: 2500, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
           } else {
             // Default response for other prompts
             events = [
               { delay: 500, type: 'LlmAgentChunk', content: 'Processing your request...' },
-              { delay: 1500, type: 'AiSessionStatusChanged', session_id: 'session-123', status: 'running' },
+              {
+                delay: 1500,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
               { delay: 2500, type: 'LlmAgentChunk', content: 'Request processed successfully.' },
               { delay: 3500, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
