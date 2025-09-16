@@ -301,7 +301,9 @@ impl LlmAgent {
             );
 
             // Extract JSON tool calls from response with retry mechanism
-            let tool_calls = self.extract_tool_calls_with_retry(session_id, response, depth).await?;
+            let tool_calls = self
+                .extract_tool_calls_with_retry(session_id, response, depth)
+                .await?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_count = %tool_calls.len(),
@@ -659,21 +661,19 @@ impl LlmAgent {
 
     /// Create system prompt for tool usage
     fn create_tool_system_prompt(&self) -> String {
-        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use crate::models::{ListFilesRequest, ReadFileRequest, ToolRequest};
         use ts_rs::TS;
 
         // Generate TypeScript types for tools
-        let tool_request_ts = ToolRequest::export_to_string().unwrap_or_else(|_| {
-            "// Failed to generate ToolRequest type".to_string()
-        });
-        let list_files_request_ts = ListFilesRequest::export_to_string().unwrap_or_else(|_| {
-            "// Failed to generate ListFilesRequest type".to_string()
-        });
-        let read_file_request_ts = ReadFileRequest::export_to_string().unwrap_or_else(|_| {
-            "// Failed to generate ReadFileRequest type".to_string()
-        });
+        let tool_request_ts = ToolRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate ToolRequest type".to_string());
+        let list_files_request_ts = ListFilesRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate ListFilesRequest type".to_string());
+        let read_file_request_ts = ReadFileRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate ReadFileRequest type".to_string());
 
-        format!(r#"You are an AI assistant with access to file system tools. You can use the following tools:
+        format!(
+            r#"You are an AI assistant with access to file system tools. You can use the following tools:
 
 ## Available Tools
 
@@ -726,7 +726,8 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         );
 
         // Look for JSON objects that might be tool calls - more flexible matching
-        let contains_tool_keywords = response.contains("list_files") || response.contains("read_file");
+        let contains_tool_keywords =
+            response.contains("list_files") || response.contains("read_file");
         let contains_json_structure = response.contains("type") && response.contains("{");
 
         let result = contains_tool_keywords && contains_json_structure;
@@ -749,30 +750,30 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         depth: u32,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<serde_json::Value>>> + Send + 'a>> {
         Box::pin(async move {
-        const MAX_JSON_RETRY_DEPTH: u32 = 3; // Maximum retries for JSON parsing errors
+            const MAX_JSON_RETRY_DEPTH: u32 = 3; // Maximum retries for JSON parsing errors
 
-        let tool_calls = self.extract_tool_calls(response)?;
+            let tool_calls = self.extract_tool_calls(response)?;
 
-        // If we successfully extracted tool calls, return them
-        if !tool_calls.is_empty() {
-            return Ok(tool_calls);
-        }
+            // If we successfully extracted tool calls, return them
+            if !tool_calls.is_empty() {
+                return Ok(tool_calls);
+            }
 
-        // If we have no tool calls but the response contains tool keywords and JSON structure,
-        // it might be malformed JSON that we should ask the LLM to fix
-        if self.contains_tool_calls(response) && depth < MAX_JSON_RETRY_DEPTH {
-            tracing::warn!(
-                session_id = %session_id,
-                retry_depth = %depth,
-                max_depth = %MAX_JSON_RETRY_DEPTH,
-                "No tool calls extracted but tool call detected - attempting JSON correction retry"
-            );
+            // If we have no tool calls but the response contains tool keywords and JSON structure,
+            // it might be malformed JSON that we should ask the LLM to fix
+            if self.contains_tool_calls(response) && depth < MAX_JSON_RETRY_DEPTH {
+                tracing::warn!(
+                    session_id = %session_id,
+                    retry_depth = %depth,
+                    max_depth = %MAX_JSON_RETRY_DEPTH,
+                    "No tool calls extracted but tool call detected - attempting JSON correction retry"
+                );
 
-            return self.retry_json_parsing(session_id, response, depth).await;
-        }
+                return self.retry_json_parsing(session_id, response, depth).await;
+            }
 
-        // No tool calls found and no retry needed
-        Ok(tool_calls)
+            // No tool calls found and no retry needed
+            Ok(tool_calls)
         })
     }
 
@@ -784,42 +785,42 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         depth: u32,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<serde_json::Value>>> + Send + 'a>> {
         Box::pin(async move {
-        use crate::models::ToolRequest;
+            use crate::models::ToolRequest;
 
-        // Try to identify specific JSON parsing errors
-        let mut error_details = Vec::new();
+            // Try to identify specific JSON parsing errors
+            let mut error_details = Vec::new();
 
-        // Test common JSON patterns to find specific errors
-        if let Err(e) = serde_json::from_str::<ToolRequest>(malformed_response.trim()) {
-            error_details.push(format!("Full response parse error: {}", e));
-        }
+            // Test common JSON patterns to find specific errors
+            if let Err(e) = serde_json::from_str::<ToolRequest>(malformed_response.trim()) {
+                error_details.push(format!("Full response parse error: {}", e));
+            }
 
-        // Look for JSON-like structures and test them
-        for line in malformed_response.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with('{') && trimmed.contains("type") {
-                if let Err(e) = serde_json::from_str::<ToolRequest>(trimmed) {
-                    error_details.push(format!("Line '{}' parse error: {}", trimmed, e));
+            // Look for JSON-like structures and test them
+            for line in malformed_response.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('{') && trimmed.contains("type") {
+                    if let Err(e) = serde_json::from_str::<ToolRequest>(trimmed) {
+                        error_details.push(format!("Line '{}' parse error: {}", trimmed, e));
+                    }
                 }
             }
-        }
 
-        let error_message = if error_details.is_empty() {
-            "Could not identify specific JSON parsing errors".to_string()
-        } else {
-            error_details.join("; ")
-        };
+            let error_message = if error_details.is_empty() {
+                "Could not identify specific JSON parsing errors".to_string()
+            } else {
+                error_details.join("; ")
+            };
 
-        tracing::info!(
-            session_id = %session_id,
-            retry_depth = %depth,
-            error_details = %error_message,
-            "Asking LLM to fix malformed JSON"
-        );
+            tracing::info!(
+                session_id = %session_id,
+                retry_depth = %depth,
+                error_details = %error_message,
+                "Asking LLM to fix malformed JSON"
+            );
 
-        // Create a message asking the LLM to fix the JSON
-        let fix_request = format!(
-            r#"The previous response contained malformed JSON that could not be parsed. Please fix the JSON and provide a valid tool call.
+            // Create a message asking the LLM to fix the JSON
+            let fix_request = format!(
+                r#"The previous response contained malformed JSON that could not be parsed. Please fix the JSON and provide a valid tool call.
 
 Original response:
 {}
@@ -828,22 +829,21 @@ Parsing errors:
 {}
 
 Please provide a corrected JSON tool call that follows the exact TypeScript interface format. The JSON must be valid and properly formatted with all required commas and quotation marks."#,
-            malformed_response, error_message
-        );
+                malformed_response, error_message
+            );
 
-        // Add the error correction request to the session
-        self.db.create_llm_agent_message(
-            session_id,
-            "user",
-            fix_request,
-        )?;
+            // Add the error correction request to the session
+            self.db
+                .create_llm_agent_message(session_id, "user", fix_request)?;
 
-        // Get corrected response from LLM using the same mechanism as follow-up
-        let corrected_response = self.follow_up_with_llm_with_depth(session_id, depth).await?;
+            // Get corrected response from LLM using the same mechanism as follow-up
+            let corrected_response = self
+                .follow_up_with_llm_with_depth(session_id, depth)
+                .await?;
 
-        // Try to extract tool calls from the corrected response
-        self.extract_tool_calls_with_retry(session_id, &corrected_response, depth + 1)
-            .await
+            // Try to extract tool calls from the corrected response
+            self.extract_tool_calls_with_retry(session_id, &corrected_response, depth + 1)
+                .await
         })
     }
 
@@ -862,9 +862,7 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         match serde_json::from_str::<ToolRequest>(response.trim()) {
             Ok(tool_request) => {
                 let json_value = serde_json::to_value(tool_request)?;
-                tracing::info!(
-                    "Successfully parsed full response as ToolRequest"
-                );
+                tracing::info!("Successfully parsed full response as ToolRequest");
                 tool_calls.push(json_value);
                 return Ok(tool_calls);
             }
@@ -1102,12 +1100,13 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+    use crate::models::{ListFilesRequest, ReadFileRequest, ToolRequest};
     use ts_rs::TS;
 
     #[test]
     fn test_typescript_generation_for_list_files_request() {
-        let ts_type = ListFilesRequest::export_to_string().expect("Failed to generate TypeScript for ListFilesRequest");
+        let ts_type = ListFilesRequest::export_to_string()
+            .expect("Failed to generate TypeScript for ListFilesRequest");
 
         // Verify the generated TypeScript contains the expected structure
         assert!(ts_type.contains("export interface ListFilesRequest"));
@@ -1124,7 +1123,8 @@ mod tests {
 
     #[test]
     fn test_typescript_generation_for_read_file_request() {
-        let ts_type = ReadFileRequest::export_to_string().expect("Failed to generate TypeScript for ReadFileRequest");
+        let ts_type = ReadFileRequest::export_to_string()
+            .expect("Failed to generate TypeScript for ReadFileRequest");
 
         // Verify the generated TypeScript contains the expected structure
         assert!(ts_type.contains("export interface ReadFileRequest"));
@@ -1139,7 +1139,8 @@ mod tests {
 
     #[test]
     fn test_typescript_generation_for_tool_request_union() {
-        let ts_type = ToolRequest::export_to_string().expect("Failed to generate TypeScript for ToolRequest");
+        let ts_type =
+            ToolRequest::export_to_string().expect("Failed to generate TypeScript for ToolRequest");
 
         // Verify the generated TypeScript contains the expected union structure
         assert!(ts_type.contains("ToolRequest"));
@@ -1154,21 +1155,19 @@ mod tests {
     #[test]
     fn test_system_prompt_contains_generated_typescript() {
         // Test the system prompt generation directly without creating full LlmAgent
-        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use crate::models::{ListFilesRequest, ReadFileRequest, ToolRequest};
         use ts_rs::TS;
 
         // Generate TypeScript types for tools
-        let tool_request_ts = ToolRequest::export_to_string().unwrap_or_else(|_| {
-            "// Failed to generate ToolRequest type".to_string()
-        });
-        let list_files_request_ts = ListFilesRequest::export_to_string().unwrap_or_else(|_| {
-            "// Failed to generate ListFilesRequest type".to_string()
-        });
-        let read_file_request_ts = ReadFileRequest::export_to_string().unwrap_or_else(|_| {
-            "// Failed to generate ReadFileRequest type".to_string()
-        });
+        let tool_request_ts = ToolRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate ToolRequest type".to_string());
+        let list_files_request_ts = ListFilesRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate ListFilesRequest type".to_string());
+        let read_file_request_ts = ReadFileRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate ReadFileRequest type".to_string());
 
-        let system_prompt = format!(r#"You are an AI assistant with access to file system tools. You can use the following tools:
+        let system_prompt = format!(
+            r#"You are an AI assistant with access to file system tools. You can use the following tools:
 
 ## Available Tools
 
@@ -1247,7 +1246,7 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
 
     #[test]
     fn test_tool_request_serialization_roundtrip() {
-        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use crate::models::{ListFilesRequest, ReadFileRequest, ToolRequest};
 
         // Test ListFilesRequest
         let list_request = ToolRequest::ListFiles(ListFilesRequest {
@@ -1388,8 +1387,12 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
 
                     // Check if the error message contains expected fragment
                     assert!(
-                        error_msg.to_lowercase().contains(&expected_error_fragment.to_lowercase()),
-                        "Error '{}' should contain '{}'", error_msg, expected_error_fragment
+                        error_msg
+                            .to_lowercase()
+                            .contains(&expected_error_fragment.to_lowercase()),
+                        "Error '{}' should contain '{}'",
+                        error_msg,
+                        expected_error_fragment
                     );
 
                     // Check error classification
