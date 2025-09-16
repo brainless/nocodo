@@ -659,21 +659,58 @@ impl LlmAgent {
 
     /// Create system prompt for tool usage
     fn create_tool_system_prompt(&self) -> String {
-        r#"You are an AI assistant with access to file system tools. You can use the following tools:
+        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use ts_rs::TS;
 
-1. **list_files**: List files and directories in a project
-   - Request format: {"type": "list_files", "path": "<directory_path>", "recursive": <boolean>, "include_hidden": <boolean>}
-   - Example: {"type": "list_files", "path": ".", "recursive": false, "include_hidden": false}
+        // Generate TypeScript types for tools
+        let tool_request_ts = ToolRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ToolRequest type".to_string()
+        });
+        let list_files_request_ts = ListFilesRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ListFilesRequest type".to_string()
+        });
+        let read_file_request_ts = ReadFileRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ReadFileRequest type".to_string()
+        });
 
-2. **read_file**: Read the content of a file
-   - Request format: {"type": "read_file", "path": "<file_path>", "max_size": <bytes>}
-   - Example: {"type": "read_file", "path": "src/main.rs", "max_size": 10000}
+        format!(r#"You are an AI assistant with access to file system tools. You can use the following tools:
+
+## Available Tools
+
+The tools are defined using TypeScript types. When calling a tool, use the exact format shown below:
+
+### Type Definitions
+
+```typescript
+// Individual tool request types
+{list_files_request_ts}
+
+{read_file_request_ts}
+
+// Union type for all tool requests
+{tool_request_ts}
+```
+
+### Tool Usage
 
 When you need to use a tool, respond with ONLY the JSON request for that tool. Do not include any other text. The tool will be executed and you will receive the results, after which you can continue your response.
 
-When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned. Always provide a complete answer to the user's original question using the information gathered from the tools.
+Examples:
+- List files: {{"type": "list_files", "path": ".", "recursive": false}}
+- Read file: {{"type": "read_file", "path": "src/main.rs", "max_size": 10000}}
 
-Always analyze the project structure and read relevant files before providing code solutions. Be concise and focus on the user's specific needs."#.to_string()
+### Guidelines
+
+1. When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned.
+2. Always provide a complete answer to the user's original question using the information gathered from the tools.
+3. Always analyze the project structure and read relevant files before providing code solutions.
+4. Be concise and focus on the user's specific needs.
+
+The tool request MUST exactly match the TypeScript interface defined above."#,
+            list_files_request_ts = list_files_request_ts,
+            read_file_request_ts = read_file_request_ts,
+            tool_request_ts = tool_request_ts
+        )
     }
 
     /// Check if response contains tool calls
@@ -689,17 +726,15 @@ Always analyze the project structure and read relevant files before providing co
         );
 
         // Look for JSON objects that might be tool calls - more flexible matching
-        let contains_list_files =
-            response.contains("list_files") && response.contains("type") && response.contains("{");
-        let contains_read_file =
-            response.contains("read_file") && response.contains("type") && response.contains("{");
+        let contains_tool_keywords = response.contains("list_files") || response.contains("read_file");
+        let contains_json_structure = response.contains("type") && response.contains("{");
 
-        let result = contains_list_files || contains_read_file;
+        let result = contains_tool_keywords && contains_json_structure;
 
         tracing::info!(
             contains_tool_calls = %result,
-            contains_list_files = %contains_list_files,
-            contains_read_file = %contains_read_file,
+            contains_tool_keywords = %contains_tool_keywords,
+            contains_json_structure = %contains_json_structure,
             "Tool call detection result"
         );
 
@@ -708,6 +743,7 @@ Always analyze the project structure and read relevant files before providing co
 
     /// Extract tool calls from response
     fn extract_tool_calls(&self, response: &str) -> Result<Vec<serde_json::Value>> {
+        use crate::models::ToolRequest;
         let mut tool_calls = Vec::new();
 
         tracing::debug!(
@@ -715,46 +751,33 @@ Always analyze the project structure and read relevant files before providing co
             "Extracting tool calls from response"
         );
 
-        // Try parsing the entire response as JSON first
-        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(response.trim()) {
-            if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
-                if tool_type == "list_files" || tool_type == "read_file" {
-                    tracing::info!(
-                        tool_type = %tool_type,
-                        "Found tool call in full response"
-                    );
-                    tool_calls.push(json_value);
-                }
-            }
+        // Try parsing the entire response as a ToolRequest first
+        if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(response.trim()) {
+            let json_value = serde_json::to_value(tool_request)?;
+            tracing::info!(
+                "Successfully parsed full response as ToolRequest"
+            );
+            tool_calls.push(json_value);
+            return Ok(tool_calls);
         }
 
         // If that didn't work, try line-by-line extraction
-        if tool_calls.is_empty() {
-            for (line_num, line) in response.lines().enumerate() {
-                let trimmed = line.trim();
-                if trimmed.starts_with('{')
-                    && (trimmed.ends_with('}')
-                        || trimmed.contains("list_files")
-                        || trimmed.contains("read_file"))
-                {
-                    tracing::debug!(
-                        line_number = %line_num,
-                        line_content = %trimmed,
-                        "Attempting to parse line as JSON tool call"
-                    );
+        for (line_num, line) in response.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') && trimmed.ends_with('}') {
+                tracing::debug!(
+                    line_number = %line_num,
+                    line_content = %trimmed,
+                    "Attempting to parse line as ToolRequest"
+                );
 
-                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                        if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
-                            if tool_type == "list_files" || tool_type == "read_file" {
-                                tracing::info!(
-                                    line_number = %line_num,
-                                    tool_type = %tool_type,
-                                    "Found tool call in line"
-                                );
-                                tool_calls.push(json_value);
-                            }
-                        }
-                    }
+                if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(trimmed) {
+                    let json_value = serde_json::to_value(tool_request)?;
+                    tracing::info!(
+                        line_number = %line_num,
+                        "Successfully parsed line as ToolRequest"
+                    );
+                    tool_calls.push(json_value);
                 }
             }
         }
@@ -780,23 +803,15 @@ Always analyze the project structure and read relevant files before providing co
                                 let json_str: String = chars[start..=i].iter().collect();
                                 tracing::debug!(
                                     json_candidate = %json_str,
-                                    "Attempting to parse multi-line JSON block"
+                                    "Attempting to parse multi-line JSON block as ToolRequest"
                                 );
 
-                                if let Ok(json_value) =
-                                    serde_json::from_str::<serde_json::Value>(&json_str)
-                                {
-                                    if let Some(tool_type) =
-                                        json_value.get("type").and_then(|v| v.as_str())
-                                    {
-                                        if tool_type == "list_files" || tool_type == "read_file" {
-                                            tracing::info!(
-                                                tool_type = %tool_type,
-                                                "Found tool call in multi-line JSON block"
-                                            );
-                                            tool_calls.push(json_value);
-                                        }
-                                    }
+                                if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&json_str) {
+                                    let json_value = serde_json::to_value(tool_request)?;
+                                    tracing::info!(
+                                        "Successfully parsed multi-line JSON block as ToolRequest"
+                                    );
+                                    tool_calls.push(json_value);
                                 }
                             }
                             json_start = None;
@@ -935,49 +950,187 @@ Always analyze the project structure and read relevant files before providing co
 
 #[cfg(test)]
 mod tests {
-    #[allow(unused_imports)]
-    use super::*;
-    #[allow(unused_imports)]
-    use crate::database::Database;
-    #[allow(unused_imports)]
-    use tempfile::TempDir;
+    use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+    use ts_rs::TS;
 
     #[test]
-    fn test_system_prompt_includes_tool_handling_instructions() {
-        // This test just verifies the system prompt contains the correct instructions
-        // We don't need to create the full LLM agent for this
+    fn test_typescript_generation_for_list_files_request() {
+        let ts_type = ListFilesRequest::export_to_string().expect("Failed to generate TypeScript for ListFilesRequest");
 
-        // We test the system prompt method directly through a simpler approach
+        // Verify the generated TypeScript contains the expected structure
+        assert!(ts_type.contains("export interface ListFilesRequest"));
+        assert!(ts_type.contains("path: string"));
+        assert!(ts_type.contains("recursive?: boolean"));
+        assert!(ts_type.contains("include_hidden?: boolean"));
 
-        let system_prompt = create_test_tool_system_prompt();
+        // Ensure optional fields are marked correctly
+        assert!(ts_type.contains("recursive?"));
+        assert!(ts_type.contains("include_hidden?"));
 
-        // Verify the system prompt contains instructions for handling tool results
-        assert!(system_prompt.contains("When you receive tool results"));
-        assert!(system_prompt.contains("provide a helpful natural language response"));
-        assert!(system_prompt.contains("messages with role \"tool\""));
-
-        // Verify the system prompt still contains the original tool instructions
-        assert!(system_prompt.contains("list_files"));
-        assert!(system_prompt.contains("read_file"));
-        assert!(system_prompt.contains("When you need to use a tool"));
+        println!("Generated ListFilesRequest TypeScript:\n{}", ts_type);
     }
 
-    // Helper function for testing the system prompt
-    fn create_test_tool_system_prompt() -> String {
-        r#"You are an AI assistant with access to file system tools. You can use the following tools:
+    #[test]
+    fn test_typescript_generation_for_read_file_request() {
+        let ts_type = ReadFileRequest::export_to_string().expect("Failed to generate TypeScript for ReadFileRequest");
 
-1. **list_files**: List files and directories in a project
-   - Request format: {"type": "list_files", "path": "<directory_path>", "recursive": <boolean>, "include_hidden": <boolean>}
-   - Example: {"type": "list_files", "path": ".", "recursive": false, "include_hidden": false}
+        // Verify the generated TypeScript contains the expected structure
+        assert!(ts_type.contains("export interface ReadFileRequest"));
+        assert!(ts_type.contains("path: string"));
+        // Note: u64 maps to bigint in TypeScript, which is correct for large numbers
+        assert!(ts_type.contains("max_size?"));
+        // Should contain either bigint or number, depending on ts-rs version
+        assert!(ts_type.contains("max_size?: bigint") || ts_type.contains("max_size?: number"));
 
-2. **read_file**: Read the content of a file
-   - Request format: {"type": "read_file", "path": "<file_path>", "max_size": <bytes>}
-   - Example: {"type": "read_file", "path": "src/main.rs", "max_size": 10000}
+        println!("Generated ReadFileRequest TypeScript:\n{}", ts_type);
+    }
+
+    #[test]
+    fn test_typescript_generation_for_tool_request_union() {
+        let ts_type = ToolRequest::export_to_string().expect("Failed to generate TypeScript for ToolRequest");
+
+        // Verify the generated TypeScript contains the expected union structure
+        assert!(ts_type.contains("ToolRequest"));
+        assert!(ts_type.contains("list_files"));
+        assert!(ts_type.contains("read_file"));
+        assert!(ts_type.contains("ListFilesRequest"));
+        assert!(ts_type.contains("ReadFileRequest"));
+
+        println!("Generated ToolRequest TypeScript:\n{}", ts_type);
+    }
+
+    #[test]
+    fn test_system_prompt_contains_generated_typescript() {
+        // Test the system prompt generation directly without creating full LlmAgent
+        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+        use ts_rs::TS;
+
+        // Generate TypeScript types for tools
+        let tool_request_ts = ToolRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ToolRequest type".to_string()
+        });
+        let list_files_request_ts = ListFilesRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ListFilesRequest type".to_string()
+        });
+        let read_file_request_ts = ReadFileRequest::export_to_string().unwrap_or_else(|_| {
+            "// Failed to generate ReadFileRequest type".to_string()
+        });
+
+        let system_prompt = format!(r#"You are an AI assistant with access to file system tools. You can use the following tools:
+
+## Available Tools
+
+The tools are defined using TypeScript types. When calling a tool, use the exact format shown below:
+
+### Type Definitions
+
+```typescript
+// Individual tool request types
+{list_files_request_ts}
+
+{read_file_request_ts}
+
+// Union type for all tool requests
+{tool_request_ts}
+```
+
+### Tool Usage
 
 When you need to use a tool, respond with ONLY the JSON request for that tool. Do not include any other text. The tool will be executed and you will receive the results, after which you can continue your response.
 
-When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned. Always provide a complete answer to the user's original question using the information gathered from the tools.
+Examples:
+- List files: {{"type": "list_files", "path": ".", "recursive": false}}
+- Read file: {{"type": "read_file", "path": "src/main.rs", "max_size": 10000}}
 
-Always analyze the project structure and read relevant files before providing code solutions. Be concise and focus on the user's specific needs."#.to_string()
+### Guidelines
+
+1. When you receive tool results (messages with role "tool"), analyze them and provide a helpful natural language response based on what you learned.
+2. Always provide a complete answer to the user's original question using the information gathered from the tools.
+3. Always analyze the project structure and read relevant files before providing code solutions.
+4. Be concise and focus on the user's specific needs.
+
+The tool request MUST exactly match the TypeScript interface defined above."#,
+            list_files_request_ts = list_files_request_ts,
+            read_file_request_ts = read_file_request_ts,
+            tool_request_ts = tool_request_ts
+        );
+
+        // Verify the system prompt contains TypeScript type definitions
+        assert!(system_prompt.contains("TypeScript types"));
+        assert!(system_prompt.contains("```typescript"));
+        assert!(system_prompt.contains("ListFilesRequest"));
+        assert!(system_prompt.contains("ReadFileRequest"));
+        assert!(system_prompt.contains("ToolRequest"));
+
+        // Verify it contains usage guidelines
+        assert!(system_prompt.contains("When you need to use a tool"));
+        assert!(system_prompt.contains("ONLY the JSON request"));
+        assert!(system_prompt.contains("MUST exactly match the TypeScript interface"));
+
+        println!("Generated system prompt:\n{}", system_prompt);
+    }
+
+    #[test]
+    fn test_tool_call_extraction_logic() {
+        use crate::models::ToolRequest;
+
+        // Test direct parsing of valid tool requests
+        let response1 = r#"{"type": "list_files", "path": ".", "recursive": true}"#;
+        let parsed1 = serde_json::from_str::<ToolRequest>(response1);
+        assert!(parsed1.is_ok());
+
+        let response2 = r#"{"type": "read_file", "path": "src/main.rs", "max_size": 10000}"#;
+        let parsed2 = serde_json::from_str::<ToolRequest>(response2);
+        assert!(parsed2.is_ok());
+
+        // Test invalid requests
+        let invalid1 = r#"{"type": "invalid_tool", "path": "."}"#;
+        let parsed_invalid1 = serde_json::from_str::<ToolRequest>(invalid1);
+        assert!(parsed_invalid1.is_err());
+
+        let invalid2 = r#"{"type": "list_files"}"#; // missing required path
+        let parsed_invalid2 = serde_json::from_str::<ToolRequest>(invalid2);
+        assert!(parsed_invalid2.is_err());
+    }
+
+    #[test]
+    fn test_tool_request_serialization_roundtrip() {
+        use crate::models::{ToolRequest, ListFilesRequest, ReadFileRequest};
+
+        // Test ListFilesRequest
+        let list_request = ToolRequest::ListFiles(ListFilesRequest {
+            path: "src".to_string(),
+            recursive: Some(true),
+            include_hidden: Some(false),
+        });
+
+        let json_str = serde_json::to_string(&list_request).expect("Failed to serialize");
+        let parsed = serde_json::from_str::<ToolRequest>(&json_str).expect("Failed to deserialize");
+
+        match parsed {
+            ToolRequest::ListFiles(req) => {
+                assert_eq!(req.path, "src");
+                assert_eq!(req.recursive, Some(true));
+                assert_eq!(req.include_hidden, Some(false));
+            }
+            _ => panic!("Wrong tool request type"),
+        }
+
+        // Test ReadFileRequest
+        let read_request = ToolRequest::ReadFile(ReadFileRequest {
+            path: "README.md".to_string(),
+            max_size: Some(5000),
+        });
+
+        let json_str = serde_json::to_string(&read_request).expect("Failed to serialize");
+        let parsed = serde_json::from_str::<ToolRequest>(&json_str).expect("Failed to deserialize");
+
+        match parsed {
+            ToolRequest::ReadFile(req) => {
+                assert_eq!(req.path, "README.md");
+                assert_eq!(req.max_size, Some(5000));
+            }
+            _ => panic!("Wrong tool request type"),
+        }
     }
 }

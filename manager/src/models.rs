@@ -471,6 +471,7 @@ pub struct ListFilesRequest {
 pub struct ReadFileRequest {
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number | undefined")]
     pub max_size: Option<u64>,
 }
 
