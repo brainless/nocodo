@@ -1,4 +1,4 @@
-import { Page, APIRequestContext } from '@playwright/test';
+import { APIRequestContext, Page } from '@playwright/test';
 
 /**
  * Helper function to start LLM agent work with a given prompt
@@ -246,7 +246,7 @@ export function createToolExecutionMocks() {
  */
 export async function waitForWorkCompletion(
   page: Page,
-  workId: string,
+  _workId: string,
   timeout: number = 20000
 ): Promise<string> {
   const startTime = Date.now();

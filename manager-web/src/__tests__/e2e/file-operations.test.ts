@@ -86,7 +86,7 @@ test.describe('File Operations', () => {
     // Verify some content is present (in mock environment, exact content may vary)
     const contentText = await responseContent.textContent();
     expect(contentText).toBeDefined();
-    expect(contentText.length).toBeGreaterThan(0);
+    expect(contentText?.length || 0).toBeGreaterThan(0);
     // In a real scenario, this would contain JSON, but in mock it might be different
     expect(contentText).not.toBe('No output yet');
   });

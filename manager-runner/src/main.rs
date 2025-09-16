@@ -10,13 +10,12 @@ async fn main() -> Result<()> {
     info!("Starting nocodo manager-runner");
 
     // Create test-logs directory
-    fs::create_dir_all("test-logs")
-        .context("Failed to create test-logs directory")?;
+    fs::create_dir_all("test-logs").context("Failed to create test-logs directory")?;
 
     // Build manager-web first
     info!("Building manager-web...");
     let web_build_status = Command::new("npm")
-        .args(&["install"])
+        .args(["install"])
         .current_dir("manager-web")
         .status()
         .context("Failed to run npm install")?;
@@ -27,7 +26,7 @@ async fn main() -> Result<()> {
     }
 
     let web_build_status = Command::new("npm")
-        .args(&["run", "build"])
+        .args(["run", "build"])
         .current_dir("manager-web")
         .status()
         .context("Failed to build manager-web")?;
@@ -42,7 +41,7 @@ async fn main() -> Result<()> {
     // Build manager binary
     info!("Building manager...");
     let manager_build_status = Command::new("cargo")
-        .args(&["build", "--release", "--bin", "nocodo-manager"])
+        .args(["build", "--release", "--bin", "nocodo-manager"])
         .status()
         .context("Failed to build manager")?;
 
@@ -64,7 +63,7 @@ async fn main() -> Result<()> {
         .context("Failed to create manager.log")?;
 
     let mut manager_process = tokio::process::Command::new("./target/release/nocodo-manager")
-        .args(&["--config", "~/.config/nocodo/manager.toml"])
+        .args(["--config", "~/.config/nocodo/manager.toml"])
         .stdout(Stdio::from(manager_log.try_clone()?))
         .stderr(Stdio::from(manager_log))
         .spawn()
@@ -103,14 +102,17 @@ async fn main() -> Result<()> {
         .context("Failed to create manager-web.log")?;
 
     let mut web_process = tokio::process::Command::new("npm")
-        .args(&["run", "dev"])
+        .args(["run", "dev"])
         .current_dir("manager-web")
         .stdout(Stdio::from(web_log.try_clone()?))
         .stderr(Stdio::from(web_log))
         .spawn()
         .context("Failed to start manager-web dev server")?;
 
-    info!("Manager-web dev server started with PID: {:?}", web_process.id());
+    info!(
+        "Manager-web dev server started with PID: {:?}",
+        web_process.id()
+    );
     info!("");
     info!("🚀 Both services are running!");
     info!("📊 Manager API/WebSocket: http://localhost:8081 (logs: test-logs/manager.log)");
@@ -145,12 +147,12 @@ async fn main() -> Result<()> {
 
     // Cleanup: kill any remaining processes
     info!("Stopping manager...");
-    let _ = manager_process.kill();
-    let _ = manager_process.wait();
+    std::mem::drop(manager_process.kill());
+    std::mem::drop(manager_process.wait());
 
     info!("Stopping manager-web...");
-    let _ = web_process.kill();
-    let _ = web_process.wait();
+    std::mem::drop(web_process.kill());
+    std::mem::drop(web_process.wait());
 
     info!("All services stopped");
     Ok(())
