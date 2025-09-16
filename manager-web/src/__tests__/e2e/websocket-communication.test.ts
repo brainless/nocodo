@@ -7,6 +7,7 @@ test.describe('WebSocket Communication', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Check for connection status indicator
@@ -15,9 +16,9 @@ test.describe('WebSocket Communication', () => {
     // Should show some connection status (green for connected, yellow for connecting, red for error)
     await expect(statusIndicator).toBeVisible();
 
-    // The status should be visible (could be connected, connecting, or disconnected in mock)
+    // The status indicator should exist (may be disconnected in test environment)
     const statusClasses = await statusIndicator.getAttribute('class');
-    expect(statusClasses).toMatch(/bg-(green|yellow|gray|red)-500/);
+    expect(statusClasses).toMatch(/bg-(gray|green|yellow|red)-500/);
   });
 
   test('should show real-time updates during work processing', async ({ page }) => {
@@ -25,23 +26,17 @@ test.describe('WebSocket Communication', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select tool using custom dropdown
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page
@@ -69,6 +64,7 @@ test.describe('WebSocket Communication', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Check initial connection status
@@ -87,6 +83,7 @@ test.describe('WebSocket Communication', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Check initial connection
@@ -111,23 +108,17 @@ test.describe('WebSocket Communication', () => {
     await page.goto('/');
 
     // Wait for the page to load
+    await page.waitForTimeout(1000); // Give time for components to render
     await page.waitForSelector('h3:has-text("What would you like to Work on?")');
 
     // Fill in the prompt
     const promptTextarea = page.locator('textarea#prompt');
     await promptTextarea.fill('List all files in the root directory');
 
-    // Select tool using custom dropdown
-    const toolButton = page
-      .locator('button[aria-haspopup="listbox"]')
-      .filter({ hasText: 'llm-agent' });
-    await toolButton.click();
-
-    // Wait for dropdown options and select llm-agent
-    await page.locator('div[role="option"]:has-text("llm-agent")').click();
+    // Tool is now hardcoded to llm-agent per issue #110 - no selection needed
 
     // Submit the form
-    const submitButton = page.locator('button[type="submit"]:has-text("Start Work")');
+    const submitButton = page.locator('button[type="submit"]:has-text("Start Work Session")');
     await submitButton.click();
 
     // Wait for navigation to work detail page

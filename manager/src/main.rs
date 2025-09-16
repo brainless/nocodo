@@ -10,7 +10,6 @@ mod models;
 mod runner;
 mod socket;
 mod templates;
-mod terminal_runner;
 mod tools;
 mod websocket;
 
@@ -30,7 +29,6 @@ use socket::SocketServer;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
-use terminal_runner::TerminalRunner;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use websocket::{WebSocketBroadcaster, WebSocketServer};
 
@@ -128,25 +126,6 @@ async fn main() -> AppResult<()> {
         None
     };
 
-    // Create terminal runner for PTY-based sessions
-    let terminal_runner_enabled = std::env::var("NOCODO_TERMINAL_RUNNER_ENABLED")
-        .ok()
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(true); // Enabled by default
-
-    tracing::info!("Terminal runner enabled: {}", terminal_runner_enabled);
-
-    let terminal_runner = if terminal_runner_enabled {
-        tracing::info!("Initializing PTY-based terminal runner");
-        Some(Arc::new(TerminalRunner::new(
-            Arc::clone(&database),
-            Arc::clone(&broadcaster),
-        )))
-    } else {
-        tracing::warn!("Terminal runner disabled - set NOCODO_TERMINAL_RUNNER_ENABLED=1 to enable");
-        None
-    };
-
     // Optionally enable LLM agent via env flag
     let llm_agent_enabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
         .ok()
@@ -172,7 +151,6 @@ async fn main() -> AppResult<()> {
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
         runner,
-        terminal_runner,
         llm_agent,
     });
 
@@ -245,32 +223,6 @@ async fn main() -> AppResult<()> {
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
                         )
-                        // Terminal session endpoints for PTY-based interactive sessions
-                        .route("/tools", web::get().to(handlers::get_tool_registry))
-                        .route(
-                            "/terminals",
-                            web::post().to(handlers::create_terminal_session),
-                        )
-                        .route(
-                            "/terminals/{id}",
-                            web::get().to(handlers::get_terminal_session),
-                        )
-                        .route(
-                            "/terminals/{id}/input",
-                            web::post().to(handlers::send_terminal_input),
-                        )
-                        .route(
-                            "/terminals/{id}/resize",
-                            web::post().to(handlers::resize_terminal_session),
-                        )
-                        .route(
-                            "/terminals/{id}/transcript",
-                            web::get().to(handlers::get_terminal_transcript),
-                        )
-                        .route(
-                            "/terminals/{id}/terminate",
-                            web::post().to(handlers::terminate_terminal_session),
-                        )
                         // LLM agent endpoints for direct LLM integration
                         .route(
                             "/work/{work_id}/llm-agent",
@@ -298,10 +250,6 @@ async fn main() -> AppResult<()> {
                 .route(
                     "/ws/work/{id}",
                     web::get().to(websocket::ai_session_websocket_handler),
-                )
-                .route(
-                    "/ws/terminals/{id}",
-                    web::get().to(websocket::terminal_websocket_handler),
                 )
                 // Serve embedded web assets (with filesystem fallback)
                 .configure(|cfg| {

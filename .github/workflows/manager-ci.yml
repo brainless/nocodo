@@ -9,7 +9,7 @@ on:
       - 'Cargo.lock'
       - '.rustfmt.toml'
       - 'clippy.toml'
-      - '.github/workflows/rust-ci.yml'
+      - '.github/workflows/manager-ci.yml'
   push:
     branches: [main]
     paths:
@@ -19,7 +19,7 @@ on:
       - 'Cargo.lock'
       - '.rustfmt.toml'
       - 'clippy.toml'
-      - '.github/workflows/rust-ci.yml'
+      - '.github/workflows/manager-ci.yml'
   schedule:
     # Run security audit weekly on Mondays at 08:00 UTC
     - cron: '0 8 * * 1'
@@ -40,6 +40,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -81,6 +86,11 @@ jobs:
         with:
           components: clippy
 
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold
+
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -106,6 +116,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust-version }}
+
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -150,6 +165,11 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold
+
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -179,6 +199,11 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2

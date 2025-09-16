@@ -129,25 +129,9 @@ export const test = base.extend({
               author_type: 'user',
               author_id: null,
               created_at: '2024-01-01T00:00:00Z',
-            },
-            {
-              id: 'message-tool-1',
-              content: 'Executing list_files tool to get directory contents...',
-              content_type: 'tool_execution',
-              author_type: 'system',
-              author_id: null,
-              created_at: '2024-01-01T00:00:01Z',
-            },
-            {
-              id: 'message-llm-1',
-              content: 'I found 4 files in the root directory: README.md, src/, package.json, and Cargo.toml.',
-              content_type: 'llm_response',
-              author_type: 'assistant',
-              author_id: null,
-              created_at: '2024-01-01T00:00:02Z',
             }
           ],
-          total_messages: 3,
+          total_messages: 1,
         }),
       });
     });
@@ -242,16 +226,20 @@ export const test = base.extend({
     // Mock WebSocket connection with enhanced tool execution simulation
     await page.addInitScript(() => {
       // Mock WebSocket for testing
+<<<<<<< HEAD
       window.WebSocket = class extends EventTarget {
         private isConnected = false;
 
+=======
+      const MockWebSocket = class extends EventTarget {
+>>>>>>> origin/main
         constructor(_url: string) {
           super();
-          // Simulate successful connection
+          // Simulate successful connection immediately
           setTimeout(() => {
             this.isConnected = true;
             this.dispatchEvent(new Event('open'));
-          }, 100);
+          }, 10);
         }
 
         send(data: string) {
@@ -439,6 +427,22 @@ export const test = base.extend({
           this.isConnected = false;
           this.dispatchEvent(new Event('close'));
         }
+      };
+
+      // Override the WebSocket constructor
+      window.WebSocket = MockWebSocket as any;
+
+      // Also mock the WebSocket client state for the provider
+      // This ensures the status indicator shows connected
+      const originalWebSocket = window.WebSocket;
+      window.WebSocket = function (url: string) {
+        const ws = new originalWebSocket(url);
+        // Force the readyState to OPEN immediately
+        Object.defineProperty(ws, 'readyState', {
+          value: WebSocket.OPEN,
+          writable: false,
+        });
+        return ws;
       } as any;
     });
 
