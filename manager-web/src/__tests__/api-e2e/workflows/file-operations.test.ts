@@ -42,8 +42,9 @@ describe('File Operations - API Only', () => {
       const createdFile = await testApiClient.createFile(fileData);
 
       expect(createdFile).toBeDefined();
-      expect(createdFile.path).toBe(fileData.path);
-      expect(createdFile.project_id).toBe(testProjectId);
+      expect(createdFile.file).toBeDefined();
+      expect(createdFile.file.path).toBe(fileData.path);
+      expect(createdFile.file.is_directory).toBe(false);
     });
 
     it('should read file content', async () => {
@@ -224,7 +225,7 @@ describe('File Operations - API Only', () => {
       });
 
       const createdFile = await testApiClient.createFile(createData);
-      expect(createdFile.path).toBe(filePath);
+      expect(createdFile.file.path).toBe(filePath);
 
       // Read file
       let fileContent = await testApiClient.getFileContent(filePath, testProjectId);

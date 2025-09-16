@@ -4,6 +4,7 @@ import {
   AiSessionOutputListResponse,
   AiSessionResponse,
   CreateAiSessionRequest,
+  CreateLlmAgentSessionRequest,
   CreateProjectRequest,
   CreateWorkRequest,
   FileContentResponse,
@@ -12,6 +13,8 @@ import {
   FileListResponse,
   FileResponse,
   FileUpdateRequest,
+  LlmAgentSessionResponse,
+  LlmAgentSession,
   Project,
   WorkMessageResponse,
   WorkResponse,
@@ -66,10 +69,11 @@ export class TestApiClient {
   }
 
   async createProject(data: CreateProjectRequest): Promise<Project> {
-    return this.request('/api/projects', {
+    const response = await this.request<{ project: Project }>('/api/projects', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    return response.project;
   }
 
   async deleteProject(id: string): Promise<void> {
@@ -176,9 +180,58 @@ export class TestApiClient {
     });
   }
 
+  // LLM Agent operations
+  async createLlmAgentSession(workId: string, data: CreateLlmAgentSessionRequest): Promise<LlmAgentSessionResponse> {
+    return this.request(`/api/work/${workId}/llm-agent`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getLlmAgentSession(sessionId: string): Promise<LlmAgentSessionResponse> {
+    return this.request(`/api/llm-agent/${sessionId}`);
+  }
+
+  async sendLlmAgentMessage(sessionId: string, message: string): Promise<{ response: string }> {
+    return this.request(`/api/llm-agent/${sessionId}/message`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
+
+  async completeLlmAgentSession(sessionId: string): Promise<void> {
+    const url = `${this.baseURL}/api/llm-agent/${sessionId}/complete`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage: string;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorJson.error || `HTTP ${response.status}`;
+      } catch {
+        errorMessage = errorText || `HTTP ${response.status}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    // No need to parse response body for 204/200 with no content
+    return;
+  }
+
+  async getLlmAgentSessions(workId: string): Promise<LlmAgentSession[]> {
+    return this.request(`/api/work/${workId}/llm-agent/sessions`);
+  }
+
   // Health check
   async healthCheck(): Promise<{ status: string }> {
-    return this.request('/health');
+    return this.request('/api/health');
   }
 }
 
