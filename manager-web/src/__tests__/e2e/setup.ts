@@ -243,7 +243,6 @@ export const test = base.extend({
     await page.addInitScript(() => {
       // Mock WebSocket for testing
       window.WebSocket = class extends EventTarget {
-        private messageQueue: string[] = [];
         private isConnected = false;
 
         constructor(_url: string) {

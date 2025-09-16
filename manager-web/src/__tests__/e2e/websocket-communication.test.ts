@@ -1,5 +1,5 @@
 import { expect, test } from './setup';
-import { startLLMAgentWork, monitorWebSocketMessages } from './test-utils';
+import { startLLMAgentWork } from './test-utils';
 
 test.describe('WebSocket Communication', () => {
   test('should establish WebSocket connection on page load', async ({ page }) => {
@@ -161,7 +161,7 @@ test.describe('WebSocket Communication', () => {
     page.on('websocket', ws => {
       ws.on('framereceived', frame => {
         try {
-          const data = JSON.parse(frame.payload);
+          const data = JSON.parse(frame.payload.toString());
           if (data.type === 'LlmAgentChunk' || data.type === 'AiSessionStatusChanged') {
             messages.push(data);
           }
@@ -203,7 +203,7 @@ test.describe('WebSocket Communication', () => {
     page.on('websocket', ws => {
       ws.on('framereceived', frame => {
         try {
-          const data = JSON.parse(frame.payload);
+          const data = JSON.parse(frame.payload.toString());
           if (data.type === 'LlmAgentChunk') {
             chunkMessages.push(data);
           }
@@ -244,7 +244,7 @@ test.describe('WebSocket Communication', () => {
     page.on('websocket', ws => {
       ws.on('framereceived', frame => {
         try {
-          const data = JSON.parse(frame.payload);
+          const data = JSON.parse(frame.payload.toString());
           allMessages.push(data);
         } catch (error) {
           // Ignore non-JSON frames
@@ -276,7 +276,6 @@ test.describe('WebSocket Communication', () => {
   });
 
   test('should maintain WebSocket connection stability during tool execution', async ({ page }) => {
-    let connectionEvents: string[] = [];
     let messageCount = 0;
 
     // Monitor connection stability
@@ -315,7 +314,7 @@ test.describe('WebSocket Communication', () => {
     page.on('websocket', ws => {
       ws.on('framereceived', frame => {
         try {
-          const data = JSON.parse(frame.payload);
+          const data = JSON.parse(frame.payload.toString());
           const timestamp = Date.now();
           orderedMessages.push({ ...data, receivedAt: timestamp });
 
@@ -346,13 +345,13 @@ test.describe('WebSocket Communication', () => {
 
   test('should handle WebSocket errors gracefully during tool execution', async ({ page }) => {
     // This test simulates network issues during tool execution
-    let errorMessages: any[] = [];
-    let normalMessages: any[] = [];
+    const errorMessages: any[] = [];
+    const normalMessages: any[] = [];
 
     page.on('websocket', ws => {
       ws.on('framereceived', frame => {
         try {
-          const data = JSON.parse(frame.payload);
+          const data = JSON.parse(frame.payload.toString());
           if (data.type === 'Error') {
             errorMessages.push(data);
           } else {

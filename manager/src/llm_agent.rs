@@ -599,8 +599,10 @@ Always analyze the project structure and read relevant files before providing co
         );
 
         // Look for JSON objects that might be tool calls - more flexible matching
-        let contains_list_files = response.contains("list_files") && response.contains("type") && response.contains("{");
-        let contains_read_file = response.contains("read_file") && response.contains("type") && response.contains("{");
+        let contains_list_files =
+            response.contains("list_files") && response.contains("type") && response.contains("{");
+        let contains_read_file =
+            response.contains("read_file") && response.contains("type") && response.contains("{");
 
         let result = contains_list_files || contains_read_file;
 
@@ -640,7 +642,11 @@ Always analyze the project structure and read relevant files before providing co
         if tool_calls.is_empty() {
             for (line_num, line) in response.lines().enumerate() {
                 let trimmed = line.trim();
-                if trimmed.starts_with('{') && (trimmed.ends_with('}') || trimmed.contains("list_files") || trimmed.contains("read_file")) {
+                if trimmed.starts_with('{')
+                    && (trimmed.ends_with('}')
+                        || trimmed.contains("list_files")
+                        || trimmed.contains("read_file"))
+                {
                     tracing::debug!(
                         line_number = %line_num,
                         line_content = %trimmed,
@@ -687,8 +693,12 @@ Always analyze the project structure and read relevant files before providing co
                                     "Attempting to parse multi-line JSON block"
                                 );
 
-                                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                                    if let Some(tool_type) = json_value.get("type").and_then(|v| v.as_str()) {
+                                if let Ok(json_value) =
+                                    serde_json::from_str::<serde_json::Value>(&json_str)
+                                {
+                                    if let Some(tool_type) =
+                                        json_value.get("type").and_then(|v| v.as_str())
+                                    {
                                         if tool_type == "list_files" || tool_type == "read_file" {
                                             tracing::info!(
                                                 tool_type = %tool_type,
@@ -835,9 +845,6 @@ Always analyze the project structure and read relevant files before providing co
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::database::Database;
-    use tempfile::TempDir;
 
     #[test]
     fn test_system_prompt_includes_tool_handling_instructions() {

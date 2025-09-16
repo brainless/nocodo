@@ -208,7 +208,7 @@ const TerminalSession: Component<TerminalSessionProps> = props => {
           onTerminalReady={handleTerminalReady}
           onInput={handleTerminalInput}
           onResize={handleTerminalResize}
-          className='h-96'
+          class='h-96'
         />
       </div>
 

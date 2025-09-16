@@ -1,9 +1,9 @@
 import { expect, test } from './setup';
 import {
+  extractToolCallsFromWork,
   startLLMAgentWork,
-  waitForToolCall,
   waitForLLMResponse,
-  extractToolCallsFromWork
+  waitForToolCall
 } from './test-utils';
 
 test.describe('Tool Execution API Tests', () => {
