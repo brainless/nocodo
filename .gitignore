@@ -66,3 +66,5 @@ test-logs/
 # Test results
 test-results/
 manager-web/test-results/
+playwright-report/
+manager-web/playwright-report/

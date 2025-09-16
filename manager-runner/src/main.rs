@@ -13,32 +13,40 @@ struct Args {
     clean: bool,
 }
 
-/// Kill any existing manager-runner instances
+/// Kill any existing manager-runner instances and standalone nocodo-manager processes
 fn kill_existing_instances() -> Result<()> {
-    info!("Checking for existing manager-runner instances...");
+    info!("Checking for existing manager-runner and nocodo-manager instances...");
 
     // Get current process ID to avoid killing ourselves
     let current_pid = std::process::id();
 
-    // Find all manager-runner processes
+    // Find all relevant processes
     let output = Command::new("ps")
         .args(["aux"])
         .output()
         .context("Failed to run ps command")?;
 
-    let output_str = String::from_utf8(output.stdout)
-        .context("Failed to parse ps output")?;
+    let output_str = String::from_utf8(output.stdout).context("Failed to parse ps output")?;
 
     let mut killed_count = 0;
 
     for line in output_str.lines() {
-        if line.contains("manager-runner") && !line.contains("grep") {
+        let should_kill = (line.contains("manager-runner") || line.contains("nocodo-manager"))
+            && !line.contains("grep");
+
+        if should_kill {
             // Extract PID (second column in ps aux output)
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 2 {
                 if let Ok(pid) = parts[1].parse::<u32>() {
                     if pid != current_pid {
-                        info!("Found existing manager-runner instance with PID: {}", pid);
+                        let process_type = if line.contains("manager-runner") {
+                            "manager-runner"
+                        } else {
+                            "nocodo-manager"
+                        };
+
+                        info!("Found existing {} instance with PID: {}", process_type, pid);
 
                         // Try to kill the process gracefully first (SIGTERM)
                         let kill_result = Command::new("kill")
@@ -47,16 +55,15 @@ fn kill_existing_instances() -> Result<()> {
 
                         match kill_result {
                             Ok(status) if status.success() => {
-                                info!("Successfully terminated manager-runner process {}", pid);
+                                info!("Successfully terminated {} process {}", process_type, pid);
                                 killed_count += 1;
 
                                 // Give it a moment to terminate gracefully
                                 std::thread::sleep(std::time::Duration::from_millis(500));
 
                                 // Check if it's still running and force kill if needed
-                                let check_result = Command::new("kill")
-                                    .args(["-0", &pid.to_string()])
-                                    .status();
+                                let check_result =
+                                    Command::new("kill").args(["-0", &pid.to_string()]).status();
 
                                 if check_result.is_ok() {
                                     warn!("Process {} still running, force killing...", pid);
@@ -66,7 +73,7 @@ fn kill_existing_instances() -> Result<()> {
                                 }
                             }
                             Ok(_) => {
-                                warn!("Failed to terminate manager-runner process {} (may have already been dead)", pid);
+                                warn!("Failed to terminate {} process {} (may have already been dead)", process_type, pid);
                             }
                             Err(e) => {
                                 warn!("Error killing process {}: {}", pid, e);
@@ -79,11 +86,11 @@ fn kill_existing_instances() -> Result<()> {
     }
 
     if killed_count > 0 {
-        info!("Killed {} existing manager-runner instance(s)", killed_count);
+        info!("Killed {} existing process instance(s)", killed_count);
         // Give processes time to fully clean up
         std::thread::sleep(std::time::Duration::from_millis(1000));
     } else {
-        info!("No existing manager-runner instances found");
+        info!("No existing manager-runner or nocodo-manager instances found");
     }
 
     Ok(())
