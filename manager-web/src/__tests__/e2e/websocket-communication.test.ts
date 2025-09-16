@@ -172,18 +172,17 @@ test.describe('WebSocket Communication', () => {
     expect(messages.length).toBeGreaterThan(0);
 
     // Check for tool execution indicators
-    const hasToolExecution = messages.some(msg =>
-      msg.type === 'LlmAgentChunk' &&
-      (msg.payload.content.includes('list_files') ||
-       msg.payload.content.includes('Executing') ||
-       msg.payload.content.includes('tool'))
+    const hasToolExecution = messages.some(
+      msg =>
+        msg.type === 'LlmAgentChunk' &&
+        (msg.payload.content.includes('list_files') ||
+          msg.payload.content.includes('Executing') ||
+          msg.payload.content.includes('tool'))
     );
     expect(hasToolExecution).toBeTruthy();
 
     // Check for status changes
-    const hasStatusChange = messages.some(msg =>
-      msg.type === 'AiSessionStatusChanged'
-    );
+    const hasStatusChange = messages.some(msg => msg.type === 'AiSessionStatusChanged');
     expect(hasStatusChange).toBeTruthy();
   });
 
@@ -214,11 +213,12 @@ test.describe('WebSocket Communication', () => {
     expect(chunkMessages.length).toBeGreaterThan(3);
 
     // Verify chunks contain file information
-    const fileRelatedChunks = chunkMessages.filter(chunk =>
-      chunk.payload.content.includes('README') ||
-      chunk.payload.content.includes('package.json') ||
-      chunk.payload.content.includes('Cargo.toml') ||
-      chunk.payload.content.includes('files')
+    const fileRelatedChunks = chunkMessages.filter(
+      chunk =>
+        chunk.payload.content.includes('README') ||
+        chunk.payload.content.includes('package.json') ||
+        chunk.payload.content.includes('Cargo.toml') ||
+        chunk.payload.content.includes('files')
     );
     expect(fileRelatedChunks.length).toBeGreaterThan(0);
 
@@ -250,19 +250,21 @@ test.describe('WebSocket Communication', () => {
     await page.waitForTimeout(8000);
 
     // Verify we received messages for both tools
-    const toolExecutionMessages = allMessages.filter(msg =>
-      msg.type === 'LlmAgentChunk' &&
-      (msg.payload.content.includes('list_files') ||
-       msg.payload.content.includes('read_file') ||
-       msg.payload.content.includes('Executing'))
+    const toolExecutionMessages = allMessages.filter(
+      msg =>
+        msg.type === 'LlmAgentChunk' &&
+        (msg.payload.content.includes('list_files') ||
+          msg.payload.content.includes('read_file') ||
+          msg.payload.content.includes('Executing'))
     );
     expect(toolExecutionMessages.length).toBeGreaterThan(1);
 
     // Verify session consistency across multiple tool calls
-    const sessionIds = [...new Set(allMessages
-      .filter(msg => msg.payload?.session_id)
-      .map(msg => msg.payload.session_id)
-    )];
+    const sessionIds = [
+      ...new Set(
+        allMessages.filter(msg => msg.payload?.session_id).map(msg => msg.payload.session_id)
+      ),
+    ];
     expect(sessionIds.length).toBe(1); // All messages should belong to same session
   });
 
@@ -362,9 +364,7 @@ test.describe('WebSocket Communication', () => {
 
     // In a real scenario, we might have error messages, but in our mock
     // we expect clean execution. Verify no unexpected errors occurred.
-    const unexpectedErrors = errorMessages.filter(msg =>
-      !msg.payload.message.includes('expected')
-    );
+    const unexpectedErrors = errorMessages.filter(msg => !msg.payload.message.includes('expected'));
     expect(unexpectedErrors.length).toBe(0);
 
     // Verify normal operation continued despite any handled errors
