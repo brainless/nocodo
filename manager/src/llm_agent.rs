@@ -300,8 +300,8 @@ impl LlmAgent {
                 "Processing tool calls from LLM response"
             );
 
-            // Extract JSON tool calls from response
-            let tool_calls = self.extract_tool_calls(response)?;
+            // Extract JSON tool calls from response with retry mechanism
+            let tool_calls = self.extract_tool_calls_with_retry(session_id, response, depth).await?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_count = %tool_calls.len(),
@@ -741,10 +741,117 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         result
     }
 
-    /// Extract tool calls from response
+    /// Extract tool calls from response with JSON error retry
+    fn extract_tool_calls_with_retry<'a>(
+        &'a self,
+        session_id: &'a str,
+        response: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<serde_json::Value>>> + Send + 'a>> {
+        Box::pin(async move {
+        const MAX_JSON_RETRY_DEPTH: u32 = 3; // Maximum retries for JSON parsing errors
+
+        let tool_calls = self.extract_tool_calls(response)?;
+
+        // If we successfully extracted tool calls, return them
+        if !tool_calls.is_empty() {
+            return Ok(tool_calls);
+        }
+
+        // If we have no tool calls but the response contains tool keywords and JSON structure,
+        // it might be malformed JSON that we should ask the LLM to fix
+        if self.contains_tool_calls(response) && depth < MAX_JSON_RETRY_DEPTH {
+            tracing::warn!(
+                session_id = %session_id,
+                retry_depth = %depth,
+                max_depth = %MAX_JSON_RETRY_DEPTH,
+                "No tool calls extracted but tool call detected - attempting JSON correction retry"
+            );
+
+            return self.retry_json_parsing(session_id, response, depth).await;
+        }
+
+        // No tool calls found and no retry needed
+        Ok(tool_calls)
+        })
+    }
+
+    /// Ask LLM to fix malformed JSON and retry parsing
+    fn retry_json_parsing<'a>(
+        &'a self,
+        session_id: &'a str,
+        malformed_response: &'a str,
+        depth: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<serde_json::Value>>> + Send + 'a>> {
+        Box::pin(async move {
+        use crate::models::ToolRequest;
+
+        // Try to identify specific JSON parsing errors
+        let mut error_details = Vec::new();
+
+        // Test common JSON patterns to find specific errors
+        if let Err(e) = serde_json::from_str::<ToolRequest>(malformed_response.trim()) {
+            error_details.push(format!("Full response parse error: {}", e));
+        }
+
+        // Look for JSON-like structures and test them
+        for line in malformed_response.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') && trimmed.contains("type") {
+                if let Err(e) = serde_json::from_str::<ToolRequest>(trimmed) {
+                    error_details.push(format!("Line '{}' parse error: {}", trimmed, e));
+                }
+            }
+        }
+
+        let error_message = if error_details.is_empty() {
+            "Could not identify specific JSON parsing errors".to_string()
+        } else {
+            error_details.join("; ")
+        };
+
+        tracing::info!(
+            session_id = %session_id,
+            retry_depth = %depth,
+            error_details = %error_message,
+            "Asking LLM to fix malformed JSON"
+        );
+
+        // Create a message asking the LLM to fix the JSON
+        let fix_request = format!(
+            r#"The previous response contained malformed JSON that could not be parsed. Please fix the JSON and provide a valid tool call.
+
+Original response:
+{}
+
+Parsing errors:
+{}
+
+Please provide a corrected JSON tool call that follows the exact TypeScript interface format. The JSON must be valid and properly formatted with all required commas and quotation marks."#,
+            malformed_response, error_message
+        );
+
+        // Add the error correction request to the session
+        self.db.create_llm_agent_message(
+            session_id,
+            "user",
+            fix_request,
+        )?;
+
+        // Get corrected response from LLM using the same mechanism as follow-up
+        let corrected_response = self.follow_up_with_llm_with_depth(session_id, depth).await?;
+
+        // Try to extract tool calls from the corrected response
+        self.extract_tool_calls_with_retry(session_id, &corrected_response, depth + 1)
+            .await
+        })
+    }
+
+    /// Extract tool calls from response (internal method)
     fn extract_tool_calls(&self, response: &str) -> Result<Vec<serde_json::Value>> {
         use crate::models::ToolRequest;
         let mut tool_calls = Vec::new();
+        let mut json_parsing_errors = Vec::new();
 
         tracing::debug!(
             response_length = %response.len(),
@@ -752,13 +859,22 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         );
 
         // Try parsing the entire response as a ToolRequest first
-        if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(response.trim()) {
-            let json_value = serde_json::to_value(tool_request)?;
-            tracing::info!(
-                "Successfully parsed full response as ToolRequest"
-            );
-            tool_calls.push(json_value);
-            return Ok(tool_calls);
+        match serde_json::from_str::<ToolRequest>(response.trim()) {
+            Ok(tool_request) => {
+                let json_value = serde_json::to_value(tool_request)?;
+                tracing::info!(
+                    "Successfully parsed full response as ToolRequest"
+                );
+                tool_calls.push(json_value);
+                return Ok(tool_calls);
+            }
+            Err(e) => {
+                tracing::debug!(
+                    error = %e,
+                    "Failed to parse full response as ToolRequest, trying line-by-line"
+                );
+                json_parsing_errors.push((response.trim().to_string(), e.to_string()));
+            }
         }
 
         // If that didn't work, try line-by-line extraction
@@ -771,13 +887,23 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
                     "Attempting to parse line as ToolRequest"
                 );
 
-                if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(trimmed) {
-                    let json_value = serde_json::to_value(tool_request)?;
-                    tracing::info!(
-                        line_number = %line_num,
-                        "Successfully parsed line as ToolRequest"
-                    );
-                    tool_calls.push(json_value);
+                match serde_json::from_str::<ToolRequest>(trimmed) {
+                    Ok(tool_request) => {
+                        let json_value = serde_json::to_value(tool_request)?;
+                        tracing::info!(
+                            line_number = %line_num,
+                            "Successfully parsed line as ToolRequest"
+                        );
+                        tool_calls.push(json_value);
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            line_number = %line_num,
+                            error = %e,
+                            "Failed to parse line as ToolRequest"
+                        );
+                        json_parsing_errors.push((trimmed.to_string(), e.to_string()));
+                    }
                 }
             }
         }
@@ -806,12 +932,21 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
                                     "Attempting to parse multi-line JSON block as ToolRequest"
                                 );
 
-                                if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&json_str) {
-                                    let json_value = serde_json::to_value(tool_request)?;
-                                    tracing::info!(
-                                        "Successfully parsed multi-line JSON block as ToolRequest"
-                                    );
-                                    tool_calls.push(json_value);
+                                match serde_json::from_str::<ToolRequest>(&json_str) {
+                                    Ok(tool_request) => {
+                                        let json_value = serde_json::to_value(tool_request)?;
+                                        tracing::info!(
+                                            "Successfully parsed multi-line JSON block as ToolRequest"
+                                        );
+                                        tool_calls.push(json_value);
+                                    }
+                                    Err(e) => {
+                                        tracing::debug!(
+                                            error = %e,
+                                            "Failed to parse multi-line JSON block as ToolRequest"
+                                        );
+                                        json_parsing_errors.push((json_str, e.to_string()));
+                                    }
                                 }
                             }
                             json_start = None;
@@ -822,8 +957,25 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
             }
         }
 
+        // If we have no tool calls but we have parsing errors, store them for potential retry
+        if tool_calls.is_empty() && !json_parsing_errors.is_empty() {
+            tracing::warn!(
+                error_count = %json_parsing_errors.len(),
+                "Failed to extract any tool calls due to JSON parsing errors"
+            );
+
+            for (json_str, error) in &json_parsing_errors {
+                tracing::error!(
+                    malformed_json = %json_str,
+                    parse_error = %error,
+                    "JSON parsing error detected"
+                );
+            }
+        }
+
         tracing::info!(
             extracted_tool_calls = %tool_calls.len(),
+            parsing_errors = %json_parsing_errors.len(),
             "Completed tool call extraction"
         );
 
@@ -1132,5 +1284,167 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
             }
             _ => panic!("Wrong tool request type"),
         }
+    }
+
+    #[test]
+    fn test_malformed_json_from_llm() {
+        use crate::models::ToolRequest;
+
+        // Test the exact malformed JSON you saw in the output
+        let malformed_json = r#"{"type": "read_file "path": "/home/noc/Projects/rust-ui-test/README.md","max_size": 5000}"#;
+
+        println!("Testing malformed JSON: {}", malformed_json);
+
+        let result = serde_json::from_str::<ToolRequest>(malformed_json);
+
+        match result {
+            Ok(_) => {
+                println!("Unexpectedly parsed successfully!");
+                panic!("This JSON should have failed to parse");
+            }
+            Err(e) => {
+                println!("JSON parsing error (as expected): {}", e);
+                println!("Error kind: {:?}", e.classify());
+
+                // This is actually a data error, not syntax - the JSON is valid but the enum variant is wrong
+                assert!(e.is_data());
+
+                // The error message should mention the unknown variant
+                assert!(e.to_string().contains("unknown variant"));
+                assert!(e.to_string().contains("read_file "));
+            }
+        }
+
+        // Test a true syntax error - missing comma between fields
+        let syntax_error_json = r#"{"type": "read_file", "path": "/test" "max_size": 1000}"#;
+        println!("Testing syntax error JSON: {}", syntax_error_json);
+
+        let result2 = serde_json::from_str::<ToolRequest>(syntax_error_json);
+
+        match result2 {
+            Ok(_) => panic!("This JSON should have failed to parse"),
+            Err(e) => {
+                println!("Syntax error (as expected): {}", e);
+                println!("Error kind: {:?}", e.classify());
+                assert!(e.is_syntax());
+            }
+        }
+
+        // Test the missing comma at the beginning - the actual issue you observed
+        let missing_comma_json = r#"{"type": "read_file" "path": "/home/noc/Projects/rust-ui-test/README.md","max_size": 5000}"#;
+        println!("Testing missing comma JSON: {}", missing_comma_json);
+
+        let result3 = serde_json::from_str::<ToolRequest>(missing_comma_json);
+
+        match result3 {
+            Ok(_) => panic!("This JSON should have failed to parse"),
+            Err(e) => {
+                println!("Missing comma error: {}", e);
+                println!("Error kind: {:?}", e.classify());
+                // This should be a syntax error
+                assert!(e.is_syntax());
+            }
+        }
+    }
+
+    #[test]
+    fn test_json_error_detection_and_messaging() {
+        use crate::models::ToolRequest;
+
+        // Test various malformed JSON scenarios and verify error messages
+        let test_cases = vec![
+            (
+                r#"{"type": "read_file" "path": "/test.txt"}"#,
+                "expected `,` or `}` at line 1 column 22",
+                true, // is_syntax
+            ),
+            (
+                r#"{"type": "invalid_tool", "path": "/test.txt"}"#,
+                "unknown variant `invalid_tool`",
+                false, // is_data, not syntax
+            ),
+            (
+                r#"{"type": "list_files"}"#,
+                "missing field `path`",
+                false, // is_data, not syntax
+            ),
+            (
+                r#"{"type": "read_file", "path": "/test.txt", "max_size": "not_a_number"}"#,
+                "invalid type",
+                false, // is_data, not syntax
+            ),
+        ];
+
+        for (json_str, expected_error_fragment, should_be_syntax) in test_cases {
+            println!("Testing JSON: {}", json_str);
+
+            let result = serde_json::from_str::<ToolRequest>(json_str);
+
+            match result {
+                Ok(_) => panic!("Expected parsing to fail for: {}", json_str),
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    println!("Error: {}", error_msg);
+
+                    // Check if the error message contains expected fragment
+                    assert!(
+                        error_msg.to_lowercase().contains(&expected_error_fragment.to_lowercase()),
+                        "Error '{}' should contain '{}'", error_msg, expected_error_fragment
+                    );
+
+                    // Check error classification
+                    if should_be_syntax {
+                        assert!(e.is_syntax(), "Error should be syntax error: {}", error_msg);
+                    } else {
+                        assert!(e.is_data(), "Error should be data error: {}", error_msg);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_json_retry_message_generation() {
+        // Test that we can generate helpful error messages for the LLM
+        let malformed_json = r#"{"type": "read_file" "path": "/home/noc/Projects/rust-ui-test/README.md","max_size": 5000}"#;
+
+        // This simulates what our retry_json_parsing method would do
+        let mut error_details = Vec::new();
+
+        if let Err(e) = serde_json::from_str::<crate::models::ToolRequest>(malformed_json.trim()) {
+            error_details.push(format!("Full response parse error: {}", e));
+        }
+
+        let error_message = error_details.join("; ");
+
+        println!("Generated error message for LLM: {}", error_message);
+
+        // Verify the error message contains useful information
+        assert!(error_message.contains("expected `,` or `}`"));
+        assert!(error_message.contains("line 1 column"));
+
+        // Test that the fix request message is helpful
+        let fix_request = format!(
+            r#"The previous response contained malformed JSON that could not be parsed. Please fix the JSON and provide a valid tool call.
+
+Original response:
+{}
+
+Parsing errors:
+{}
+
+Please provide a corrected JSON tool call that follows the exact TypeScript interface format. The JSON must be valid and properly formatted with all required commas and quotation marks."#,
+            malformed_json, error_message
+        );
+
+        println!("Generated fix request:\n{}", fix_request);
+
+        // Verify the fix request contains all necessary components
+        assert!(fix_request.contains("malformed JSON"));
+        assert!(fix_request.contains("Original response:"));
+        assert!(fix_request.contains("Parsing errors:"));
+        assert!(fix_request.contains("TypeScript interface format"));
+        assert!(fix_request.contains(malformed_json));
+        assert!(fix_request.contains(&error_message));
     }
 }
