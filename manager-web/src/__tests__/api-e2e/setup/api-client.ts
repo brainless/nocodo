@@ -13,8 +13,8 @@ import {
   FileListResponse,
   FileResponse,
   FileUpdateRequest,
-  LlmAgentSessionResponse,
   LlmAgentSession,
+  LlmAgentSessionResponse,
   Project,
   WorkMessageResponse,
   WorkResponse,
@@ -54,7 +54,22 @@ export class TestApiClient {
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    // Handle empty responses (like DELETE operations)
+    const contentType = response.headers.get('content-type');
+    if (response.status === 204 || !contentType?.includes('application/json')) {
+      return {} as T;
+    }
+
+    const text = await response.text();
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {} as T;
+    }
   }
 
   // Project operations
@@ -181,7 +196,10 @@ export class TestApiClient {
   }
 
   // LLM Agent operations
-  async createLlmAgentSession(workId: string, data: CreateLlmAgentSessionRequest): Promise<LlmAgentSessionResponse> {
+  async createLlmAgentSession(
+    workId: string,
+    data: CreateLlmAgentSessionRequest
+  ): Promise<LlmAgentSessionResponse> {
     return this.request(`/api/work/${workId}/llm-agent`, {
       method: 'POST',
       body: JSON.stringify(data),

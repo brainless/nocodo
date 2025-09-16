@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -64,9 +64,11 @@ describe('Performance and Load Testing - API Only', () => {
 
     it('should measure file operation performance', async () => {
       // Create test project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'File Perf Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'File Perf Test Project',
+        })
+      );
 
       const operations = 30;
       const fileSize = 10000; // 10KB files
@@ -180,9 +182,11 @@ describe('Performance and Load Testing - API Only', () => {
 
     it('should handle mixed concurrent operations', async () => {
       // Create base project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Mixed Load Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Mixed Load Test Project',
+        })
+      );
 
       const operationCount = 50;
       const operations = [];
@@ -239,9 +243,11 @@ describe('Performance and Load Testing - API Only', () => {
     });
 
     it('should handle sustained load over time', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Sustained Load Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Sustained Load Test Project',
+        })
+      );
 
       const duration = 10000; // 10 seconds
       const startTime = performance.now();
@@ -299,9 +305,11 @@ describe('Performance and Load Testing - API Only', () => {
 
   describe('Memory and Resource Usage', () => {
     it('should handle large dataset operations without memory issues', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Memory Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Memory Test Project',
+        })
+      );
 
       const fileCount = 100;
       const avgFileSize = 5000; // 5KB average
@@ -404,9 +412,11 @@ describe('Performance and Load Testing - API Only', () => {
 
   describe('Database Performance Under Load', () => {
     it('should measure database operation performance', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'DB Perf Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'DB Perf Test Project',
+        })
+      );
 
       const operations = 100;
       const timings: { create: number[]; read: number[]; update: number[] } = {
@@ -431,7 +441,8 @@ describe('Performance and Load Testing - API Only', () => {
       const workList = await testApiClient.listWork();
       const dbWorks = workList.works.filter(w => w.title.startsWith('DB Perf Work'));
 
-      for (const work of dbWorks.slice(0, 50)) { // Test first 50 reads
+      for (const work of dbWorks.slice(0, 50)) {
+        // Test first 50 reads
         const startTime = performance.now();
         await testApiClient.getWork(work.id);
         const endTime = performance.now();
@@ -454,9 +465,11 @@ describe('Performance and Load Testing - API Only', () => {
     });
 
     it('should handle database transaction integrity under concurrent load', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'DB Transaction Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'DB Transaction Test Project',
+        })
+      );
 
       const concurrentTransactions = 10;
       const operationsPerTransaction = 5;
@@ -521,9 +534,11 @@ describe('Performance and Load Testing - API Only', () => {
 
   describe('System Resource Monitoring', () => {
     it('should monitor API response time degradation under load', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Load Degradation Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Load Degradation Test Project',
+        })
+      );
 
       const testPhases = [
         { operations: 10, name: 'Light Load' },
@@ -568,7 +583,7 @@ describe('Performance and Load Testing - API Only', () => {
       // Analyze degradation
       const degradation = phaseResults.map((result, index) => ({
         ...result,
-        degradation: index > 0 ? (result.avgResponseTime / phaseResults[0].avgResponseTime) : 1,
+        degradation: index > 0 ? result.avgResponseTime / phaseResults[0].avgResponseTime : 1,
       }));
 
       console.log('Load Degradation Analysis:');
@@ -592,9 +607,11 @@ describe('Performance and Load Testing - API Only', () => {
     });
 
     it('should test system recovery after load spikes', async () => {
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Recovery Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Recovery Test Project',
+        })
+      );
 
       // Phase 1: Normal load
       const normalOperations = 20;

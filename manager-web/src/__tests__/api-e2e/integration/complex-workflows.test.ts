@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -28,11 +28,13 @@ describe('Complex Workflows - API Only', () => {
       console.log('🔍 Phase 1: Project Setup and Analysis');
 
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Complex Feature Development',
-        language: 'rust',
-        description: 'Testing complete feature development workflow',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Complex Feature Development',
+          language: 'rust',
+          description: 'Testing complete feature development workflow',
+        })
+      );
 
       // Create initial project structure
       const initialFiles = [
@@ -65,15 +67,19 @@ describe('Complex Workflows - API Only', () => {
       console.log('📋 Phase 2: Feature Planning');
 
       // Create work session for feature planning
-      const planningWork = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Feature Planning: User Management System',
-        tool_name: 'llm-agent',
-        project_id: project.id,
-      }));
+      const planningWork = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Feature Planning: User Management System',
+          tool_name: 'llm-agent',
+          project_id: project.id,
+        })
+      );
 
       // Add planning requirements
-      await testApiClient.addMessageToWork(planningWork.work.id, testDataGenerator.generateMessageData({
-        content: `Plan and implement a user management system with the following features:
+      await testApiClient.addMessageToWork(
+        planningWork.work.id,
+        testDataGenerator.generateMessageData({
+          content: `Plan and implement a user management system with the following features:
         1. User registration and authentication
         2. User profile management
         3. Role-based access control
@@ -81,12 +87,19 @@ describe('Complex Workflows - API Only', () => {
         5. Account deactivation/reactivation
 
         Start with analysis and design, then implement step by step.`,
-        author_type: 'user',
-      }));
+          author_type: 'user',
+        })
+      );
 
       // AI analysis and planning
-      await testApiClient.createAiSession(planningWork.work.id, testDataGenerator.generateAiSessionData());
-      await testApiClient.recordAiOutput(planningWork.work.id, 'Analyzing requirements and creating implementation plan...');
+      await testApiClient.createAiSession(
+        planningWork.work.id,
+        testDataGenerator.generateAiSessionData()
+      );
+      await testApiClient.recordAiOutput(
+        planningWork.work.id,
+        'Analyzing requirements and creating implementation plan...'
+      );
 
       // Create design document
       const designDoc = testDataGenerator.generateFileData({
@@ -114,25 +127,40 @@ describe('Complex Workflows - API Only', () => {
       });
       await testApiClient.createFile(designDoc);
 
-      await testApiClient.recordAiOutput(planningWork.work.id, 'Design document created. Ready to start implementation.');
+      await testApiClient.recordAiOutput(
+        planningWork.work.id,
+        'Design document created. Ready to start implementation.'
+      );
 
       // === PHASE 3: Core Implementation ===
       console.log('⚙️ Phase 3: Core Implementation');
 
       // Create implementation work session
-      const implementationWork = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Implementation: Core User Model',
-        tool_name: 'llm-agent',
-        project_id: project.id,
-      }));
+      const implementationWork = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Implementation: Core User Model',
+          tool_name: 'llm-agent',
+          project_id: project.id,
+        })
+      );
 
-      await testApiClient.addMessageToWork(implementationWork.work.id, testDataGenerator.generateMessageData({
-        content: 'Implement the core user model with basic CRUD operations. Include password hashing and validation.',
-        author_type: 'user',
-      }));
+      await testApiClient.addMessageToWork(
+        implementationWork.work.id,
+        testDataGenerator.generateMessageData({
+          content:
+            'Implement the core user model with basic CRUD operations. Include password hashing and validation.',
+          author_type: 'user',
+        })
+      );
 
-      const aiSession = await testStateManager.addAiSession(implementationWork.work.id, testDataGenerator.generateAiSessionData());
-      await testApiClient.recordAiOutput(implementationWork.work.id, 'Starting core user model implementation...');
+      const aiSession = await testStateManager.addAiSession(
+        implementationWork.work.id,
+        testDataGenerator.generateAiSessionData()
+      );
+      await testApiClient.recordAiOutput(
+        implementationWork.work.id,
+        'Starting core user model implementation...'
+      );
 
       // Implement user model
       const userModel = testDataGenerator.generateFileData({
@@ -336,25 +364,39 @@ impl UserService {
       });
       await testApiClient.createFile(userService);
 
-      await testApiClient.recordAiOutput(implementationWork.work.id, 'Core user model and service implemented successfully.');
+      await testApiClient.recordAiOutput(
+        implementationWork.work.id,
+        'Core user model and service implemented successfully.'
+      );
 
       // === PHASE 4: Authentication System ===
       console.log('🔐 Phase 4: Authentication System');
 
       // Create authentication work session
-      const authWork = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Implementation: Authentication System',
-        tool_name: 'llm-agent',
-        project_id: project.id,
-      }));
+      const authWork = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Implementation: Authentication System',
+          tool_name: 'llm-agent',
+          project_id: project.id,
+        })
+      );
 
-      await testApiClient.addMessageToWork(authWork.work.id, testDataGenerator.generateMessageData({
-        content: 'Implement JWT-based authentication system with login/register endpoints.',
-        author_type: 'user',
-      }));
+      await testApiClient.addMessageToWork(
+        authWork.work.id,
+        testDataGenerator.generateMessageData({
+          content: 'Implement JWT-based authentication system with login/register endpoints.',
+          author_type: 'user',
+        })
+      );
 
-      await testApiClient.createAiSession(authWork.work.id, testDataGenerator.generateAiSessionData());
-      await testApiClient.recordAiOutput(authWork.work.id, 'Implementing JWT authentication system...');
+      await testApiClient.createAiSession(
+        authWork.work.id,
+        testDataGenerator.generateAiSessionData()
+      );
+      await testApiClient.recordAiOutput(
+        authWork.work.id,
+        'Implementing JWT authentication system...'
+      );
 
       // Implement auth service
       const authService = testDataGenerator.generateFileData({
@@ -484,24 +526,36 @@ impl AuthService {
       });
       await testApiClient.createFile(authService);
 
-      await testApiClient.recordAiOutput(authWork.work.id, 'JWT authentication system implemented.');
+      await testApiClient.recordAiOutput(
+        authWork.work.id,
+        'JWT authentication system implemented.'
+      );
 
       // === PHASE 5: API Routes and Integration ===
       console.log('🌐 Phase 5: API Routes and Integration');
 
       // Create API routes work session
-      const apiWork = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Implementation: API Routes and Integration',
-        tool_name: 'llm-agent',
-        project_id: project.id,
-      }));
+      const apiWork = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Implementation: API Routes and Integration',
+          tool_name: 'llm-agent',
+          project_id: project.id,
+        })
+      );
 
-      await testApiClient.addMessageToWork(apiWork.work.id, testDataGenerator.generateMessageData({
-        content: 'Create REST API routes for user management and authentication using Axum framework.',
-        author_type: 'user',
-      }));
+      await testApiClient.addMessageToWork(
+        apiWork.work.id,
+        testDataGenerator.generateMessageData({
+          content:
+            'Create REST API routes for user management and authentication using Axum framework.',
+          author_type: 'user',
+        })
+      );
 
-      await testApiClient.createAiSession(apiWork.work.id, testDataGenerator.generateAiSessionData());
+      await testApiClient.createAiSession(
+        apiWork.work.id,
+        testDataGenerator.generateAiSessionData()
+      );
       await testApiClient.recordAiOutput(apiWork.work.id, 'Creating REST API routes with Axum...');
 
       // Implement API routes
@@ -730,7 +784,10 @@ tower-http = "0.5"`,
         project_id: project.id,
       });
 
-      await testApiClient.recordAiOutput(apiWork.work.id, 'REST API routes and main application integration completed.');
+      await testApiClient.recordAiOutput(
+        apiWork.work.id,
+        'REST API routes and main application integration completed.'
+      );
 
       // === PHASE 6: Testing and Validation ===
       console.log('✅ Phase 6: Testing and Validation');
@@ -800,7 +857,10 @@ mod tests {
       });
       await testApiClient.createFile(testFile);
 
-      await testApiClient.recordAiOutput(apiWork.work.id, 'Comprehensive unit tests added for user management system.');
+      await testApiClient.recordAiOutput(
+        apiWork.work.id,
+        'Comprehensive unit tests added for user management system.'
+      );
 
       // === PHASE 7: Documentation and Finalization ===
       console.log('📚 Phase 7: Documentation and Finalization');
@@ -936,15 +996,19 @@ This project was developed using a complete LLM agent workflow:
   describe('Error Recovery and Resilience', () => {
     it('should handle partial failures and recover gracefully', async () => {
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Error Recovery Test',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Error Recovery Test',
+        })
+      );
 
       // Create work session
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Error recovery workflow',
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Error recovery workflow',
+          project_id: project.id,
+        })
+      );
 
       // Simulate partial success scenario
       await testApiClient.recordAiOutput(work.work.id, 'Starting error recovery test...');
@@ -967,7 +1031,10 @@ This project was developed using a complete LLM agent workflow:
         await testApiClient.createFile(invalidFile);
         expect.fail('Should have rejected invalid file path');
       } catch (error) {
-        await testApiClient.recordAiOutput(work.work.id, 'Handled invalid file path error gracefully');
+        await testApiClient.recordAiOutput(
+          work.work.id,
+          'Handled invalid file path error gracefully'
+        );
       }
 
       // Continue with successful operations
@@ -978,7 +1045,10 @@ This project was developed using a complete LLM agent workflow:
       });
       await testApiClient.createFile(successFile2);
 
-      await testApiClient.recordAiOutput(work.work.id, 'Workflow resumed successfully after error handling');
+      await testApiClient.recordAiOutput(
+        work.work.id,
+        'Workflow resumed successfully after error handling'
+      );
 
       // Verify final state
       const fileList = await testApiClient.listFiles({ project_id: project.id });
@@ -991,36 +1061,46 @@ This project was developed using a complete LLM agent workflow:
 
     it('should handle concurrent workflow conflicts', async () => {
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Concurrency Test',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Concurrency Test',
+        })
+      );
 
       // Create multiple work sessions trying to modify the same file
-      const work1 = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Concurrent workflow 1',
-        project_id: project.id,
-      }));
+      const work1 = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Concurrent workflow 1',
+          project_id: project.id,
+        })
+      );
 
-      const work2 = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Concurrent workflow 2',
-        project_id: project.id,
-      }));
+      const work2 = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Concurrent workflow 2',
+          project_id: project.id,
+        })
+      );
 
       // Both workflows try to create the same file
       const sharedFile = 'shared-file.txt';
 
       // Start both operations
-      const operation1 = testApiClient.createFile(testDataGenerator.generateFileData({
-        project_id: project.id,
-        path: sharedFile,
-        content: 'Content from workflow 1',
-      }));
+      const operation1 = testApiClient.createFile(
+        testDataGenerator.generateFileData({
+          project_id: project.id,
+          path: sharedFile,
+          content: 'Content from workflow 1',
+        })
+      );
 
-      const operation2 = testApiClient.createFile(testDataGenerator.generateFileData({
-        project_id: project.id,
-        path: sharedFile,
-        content: 'Content from workflow 2',
-      }));
+      const operation2 = testApiClient.createFile(
+        testDataGenerator.generateFileData({
+          project_id: project.id,
+          path: sharedFile,
+          content: 'Content from workflow 2',
+        })
+      );
 
       // One should succeed, one should fail (depending on API implementation)
       let successCount = 0;
@@ -1032,7 +1112,10 @@ This project was developed using a complete LLM agent workflow:
         await testApiClient.recordAiOutput(work1.work.id, 'Successfully created shared file');
       } catch (error) {
         failureCount++;
-        await testApiClient.recordAiOutput(work1.work.id, 'File creation failed - concurrent conflict');
+        await testApiClient.recordAiOutput(
+          work1.work.id,
+          'File creation failed - concurrent conflict'
+        );
       }
 
       try {
@@ -1041,7 +1124,10 @@ This project was developed using a complete LLM agent workflow:
         await testApiClient.recordAiOutput(work2.work.id, 'Successfully created shared file');
       } catch (error) {
         failureCount++;
-        await testApiClient.recordAiOutput(work2.work.id, 'File creation failed - concurrent conflict');
+        await testApiClient.recordAiOutput(
+          work2.work.id,
+          'File creation failed - concurrent conflict'
+        );
       }
 
       // Either both succeed (if API allows overwrites) or one succeeds and one fails
@@ -1058,16 +1144,23 @@ This project was developed using a complete LLM agent workflow:
   describe('Performance Under Load', () => {
     it('should handle high-frequency operations efficiently', async () => {
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Performance Load Test',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Performance Load Test',
+        })
+      );
 
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'High-frequency operations test',
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'High-frequency operations test',
+          project_id: project.id,
+        })
+      );
 
-      await testApiClient.recordAiOutput(work.work.id, 'Starting high-frequency operations test...');
+      await testApiClient.recordAiOutput(
+        work.work.id,
+        'Starting high-frequency operations test...'
+      );
 
       const operationCount = 50;
       const operations = [];
@@ -1087,7 +1180,8 @@ This project was developed using a complete LLM agent workflow:
       const endTime = Date.now();
       const duration = endTime - startTime;
 
-      await testApiClient.recordAiOutput(work.work.id,
+      await testApiClient.recordAiOutput(
+        work.work.id,
         `Completed ${operationCount} operations in ${duration}ms`
       );
 
@@ -1104,16 +1198,19 @@ This project was developed using a complete LLM agent workflow:
       console.log(`Performance: ${opsPerSecond.toFixed(2)} operations/second`);
 
       // Record performance metrics
-      await testApiClient.recordAiOutput(work.work.id,
+      await testApiClient.recordAiOutput(
+        work.work.id,
         `Performance metrics: ${opsPerSecond.toFixed(2)} ops/sec, ${duration}ms total`
       );
     });
 
     it('should maintain state consistency during rapid updates', async () => {
       // Create project and file
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'State Consistency Test',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'State Consistency Test',
+        })
+      );
 
       const initialContent = 'Initial content';
       const testFile = testDataGenerator.generateFileData({
@@ -1123,10 +1220,12 @@ This project was developed using a complete LLM agent workflow:
       });
       await testApiClient.createFile(testFile);
 
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'State consistency during rapid updates',
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'State consistency during rapid updates',
+          project_id: project.id,
+        })
+      );
 
       await testApiClient.recordAiOutput(work.work.id, 'Starting rapid update consistency test...');
 
@@ -1158,7 +1257,8 @@ This project was developed using a complete LLM agent workflow:
       const stateValidation = testStateManager.validateStateConsistency();
       expect(stateValidation.valid).toBe(true);
 
-      await testApiClient.recordAiOutput(work.work.id,
+      await testApiClient.recordAiOutput(
+        work.work.id,
         `State consistency maintained: ${updateCount} rapid updates in ${duration}ms`
       );
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -29,13 +29,12 @@ describe('End-to-End Workflow - API Only', () => {
 
       // Create project
       const projectData = testDataGenerator.generateProjectData({
-        name: 'E2E Test Project',
         language: 'rust',
         description: 'Complete end-to-end workflow test project',
       });
       const project = await testApiClient.createProject(projectData);
       expect(project.id).toBeDefined();
-      expect(project.name).toBe('E2E Test Project');
+      expect(project.name).toBe(projectData.name);
 
       // Create initial project structure
       const initialFiles = [
@@ -109,7 +108,8 @@ edition = "2021"`,
       const cargoContent = await testApiClient.getFileContent('Cargo.toml', project.id);
       const mainContent = await testApiClient.getFileContent('src/main.rs', project.id);
 
-      await testApiClient.recordAiOutput(workId,
+      await testApiClient.recordAiOutput(
+        workId,
         `Analysis complete. Found Rust project with basic structure. README: ${readmeContent.content.substring(0, 50)}...`
       );
 
@@ -146,7 +146,10 @@ edition = "2021"`,
       });
       await testApiClient.createFile(planFile);
 
-      await testApiClient.recordAiOutput(workId, 'Implementation plan created. Starting with dependencies...');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Implementation plan created. Starting with dependencies...'
+      );
 
       // === PHASE 5: Dependency Management ===
       console.log('📦 Phase 5: Dependency Management');
@@ -173,7 +176,10 @@ tower-http = "0.5"`;
         project_id: project.id,
       });
 
-      await testApiClient.recordAiOutput(workId, 'Dependencies updated. Added authentication crates.');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Dependencies updated. Added authentication crates.'
+      );
 
       // === PHASE 6: Core Implementation ===
       console.log('⚙️ Phase 6: Core Implementation');
@@ -325,7 +331,10 @@ impl AuthService {
       });
       await testApiClient.createFile(authServiceFile);
 
-      await testApiClient.recordAiOutput(workId, 'Core authentication models and service implemented.');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Core authentication models and service implemented.'
+      );
 
       // === PHASE 7: Middleware and Routes ===
       console.log('🔒 Phase 7: Middleware and Routes');
@@ -436,7 +445,10 @@ async fn protected_route() -> Json<serde_json::Value> {
       });
       await testApiClient.createFile(routesFile);
 
-      await testApiClient.recordAiOutput(workId, 'Authentication routes and middleware implemented.');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Authentication routes and middleware implemented.'
+      );
 
       // === PHASE 8: Main Application Update ===
       console.log('🚀 Phase 8: Main Application Update');
@@ -483,7 +495,10 @@ async fn main() {
         project_id: project.id,
       });
 
-      await testApiClient.recordAiOutput(workId, 'Main application updated with authentication system.');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Main application updated with authentication system.'
+      );
 
       // === PHASE 9: Testing and Validation ===
       console.log('✅ Phase 9: Testing and Validation');
@@ -523,7 +538,10 @@ mod tests {
       });
       await testApiClient.createFile(testFile);
 
-      await testApiClient.recordAiOutput(workId, 'Basic unit tests added for authentication models.');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Basic unit tests added for authentication models.'
+      );
 
       // === PHASE 10: Documentation Update ===
       console.log('📚 Phase 10: Documentation Update');
@@ -586,7 +604,10 @@ cargo test
         project_id: project.id,
       });
 
-      await testApiClient.recordAiOutput(workId, 'Documentation updated with authentication API details.');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Documentation updated with authentication API details.'
+      );
 
       // === PHASE 11: Final Verification ===
       console.log('🎉 Phase 11: Final Verification');
@@ -609,7 +630,10 @@ cargo test
       const outputs = await testApiClient.listAiOutputs(workId);
       expect(outputs.outputs.length).toBeGreaterThan(5); // Multiple AI responses recorded
 
-      await testApiClient.recordAiOutput(workId, '🎉 Authentication system implementation complete! All features successfully implemented.');
+      await testApiClient.recordAiOutput(
+        workId,
+        '🎉 Authentication system implementation complete! All features successfully implemented.'
+      );
 
       console.log('✅ End-to-End Workflow Test Completed Successfully!');
     });
@@ -619,7 +643,7 @@ cargo test
     it('should handle and recover from workflow interruptions', async () => {
       // Create project and work session
       const projectData = testDataGenerator.generateProjectData({
-        name: 'Error Recovery Test Project',
+        description: 'Error recovery test project',
       });
       const project = await testApiClient.createProject(projectData);
 
@@ -650,10 +674,16 @@ cargo test
       });
       await testApiClient.createFile(recoveryFile);
 
-      await testApiClient.recordAiOutput(workId, 'Error recovery complete - workflow resumed successfully');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Error recovery complete - workflow resumed successfully'
+      );
 
       // Verify recovery was successful
-      const recoveryFileContent = await testApiClient.getFileContent('error-recovery-log.txt', project.id);
+      const recoveryFileContent = await testApiClient.getFileContent(
+        'error-recovery-log.txt',
+        project.id
+      );
       expect(recoveryFileContent.content).toContain('Error recovery successful');
     });
 
@@ -682,9 +712,12 @@ cargo test
         const workId = work.id;
 
         // Add message
-        await testApiClient.addMessageToWork(workId, testDataGenerator.generateMessageData({
-          content: `Concurrent operation ${index + 1}`,
-        }));
+        await testApiClient.addMessageToWork(
+          workId,
+          testDataGenerator.generateMessageData({
+            content: `Concurrent operation ${index + 1}`,
+          })
+        );
 
         // Create AI session
         await testApiClient.createAiSession(workId, testDataGenerator.generateAiSessionData());
@@ -713,7 +746,10 @@ cargo test
         expect(outputs.outputs.length).toBeGreaterThan(0);
 
         // Verify file was created
-        const fileContent = await testApiClient.getFileContent(`concurrent-file-${i + 1}.txt`, projects[i].id);
+        const fileContent = await testApiClient.getFileContent(
+          `concurrent-file-${i + 1}.txt`,
+          projects[i].id
+        );
         expect(fileContent.content).toContain(`concurrent file ${i + 1}`);
       }
     });
@@ -723,7 +759,7 @@ cargo test
     it('should handle high-volume file operations', async () => {
       // Create project for performance testing
       const projectData = testDataGenerator.generateProjectData({
-        name: 'Performance Test Project',
+        description: 'Performance test project',
       });
       const project = await testApiClient.createProject(projectData);
 
@@ -756,7 +792,8 @@ cargo test
       console.log(`Created ${fileCount} files in ${duration}ms`);
 
       // Record performance result
-      await testApiClient.recordAiOutput(workId,
+      await testApiClient.recordAiOutput(
+        workId,
         `Performance test: Created ${fileCount} files in ${duration}ms`
       );
 
@@ -772,7 +809,7 @@ cargo test
     it('should maintain data consistency across rapid operations', async () => {
       // Create project and work session
       const projectData = testDataGenerator.generateProjectData({
-        name: 'Consistency Test Project',
+        description: 'Consistency test project',
       });
       const project = await testApiClient.createProject(projectData);
 
@@ -808,7 +845,10 @@ cargo test
       expect(finalContent.content).toBe('Updated content v5');
 
       // Record consistency result
-      await testApiClient.recordAiOutput(workId, 'Data consistency maintained across rapid operations');
+      await testApiClient.recordAiOutput(
+        workId,
+        'Data consistency maintained across rapid operations'
+      );
 
       // Clean up
       await testApiClient.deleteFile(testFilePath, project.id);

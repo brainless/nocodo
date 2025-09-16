@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';

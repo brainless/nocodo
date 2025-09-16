@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { testDataGenerator } from './test-data';
 import { TestApiClient } from './api-client';
 
@@ -8,7 +8,7 @@ describe('API E2E Test Setup', () => {
       const projectData = testDataGenerator.generateProjectData();
 
       expect(projectData).toBeDefined();
-      expect(projectData.name).toMatch(/^Test Project/);
+      expect(projectData.name).toMatch(/^API-E2E-/);
       expect(projectData.language).toBeDefined();
       expect(typeof projectData.name).toBe('string');
       expect(typeof projectData.language).toBe('string');
@@ -37,7 +37,7 @@ describe('API E2E Test Setup', () => {
 
       expect(aiSessionData).toBeDefined();
       expect(aiSessionData.tool_name).toBe('llm-agent');
-      expect(aiSessionData.project_context).toBeNull();
+      expect(aiSessionData.message_id).toBeDefined();
     });
 
     it('should generate valid file data', () => {

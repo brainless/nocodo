@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testApiClient } from '../setup/api-client';
 import { testServer } from '../setup/test-server';
 import { testDatabase } from '../setup/test-database';
@@ -72,14 +72,18 @@ describe('Solid State Management Integration - API Only', () => {
 
     it('should synchronize state with API', async () => {
       // Create some data through API directly
-      const apiProject = await testApiClient.createProject(testDataGenerator.generateProjectData({
-        name: 'Sync Test Project',
-      }));
+      const apiProject = await testApiClient.createProject(
+        testDataGenerator.generateProjectData({
+          name: 'Sync Test Project',
+        })
+      );
 
-      const apiWork = await testApiClient.createWork(testDataGenerator.generateWorkData({
-        title: 'Sync Test Work',
-        project_id: apiProject.id,
-      }));
+      const apiWork = await testApiClient.createWork(
+        testDataGenerator.generateWorkData({
+          title: 'Sync Test Work',
+          project_id: apiProject.id,
+        })
+      );
 
       // State manager should not have this data initially
       expect(testStateManager.getProject(apiProject.id)).toBeUndefined();
@@ -103,16 +107,18 @@ describe('Solid State Management Integration - API Only', () => {
       let updateNotifications = 0;
       let lastUpdateData: any = null;
 
-      const unsubscribe = testStateManager.subscribe('work-updated', (data) => {
+      const unsubscribe = testStateManager.subscribe('work-updated', data => {
         updateNotifications++;
         lastUpdateData = data;
       });
 
       // Create and update a work session
       const project = await testStateManager.addProject(testDataGenerator.generateProjectData());
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          project_id: project.id,
+        })
+      );
 
       // Update the work session (simulate status change)
       await testStateManager.updateWorkSession(work.work.id);
@@ -144,13 +150,17 @@ describe('Solid State Management Integration - API Only', () => {
       });
 
       // Add projects
-      const project1 = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Reactive Project 1',
-      }));
+      const project1 = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Reactive Project 1',
+        })
+      );
 
-      const project2 = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Reactive Project 2',
-      }));
+      const project2 = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Reactive Project 2',
+        })
+      );
 
       // Verify reactive updates
       expect(addNotifications).toBe(2);
@@ -173,23 +183,30 @@ describe('Solid State Management Integration - API Only', () => {
 
     it('should handle complex state relationships', async () => {
       // Create a project with multiple work sessions and AI sessions
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Complex State Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Complex State Project',
+        })
+      );
 
       const workSessions = [];
       const aiSessions = [];
 
       // Create multiple work sessions
       for (let i = 0; i < 3; i++) {
-        const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-          title: `Complex Work ${i}`,
-          project_id: project.id,
-        }));
+        const work = await testStateManager.addWorkSession(
+          testDataGenerator.generateWorkData({
+            title: `Complex Work ${i}`,
+            project_id: project.id,
+          })
+        );
         workSessions.push(work);
 
         // Create AI session for each work session
-        const aiSession = await testStateManager.addAiSession(work.work.id, testDataGenerator.generateAiSessionData());
+        const aiSession = await testStateManager.addAiSession(
+          work.work.id,
+          testDataGenerator.generateAiSessionData()
+        );
         aiSessions.push(aiSession);
       }
 
@@ -223,18 +240,22 @@ describe('Solid State Management Integration - API Only', () => {
       });
 
       // Create project
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Batch Update Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Batch Update Project',
+        })
+      );
 
       // Perform batched operations
       const batchOperations = [];
       for (let i = 0; i < 5; i++) {
         batchOperations.push(
-          testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-            title: `Batch Work ${i}`,
-            project_id: project.id,
-          }))
+          testStateManager.addWorkSession(
+            testDataGenerator.generateWorkData({
+              title: `Batch Work ${i}`,
+              project_id: project.id,
+            })
+          )
         );
       }
 
@@ -257,21 +278,27 @@ describe('Solid State Management Integration - API Only', () => {
   describe('State Persistence and Recovery', () => {
     it('should persist state across operations', async () => {
       // Create initial state
-      const project1 = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Persistence Project 1',
-      }));
+      const project1 = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Persistence Project 1',
+        })
+      );
 
-      const work1 = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        title: 'Persistence Work 1',
-        project_id: project1.id,
-      }));
+      const work1 = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          title: 'Persistence Work 1',
+          project_id: project1.id,
+        })
+      );
 
       const initialSummary = testStateManager.getStateSummary();
 
       // Perform some operations that might affect persistence
-      const project2 = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Persistence Project 2',
-      }));
+      const project2 = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Persistence Project 2',
+        })
+      );
 
       // Sync with API (simulates persistence layer)
       await testStateManager.syncWithAPI();
@@ -289,22 +316,28 @@ describe('Solid State Management Integration - API Only', () => {
 
     it('should handle state recovery after API failures', async () => {
       // Create known good state
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Recovery Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Recovery Test Project',
+        })
+      );
 
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          project_id: project.id,
+        })
+      );
 
       const baselineSummary = testStateManager.getStateSummary();
 
       // Simulate API failure scenario (try operations that might fail)
       try {
         // Try to create work session with invalid project ID
-        await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-          project_id: 'invalid-project-id',
-        }));
+        await testStateManager.addWorkSession(
+          testDataGenerator.generateWorkData({
+            project_id: 'invalid-project-id',
+          })
+        );
         expect.fail('Should have failed with invalid project ID');
       } catch (error) {
         // Expected failure - state should remain consistent
@@ -324,13 +357,17 @@ describe('Solid State Management Integration - API Only', () => {
 
     it('should support state export/import patterns', async () => {
       // Create test state
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Export/Import Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Export/Import Test Project',
+        })
+      );
 
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          project_id: project.id,
+        })
+      );
 
       // Export state summary
       const exportedState = testStateManager.getStateSummary();
@@ -366,9 +403,11 @@ describe('Solid State Management Integration - API Only', () => {
         const startTime = performance.now();
 
         // Create project through state manager (includes state updates)
-        await testStateManager.addProject(testDataGenerator.generateProjectData({
-          name: `Perf State Project ${i}`,
-        }));
+        await testStateManager.addProject(
+          testDataGenerator.generateProjectData({
+            name: `Perf State Project ${i}`,
+          })
+        );
 
         const endTime = performance.now();
         timings.push(endTime - startTime);
@@ -405,9 +444,11 @@ describe('Solid State Management Integration - API Only', () => {
       // Launch concurrent state operations
       for (let i = 0; i < concurrentOperations; i++) {
         operationPromises.push(
-          testStateManager.addProject(testDataGenerator.generateProjectData({
-            name: `Concurrent State Project ${i}`,
-          }))
+          testStateManager.addProject(
+            testDataGenerator.generateProjectData({
+              name: `Concurrent State Project ${i}`,
+            })
+          )
         );
       }
 
@@ -433,7 +474,9 @@ describe('Solid State Management Integration - API Only', () => {
 
       // Verify all projects were added
       const projects = testStateManager.getProjects();
-      const concurrentProjects = projects.filter(p => p.name.startsWith('Concurrent State Project'));
+      const concurrentProjects = projects.filter(p =>
+        p.name.startsWith('Concurrent State Project')
+      );
       expect(concurrentProjects.length).toBe(concurrentOperations);
     });
 
@@ -452,9 +495,11 @@ describe('Solid State Management Integration - API Only', () => {
         const createPromises = [];
         for (let i = 0; i < size; i++) {
           createPromises.push(
-            testStateManager.addProject(testDataGenerator.generateProjectData({
-              name: `Scale Project ${i}`,
-            }))
+            testStateManager.addProject(
+              testDataGenerator.generateProjectData({
+                name: `Scale Project ${i}`,
+              })
+            )
           );
         }
         await Promise.all(createPromises);
@@ -483,7 +528,9 @@ describe('Solid State Management Integration - API Only', () => {
       // Analyze scaling performance
       console.log('State Management Scaling Performance:');
       performanceResults.forEach(result => {
-        console.log(`  Size ${result.size}: Total ${result.totalTime.toFixed(2)}ms, List ${result.listTime.toFixed(2)}ms`);
+        console.log(
+          `  Size ${result.size}: Total ${result.totalTime.toFixed(2)}ms, List ${result.listTime.toFixed(2)}ms`
+        );
       });
 
       // Performance should scale reasonably (list operations shouldn't grow exponentially)
@@ -491,7 +538,9 @@ describe('Solid State Management Integration - API Only', () => {
       const lastListTime = performanceResults[performanceResults.length - 1].listTime;
       const scalingFactor = lastListTime / firstListTime;
 
-      console.log(`Scaling factor: ${scalingFactor.toFixed(2)}x (from size ${performanceResults[0].size} to ${performanceResults[performanceResults.length - 1].size})`);
+      console.log(
+        `Scaling factor: ${scalingFactor.toFixed(2)}x (from size ${performanceResults[0].size} to ${performanceResults[performanceResults.length - 1].size})`
+      );
 
       // Scaling should be reasonable (less than 10x increase for 5x data size increase)
       expect(scalingFactor).toBeLessThan(10);
@@ -501,15 +550,19 @@ describe('Solid State Management Integration - API Only', () => {
   describe('State Manager Error Handling', () => {
     it('should handle API failures gracefully in state operations', async () => {
       // Test state manager resilience to API failures
-      const validProject = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Error Handling Project',
-      }));
+      const validProject = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Error Handling Project',
+        })
+      );
 
       // Attempt invalid operation (should fail at API level)
       try {
-        await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-          project_id: 'non-existent-project-id',
-        }));
+        await testStateManager.addWorkSession(
+          testDataGenerator.generateWorkData({
+            project_id: 'non-existent-project-id',
+          })
+        );
         expect.fail('Should have failed with invalid project ID');
       } catch (error) {
         // Expected failure - verify state integrity is maintained
@@ -523,13 +576,17 @@ describe('Solid State Management Integration - API Only', () => {
 
     it('should handle state manager cleanup properly', async () => {
       // Create some state
-      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({
-        name: 'Cleanup Test Project',
-      }));
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          name: 'Cleanup Test Project',
+        })
+      );
 
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          project_id: project.id,
+        })
+      );
 
       // Verify state exists
       expect(testStateManager.getStateSummary().projects).toBeGreaterThan(0);
@@ -554,13 +611,18 @@ describe('Solid State Management Integration - API Only', () => {
       expect(testStateManager.validateStateConsistency().valid).toBe(true);
 
       // 2. Create work session
-      const work = await testStateManager.addWorkSession(testDataGenerator.generateWorkData({
-        project_id: project.id,
-      }));
+      const work = await testStateManager.addWorkSession(
+        testDataGenerator.generateWorkData({
+          project_id: project.id,
+        })
+      );
       expect(testStateManager.validateStateConsistency().valid).toBe(true);
 
       // 3. Create AI session
-      const aiSession = await testStateManager.addAiSession(work.work.id, testDataGenerator.generateAiSessionData());
+      const aiSession = await testStateManager.addAiSession(
+        work.work.id,
+        testDataGenerator.generateAiSessionData()
+      );
       expect(testStateManager.validateStateConsistency().valid).toBe(true);
 
       // 4. Update work session

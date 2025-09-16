@@ -36,7 +36,9 @@ export class TestStateManager {
     return this.projects.get(id);
   }
 
-  async addProject(projectData: Parameters<typeof testApiClient.createProject>[0]): Promise<Project> {
+  async addProject(
+    projectData: Parameters<typeof testApiClient.createProject>[0]
+  ): Promise<Project> {
     const project = await testApiClient.createProject(projectData);
     this.projects.set(project.id, project);
     this.notifyListeners('project-added', project);
@@ -74,7 +76,9 @@ export class TestStateManager {
     return this.workSessions.get(id);
   }
 
-  async addWorkSession(workData: Parameters<typeof testApiClient.createWork>[0]): Promise<WorkResponse> {
+  async addWorkSession(
+    workData: Parameters<typeof testApiClient.createWork>[0]
+  ): Promise<WorkResponse> {
     const work = await testApiClient.createWork(workData);
     this.workSessions.set(work.work.id, work);
     this.notifyListeners('work-added', work);
@@ -99,7 +103,10 @@ export class TestStateManager {
     return this.aiSessions.get(id);
   }
 
-  async addAiSession(workId: string, sessionData: Parameters<typeof testApiClient.createAiSession>[1]): Promise<ExtendedAiSession> {
+  async addAiSession(
+    workId: string,
+    sessionData: Parameters<typeof testApiClient.createAiSession>[1]
+  ): Promise<ExtendedAiSession> {
     const session = await testApiClient.createAiSession(workId, sessionData);
 
     // Transform to ExtendedAiSession format
@@ -173,14 +180,18 @@ export class TestStateManager {
     // Check that all work sessions have valid projects if project_id is set
     for (const work of this.workSessions.values()) {
       if (work.work.project_id && !this.projects.has(work.work.project_id)) {
-        errors.push(`Work session ${work.work.id} references non-existent project ${work.work.project_id}`);
+        errors.push(
+          `Work session ${work.work.id} references non-existent project ${work.work.project_id}`
+        );
       }
     }
 
     // Check that all AI sessions reference valid work sessions
     for (const session of this.aiSessions.values()) {
       if (!this.workSessions.has(session.work_id)) {
-        errors.push(`AI session ${session.id} references non-existent work session ${session.work_id}`);
+        errors.push(
+          `AI session ${session.id} references non-existent work session ${session.work_id}`
+        );
       }
     }
 
