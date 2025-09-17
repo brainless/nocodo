@@ -6,7 +6,7 @@ import {
   CreateWorkRequest,
   FileCreateRequest,
   FileUpdateRequest,
-} from '../../types';
+} from '../../types/generated';
 
 /**
  * Mock data generators for API-only e2e tests

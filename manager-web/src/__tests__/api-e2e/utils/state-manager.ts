@@ -1,5 +1,6 @@
 import { testApiClient } from '../setup/api-client';
-import type { ExtendedAiSession, Project, WorkResponse } from '../../types';
+import type { ExtendedAiSession } from '../../types.ts';
+import type { Project, WorkResponse } from '../../types/generated';
 
 /**
  * State manager utilities for testing Solid state management integration
