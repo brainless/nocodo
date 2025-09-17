@@ -955,8 +955,15 @@ pub async fn create_ai_session(
             let session_id = llm_session.id.clone();
             let message_content = message.content.clone();
             tokio::spawn(async move {
-                if let Err(e) = llm_agent_clone.process_message(&session_id, message_content).await {
-                    tracing::error!("Failed to process LLM message for session {}: {}", session_id, e);
+                if let Err(e) = llm_agent_clone
+                    .process_message(&session_id, message_content)
+                    .await
+                {
+                    tracing::error!(
+                        "Failed to process LLM message for session {}: {}",
+                        session_id,
+                        e
+                    );
                 } else {
                     tracing::info!(
                         "Successfully completed LLM agent processing for session {}",
