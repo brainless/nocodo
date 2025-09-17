@@ -437,11 +437,11 @@ const AiSessionDetail: Component = () => {
 
             {/* Tool Calls */}
             <Show when={toolCalls().length > 0}>
-              <div class="mt-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Tool Execution</h3>
-                <div class="space-y-2">
+              <div class='mt-6'>
+                <h3 class='text-lg font-medium text-gray-900 mb-4'>Tool Execution</h3>
+                <div class='space-y-2'>
                   <For each={toolCalls()}>
-                    {(toolCall) => <ToolCallProgress toolCall={toolCall} />}
+                    {toolCall => <ToolCallProgress toolCall={toolCall} />}
                   </For>
                 </div>
               </div>
