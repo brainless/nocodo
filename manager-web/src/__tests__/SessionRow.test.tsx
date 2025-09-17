@@ -268,7 +268,7 @@ describe('SessionRow Component', () => {
           session={mockRunningSession}
           project={mockProject}
           showPrompt={true}
-          class='custom-class'
+          className='custom-class'
         />
       ),
       { wrapper: TestWrapper }

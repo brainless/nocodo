@@ -18,7 +18,7 @@ import {
   Project,
   WorkMessageResponse,
   WorkResponse,
-} from '../../types';
+} from '../../types/generated';
 
 /**
  * API client for API-only end-to-end tests
