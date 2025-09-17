@@ -485,10 +485,15 @@ pub struct ReadFileRequest {
 pub struct WriteFileRequest {
     pub path: String,
     pub content: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub create_dirs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub append: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_if_not_exists: Option<bool>,
 }
 
 /// Grep search tool request
@@ -498,14 +503,18 @@ pub struct GrepRequest {
     pub pattern: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub include_pattern: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exclude_pattern: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_results: Option<u32>,
+    pub recursive: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub case_sensitive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_line_numbers: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number | undefined")]
+    pub max_results: Option<u32>,
 }
 
 /// Tool response to LLM (typed JSON)
@@ -549,9 +558,27 @@ pub struct ReadFileResponse {
 #[ts(export)]
 pub struct WriteFileResponse {
     pub path: String,
+    pub success: bool,
+    #[ts(type = "number")]
     pub bytes_written: u64,
     pub created: bool,
     pub modified: bool,
+}
+
+/// Grep match result
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GrepMatch {
+    pub file_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number | undefined")]
+    pub line_number: Option<u32>,
+    pub line_content: String,
+    #[ts(type = "number")]
+    pub match_start: u32,
+    #[ts(type = "number")]
+    pub match_end: u32,
+    pub matched_text: String,
 }
 
 /// Grep search tool response
@@ -560,21 +587,11 @@ pub struct WriteFileResponse {
 pub struct GrepResponse {
     pub pattern: String,
     pub matches: Vec<GrepMatch>,
+    #[ts(type = "number")]
     pub total_matches: u32,
+    #[ts(type = "number")]
     pub files_searched: u32,
     pub truncated: bool,
-}
-
-/// Individual grep match
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct GrepMatch {
-    pub file_path: String,
-    pub line_number: u32,
-    pub line_content: String,
-    pub match_start: u32,
-    pub match_end: u32,
-    pub matched_text: String,
 }
 
 /// Tool error response

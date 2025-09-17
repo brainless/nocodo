@@ -10,6 +10,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+
+
 #[allow(clippy::needless_borrow)]
 /// Tool execution error
 #[derive(Debug, thiserror::Error)]
@@ -73,7 +75,7 @@ impl ToolExecutor {
             ToolRequest::ListFiles(req) => self.list_files(req).await,
             ToolRequest::ReadFile(req) => self.read_file(req).await,
             ToolRequest::WriteFile(req) => self.write_file(req).await,
-            ToolRequest::Grep(req) => self.grep(req).await,
+            ToolRequest::Grep(req) => self.grep_search(req).await,
         }
     }
 
@@ -232,41 +234,80 @@ impl ToolExecutor {
     async fn write_file(&self, request: WriteFileRequest) -> Result<ToolResponse> {
         let target_path = self.validate_and_resolve_path(&request.path)?;
 
+        // Check if file exists for metadata
+        let file_exists = target_path.exists();
+
         // Create parent directories if requested
-        if request.create_dirs.unwrap_or(false) {
+        if request.create_dirs.unwrap_or(false) || request.create_if_not_exists.unwrap_or(false) {
             if let Some(parent) = target_path.parent() {
                 fs::create_dir_all(parent)?;
             }
         }
 
-        // Check if file exists for metadata
-        let existed = target_path.exists();
+        // Handle create_if_not_exists flag
+        if !file_exists && !request.create_if_not_exists.unwrap_or(false) && !request.create_dirs.unwrap_or(false) {
+            return Ok(ToolResponse::Error(ToolErrorResponse {
+                tool: "write_file".to_string(),
+                error: "FileNotFound".to_string(),
+                message: format!("File does not exist: {} (use create_if_not_exists=true to create it)", request.path),
+            }));
+        }
+
+        // Handle search and replace functionality
+        let content_to_write = if let (Some(search), Some(replace)) = (&request.search, &request.replace) {
+            // Read existing content for search/replace
+            let existing_content = match fs::read_to_string(&target_path) {
+                Ok(content) => content,
+                Err(_) => {
+                    return Ok(ToolResponse::Error(ToolErrorResponse {
+                        tool: "write_file".to_string(),
+                        error: "ReadError".to_string(),
+                        message: format!("Cannot read file for search/replace: {}", request.path),
+                    }));
+                }
+            };
+
+            // Perform search and replace
+            if existing_content.contains(search) {
+                existing_content.replace(search, replace)
+            } else {
+                return Ok(ToolResponse::Error(ToolErrorResponse {
+                    tool: "write_file".to_string(),
+                    error: "SearchNotFound".to_string(),
+                    message: format!("Search pattern '{}' not found in file: {}", search, request.path),
+                }));
+            }
+        } else {
+            request.content
+        };
+
         let mut bytes_written = 0;
 
-        if request.append.unwrap_or(false) && existed {
+        if request.append.unwrap_or(false) && file_exists {
             // Append to existing file
             let mut file = fs::OpenOptions::new()
                 .append(true)
                 .open(&target_path)?;
             use std::io::Write;
-            bytes_written = file.write(request.content.as_bytes())?;
+            bytes_written = file.write(content_to_write.as_bytes())?;
         } else {
             // Write new file or overwrite existing
-            fs::write(&target_path, &request.content)?;
-            bytes_written = request.content.len();
+            fs::write(&target_path, &content_to_write)?;
+            bytes_written = content_to_write.len();
         }
 
         Ok(ToolResponse::WriteFile(WriteFileResponse {
             path: request.path,
+            success: true,
             bytes_written: bytes_written as u64,
-            created: !existed,
-            modified: existed,
+            created: !file_exists,
+            modified: file_exists,
         }))
     }
 
-    /// Search for patterns in files using grep-like functionality
-    async fn grep(&self, request: GrepRequest) -> Result<ToolResponse> {
-        use regex::RegexBuilder;
+    /// Search files using grep
+    async fn grep_search(&self, request: GrepRequest) -> Result<ToolResponse> {
+        use regex::{Regex, RegexBuilder};
 
         let search_path = if let Some(path) = &request.path {
             self.validate_and_resolve_path(path)?
@@ -303,10 +344,17 @@ impl ToolExecutor {
 
         let mut matches = Vec::new();
         let mut files_searched = 0;
-        let max_results = request.max_results.unwrap_or(100);
+        let max_results = request.max_results.unwrap_or(100) as usize;
 
-        // Walk through files
-        for entry in WalkDir::new(&search_path) {
+        // Use walkdir for recursive search if requested
+        let recursive = request.recursive.unwrap_or(true);
+        let walker = if recursive {
+            WalkDir::new(&search_path)
+        } else {
+            WalkDir::new(&search_path).max_depth(1)
+        };
+
+        for entry in walker {
             let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
 
             // Skip directories
@@ -334,41 +382,59 @@ impl ToolExecutor {
                 }
             }
 
+            // Skip files that don't match common patterns (like .gitignore)
+            let file_name = entry.file_name().to_string_lossy();
+            if file_name.starts_with('.') || file_name == "target" || file_name == "node_modules" {
+                continue;
+            }
+
             files_searched += 1;
 
             // Search file content
-            if let Ok(content) = fs::read_to_string(file_path) {
-                for (line_num, line) in content.lines().enumerate() {
-                    for mat in regex.find_iter(line) {
-                        matches.push(GrepMatch {
-                            file_path: relative_path.to_string(),
-                            line_number: (line_num + 1) as u32,
-                            line_content: line.to_string(),
-                            match_start: mat.start() as u32,
-                            match_end: mat.end() as u32,
-                            matched_text: mat.as_str().to_string(),
-                        });
+            let content = match fs::read_to_string(file_path) {
+                Ok(content) => content,
+                Err(_) => continue, // Skip files we can't read
+            };
 
-                        // Check if we've reached the max results limit
-                        if matches.len() >= max_results as usize {
-                            break;
-                        }
-                    }
+            // Search for pattern in content
+            for (line_num, line) in content.lines().enumerate() {
+                if matches.len() >= max_results {
+                    break;
+                }
 
-                    if matches.len() >= max_results as usize {
+                // Find all matches in this line
+                for mat in regex.find_iter(line) {
+                    if matches.len() >= max_results {
                         break;
                     }
+
+                    let matched_text = mat.as_str().to_string();
+
+                    let grep_match = GrepMatch {
+                        file_path: relative_path.to_string(),
+                        line_number: if request.include_line_numbers.unwrap_or(true) {
+                            Some((line_num + 1) as u32)
+                        } else {
+                            None
+                        },
+                        line_content: line.to_string(),
+                        match_start: mat.start() as u32,
+                        match_end: mat.end() as u32,
+                        matched_text,
+                    };
+
+                    matches.push(grep_match);
                 }
             }
 
-            if matches.len() >= max_results as usize {
+            // Stop if we've reached the max results limit
+            if matches.len() >= max_results {
                 break;
             }
         }
 
-        let truncated = matches.len() >= max_results as usize;
-
         let total_matches = matches.len() as u32;
+        let truncated = matches.len() >= max_results;
         Ok(ToolResponse::Grep(GrepResponse {
             pattern: request.pattern,
             matches,
@@ -557,6 +623,122 @@ mod tests {
                 assert_eq!(read_response.size, 11);
             }
             _ => panic!("Expected ReadFile response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_write_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        let request = WriteFileRequest {
+            path: "test.txt".to_string(),
+            content: "Hello World".to_string(),
+            create_dirs: None,
+            append: None,
+            search: None,
+            replace: None,
+            create_if_not_exists: Some(true),
+        };
+
+        let response = executor
+            .execute(ToolRequest::WriteFile(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::WriteFile(write_response) => {
+                assert_eq!(write_response.path, "test.txt");
+                assert!(write_response.success);
+                assert_eq!(write_response.bytes_written, 11);
+                assert!(write_response.created);
+            }
+            _ => panic!("Expected WriteFile response"),
+        }
+
+        // Verify file was created
+        let content = fs::read_to_string(temp_dir.path().join("test.txt")).unwrap();
+        assert_eq!(content, "Hello World");
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_write_file_search_replace() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create initial file
+        fs::write(temp_dir.path().join("test.txt"), "Hello old world").unwrap();
+
+        let request = WriteFileRequest {
+            path: "test.txt".to_string(),
+            content: "".to_string(), // Not used in search/replace
+            create_dirs: None,
+            append: None,
+            search: Some("old".to_string()),
+            replace: Some("new".to_string()),
+            create_if_not_exists: None,
+        };
+
+        let response = executor
+            .execute(ToolRequest::WriteFile(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::WriteFile(write_response) => {
+                assert_eq!(write_response.path, "test.txt");
+                assert!(write_response.success);
+                assert_eq!(write_response.bytes_written, 15); // "Hello new world".len()
+                assert!(!write_response.created); // File was modified, not created
+            }
+            _ => panic!("Expected WriteFile response"),
+        }
+
+        // Verify content was replaced
+        let content = fs::read_to_string(temp_dir.path().join("test.txt")).unwrap();
+        assert_eq!(content, "Hello new world");
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_grep_search() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create test files
+        fs::write(temp_dir.path().join("test1.txt"), "fn main() {\n    println!(\"Hello\");\n}").unwrap();
+        fs::write(temp_dir.path().join("test2.txt"), "fn helper() {\n    println!(\"World\");\n}").unwrap();
+
+        let request = GrepRequest {
+            pattern: "fn \\w+\\(\\)".to_string(),
+            path: None,
+            include_pattern: None,
+            exclude_pattern: None,
+            recursive: Some(false),
+            case_sensitive: Some(false),
+            include_line_numbers: Some(true),
+            max_results: Some(10),
+        };
+
+        let response = executor
+            .execute(ToolRequest::Grep(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::Grep(grep_response) => {
+                assert_eq!(grep_response.pattern, "fn \\w+\\(\\)");
+                assert!(grep_response.total_matches >= 2); // Should find both functions
+                assert!(grep_response.files_searched >= 2);
+                assert!(!grep_response.truncated);
+
+                // Check that we found matches
+                let main_match = grep_response.matches.iter().find(|m| m.matched_text.contains("main"));
+                let helper_match = grep_response.matches.iter().find(|m| m.matched_text.contains("helper"));
+
+                assert!(main_match.is_some());
+                assert!(helper_match.is_some());
+            }
+            _ => panic!("Expected Grep response"),
         }
     }
 }
