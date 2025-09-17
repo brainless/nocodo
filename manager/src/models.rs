@@ -485,6 +485,9 @@ pub struct ReadFileRequest {
 pub struct WriteFileRequest {
     pub path: String,
     pub content: String,
+    pub create_dirs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub append: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -500,6 +503,9 @@ pub struct GrepRequest {
     pub pattern: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    pub include_pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude_pattern: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recursive: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -556,6 +562,7 @@ pub struct WriteFileResponse {
     #[ts(type = "number")]
     pub bytes_written: u64,
     pub created: bool,
+    pub modified: bool,
 }
 
 /// Grep match result
