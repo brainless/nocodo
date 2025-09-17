@@ -196,7 +196,7 @@ const Layout: Component<LayoutProps> = props => {
 // Dashboard Page
 const DashboardPage: Component = () => {
   return (
-    <Layout title='Welcome back!' subtitle='Manage your AI coding projects and work' noBox>
+    <Layout noBox>
       <Dashboard />
     </Layout>
   );
