@@ -203,12 +203,12 @@ async fn main() -> Result<()> {
     info!("🚀 Both services are running in watch mode!");
     info!("📊 Manager API/WebSocket: http://localhost:8081 (logs: test-logs/manager.log)");
     info!("   └── Auto-rebuilds on code changes with cargo-watch");
-    info!("🌐 Manager-web dev server: http://localhost:3001 (logs: test-logs/manager-web.log)");
+    info!("🌐 Manager-web dev server: http://localhost:3000 (logs: test-logs/manager-web.log)");
     info!("   └── Hot reloads on code changes with Vite");
     info!("");
     info!("🔗 SSH Testing:");
-    info!("   SSH with: ssh -L 8081:localhost:8081 -L 3001:localhost:3001 <your-server>");
-    info!("   Then access: http://localhost:3001 in your browser");
+    info!("   SSH with: ssh -L 8081:localhost:8081 -L 3000:localhost:3000 <your-server>");
+    info!("   Then access: http://localhost:3000 in your browser");
     info!("");
     info!("Press Ctrl+C to stop both services");
 
