@@ -6,12 +6,23 @@ use futures_util::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::pin::Pin;
+use uuid::Uuid;
 
 /// LLM message structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmMessage {
     pub role: String,
-    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // NEW: Tool calls in message (for assistant responses)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<LlmToolCall>>,
+    // Legacy OpenAI function call
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_call: Option<LlmFunctionCall>,
+    // Tool call ID (for tool responses)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
 /// LLM completion request
@@ -22,6 +33,16 @@ pub struct LlmCompletionRequest {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub stream: Option<bool>,
+    // NEW: Tool/Function parameters for native tool calling support
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ToolDefinition>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<ToolChoice>,
+    // OpenAI legacy function calling (for backward compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub functions: Option<Vec<FunctionDefinition>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_call: Option<FunctionCall>,
 }
 
 /// LLM completion response
@@ -42,6 +63,50 @@ pub struct LlmChoice {
     pub message: Option<LlmMessage>,
     pub delta: Option<LlmMessageDelta>,
     pub finish_reason: Option<String>,
+    // Anthropic-specific: tool calls in choice level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<LlmToolCall>>,
+}
+
+/// Tool call in LLM response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmToolCall {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub r#type: String, // Should be "function"
+    pub function: LlmToolCallFunction,
+}
+
+/// Function call within tool call
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmToolCallFunction {
+    pub name: String,
+    pub arguments: String, // JSON string of arguments
+}
+
+/// Legacy OpenAI function call in response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmFunctionCall {
+    pub name: String,
+    pub arguments: String, // JSON string of arguments
+}
+
+/// Provider capabilities structure
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct ProviderCapabilities {
+    pub supports_native_tools: bool,
+    pub supports_legacy_functions: bool,
+    pub supports_streaming: bool,
+    pub supports_json_mode: bool,
+}
+
+/// Completion result with tool calls
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct CompletionResult {
+    pub response: LlmCompletionResponse,
+    pub tool_calls: Vec<LlmToolCall>,
 }
 
 /// LLM message delta for streaming
@@ -49,6 +114,26 @@ pub struct LlmChoice {
 pub struct LlmMessageDelta {
     pub role: Option<String>,
     pub content: Option<String>,
+    // NEW: Tool calls in streaming delta
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<LlmToolCallDelta>>,
+}
+
+/// Tool call delta for streaming
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmToolCallDelta {
+    pub index: u32,
+    pub id: Option<String>,
+    #[serde(rename = "type")]
+    pub r#type: Option<String>,
+    pub function: Option<LlmToolCallFunctionDelta>,
+}
+
+/// Function call delta for streaming
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmToolCallFunctionDelta {
+    pub name: Option<String>,
+    pub arguments: Option<String>,
 }
 
 /// LLM token usage statistics
@@ -70,10 +155,68 @@ pub struct LlmCompletionChunk {
 }
 
 /// Streaming response chunk
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StreamChunk {
     pub content: String,
     pub is_finished: bool,
+    // NEW: Tool calls in streaming chunk
+    pub tool_calls: Vec<LlmToolCall>,
+}
+
+
+
+/// Tool definition for native tool calling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolDefinition {
+    #[serde(rename = "type")]
+    pub r#type: String, // Should be "function"
+    pub function: FunctionDefinition,
+}
+
+/// Function definition within a tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionDefinition {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value, // JSON Schema object
+}
+
+/// Tool choice specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ToolChoice {
+    /// Use "none" to disable tool calling
+    None(String),
+    /// Use "auto" to let the model decide
+    Auto(String),
+    /// Use "required" to force tool calling
+    Required(String),
+    /// Specify a particular tool by name
+    Specific {
+        #[serde(rename = "type")]
+        r#type: String, // Should be "function"
+        function: ToolFunctionChoice,
+    },
+}
+
+/// Function choice within tool choice
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFunctionChoice {
+    pub name: String,
+}
+
+/// Legacy OpenAI function call specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FunctionCall {
+    /// Disable function calling
+    None(String),
+    /// Let the model decide
+    Auto(String),
+    /// Force function calling
+    Required(String),
+    /// Specify a particular function by name
+    Specific { name: String },
 }
 
 /// Abstract LLM client trait
@@ -88,6 +231,23 @@ pub trait LlmClient: Send + Sync {
         &self,
         request: LlmCompletionRequest,
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>;
+
+    /// Complete a prompt and extract tool calls
+    #[allow(dead_code)]
+    async fn complete_with_tools(&self, request: LlmCompletionRequest) -> Result<CompletionResult> {
+        let response = self.complete(request).await?;
+        let tool_calls = self.extract_tool_calls_from_response(&response);
+        Ok(CompletionResult {
+            response,
+            tool_calls,
+        })
+    }
+
+    /// Extract tool calls from a completion response
+    fn extract_tool_calls_from_response(
+        &self,
+        response: &LlmCompletionResponse,
+    ) -> Vec<LlmToolCall>;
 
     /// Get the provider name
     #[allow(dead_code)]
@@ -116,6 +276,217 @@ impl OpenAiCompatibleClient {
         } else {
             "https://api.openai.com/v1/chat/completions".to_string()
         }
+    }
+
+    /// Check if the provider supports native tool calling
+    fn supports_native_tools(&self) -> bool {
+        match self.config.provider.to_lowercase().as_str() {
+            "openai" => {
+                // OpenAI supports native tools for GPT-4 and newer models
+                self.config.model.to_lowercase().starts_with("gpt-4")
+                    || self.config.model.to_lowercase().contains("gpt-4")
+            }
+            "anthropic" | "claude" => {
+                // Anthropic supports native tools for Claude models
+                self.config.model.to_lowercase().contains("claude")
+                    || self.config.model.to_lowercase().contains("opus")
+                    || self.config.model.to_lowercase().contains("sonnet")
+                    || self.config.model.to_lowercase().contains("haiku")
+            }
+            "grok" | "xai" => {
+                // Grok/xAI does not support native tools yet
+                false
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if the provider supports legacy function calling
+    fn supports_legacy_functions(&self) -> bool {
+        match self.config.provider.to_lowercase().as_str() {
+            "openai" => {
+                // OpenAI supports legacy functions for older models
+                !self.supports_native_tools()
+            }
+            _ => false,
+        }
+    }
+
+    /// Get provider capabilities as a structured object
+    #[allow(dead_code)]
+    fn get_provider_capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            supports_native_tools: self.supports_native_tools(),
+            supports_legacy_functions: self.supports_legacy_functions(),
+            supports_streaming: true, // All current providers support streaming
+            supports_json_mode: matches!(self.config.provider.to_lowercase().as_str(), "openai"),
+        }
+    }
+
+    /// Extract tool calls from a completion response (internal method)
+    fn extract_tool_calls_from_response_internal(
+        &self,
+        response: &LlmCompletionResponse,
+    ) -> Vec<LlmToolCall> {
+        let mut tool_calls = Vec::new();
+        let mut message_tool_calls_count = 0;
+        let mut choice_tool_calls_count = 0;
+        let mut legacy_function_calls_count = 0;
+
+        for choice in &response.choices {
+            if let Some(message) = &choice.message {
+                // Check for tool calls in the message (OpenAI format)
+                if let Some(message_tool_calls) = &message.tool_calls {
+                    message_tool_calls_count += message_tool_calls.len();
+                    tool_calls.extend(message_tool_calls.clone());
+                    tracing::debug!(
+                        provider = %self.config.provider,
+                        choice_index = %choice.index,
+                        tool_calls_in_message = %message_tool_calls.len(),
+                        "Found tool calls in message (OpenAI format)"
+                    );
+                }
+
+                // Check for legacy function calls (older OpenAI models)
+                if let Some(function_call) = &message.function_call {
+                    legacy_function_calls_count += 1;
+                    tool_calls.push(LlmToolCall {
+                        id: format!("legacy-{}", Uuid::new_v4()),
+                        r#type: "function".to_string(),
+                        function: LlmToolCallFunction {
+                            name: function_call.name.clone(),
+                            arguments: function_call.arguments.clone(),
+                        },
+                    });
+                    tracing::debug!(
+                        provider = %self.config.provider,
+                        choice_index = %choice.index,
+                        function_name = %function_call.name,
+                        "Found legacy function call in message"
+                    );
+                }
+            }
+
+            // Check for tool calls at choice level (Anthropic format)
+            if let Some(choice_tool_calls) = &choice.tool_calls {
+                choice_tool_calls_count += choice_tool_calls.len();
+                tool_calls.extend(choice_tool_calls.clone());
+                tracing::debug!(
+                    provider = %self.config.provider,
+                    choice_index = %choice.index,
+                    tool_calls_in_choice = %choice_tool_calls.len(),
+                    "Found tool calls at choice level (Anthropic format)"
+                );
+            }
+        }
+
+        tracing::info!(
+            provider = %self.config.provider,
+            total_tool_calls = %tool_calls.len(),
+            message_tool_calls = %message_tool_calls_count,
+            choice_tool_calls = %choice_tool_calls_count,
+            legacy_function_calls = %legacy_function_calls_count,
+            "Extracted tool calls from completion response"
+        );
+
+        tool_calls
+    }
+
+    /// Prepare request for the specific provider by converting tools to appropriate format
+    fn prepare_request_for_provider(
+        &self,
+        mut request: LlmCompletionRequest,
+    ) -> LlmCompletionRequest {
+        // If no tools are specified, return as-is
+        if request.tools.is_none() && request.functions.is_none() {
+            return request;
+        }
+
+        if self.supports_native_tools() {
+            // Provider supports native tools - ensure tools are in the right format
+            match self.config.provider.to_lowercase().as_str() {
+                "anthropic" | "claude" => {
+                    // Anthropic uses similar format to OpenAI, but may have some differences
+                    // For now, we use the same format and can refine later if needed
+                    tracing::debug!(
+                        provider = %self.config.provider,
+                        "Using Anthropic native tool calling format"
+                    );
+                }
+                "openai" => {
+                    // OpenAI native tools format
+                    tracing::debug!(
+                        provider = %self.config.provider,
+                        "Using OpenAI native tool calling format"
+                    );
+                }
+                _ => {
+                    tracing::debug!(
+                        provider = %self.config.provider,
+                        "Using generic native tool calling format"
+                    );
+                }
+            }
+        } else if self.supports_legacy_functions() {
+            // Convert tools to legacy functions format for older OpenAI models
+            if let Some(tools) = request.tools.take() {
+                let functions: Vec<FunctionDefinition> = tools
+                    .into_iter()
+                    .filter_map(|tool| {
+                        if tool.r#type == "function" {
+                            Some(tool.function)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if !functions.is_empty() {
+                    request.functions = Some(functions);
+                    // Convert tool_choice to function_call if needed
+                    if let Some(tool_choice) = request.tool_choice.take() {
+                        match tool_choice {
+                            ToolChoice::None(_) => {
+                                request.function_call =
+                                    Some(FunctionCall::None("none".to_string()));
+                            }
+                            ToolChoice::Auto(_) => {
+                                request.function_call =
+                                    Some(FunctionCall::Auto("auto".to_string()));
+                            }
+                            ToolChoice::Required(_) => {
+                                request.function_call =
+                                    Some(FunctionCall::Required("required".to_string()));
+                            }
+                            ToolChoice::Specific { function, .. } => {
+                                request.function_call = Some(FunctionCall::Specific {
+                                    name: function.name,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            tracing::debug!(
+                provider = %self.config.provider,
+                "Converted tools to legacy function calling format"
+            );
+        } else {
+            // Provider doesn't support native tools - remove tools from request
+            // The LLM agent will fall back to JSON parsing in the system prompt
+            request.tools = None;
+            request.tool_choice = None;
+            request.functions = None;
+            request.function_call = None;
+
+            tracing::info!(
+                provider = %self.config.provider,
+                model = %self.config.model,
+                "Provider does not support native tools, falling back to JSON parsing. Tools removed from request."
+            );
+        }
+
+        request
     }
 
     #[allow(dead_code)]
@@ -150,7 +521,11 @@ impl LlmClient for OpenAiCompatibleClient {
 
         let start_time = std::time::Instant::now();
         let message_count = request.messages.len();
-        let total_input_tokens: usize = request.messages.iter().map(|m| m.content.len()).sum();
+        let total_input_tokens: usize = request
+            .messages
+            .iter()
+            .map(|m| m.content.as_ref().map(|c| c.len()).unwrap_or(0))
+            .sum();
 
         tracing::info!(
             provider = %self.config.provider,
@@ -159,10 +534,16 @@ impl LlmClient for OpenAiCompatibleClient {
             estimated_input_tokens = %total_input_tokens,
             max_tokens = ?request.max_tokens,
             temperature = ?request.temperature,
+            has_tools = %request.tools.is_some(),
+            supports_native_tools = %self.supports_native_tools(),
+            supports_legacy_functions = %self.supports_legacy_functions(),
             "Sending non-streaming completion request to LLM provider"
         );
 
-        let response = self.make_request(request.clone()).await?;
+        // Prepare request for the specific provider
+        let prepared_request = self.prepare_request_for_provider(request.clone());
+
+        let response = self.make_request(prepared_request).await?;
 
         let response_time = start_time.elapsed();
         let status = response.status();
@@ -227,15 +608,19 @@ impl LlmClient for OpenAiCompatibleClient {
             estimated_input_tokens = %total_input_tokens,
             max_tokens = ?request.max_tokens,
             temperature = ?request.temperature,
+            has_tools = %request.tools.is_some(),
             "Sending streaming completion request to LLM provider"
         );
+
+        // Prepare request for the specific provider
+        let prepared_request = self.prepare_request_for_provider(request.clone());
 
         Box::pin(try_stream! {
             let mut req = client
                 .post(&api_url)
                 .header("Authorization", format!("Bearer {}", config.api_key))
                 .header("Content-Type", "application/json")
-                .json(&request);
+                .json(&prepared_request);
 
             // Add custom headers for different providers
             if config.provider.to_lowercase() == "grok" {
@@ -265,6 +650,7 @@ impl LlmClient for OpenAiCompatibleClient {
                             yield StreamChunk {
                                 content: String::new(),
                                 is_finished: true,
+                                tool_calls: Vec::new(),
                             };
                             return;
                         }
@@ -285,6 +671,7 @@ impl LlmClient for OpenAiCompatibleClient {
                                             yield StreamChunk {
                                                 content: content.to_string(),
                                                 is_finished: false,
+                                                tool_calls: Vec::new(),
                                             };
                                         }
                                     }
@@ -295,6 +682,13 @@ impl LlmClient for OpenAiCompatibleClient {
                 }
             }
         })
+    }
+
+    fn extract_tool_calls_from_response(
+        &self,
+        response: &LlmCompletionResponse,
+    ) -> Vec<LlmToolCall> {
+        self.extract_tool_calls_from_response_internal(response)
     }
 
     fn provider(&self) -> &str {

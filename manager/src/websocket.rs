@@ -474,7 +474,12 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast tool call started
-    pub async fn broadcast_tool_call_started(&self, session_id: String, call_id: String, tool_name: String) {
+    pub async fn broadcast_tool_call_started(
+        &self,
+        session_id: String,
+        call_id: String,
+        tool_name: String,
+    ) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::ToolCallStarted {
                 session_id,
@@ -485,7 +490,12 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast tool call completed
-    pub async fn broadcast_tool_call_completed(&self, session_id: String, call_id: String, result: serde_json::Value) {
+    pub async fn broadcast_tool_call_completed(
+        &self,
+        session_id: String,
+        call_id: String,
+        result: serde_json::Value,
+    ) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::ToolCallCompleted {
                 session_id,
@@ -496,7 +506,12 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast tool call failed
-    pub async fn broadcast_tool_call_failed(&self, session_id: String, call_id: String, error: String) {
+    pub async fn broadcast_tool_call_failed(
+        &self,
+        session_id: String,
+        call_id: String,
+        error: String,
+    ) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::ToolCallFailed {
                 session_id,

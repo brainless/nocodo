@@ -120,7 +120,7 @@ export const WebSocketProvider: ParentComponent = props => {
 };
 
 // Hook to use WebSocket context
-export const useWebSocket = () => {
+export const useWebSocket = (): WebSocketContextValue => {
   const context = useContext(WebSocketContext);
   if (!context) {
     throw new Error('useWebSocket must be used within a WebSocketProvider');
@@ -132,14 +132,14 @@ export const useWebSocket = () => {
 export const useWebSocketMessage = (
   messageType: WebSocketMessage['type'],
   callback: (message: WebSocketMessage) => void
-) => {
+): void => {
   const { store } = useWebSocket();
 
   // Create effect to watch for messages of specific type
-  const cleanup = () => {};
+  const cleanup = (): void => {};
 
   onMount(() => {
-    const checkMessage = () => {
+    const checkMessage = (): void => {
       const message = store.lastMessage;
       if (message && message.type === messageType) {
         callback(message);
@@ -158,7 +158,14 @@ export const useWebSocketMessage = (
 };
 
 // Hook to get connection status
-export const useWebSocketConnection = () => {
+export const useWebSocketConnection = (): {
+  state: WebSocketConnectionState;
+  isConnected: boolean;
+  error: string | null;
+  clientId: string | null;
+  connect: () => void;
+  disconnect: () => void;
+} => {
   const { store, actions } = useWebSocket();
 
   return {

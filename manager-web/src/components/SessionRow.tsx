@@ -189,7 +189,7 @@ interface SessionRowProps {
   session: ExtendedAiSession;
   project?: Project | null;
   showPrompt?: boolean;
-  className?: string;
+  class?: string;
 }
 
 // Main SessionRow component
@@ -197,7 +197,7 @@ const SessionRow: Component<SessionRowProps> = props => {
   const session = () => props.session;
 
   return (
-    <li class={props.className}>
+    <li class={props.class}>
       <A
         href={`/work/${session().id}`}
         class='block hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset transition-colors duration-200'
