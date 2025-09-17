@@ -1,5 +1,6 @@
 // Re-export all generated types from ts-rs
-export * from './types/generated/AiSession';
+import { AiSession } from './types/generated/AiSession';
+export * from './types/generated';
 // Re-export for convenience
 export type { AiSession } from './types/generated/AiSession';
 export * from './types/generated/AiSessionListResponse';
@@ -77,6 +78,18 @@ export type WebSocketMessage =
   | { type: 'ProjectUpdated'; payload: { project: Project } }
   | { type: 'ProjectDeleted'; payload: { project_id: string } }
   | { type: 'ProjectStatusChanged'; payload: { project_id: string; status: string } }
+  | { type: 'AiSessionCreated'; payload: { session: AiSession } }
+  | { type: 'AiSessionStatusChanged'; payload: { session_id: string; status: string } }
+  | { type: 'AiSessionCompleted'; payload: { session_id: string } }
+  | { type: 'AiSessionFailed'; payload: { session_id: string } }
+  | {
+      type: 'AiSessionOutputChunk';
+      payload: { session_id: string; stream: string; content: string; seq: number };
+    }
+  | { type: 'LlmAgentChunk'; payload: { session_id: string; content: string } }
+  | { type: 'ToolCallStarted'; payload: { session_id: string; call_id: string; tool_name: string } }
+  | { type: 'ToolCallCompleted'; payload: { session_id: string; call_id: string; result: any } }
+  | { type: 'ToolCallFailed'; payload: { session_id: string; call_id: string; error: string } }
   | { type: 'Error'; payload: { message: string } }
   | { type: 'Ping' }
   | { type: 'Pong' };

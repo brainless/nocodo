@@ -699,6 +699,9 @@ pub struct LlmAgentToolCall {
     pub status: String, // "pending" | "executing" | "completed" | "failed"
     pub created_at: i64,
     pub completed_at: Option<i64>,
+    pub execution_time_ms: Option<i64>,
+    pub progress_updates: Option<String>, // JSON array of progress updates
+    pub error_details: Option<String>,
 }
 
 impl LlmAgentToolCall {
@@ -714,6 +717,9 @@ impl LlmAgentToolCall {
             status: "pending".to_string(),
             created_at: now,
             completed_at: None,
+            execution_time_ms: None,
+            progress_updates: None,
+            error_details: None,
         }
     }
 

@@ -10,6 +10,15 @@ interface OutputChunk {
   created_at?: number;
 }
 
+export interface ToolCallState {
+  id: string;
+  toolName: string;
+  status: 'pending' | 'executing' | 'completed' | 'failed';
+  startTime: number;
+  result?: any;
+  error?: string;
+}
+
 interface SessionsStore {
   list: ExtendedAiSession[];
   byId: Record<string, ExtendedAiSession>;
@@ -19,6 +28,7 @@ interface SessionsStore {
   pollingTimers: Record<string, NodeJS.Timeout>;
   connectionStatus: Record<string, 'connected' | 'disconnected' | 'error' | 'fallback'>;
   outputsBySession: Record<string, { chunks: OutputChunk[]; lastSeq?: number }>;
+  toolCallsBySession: Record<string, ToolCallState[]>;
 }
 
 interface SessionsActions {
@@ -34,6 +44,9 @@ interface SessionsActions {
   appendOutputChunk: (id: string, chunk: OutputChunk) => void;
   clearOutputs: (id: string) => void;
   getOutputs: (id: string) => OutputChunk[];
+  addToolCall: (sessionId: string, toolCall: ToolCallState) => void;
+  updateToolCall: (sessionId: string, callId: string, updates: Partial<ToolCallState>) => void;
+  getToolCalls: (sessionId: string) => ToolCallState[];
 }
 
 interface SessionsContextValue {
@@ -53,6 +66,7 @@ export const SessionsProvider: ParentComponent = props => {
     pollingTimers: {},
     connectionStatus: {},
     outputsBySession: {},
+    toolCallsBySession: {},
   });
 
   const actions: SessionsActions = {
@@ -186,6 +200,47 @@ export const SessionsProvider: ParentComponent = props => {
                 actions.appendOutputChunk(id, {
                   stream: 'stdout',
                   content: payload.content,
+                });
+              }
+            }
+            if (data.type === 'ToolCallStarted' && data.payload) {
+              const payload = data.payload as {
+                session_id: string;
+                call_id: string;
+                tool_name: string;
+              };
+              if (payload.session_id === id) {
+                actions.addToolCall(id, {
+                  id: payload.call_id,
+                  toolName: payload.tool_name,
+                  status: 'executing',
+                  startTime: Date.now(),
+                });
+              }
+            }
+            if (data.type === 'ToolCallCompleted' && data.payload) {
+              const payload = data.payload as {
+                session_id: string;
+                call_id: string;
+                result: any;
+              };
+              if (payload.session_id === id) {
+                actions.updateToolCall(id, payload.call_id, {
+                  status: 'completed',
+                  result: payload.result,
+                });
+              }
+            }
+            if (data.type === 'ToolCallFailed' && data.payload) {
+              const payload = data.payload as {
+                session_id: string;
+                call_id: string;
+                error: string;
+              };
+              if (payload.session_id === id) {
+                actions.updateToolCall(id, payload.call_id, {
+                  status: 'failed',
+                  error: payload.error,
                 });
               }
             }
@@ -341,6 +396,23 @@ export const SessionsProvider: ParentComponent = props => {
 
     getOutputs: (id: string) => {
       return store.outputsBySession[id]?.chunks || [];
+    },
+
+    addToolCall: (sessionId: string, toolCall: ToolCallState) => {
+      const currentCalls = store.toolCallsBySession[sessionId] || [];
+      setStore('toolCallsBySession', sessionId, [...currentCalls, toolCall]);
+    },
+
+    updateToolCall: (sessionId: string, callId: string, updates: Partial<ToolCallState>) => {
+      const currentCalls = store.toolCallsBySession[sessionId] || [];
+      const updatedCalls = currentCalls.map(call =>
+        call.id === callId ? { ...call, ...updates } : call
+      );
+      setStore('toolCallsBySession', sessionId, updatedCalls);
+    },
+
+    getToolCalls: (sessionId: string) => {
+      return store.toolCallsBySession[sessionId] || [];
     },
   };
 
