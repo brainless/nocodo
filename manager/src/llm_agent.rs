@@ -346,6 +346,8 @@ impl LlmAgent {
                 let tool_name = match &tool_request {
                     ToolRequest::ListFiles(_) => "list_files",
                     ToolRequest::ReadFile(_) => "read_file",
+                    ToolRequest::WriteFile(_) => "write_file",
+                    ToolRequest::Grep(_) => "grep",
                 };
 
                 tracing::debug!(

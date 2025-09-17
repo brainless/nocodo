@@ -1,6 +1,7 @@
 use crate::models::{
-    FileInfo, ListFilesRequest, ListFilesResponse, ReadFileRequest, ReadFileResponse,
-    ToolErrorResponse, ToolRequest, ToolResponse,
+    FileInfo, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
+    ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse,
+    WriteFileRequest, WriteFileResponse,
 };
 use anyhow::Result;
 use base64::Engine;
@@ -71,6 +72,8 @@ impl ToolExecutor {
         match request {
             ToolRequest::ListFiles(req) => self.list_files(req).await,
             ToolRequest::ReadFile(req) => self.read_file(req).await,
+            ToolRequest::WriteFile(req) => self.write_file(req).await,
+            ToolRequest::Grep(req) => self.grep(req).await,
         }
     }
 
@@ -225,6 +228,156 @@ impl ToolExecutor {
         }))
     }
 
+    /// Write file content
+    async fn write_file(&self, request: WriteFileRequest) -> Result<ToolResponse> {
+        let target_path = self.validate_and_resolve_path(&request.path)?;
+
+        // Create parent directories if requested
+        if request.create_dirs.unwrap_or(false) {
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+
+        // Check if file exists for metadata
+        let existed = target_path.exists();
+        let mut bytes_written = 0;
+
+        if request.append.unwrap_or(false) && existed {
+            // Append to existing file
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .open(&target_path)?;
+            use std::io::Write;
+            bytes_written = file.write(request.content.as_bytes())?;
+        } else {
+            // Write new file or overwrite existing
+            fs::write(&target_path, &request.content)?;
+            bytes_written = request.content.len();
+        }
+
+        Ok(ToolResponse::WriteFile(WriteFileResponse {
+            path: request.path,
+            bytes_written: bytes_written as u64,
+            created: !existed,
+            modified: existed,
+        }))
+    }
+
+    /// Search for patterns in files using grep-like functionality
+    async fn grep(&self, request: GrepRequest) -> Result<ToolResponse> {
+        use regex::RegexBuilder;
+
+        let search_path = if let Some(path) = &request.path {
+            self.validate_and_resolve_path(path)?
+        } else {
+            self.base_path.clone()
+        };
+
+        if !search_path.exists() {
+            return Ok(ToolResponse::Error(ToolErrorResponse {
+                tool: "grep".to_string(),
+                error: "PathNotFound".to_string(),
+                message: format!("Search path does not exist: {}", request.path.unwrap_or_else(|| ".".to_string())),
+            }));
+        }
+
+        // Compile regex pattern
+        let regex = RegexBuilder::new(&request.pattern)
+            .case_insensitive(!request.case_sensitive.unwrap_or(false))
+            .build()
+            .map_err(|e| ToolError::InvalidPath(format!("Invalid regex pattern: {}", e)))?;
+
+        // Compile include/exclude patterns
+        let include_regex = if let Some(pattern) = &request.include_pattern {
+            Some(RegexBuilder::new(pattern).build().map_err(|e| ToolError::InvalidPath(format!("Invalid include pattern: {}", e)))?)
+        } else {
+            None
+        };
+
+        let exclude_regex = if let Some(pattern) = &request.exclude_pattern {
+            Some(RegexBuilder::new(pattern).build().map_err(|e| ToolError::InvalidPath(format!("Invalid exclude pattern: {}", e)))?)
+        } else {
+            None
+        };
+
+        let mut matches = Vec::new();
+        let mut files_searched = 0;
+        let max_results = request.max_results.unwrap_or(100);
+
+        // Walk through files
+        for entry in WalkDir::new(&search_path) {
+            let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
+
+            // Skip directories
+            if entry.file_type().is_dir() {
+                continue;
+            }
+
+            // Check include/exclude patterns
+            let file_path = entry.path();
+            let relative_path = file_path.strip_prefix(&search_path)
+                .unwrap_or(file_path)
+                .to_string_lossy();
+
+            // Apply include filter
+            if let Some(ref include_re) = include_regex {
+                if !include_re.is_match(&relative_path) {
+                    continue;
+                }
+            }
+
+            // Apply exclude filter
+            if let Some(ref exclude_re) = exclude_regex {
+                if exclude_re.is_match(&relative_path) {
+                    continue;
+                }
+            }
+
+            files_searched += 1;
+
+            // Search file content
+            if let Ok(content) = fs::read_to_string(file_path) {
+                for (line_num, line) in content.lines().enumerate() {
+                    for mat in regex.find_iter(line) {
+                        matches.push(GrepMatch {
+                            file_path: relative_path.to_string(),
+                            line_number: (line_num + 1) as u32,
+                            line_content: line.to_string(),
+                            match_start: mat.start() as u32,
+                            match_end: mat.end() as u32,
+                            matched_text: mat.as_str().to_string(),
+                        });
+
+                        // Check if we've reached the max results limit
+                        if matches.len() >= max_results as usize {
+                            break;
+                        }
+                    }
+
+                    if matches.len() >= max_results as usize {
+                        break;
+                    }
+                }
+            }
+
+            if matches.len() >= max_results as usize {
+                break;
+            }
+        }
+
+        let truncated = matches.len() >= max_results as usize;
+
+        let total_matches = matches.len() as u32;
+        Ok(ToolResponse::Grep(GrepResponse {
+            pattern: request.pattern,
+            matches,
+            total_matches,
+            files_searched,
+            truncated,
+        }))
+    }
+
     /// Validate and resolve a path relative to the base path
     fn validate_and_resolve_path(&self, path: &str) -> Result<PathBuf> {
         use std::path::Path;
@@ -335,6 +488,8 @@ impl ToolExecutor {
         let response_value = match tool_response {
             ToolResponse::ListFiles(response) => serde_json::to_value(response)?,
             ToolResponse::ReadFile(response) => serde_json::to_value(response)?,
+            ToolResponse::WriteFile(response) => serde_json::to_value(response)?,
+            ToolResponse::Grep(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 

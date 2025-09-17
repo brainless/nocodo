@@ -452,6 +452,10 @@ pub enum ToolRequest {
     ListFiles(ListFilesRequest),
     #[serde(rename = "read_file")]
     ReadFile(ReadFileRequest),
+    #[serde(rename = "write_file")]
+    WriteFile(WriteFileRequest),
+    #[serde(rename = "grep")]
+    Grep(GrepRequest),
 }
 
 /// List files tool request
@@ -475,6 +479,35 @@ pub struct ReadFileRequest {
     pub max_size: Option<u64>,
 }
 
+/// Write file tool request
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WriteFileRequest {
+    pub path: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_dirs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub append: Option<bool>,
+}
+
+/// Grep search tool request
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GrepRequest {
+    pub pattern: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude_pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_results: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub case_sensitive: Option<bool>,
+}
+
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -484,6 +517,10 @@ pub enum ToolResponse {
     ListFiles(ListFilesResponse),
     #[serde(rename = "read_file")]
     ReadFile(ReadFileResponse),
+    #[serde(rename = "write_file")]
+    WriteFile(WriteFileResponse),
+    #[serde(rename = "grep")]
+    Grep(GrepResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
@@ -505,6 +542,39 @@ pub struct ReadFileResponse {
     pub content: String,
     pub size: u64,
     pub truncated: bool,
+}
+
+/// Write file tool response
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WriteFileResponse {
+    pub path: String,
+    pub bytes_written: u64,
+    pub created: bool,
+    pub modified: bool,
+}
+
+/// Grep search tool response
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GrepResponse {
+    pub pattern: String,
+    pub matches: Vec<GrepMatch>,
+    pub total_matches: u32,
+    pub files_searched: u32,
+    pub truncated: bool,
+}
+
+/// Individual grep match
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GrepMatch {
+    pub file_path: String,
+    pub line_number: u32,
+    pub line_content: String,
+    pub match_start: u32,
+    pub match_end: u32,
+    pub matched_text: String,
 }
 
 /// Tool error response
