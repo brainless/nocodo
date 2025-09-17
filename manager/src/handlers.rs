@@ -408,9 +408,6 @@ pub async fn add_existing_project(
     // Save to database
     data.database.create_project(&project)?;
 
-    // Save to database
-    data.database.create_project(&project)?;
-
     // Analyze project to detect language/framework and components
     let analysis = analyze_project_path(&absolute_path).map_err(AppError::Internal)?;
 
