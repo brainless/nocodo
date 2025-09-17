@@ -66,6 +66,7 @@ const TopNavigation: Component = () => {
       const projectList = await apiClient.fetchProjects();
       setProjects(projectList);
     } catch (error) {
+      // TODO: Replace with proper error handling/display
       console.error('Failed to fetch projects:', error);
     }
 
@@ -195,7 +196,7 @@ const Layout: Component<LayoutProps> = props => {
 // Dashboard Page
 const DashboardPage: Component = () => {
   return (
-    <Layout title='Welcome back!' subtitle='Manage your AI coding projects and work' noBox>
+    <Layout noBox>
       <Dashboard />
     </Layout>
   );
@@ -237,7 +238,7 @@ const ProjectDetailsWrapper: Component = () => {
   // Load project data to get the title
   onMount(async () => {
     try {
-      const projectId = (params as any).id;
+      const projectId = (params as { id: string }).id;
       if (projectId) {
         const details = await apiClient.fetchProjectDetails(projectId);
         setProject(details.project);

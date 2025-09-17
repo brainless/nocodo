@@ -4,89 +4,9 @@ import { Project } from '../types';
 import type { MessageAuthorType, MessageContentType } from '../types';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
-import ProjectCard from './ProjectCard';
+
 import AiSessionCard from './AiSessionCard';
-
-// Projects card component
-const ProjectsCard: Component = () => {
-  const [projects, setProjects] = createSignal<Project[]>([]);
-  const [loading, setLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
-
-  const loadProjects = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const projectList = await apiClient.fetchProjects();
-      setProjects(Array.isArray(projectList) ? projectList : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  onMount(loadProjects);
-
-  const recentProjects = () => projects().slice(0, 5);
-
-  return (
-    <div>
-      {/* Section header outside the white box */}
-      <div class='flex items-center justify-between mb-6'>
-        <h2 class='text-xl font-semibold text-gray-900'>Recent Projects</h2>
-        <A href='/projects' class='text-sm text-blue-600 hover:text-blue-800 font-medium'>
-          View all →
-        </A>
-      </div>
-
-      {/* Project cards grid - no outer container */}
-      {loading() ? (
-        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          {[1, 2, 3].map(() => (
-            <div class='animate-pulse'>
-              <div class='bg-gray-200 rounded-xl h-48'></div>
-            </div>
-          ))}
-        </div>
-      ) : error() ? (
-        <div class='text-center py-8'>
-          <p class='text-red-500 text-sm'>{error()}</p>
-        </div>
-      ) : projects().length === 0 ? (
-        <div class='text-center py-8'>
-          <p class='text-gray-500 text-sm mb-3'>No projects yet</p>
-          <A
-            href='/projects/create'
-            class='inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700'
-          >
-            Create your first project
-          </A>
-        </div>
-      ) : (
-        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          <For each={recentProjects()}>{project => <ProjectCard project={project} />}</For>
-
-          {/* Show more projects if there are more than 5 */}
-          {projects().length > 5 && (
-            <div class='flex items-center justify-center'>
-              <A
-                href='/projects'
-                class='p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors text-center'
-              >
-                <div class='text-gray-500'>
-                  <span class='text-sm font-medium'>+{projects().length - 5} more projects</span>
-                  <p class='text-xs mt-1'>View all projects</p>
-                </div>
-              </A>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+import { AddExistingProjectForm } from './CreateProjectForm';
 
 // Start AI Session form component (Issue #59)
 const StartAiSessionForm: Component = () => {
@@ -355,18 +275,101 @@ const SessionsCard: Component = () => {
   );
 };
 
+// Project CTA component - only shown when no projects exist
+const ProjectCTA: Component = () => {
+  const [showAddExistingModal, setShowAddExistingModal] = createSignal(false);
+  // Check if projects exist after adding one
+  const handleProjectAdded = () => {
+    setShowAddExistingModal(false);
+  };
+
+  return (
+    <>
+      <div class='bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-8'>
+        <div class='text-center'>
+          <div class='text-blue-600 text-6xl mb-4'>📁</div>
+          <h2 class='text-2xl font-bold text-gray-900 mb-2'>Create or add a Project</h2>
+          <p class='text-gray-600 mb-6 max-w-md mx-auto'>
+            Get started by creating your first project or adding an existing one to organize your
+            work.
+          </p>
+          <div class='flex flex-col sm:flex-row gap-3 justify-center'>
+            <A
+              href='/projects/create'
+              class='inline-flex items-center px-6 py-3 text-base font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors'
+            >
+              Create New Project
+            </A>
+            <button
+              onClick={() => setShowAddExistingModal(true)}
+              class='inline-flex items-center px-6 py-3 text-base font-medium text-blue-600 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors'
+            >
+              Add Existing Project
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal for Add Existing Project Form */}
+      <Show when={showAddExistingModal()}>
+        <div
+          class='fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center'
+          style='z-index: 1000;'
+        >
+          <div class='bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto relative'>
+            <div class='flex justify-between items-center mb-4'>
+              <h3 class='text-lg font-semibold'>Add Existing Project</h3>
+              <button
+                onClick={() => setShowAddExistingModal(false)}
+                class='text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors'
+              >
+                <svg class='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path
+                    stroke-linecap='round'
+                    stroke-linejoin='round'
+                    stroke-width={2}
+                    d='M6 18L18 6M6 6l12 12'
+                  />
+                </svg>
+              </button>
+            </div>
+            <AddExistingProjectForm onProjectAdded={handleProjectAdded} />
+          </div>
+        </div>
+      </Show>
+    </>
+  );
+};
+
 // Main Dashboard component
 const Dashboard: Component = () => {
+  const [hasProjects, setHasProjects] = createSignal<boolean | null>(null);
+
+  // Check if projects exist
+  const checkProjects = async () => {
+    try {
+      const projectList = await apiClient.fetchProjects();
+      setHasProjects(Array.isArray(projectList) && projectList.length > 0);
+    } catch (err) {
+      console.error('Failed to check projects:', err);
+      setHasProjects(false); // Default to showing CTA on error
+    }
+  };
+
+  onMount(checkProjects);
+
   return (
-    <div class='space-y-8'>
-      {/* Recent Projects - stacked vertically */}
-      <ProjectsCard />
-
-      {/* Recent Work - stacked vertically */}
-      <SessionsCard />
-
-      {/* Start Work Session */}
+    <div class='space-y-8 mt-8'>
+      {/* Start Work Session - first section */}
       <StartAiSessionForm />
+
+      {/* Project CTA - only if no projects exist */}
+      <Show when={hasProjects() === false}>
+        <ProjectCTA />
+      </Show>
+
+      {/* Recent Work - second section */}
+      <SessionsCard />
     </div>
   );
 };

@@ -408,9 +408,6 @@ pub async fn add_existing_project(
     // Save to database
     data.database.create_project(&project)?;
 
-    // Save to database
-    data.database.create_project(&project)?;
-
     // Analyze project to detect language/framework and components
     let analysis = analyze_project_path(&absolute_path).map_err(AppError::Internal)?;
 
@@ -955,8 +952,15 @@ pub async fn create_ai_session(
             let session_id = llm_session.id.clone();
             let message_content = message.content.clone();
             tokio::spawn(async move {
-                if let Err(e) = llm_agent_clone.process_message(&session_id, message_content).await {
-                    tracing::error!("Failed to process LLM message for session {}: {}", session_id, e);
+                if let Err(e) = llm_agent_clone
+                    .process_message(&session_id, message_content)
+                    .await
+                {
+                    tracing::error!(
+                        "Failed to process LLM message for session {}: {}",
+                        session_id,
+                        e
+                    );
                 } else {
                     tracing::info!(
                         "Successfully completed LLM agent processing for session {}",

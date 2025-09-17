@@ -469,6 +469,32 @@ pub struct ListFilesRequest {
     pub include_hidden: Option<bool>,
 }
 
+impl ListFilesRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The directory path to list files from"
+                },
+                "recursive": {
+                    "type": "boolean",
+                    "description": "Whether to list files recursively",
+                    "default": false
+                },
+                "include_hidden": {
+                    "type": "boolean",
+                    "description": "Whether to include hidden files",
+                    "default": false
+                }
+            },
+            "required": ["path"]
+        })
+    }
+}
+
 /// Read file tool request
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -477,6 +503,27 @@ pub struct ReadFileRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(type = "number | undefined")]
     pub max_size: Option<u64>,
+}
+
+impl ReadFileRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The file path to read"
+                },
+                "max_size": {
+                    "type": "number",
+                    "description": "Maximum number of bytes to read",
+                    "default": 10000
+                }
+            },
+            "required": ["path"]
+        })
+    }
 }
 
 /// Write file tool request
@@ -494,6 +541,49 @@ pub struct WriteFileRequest {
     pub replace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create_if_not_exists: Option<bool>,
+}
+
+impl WriteFileRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The file path to write to"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The content to write to the file"
+                },
+                "create_dirs": {
+                    "type": "boolean",
+                    "description": "Whether to create parent directories if they don't exist",
+                    "default": false
+                },
+                "append": {
+                    "type": "boolean",
+                    "description": "Whether to append to the file instead of overwriting",
+                    "default": false
+                },
+                "search": {
+                    "type": "string",
+                    "description": "Text to search for (for search and replace operations)"
+                },
+                "replace": {
+                    "type": "string",
+                    "description": "Text to replace the search text with"
+                },
+                "create_if_not_exists": {
+                    "type": "boolean",
+                    "description": "Whether to create the file if it doesn't exist",
+                    "default": false
+                }
+            },
+            "required": ["path", "content"]
+        })
+    }
 }
 
 /// Grep search tool request
@@ -515,6 +605,55 @@ pub struct GrepRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(type = "number | undefined")]
     pub max_results: Option<u32>,
+}
+
+impl GrepRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "The regex pattern to search for"
+                },
+                "path": {
+                    "type": "string",
+                    "description": "The directory path to search in",
+                    "default": "."
+                },
+                "include_pattern": {
+                    "type": "string",
+                    "description": "File pattern to include in search (e.g., '*.rs')"
+                },
+                "exclude_pattern": {
+                    "type": "string",
+                    "description": "File pattern to exclude from search"
+                },
+                "recursive": {
+                    "type": "boolean",
+                    "description": "Whether to search recursively",
+                    "default": true
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "description": "Whether the search is case sensitive",
+                    "default": false
+                },
+                "include_line_numbers": {
+                    "type": "boolean",
+                    "description": "Whether to include line numbers in results",
+                    "default": true
+                },
+                "max_results": {
+                    "type": "number",
+                    "description": "Maximum number of results to return",
+                    "default": 100
+                }
+            },
+            "required": ["pattern"]
+        })
+    }
 }
 
 /// Tool response to LLM (typed JSON)

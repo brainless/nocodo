@@ -12,7 +12,7 @@ on:
       - '.github/workflows/web-ci.yml'
 
 env:
-  NODE_VERSION: 'lts/*'
+  NODE_VERSION: '20'
 
 jobs:
   # Type checking

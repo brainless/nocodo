@@ -194,7 +194,7 @@ const LiveProgressIndicator: Component<{ session: AiSession }> = props => {
 // Props interface for SessionTimeline
 interface SessionTimelineProps {
   session: AiSession;
-  className?: string;
+  class?: string;
 }
 
 // Main SessionTimeline component
@@ -210,7 +210,7 @@ const SessionTimeline: Component<SessionTimelineProps> = props => {
   });
 
   return (
-    <div class={`bg-white rounded-lg border border-gray-200 p-6 ${props.className || ''}`}>
+    <div class={`bg-white rounded-lg border border-gray-200 p-6 ${props.class || ''}`}>
       {/* Timeline header */}
       <div class='mb-6'>
         <h3 class='text-lg font-medium text-gray-900 mb-2'>Work Timeline</h3>
