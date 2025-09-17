@@ -66,6 +66,7 @@ const TopNavigation: Component = () => {
       const projectList = await apiClient.fetchProjects();
       setProjects(projectList);
     } catch (error) {
+      // TODO: Replace with proper error handling/display
       console.error('Failed to fetch projects:', error);
     }
 
@@ -158,7 +159,7 @@ const TopNavigation: Component = () => {
 
 // Layout component with page heading support outside white content box
 interface LayoutProps {
-  children: any;
+  children: JSX.Element;
   title?: string;
   subtitle?: string;
   noBox?: boolean; // Skip the outer white content box
@@ -237,7 +238,7 @@ const ProjectDetailsWrapper: Component = () => {
   // Load project data to get the title
   onMount(async () => {
     try {
-      const projectId = (params as any).id;
+      const projectId = (params as { id: string }).id;
       if (projectId) {
         const details = await apiClient.fetchProjectDetails(projectId);
         setProject(details.project);
