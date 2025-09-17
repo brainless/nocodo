@@ -8,7 +8,10 @@ import {
 
 test.describe('New Tools Integration Tests', () => {
   test('should handle write_file followed by grep search', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create a file with function definitions, then search for them');
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a file with function definitions, then search for them'
+    );
 
     // Wait for write_file tool
     const writeResult = await waitForToolCall(request, workId, 'write_file');
@@ -50,15 +53,23 @@ test.describe('New Tools Integration Tests', () => {
     expect(grepResult.status).toBe('completed');
 
     // Verify all tools completed successfully
-    expect([listResult, readResult, writeResult, grepResult].every(r => r.status === 'completed')).toBe(true);
+    expect(
+      [listResult, readResult, writeResult, grepResult].every(r => r.status === 'completed')
+    ).toBe(true);
 
     // Verify final LLM response
     const llmResponse = await waitForLLMResponse(request, workId);
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should handle write_file and grep in sequence with error recovery', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create a file, then search for non-existent pattern, then create another file');
+  test('should handle write_file and grep in sequence with error recovery', async ({
+    page,
+    request,
+  }) => {
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a file, then search for non-existent pattern, then create another file'
+    );
 
     // First write_file
     const writeResult1 = await waitForToolCall(request, workId, 'write_file');
@@ -79,7 +90,10 @@ test.describe('New Tools Integration Tests', () => {
   });
 
   test('should execute multiple grep searches in sequence', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Search for "function", then search for "class", then search for "interface"');
+    const workId = await startLLMAgentWork(
+      page,
+      'Search for "function", then search for "class", then search for "interface"'
+    );
 
     // First grep search
     const grepResult1 = await waitForToolCall(request, workId, 'grep');
@@ -101,8 +115,14 @@ test.describe('New Tools Integration Tests', () => {
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should handle write_file with different file types and grep validation', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create multiple files of different types, then search for specific patterns in each');
+  test('should handle write_file with different file types and grep validation', async ({
+    page,
+    request,
+  }) => {
+    const workId = await startLLMAgentWork(
+      page,
+      'Create multiple files of different types, then search for specific patterns in each'
+    );
 
     // Multiple write_file operations
     const writeResults = [];
@@ -130,7 +150,10 @@ test.describe('New Tools Integration Tests', () => {
   });
 
   test('should maintain tool execution order in complex workflows', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Read existing file, modify it, search for old content, then search for new content');
+    const workId = await startLLMAgentWork(
+      page,
+      'Read existing file, modify it, search for old content, then search for new content'
+    );
 
     // Read existing file
     const readResult = await waitForToolCall(request, workId, 'read_file');
@@ -153,8 +176,14 @@ test.describe('New Tools Integration Tests', () => {
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should handle tool failures gracefully in integration scenarios', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Try to write to invalid path, then create valid file, then search successfully');
+  test('should handle tool failures gracefully in integration scenarios', async ({
+    page,
+    request,
+  }) => {
+    const workId = await startLLMAgentWork(
+      page,
+      'Try to write to invalid path, then create valid file, then search successfully'
+    );
 
     // First write_file (should fail)
     const writeResult1 = await waitForToolCall(request, workId, 'write_file');
@@ -173,10 +202,16 @@ test.describe('New Tools Integration Tests', () => {
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should validate tool execution timing in integration scenarios', async ({ page, request }) => {
+  test('should validate tool execution timing in integration scenarios', async ({
+    page,
+    request,
+  }) => {
     const startTime = Date.now();
 
-    const workId = await startLLMAgentWork(page, 'Quickly create a file and search for its content');
+    const workId = await startLLMAgentWork(
+      page,
+      'Quickly create a file and search for its content'
+    );
 
     // Wait for write_file
     await waitForToolCall(request, workId, 'write_file', 3000);
@@ -193,7 +228,10 @@ test.describe('New Tools Integration Tests', () => {
   });
 
   test('should handle large file creation and search integration', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create a large file with many lines, then search for specific patterns');
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a large file with many lines, then search for specific patterns'
+    );
 
     // Create large file
     const writeResult = await waitForToolCall(request, workId, 'write_file', 10000);
@@ -209,7 +247,10 @@ test.describe('New Tools Integration Tests', () => {
   });
 
   test('should maintain state consistency across tool executions', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create file A, create file B, search in both, then modify file A');
+    const workId = await startLLMAgentWork(
+      page,
+      'Create file A, create file B, search in both, then modify file A'
+    );
 
     // Create file A
     const writeResult1 = await waitForToolCall(request, workId, 'write_file');

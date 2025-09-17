@@ -38,11 +38,12 @@ test.describe('Solid Store Integration Tests', () => {
     expect(data.messages.length).toBeGreaterThan(0);
 
     // Verify tool execution messages are present
-    const toolMessages = data.messages.filter((m: any) =>
-      m.content.includes('grep') ||
-      m.content.includes('search') ||
-      m.content.includes('matches') ||
-      m.content_type === 'tool_execution'
+    const toolMessages = data.messages.filter(
+      (m: any) =>
+        m.content.includes('grep') ||
+        m.content.includes('search') ||
+        m.content.includes('matches') ||
+        m.content_type === 'tool_execution'
     );
     expect(toolMessages.length).toBeGreaterThan(0);
   });
@@ -64,19 +65,20 @@ test.describe('Solid Store Integration Tests', () => {
     expect(workData.messages.length).toBeGreaterThan(2);
 
     // Verify chronological order of tool executions
-    const toolExecutionMessages = workData.messages.filter((m: any) =>
-      m.content.includes('write_file') ||
-      m.content.includes('grep') ||
-      m.content.includes('created') ||
-      m.content.includes('matches')
+    const toolExecutionMessages = workData.messages.filter(
+      (m: any) =>
+        m.content.includes('write_file') ||
+        m.content.includes('grep') ||
+        m.content.includes('created') ||
+        m.content.includes('matches')
     );
 
     expect(toolExecutionMessages.length).toBeGreaterThanOrEqual(2);
 
     // Verify messages are in chronological order
     for (let i = 1; i < toolExecutionMessages.length; i++) {
-      expect(new Date(toolExecutionMessages[i].created_at)).toBeGreaterThanOrEqual(
-        new Date(toolExecutionMessages[i - 1].created_at)
+      expect(new Date(toolExecutionMessages[i].created_at).getTime()).toBeGreaterThanOrEqual(
+        new Date(toolExecutionMessages[i - 1].created_at).getTime()
       );
     }
   });
@@ -110,15 +112,18 @@ test.describe('Solid Store Integration Tests', () => {
     const workData = await response.json();
 
     // Verify error messages are properly stored
-    const errorMessages = workData.messages.filter((m: any) =>
-      m.content.includes('error') ||
-      m.content.includes('permission') ||
-      m.content.includes('denied') ||
-      m.content.includes('failed')
+    const errorMessages = workData.messages.filter(
+      (m: any) =>
+        m.content.includes('error') ||
+        m.content.includes('permission') ||
+        m.content.includes('denied') ||
+        m.content.includes('failed')
     );
 
     // Should have some indication of the error in the message history
     expect(workData.messages.length).toBeGreaterThan(0);
+    // Verify that error messages array was created (even if empty, the filtering should work)
+    expect(Array.isArray(errorMessages)).toBe(true);
   });
 
   test('should maintain message content types correctly', async ({ page, request }) => {

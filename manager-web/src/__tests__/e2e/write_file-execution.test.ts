@@ -9,7 +9,10 @@ import {
 test.describe('Write File Tool Execution API Tests', () => {
   test('should create new file via write_file tool API', async ({ page, request }) => {
     // Start LLM agent work
-    const workId = await startLLMAgentWork(page, 'Create a new file called test.txt with content "Hello World"');
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a new file called test.txt with content "Hello World"'
+    );
 
     // Wait for tool execution to complete
     const toolCallResult = await waitForToolCall(request, workId, 'write_file');
@@ -33,11 +36,17 @@ test.describe('Write File Tool Execution API Tests', () => {
 
   test('should overwrite existing file via write_file tool API', async ({ page, request }) => {
     // First create a file
-    const createWorkId = await startLLMAgentWork(page, 'Create a file called overwrite-test.txt with content "Original content"');
+    const createWorkId = await startLLMAgentWork(
+      page,
+      'Create a file called overwrite-test.txt with content "Original content"'
+    );
     await waitForToolCall(request, createWorkId, 'write_file');
 
     // Now overwrite it
-    const workId = await startLLMAgentWork(page, 'Overwrite overwrite-test.txt with new content "Updated content"');
+    const workId = await startLLMAgentWork(
+      page,
+      'Overwrite overwrite-test.txt with new content "Updated content"'
+    );
 
     // Wait for tool execution to complete
     const toolCallResult = await waitForToolCall(request, workId, 'write_file');
@@ -56,7 +65,10 @@ test.describe('Write File Tool Execution API Tests', () => {
 
   test('should perform search and replace via write_file tool API', async ({ page, request }) => {
     // First create a file with specific content
-    const createWorkId = await startLLMAgentWork(page, 'Create config.toml with content "[database]\nurl = \"old_url\"\nport = 5432"');
+    const createWorkId = await startLLMAgentWork(
+      page,
+      'Create config.toml with content "[database]\nurl = "old_url"\nport = 5432"'
+    );
     await waitForToolCall(request, createWorkId, 'write_file');
 
     // Now perform search and replace
@@ -97,7 +109,10 @@ test.describe('Write File Tool Execution API Tests', () => {
 
   test('should append content to existing file via write_file tool', async ({ page, request }) => {
     // First create a file
-    const createWorkId = await startLLMAgentWork(page, 'Create append-test.txt with content "Line 1\n"');
+    const createWorkId = await startLLMAgentWork(
+      page,
+      'Create append-test.txt with content "Line 1\n"'
+    );
     await waitForToolCall(request, createWorkId, 'write_file');
 
     // Now append to it
@@ -120,8 +135,14 @@ test.describe('Write File Tool Execution API Tests', () => {
     expect(llmResponse.content).toContain('Line 3');
   });
 
-  test('should create directories when requested via write_file tool', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create a file at nested/deep/path/test.txt with content "Nested file"');
+  test('should create directories when requested via write_file tool', async ({
+    page,
+    request,
+  }) => {
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a file at nested/deep/path/test.txt with content "Nested file"'
+    );
 
     // Wait for tool execution to complete
     const toolCallResult = await waitForToolCall(request, workId, 'write_file');
@@ -138,11 +159,17 @@ test.describe('Write File Tool Execution API Tests', () => {
     expect(llmResponse.content).toContain('Nested file');
   });
 
-  test('should validate write_file tool execution timing and performance', async ({ page, request }) => {
+  test('should validate write_file tool execution timing and performance', async ({
+    page,
+    request,
+  }) => {
     const startTime = Date.now();
 
     // Start LLM agent work
-    const workId = await startLLMAgentWork(page, 'Write a small file with content "Performance test"');
+    const workId = await startLLMAgentWork(
+      page,
+      'Write a small file with content "Performance test"'
+    );
 
     // Wait for tool execution
     const toolCallResult = await waitForToolCall(request, workId, 'write_file', 5000);
@@ -158,7 +185,10 @@ test.describe('Write File Tool Execution API Tests', () => {
   });
 
   test('should handle write_file with complex file paths', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create a file at src/components/Button.tsx with React component code');
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a file at src/components/Button.tsx with React component code'
+    );
 
     // Wait for tool execution
     const toolCallResult = await waitForToolCall(request, workId, 'write_file');
@@ -171,7 +201,10 @@ test.describe('Write File Tool Execution API Tests', () => {
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should maintain write_file tool execution history across sessions', async ({ page, request }) => {
+  test('should maintain write_file tool execution history across sessions', async ({
+    page,
+    request,
+  }) => {
     // First file write
     const workId1 = await startLLMAgentWork(page, 'Create file1.txt with content "First file"');
     await waitForToolCall(request, workId1, 'write_file');
