@@ -222,7 +222,7 @@ export const test = base.extend({
                   match_start: 0,
                   match_end: 7,
                   matched_text: 'fn main',
-                }
+                },
               ],
               total_matches: 1,
               files_searched: 5,
@@ -391,7 +391,11 @@ export const test = base.extend({
             events = [
               // Initial processing
               { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your search request...' },
-              { delay: 1000, type: 'LlmAgentChunk', content: 'I need to search for patterns in files.' },
+              {
+                delay: 1000,
+                type: 'LlmAgentChunk',
+                content: 'I need to search for patterns in files.',
+              },
               { delay: 1500, type: 'LlmAgentChunk', content: 'Executing grep tool...' },
 
               // Tool execution start

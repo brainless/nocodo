@@ -205,7 +205,9 @@ test.describe('Grep Tool Execution API Tests', () => {
     expect(toolCallResult.message).toHaveProperty('created_at');
 
     // Verify grep specific fields in content
-    expect(toolCallResult.message.content).toMatch(/(matches|files_searched|total_matches|pattern)/);
+    expect(toolCallResult.message.content).toMatch(
+      /(matches|files_searched|total_matches|pattern)/
+    );
   });
 
   test('should handle grep searches with no results', async ({ page, request }) => {
@@ -227,7 +229,10 @@ test.describe('Grep Tool Execution API Tests', () => {
   });
 
   test('should handle grep searches with special characters', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Search for patterns with special characters like "->" or "::"');
+    const workId = await startLLMAgentWork(
+      page,
+      'Search for patterns with special characters like "->" or "::"'
+    );
 
     // Wait for tool execution to complete
     const toolCallResult = await waitForToolCall(request, workId, 'grep');

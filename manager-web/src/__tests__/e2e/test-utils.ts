@@ -39,15 +39,15 @@ export async function startLLMAgentWork(page: Page, prompt: string): Promise<str
   return workId;
 }
 
-  /**
-   * Helper function to wait for tool call completion via API
-   */
-  export async function waitForToolCall(
-    request: APIRequestContext,
-    workId: string,
-    toolType: 'list_files' | 'read_file' | 'write_file' | 'grep' = 'list_files',
-    timeout: number = 10000
-  ): Promise<any> {
+/**
+ * Helper function to wait for tool call completion via API
+ */
+export async function waitForToolCall(
+  request: APIRequestContext,
+  workId: string,
+  toolType: 'list_files' | 'read_file' | 'write_file' | 'grep' = 'list_files',
+  timeout: number = 10000
+): Promise<any> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {
@@ -65,8 +65,14 @@ export async function startLLMAgentWork(page: Page, prompt: string): Promise<str
             msg.content.includes('function_call') ||
             msg.content_type === 'tool_execution' ||
             (msg.content.includes('Executing') && msg.content.includes('tool')) ||
-            (toolType === 'write_file' && (msg.content.includes('write') || msg.content.includes('create') || msg.content.includes('file'))) ||
-            (toolType === 'grep' && (msg.content.includes('search') || msg.content.includes('grep') || msg.content.includes('pattern')))
+            (toolType === 'write_file' &&
+              (msg.content.includes('write') ||
+                msg.content.includes('create') ||
+                msg.content.includes('file'))) ||
+            (toolType === 'grep' &&
+              (msg.content.includes('search') ||
+                msg.content.includes('grep') ||
+                msg.content.includes('pattern')))
         );
 
         if (toolMessage) {
@@ -104,11 +110,12 @@ export async function startLLMAgentWork(page: Page, prompt: string): Promise<str
 
         // For write_file tool, look for file creation/modification messages
         if (toolType === 'write_file' && data.messages.length > 1) {
-          const writeMessage = data.messages.find((msg: any) =>
-            msg.content.includes('created') ||
-            msg.content.includes('written') ||
-            msg.content.includes('bytes_written') ||
-            msg.content.includes('modified')
+          const writeMessage = data.messages.find(
+            (msg: any) =>
+              msg.content.includes('created') ||
+              msg.content.includes('written') ||
+              msg.content.includes('bytes_written') ||
+              msg.content.includes('modified')
           );
           if (writeMessage) {
             return {
@@ -123,11 +130,12 @@ export async function startLLMAgentWork(page: Page, prompt: string): Promise<str
 
         // For grep tool, look for search result messages
         if (toolType === 'grep' && data.messages.length > 1) {
-          const grepMessage = data.messages.find((msg: any) =>
-            msg.content.includes('matches') ||
-            msg.content.includes('found') ||
-            msg.content.includes('search') ||
-            msg.content.includes('pattern')
+          const grepMessage = data.messages.find(
+            (msg: any) =>
+              msg.content.includes('matches') ||
+              msg.content.includes('found') ||
+              msg.content.includes('search') ||
+              msg.content.includes('pattern')
           );
           if (grepMessage) {
             return {
@@ -292,7 +300,7 @@ export function createToolExecutionMocks() {
           match_start: 0,
           match_end: 7,
           matched_text: 'fn main',
-        }
+        },
       ],
       total_matches: 1,
       files_searched: 5,

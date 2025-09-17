@@ -1,5 +1,5 @@
 import { expect, test } from './setup';
-import { startLLMAgentWork, waitForToolCall, waitForLLMResponse } from './test-utils';
+import { startLLMAgentWork, waitForLLMResponse, waitForToolCall } from './test-utils';
 
 test.describe('New Tools Performance and Reliability Tests', () => {
   test('should execute new tools within performance bounds', async ({ page, request }) => {
@@ -77,7 +77,10 @@ test.describe('New Tools Performance and Reliability Tests', () => {
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should validate write_file performance with different file sizes', async ({ page, request }) => {
+  test('should validate write_file performance with different file sizes', async ({
+    page,
+    request,
+  }) => {
     // Test with small file
     const smallFileWorkId = await startLLMAgentWork(page, 'Create a small text file');
     const smallFileStart = Date.now();
@@ -87,7 +90,10 @@ test.describe('New Tools Performance and Reliability Tests', () => {
     expect(smallFileTime).toBeLessThan(5000);
 
     // Test with medium file
-    const mediumFileWorkId = await startLLMAgentWork(page, 'Create a medium-sized file with more content');
+    const mediumFileWorkId = await startLLMAgentWork(
+      page,
+      'Create a medium-sized file with more content'
+    );
     const mediumFileStart = Date.now();
     await waitForToolCall(request, mediumFileWorkId, 'write_file', 5000);
     const mediumFileTime = Date.now() - mediumFileStart;
@@ -98,7 +104,10 @@ test.describe('New Tools Performance and Reliability Tests', () => {
     expect(smallFileTime).toBeLessThan(mediumFileTime);
   });
 
-  test('should maintain consistent performance across multiple executions', async ({ page, request }) => {
+  test('should maintain consistent performance across multiple executions', async ({
+    page,
+    request,
+  }) => {
     const executionTimes: number[] = [];
 
     // Execute the same operation multiple times
@@ -117,7 +126,9 @@ test.describe('New Tools Performance and Reliability Tests', () => {
 
     // Calculate performance variance
     const avgTime = executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length;
-    const variance = executionTimes.reduce((acc, time) => acc + Math.pow(time - avgTime, 2), 0) / executionTimes.length;
+    const variance =
+      executionTimes.reduce((acc, time) => acc + Math.pow(time - avgTime, 2), 0) /
+      executionTimes.length;
     const stdDev = Math.sqrt(variance);
 
     // Performance should be reasonably consistent (std dev < 50% of average)
@@ -149,9 +160,15 @@ test.describe('New Tools Performance and Reliability Tests', () => {
     expect(llmResponse.content).toBeDefined();
   });
 
-  test('should validate grep performance with different search scopes', async ({ page, request }) => {
+  test('should validate grep performance with different search scopes', async ({
+    page,
+    request,
+  }) => {
     // Test focused search
-    const focusedWorkId = await startLLMAgentWork(page, 'Search for "function" in src directory only');
+    const focusedWorkId = await startLLMAgentWork(
+      page,
+      'Search for "function" in src directory only'
+    );
     const focusedStart = Date.now();
     await waitForToolCall(request, focusedWorkId, 'grep', 5000);
     const focusedTime = Date.now() - focusedStart;
@@ -173,8 +190,14 @@ test.describe('New Tools Performance and Reliability Tests', () => {
     }
   });
 
-  test('should handle memory-intensive operations without degradation', async ({ page, request }) => {
-    const workId = await startLLMAgentWork(page, 'Create a large file and perform extensive search');
+  test('should handle memory-intensive operations without degradation', async ({
+    page,
+    request,
+  }) => {
+    const workId = await startLLMAgentWork(
+      page,
+      'Create a large file and perform extensive search'
+    );
 
     const startTime = Date.now();
 
@@ -216,9 +239,10 @@ test.describe('New Tools Performance and Reliability Tests', () => {
     const endTime = Date.now();
 
     // Calculate average completion time
-    const avgCompletionTime = startTimes.reduce((acc, startTime) => {
-      return acc + (endTime - startTime);
-    }, 0) / startTimes.length;
+    const avgCompletionTime =
+      startTimes.reduce((acc, startTime) => {
+        return acc + (endTime - startTime);
+      }, 0) / startTimes.length;
 
     // Should maintain reasonable performance under load
     expect(avgCompletionTime).toBeLessThan(20000);
