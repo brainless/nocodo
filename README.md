@@ -80,6 +80,84 @@ nocodo-manager --config ~/.config/nocodo/manager.toml
 # Note: The nocodo CLI has been removed as part of issue #80
 ```
 
+## 🧪 Testing
+
+### API-Only End-to-End Tests
+
+nocodo includes fast, reliable API-only end-to-end tests that focus on LLM agent tool call processing without loading UI components.
+
+#### 🚀 Key Benefits
+- **10-20x faster** than browser-based tests
+- **More reliable** - no UI timing issues or DOM dependencies
+- **Better coverage** - direct API endpoint testing
+- **CI/CD friendly** - no headless browser requirements
+
+#### 🏃 Running Tests
+
+```bash
+# Run all API E2E tests
+cd manager-web
+npm run test:api-e2e
+
+# Run tests in watch mode during development
+npm run test:api-e2e:watch
+
+# Run tests with coverage reporting
+npm run test:api-e2e:coverage
+
+# Run tests for CI (with JSON output)
+npm run test:api-e2e:ci
+```
+
+#### 📊 Test Coverage
+
+The API-only tests cover:
+
+- **Project Management**: CRUD operations, validation, workflows
+- **File Operations**: Create, read, update, delete, listing, search
+- **Work Sessions**: LLM agent session management, message handling
+- **Tool Call Processing**: File operations, error handling, complex workflows
+- **WebSocket Communication**: Real-time updates, connection management
+- **State Management**: SolidJS store integration, reactive updates
+- **Performance**: Load testing, concurrent operations, memory usage
+- **Error Handling**: Edge cases, boundary conditions, recovery scenarios
+
+#### 🏗️ Test Architecture
+
+```
+manager-web/src/__tests__/api-e2e/
+├── setup/                    # Test infrastructure
+│   ├── api-client.ts        # HTTP client for API calls
+│   ├── test-server.ts       # Manager daemon lifecycle
+│   ├── test-database.ts     # Database setup/cleanup
+│   ├── test-data.ts         # Mock data generators
+│   └── setup.test.ts        # Framework verification
+├── workflows/               # Core workflow tests
+│   ├── project-workflow.test.ts
+│   ├── file-operations.test.ts
+│   ├── work-session.test.ts
+│   └── llm-agent.test.ts
+├── integration/             # Complex integration tests
+│   ├── end-to-end-workflow.test.ts
+│   ├── websocket-communication.test.ts
+│   ├── complex-workflows.test.ts
+│   ├── error-handling.test.ts
+│   ├── performance-testing.test.ts
+│   └── solid-integration.test.ts
+└── utils/                   # Test utilities
+    ├── websocket-client.ts
+    └── state-manager.ts
+```
+
+#### 🔄 CI/CD Integration
+
+Tests run automatically on:
+- Push to `main` or `develop` branches
+- Pull requests affecting test files
+- Scheduled runs for performance regression detection
+
+Coverage reports are uploaded to Codecov, and test results are archived for 30 days.
+
 ## 📖 Vibe Coding Playbook
 
 Learn our proven methodology for building MVP web applications using terminal-based coding tools and structured prompting flows. Master the art of being both Product Owner and Project Manager in your AI-assisted development workflow.
