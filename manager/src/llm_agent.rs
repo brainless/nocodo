@@ -346,6 +346,8 @@ impl LlmAgent {
                 let tool_name = match &tool_request {
                     ToolRequest::ListFiles(_) => "list_files",
                     ToolRequest::ReadFile(_) => "read_file",
+                    ToolRequest::WriteFile(_) => "write_file",
+                    ToolRequest::Grep(_) => "grep",
                 };
 
                 tracing::debug!(
@@ -661,7 +663,7 @@ impl LlmAgent {
 
     /// Create system prompt for tool usage
     fn create_tool_system_prompt(&self) -> String {
-        use crate::models::{ListFilesRequest, ReadFileRequest, ToolRequest};
+        use crate::models::{GrepRequest, ListFilesRequest, ReadFileRequest, ToolRequest, WriteFileRequest};
         use ts_rs::TS;
 
         // Generate TypeScript types for tools
@@ -671,6 +673,10 @@ impl LlmAgent {
             .unwrap_or_else(|_| "// Failed to generate ListFilesRequest type".to_string());
         let read_file_request_ts = ReadFileRequest::export_to_string()
             .unwrap_or_else(|_| "// Failed to generate ReadFileRequest type".to_string());
+        let write_file_request_ts = WriteFileRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate WriteFileRequest type".to_string());
+        let grep_request_ts = GrepRequest::export_to_string()
+            .unwrap_or_else(|_| "// Failed to generate GrepRequest type".to_string());
 
         format!(
             r#"You are an AI assistant with access to file system tools. You can use the following tools:
@@ -687,6 +693,10 @@ The tools are defined using TypeScript types. When calling a tool, use the exact
 
 {read_file_request_ts}
 
+{write_file_request_ts}
+
+{grep_request_ts}
+
 // Union type for all tool requests
 {tool_request_ts}
 ```
@@ -698,6 +708,9 @@ When you need to use a tool, respond with ONLY the JSON request for that tool. D
 Examples:
 - List files: {{"type": "list_files", "path": ".", "recursive": false}}
 - Read file: {{"type": "read_file", "path": "src/main.rs", "max_size": 10000}}
+- Write file: {{"type": "write_file", "path": "src/main.rs", "content": "fn main() {{\n    println!(\"Hello, world!\");\n}}" }}
+- Search and replace: {{"type": "write_file", "path": "src/lib.rs", "search": "old_function", "replace": "new_function"}}
+- Grep search: {{"type": "grep", "pattern": "fn main", "recursive": true, "include_line_numbers": true}}
 
 ### Guidelines
 
@@ -705,10 +718,15 @@ Examples:
 2. Always provide a complete answer to the user's original question using the information gathered from the tools.
 3. Always analyze the project structure and read relevant files before providing code solutions.
 4. Be concise and focus on the user's specific needs.
+5. Use write_file to create new files by setting create_if_not_exists=true when the file doesn't exist.
+6. Use write_file with search and replace parameters to modify specific parts of existing files.
+7. Use grep to search for patterns across multiple files efficiently.
 
 The tool request MUST exactly match the TypeScript interface defined above."#,
             list_files_request_ts = list_files_request_ts,
             read_file_request_ts = read_file_request_ts,
+            write_file_request_ts = write_file_request_ts,
+            grep_request_ts = grep_request_ts,
             tool_request_ts = tool_request_ts
         )
     }
@@ -727,7 +745,8 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
 
         // Look for JSON objects that might be tool calls - more flexible matching
         let contains_tool_keywords =
-            response.contains("list_files") || response.contains("read_file");
+            response.contains("list_files") || response.contains("read_file") ||
+            response.contains("write_file") || response.contains("grep");
         let contains_json_structure = response.contains("type") && response.contains("{");
 
         let result = contains_tool_keywords && contains_json_structure;
