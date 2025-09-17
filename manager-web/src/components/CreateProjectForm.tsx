@@ -1,5 +1,5 @@
 import { Component, createSignal } from 'solid-js';
-import { CreateProjectRequest, AddExistingProjectRequest } from '../types';
+import { AddExistingProjectRequest, CreateProjectRequest } from '../types';
 import { apiClient } from '../api';
 
 interface CreateProjectFormProps {
@@ -201,9 +201,7 @@ export const AddExistingProjectForm: Component<AddExistingProjectFormProps> = pr
             placeholder='/home/me/Projects/my-existing-project'
             required
           />
-          <p class='text-xs text-gray-500 mt-1'>
-            Full path to the existing project directory.
-          </p>
+          <p class='text-xs text-gray-500 mt-1'>Full path to the existing project directory.</p>
         </div>
 
         {error() && (
