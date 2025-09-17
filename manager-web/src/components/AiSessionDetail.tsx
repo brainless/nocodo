@@ -78,90 +78,45 @@ const LiveStatusIndicator: Component<{
   );
 };
 
-// Output panel component (Issue #59)
+// Output panel component - simplified card-based display
 const OutputPanel: Component<{ sessionId: string }> = props => {
-  const { actions } = useSessions();
   const outputs = useSessionOutputs(props.sessionId);
-  const [autoScroll, setAutoScroll] = createSignal(true);
-  let containerRef: HTMLDivElement | undefined;
-
-  const scrollToBottom = () => {
-    if (containerRef && autoScroll()) {
-      containerRef.scrollTop = containerRef.scrollHeight;
-    }
-  };
-
-  const copyAll = async () => {
-    try {
-      const text = outputs
-        .get()
-        .map(c => `${c.stream === 'stderr' ? '[stderr] ' : ''}${c.content}`)
-        .join('');
-      await navigator.clipboard.writeText(text);
-    } catch (e) {
-      console.error('Failed to copy outputs', e);
-    }
-  };
-
-  const clearAll = () => actions.clearOutputs(props.sessionId);
-
-  // Scroll on new outputs
-  const observer = new MutationObserver(scrollToBottom);
-  onMount(() => {
-    if (containerRef) {
-      observer.observe(containerRef, { childList: true, subtree: true });
-    }
-  });
-  onCleanup(() => observer.disconnect());
 
   return (
-    <div class='bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden'>
-      <div class='px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between'>
-        <div>
-          <h3 class='text-lg font-medium text-gray-900'>Live Output</h3>
-          <p class='text-sm text-gray-600'>Real-time stdout/stderr from the AI tool</p>
+    <Show
+      when={outputs.get().length > 0}
+      fallback={
+        <div class='text-center py-8 text-gray-500'>
+          <div class='text-gray-400 text-lg mb-2'>No output yet</div>
+          <p class='text-sm'>Output will appear here as the work progresses</p>
         </div>
-        <div class='flex items-center gap-2'>
-          <label class='inline-flex items-center text-sm text-gray-700'>
-            <input
-              type='checkbox'
-              checked={autoScroll()}
-              onInput={e => setAutoScroll(e.currentTarget.checked)}
-              class='mr-2'
-            />
-            Auto-scroll
-          </label>
-          <button
-            onClick={copyAll}
-            class='px-3 py-1.5 text-sm bg-gray-100 border border-gray-300 rounded hover:bg-gray-200'
-          >
-            Copy all
-          </button>
-          <button
-            onClick={clearAll}
-            class='px-3 py-1.5 text-sm bg-gray-100 border border-gray-300 rounded hover:bg-gray-200'
-          >
-            Clear
-          </button>
-        </div>
+      }
+    >
+      <div class='space-y-3'>
+        <For each={outputs.get()}>
+          {chunk => (
+            <div class={`bg-gray-50 border rounded-lg p-4 ${
+              chunk.stream === 'stderr'
+                ? 'border-red-200 bg-red-50'
+                : 'border-gray-200'
+            }`}>
+              <div class='flex items-start justify-between mb-2'>
+                <span class={`text-xs font-medium px-2 py-1 rounded ${
+                  chunk.stream === 'stderr'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {chunk.stream === 'stderr' ? 'Error' : 'Output'}
+                </span>
+              </div>
+              <div class='text-sm text-gray-900 whitespace-pre-wrap font-mono leading-relaxed'>
+                {chunk.content}
+              </div>
+            </div>
+          )}
+        </For>
       </div>
-      <div
-        ref={el => (containerRef = el)}
-        class='px-6 py-4 font-mono text-sm whitespace-pre-wrap h-72 overflow-auto bg-black text-gray-100'
-        aria-live='polite'
-      >
-        <Show
-          when={outputs.get().length > 0}
-          fallback={<div class='text-gray-400'>No output yet</div>}
-        >
-          <For each={outputs.get()}>
-            {chunk => (
-              <div class={chunk.stream === 'stderr' ? 'text-red-400' : ''}>{chunk.content}</div>
-            )}
-          </For>
-        </Show>
-      </div>
-    </div>
+    </Show>
   );
 };
 

@@ -1,4 +1,5 @@
 import {
+  AddExistingProjectRequest,
   AddMessageRequest,
   AiSessionListResponse,
   AiSessionOutputListResponse,
@@ -60,6 +61,13 @@ class ApiClient {
 
   async createProject(data: CreateProjectRequest): Promise<Project> {
     return this.request('/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addExistingProject(data: AddExistingProjectRequest): Promise<Project> {
+    return this.request('/projects/add-existing', {
       method: 'POST',
       body: JSON.stringify(data),
     });
