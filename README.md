@@ -13,7 +13,7 @@ Transform your ideas into production-ready applications using AI coding agents, 
 ## ✨ What We're Solving
 
 ### 🤖 **Free AI Coding Agents**
-Automatically use free tiers from Claude Code, OpenAI Codex, Gemini and similar tools - no vendor lock-in!
+Integrated AI-powered development tools with no vendor lock-in!
 
 ### ☁️ **Your Cloud Infrastructure**
 Your development setup is managed by nocodo on your own cloud infrastructure. You own everything.
@@ -56,7 +56,7 @@ The nocodo MVP consists of two core components running locally on your Linux mac
 - 🐧 Linux laptop (tested on CachyOS Linux)
 - 🦀 Rust toolchain
 - 📦 Node.js and npm
-- 🤖 AI coding tools (Claude Code, Gemini CLI, etc.)
+- 🤖 AI tools (if using external integrations)
 
 ### 🔧 Installation
 ```bash
