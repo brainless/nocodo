@@ -79,6 +79,23 @@ pub enum WebSocketMessage {
         session_id: String,
         content: String,
     },
+
+    // Tool call lifecycle messages
+    ToolCallStarted {
+        session_id: String,
+        call_id: String,
+        tool_name: String,
+    },
+    ToolCallCompleted {
+        session_id: String,
+        call_id: String,
+        result: String, // JSON string
+    },
+    ToolCallFailed {
+        session_id: String,
+        call_id: String,
+        error: String,
+    },
 }
 
 /// WebSocket connection actor
@@ -452,6 +469,39 @@ impl WebSocketBroadcaster {
             message: WebSocketMessage::LlmAgentChunk {
                 session_id,
                 content,
+            },
+        });
+    }
+
+    /// Broadcast tool call started
+    pub async fn broadcast_tool_call_started(&self, session_id: String, call_id: String, tool_name: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::ToolCallStarted {
+                session_id,
+                call_id,
+                tool_name,
+            },
+        });
+    }
+
+    /// Broadcast tool call completed
+    pub async fn broadcast_tool_call_completed(&self, session_id: String, call_id: String, result: serde_json::Value) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::ToolCallCompleted {
+                session_id,
+                call_id,
+                result: serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string()),
+            },
+        });
+    }
+
+    /// Broadcast tool call failed
+    pub async fn broadcast_tool_call_failed(&self, session_id: String, call_id: String, error: String) {
+        self.server.do_send(Broadcast {
+            message: WebSocketMessage::ToolCallFailed {
+                session_id,
+                call_id,
+                error,
             },
         });
     }

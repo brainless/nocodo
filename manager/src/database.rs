@@ -266,6 +266,36 @@ impl Database {
             [],
         )?;
 
+        // Add new columns for enhanced tool call tracking (migration for issue #107)
+        // Add execution_time_ms column
+        let _ = conn.execute(
+            "ALTER TABLE llm_agent_tool_calls ADD COLUMN execution_time_ms INTEGER",
+            [],
+        ); // Ignore error if column already exists
+
+        // Add progress_updates column
+        let _ = conn.execute(
+            "ALTER TABLE llm_agent_tool_calls ADD COLUMN progress_updates TEXT",
+            [],
+        ); // Ignore error if column already exists
+
+        // Add error_details column
+        let _ = conn.execute(
+            "ALTER TABLE llm_agent_tool_calls ADD COLUMN error_details TEXT",
+            [],
+        ); // Ignore error if column already exists
+
+        // Add indexes for performance
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tool_calls_session_status ON llm_agent_tool_calls(session_id, status)",
+            [],
+        ); // Ignore error if index already exists
+
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tool_calls_created_at ON llm_agent_tool_calls(created_at)",
+            [],
+        ); // Ignore error if index already exists
+
         tracing::info!("Database migrations completed");
         Ok(())
     }
@@ -1243,8 +1273,8 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
-            "INSERT INTO llm_agent_tool_calls (session_id, message_id, tool_name, request, response, status, created_at, completed_at) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO llm_agent_tool_calls (session_id, message_id, tool_name, request, response, status, created_at, completed_at, execution_time_ms, progress_updates, error_details)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 tool_call.session_id,
                 tool_call.message_id,
@@ -1254,6 +1284,9 @@ impl Database {
                 tool_call.status,
                 tool_call.created_at,
                 tool_call.completed_at,
+                tool_call.execution_time_ms,
+                tool_call.progress_updates,
+                tool_call.error_details,
             ],
         )?;
 
@@ -1273,8 +1306,8 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
-            "UPDATE llm_agent_tool_calls 
-             SET session_id = ?, message_id = ?, tool_name = ?, request = ?, response = ?, status = ?, created_at = ?, completed_at = ? 
+            "UPDATE llm_agent_tool_calls
+             SET session_id = ?, message_id = ?, tool_name = ?, request = ?, response = ?, status = ?, created_at = ?, completed_at = ?, execution_time_ms = ?, progress_updates = ?, error_details = ?
              WHERE id = ?",
             params![
                 tool_call.session_id,
@@ -1285,6 +1318,9 @@ impl Database {
                 tool_call.status,
                 tool_call.created_at,
                 tool_call.completed_at,
+                tool_call.execution_time_ms,
+                tool_call.progress_updates,
+                tool_call.error_details,
                 tool_call.id,
             ],
         )?;
@@ -1301,24 +1337,27 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, message_id, tool_name, request, response, status, created_at, completed_at 
+            "SELECT id, session_id, message_id, tool_name, request, response, status, created_at, completed_at, execution_time_ms, progress_updates, error_details
              FROM llm_agent_tool_calls WHERE session_id = ? ORDER BY created_at ASC",
         )?;
 
         let tool_call_iter = stmt.query_map([session_id], |row| {
-            let request_str: String = row.get(3)?;
-            let response_str: Option<String> = row.get(4)?;
+            let request_str: String = row.get(4)?;
+            let response_str: Option<String> = row.get(5)?;
 
             Ok(LlmAgentToolCall {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
                 message_id: row.get(2)?,
-                tool_name: row.get(5)?,
+                tool_name: row.get(3)?,
                 request: serde_json::from_str(&request_str).unwrap_or_default(),
                 response: response_str.and_then(|s| serde_json::from_str(&s).ok()),
                 status: row.get(6)?,
                 created_at: row.get(7)?,
                 completed_at: row.get(8)?,
+                execution_time_ms: row.get(9)?,
+                progress_updates: row.get(10)?,
+                error_details: row.get(11)?,
             })
         })?;
 

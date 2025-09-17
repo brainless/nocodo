@@ -5,6 +5,7 @@ import { apiClient } from '../api';
 import { useSessionOutputs, useSessions } from '../stores/sessionsStore';
 import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
 import SessionTimeline from './SessionTimeline';
+import ToolCallProgress from './ToolCallProgress';
 
 // Utility function to format duration
 const formatDuration = (startedAt: number, endedAt?: number): string => {
@@ -171,6 +172,7 @@ const AiSessionDetail: Component = () => {
   const [, setIsConnected] = createSignal(false);
 
   const session = () => store.byId[params.id];
+  const toolCalls = () => actions.getToolCalls(params.id);
 
   // Fetch project details when session is loaded
   const fetchProject = async (projectId: string) => {
@@ -432,6 +434,18 @@ const AiSessionDetail: Component = () => {
                 </Show>
               </div>
             </div>
+
+            {/* Tool Calls */}
+            <Show when={toolCalls().length > 0}>
+              <div class="mt-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Tool Execution</h3>
+                <div class="space-y-2">
+                  <For each={toolCalls()}>
+                    {(toolCall) => <ToolCallProgress toolCall={toolCall} />}
+                  </For>
+                </div>
+              </div>
+            </Show>
 
             {/* Timeline */}
             <SessionTimeline session={session()!} />
