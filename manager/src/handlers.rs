@@ -1837,8 +1837,6 @@ pub async fn get_work_messages(
     Ok(HttpResponse::Ok().json(response))
 }
 
-// Terminal session HTTP handlers for PTY-based interactive sessions
-
 // LLM Agent Endpoints
 
 /// Create a new LLM agent session

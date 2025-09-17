@@ -1,6 +1,6 @@
 # nocodo
 
-Local AI-assisted development environment providing guardrails and software engineering practices for CLI-based coding tools.
+Local AI-assisted development environment providing guardrails and software engineering practices.
 
 ## Project Structure
 - **manager/**: Rust daemon with Actix Web, SQLite, Unix socket server
@@ -34,11 +34,11 @@ cd manager-web && npm install && npm run build
 ## Quick Start
 1. Start Manager daemon: `nocodo-manager --config ~/.config/nocodo/manager.toml`
 2. Access Web interface at http://localhost:8081
-3. AI tools interact with nocodo CLI for context and guardrails
+3. AI-powered development environment with integrated tools
 
 ## Tech Stack
 - Rust + Actix Web for backends
 - SQLite for data storage
 - SolidJS + TailwindCSS for web interfaces
-- Unix sockets for CLI ↔ Manager communication
+- Internal API communication
 - HTTP/WebSocket for Web app ↔ Manager communication
