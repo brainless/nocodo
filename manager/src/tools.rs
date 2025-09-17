@@ -10,8 +10,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-
-
 #[allow(clippy::needless_borrow)]
 /// Tool execution error
 #[derive(Debug, thiserror::Error)]
@@ -234,25 +232,35 @@ impl ToolExecutor {
     async fn write_file(&self, request: WriteFileRequest) -> Result<ToolResponse> {
         let target_path = self.validate_and_resolve_path(&request.path)?;
 
-        // Check if file exists for create_if_not_exists logic
+        // Check if file exists for metadata
         let file_exists = target_path.exists();
 
-        // Handle create_if_not_exists flag
-        if !file_exists && request.create_if_not_exists.unwrap_or(false) {
-            // Create parent directories if they don't exist
+        // Create parent directories if requested
+        if request.create_dirs.unwrap_or(false) || request.create_if_not_exists.unwrap_or(false) {
             if let Some(parent) = target_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-        } else if !file_exists {
+        }
+
+        // Handle create_if_not_exists flag
+        if !file_exists
+            && !request.create_if_not_exists.unwrap_or(false)
+            && !request.create_dirs.unwrap_or(false)
+        {
             return Ok(ToolResponse::Error(ToolErrorResponse {
                 tool: "write_file".to_string(),
                 error: "FileNotFound".to_string(),
-                message: format!("File does not exist: {} (use create_if_not_exists=true to create it)", request.path),
+                message: format!(
+                    "File does not exist: {} (use create_if_not_exists=true to create it)",
+                    request.path
+                ),
             }));
         }
 
         // Handle search and replace functionality
-        let content_to_write = if let (Some(search), Some(replace)) = (&request.search, &request.replace) {
+        let content_to_write = if let (Some(search), Some(replace)) =
+            (&request.search, &request.replace)
+        {
             // Read existing content for search/replace
             let existing_content = match fs::read_to_string(&target_path) {
                 Ok(content) => content,
@@ -272,35 +280,39 @@ impl ToolExecutor {
                 return Ok(ToolResponse::Error(ToolErrorResponse {
                     tool: "write_file".to_string(),
                     error: "SearchNotFound".to_string(),
-                    message: format!("Search pattern '{}' not found in file: {}", search, request.path),
+                    message: format!(
+                        "Search pattern '{}' not found in file: {}",
+                        search, request.path
+                    ),
                 }));
             }
         } else {
             request.content
         };
 
-        // Write the content to file
-        match fs::write(&target_path, &content_to_write) {
-            Ok(_) => {
-                let bytes_written = content_to_write.len() as u64;
-                Ok(ToolResponse::WriteFile(WriteFileResponse {
-                    path: request.path,
-                    success: true,
-                    bytes_written,
-                    created: !file_exists,
-                }))
-            }
-            Err(e) => Ok(ToolResponse::Error(ToolErrorResponse {
-                tool: "write_file".to_string(),
-                error: "WriteError".to_string(),
-                message: format!("Failed to write file {}: {}", request.path, e),
-            })),
-        }
+        let bytes_written = if request.append.unwrap_or(false) && file_exists {
+            // Append to existing file
+            let mut file = fs::OpenOptions::new().append(true).open(&target_path)?;
+            use std::io::Write;
+            file.write(content_to_write.as_bytes())?
+        } else {
+            // Write new file or overwrite existing
+            fs::write(&target_path, &content_to_write)?;
+            content_to_write.len()
+        };
+
+        Ok(ToolResponse::WriteFile(WriteFileResponse {
+            path: request.path,
+            success: true,
+            bytes_written: bytes_written as u64,
+            created: !file_exists,
+            modified: file_exists,
+        }))
     }
 
     /// Search files using grep
     async fn grep_search(&self, request: GrepRequest) -> Result<ToolResponse> {
-        use regex::Regex;
+        use regex::RegexBuilder;
 
         let search_path = if let Some(path) = &request.path {
             self.validate_and_resolve_path(path)?
@@ -312,18 +324,38 @@ impl ToolExecutor {
             return Ok(ToolResponse::Error(ToolErrorResponse {
                 tool: "grep".to_string(),
                 error: "PathNotFound".to_string(),
-                message: format!("Search path does not exist: {}", request.path.unwrap_or_else(|| ".".to_string())),
+                message: format!(
+                    "Search path does not exist: {}",
+                    request.path.unwrap_or_else(|| ".".to_string())
+                ),
             }));
         }
 
-        // Create regex pattern
-        let pattern = if request.case_sensitive.unwrap_or(false) {
-            Regex::new(&request.pattern)
-        } else {
-            Regex::new(&format!("(?i){}", request.pattern))
-        }.map_err(|e| ToolError::SerializationError(format!("Invalid regex pattern: {}", e)))?;
+        // Compile regex pattern
+        let regex = RegexBuilder::new(&request.pattern)
+            .case_insensitive(!request.case_sensitive.unwrap_or(false))
+            .build()
+            .map_err(|e| ToolError::InvalidPath(format!("Invalid regex pattern: {}", e)))?;
 
-        // Collect matches
+        // Compile include/exclude patterns
+        let include_regex =
+            if let Some(pattern) = &request.include_pattern {
+                Some(RegexBuilder::new(pattern).build().map_err(|e| {
+                    ToolError::InvalidPath(format!("Invalid include pattern: {}", e))
+                })?)
+            } else {
+                None
+            };
+
+        let exclude_regex =
+            if let Some(pattern) = &request.exclude_pattern {
+                Some(RegexBuilder::new(pattern).build().map_err(|e| {
+                    ToolError::InvalidPath(format!("Invalid exclude pattern: {}", e))
+                })?)
+            } else {
+                None
+            };
+
         let mut matches = Vec::new();
         let mut files_searched = 0;
         let max_results = request.max_results.unwrap_or(100) as usize;
@@ -331,9 +363,9 @@ impl ToolExecutor {
         // Use walkdir for recursive search if requested
         let recursive = request.recursive.unwrap_or(true);
         let walker = if recursive {
-            walkdir::WalkDir::new(&search_path)
+            WalkDir::new(&search_path)
         } else {
-            walkdir::WalkDir::new(&search_path).max_depth(1)
+            WalkDir::new(&search_path).max_depth(1)
         };
 
         for entry in walker {
@@ -344,6 +376,27 @@ impl ToolExecutor {
                 continue;
             }
 
+            // Check include/exclude patterns
+            let file_path = entry.path();
+            let relative_path = file_path
+                .strip_prefix(&search_path)
+                .unwrap_or(file_path)
+                .to_string_lossy();
+
+            // Apply include filter
+            if let Some(ref include_re) = include_regex {
+                if !include_re.is_match(&relative_path) {
+                    continue;
+                }
+            }
+
+            // Apply exclude filter
+            if let Some(ref exclude_re) = exclude_regex {
+                if exclude_re.is_match(&relative_path) {
+                    continue;
+                }
+            }
+
             // Skip files that don't match common patterns (like .gitignore)
             let file_name = entry.file_name().to_string_lossy();
             if file_name.starts_with('.') || file_name == "target" || file_name == "node_modules" {
@@ -352,8 +405,8 @@ impl ToolExecutor {
 
             files_searched += 1;
 
-            // Read file content and search manually
-            let content = match fs::read_to_string(entry.path()) {
+            // Search file content
+            let content = match fs::read_to_string(file_path) {
                 Ok(content) => content,
                 Err(_) => continue, // Skip files we can't read
             };
@@ -365,20 +418,15 @@ impl ToolExecutor {
                 }
 
                 // Find all matches in this line
-                for mat in pattern.find_iter(line) {
+                for mat in regex.find_iter(line) {
                     if matches.len() >= max_results {
                         break;
                     }
 
                     let matched_text = mat.as_str().to_string();
 
-                    let relative_path = entry.path().strip_prefix(&search_path)
-                        .unwrap_or(entry.path())
-                        .to_string_lossy()
-                        .to_string();
-
                     let grep_match = GrepMatch {
-                        file_path: relative_path,
+                        file_path: relative_path.to_string(),
                         line_number: if request.include_line_numbers.unwrap_or(true) {
                             Some((line_num + 1) as u32)
                         } else {
@@ -401,8 +449,7 @@ impl ToolExecutor {
         }
 
         let total_matches = matches.len() as u32;
-        let truncated = total_matches >= max_results as u32;
-
+        let truncated = matches.len() >= max_results;
         Ok(ToolResponse::Grep(GrepResponse {
             pattern: request.pattern,
             matches,
@@ -602,6 +649,8 @@ mod tests {
         let request = WriteFileRequest {
             path: "test.txt".to_string(),
             content: "Hello World".to_string(),
+            create_dirs: None,
+            append: None,
             search: None,
             replace: None,
             create_if_not_exists: Some(true),
@@ -638,6 +687,8 @@ mod tests {
         let request = WriteFileRequest {
             path: "test.txt".to_string(),
             content: "".to_string(), // Not used in search/replace
+            create_dirs: None,
+            append: None,
             search: Some("old".to_string()),
             replace: Some("new".to_string()),
             create_if_not_exists: None,
@@ -669,22 +720,29 @@ mod tests {
         let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
 
         // Create test files
-        fs::write(temp_dir.path().join("test1.txt"), "fn main() {\n    println!(\"Hello\");\n}").unwrap();
-        fs::write(temp_dir.path().join("test2.txt"), "fn helper() {\n    println!(\"World\");\n}").unwrap();
+        fs::write(
+            temp_dir.path().join("test1.txt"),
+            "fn main() {\n    println!(\"Hello\");\n}",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join("test2.txt"),
+            "fn helper() {\n    println!(\"World\");\n}",
+        )
+        .unwrap();
 
         let request = GrepRequest {
             pattern: "fn \\w+\\(\\)".to_string(),
             path: None,
+            include_pattern: None,
+            exclude_pattern: None,
             recursive: Some(false),
             case_sensitive: Some(false),
             include_line_numbers: Some(true),
             max_results: Some(10),
         };
 
-        let response = executor
-            .execute(ToolRequest::Grep(request))
-            .await
-            .unwrap();
+        let response = executor.execute(ToolRequest::Grep(request)).await.unwrap();
 
         match response {
             ToolResponse::Grep(grep_response) => {
@@ -694,8 +752,14 @@ mod tests {
                 assert!(!grep_response.truncated);
 
                 // Check that we found matches
-                let main_match = grep_response.matches.iter().find(|m| m.matched_text.contains("main"));
-                let helper_match = grep_response.matches.iter().find(|m| m.matched_text.contains("helper"));
+                let main_match = grep_response
+                    .matches
+                    .iter()
+                    .find(|m| m.matched_text.contains("main"));
+                let helper_match = grep_response
+                    .matches
+                    .iter()
+                    .find(|m| m.matched_text.contains("helper"));
 
                 assert!(main_match.is_some());
                 assert!(helper_match.is_some());

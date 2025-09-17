@@ -663,7 +663,9 @@ impl LlmAgent {
 
     /// Create system prompt for tool usage
     fn create_tool_system_prompt(&self) -> String {
-        use crate::models::{GrepRequest, ListFilesRequest, ReadFileRequest, ToolRequest, WriteFileRequest};
+        use crate::models::{
+            GrepRequest, ListFilesRequest, ReadFileRequest, ToolRequest, WriteFileRequest,
+        };
         use ts_rs::TS;
 
         // Generate TypeScript types for tools
@@ -744,9 +746,10 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         );
 
         // Look for JSON objects that might be tool calls - more flexible matching
-        let contains_tool_keywords =
-            response.contains("list_files") || response.contains("read_file") ||
-            response.contains("write_file") || response.contains("grep");
+        let contains_tool_keywords = response.contains("list_files")
+            || response.contains("read_file")
+            || response.contains("write_file")
+            || response.contains("grep");
         let contains_json_structure = response.contains("type") && response.contains("{");
 
         let result = contains_tool_keywords && contains_json_structure;
