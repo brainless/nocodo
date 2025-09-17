@@ -950,15 +950,20 @@ pub async fn create_ai_session(
                 )
                 .await?;
 
-            // Process the message
-            let _response = llm_agent
-                .process_message(&llm_session.id, message.content.clone())
-                .await?;
-
-            tracing::info!(
-                "Successfully started LLM agent processing for session {}",
-                session.id
-            );
+            // Process the message in background task to avoid blocking HTTP response
+            let llm_agent_clone = llm_agent.clone();
+            let session_id = llm_session.id.clone();
+            let message_content = message.content.clone();
+            tokio::spawn(async move {
+                if let Err(e) = llm_agent_clone.process_message(&session_id, message_content).await {
+                    tracing::error!("Failed to process LLM message for session {}: {}", session_id, e);
+                } else {
+                    tracing::info!(
+                        "Successfully completed LLM agent processing for session {}",
+                        session_id
+                    );
+                }
+            });
         } else {
             tracing::warn!(
                 "LLM agent not available - AI session {} will not be executed",

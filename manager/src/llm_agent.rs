@@ -373,6 +373,13 @@ impl LlmAgent {
                     "Tool call record created with executing status"
                 );
 
+                // Broadcast tool call started
+                self.ws.broadcast_tool_call_started(
+                    session_id.to_string(),
+                    tool_call_id.to_string(),
+                    tool_name.to_string(),
+                ).await;
+
                 // Execute tool
                 tracing::info!(
                     session_id = %session_id,
@@ -388,21 +395,30 @@ impl LlmAgent {
                 // Update tool call with response
                 let response_value = match tool_response {
                     Ok(response) => {
-                        tool_call.complete(serde_json::to_value(response)?);
-                        let response_json =
-                            serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                        tool_call.complete(serde_json::to_value(&response)?);
+                        let response_json = serde_json::to_value(&response)?;
                         tracing::info!(
                             session_id = %session_id,
                             tool_call_id = %tool_call_id,
                             tool_name = %tool_name,
                             "Tool execution completed successfully"
                         );
+
+                        // Broadcast tool call completed
+                        self.ws.broadcast_tool_call_completed(
+                            session_id.to_string(),
+                            tool_call_id.to_string(),
+                            response_json.clone(),
+                        ).await;
+
                         response_json
                     }
                     Err(e) => {
                         tool_call.fail(e.to_string());
-                        let response_json =
-                            serde_json::to_value(tool_call.response.clone().unwrap_or_default())?;
+                        let error_value = serde_json::json!({
+                            "error": e.to_string(),
+                            "tool_name": tool_name
+                        });
                         tracing::error!(
                             session_id = %session_id,
                             tool_call_id = %tool_call_id,
@@ -410,7 +426,15 @@ impl LlmAgent {
                             error = %e,
                             "Tool execution failed"
                         );
-                        response_json
+
+                        // Broadcast tool call failed
+                        self.ws.broadcast_tool_call_failed(
+                            session_id.to_string(),
+                            tool_call_id.to_string(),
+                            e.to_string(),
+                        ).await;
+
+                        error_value
                     }
                 };
 
