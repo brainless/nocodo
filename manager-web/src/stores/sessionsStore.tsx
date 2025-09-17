@@ -10,7 +10,7 @@ interface OutputChunk {
   created_at?: number;
 }
 
-interface ToolCallState {
+export interface ToolCallState {
   id: string;
   toolName: string;
   status: 'pending' | 'executing' | 'completed' | 'failed';
