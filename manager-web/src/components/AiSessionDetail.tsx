@@ -95,17 +95,19 @@ const OutputPanel: Component<{ sessionId: string }> = props => {
       <div class='space-y-3'>
         <For each={outputs.get()}>
           {chunk => (
-            <div class={`bg-gray-50 border rounded-lg p-4 ${
-              chunk.stream === 'stderr'
-                ? 'border-red-200 bg-red-50'
-                : 'border-gray-200'
-            }`}>
+            <div
+              class={`bg-gray-50 border rounded-lg p-4 ${
+                chunk.stream === 'stderr' ? 'border-red-200 bg-red-50' : 'border-gray-200'
+              }`}
+            >
               <div class='flex items-start justify-between mb-2'>
-                <span class={`text-xs font-medium px-2 py-1 rounded ${
-                  chunk.stream === 'stderr'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
+                <span
+                  class={`text-xs font-medium px-2 py-1 rounded ${
+                    chunk.stream === 'stderr'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
                   {chunk.stream === 'stderr' ? 'Error' : 'Output'}
                 </span>
               </div>

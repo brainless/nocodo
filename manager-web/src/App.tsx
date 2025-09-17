@@ -159,7 +159,7 @@ const TopNavigation: Component = () => {
 
 // Layout component with page heading support outside white content box
 interface LayoutProps {
-  children: JSX.Element;
+  children: any;
   title?: string;
   subtitle?: string;
   noBox?: boolean; // Skip the outer white content box
