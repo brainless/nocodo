@@ -125,7 +125,6 @@ default_shell = "fish"
 path = "~/.local/share/nocodo/manager.db"
 
 [ai_tools]
-claude_code_path = "claude"  # Assumes claude is in PATH
 timeout_seconds = 300
 max_concurrent_sessions = 3
 
@@ -230,7 +229,6 @@ severity_threshold = "warning"
 - Rust toolchain (stable)
 - Node.js and npm
 - Git
-- AI coding tools (Claude Code, Gemini CLI, etc.)
 
 ### Installation Process
 
