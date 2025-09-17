@@ -434,7 +434,7 @@ const Dashboard: Component = () => {
   onMount(checkProjects);
 
   return (
-    <div class='space-y-8'>
+    <div class='space-y-8 mt-8'>
       {/* Start Work Session - first section */}
       <StartAiSessionForm />
 

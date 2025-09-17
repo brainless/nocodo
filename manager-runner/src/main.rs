@@ -104,10 +104,11 @@ async fn main() -> Result<()> {
     info!("Starting nocodo manager-runner");
 
     // Kill any existing manager-runner instances before starting
-    if let Err(e) = kill_existing_instances() {
-        warn!("Failed to clean up existing instances: {}", e);
-        // Continue anyway - this is not a fatal error
-    }
+    // Temporarily disabled due to issues with process detection
+    // if let Err(e) = kill_existing_instances() {
+    //     warn!("Failed to clean up existing instances: {}", e);
+    //     // Continue anyway - this is not a fatal error
+    // }
 
     // Create test-logs directory
     fs::create_dir_all("test-logs").context("Failed to create test-logs directory")?;
@@ -120,48 +121,25 @@ async fn main() -> Result<()> {
         info!("Log files cleaned");
     }
 
-    // Build manager-web first
-    info!("Building manager-web...");
-    let web_build_status = Command::new("npm")
+    // Install manager-web dependencies
+    info!("Installing manager-web dependencies...");
+    let web_install_status = Command::new("npm")
         .args(["install"])
         .current_dir("manager-web")
         .status()
         .context("Failed to run npm install")?;
 
-    if !web_build_status.success() {
+    if !web_install_status.success() {
         error!("npm install failed");
         return Err(anyhow::anyhow!("npm install failed"));
     }
 
-    let web_build_status = Command::new("npm")
-        .args(["run", "build"])
-        .current_dir("manager-web")
-        .status()
-        .context("Failed to build manager-web")?;
+    info!("manager-web dependencies installed successfully");
 
-    if !web_build_status.success() {
-        error!("manager-web build failed");
-        return Err(anyhow::anyhow!("manager-web build failed"));
-    }
+    // Note: Manager will be built by cargo-watch in watch mode
 
-    info!("manager-web built successfully");
-
-    // Build manager binary
-    info!("Building manager...");
-    let manager_build_status = Command::new("cargo")
-        .args(["build", "--bin", "nocodo-manager"])
-        .status()
-        .context("Failed to build manager")?;
-
-    if !manager_build_status.success() {
-        error!("Manager build failed");
-        return Err(anyhow::anyhow!("Manager build failed"));
-    }
-
-    info!("Manager built successfully");
-
-    // Start manager with logging
-    info!("Starting nocodo-manager...");
+    // Start manager with cargo-watch in watch mode
+    info!("Starting nocodo-manager with cargo-watch...");
 
     let manager_log = fs::OpenOptions::new()
         .create(true)
@@ -170,12 +148,12 @@ async fn main() -> Result<()> {
         .open("test-logs/manager.log")
         .context("Failed to create manager.log")?;
 
-    let mut manager_process = tokio::process::Command::new("./target/debug/nocodo-manager")
-        .args(["--config", "~/.config/nocodo/manager.toml"])
+    let mut manager_process = tokio::process::Command::new("/home/nocodo/.cargo/bin/cargo-watch")
+        .args(["-x", "run --bin nocodo-manager -- --config ~/.config/nocodo/manager.toml"])
         .stdout(Stdio::from(manager_log.try_clone()?))
         .stderr(Stdio::from(manager_log))
         .spawn()
-        .context("Failed to start manager")?;
+        .context("Failed to start manager with cargo-watch")?;
 
     info!("Manager started with PID: {:?}", manager_process.id());
 
@@ -222,15 +200,15 @@ async fn main() -> Result<()> {
         web_process.id()
     );
     info!("");
-    info!("🚀 Both services are running!");
+    info!("🚀 Both services are running in watch mode!");
     info!("📊 Manager API/WebSocket: http://localhost:8081 (logs: test-logs/manager.log)");
-    info!("🌐 Manager-web dev server: http://localhost:3000 (logs: test-logs/manager-web.log)");
-    info!("   └── Proxies API calls to manager on port 8081");
+    info!("   └── Auto-rebuilds on code changes with cargo-watch");
+    info!("🌐 Manager-web dev server: http://localhost:3001 (logs: test-logs/manager-web.log)");
+    info!("   └── Hot reloads on code changes with Vite");
     info!("");
     info!("🔗 SSH Testing:");
-    info!("   SSH with: ssh -L 8081:localhost:8081 -L 3000:localhost:3000 <your-server>");
-    info!("   Then access: http://localhost:3000 in your browser");
-    info!("   (The dev server will proxy API calls to the manager)");
+    info!("   SSH with: ssh -L 8081:localhost:8081 -L 3001:localhost:3001 <your-server>");
+    info!("   Then access: http://localhost:3001 in your browser");
     info!("");
     info!("Press Ctrl+C to stop both services");
 
