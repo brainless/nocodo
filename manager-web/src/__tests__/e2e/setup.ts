@@ -189,6 +189,48 @@ export const test = base.extend({
             execution_time: 800,
           }),
         });
+      } else if (requestData.tool_name === 'write_file') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            tool_name: 'write_file',
+            status: 'completed',
+            result: {
+              path: requestData.path || 'test.txt',
+              bytes_written: (requestData.content || '').length,
+              created: true,
+              modified: false,
+            },
+            execution_time: 1200,
+          }),
+        });
+      } else if (requestData.tool_name === 'grep') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            tool_name: 'grep',
+            status: 'completed',
+            result: {
+              pattern: requestData.pattern || 'test',
+              matches: [
+                {
+                  file_path: 'src/main.rs',
+                  line_number: 10,
+                  line_content: 'fn main() {',
+                  match_start: 0,
+                  match_end: 7,
+                  matched_text: 'fn main',
+                }
+              ],
+              total_matches: 1,
+              files_searched: 5,
+              truncated: false,
+            },
+            execution_time: 2000,
+          }),
+        });
       } else {
         await route.fulfill({
           status: 400,
@@ -299,6 +341,86 @@ export const test = base.extend({
 
               // Completion
               { delay: 4500, type: 'AiSessionCompleted', session_id: 'session-123' },
+            ];
+          } else if (
+            prompt.toLowerCase().includes('write') ||
+            prompt.toLowerCase().includes('create') ||
+            prompt.toLowerCase().includes('file')
+          ) {
+            // Simulate write_file tool execution
+            events = [
+              // Initial processing
+              { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your request...' },
+              { delay: 1000, type: 'LlmAgentChunk', content: 'I need to create or modify a file.' },
+              { delay: 1500, type: 'LlmAgentChunk', content: 'Executing write_file tool...' },
+
+              // Tool execution start
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
+
+              // Tool results
+              { delay: 2500, type: 'LlmAgentChunk', content: 'Writing file content...' },
+              { delay: 3000, type: 'LlmAgentChunk', content: 'File created successfully.' },
+              { delay: 3200, type: 'LlmAgentChunk', content: '42 bytes written.' },
+
+              // Follow-up response
+              {
+                delay: 4000,
+                type: 'LlmAgentChunk',
+                content: "I've successfully created the file for you.",
+              },
+              {
+                delay: 4500,
+                type: 'LlmAgentChunk',
+                content: 'The file has been written with the specified content.',
+              },
+
+              // Completion
+              { delay: 5000, type: 'AiSessionCompleted', session_id: 'session-123' },
+            ];
+          } else if (
+            prompt.toLowerCase().includes('search') ||
+            prompt.toLowerCase().includes('grep') ||
+            prompt.toLowerCase().includes('find')
+          ) {
+            // Simulate grep tool execution
+            events = [
+              // Initial processing
+              { delay: 500, type: 'LlmAgentChunk', content: 'Analyzing your search request...' },
+              { delay: 1000, type: 'LlmAgentChunk', content: 'I need to search for patterns in files.' },
+              { delay: 1500, type: 'LlmAgentChunk', content: 'Executing grep tool...' },
+
+              // Tool execution start
+              {
+                delay: 2000,
+                type: 'AiSessionStatusChanged',
+                session_id: 'session-123',
+                status: 'running',
+              },
+
+              // Tool results
+              { delay: 2500, type: 'LlmAgentChunk', content: 'Searching for patterns...' },
+              { delay: 3000, type: 'LlmAgentChunk', content: 'Found 3 matches in 2 files.' },
+              { delay: 3200, type: 'LlmAgentChunk', content: 'Search completed.' },
+
+              // Follow-up response
+              {
+                delay: 4000,
+                type: 'LlmAgentChunk',
+                content: "I've completed the search for you.",
+              },
+              {
+                delay: 4500,
+                type: 'LlmAgentChunk',
+                content: 'Here are the results of your search query.',
+              },
+
+              // Completion
+              { delay: 5000, type: 'AiSessionCompleted', session_id: 'session-123' },
             ];
           } else if (
             prompt.toLowerCase().includes('read') &&

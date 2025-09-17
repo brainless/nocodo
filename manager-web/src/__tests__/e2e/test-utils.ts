@@ -39,15 +39,15 @@ export async function startLLMAgentWork(page: Page, prompt: string): Promise<str
   return workId;
 }
 
-/**
- * Helper function to wait for tool call completion via API
- */
-export async function waitForToolCall(
-  request: APIRequestContext,
-  workId: string,
-  toolType: string = 'list_files',
-  timeout: number = 10000
-): Promise<any> {
+  /**
+   * Helper function to wait for tool call completion via API
+   */
+  export async function waitForToolCall(
+    request: APIRequestContext,
+    workId: string,
+    toolType: 'list_files' | 'read_file' | 'write_file' | 'grep' = 'list_files',
+    timeout: number = 10000
+  ): Promise<any> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {
@@ -64,7 +64,9 @@ export async function waitForToolCall(
             msg.content.includes('tool_call') ||
             msg.content.includes('function_call') ||
             msg.content_type === 'tool_execution' ||
-            (msg.content.includes('Executing') && msg.content.includes('tool'))
+            (msg.content.includes('Executing') && msg.content.includes('tool')) ||
+            (toolType === 'write_file' && (msg.content.includes('write') || msg.content.includes('create') || msg.content.includes('file'))) ||
+            (toolType === 'grep' && (msg.content.includes('search') || msg.content.includes('grep') || msg.content.includes('pattern')))
         );
 
         if (toolMessage) {
@@ -98,6 +100,44 @@ export async function waitForToolCall(
             message: data.messages[1],
             timestamp: new Date().toISOString(),
           };
+        }
+
+        // For write_file tool, look for file creation/modification messages
+        if (toolType === 'write_file' && data.messages.length > 1) {
+          const writeMessage = data.messages.find((msg: any) =>
+            msg.content.includes('created') ||
+            msg.content.includes('written') ||
+            msg.content.includes('bytes_written') ||
+            msg.content.includes('modified')
+          );
+          if (writeMessage) {
+            return {
+              workId,
+              toolType,
+              status: 'completed',
+              message: writeMessage,
+              timestamp: new Date().toISOString(),
+            };
+          }
+        }
+
+        // For grep tool, look for search result messages
+        if (toolType === 'grep' && data.messages.length > 1) {
+          const grepMessage = data.messages.find((msg: any) =>
+            msg.content.includes('matches') ||
+            msg.content.includes('found') ||
+            msg.content.includes('search') ||
+            msg.content.includes('pattern')
+          );
+          if (grepMessage) {
+            return {
+              workId,
+              toolType,
+              status: 'completed',
+              message: grepMessage,
+              timestamp: new Date().toISOString(),
+            };
+          }
         }
       }
 
@@ -233,6 +273,32 @@ export function createToolExecutionMocks() {
       message: 'The requested file does not exist',
     },
 
+    writeFileResponse: {
+      type: 'write_file',
+      path: 'test.txt',
+      bytes_written: 42,
+      created: true,
+      modified: false,
+    },
+
+    grepResponse: {
+      type: 'grep',
+      pattern: 'function',
+      matches: [
+        {
+          file_path: 'src/main.rs',
+          line_number: 10,
+          line_content: 'fn main() {',
+          match_start: 0,
+          match_end: 7,
+          matched_text: 'fn main',
+        }
+      ],
+      total_matches: 1,
+      files_searched: 5,
+      truncated: false,
+    },
+
     llmAgentChunk: {
       type: 'LlmAgentChunk',
       payload: {
@@ -291,6 +357,8 @@ export async function extractToolCallsFromWork(
       if (
         message.content.includes('list_files') ||
         message.content.includes('read_file') ||
+        message.content.includes('write_file') ||
+        message.content.includes('grep') ||
         message.content.includes('tool_call')
       ) {
         toolCalls.push({

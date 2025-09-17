@@ -1615,6 +1615,7 @@ dependencies = [
  "handlebars",
  "home",
  "mime_guess",
+ "regex",
  "reqwest",
  "rusqlite",
  "rust-embed",
