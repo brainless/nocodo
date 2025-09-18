@@ -6,6 +6,7 @@ import ProjectFilesPage from './components/ProjectFilesPage';
 import AiSessionsList from './components/AiSessionsList';
 import AiSessionDetail from './components/AiSessionDetail';
 import Dashboard from './components/Dashboard';
+import Settings from './components/Settings';
 import { WebSocketProvider, useWebSocketConnection } from './WebSocketProvider';
 import { SessionsProvider } from './stores/sessionsStore';
 import { apiClient } from './api';
@@ -143,13 +144,19 @@ const TopNavigation: Component = () => {
           </div>
         </div>
 
-        {/* Right side - Work Management link */}
-        <div class='flex items-center'>
+        {/* Right side - Work Management and Settings links */}
+        <div class='flex items-center space-x-2'>
           <A
             href='/work'
             class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
           >
             Work Management
+          </A>
+          <A
+            href='/settings'
+            class='px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-muted rounded-md border border-border'
+          >
+            Settings
           </A>
         </div>
       </div>
@@ -272,6 +279,15 @@ const AiSessionDetailPage: Component = () => {
   );
 };
 
+// Settings Page
+const SettingsPage: Component = () => {
+  return (
+    <Layout title='Settings' subtitle='Configure your nocodo environment' noBox>
+      <Settings />
+    </Layout>
+  );
+};
+
 // Root App Component - defines the routes
 const App: Component = () => {
   return (
@@ -286,6 +302,7 @@ const App: Component = () => {
           <Route path='/projects/:id/files' component={FilesPageWrapper} />
           <Route path='/work' component={AiSessionsPage} />
           <Route path='/work/:id' component={AiSessionDetailPage} />
+          <Route path='/settings' component={SettingsPage} />
         </Router>
       </SessionsProvider>
     </WebSocketProvider>
