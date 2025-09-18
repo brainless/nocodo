@@ -1417,10 +1417,16 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
                 model.to_lowercase().starts_with("gpt-4") || model.to_lowercase().contains("gpt-4")
             }
             "anthropic" | "claude" => {
-                model.to_lowercase().contains("claude")
-                    || model.to_lowercase().contains("opus")
-                    || model.to_lowercase().contains("sonnet")
-                    || model.to_lowercase().contains("haiku")
+                let model_lower = model.to_lowercase();
+                model_lower.contains("claude")
+                    || model_lower.contains("opus")
+                    || model_lower.contains("sonnet")
+                    || model_lower.contains("haiku")
+                    // Explicit support for current Claude model versions
+                    || model_lower == "claude-3-5-sonnet-20241022"
+                    || model_lower == "claude-3-5-haiku-20241022"
+                    || model_lower == "claude-3-sonnet-20240229"
+                    || model_lower == "claude-3-haiku-20240307"
             }
             _ => false,
         }
