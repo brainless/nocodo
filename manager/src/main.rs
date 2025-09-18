@@ -242,6 +242,23 @@ async fn main() -> AppResult<()> {
                             "/llm-agent/{session_id}/complete",
                             web::post().to(handlers::complete_llm_agent_session),
                         )
+                        // Workflow endpoints
+                        .route(
+                            "/projects/{id}/workflows/scan",
+                            web::post().to(handlers::scan_workflows),
+                        )
+                        .route(
+                            "/projects/{id}/workflows/commands",
+                            web::get().to(handlers::get_workflow_commands),
+                        )
+                        .route(
+                            "/projects/{project_id}/workflows/commands/{command_id}/execute",
+                            web::post().to(handlers::execute_workflow_command),
+                        )
+                        .route(
+                            "/projects/{project_id}/workflows/commands/{command_id}/executions",
+                            web::get().to(handlers::get_command_executions),
+                        )
                         // Settings endpoint
                         .route("/settings", web::get().to(handlers::get_settings)),
                 )

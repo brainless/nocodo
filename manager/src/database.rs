@@ -296,6 +296,55 @@ impl Database {
             [],
         ); // Ignore error if index already exists
 
+        // GitHub Actions workflow tables
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS workflow_commands (
+                id TEXT PRIMARY KEY,
+                workflow_name TEXT NOT NULL,
+                job_name TEXT NOT NULL,
+                step_name TEXT,
+                command TEXT NOT NULL,
+                shell TEXT,
+                working_directory TEXT,
+                environment TEXT, -- JSON string
+                file_path TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            )
+            "#,
+            [],
+        )?;
+
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS command_executions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                command_id TEXT NOT NULL,
+                exit_code INTEGER,
+                stdout TEXT NOT NULL,
+                stderr TEXT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                executed_at DATETIME NOT NULL,
+                success BOOLEAN NOT NULL,
+                FOREIGN KEY (command_id) REFERENCES workflow_commands (id) ON DELETE CASCADE
+            )
+            "#,
+            [],
+        )?;
+
+        // Indexes for workflow tables
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_workflow_commands_project_id ON workflow_commands(project_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_command_executions_command_id ON command_executions(command_id)",
+            [],
+        )?;
+
         tracing::info!("Database migrations completed");
         Ok(())
     }
@@ -1363,5 +1412,174 @@ impl Database {
 
         let tool_calls: Result<Vec<_>, _> = tool_call_iter.collect();
         tool_calls.map_err(AppError::from)
+    }
+
+    // Workflow methods
+
+    #[allow(dead_code)]
+    pub fn store_workflow_commands(
+        &self,
+        project_id: &str,
+        commands: &[nocodo_github_actions::WorkflowCommand],
+    ) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        for command in commands {
+            let environment_json = command
+                .environment
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|e| {
+                    AppError::Internal(format!("Failed to serialize environment: {}", e))
+                })?;
+
+            conn.execute(
+                r#"
+                INSERT OR REPLACE INTO workflow_commands
+                (id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path, project_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                rusqlite::params![
+                    command.id,
+                    command.workflow_name,
+                    command.job_name,
+                    command.step_name,
+                    command.command,
+                    command.shell,
+                    command.working_directory,
+                    environment_json,
+                    command.file_path,
+                    project_id
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn get_workflow_commands(
+        &self,
+        project_id: &str,
+    ) -> AppResult<Vec<nocodo_github_actions::WorkflowCommand>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path
+            FROM workflow_commands
+            WHERE project_id = ?
+            ORDER BY workflow_name, job_name
+            "#,
+        )?;
+
+        let command_iter = stmt.query_map([project_id], |row| {
+            let environment: Option<String> = row.get("environment")?;
+            let environment_parsed = if let Some(env_json) = environment {
+                Some(serde_json::from_str(&env_json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?)
+            } else {
+                None
+            };
+
+            Ok(nocodo_github_actions::WorkflowCommand {
+                id: row.get("id")?,
+                workflow_name: row.get("workflow_name")?,
+                job_name: row.get("job_name")?,
+                step_name: row.get("step_name")?,
+                command: row.get("command")?,
+                shell: row.get("shell")?,
+                working_directory: row.get("working_directory")?,
+                environment: environment_parsed,
+                file_path: row.get("file_path")?,
+            })
+        })?;
+
+        let mut commands = Vec::new();
+        for command in command_iter {
+            commands.push(command?);
+        }
+
+        Ok(commands)
+    }
+
+    #[allow(dead_code)]
+    pub fn store_command_execution(
+        &self,
+        execution: &nocodo_github_actions::CommandExecution,
+    ) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            r#"
+            INSERT INTO command_executions
+            (command_id, exit_code, stdout, stderr, duration_ms, executed_at, success)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            "#,
+            rusqlite::params![
+                execution.command_id,
+                execution.exit_code,
+                execution.stdout,
+                execution.stderr,
+                execution.duration_ms as i64,
+                execution.executed_at.timestamp(),
+                execution.success
+            ],
+        )?;
+
+        Ok(conn.last_insert_rowid())
+    }
+
+    pub fn get_command_executions(
+        &self,
+        command_id: &str,
+    ) -> AppResult<Vec<nocodo_github_actions::CommandExecution>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT command_id, exit_code, stdout, stderr, duration_ms, executed_at, success
+            FROM command_executions
+            WHERE command_id = ?
+            ORDER BY executed_at DESC
+            "#,
+        )?;
+
+        let execution_iter = stmt.query_map([command_id], |row| {
+            Ok(nocodo_github_actions::CommandExecution {
+                command_id: row.get("command_id")?,
+                exit_code: row.get("exit_code")?,
+                stdout: row.get("stdout")?,
+                stderr: row.get("stderr")?,
+                duration_ms: row.get::<_, i64>("duration_ms")? as u64,
+                executed_at: chrono::DateTime::from_timestamp(row.get::<_, i64>("executed_at")?, 0)
+                    .unwrap_or_else(chrono::Utc::now),
+                success: row.get("success")?,
+            })
+        })?;
+
+        let mut executions = Vec::new();
+        for execution in execution_iter {
+            executions.push(execution?);
+        }
+
+        Ok(executions)
     }
 }
