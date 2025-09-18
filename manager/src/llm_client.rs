@@ -287,10 +287,16 @@ impl OpenAiCompatibleClient {
             }
             "anthropic" | "claude" => {
                 // Anthropic supports native tools for Claude models
-                self.config.model.to_lowercase().contains("claude")
-                    || self.config.model.to_lowercase().contains("opus")
-                    || self.config.model.to_lowercase().contains("sonnet")
-                    || self.config.model.to_lowercase().contains("haiku")
+                let model_lower = self.config.model.to_lowercase();
+                model_lower.contains("claude")
+                    || model_lower.contains("opus")
+                    || model_lower.contains("sonnet")
+                    || model_lower.contains("haiku")
+                    // Explicit support for current Claude model versions
+                    || model_lower == "claude-3-5-sonnet-20241022"
+                    || model_lower == "claude-3-5-haiku-20241022"
+                    || model_lower == "claude-3-sonnet-20240229"
+                    || model_lower == "claude-3-haiku-20240307"
             }
             "grok" | "xai" => {
                 // Grok/xAI does not support native tools yet
