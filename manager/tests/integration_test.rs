@@ -1,6 +1,7 @@
 use actix::Actor;
 use actix_web::{test, web, App};
 use nocodo_manager::database::Database;
+use nocodo_manager::config::AppConfig;
 use nocodo_manager::handlers::{create_project, get_templates, AppState};
 use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 use std::sync::Arc;
@@ -22,6 +23,7 @@ async fn test_project_creation_workflow() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     // Initialize the test app
@@ -140,6 +142,7 @@ async fn test_project_creation_error_handling() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(

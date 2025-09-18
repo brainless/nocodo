@@ -14,6 +14,7 @@ struct Args {
 }
 
 /// Kill any existing manager-runner instances and standalone nocodo-manager processes
+#[allow(dead_code)]
 fn kill_existing_instances() -> Result<()> {
     info!("Checking for existing manager-runner and nocodo-manager instances...");
 

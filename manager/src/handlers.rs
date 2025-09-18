@@ -1961,7 +1961,9 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
 
     // Get config file path - similar to how it's determined in config.rs
     let config_file_path = if let Some(home) = home::home_dir() {
-        home.join(".config/nocodo/manager.toml").to_string_lossy().to_string()
+        home.join(".config/nocodo/manager.toml")
+            .to_string_lossy()
+            .to_string()
     } else {
         "manager.toml".to_string()
     };
@@ -1980,7 +1982,8 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                     format!("{}****", &key[..key.len().min(4)])
                 }
             }),
-            is_configured: api_key_config.grok_api_key.is_some() && !api_key_config.grok_api_key.as_ref().unwrap().is_empty(),
+            is_configured: api_key_config.grok_api_key.is_some()
+                && !api_key_config.grok_api_key.as_ref().unwrap().is_empty(),
         });
 
         // OpenAI API Key
@@ -1993,7 +1996,8 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                     format!("{}****", &key[..key.len().min(4)])
                 }
             }),
-            is_configured: api_key_config.openai_api_key.is_some() && !api_key_config.openai_api_key.as_ref().unwrap().is_empty(),
+            is_configured: api_key_config.openai_api_key.is_some()
+                && !api_key_config.openai_api_key.as_ref().unwrap().is_empty(),
         });
 
         // Anthropic API Key
@@ -2006,7 +2010,12 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                     format!("{}****", &key[..key.len().min(4)])
                 }
             }),
-            is_configured: api_key_config.anthropic_api_key.is_some() && !api_key_config.anthropic_api_key.as_ref().unwrap().is_empty(),
+            is_configured: api_key_config.anthropic_api_key.is_some()
+                && !api_key_config
+                    .anthropic_api_key
+                    .as_ref()
+                    .unwrap()
+                    .is_empty(),
         });
     } else {
         // If no API keys config section exists, show as not configured
