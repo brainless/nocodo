@@ -46,6 +46,10 @@ The nocodo MVP consists of two core components running locally on your Linux mac
 ### 🎯 **Core Components**
 
 - **🖥️ Manager Daemon**: Local orchestration service managing projects, APIs, and coordination
+  - Project management and file system operations
+  - AI agent session management
+  - GitHub Actions workflow parsing and command execution
+  - RESTful API server for web app communication
 - **💻 Manager Web App**: Chat-based interface for AI interaction at `localhost:8081`
 
 > ⚠️ **Note**: The CLI component has been removed as part of issue #80. The nocodo CLI is no longer included in this repository.
