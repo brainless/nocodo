@@ -1,6 +1,7 @@
 use actix::Actor;
 use actix_web::{test, web, App};
 use nocodo_manager::{
+    config::AppConfig,
     database::Database,
     handlers::{create_project, get_projects, health_check, AppState},
     models::CreateProjectRequest,
@@ -23,6 +24,7 @@ async fn test_health_check() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(
@@ -56,6 +58,7 @@ async fn test_get_projects_empty() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(
@@ -87,6 +90,7 @@ async fn test_create_project() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(
@@ -156,6 +160,7 @@ async fn test_create_project_with_default_path() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(
@@ -225,6 +230,7 @@ async fn test_create_project_invalid_name() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(
@@ -271,6 +277,7 @@ async fn test_get_projects_after_creation() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(
@@ -333,6 +340,7 @@ async fn test_technology_detection_for_rust_project() {
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         runner: None,
         llm_agent: None,
+        config: Arc::new(AppConfig::default()),
     });
 
     let app = test::init_service(

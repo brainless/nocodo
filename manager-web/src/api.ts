@@ -16,6 +16,7 @@ import {
   FileResponse,
   FileUpdateRequest,
   Project,
+  SettingsResponse,
   WorkMessageResponse,
   WorkResponse,
 } from './types';
@@ -288,6 +289,11 @@ class ApiClient {
         }
       },
     };
+  }
+
+  // Settings endpoint
+  async getSettings(): Promise<SettingsResponse> {
+    return this.request<SettingsResponse>('/settings');
   }
 }
 

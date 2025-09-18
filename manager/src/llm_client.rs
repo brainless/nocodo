@@ -146,6 +146,7 @@ pub struct LlmUsage {
 
 /// LLM completion chunk for streaming
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct LlmCompletionChunk {
     pub id: String,
     pub object: String,
