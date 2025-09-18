@@ -21,7 +21,7 @@ chrono = { workspace = true }
 ts-rs = { workspace = true }
 
 # Optional dependencies for nocodo integration
-sqlx = { workspace = true, features = ["sqlite"], optional = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 actix-web = { workspace = true, optional = true }
 
 # Optional CLI dependency
@@ -32,5 +32,5 @@ tempfile = "3.0"
 
 [features]
 default = []
-nocodo-integration = ["dep:sqlx", "dep:actix-web"]
+nocodo-integration = ["dep:rusqlite", "dep:actix-web"]
 cli = ["dep:clap"]

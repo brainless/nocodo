@@ -14,7 +14,11 @@ pub enum Error {
 
     #[cfg(feature = "nocodo-integration")]
     #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
+    Database(String),
+
+    #[cfg(feature = "nocodo-integration")]
+    #[error("SQLite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
 
     #[error("Task join error: {0}")]
     TaskJoin(#[from] tokio::task::JoinError),

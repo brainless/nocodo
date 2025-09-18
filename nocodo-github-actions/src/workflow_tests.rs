@@ -1,12 +1,16 @@
 //! Tests for parsing real GitHub Actions workflows from the nocodo project
 
-use crate::parser::WorkflowParser;
-
 #[cfg(test)]
 mod real_workflow_tests {
+    use crate::parser::WorkflowParser;
+
+    #[allow(unused_imports)]
     use super::*;
 
-    async fn create_workflow_file(content: &str, filename: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    async fn create_workflow_file(
+        content: &str,
+        filename: &str,
+    ) -> (tempfile::TempDir, std::path::PathBuf) {
         let temp_dir = tempfile::tempdir().unwrap();
         let workflow_path = temp_dir.path().join(filename);
         tokio::fs::write(&workflow_path, content).await.unwrap();
@@ -62,10 +66,10 @@ jobs:
         TEST_DATABASE_PATH: /tmp/nocodo-test.db
 "#;
 
-        let (temp_dir, workflow_path) = create_workflow_file(workflow_content, "api-e2e-tests.yml").await;
+        let (temp_dir, workflow_path) =
+            create_workflow_file(workflow_content, "api-e2e-tests.yml").await;
 
         let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .await
             .unwrap();
 
         assert_eq!(info.name, "API-Only E2E Tests");
@@ -73,22 +77,41 @@ jobs:
         assert_eq!(info.commands_count, 4); // 4 run steps (including checkout, setup rust, install mold, build, install deps, run tests)
 
         // Check specific commands
-        let command_names: Vec<String> = commands.iter().map(|c| c.step_name.clone().unwrap_or_default()).collect();
+        let command_names: Vec<String> = commands
+            .iter()
+            .map(|c| c.step_name.clone().unwrap_or_default())
+            .collect();
         assert!(command_names.contains(&"Install mold linker".to_string()));
         assert!(command_names.contains(&"Build nocodo-manager".to_string()));
         assert!(command_names.contains(&"Run API E2E Tests".to_string()));
 
         // Check that commands have correct properties
-        let mold_command = commands.iter().find(|c| c.step_name == Some("Install mold linker".to_string())).unwrap();
+        let mold_command = commands
+            .iter()
+            .find(|c| c.step_name == Some("Install mold linker".to_string()))
+            .unwrap();
         assert!(mold_command.command.starts_with("sudo apt-get update"));
-        assert!(mold_command.command.contains("sudo apt-get install -y mold"));
+        assert!(mold_command
+            .command
+            .contains("sudo apt-get install -y mold"));
         assert_eq!(mold_command.shell, None); // Uses default shell
 
-        let e2e_command = commands.iter().find(|c| c.step_name == Some("Run API E2E Tests".to_string())).unwrap();
+        let e2e_command = commands
+            .iter()
+            .find(|c| c.step_name == Some("Run API E2E Tests".to_string()))
+            .unwrap();
         assert!(e2e_command.command.contains("cd manager-web"));
         assert!(e2e_command.command.contains("npm run test:api-e2e"));
-        assert!(e2e_command.environment.as_ref().unwrap().contains_key("NODE_ENV"));
-        assert!(e2e_command.environment.as_ref().unwrap().contains_key("TEST_DATABASE_PATH"));
+        assert!(e2e_command
+            .environment
+            .as_ref()
+            .unwrap()
+            .contains_key("NODE_ENV"));
+        assert!(e2e_command
+            .environment
+            .as_ref()
+            .unwrap()
+            .contains_key("TEST_DATABASE_PATH"));
     }
 
     /// Test parsing of integration-ci.yml workflow
@@ -138,10 +161,10 @@ jobs:
         run: test -d manager-web/dist
 "#;
 
-        let (temp_dir, workflow_path) = create_workflow_file(workflow_content, "integration-ci.yml").await;
+        let (temp_dir, workflow_path) =
+            create_workflow_file(workflow_content, "integration-ci.yml").await;
 
         let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .await
             .unwrap();
 
         assert_eq!(info.name, "Integration CI");
@@ -149,13 +172,23 @@ jobs:
         assert_eq!(info.commands_count, 4); // 4 run steps
 
         // Check working directory handling
-        let web_build = commands.iter().find(|c| c.step_name == Some("Build Web application".to_string())).unwrap();
-        assert!(web_build.working_directory.as_ref().unwrap().ends_with("manager-web"));
+        let web_build = commands
+            .iter()
+            .find(|c| c.step_name == Some("Build Web application".to_string()))
+            .unwrap();
+        assert!(web_build
+            .working_directory
+            .as_ref()
+            .unwrap()
+            .ends_with("manager-web"));
         assert!(web_build.command.contains("npm ci"));
         assert!(web_build.command.contains("npm run build"));
 
         // Check multi-line commands
-        let rust_build = commands.iter().find(|c| c.step_name == Some("Build Rust workspace".to_string())).unwrap();
+        let rust_build = commands
+            .iter()
+            .find(|c| c.step_name == Some("Build Rust workspace".to_string()))
+            .unwrap();
         assert!(rust_build.command.contains("cargo build"));
         assert!(rust_build.command.contains("cargo test"));
     }
@@ -247,14 +280,17 @@ jobs:
         let (temp_dir, workflow_path) = create_workflow_file(workflow_content, "web-ci.yml").await;
 
         let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .await
+            
             .unwrap();
 
         assert_eq!(info.name, "Web CI");
         assert_eq!(info.jobs_count, 3); // typecheck, test, build
 
         // Check working directory defaults
-        let typecheck_commands: Vec<_> = commands.iter().filter(|c| c.job_name == "typecheck").collect();
+        let typecheck_commands: Vec<_> = commands
+            .iter()
+            .filter(|c| c.job_name == "typecheck")
+            .collect();
         for cmd in typecheck_commands {
             if let Some(wd) = &cmd.working_directory {
                 assert!(wd.ends_with("manager-web"));
@@ -313,10 +349,11 @@ jobs:
           pnpm build
 "#;
 
-        let (temp_dir, workflow_path) = create_workflow_file(workflow_content, "website-ci.yml").await;
+        let (temp_dir, workflow_path) =
+            create_workflow_file(workflow_content, "website-ci.yml").await;
 
         let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .await
+            
             .unwrap();
 
         assert_eq!(info.name, "Website CI");
@@ -331,10 +368,16 @@ jobs:
         }
 
         // Check specific commands
-        let type_check = commands.iter().find(|c| c.step_name == Some("Type check".to_string())).unwrap();
+        let type_check = commands
+            .iter()
+            .find(|c| c.step_name == Some("Type check".to_string()))
+            .unwrap();
         assert!(type_check.command.trim() == "pnpm astro check");
 
-        let build = commands.iter().find(|c| c.step_name == Some("Build website".to_string())).unwrap();
+        let build = commands
+            .iter()
+            .find(|c| c.step_name == Some("Build website".to_string()))
+            .unwrap();
         assert!(build.command.trim() == "pnpm build");
     }
 
@@ -372,7 +415,7 @@ jobs:
         std::fs::write(workflows_dir.join("not-a-workflow.txt"), "not yaml").unwrap();
 
         let workflows = WorkflowParser::scan_workflows_directory(&workflows_dir, temp_dir.path())
-            .await
+            
             .unwrap();
 
         assert_eq!(workflows.len(), 2);

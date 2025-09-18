@@ -50,14 +50,18 @@ pub async fn run() -> crate::error::Result<()> {
     match cli.command {
         Commands::Parse { path, format } => {
             if path.is_file() {
-                let (info, commands) = crate::parser::WorkflowParser::parse_workflow_file(&path, &path.parent().unwrap_or(&PathBuf::from("."))).await?;
+                let (info, commands) = crate::parser::WorkflowParser::parse_workflow_file(
+                    &path,
+                    path.parent().unwrap_or(&PathBuf::from(".")),
+                )?;
                 match format.as_str() {
                     "json" => println!("{}", serde_json::to_string_pretty(&(info, commands))?),
                     "yaml" => println!("{}", serde_yaml::to_string(&(info, commands))?),
                     _ => eprintln!("Unsupported format: {}", format),
                 }
             } else if path.is_dir() {
-                let workflows = crate::parser::WorkflowParser::scan_workflows_directory(&path, &path).await?;
+                let workflows =
+                    crate::parser::WorkflowParser::scan_workflows_directory(&path, &path)?;
                 match format.as_str() {
                     "json" => println!("{}", serde_json::to_string_pretty(&workflows)?),
                     "yaml" => println!("{}", serde_yaml::to_string(&workflows)?),
@@ -67,8 +71,16 @@ pub async fn run() -> crate::error::Result<()> {
                 eprintln!("Path does not exist: {}", path.display());
             }
         }
-        Commands::Execute { workflow, job, step, working_dir } => {
-            let (info, commands) = crate::parser::WorkflowParser::parse_workflow_file(&workflow, &workflow.parent().unwrap_or(&PathBuf::from("."))).await?;
+        Commands::Execute {
+            workflow,
+            job,
+            step,
+            working_dir,
+        } => {
+            let (_info, commands) = crate::parser::WorkflowParser::parse_workflow_file(
+                &workflow,
+                workflow.parent().unwrap_or(&PathBuf::from(".")),
+            )?;
 
             let command = commands
                 .into_iter()
@@ -80,7 +92,7 @@ pub async fn run() -> crate::error::Result<()> {
                 cmd.working_directory = Some(wd.to_string_lossy().to_string());
             }
 
-            let execution = crate::executor::CommandExecutor::execute_command(&cmd, None).await?;
+            let execution = crate::executor::CommandExecutor::execute_command(&cmd, None)?;
 
             println!("Exit code: {:?}", execution.exit_code);
             println!("Success: {}", execution.success);

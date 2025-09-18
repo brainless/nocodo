@@ -7,11 +7,11 @@ pub struct WorkflowParser;
 
 impl WorkflowParser {
     /// Parse a workflow file and extract commands
-    pub async fn parse_workflow_file(
+    pub fn parse_workflow_file(
         file_path: &Path,
         base_path: &Path,
     ) -> Result<(WorkflowInfo, Vec<WorkflowCommand>)> {
-        let content = tokio::fs::read_to_string(&file_path).await?;
+        let content = std::fs::read_to_string(&file_path)?;
         let workflow: Workflow = serde_yaml::from_str(&content)?;
 
         let file_path_str = file_path.to_string_lossy().to_string();
@@ -33,7 +33,7 @@ impl WorkflowParser {
                 job_name,
                 job,
                 &file_path_str,
-                base_path.as_ref(),
+                base_path,
             );
             commands.extend(job_commands);
         }
@@ -63,9 +63,10 @@ impl WorkflowParser {
                 let command_id = format!("{}_{}_{}", workflow_name, job_name, step_index);
 
                 // Determine working directory
-                let working_directory = step.working_directory
+                let working_directory = step
+                    .working_directory
                     .as_ref()
-                    .or_else(|| job.working_directory.as_ref())
+                    .or(job.working_directory.as_ref())
                     .map(|wd| {
                         if wd.starts_with('/') {
                             wd.clone()
@@ -94,17 +95,21 @@ impl WorkflowParser {
     }
 
     /// Scan a directory for workflow files
-    pub async fn scan_workflows_directory(
+    pub fn scan_workflows_directory(
         workflows_dir: &Path,
         base_path: &Path,
     ) -> Result<Vec<(WorkflowInfo, Vec<WorkflowCommand>)>> {
         let mut workflows = Vec::new();
 
-        let mut entries = tokio::fs::read_dir(&workflows_dir).await?;
-        while let Some(entry) = entries.next_entry().await? {
+        let entries = std::fs::read_dir(&workflows_dir)?;
+        for entry in entries {
+            let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yml" || ext == "yaml") {
-                match Self::parse_workflow_file(&path, &base_path).await {
+            if path
+                .extension()
+                .is_some_and(|ext| ext == "yml" || ext == "yaml")
+            {
+                match Self::parse_workflow_file(&path, base_path) {
                     Ok(workflow_data) => workflows.push(workflow_data),
                     Err(e) => {
                         // Log error but continue with other files
@@ -137,10 +142,11 @@ jobs:
 
         let temp_dir = tempfile::tempdir().unwrap();
         let workflow_path = temp_dir.path().join("ci.yml");
-        tokio::fs::write(&workflow_path, yaml_content).await.unwrap();
+        tokio::fs::write(&workflow_path, yaml_content)
+            .await
+            .unwrap();
 
         let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .await
             .unwrap();
 
         assert_eq!(info.name, "CI");

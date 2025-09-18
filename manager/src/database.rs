@@ -1427,11 +1427,14 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         for command in commands {
-            let environment_json = command.environment
+            let environment_json = command
+                .environment
                 .as_ref()
                 .map(|env| serde_json::to_string(env))
                 .transpose()
-                .map_err(|e| AppError::Internal(format!("Failed to serialize environment: {}", e)))?;
+                .map_err(|e| {
+                    AppError::Internal(format!("Failed to serialize environment: {}", e))
+                })?;
 
             conn.execute(
                 r#"
@@ -1457,7 +1460,10 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_workflow_commands(&self, project_id: &str) -> AppResult<Vec<nocodo_github_actions::WorkflowCommand>> {
+    pub fn get_workflow_commands(
+        &self,
+        project_id: &str,
+    ) -> AppResult<Vec<nocodo_github_actions::WorkflowCommand>> {
         let conn = self
             .connection
             .lock()
@@ -1476,7 +1482,11 @@ impl Database {
             let environment: Option<String> = row.get("environment")?;
             let environment_parsed = if let Some(env_json) = environment {
                 Some(serde_json::from_str(&env_json).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
                 })?)
             } else {
                 None
@@ -1532,7 +1542,10 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn get_command_executions(&self, command_id: &str) -> AppResult<Vec<nocodo_github_actions::CommandExecution>> {
+    pub fn get_command_executions(
+        &self,
+        command_id: &str,
+    ) -> AppResult<Vec<nocodo_github_actions::CommandExecution>> {
         let conn = self
             .connection
             .lock()

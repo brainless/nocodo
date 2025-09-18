@@ -5,22 +5,30 @@
 
 use crate::error::{Error, Result};
 use crate::models::*;
-use sqlx::{sqlite::SqlitePool, Row};
+use rusqlite::{params, Connection};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
+
+pub type DbConnection = Arc<Mutex<Connection>>;
 
 /// Database operations for workflow commands
 pub struct WorkflowDatabase {
-    pool: SqlitePool,
+    connection: DbConnection,
 }
 
 impl WorkflowDatabase {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(connection: DbConnection) -> Self {
+        Self { connection }
     }
 
     /// Create the necessary database tables
-    pub async fn create_tables(&self) -> Result<()> {
-        sqlx::query(
+    pub fn create_tables(&self) -> Result<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| Error::Database(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
             r#"
             CREATE TABLE IF NOT EXISTS workflow_commands (
                 id TEXT PRIMARY KEY,
@@ -36,11 +44,10 @@ impl WorkflowDatabase {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
             "#,
-        )
-        .execute(&self.pool)
-        .await?;
+            [],
+        )?;
 
-        sqlx::query(
+        conn.execute(
             r#"
             CREATE TABLE IF NOT EXISTS command_executions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,63 +61,91 @@ impl WorkflowDatabase {
                 FOREIGN KEY (command_id) REFERENCES workflow_commands (id)
             )
             "#,
-        )
-        .execute(&self.pool)
-        .await?;
+            [],
+        )?;
 
         Ok(())
     }
 
     /// Store workflow commands for a project
-    pub async fn store_commands(&self, project_id: &str, commands: &[WorkflowCommand]) -> Result<()> {
+    pub fn store_commands(
+        &self,
+        project_id: &str,
+        commands: &[WorkflowCommand],
+    ) -> Result<()> {
         for command in commands {
-            let environment_json = command.environment
+            let environment_json = command
+                .environment
                 .as_ref()
-                .map(|env| serde_json::to_string(env))
+                .map(serde_json::to_string)
                 .transpose()
-                .map_err(|e| Error::InvalidWorkflow(format!("Failed to serialize environment: {}", e)))?;
+                .map_err(|e| {
+                    Error::InvalidWorkflow(format!("Failed to serialize environment: {}", e))
+                })?;
 
-            sqlx::query(
+            let conn = self
+                .connection
+                .lock()
+                .map_err(|e| Error::Database(format!("Failed to acquire database lock: {e}")))?;
+
+            conn.execute(
                 r#"
                 INSERT OR REPLACE INTO workflow_commands
                 (id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path, project_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
-            )
-            .bind(&command.id)
-            .bind(&command.workflow_name)
-            .bind(&command.job_name)
-            .bind(&command.step_name)
-            .bind(&command.command)
-            .bind(&command.shell)
-            .bind(&command.working_directory)
-            .bind(&environment_json)
-            .bind(&command.file_path)
-            .bind(project_id)
-            .execute(&self.pool)
-            .await?;
+                params![
+                    &command.id,
+                    &command.workflow_name,
+                    &command.job_name,
+                    &command.step_name,
+                    &command.command,
+                    &command.shell,
+                    &command.working_directory,
+                    &environment_json,
+                    &command.file_path,
+                    project_id
+                ],
+            )?;
         }
 
         Ok(())
     }
 
     /// Get commands for a project
-    pub async fn get_commands(&self, project_id: &str) -> Result<Vec<WorkflowCommand>> {
-        let rows = sqlx::query(
+    pub fn get_commands(&self, project_id: &str) -> Result<Vec<WorkflowCommand>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| Error::Database(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
             r#"
             SELECT id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path
             FROM workflow_commands
             WHERE project_id = ?
             ORDER BY workflow_name, job_name
             "#,
-        )
-        .bind(project_id)
-        .fetch_all(&self.pool)
-        .await?;
+        )?;
+
+        let rows = stmt.query_map(params![project_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // id
+                row.get::<_, String>(1)?, // workflow_name
+                row.get::<_, String>(2)?, // job_name
+                row.get::<_, Option<String>>(3)?, // step_name
+                row.get::<_, String>(4)?, // command
+                row.get::<_, Option<String>>(5)?, // shell
+                row.get::<_, Option<String>>(6)?, // working_directory
+                row.get::<_, Option<String>>(7)?, // environment
+                row.get::<_, String>(8)?, // file_path
+            ))
+        })?;
 
         let mut commands = Vec::new();
-        for row in rows {
-            let environment: Option<String> = row.try_get("environment")?;
+        for row_result in rows {
+            let (id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path) = row_result?;
+
             let environment_parsed = match environment {
                 Some(env_json) => Some(serde_json::from_str(&env_json).map_err(|e| {
                     Error::InvalidWorkflow(format!("Failed to parse environment: {}", e))
@@ -119,15 +154,15 @@ impl WorkflowDatabase {
             };
 
             let command = WorkflowCommand {
-                id: row.try_get("id")?,
-                workflow_name: row.try_get("workflow_name")?,
-                job_name: row.try_get("job_name")?,
-                step_name: row.try_get("step_name")?,
-                command: row.try_get("command")?,
-                shell: row.try_get("shell")?,
-                working_directory: row.try_get("working_directory")?,
+                id,
+                workflow_name,
+                job_name,
+                step_name,
+                command,
+                shell,
+                working_directory,
                 environment: environment_parsed,
-                file_path: row.try_get("file_path")?,
+                file_path,
             };
 
             commands.push(command);
@@ -137,51 +172,75 @@ impl WorkflowDatabase {
     }
 
     /// Store command execution result
-    pub async fn store_execution(&self, execution: &CommandExecution) -> Result<i64> {
-        let result = sqlx::query(
+    pub fn store_execution(&self, execution: &CommandExecution) -> Result<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| Error::Database(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
             r#"
             INSERT INTO command_executions
             (command_id, exit_code, stdout, stderr, duration_ms, executed_at, success)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
-        )
-        .bind(&execution.command_id)
-        .bind(execution.exit_code)
-        .bind(&execution.stdout)
-        .bind(&execution.stderr)
-        .bind(execution.duration_ms as i64)
-        .bind(execution.executed_at)
-        .bind(execution.success)
-        .execute(&self.pool)
-        .await?;
+            params![
+                &execution.command_id,
+                execution.exit_code,
+                &execution.stdout,
+                &execution.stderr,
+                execution.duration_ms as i64,
+                execution.executed_at.to_rfc3339(),
+                execution.success
+            ],
+        )?;
 
-        Ok(result.last_insert_rowid())
+        Ok(conn.last_insert_rowid())
     }
 
     /// Get execution history for a command
-    pub async fn get_executions(&self, command_id: &str) -> Result<Vec<CommandExecution>> {
-        let rows = sqlx::query(
+    pub fn get_executions(&self, command_id: &str) -> Result<Vec<CommandExecution>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| Error::Database(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
             r#"
             SELECT command_id, exit_code, stdout, stderr, duration_ms, executed_at, success
             FROM command_executions
             WHERE command_id = ?
             ORDER BY executed_at DESC
             "#,
-        )
-        .bind(command_id)
-        .fetch_all(&self.pool)
-        .await?;
+        )?;
+
+        let rows = stmt.query_map(params![command_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // command_id
+                row.get::<_, Option<i32>>(1)?, // exit_code
+                row.get::<_, String>(2)?, // stdout
+                row.get::<_, String>(3)?, // stderr
+                row.get::<_, i64>(4)?, // duration_ms
+                row.get::<_, String>(5)?, // executed_at
+                row.get::<_, bool>(6)?, // success
+            ))
+        })?;
 
         let mut executions = Vec::new();
-        for row in rows {
+        for row_result in rows {
+            let (command_id, exit_code, stdout, stderr, duration_ms, executed_at_str, success) = row_result?;
+            let executed_at = chrono::DateTime::parse_from_rfc3339(&executed_at_str)
+                .map_err(|e| Error::Database(format!("Failed to parse datetime: {}", e)))?
+                .with_timezone(&chrono::Utc);
+
             let execution = CommandExecution {
-                command_id: row.try_get("command_id")?,
-                exit_code: row.try_get("exit_code")?,
-                stdout: row.try_get("stdout")?,
-                stderr: row.try_get("stderr")?,
-                duration_ms: row.try_get::<i64, _>("duration_ms")? as u64,
-                executed_at: row.try_get("executed_at")?,
-                success: row.try_get("success")?,
+                command_id,
+                exit_code,
+                stdout,
+                stderr,
+                duration_ms: duration_ms as u64,
+                executed_at,
+                success,
             };
 
             executions.push(execution);
@@ -194,16 +253,17 @@ impl WorkflowDatabase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::sqlite::SqlitePool;
+    use rusqlite::Connection;
 
-    #[tokio::test]
+    #[test]
     #[cfg(feature = "nocodo-integration")]
-    async fn test_workflow_service_scan_and_execute() {
-        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        let service = WorkflowService::new(pool.clone());
+    fn test_workflow_service_scan_and_execute() {
+        let conn = Connection::open_in_memory().unwrap();
+        let db_connection = Arc::new(Mutex::new(conn));
+        let service = WorkflowService::new(db_connection.clone());
 
         // Create tables
-        service.database.create_tables().await.unwrap();
+        service.database.create_tables().unwrap();
 
         // Create a temporary directory with a workflow
         let temp_dir = tempfile::tempdir().unwrap();
@@ -225,7 +285,9 @@ jobs:
         std::fs::write(&workflow_path, workflow_content).unwrap();
 
         // Scan workflows
-        let response = service.scan_workflows("test-project", temp_dir.path()).await.unwrap();
+        let response = service
+            .scan_workflows("test-project", temp_dir.path())
+            .unwrap();
 
         assert_eq!(response.workflows.len(), 1);
         assert_eq!(response.workflows[0].name, "Test CI");
@@ -234,10 +296,12 @@ jobs:
 
         // Execute the command (need to update execute_command to take project_id)
         // For now, let's directly execute using the executor
-        let execution = crate::executor::CommandExecutor::execute_command(&response.commands[0], Some(10)).await.unwrap();
+        let execution =
+            crate::executor::CommandExecutor::execute_command(&response.commands[0], Some(10))
+                .unwrap();
 
         // Store the execution
-        service.database.store_execution(&execution).await.unwrap();
+        service.database.store_execution(&execution).unwrap();
 
         assert!(execution.success);
         assert_eq!(execution.exit_code, Some(0));
@@ -246,19 +310,24 @@ jobs:
 }
 
 /// Service for managing workflows in nocodo
+#[allow(clippy::items_after_test_module)]
 pub struct WorkflowService {
     database: WorkflowDatabase,
 }
 
 impl WorkflowService {
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(connection: DbConnection) -> Self {
         Self {
-            database: WorkflowDatabase::new(pool),
+            database: WorkflowDatabase::new(connection),
         }
     }
 
     /// Scan workflows for a project
-    pub async fn scan_workflows(&self, project_id: &str, project_path: &Path) -> Result<ScanWorkflowsResponse> {
+    pub fn scan_workflows(
+        &self,
+        project_id: &str,
+        project_path: &Path,
+    ) -> Result<ScanWorkflowsResponse> {
         use crate::parser::WorkflowParser;
 
         let workflows_dir = project_path.join(".github").join("workflows");
@@ -270,7 +339,8 @@ impl WorkflowService {
             });
         }
 
-        let workflows_data = WorkflowParser::scan_workflows_directory(&workflows_dir, project_path).await?;
+        let workflows_data =
+            WorkflowParser::scan_workflows_directory(&workflows_dir, project_path)?;
 
         let mut workflows = Vec::new();
         let mut all_commands = Vec::new();
@@ -281,7 +351,8 @@ impl WorkflowService {
         }
 
         // Store commands in database
-        self.database.store_commands(project_id, &all_commands).await?;
+        self.database
+            .store_commands(project_id, &all_commands)?;
 
         Ok(ScanWorkflowsResponse {
             workflows,
@@ -290,7 +361,7 @@ impl WorkflowService {
     }
 
     /// Execute a command
-    pub async fn execute_command(
+    pub fn execute_command(
         &self,
         command_id: &str,
         timeout_seconds: Option<u64>,
@@ -299,15 +370,16 @@ impl WorkflowService {
         // Since we don't have project_id as parameter, we need to get it from the command
         // For now, we'll get all commands and find the matching one
         // In a real implementation, we'd want to index by command_id or store project_id with executions
-        let commands = self.database.get_commands("test-project").await?;
+        let commands = self.database.get_commands("test-project")?;
         let command = commands
             .into_iter()
             .find(|c| c.id == command_id)
             .ok_or_else(|| Error::CommandNotFound(command_id.to_string()))?;
 
-        let execution = crate::executor::CommandExecutor::execute_command(&command, timeout_seconds).await?;
+        let execution =
+            crate::executor::CommandExecutor::execute_command(&command, timeout_seconds)?;
 
-        self.database.store_execution(&execution).await?;
+        self.database.store_execution(&execution)?;
 
         Ok(execution)
     }
