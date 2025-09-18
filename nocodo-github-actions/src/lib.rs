@@ -12,6 +12,7 @@ pub mod error;
 pub mod models;
 pub mod parser;
 pub mod executor;
+pub mod workflow_tests;
 
 #[cfg(feature = "nocodo-integration")]
 pub mod nocodo;
