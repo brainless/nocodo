@@ -1,7 +1,5 @@
-mod browser_launcher;
 mod config;
 mod database;
-mod embedded_web;
 mod error;
 mod handlers;
 mod llm_agent;
@@ -14,13 +12,10 @@ mod tools;
 mod websocket;
 
 use actix::Actor;
-use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use browser_launcher::{launch_browser, print_startup_banner, wait_for_server, BrowserConfig};
 use clap::{Arg, Command};
 use config::AppConfig;
 use database::Database;
-use embedded_web::{configure_embedded_routes, get_embedded_assets_size, validate_embedded_assets};
 use error::AppResult;
 use handlers::AppState;
 use llm_agent::LlmAgent;
@@ -35,15 +30,9 @@ use websocket::{WebSocketBroadcaster, WebSocketServer};
 #[actix_web::main]
 async fn main() -> AppResult<()> {
     // Parse command line arguments
-    let matches = Command::new("nocodo-manager")
+    let _matches = Command::new("nocodo-manager")
         .version("0.1.0")
         .about("nocodo Manager - AI-assisted development environment daemon")
-        .arg(
-            Arg::new("no-browser")
-                .long("no-browser")
-                .help("Don't automatically open browser")
-                .action(clap::ArgAction::SetTrue),
-        )
         .arg(
             Arg::new("config")
                 .short('c')
@@ -59,26 +48,11 @@ async fn main() -> AppResult<()> {
         .with(EnvFilter::from_default_env().add_directive("nocodo_manager=info".parse().unwrap()))
         .init();
 
-    // Configure browser launching
-    let browser_config = BrowserConfig {
-        auto_launch: !matches.get_flag("no-browser"),
-        ..BrowserConfig::default()
-    };
-
-    print_startup_banner(&browser_config);
     tracing::info!("Starting nocodo Manager daemon");
 
     // Load configuration
     let config = AppConfig::load()?;
     tracing::info!("Loaded configuration from ~/.config/nocodo/manager.toml");
-
-    // Validate embedded web assets
-    if validate_embedded_assets() {
-        let asset_size = get_embedded_assets_size();
-        tracing::info!("Embedded web assets loaded: {} bytes", asset_size);
-    } else {
-        tracing::warn!("No embedded web assets found - serving from filesystem as fallback");
-    }
 
     // Initialize database
     let database = Arc::new(Database::new(&config.database.path)?);
@@ -123,25 +97,14 @@ async fn main() -> AppResult<()> {
         None
     };
 
-    // LLM agent is now enabled by default
-    // Can be explicitly disabled with NOCODO_LLM_AGENT_ENABLED=false
-    let llm_agent_disabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
-        .ok()
-        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
-        .unwrap_or(false);
-
-    let llm_agent = if !llm_agent_disabled {
-        tracing::info!("Initializing LLM agent");
-        Some(Arc::new(LlmAgent::new(
-            Arc::clone(&database),
-            Arc::clone(&broadcaster),
-            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            Arc::new(config.clone()),
-        )))
-    } else {
-        tracing::warn!("LLM agent explicitly disabled via NOCODO_LLM_AGENT_ENABLED=false");
-        None
-    };
+    // Initialize LLM agent (always enabled)
+    tracing::info!("Initializing LLM agent");
+    let llm_agent = Some(Arc::new(LlmAgent::new(
+        Arc::clone(&database),
+        Arc::clone(&broadcaster),
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        Arc::new(config.clone()),
+    )));
 
     let app_state = web::Data::new(AppState {
         database,
@@ -154,14 +117,7 @@ async fn main() -> AppResult<()> {
 
     // Start HTTP server
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
-    let server_url = format!("http://{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
-
-    // Update browser config with actual server URL
-    let browser_config = BrowserConfig {
-        url: server_url.clone(),
-        ..browser_config
-    };
 
     let http_task = tokio::spawn(async move {
         HttpServer::new(move || {
@@ -251,26 +207,6 @@ async fn main() -> AppResult<()> {
                     "/ws/work/{id}",
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
-                // Serve embedded web assets (with filesystem fallback)
-                .configure(|cfg| {
-                    if validate_embedded_assets() {
-                        // Use embedded assets
-                        tracing::info!("Configuring embedded web asset routes");
-                        configure_embedded_routes(cfg);
-                    } else if std::path::Path::new("manager-web/dist").exists() {
-                        // Fallback to filesystem (development mode)
-                        tracing::info!("Using filesystem fallback for web assets");
-                        cfg.service(
-                            fs::Files::new("/", "manager-web/dist")
-                                .index_file("index.html")
-                                .use_etag(true)
-                                .use_last_modified(true)
-                                .prefer_utf8(true),
-                        );
-                    } else {
-                        tracing::warn!("No web assets available - neither embedded nor filesystem");
-                    }
-                })
         })
         .bind(&server_addr)
         .expect("Failed to bind HTTP server")
@@ -279,22 +215,7 @@ async fn main() -> AppResult<()> {
         .expect("HTTP server failed")
     });
 
-    // Launch browser after server starts
-    let _browser_task = tokio::spawn({
-        let browser_config = browser_config.clone();
-        let server_url = server_url.clone();
-        async move {
-            // Wait for server to be ready
-            wait_for_server(&server_url, 10).await;
-
-            // Launch browser
-            launch_browser(&browser_config).await;
-        }
-    });
-
     // Wait for servers (they should run indefinitely)
-    // We don't want to exit when browser launcher completes
-    // Only exit when HTTP or socket server completes
     tokio::select! {
         _ = socket_task => tracing::info!("Socket server completed"),
         _ = http_task => tracing::info!("HTTP server completed"),
