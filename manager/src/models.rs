@@ -260,6 +260,7 @@ pub struct AiSessionOutputListResponse {
 
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct RecordAiOutputRequest {
     pub content: String,
 }
@@ -267,6 +268,7 @@ pub struct RecordAiOutputRequest {
 /// Send interactive input to a running AI session (Phase 1 streaming)
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct AiSessionInputRequest {
     pub content: String,
 }
