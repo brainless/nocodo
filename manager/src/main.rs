@@ -34,9 +34,6 @@ use websocket::{WebSocketBroadcaster, WebSocketServer};
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
-    // Load .env file if it exists
-    dotenvy::dotenv().ok();
-
     // Parse command line arguments
     let matches = Command::new("nocodo-manager")
         .version("0.1.0")
@@ -140,6 +137,7 @@ async fn main() -> AppResult<()> {
             Arc::clone(&database),
             Arc::clone(&broadcaster),
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            Arc::new(config.clone()),
         )))
     } else {
         tracing::warn!("LLM agent disabled - set NOCODO_LLM_AGENT_ENABLED=1 to enable");

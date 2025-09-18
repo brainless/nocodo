@@ -7,6 +7,14 @@ pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub socket: SocketConfig,
+    pub api_keys: Option<ApiKeysConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiKeysConfig {
+    pub grok_api_key: Option<String>,
+    pub openai_api_key: Option<String>,
+    pub anthropic_api_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -38,6 +46,7 @@ impl Default for AppConfig {
             socket: SocketConfig {
                 path: "/tmp/nocodo-manager.sock".to_string(),
             },
+            api_keys: None,
         }
     }
 }
@@ -65,6 +74,11 @@ path = "~/.local/share/nocodo/manager.db"
 
 [socket]
 path = "/tmp/nocodo-manager.sock"
+
+[api_keys]
+# grok_api_key = "your-grok-key"
+# openai_api_key = "your-openai-key"
+# anthropic_api_key = "your-anthropic-key"
 "#;
             std::fs::write(&config_path, default_config).map_err(|e| {
                 ConfigError::Message(format!("Failed to write default config: {e}"))
