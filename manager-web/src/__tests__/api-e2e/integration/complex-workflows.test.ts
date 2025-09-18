@@ -27,13 +27,13 @@ describe('Complex Workflows - API Only', () => {
       // === PHASE 1: Project and Requirements Analysis ===
       console.log('🔍 Phase 1: Project Setup and Analysis');
 
-       // Create project
-       const project = await testStateManager.addProject(
-         testDataGenerator.generateProjectData({
-           language: 'rust',
-           description: 'Testing complete feature development workflow',
-         })
-       );
+      // Create project
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          language: 'rust',
+          description: 'Testing complete feature development workflow',
+        })
+      );
 
       // Create initial project structure
       const initialFiles = [
@@ -994,12 +994,12 @@ This project was developed using a complete LLM agent workflow:
 
   describe('Error Recovery and Resilience', () => {
     it('should handle partial failures and recover gracefully', async () => {
-       // Create project
-       const project = await testStateManager.addProject(
-         testDataGenerator.generateProjectData({
-           description: 'Testing error recovery and resilience',
-         })
-       );
+      // Create project
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          description: 'Testing error recovery and resilience',
+        })
+      );
 
       // Create work session
       const work = await testStateManager.addWorkSession(
@@ -1059,12 +1059,12 @@ This project was developed using a complete LLM agent workflow:
     });
 
     it('should handle concurrent workflow conflicts', async () => {
-       // Create project
-       const project = await testStateManager.addProject(
-         testDataGenerator.generateProjectData({
-           description: 'Testing concurrent workflow conflicts',
-         })
-       );
+      // Create project
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          description: 'Testing concurrent workflow conflicts',
+        })
+      );
 
       // Create multiple work sessions trying to modify the same file
       const work1 = await testStateManager.addWorkSession(
@@ -1142,12 +1142,12 @@ This project was developed using a complete LLM agent workflow:
 
   describe('Performance Under Load', () => {
     it('should handle high-frequency operations efficiently', async () => {
-       // Create project
-       const project = await testStateManager.addProject(
-         testDataGenerator.generateProjectData({
-           description: 'Testing performance under load',
-         })
-       );
+      // Create project
+      const project = await testStateManager.addProject(
+        testDataGenerator.generateProjectData({
+          description: 'Testing performance under load',
+        })
+      );
 
       const work = await testStateManager.addWorkSession(
         testDataGenerator.generateWorkData({
@@ -1205,11 +1205,7 @@ This project was developed using a complete LLM agent workflow:
 
     it('should maintain state consistency during rapid updates', async () => {
       // Create project and file
-      const project = await testStateManager.addProject(
-        testDataGenerator.generateProjectData({
-
-        })
-      );
+      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({}));
 
       const initialContent = 'Initial content';
       const testFile = testDataGenerator.generateFileData({
