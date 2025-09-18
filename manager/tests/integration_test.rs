@@ -1,7 +1,7 @@
 use actix::Actor;
 use actix_web::{test, web, App};
-use nocodo_manager::database::Database;
 use nocodo_manager::config::AppConfig;
+use nocodo_manager::database::Database;
 use nocodo_manager::handlers::{create_project, get_templates, AppState};
 use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 use std::sync::Arc;
