@@ -163,8 +163,6 @@ pub struct StreamChunk {
     pub tool_calls: Vec<LlmToolCall>,
 }
 
-
-
 /// Tool definition for native tool calling
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {

@@ -149,7 +149,10 @@ async fn main() -> Result<()> {
         .context("Failed to create manager.log")?;
 
     let mut manager_process = tokio::process::Command::new("/home/nocodo/.cargo/bin/cargo-watch")
-        .args(["-x", "run --bin nocodo-manager -- --config ~/.config/nocodo/manager.toml"])
+        .args([
+            "-x",
+            "run --bin nocodo-manager -- --config ~/.config/nocodo/manager.toml",
+        ])
         .stdout(Stdio::from(manager_log.try_clone()?))
         .stderr(Stdio::from(manager_log))
         .spawn()
