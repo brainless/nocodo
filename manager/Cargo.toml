@@ -46,7 +46,6 @@ clap = { version = "4.4", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json", "stream"] }
 async-stream = "0.3"
 futures-util = "0.3"
-dotenvy = "0.15"
 grep = "0.3"
 regex = "1.10"
 

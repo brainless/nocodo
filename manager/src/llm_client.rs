@@ -146,6 +146,7 @@ pub struct LlmUsage {
 
 /// LLM completion chunk for streaming
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct LlmCompletionChunk {
     pub id: String,
     pub object: String,
@@ -162,8 +163,6 @@ pub struct StreamChunk {
     // NEW: Tool calls in streaming chunk
     pub tool_calls: Vec<LlmToolCall>,
 }
-
-
 
 /// Tool definition for native tool calling
 #[derive(Debug, Clone, Serialize, Deserialize)]

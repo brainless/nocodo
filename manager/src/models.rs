@@ -260,6 +260,7 @@ pub struct AiSessionOutputListResponse {
 
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct RecordAiOutputRequest {
     pub content: String,
 }
@@ -267,6 +268,7 @@ pub struct RecordAiOutputRequest {
 /// Send interactive input to a running AI session (Phase 1 streaming)
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct AiSessionInputRequest {
     pub content: String,
 }
@@ -875,4 +877,21 @@ impl LlmAgentToolCall {
         self.status = "failed".to_string();
         self.completed_at = Some(Utc::now().timestamp());
     }
+}
+
+/// API key configuration for the settings page
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ApiKeyConfig {
+    pub name: String,
+    pub key: Option<String>, // Will be masked for security
+    pub is_configured: bool,
+}
+
+/// Settings response containing API keys and configuration info
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SettingsResponse {
+    pub config_file_path: String,
+    pub api_keys: Vec<ApiKeyConfig>,
 }

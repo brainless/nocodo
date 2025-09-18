@@ -34,9 +34,6 @@ use websocket::{WebSocketBroadcaster, WebSocketServer};
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
-    // Load .env file if it exists
-    dotenvy::dotenv().ok();
-
     // Parse command line arguments
     let matches = Command::new("nocodo-manager")
         .version("0.1.0")
@@ -126,23 +123,23 @@ async fn main() -> AppResult<()> {
         None
     };
 
-    // Optionally enable LLM agent via env flag
-    let llm_agent_enabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
+    // LLM agent is now enabled by default
+    // Can be explicitly disabled with NOCODO_LLM_AGENT_ENABLED=false
+    let llm_agent_disabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
         .ok()
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
         .unwrap_or(false);
 
-    tracing::info!("LLM agent enabled: {}", llm_agent_enabled);
-
-    let llm_agent = if llm_agent_enabled {
+    let llm_agent = if !llm_agent_disabled {
         tracing::info!("Initializing LLM agent");
         Some(Arc::new(LlmAgent::new(
             Arc::clone(&database),
             Arc::clone(&broadcaster),
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            Arc::new(config.clone()),
         )))
     } else {
-        tracing::warn!("LLM agent disabled - set NOCODO_LLM_AGENT_ENABLED=1 to enable");
+        tracing::warn!("LLM agent explicitly disabled via NOCODO_LLM_AGENT_ENABLED=false");
         None
     };
 
@@ -152,6 +149,7 @@ async fn main() -> AppResult<()> {
         ws_broadcaster: broadcaster,
         runner,
         llm_agent,
+        config: Arc::new(config.clone()),
     });
 
     // Start HTTP server
@@ -243,7 +241,9 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/llm-agent/{session_id}/complete",
                             web::post().to(handlers::complete_llm_agent_session),
-                        ),
+                        )
+                        // Settings endpoint
+                        .route("/settings", web::get().to(handlers::get_settings)),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
