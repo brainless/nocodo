@@ -68,11 +68,7 @@ impl WorkflowDatabase {
     }
 
     /// Store workflow commands for a project
-    pub fn store_commands(
-        &self,
-        project_id: &str,
-        commands: &[WorkflowCommand],
-    ) -> Result<()> {
+    pub fn store_commands(&self, project_id: &str, commands: &[WorkflowCommand]) -> Result<()> {
         for command in commands {
             let environment_json = command
                 .environment
@@ -130,21 +126,31 @@ impl WorkflowDatabase {
 
         let rows = stmt.query_map(params![project_id], |row| {
             Ok((
-                row.get::<_, String>(0)?, // id
-                row.get::<_, String>(1)?, // workflow_name
-                row.get::<_, String>(2)?, // job_name
+                row.get::<_, String>(0)?,         // id
+                row.get::<_, String>(1)?,         // workflow_name
+                row.get::<_, String>(2)?,         // job_name
                 row.get::<_, Option<String>>(3)?, // step_name
-                row.get::<_, String>(4)?, // command
+                row.get::<_, String>(4)?,         // command
                 row.get::<_, Option<String>>(5)?, // shell
                 row.get::<_, Option<String>>(6)?, // working_directory
                 row.get::<_, Option<String>>(7)?, // environment
-                row.get::<_, String>(8)?, // file_path
+                row.get::<_, String>(8)?,         // file_path
             ))
         })?;
 
         let mut commands = Vec::new();
         for row_result in rows {
-            let (id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path) = row_result?;
+            let (
+                id,
+                workflow_name,
+                job_name,
+                step_name,
+                command,
+                shell,
+                working_directory,
+                environment,
+                file_path,
+            ) = row_result?;
 
             let environment_parsed = match environment {
                 Some(env_json) => Some(serde_json::from_str(&env_json).map_err(|e| {
@@ -216,19 +222,20 @@ impl WorkflowDatabase {
 
         let rows = stmt.query_map(params![command_id], |row| {
             Ok((
-                row.get::<_, String>(0)?, // command_id
+                row.get::<_, String>(0)?,      // command_id
                 row.get::<_, Option<i32>>(1)?, // exit_code
-                row.get::<_, String>(2)?, // stdout
-                row.get::<_, String>(3)?, // stderr
-                row.get::<_, i64>(4)?, // duration_ms
-                row.get::<_, String>(5)?, // executed_at
-                row.get::<_, bool>(6)?, // success
+                row.get::<_, String>(2)?,      // stdout
+                row.get::<_, String>(3)?,      // stderr
+                row.get::<_, i64>(4)?,         // duration_ms
+                row.get::<_, String>(5)?,      // executed_at
+                row.get::<_, bool>(6)?,        // success
             ))
         })?;
 
         let mut executions = Vec::new();
         for row_result in rows {
-            let (command_id, exit_code, stdout, stderr, duration_ms, executed_at_str, success) = row_result?;
+            let (command_id, exit_code, stdout, stderr, duration_ms, executed_at_str, success) =
+                row_result?;
             let executed_at = chrono::DateTime::parse_from_rfc3339(&executed_at_str)
                 .map_err(|e| Error::Database(format!("Failed to parse datetime: {}", e)))?
                 .with_timezone(&chrono::Utc);
@@ -351,8 +358,7 @@ impl WorkflowService {
         }
 
         // Store commands in database
-        self.database
-            .store_commands(project_id, &all_commands)?;
+        self.database.store_commands(project_id, &all_commands)?;
 
         Ok(ScanWorkflowsResponse {
             workflows,

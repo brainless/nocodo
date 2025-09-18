@@ -11,7 +11,7 @@ impl WorkflowParser {
         file_path: &Path,
         base_path: &Path,
     ) -> Result<(WorkflowInfo, Vec<WorkflowCommand>)> {
-        let content = std::fs::read_to_string(&file_path)?;
+        let content = std::fs::read_to_string(file_path)?;
         let workflow: Workflow = serde_yaml::from_str(&content)?;
 
         let file_path_str = file_path.to_string_lossy().to_string();
@@ -101,7 +101,7 @@ impl WorkflowParser {
     ) -> Result<Vec<(WorkflowInfo, Vec<WorkflowCommand>)>> {
         let mut workflows = Vec::new();
 
-        let entries = std::fs::read_dir(&workflows_dir)?;
+        let entries = std::fs::read_dir(workflows_dir)?;
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
@@ -146,8 +146,8 @@ jobs:
             .await
             .unwrap();
 
-        let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .unwrap();
+        let (info, commands) =
+            WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path()).unwrap();
 
         assert_eq!(info.name, "CI");
         assert_eq!(commands.len(), 1);

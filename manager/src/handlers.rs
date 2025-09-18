@@ -16,8 +16,7 @@ use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
 use nocodo_github_actions::{
-    ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
-    nocodo::WorkflowService,
+    nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -2025,11 +2024,13 @@ pub async fn execute_workflow_command(
     let response = ExecuteCommandResponse { execution };
 
     // Broadcast execution result via WebSocket
-    let _ = data.ws_broadcaster.broadcast(crate::websocket::WebSocketMessage::WorkflowExecutionCompleted {
-        project_id: project_id.clone(),
-        command_id: command_id.clone(),
-        execution: serde_json::to_string(&response).unwrap_or_default(),
-    });
+    data.ws_broadcaster.broadcast(
+        crate::websocket::WebSocketMessage::WorkflowExecutionCompleted {
+            project_id: project_id.clone(),
+            command_id: command_id.clone(),
+            execution: serde_json::to_string(&response).unwrap_or_default(),
+        },
+    );
 
     Ok(HttpResponse::Ok().json(response))
 }
