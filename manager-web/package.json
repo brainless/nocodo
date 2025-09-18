@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run",
+    "test:run": "vitest run --config vitest.api-e2e.config.ts",
     "test:ui": "vitest --ui",
 
     "test:api-e2e": "vitest run --config vitest.api-e2e.config.ts",
