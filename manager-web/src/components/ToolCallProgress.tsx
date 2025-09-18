@@ -1,7 +1,7 @@
 import { Component } from 'solid-js';
 import { ToolCallState } from '../stores/sessionsStore';
 
-const ToolCallProgress: Component<{ toolCall: ToolCallState }> = (props) => {
+const ToolCallProgress: Component<{ toolCall: ToolCallState }> = props => {
   const getStatusColor = () => {
     switch (props.toolCall.status) {
       case 'pending':
