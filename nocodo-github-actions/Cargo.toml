@@ -1,0 +1,36 @@
+[package]
+name = "nocodo-github-actions"
+version = "0.1.0"
+edition = "2021"
+description = "GitHub Actions workflow parsing and command extraction library"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "nocodo-github-actions"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+tokio = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+ts-rs = { workspace = true }
+
+# Optional dependencies for nocodo integration
+sqlx = { workspace = true, features = ["sqlite"], optional = true }
+actix-web = { workspace = true, optional = true }
+
+# Optional CLI dependency
+clap = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3.0"
+
+[features]
+default = []
+nocodo-integration = ["dep:sqlx", "dep:actix-web"]
+cli = ["dep:clap"]
