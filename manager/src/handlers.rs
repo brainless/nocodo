@@ -12,6 +12,7 @@ use crate::models::{
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
+use nocodo_github_actions::{ScanWorkflowsRequest, ScanWorkflowsResponse, ExecuteCommandRequest, ExecuteCommandResponse, WorkflowService};
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
 use serde::Deserialize;
@@ -1951,4 +1952,92 @@ pub async fn get_llm_agent_sessions(
         .database
         .get_llm_agent_sessions_by_work(&work_id.into_inner())?;
     Ok(HttpResponse::Ok().json(sessions))
+}
+
+// Workflow handlers
+
+/// Scan workflows for a project
+pub async fn scan_workflows(
+    data: web::Data<AppState>,
+    project_id: web::Path<String>,
+    _request: web::Json<ScanWorkflowsRequest>,
+) -> Result<HttpResponse, AppError> {
+    let project_id = project_id.into_inner();
+
+    // Get project to verify it exists and get path
+    let project = data.database.get_project_by_id(&project_id)?;
+    let project_path = PathBuf::from(&project.path);
+
+    // Create workflow service
+    let workflow_service = WorkflowService::new(data.database.connection());
+
+    // Scan workflows
+    let response = workflow_service.scan_workflows(&project_id, &project_path).await
+        .map_err(|e| AppError::Internal(format!("Failed to scan workflows: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Get workflow commands for a project
+pub async fn get_workflow_commands(
+    data: web::Data<AppState>,
+    project_id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let project_id = project_id.into_inner();
+
+    // Verify project exists
+    data.database.get_project_by_id(&project_id)?;
+
+    let commands = data.database.get_workflow_commands(&project_id)
+        .map_err(|e| AppError::Internal(format!("Failed to get workflow commands: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(commands))
+}
+
+/// Execute a workflow command
+pub async fn execute_workflow_command(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+    request: web::Json<ExecuteCommandRequest>,
+) -> Result<HttpResponse, AppError> {
+    let (project_id, command_id) = path.into_inner();
+    let request = request.into_inner();
+
+    // Verify project exists
+    data.database.get_project_by_id(&project_id)?;
+
+    // Create workflow service
+    let workflow_service = WorkflowService::new(data.database.connection());
+
+    // Execute command
+    let execution = workflow_service.execute_command(&command_id, request.timeout_seconds).await
+        .map_err(|e| AppError::Internal(format!("Failed to execute command: {}", e)))?;
+
+    let response = ExecuteCommandResponse { execution };
+
+    // Broadcast execution result via WebSocket
+    let _ = data.ws_broadcaster.broadcast(&format!(
+        r#"{{"type": "workflow_execution", "project_id": "{}", "command_id": "{}", "execution": {}}}"#,
+        project_id,
+        command_id,
+        serde_json::to_string(&response).unwrap_or_default()
+    ));
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Get execution history for a workflow command
+pub async fn get_command_executions(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, AppError> {
+    let (project_id, command_id) = path.into_inner();
+
+    // Verify project exists
+    data.database.get_project_by_id(&project_id)?;
+
+    let executions = data.database.get_command_executions(&command_id)
+        .map_err(|e| AppError::Internal(format!("Failed to get command executions: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(executions))
 }
