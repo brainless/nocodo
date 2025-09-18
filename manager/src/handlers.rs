@@ -12,9 +12,12 @@ use crate::models::{
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
-use nocodo_github_actions::{ScanWorkflowsRequest, ScanWorkflowsResponse, ExecuteCommandRequest, ExecuteCommandResponse, WorkflowService};
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
+use nocodo_github_actions::{
+    ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
+    nocodo::WorkflowService,
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -1972,7 +1975,8 @@ pub async fn scan_workflows(
     let workflow_service = WorkflowService::new(data.database.connection());
 
     // Scan workflows
-    let response = workflow_service.scan_workflows(&project_id, &project_path).await
+    let response = workflow_service
+        .scan_workflows(&project_id, &project_path)
         .map_err(|e| AppError::Internal(format!("Failed to scan workflows: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(response))
@@ -1988,7 +1992,9 @@ pub async fn get_workflow_commands(
     // Verify project exists
     data.database.get_project_by_id(&project_id)?;
 
-    let commands = data.database.get_workflow_commands(&project_id)
+    let commands = data
+        .database
+        .get_workflow_commands(&project_id)
         .map_err(|e| AppError::Internal(format!("Failed to get workflow commands: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(commands))
@@ -2010,18 +2016,18 @@ pub async fn execute_workflow_command(
     let workflow_service = WorkflowService::new(data.database.connection());
 
     // Execute command
-    let execution = workflow_service.execute_command(&command_id, request.timeout_seconds).await
+    let execution = workflow_service
+        .execute_command(&command_id, request.timeout_seconds)
         .map_err(|e| AppError::Internal(format!("Failed to execute command: {}", e)))?;
 
     let response = ExecuteCommandResponse { execution };
 
     // Broadcast execution result via WebSocket
-    let _ = data.ws_broadcaster.broadcast(&format!(
-        r#"{{"type": "workflow_execution", "project_id": "{}", "command_id": "{}", "execution": {}}}"#,
-        project_id,
-        command_id,
-        serde_json::to_string(&response).unwrap_or_default()
-    ));
+    let _ = data.ws_broadcaster.broadcast(crate::websocket::WebSocketMessage::WorkflowExecutionCompleted {
+        project_id: project_id.clone(),
+        command_id: command_id.clone(),
+        execution: serde_json::to_string(&response).unwrap_or_default(),
+    });
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -2036,7 +2042,9 @@ pub async fn get_command_executions(
     // Verify project exists
     data.database.get_project_by_id(&project_id)?;
 
-    let executions = data.database.get_command_executions(&command_id)
+    let executions = data
+        .database
+        .get_command_executions(&command_id)
         .map_err(|e| AppError::Internal(format!("Failed to get command executions: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(executions))
