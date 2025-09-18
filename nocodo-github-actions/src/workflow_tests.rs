@@ -69,8 +69,8 @@ jobs:
         let (temp_dir, workflow_path) =
             create_workflow_file(workflow_content, "api-e2e-tests.yml").await;
 
-        let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .unwrap();
+        let (info, commands) =
+            WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path()).unwrap();
 
         assert_eq!(info.name, "API-Only E2E Tests");
         assert_eq!(info.jobs_count, 1);
@@ -164,8 +164,8 @@ jobs:
         let (temp_dir, workflow_path) =
             create_workflow_file(workflow_content, "integration-ci.yml").await;
 
-        let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            .unwrap();
+        let (info, commands) =
+            WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path()).unwrap();
 
         assert_eq!(info.name, "Integration CI");
         assert_eq!(info.jobs_count, 1);
@@ -279,9 +279,8 @@ jobs:
 
         let (temp_dir, workflow_path) = create_workflow_file(workflow_content, "web-ci.yml").await;
 
-        let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            
-            .unwrap();
+        let (info, commands) =
+            WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path()).unwrap();
 
         assert_eq!(info.name, "Web CI");
         assert_eq!(info.jobs_count, 3); // typecheck, test, build
@@ -352,9 +351,8 @@ jobs:
         let (temp_dir, workflow_path) =
             create_workflow_file(workflow_content, "website-ci.yml").await;
 
-        let (info, commands) = WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path())
-            
-            .unwrap();
+        let (info, commands) =
+            WorkflowParser::parse_workflow_file(&workflow_path, temp_dir.path()).unwrap();
 
         assert_eq!(info.name, "Website CI");
         assert_eq!(info.jobs_count, 1);
@@ -414,9 +412,8 @@ jobs:
         std::fs::write(workflows_dir.join("workflow2.yaml"), workflow2_content).unwrap();
         std::fs::write(workflows_dir.join("not-a-workflow.txt"), "not yaml").unwrap();
 
-        let workflows = WorkflowParser::scan_workflows_directory(&workflows_dir, temp_dir.path())
-            
-            .unwrap();
+        let workflows =
+            WorkflowParser::scan_workflows_directory(&workflows_dir, temp_dir.path()).unwrap();
 
         assert_eq!(workflows.len(), 2);
 

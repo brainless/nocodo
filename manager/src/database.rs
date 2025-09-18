@@ -1416,6 +1416,7 @@ impl Database {
 
     // Workflow methods
 
+    #[allow(dead_code)]
     pub fn store_workflow_commands(
         &self,
         project_id: &str,
@@ -1430,7 +1431,7 @@ impl Database {
             let environment_json = command
                 .environment
                 .as_ref()
-                .map(|env| serde_json::to_string(env))
+                .map(serde_json::to_string)
                 .transpose()
                 .map_err(|e| {
                     AppError::Internal(format!("Failed to serialize environment: {}", e))
@@ -1513,6 +1514,7 @@ impl Database {
         Ok(commands)
     }
 
+    #[allow(dead_code)]
     pub fn store_command_execution(
         &self,
         execution: &nocodo_github_actions::CommandExecution,
@@ -1568,7 +1570,7 @@ impl Database {
                 stderr: row.get("stderr")?,
                 duration_ms: row.get::<_, i64>("duration_ms")? as u64,
                 executed_at: chrono::DateTime::from_timestamp(row.get::<_, i64>("executed_at")?, 0)
-                    .unwrap_or_else(|| chrono::Utc::now()),
+                    .unwrap_or_else(chrono::Utc::now),
                 success: row.get("success")?,
             })
         })?;
