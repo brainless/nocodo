@@ -1,3 +1,4 @@
+use crate::config::AppConfig;
 use crate::database::Database;
 use crate::llm_client::{create_llm_client, LlmCompletionRequest, LlmMessage};
 use crate::models::{LlmAgentSession, LlmAgentToolCall, LlmProviderConfig, ToolRequest};
@@ -17,14 +18,21 @@ pub struct LlmAgent {
     db: Arc<Database>,
     ws: Arc<WebSocketBroadcaster>,
     tool_executor: ToolExecutor,
+    config: Arc<AppConfig>,
 }
 
 impl LlmAgent {
-    pub fn new(db: Arc<Database>, ws: Arc<WebSocketBroadcaster>, project_path: PathBuf) -> Self {
+    pub fn new(
+        db: Arc<Database>,
+        ws: Arc<WebSocketBroadcaster>,
+        project_path: PathBuf,
+        config: Arc<AppConfig>,
+    ) -> Self {
         Self {
             db,
             ws,
             tool_executor: ToolExecutor::new(project_path),
+            config,
         }
     }
 
@@ -1307,18 +1315,42 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
 
     /// Get API key for provider
     fn get_api_key(&self, provider: &str) -> Result<String> {
-        // In production, this should come from secure configuration
-        match provider.to_lowercase().as_str() {
-            "grok" => std::env::var("GROK_API_KEY").map_err(|e| anyhow::anyhow!(e)),
-            "openai" => std::env::var("OPENAI_API_KEY").map_err(|e| anyhow::anyhow!(e)),
-            "anthropic" | "claude" => {
-                std::env::var("ANTHROPIC_API_KEY").map_err(|e| anyhow::anyhow!(e))
+        let provider_lower = provider.to_lowercase();
+
+        // First try to get from config file
+        if let Some(api_keys) = &self.config.api_keys {
+            let config_key = match provider_lower.as_str() {
+                "grok" => &api_keys.grok_api_key,
+                "openai" => &api_keys.openai_api_key,
+                "anthropic" | "claude" => &api_keys.anthropic_api_key,
+                _ => &None,
+            };
+
+            if let Some(key) = config_key {
+                if !key.is_empty() {
+                    return Ok(key.clone());
+                }
             }
-            _ => Err(anyhow::anyhow!(
-                "No API key configured for provider: {}",
-                provider
-            )),
         }
+
+        // Fallback to environment variables
+        let env_var = match provider_lower.as_str() {
+            "grok" => "GROK_API_KEY",
+            "openai" => "OPENAI_API_KEY",
+            "anthropic" | "claude" => "ANTHROPIC_API_KEY",
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No API key configured for provider: {}",
+                    provider
+                ))
+            }
+        };
+
+        std::env::var(env_var).map_err(|_| anyhow::anyhow!(
+            "No API key configured for provider: {}. Please set it in ~/.config/nocodo/manager.toml [api_keys] section or {} environment variable",
+            provider,
+            env_var
+        ))
     }
 
     /// Get base URL for provider

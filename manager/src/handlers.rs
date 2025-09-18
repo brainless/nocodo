@@ -1,13 +1,14 @@
+use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
 use crate::llm_agent::LlmAgent;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
-    AiSessionOutputListResponse, AiSessionResponse, CreateAiSessionRequest,
+    AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
     CreateLlmAgentSessionRequest, CreateProjectRequest, CreateWorkRequest, FileContentResponse,
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
     FileUpdateRequest, LlmAgentSessionResponse, Project, ProjectListResponse, ProjectResponse,
-    ServerStatus, WorkListResponse, WorkMessageResponse, WorkResponse,
+    ServerStatus, SettingsResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -32,6 +33,7 @@ pub struct AppState {
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
     pub runner: Option<Arc<Runner>>,      // Enabled via env flag
     pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
+    pub config: Arc<AppConfig>,
 }
 
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
@@ -2048,4 +2050,93 @@ pub async fn get_command_executions(
         .map_err(|e| AppError::Internal(format!("Failed to get command executions: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(executions))
+}
+
+/// Get settings information including API key configuration
+pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let config = &data.config;
+
+    // Get config file path - similar to how it's determined in config.rs
+    let config_file_path = if let Some(home) = home::home_dir() {
+        home.join(".config/nocodo/manager.toml")
+            .to_string_lossy()
+            .to_string()
+    } else {
+        "manager.toml".to_string()
+    };
+
+    // Create API key configurations with masked values
+    let mut api_keys = Vec::new();
+
+    if let Some(api_key_config) = &config.api_keys {
+        // Grok API Key
+        api_keys.push(ApiKeyConfig {
+            name: "Grok API Key".to_string(),
+            key: api_key_config.grok_api_key.as_ref().map(|key| {
+                if key.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("{}****", &key[..key.len().min(4)])
+                }
+            }),
+            is_configured: api_key_config.grok_api_key.is_some()
+                && !api_key_config.grok_api_key.as_ref().unwrap().is_empty(),
+        });
+
+        // OpenAI API Key
+        api_keys.push(ApiKeyConfig {
+            name: "OpenAI API Key".to_string(),
+            key: api_key_config.openai_api_key.as_ref().map(|key| {
+                if key.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("{}****", &key[..key.len().min(4)])
+                }
+            }),
+            is_configured: api_key_config.openai_api_key.is_some()
+                && !api_key_config.openai_api_key.as_ref().unwrap().is_empty(),
+        });
+
+        // Anthropic API Key
+        api_keys.push(ApiKeyConfig {
+            name: "Anthropic API Key".to_string(),
+            key: api_key_config.anthropic_api_key.as_ref().map(|key| {
+                if key.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("{}****", &key[..key.len().min(4)])
+                }
+            }),
+            is_configured: api_key_config.anthropic_api_key.is_some()
+                && !api_key_config
+                    .anthropic_api_key
+                    .as_ref()
+                    .unwrap()
+                    .is_empty(),
+        });
+    } else {
+        // If no API keys config section exists, show as not configured
+        api_keys.push(ApiKeyConfig {
+            name: "Grok API Key".to_string(),
+            key: None,
+            is_configured: false,
+        });
+        api_keys.push(ApiKeyConfig {
+            name: "OpenAI API Key".to_string(),
+            key: None,
+            is_configured: false,
+        });
+        api_keys.push(ApiKeyConfig {
+            name: "Anthropic API Key".to_string(),
+            key: None,
+            is_configured: false,
+        });
+    }
+
+    let response = SettingsResponse {
+        config_file_path,
+        api_keys,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }

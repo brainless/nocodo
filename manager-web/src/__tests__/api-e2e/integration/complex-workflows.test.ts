@@ -30,7 +30,6 @@ describe('Complex Workflows - API Only', () => {
       // Create project
       const project = await testStateManager.addProject(
         testDataGenerator.generateProjectData({
-          name: 'Complex Feature Development',
           language: 'rust',
           description: 'Testing complete feature development workflow',
         })
@@ -998,7 +997,7 @@ This project was developed using a complete LLM agent workflow:
       // Create project
       const project = await testStateManager.addProject(
         testDataGenerator.generateProjectData({
-          name: 'Error Recovery Test',
+          description: 'Testing error recovery and resilience',
         })
       );
 
@@ -1063,7 +1062,7 @@ This project was developed using a complete LLM agent workflow:
       // Create project
       const project = await testStateManager.addProject(
         testDataGenerator.generateProjectData({
-          name: 'Concurrency Test',
+          description: 'Testing concurrent workflow conflicts',
         })
       );
 
@@ -1146,7 +1145,7 @@ This project was developed using a complete LLM agent workflow:
       // Create project
       const project = await testStateManager.addProject(
         testDataGenerator.generateProjectData({
-          name: 'Performance Load Test',
+          description: 'Testing performance under load',
         })
       );
 
@@ -1206,11 +1205,7 @@ This project was developed using a complete LLM agent workflow:
 
     it('should maintain state consistency during rapid updates', async () => {
       // Create project and file
-      const project = await testStateManager.addProject(
-        testDataGenerator.generateProjectData({
-          name: 'State Consistency Test',
-        })
-      );
+      const project = await testStateManager.addProject(testDataGenerator.generateProjectData({}));
 
       const initialContent = 'Initial content';
       const testFile = testDataGenerator.generateFileData({
