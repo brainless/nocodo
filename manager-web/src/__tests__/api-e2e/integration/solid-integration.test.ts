@@ -26,7 +26,7 @@ describe('Solid State Management Integration - API Only', () => {
     it('should integrate with API for project state management', async () => {
       // Test state manager integration with API
       const projectData = testDataGenerator.generateProjectData({
-        name: 'State Integration Test Project',
+        description: 'Testing state integration',
       });
 
       // Create project through state manager
@@ -74,7 +74,7 @@ describe('Solid State Management Integration - API Only', () => {
       // Create some data through API directly
       const apiProject = await testApiClient.createProject(
         testDataGenerator.generateProjectData({
-          name: 'Sync Test Project',
+          description: 'Testing state synchronization',
         })
       );
 

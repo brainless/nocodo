@@ -77,7 +77,7 @@ describe('Error Handling and Edge Cases - API Only', () => {
     beforeAll(async () => {
       const project = await testStateManager.addProject(
         testDataGenerator.generateProjectData({
-          name: 'Error Handling Test Project',
+          description: 'Testing error handling scenarios',
         })
       );
       testProjectId = project.id;
