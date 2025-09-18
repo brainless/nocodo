@@ -876,3 +876,20 @@ impl LlmAgentToolCall {
         self.completed_at = Some(Utc::now().timestamp());
     }
 }
+
+/// API key configuration for the settings page
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ApiKeyConfig {
+    pub name: String,
+    pub key: Option<String>, // Will be masked for security
+    pub is_configured: bool,
+}
+
+/// Settings response containing API keys and configuration info
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SettingsResponse {
+    pub config_file_path: String,
+    pub api_keys: Vec<ApiKeyConfig>,
+}
