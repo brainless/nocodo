@@ -150,6 +150,7 @@ async fn main() -> AppResult<()> {
         ws_broadcaster: broadcaster,
         runner,
         llm_agent,
+        config: Arc::new(config.clone()),
     });
 
     // Start HTTP server
@@ -241,7 +242,9 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/llm-agent/{session_id}/complete",
                             web::post().to(handlers::complete_llm_agent_session),
-                        ),
+                        )
+                        // Settings endpoint
+                        .route("/settings", web::get().to(handlers::get_settings)),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
