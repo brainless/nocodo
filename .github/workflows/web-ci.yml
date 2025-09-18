@@ -131,8 +131,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-       - name: Run API E2E tests
-         run: npm run test:api-e2e:ci
+      - name: Run API E2E tests
+        run: npm run test:api-e2e:ci
 
       - name: Upload test results
         if: always()
