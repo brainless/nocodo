@@ -10,7 +10,6 @@ use crate::models::{
     FileUpdateRequest, LlmAgentSessionResponse, Project, ProjectListResponse, ProjectResponse,
     ServerStatus, SettingsResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
-use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
@@ -27,7 +26,6 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
-    pub runner: Option<Arc<Runner>>,      // Enabled via env flag
     pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
     pub config: Arc<AppConfig>,
 }
@@ -977,53 +975,8 @@ pub async fn create_ai_session(
             );
         }
     }
-    // If runner is enabled, start streaming execution for this session in background
-    else if let Some(runner) = &data.runner {
-        tracing::info!(
-            "Runner is available, starting AI session execution for session {}",
-            session.id
-        );
-
-        // Get the prompt from the associated message
-        let message = messages
-            .iter()
-            .find(|m| m.id == session.message_id)
-            .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
-
-        // Build a simple enhanced prompt similar to CLI
-        let enhanced_prompt = if let Some(ctx) = &session.project_context {
-            format!(
-                "Project Context:\n{}\n\nUser Request:\n{}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes.",
-                ctx, message.content
-            )
-        } else {
-            message.content.clone()
-        };
-
-        tracing::info!(
-            "Starting runner with tool: {} for session: {}",
-            session.tool_name,
-            session.id
-        );
-
-        // Fire-and-forget - but log any errors
-        match runner.start_session(session.clone(), enhanced_prompt).await {
-            Ok(_) => tracing::info!(
-                "Successfully started runner execution for session {}",
-                session.id
-            ),
-            Err(e) => tracing::error!(
-                "Failed to start runner execution for session {}: {}",
-                session.id,
-                e
-            ),
-        }
-    } else {
-        tracing::warn!(
-            "Runner is not available - AI session {} will not be executed",
-            session.id
-        );
-    }
+    // Note: AI session created but no execution backend enabled
+    // Sessions can be executed externally or via LLM agent
 
     Ok(HttpResponse::Created().json(response))
 }
