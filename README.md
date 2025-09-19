@@ -32,7 +32,7 @@ Whether you're a marketing team wanting to customize your WordPress site, a star
 - **Non-technical users welcome**: Marketing, design, and business teams can contribute ideas and request changes
 - **Real-time collaboration**: Work together through a web-based interface accessible from any device
 - **Task management**: Built-in project and issue tracking keeps everyone aligned
-- **Secure access**: SSH-based access ensures security while remaining user-friendly
+- **Secure access**: Use our simple app to connect to the development server over SSH for secure access. Test deployments are hosted on the development server and accessible through SSH with HTTP forwarding
 
 ### 🚀 **From Idea to Working Software**
 
@@ -93,7 +93,7 @@ Creating custom business software:
 ### **Secure Architecture**
 - Runs entirely on your own infrastructure
 - No data leaves your environment
-- SSH-only access for maximum security
+- SSH-based secure access with HTTP forwarding for test deployments
 - Web-based interface accessible from any operating system
 
 ### **Flexible Integration**
