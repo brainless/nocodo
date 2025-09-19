@@ -3,8 +3,8 @@
 Local AI-assisted development environment providing guardrails and software engineering practices.
 
 ## Project Structure
-- **manager/**: Rust daemon with Actix Web, SQLite, Unix socket server
-- **manager-web/**: SolidJS web interface served at localhost:8081
+- **manager/**: Rust daemon with Actix Web, SQLite, Unix socket server (API only)
+- **manager-web/**: SolidJS web interface with Vite dev server (proxies to manager API)
 
 ## Development Workflow
 
@@ -21,24 +21,22 @@ Local AI-assisted development environment providing guardrails and software engi
 
 ## Build Commands
 ```bash
-# Build all Rust components
-cargo build --release
-
-# Build Manager daemon
+# Build Manager daemon only (no web embedding)
 cargo build --release --bin nocodo-manager
 
-# Build Web app
+# Build Web app (for production deployment)
 cd manager-web && npm install && npm run build
 ```
 
 ## Quick Start
-1. Start Manager daemon: `nocodo-manager --config ~/.config/nocodo/manager.toml`
-2. Access Web interface at http://localhost:8081
-3. AI-powered development environment with integrated tools
+1. Start Manager daemon: `nocodo-manager --config ~/.config/nocodo/manager.toml` (runs on http://localhost:8081)
+2. Start Web app: `cd manager-web && npm run dev` (runs on http://localhost:3000 with API proxy)
+3. Access Web interface at http://localhost:3000
+4. AI-powered development environment with separate frontend and backend
 
 ## Tech Stack
-- Rust + Actix Web for backends
+- Rust + Actix Web for backends (API only, no web asset serving)
 - SQLite for data storage
-- SolidJS + TailwindCSS for web interfaces
-- Internal API communication
-- HTTP/WebSocket for Web app ↔ Manager communication
+- SolidJS + TailwindCSS for web interfaces (separate Vite dev server)
+- HTTP/WebSocket API communication with Vite proxy
+- Manager: localhost:8081 (API server), Web: localhost:3000 (dev server)
