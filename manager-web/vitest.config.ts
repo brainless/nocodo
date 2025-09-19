@@ -7,7 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
-    exclude: ['src/__tests__/api-e2e/**', 'node_modules/**'],
+    exclude: ['node_modules/**'],
     transformMode: {
       web: [/\.[jt]sx?$/]
     },
