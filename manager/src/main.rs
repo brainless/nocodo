@@ -1,7 +1,6 @@
 mod browser_launcher;
 mod config;
 mod database;
-mod embedded_web;
 mod error;
 mod handlers;
 mod llm_agent;
@@ -19,7 +18,6 @@ use browser_launcher::{launch_browser, print_startup_banner, wait_for_server, Br
 use clap::{Arg, Command};
 use config::AppConfig;
 use database::Database;
-use embedded_web::{configure_embedded_routes, get_embedded_assets_size, validate_embedded_assets};
 use error::AppResult;
 use handlers::AppState;
 use llm_agent::LlmAgent;
@@ -70,13 +68,6 @@ async fn main() -> AppResult<()> {
     let config = AppConfig::load()?;
     tracing::info!("Loaded configuration from ~/.config/nocodo/manager.toml");
 
-    // Validate embedded web assets
-    if validate_embedded_assets() {
-        let asset_size = get_embedded_assets_size();
-        tracing::info!("Embedded web assets loaded: {} bytes", asset_size);
-    } else {
-        tracing::warn!("No embedded web assets found - serving from filesystem as fallback");
-    }
 
     // Initialize database
     let database = Arc::new(Database::new(&config.database.path)?);
@@ -230,15 +221,10 @@ async fn main() -> AppResult<()> {
                     "/ws/work/{id}",
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
-                // Serve embedded web assets (with filesystem fallback)
+                // Serve web assets from filesystem
                 .configure(|cfg| {
-                    if validate_embedded_assets() {
-                        // Use embedded assets
-                        tracing::info!("Configuring embedded web asset routes");
-                        configure_embedded_routes(cfg);
-                    } else if std::path::Path::new("manager-web/dist").exists() {
-                        // Fallback to filesystem (development mode)
-                        tracing::info!("Using filesystem fallback for web assets");
+                    if std::path::Path::new("manager-web/dist").exists() {
+                        tracing::info!("Serving web assets from filesystem");
                         cfg.service(
                             fs::Files::new("/", "manager-web/dist")
                                 .index_file("index.html")
@@ -247,7 +233,7 @@ async fn main() -> AppResult<()> {
                                 .prefer_utf8(true),
                         );
                     } else {
-                        tracing::warn!("No web assets available - neither embedded nor filesystem");
+                        tracing::warn!("No web assets available - manager-web/dist not found");
                     }
                 })
         })
