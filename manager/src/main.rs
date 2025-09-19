@@ -1,4 +1,3 @@
-mod browser_launcher;
 mod config;
 mod database;
 mod error;
@@ -14,7 +13,6 @@ mod websocket;
 use actix::Actor;
 use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use browser_launcher::{launch_browser, print_startup_banner, wait_for_server, BrowserConfig};
 use clap::{Arg, Command};
 use config::AppConfig;
 use database::Database;
@@ -31,15 +29,9 @@ use websocket::{WebSocketBroadcaster, WebSocketServer};
 #[actix_web::main]
 async fn main() -> AppResult<()> {
     // Parse command line arguments
-    let matches = Command::new("nocodo-manager")
+    let _matches = Command::new("nocodo-manager")
         .version("0.1.0")
         .about("nocodo Manager - AI-assisted development environment daemon")
-        .arg(
-            Arg::new("no-browser")
-                .long("no-browser")
-                .help("Don't automatically open browser")
-                .action(clap::ArgAction::SetTrue),
-        )
         .arg(
             Arg::new("config")
                 .short('c')
@@ -55,13 +47,6 @@ async fn main() -> AppResult<()> {
         .with(EnvFilter::from_default_env().add_directive("nocodo_manager=info".parse().unwrap()))
         .init();
 
-    // Configure browser launching
-    let browser_config = BrowserConfig {
-        auto_launch: !matches.get_flag("no-browser"),
-        ..BrowserConfig::default()
-    };
-
-    print_startup_banner(&browser_config);
     tracing::info!("Starting nocodo Manager daemon");
 
     // Load configuration
@@ -124,14 +109,9 @@ async fn main() -> AppResult<()> {
 
     // Start HTTP server
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
-    let server_url = format!("http://{}:{}", config.server.host, config.server.port);
+    let _server_url = format!("http://{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
 
-    // Update browser config with actual server URL
-    let browser_config = BrowserConfig {
-        url: server_url.clone(),
-        ..browser_config
-    };
 
     let http_task = tokio::spawn(async move {
         HttpServer::new(move || {
@@ -244,18 +224,6 @@ async fn main() -> AppResult<()> {
         .expect("HTTP server failed")
     });
 
-    // Launch browser after server starts
-    let _browser_task = tokio::spawn({
-        let browser_config = browser_config.clone();
-        let server_url = server_url.clone();
-        async move {
-            // Wait for server to be ready
-            wait_for_server(&server_url, 10).await;
-
-            // Launch browser
-            launch_browser(&browser_config).await;
-        }
-    });
 
     // Wait for servers (they should run indefinitely)
     // We don't want to exit when browser launcher completes
