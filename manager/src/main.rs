@@ -7,7 +7,6 @@ mod handlers;
 mod llm_agent;
 mod llm_client;
 mod models;
-mod runner;
 mod socket;
 mod templates;
 mod tools;
@@ -24,7 +23,6 @@ use embedded_web::{configure_embedded_routes, get_embedded_assets_size, validate
 use error::AppResult;
 use handlers::AppState;
 use llm_agent::LlmAgent;
-use runner::Runner;
 use socket::SocketServer;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -104,24 +102,6 @@ async fn main() -> AppResult<()> {
     });
 
     // Create application state with WebSocket broadcaster
-    // Optionally enable in-Manager runner via env flag
-    let runner_enabled = std::env::var("NOCODO_RUNNER_ENABLED")
-        .ok()
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-
-    tracing::info!("Runner enabled: {}", runner_enabled);
-
-    let runner = if runner_enabled {
-        tracing::info!("Initializing in-process AI runner");
-        Some(Arc::new(Runner::new(
-            Arc::clone(&database),
-            Arc::clone(&broadcaster),
-        )))
-    } else {
-        tracing::warn!("AI runner disabled - set NOCODO_RUNNER_ENABLED=1 to enable");
-        None
-    };
 
     // LLM agent is now enabled by default
     // Can be explicitly disabled with NOCODO_LLM_AGENT_ENABLED=false
@@ -147,7 +127,6 @@ async fn main() -> AppResult<()> {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
-        runner,
         llm_agent,
         config: Arc::new(config.clone()),
     });
