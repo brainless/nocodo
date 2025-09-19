@@ -8,6 +8,8 @@ pub mod config;
 pub mod database;
 pub mod fixtures;
 pub mod logging;
+pub mod llm_config;
+pub mod keyword_validation;
 
 pub use app::TestApp;
 pub use config::TestConfig;
