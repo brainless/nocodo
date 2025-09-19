@@ -4,6 +4,7 @@ members = [
     "manager",
     "services",
     "manager-runner",
+    "nocodo-github-actions",
 ]
 exclude = [
     "manager-web"
