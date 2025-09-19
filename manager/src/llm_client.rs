@@ -293,8 +293,10 @@ impl OpenAiCompatibleClient {
                     || self.config.model.to_lowercase().contains("haiku")
             }
             "grok" | "xai" => {
-                // Grok/xAI does not support native tools yet
-                false
+                // Grok Code Fast 1 and newer models support native function calling
+                self.config.model.to_lowercase().contains("grok-code-fast")
+                    || self.config.model.to_lowercase().contains("grok-2")
+                    || self.config.model.to_lowercase().contains("grok-3")
             }
             _ => false,
         }
@@ -419,6 +421,13 @@ impl OpenAiCompatibleClient {
                         "Using OpenAI native tool calling format"
                     );
                 }
+                "grok" | "xai" => {
+                    // Grok uses OpenAI-compatible tool calling format
+                    tracing::debug!(
+                        provider = %self.config.provider,
+                        "Using Grok/xAI OpenAI-compatible tool calling format"
+                    );
+                }
                 _ => {
                     tracing::debug!(
                         provider = %self.config.provider,
@@ -490,7 +499,7 @@ impl OpenAiCompatibleClient {
 
     #[allow(dead_code)]
     async fn make_request(&self, request: LlmCompletionRequest) -> Result<reqwest::Response> {
-        let mut req = self
+        let req = self
             .client
             .post(self.get_api_url())
             .header("Authorization", format!("Bearer {}", self.config.api_key))
@@ -499,8 +508,9 @@ impl OpenAiCompatibleClient {
 
         // Add custom headers for different providers
         if self.config.provider.to_lowercase() == "grok" {
-            req = req.header("x-api-key", &self.config.api_key);
-            req = req.header("x-api-version", "2024-06-01");
+            // Grok uses Bearer token authentication, no additional headers needed
+            // API documented at https://docs.x.ai/docs/api-reference
+            // OpenAI-compatible API, uses standard Authorization header only
         }
 
         Ok(req.send().await?)
@@ -569,6 +579,7 @@ impl LlmClient for OpenAiCompatibleClient {
             ));
         }
 
+        // Parse the response
         let completion: LlmCompletionResponse = response.json().await?;
 
         tracing::info!(
@@ -582,6 +593,8 @@ impl LlmClient for OpenAiCompatibleClient {
             usage = ?completion.usage,
             "LLM API request completed successfully"
         );
+
+
 
         Ok(completion)
     }
@@ -615,7 +628,7 @@ impl LlmClient for OpenAiCompatibleClient {
         let prepared_request = self.prepare_request_for_provider(request.clone());
 
         Box::pin(try_stream! {
-            let mut req = client
+            let req = client
                 .post(&api_url)
                 .header("Authorization", format!("Bearer {}", config.api_key))
                 .header("Content-Type", "application/json")
@@ -623,12 +636,14 @@ impl LlmClient for OpenAiCompatibleClient {
 
             // Add custom headers for different providers
             if config.provider.to_lowercase() == "grok" {
-                req = req.header("x-api-key", &config.api_key);
-                req = req.header("x-api-version", "2024-06-01");
+                // Grok uses Bearer token authentication, no additional headers needed
+                // API documented at https://docs.x.ai/docs/api-reference
+                // OpenAI-compatible API, uses standard Authorization header only
             }
 
             let response = req.send().await?;
             let mut stream = response.bytes_stream();
+            let mut accumulated_tool_calls = Vec::new();
 
             while let Some(chunk) = stream.next().await {
                 let chunk = chunk?;
@@ -644,35 +659,137 @@ impl LlmClient for OpenAiCompatibleClient {
                                 provider = %config.provider,
                                 model = %request.model,
                                 response_time_ms = %response_time.as_millis(),
+                                total_accumulated_tool_calls = %accumulated_tool_calls.len(),
                                 "Streaming LLM API request completed successfully"
                             );
-                            yield StreamChunk {
-                                content: String::new(),
-                                is_finished: true,
-                                tool_calls: Vec::new(),
-                            };
+                            // Only yield if we haven't already yielded the final chunk via finish_reason
+                            if accumulated_tool_calls.iter().any(|tc: &LlmToolCall| !tc.id.is_empty() || !tc.function.name.is_empty()) {
+                                yield StreamChunk {
+                                    content: String::new(),
+                                    is_finished: true,
+                                    tool_calls: accumulated_tool_calls,
+                                };
+                            } else {
+                                yield StreamChunk {
+                                    content: String::new(),
+                                    is_finished: true,
+                                    tool_calls: Vec::new(),
+                                };
+                            }
                             return;
                         }
 
                         if let Ok(chunk_value) = serde_json::from_str::<Value>(data) {
                             if let Some(choices) = chunk_value.get("choices").and_then(|v| v.as_array()) {
                                 if let Some(choice) = choices.first() {
-                                    if let Some(delta) = choice.get("delta") {
-                                        if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
-                                            let response_time = start_time.elapsed();
-                                            tracing::trace!(
-                                                provider = %config.provider,
-                                                model = %request.model,
-                                                response_time_ms = %response_time.as_millis(),
-                                                chunk_length = %content.len(),
-                                                "Received streaming chunk"
-                                            );
-                                            yield StreamChunk {
-                                                content: content.to_string(),
-                                                is_finished: false,
-                                                tool_calls: Vec::new(),
-                                            };
+                                    let mut content = String::new();
+                                    let mut tool_calls_in_chunk = Vec::new();
+
+                                    // Check finish_reason to see if this is the final chunk
+                                    let finish_reason = choice.get("finish_reason").and_then(|v| v.as_str());
+                                    let is_finished = finish_reason.is_some();
+
+                                    // Handle tool calls at choice level (Anthropic/Grok format)
+                                    if let Some(choice_tool_calls) = choice.get("tool_calls").and_then(|v| v.as_array()) {
+                                        for tool_call_value in choice_tool_calls {
+                                            if let Ok(tool_call) = serde_json::from_value::<LlmToolCall>(tool_call_value.clone()) {
+                                                accumulated_tool_calls.push(tool_call.clone());
+                                                tool_calls_in_chunk.push(tool_call);
+                                            }
                                         }
+                                        tracing::debug!(
+                                            provider = %config.provider,
+                                            tool_calls_at_choice_level = %choice_tool_calls.len(),
+                                            "Found tool calls at choice level"
+                                        );
+                                    }
+
+                                    // Handle streaming delta (OpenAI format)
+                                    if let Some(delta) = choice.get("delta") {
+                                        // Parse the delta as LlmMessageDelta to handle both content and tool calls
+                                        if let Ok(message_delta) = serde_json::from_value::<LlmMessageDelta>(delta.clone()) {
+                                            // Extract content
+                                            if let Some(delta_content) = message_delta.content {
+                                                content = delta_content;
+                                            }
+
+                                            // Extract and accumulate tool calls from delta
+                                            if let Some(delta_tool_calls) = message_delta.tool_calls {
+                                                for delta_tool_call in delta_tool_calls {
+                                                    // Convert streaming tool call delta to complete tool call
+                                                    let index = delta_tool_call.index;
+                                                    let index_usize = index as usize;
+
+                                                    // Ensure we have enough space in accumulated_tool_calls
+                                                    while accumulated_tool_calls.len() <= index_usize {
+                                                        accumulated_tool_calls.push(LlmToolCall {
+                                                            id: String::new(),
+                                                            r#type: "function".to_string(),
+                                                            function: LlmToolCallFunction {
+                                                                name: String::new(),
+                                                                arguments: String::new(),
+                                                            },
+                                                        });
+                                                    }
+
+                                                    // Update the tool call at this index
+                                                    if let Some(existing_tool_call) = accumulated_tool_calls.get_mut(index_usize) {
+                                                        // Update ID
+                                                        if let Some(id) = delta_tool_call.id {
+                                                            existing_tool_call.id = id;
+                                                        }
+
+                                                        // Update function name
+                                                        if let Some(function_delta) = delta_tool_call.function {
+                                                            if let Some(name) = function_delta.name {
+                                                                existing_tool_call.function.name = name;
+                                                            }
+                                                            if let Some(arguments) = function_delta.arguments {
+                                                                // Accumulate arguments (they come in pieces)
+                                                                existing_tool_call.function.arguments.push_str(&arguments);
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Add to chunk tool calls for immediate processing
+                                                    tool_calls_in_chunk.push(accumulated_tool_calls[index_usize].clone());
+                                                }
+                                            }
+                                        } else {
+                                            // Fallback: try to extract content directly if parsing as LlmMessageDelta fails
+                                            if let Some(content_str) = delta.get("content").and_then(|v| v.as_str()) {
+                                                content = content_str.to_string();
+                                            }
+                                        }
+                                    }
+
+                                    let response_time = start_time.elapsed();
+                                    tracing::debug!(
+                                        provider = %config.provider,
+                                        model = %request.model,
+                                        response_time_ms = %response_time.as_millis(),
+                                        chunk_length = %content.len(),
+                                        tool_calls_in_chunk = %tool_calls_in_chunk.len(),
+                                        total_accumulated_tool_calls = %accumulated_tool_calls.len(),
+                                        finish_reason = ?finish_reason,
+                                        is_finished = %is_finished,
+                                        content_preview = %if content.len() > 100 {
+                                            format!("{}...", &content[..100])
+                                        } else {
+                                            content.clone()
+                                        },
+                                        "Received streaming chunk"
+                                    );
+
+                                    yield StreamChunk {
+                                        content,
+                                        is_finished,
+                                        tool_calls: tool_calls_in_chunk,
+                                    };
+
+                                    // If this is the final chunk, we're done
+                                    if is_finished {
+                                        return;
                                     }
                                 }
                             }
@@ -710,5 +827,53 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
             "Unsupported LLM provider: {}",
             config.provider
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grok_supports_native_tools() {
+        let config = LlmProviderConfig {
+            provider: "grok".to_string(),
+            model: "grok-code-fast-1".to_string(),
+            api_key: "test".to_string(),
+            base_url: Some("https://api.x.ai".to_string()),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let client = OpenAiCompatibleClient::new(config).unwrap();
+
+        // Test that grok-code-fast-1 supports native tools
+        assert!(client.supports_native_tools());
+
+        // Test case insensitive
+        let config_upper = LlmProviderConfig {
+            provider: "GROK".to_string(),
+            model: "grok-code-fast-1".to_string(),
+            api_key: "test".to_string(),
+            base_url: Some("https://api.x.ai".to_string()),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let client_upper = OpenAiCompatibleClient::new(config_upper).unwrap();
+        assert!(client_upper.supports_native_tools());
+
+        // Test that older grok models don't support native tools
+        let config_old = LlmProviderConfig {
+            provider: "grok".to_string(),
+            model: "grok-1".to_string(),
+            api_key: "test".to_string(),
+            base_url: Some("https://api.x.ai".to_string()),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let client_old = OpenAiCompatibleClient::new(config_old).unwrap();
+        assert!(!client_old.supports_native_tools());
     }
 }

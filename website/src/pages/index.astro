@@ -1,54 +1,14 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Button from '../components/UI/Button.astro';
-import Card from '../components/UI/Card.astro';
 import screenshotImage from '../assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png';
-
-const solutionPoints = [
-  {
-    title: "Free AI Coding Agents",
-    description: "Automatically use free tiers from Claude Code, OpenAI Codex, Gemini and similar tools",
-    icon: "🤖",
-    color: "blue"
-  },
-  {
-    title: "Your Cloud Infrastructure",
-    description: "Development setup managed on your own cloud infrastructure",
-    icon: "☁️",
-    color: "purple"
-  },
-  {
-    title: "No Lock-in",
-    description: "Keep your API keys for coding agents and cloud providers (DigitalOcean, Scaleway, CloudFlare)",
-    icon: "🔓",
-    color: "green"
-  },
-  {
-    title: "Idea to Live App",
-    description: "Transform voice notes or written text into live full-stack apps on your domain",
-    icon: "🚀",
-    color: "orange"
-  },
-  {
-    title: "GitHub Integration",
-    description: "Automated project setup with tickets, automation, and comprehensive testing",
-    icon: "📱",
-    color: "indigo"
-  },
-  {
-    title: "Unlimited Changes",
-    description: "Make endless modifications using your own API credits or subscriptions",
-    icon: "♾️",
-    color: "red"
-  }
-];
 ---
 
-<Layout 
-  title="nocodo - A platform that takes you from idea to live full-stack MVP (no lock-in)" 
-  description="nocodo is a platform that takes you from idea to live full-stack MVP with no lock-in. Use free AI coding agents, your cloud infrastructure, and unlimited change requests."
+<Layout
+  title="nocodo - Empowering teams worldwide to build and maintain business software without programming knowledge"
+  description="Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help teams around the world create custom business software without technical knowledge."
 >
-  <!-- Hero Section -->
+  <!-- Hero/Mantle Section -->
   <section class="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50">
     <!-- Background Pattern -->
     <div class="absolute inset-0 opacity-10">
@@ -61,48 +21,41 @@ const solutionPoints = [
         <rect width="100%" height="100%" fill="url(#grid)"/>
       </svg>
     </div>
-    
+
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
       <div class="text-center">
         <!-- Main Branding -->
         <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-6">
-          <span class="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+          <span class="text-green-800">
             nocodo
           </span>
         </h1>
-        
+
         <!-- Tagline -->
         <p class="text-xl sm:text-2xl text-gray-600 max-w-4xl mx-auto mb-8 leading-relaxed">
-          A platform that takes you from idea to live full-stack MVP 
-          <strong class="text-gray-900">(no lock-in)</strong>
+          Empowering teams worldwide to build and maintain business software
+          <strong class="text-gray-900">without programming knowledge</strong>
         </p>
-        
+
         <!-- Call to Action -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-          <Button 
-            href="/playbook"
+          <Button
+            href="https://github.com/brainless/nocodo"
             variant="primary"
             size="lg"
           >
-            Get Started
-            <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            Follow Progress on GitHub
+            <svg class="ml-2 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
             </svg>
           </Button>
-          <Button 
-            href="/fundamentals"
-            variant="secondary"
-            size="lg"
-          >
-            Learn Fundamentals
-          </Button>
         </div>
-        
+
         <!-- Product Screenshot -->
         <div class="max-w-5xl mx-auto">
           <div class="relative">
-            <img 
-              src={screenshotImage.src} 
+            <img
+              src={screenshotImage.src}
               alt="nocodo AI Session Details - Live output from AI coding session showing project analysis and development workflow"
               class="w-full rounded-lg shadow-2xl border border-gray-200"
             />
@@ -114,145 +67,302 @@ const solutionPoints = [
     </div>
   </section>
 
-  <!-- What are we solving Section -->
-  <section class="py-24 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold text-gray-900 mb-4">
-          What are we solving?
-        </h2>
-        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          Transform your development workflow with AI coding agents and seamless infrastructure management
+  <!-- Sumit's Introduction Section -->
+  <section class="py-16 bg-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center">
+        <p class="text-xl text-gray-700 leading-relaxed">
+          Hello! I am Sumit, a software engineer living in a small Himalayan village in India.
+          I am building nocodo to help teams around the world create custom business software without technical knowledge.
         </p>
-      </div>
-      
-      <div class="grid lg:grid-cols-3 gap-8">
-        {solutionPoints.map((point) => (
-          <Card 
-            hover={true}
-            class={`border-t-4 border-${point.color}-500 text-center`}
-          >
-            <!-- Icon centered above title -->
-            <div class="text-5xl mb-4">{point.icon}</div>
-            
-            <!-- Title -->
-            <h3 class="text-xl font-bold text-gray-900 mb-4">{point.title}</h3>
-            
-            <!-- Description -->
-            <div class="mb-6">
-              <p class="text-gray-600">{point.description}</p>
-            </div>
-          </Card>
-        ))}
       </div>
     </div>
   </section>
 
-  <!-- Our Vibe Coding Playbook Section -->
-  <section class="py-24 bg-gray-50">
+  <!-- What is nocodo Section -->
+  <section class="py-20 bg-gray-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto text-center">
+      <div class="max-w-4xl mx-auto text-center mb-16">
         <h2 class="text-4xl font-bold text-gray-900 mb-6">
-          Our Vibe Coding Playbook
+          What is nocodo?
         </h2>
-        <p class="text-xl text-gray-600 mb-8">
-          A comprehensive guide to building MVP web applications using terminal-based coding tools and structured prompting flows. Learn our proven methodology for vibe coding where you become the Product Owner and Project Manager.
+        <p class="text-xl text-gray-700 leading-relaxed">
+          nocodo is your team's AI-powered development environment that runs securely on your own cloud server.
+          It transforms ideas into working software while handling all the complex technical details behind the scenes.
         </p>
-        <div class="inline-flex">
-          <Button 
-            href="/playbook"
-            variant="primary"
-            size="lg"
-          >
-            Read the Playbook
-            <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-6">For Teams Who Want to Build Software</h3>
+          <p class="text-gray-700 mb-6 leading-relaxed">
+            Whether you're a marketing team wanting to customize your WordPress site, a startup building an e-commerce platform,
+            or any team with software needs - nocodo empowers everyone to contribute to building their business software.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-6">Complete Privacy & Security</h3>
+          <ul class="space-y-3 text-gray-700">
+            <li class="flex items-start">
+              <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span><strong>Your server, your data:</strong> Everything runs on your own cloud infrastructure</span>
+            </li>
+            <li class="flex items-start">
+              <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span><strong>No vendor access:</strong> The nocodo team never accesses your projects or code</span>
+            </li>
+            <li class="flex items-start">
+              <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span><strong>Bring your own AI:</strong> Use any AI models with your own API keys</span>
+            </li>
+            <li class="flex items-start">
+              <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span><strong>No lock-in:</strong> Switch cloud providers or AI models anytime</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How nocodo Helps Section -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-6">
+          How nocodo Helps Your Team
+        </h2>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-12">
+        <!-- Team Collaboration -->
+        <div class="text-center">
+          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
-          </Button>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Team Collaboration Made Simple</h3>
+          <ul class="text-gray-700 space-y-2 text-left">
+            <li>• Non-technical users welcome: Marketing, design, and business teams can contribute</li>
+            <li>• Real-time collaboration through web-based interface</li>
+            <li>• Built-in task management keeps everyone aligned</li>
+            <li>• Secure SSH access with HTTP forwarding for test deployments</li>
+          </ul>
+        </div>
+
+        <!-- From Idea to Software -->
+        <div class="text-center">
+          <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4">From Idea to Working Software</h3>
+          <ul class="text-gray-700 space-y-2 text-left">
+            <li>• Natural communication: Describe what you want in plain language</li>
+            <li>• Instant test deployments on separate environments</li>
+            <li>• Supports any tech stack: WordPress, e-commerce, custom apps</li>
+            <li>• Autonomous operation once configured</li>
+          </ul>
+        </div>
+
+        <!-- Best Practices -->
+        <div class="text-center">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Software Best Practices, Automatically</h3>
+          <ul class="text-gray-700 space-y-2 text-left">
+            <li>• Automatic git branch creation and management</li>
+            <li>• Automated testing and code quality checks</li>
+            <li>• Safe development without affecting live software</li>
+            <li>• Database and infrastructure management</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Real-World Examples Section -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-6">
+          Real-World Examples
+        </h2>
+        <p class="text-xl text-gray-600">
+          See how teams are using nocodo to build their business software
+        </p>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-8">
+        <!-- Marketing Team -->
+        <div class="bg-white rounded-lg p-8 shadow-lg">
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Marketing Team Scenario</h3>
+          <p class="text-gray-700 mb-4">
+            Your marketing team uses WordPress for your company website. With nocodo, they can:
+          </p>
+          <ul class="text-gray-700 space-y-2">
+            <li>• Customize layouts and features without IT involvement</li>
+            <li>• Test changes on separate deployments before going live</li>
+            <li>• Collaborate with developers when needed through built-in chat</li>
+          </ul>
+        </div>
+
+        <!-- E-commerce -->
+        <div class="bg-white rounded-lg p-8 shadow-lg">
+          <h3 class="text-xl font-bold text-gray-900 mb-4">E-commerce Business</h3>
+          <p class="text-gray-700 mb-4">
+            Building an online store using PHP, Node.js, or Python:
+          </p>
+          <ul class="text-gray-700 space-y-2">
+            <li>• Add new features through natural language requests</li>
+            <li>• Test payment integrations and checkout flows safely</li>
+            <li>• Scale and modify your platform as business grows</li>
+          </ul>
+        </div>
+
+        <!-- Startup -->
+        <div class="bg-white rounded-lg p-8 shadow-lg">
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Startup Development</h3>
+          <p class="text-gray-700 mb-4">
+            Creating custom business software:
+          </p>
+          <ul class="text-gray-700 space-y-2">
+            <li>• Non-technical founders contribute feature ideas</li>
+            <li>• Developers focus on complex logic while nocodo handles routine tasks</li>
+            <li>• Rapid iteration and testing of new concepts</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-6">
+          How It Works
+        </h2>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-12">
+        <div class="text-center">
+          <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-xl font-bold">
+            1
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Setup & Understanding</h3>
+          <p class="text-gray-700">
+            Deploy nocodo on your cloud server. nocodo scans your project to understand the technology stack.
+            If help is needed, bring engineers into the chat to guide nocodo.
+          </p>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-xl font-bold">
+            2
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Collaborative Development</h3>
+          <p class="text-gray-700">
+            Team members request features or changes through the web interface.
+            nocodo creates separate git branches and test deployments automatically.
+            Review and test changes before merging to production.
+          </p>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-xl font-bold">
+            3
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-4">Continuous Improvement</h3>
+          <p class="text-gray-700">
+            GitHub integration for issue tracking and automation.
+            Continuous integration pipelines run automatically.
+            Quality checks and testing happen behind the scenes.
+          </p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- Getting Started Section -->
-  <section class="py-24 bg-white">
+  <section class="py-20 bg-blue-600 text-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-4xl font-bold mb-6">
+        Ready to Transform How Your Team Builds Software?
+      </h2>
+      <p class="text-xl mb-8 opacity-90">
+        Setup guides for getting started with nocodo are coming soon! In the meantime,
+        you can read our prompt guide to understand how to effectively communicate with AI development environments.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <Button
+          href="/playbook"
+          variant="secondary"
+          size="lg"
+        >
+          📚 Read our Prompt Guide
+        </Button>
+        <Button
+          href="https://github.com/brainless/nocodo"
+          variant="ghost"
+          size="lg"
+          class="border-2 border-white text-white hover:bg-white hover:text-blue-600"
+        >
+          Follow Progress on GitHub
+        </Button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Global Community Section -->
+  <section class="py-20 bg-gray-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold text-gray-900 mb-4">
-          Vibe Coding Fundamentals
+      <div class="text-center mb-12">
+        <h2 class="text-4xl font-bold text-gray-900 mb-6">
+          Join the Global Community
         </h2>
         <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          Master the essential fundamentals for AI-powered development and build a solid foundation for your coding journey
+          Teams worldwide are using nocodo to build:
         </p>
       </div>
-      
-      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-        <div class="text-center">
-          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Learn</h3>
-          <p class="text-gray-600">Master fundamentals and AI tools through structured modules</p>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-5 gap-6 text-center">
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+          <div class="text-3xl mb-2">💼</div>
+          <p class="font-medium text-gray-900">Custom business applications</p>
         </div>
-        
-        <div class="text-center">
-          <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Practice</h3>
-          <p class="text-gray-600">Apply concepts with hands-on projects and real-world scenarios</p>
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+          <div class="text-3xl mb-2">🛒</div>
+          <p class="font-medium text-gray-900">E-commerce platforms</p>
         </div>
-        
-        <div class="text-center">
-          <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Optimize</h3>
-          <p class="text-gray-600">Fine-tune your AI-assisted development workflow</p>
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+          <div class="text-3xl mb-2">📱</div>
+          <p class="font-medium text-gray-900">Marketing websites</p>
         </div>
-        
-        <div class="text-center">
-          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Share</h3>
-          <p class="text-gray-600">Contribute to the vibe coding community</p>
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+          <div class="text-3xl mb-2">🔧</div>
+          <p class="font-medium text-gray-900">Internal tools and dashboards</p>
+        </div>
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+          <div class="text-3xl mb-2">🔗</div>
+          <p class="font-medium text-gray-900">API integrations</p>
         </div>
       </div>
-      
-      <!-- Final CTA -->
-      <div class="text-center">
-        <div class="inline-flex flex-col sm:flex-row gap-4">
-          <Button 
-            href="/fundamentals"
-            variant="primary"
-            size="lg"
-          >
-            Learn Fundamentals
-            <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-          </Button>
-          <Button 
-            href="/playbook"
-            variant="secondary"
-            size="lg"
-          >
-            Read Playbook
-          </Button>
-        </div>
-        <p class="mt-4 text-sm text-gray-500">
-          Free to learn • Community-driven • No lock-in
-        </p>
-      </div>
+
     </div>
   </section>
 </Layout>
