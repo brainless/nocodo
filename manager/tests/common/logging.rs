@@ -48,8 +48,8 @@ impl TestLogger {
     }
 
     /// Get the log file path
-    pub fn log_path(&self) -> &PathBuf {
-        &self.config.log_path()
+    pub fn log_path(&self) -> PathBuf {
+        self.config.log_path()
     }
 
     /// Get the test configuration
@@ -59,7 +59,7 @@ impl TestLogger {
 
     /// Read the current log contents
     pub fn read_logs(&self) -> std::io::Result<String> {
-        std::fs::read_to_string(self.log_path())
+        std::fs::read_to_string(&self.log_path())
     }
 
     /// Check if logs contain a specific pattern
@@ -70,7 +70,7 @@ impl TestLogger {
 
     /// Clear the log file
     pub fn clear_logs(&self) -> std::io::Result<()> {
-        std::fs::write(self.log_path(), "")
+        std::fs::write(&self.log_path(), "")
     }
 
     /// Get log lines as a vector

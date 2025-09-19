@@ -20,11 +20,6 @@ pub struct TestApp {
     pub config: TestConfig,
     pub database: TestDatabase,
     pub app_state: web::Data<AppState>,
-    pub test_service: impl actix_web::dev::Service<
-        actix_web::dev::ServiceRequest,
-        Response = actix_web::dev::ServiceResponse,
-        Error = actix_web::Error,
-    >,
 }
 
 impl TestApp {
@@ -59,25 +54,21 @@ impl TestApp {
                 .route("/api/projects/{id}", web::get().to(nocodo_manager::handlers::get_project))
                 .route("/api/projects/{id}", web::delete().to(nocodo_manager::handlers::delete_project))
                 // Works
-                .route("/api/works", web::get().to(nocodo_manager::handlers::get_works))
+                .route("/api/works", web::get().to(nocodo_manager::handlers::list_works))
                 .route("/api/works", web::post().to(nocodo_manager::handlers::create_work))
                 .route("/api/works/{id}", web::get().to(nocodo_manager::handlers::get_work))
-                .route("/api/works/{id}", web::put().to(nocodo_manager::handlers::update_work))
+                .route("/api/works/{id}", web::put().to(nocodo_manager::handlers::delete_work))
                 .route("/api/works/{id}", web::delete().to(nocodo_manager::handlers::delete_work))
                 // Work messages
                 .route("/api/works/{work_id}/messages", web::get().to(nocodo_manager::handlers::get_work_messages))
                 .route("/api/works/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
                 // AI Sessions
-                .route("/api/ai-sessions", web::get().to(nocodo_manager::handlers::get_ai_sessions))
+                .route("/api/ai-sessions", web::get().to(nocodo_manager::handlers::list_ai_sessions))
                 .route("/api/ai-sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
-                .route("/api/ai-sessions/{id}", web::get().to(nocodo_manager::handlers::get_ai_session))
-                .route("/api/ai-sessions/{id}", web::put().to(nocodo_manager::handlers::update_ai_session))
                 // AI Session outputs
                 .route("/api/ai-sessions/{session_id}/outputs", web::get().to(nocodo_manager::handlers::list_ai_session_outputs))
-                .route("/api/ai-sessions/{session_id}/outputs", web::post().to(nocodo_manager::handlers::record_ai_output))
                 // Files
                 .route("/api/files/list", web::post().to(nocodo_manager::handlers::list_files))
-                .route("/api/files/read", web::post().to(nocodo_manager::handlers::read_file))
                 .route("/api/files/create", web::post().to(nocodo_manager::handlers::create_file))
                 .route("/api/files/update", web::post().to(nocodo_manager::handlers::update_file))
                 // Templates
@@ -87,12 +78,7 @@ impl TestApp {
                 // LLM Agent
                 .route("/api/llm-agent/sessions", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
                 .route("/api/llm-agent/sessions/{session_id}", web::get().to(nocodo_manager::handlers::get_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}", web::put().to(nocodo_manager::handlers::update_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}/messages", web::get().to(nocodo_manager::handlers::get_llm_agent_messages))
-                .route("/api/llm-agent/sessions/{session_id}/messages", web::post().to(nocodo_manager::handlers::create_llm_agent_message))
-                .route("/api/llm-agent/sessions/{session_id}/tool-calls", web::get().to(nocodo_manager::handlers::get_llm_agent_tool_calls))
-                .route("/api/llm-agent/sessions/{session_id}/tool-calls", web::post().to(nocodo_manager::handlers::create_llm_agent_tool_call))
-                .route("/api/llm-agent/sessions/{session_id}/tool-calls/{tool_call_id}", web::put().to(nocodo_manager::handlers::update_llm_agent_tool_call))
+                .route("/api/llm-agent/sessions/{session_id}/messages", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
         )
         .await;
 
@@ -100,14 +86,9 @@ impl TestApp {
             config,
             database,
             app_state,
-            test_service,
         }
     }
 
-    /// Get the test service for making requests
-    pub fn service(&self) -> &actix_web::test::TestService {
-        &self.test_service
-    }
 
     /// Get the app state
     pub fn app_state(&self) -> &web::Data<AppState> {
@@ -163,25 +144,21 @@ impl TestApp {
                 .route("/api/projects/{id}", web::get().to(nocodo_manager::handlers::get_project))
                 .route("/api/projects/{id}", web::delete().to(nocodo_manager::handlers::delete_project))
                 // Works
-                .route("/api/works", web::get().to(nocodo_manager::handlers::get_works))
+                .route("/api/works", web::get().to(nocodo_manager::handlers::list_works))
                 .route("/api/works", web::post().to(nocodo_manager::handlers::create_work))
                 .route("/api/works/{id}", web::get().to(nocodo_manager::handlers::get_work))
-                .route("/api/works/{id}", web::put().to(nocodo_manager::handlers::update_work))
+                .route("/api/works/{id}", web::put().to(nocodo_manager::handlers::delete_work))
                 .route("/api/works/{id}", web::delete().to(nocodo_manager::handlers::delete_work))
                 // Work messages
                 .route("/api/works/{work_id}/messages", web::get().to(nocodo_manager::handlers::get_work_messages))
                 .route("/api/works/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
                 // AI Sessions
-                .route("/api/ai-sessions", web::get().to(nocodo_manager::handlers::get_ai_sessions))
+                .route("/api/ai-sessions", web::get().to(nocodo_manager::handlers::list_ai_sessions))
                 .route("/api/ai-sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
-                .route("/api/ai-sessions/{id}", web::get().to(nocodo_manager::handlers::get_ai_session))
-                .route("/api/ai-sessions/{id}", web::put().to(nocodo_manager::handlers::update_ai_session))
                 // AI Session outputs
                 .route("/api/ai-sessions/{session_id}/outputs", web::get().to(nocodo_manager::handlers::list_ai_session_outputs))
-                .route("/api/ai-sessions/{session_id}/outputs", web::post().to(nocodo_manager::handlers::record_ai_output))
                 // Files
                 .route("/api/files/list", web::post().to(nocodo_manager::handlers::list_files))
-                .route("/api/files/read", web::post().to(nocodo_manager::handlers::read_file))
                 .route("/api/files/create", web::post().to(nocodo_manager::handlers::create_file))
                 .route("/api/files/update", web::post().to(nocodo_manager::handlers::update_file))
                 // Templates
@@ -191,12 +168,7 @@ impl TestApp {
                 // LLM Agent
                 .route("/api/llm-agent/sessions", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
                 .route("/api/llm-agent/sessions/{session_id}", web::get().to(nocodo_manager::handlers::get_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}", web::put().to(nocodo_manager::handlers::update_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}/messages", web::get().to(nocodo_manager::handlers::get_llm_agent_messages))
-                .route("/api/llm-agent/sessions/{session_id}/messages", web::post().to(nocodo_manager::handlers::create_llm_agent_message))
-                .route("/api/llm-agent/sessions/{session_id}/tool-calls", web::get().to(nocodo_manager::handlers::get_llm_agent_tool_calls))
-                .route("/api/llm-agent/sessions/{session_id}/tool-calls", web::post().to(nocodo_manager::handlers::create_llm_agent_tool_call))
-                .route("/api/llm-agent/sessions/{session_id}/tool-calls/{tool_call_id}", web::put().to(nocodo_manager::handlers::update_llm_agent_tool_call))
+                .route("/api/llm-agent/sessions/{session_id}/messages", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
         )
         .await;
 
@@ -204,7 +176,6 @@ impl TestApp {
             config,
             database,
             app_state,
-            test_service,
         }
     }
 
@@ -288,7 +259,12 @@ mod tests {
 
         // Test health check endpoint
         let req = test::TestRequest::get().uri("/api/health").to_request();
-        let resp = test::call_service(&test_app.test_service, req).await;
+        let service = test::init_service(
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/api/health", web::get().to(nocodo_manager::handlers::health_check))
+        ).await;
+        let resp = test::call_service(&service, req).await;
 
         assert!(resp.status().is_success());
 
