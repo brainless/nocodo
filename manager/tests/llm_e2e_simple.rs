@@ -18,23 +18,18 @@ use nocodo_manager::{
 };
 
 use crate::common::{
-    llm_config::{LlmTestConfig, should_run_llm_tests},
+    llm_config::LlmTestConfig,
     keyword_validation::{KeywordValidator, LlmTestScenario},
 };
 
 /// Simple LLM E2E test that makes real API calls
 #[actix_rt::test]
 async fn test_simple_llm_e2e() {
-    // Skip test if no LLM providers are available
-    if !should_run_llm_tests() {
-        println!("⚠️  Skipping LLM E2E test - no API keys available");
-        return;
-    }
-
-    // Get LLM configuration from environment
+    // Get LLM configuration from environment and skip if no providers available
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
-        println!("⚠️  Skipping LLM E2E test - no LLM providers configured");
+        println!("⚠️  Skipping LLM E2E test - no API keys available");
+        println!("   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
         return;
     }
 

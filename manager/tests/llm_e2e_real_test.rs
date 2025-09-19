@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::common::{
     TestApp, TestDataGenerator,
-    llm_config::{LlmTestConfig, should_run_llm_tests},
+    llm_config::LlmTestConfig,
     keyword_validation::{KeywordValidator, LlmTestScenario},
 };
 use nocodo_manager::models::{CreateLlmAgentSessionRequest, MessageAuthorType};
@@ -18,18 +18,11 @@ use nocodo_manager::models::{CreateLlmAgentSessionRequest, MessageAuthorType};
 /// - Phase 3: Keyword-based validation
 #[actix_rt::test]
 async fn test_llm_e2e_real_integration() {
-    // Skip test if no LLM providers are available
-    if !should_run_llm_tests() {
+    // Get LLM configuration from environment and skip if no providers available
+    let llm_config = LlmTestConfig::from_environment();
+    if !llm_config.has_available_providers() {
         println!("⚠️  Skipping LLM E2E test - no API keys available");
         println!("   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
-        return;
-    }
-
-    // Get LLM configuration from environment
-    let llm_config = LlmTestConfig::from_environment();
-
-    if !llm_config.has_available_providers() {
-        println!("⚠️  Skipping LLM E2E test - no LLM providers configured");
         return;
     }
 
@@ -217,15 +210,10 @@ async fn test_llm_e2e_real_integration() {
 /// Test multiple scenarios in sequence
 #[actix_rt::test]
 async fn test_llm_multiple_scenarios() {
-    if !should_run_llm_tests() {
-        println!("⚠️  Skipping multiple scenarios test - no API keys available");
-        return;
-    }
-
     let llm_config = LlmTestConfig::from_environment();
-
     if !llm_config.has_available_providers() {
-        println!("⚠️  Skipping multiple scenarios test - no LLM providers configured");
+        println!("⚠️  Skipping multiple scenarios test - no API keys available");
+        println!("   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
         return;
     }
 
