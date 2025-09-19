@@ -8,7 +8,7 @@ use crate::common::{
     llm_config::LlmTestConfig,
     keyword_validation::{KeywordValidator, LlmTestScenario},
 };
-use nocodo_manager::models::{CreateLlmAgentSessionRequest, MessageAuthorType};
+use nocodo_manager::models::{CreateWorkRequest, AddMessageRequest, CreateLlmAgentSessionRequest, MessageAuthorType, MessageContentType};
 
 /// Comprehensive end-to-end test combining phases 1, 2, and 3
 ///
@@ -55,90 +55,170 @@ async fn test_llm_e2e_real_integration() {
         .await
         .expect("Failed to create project from scenario");
 
-    // Create a work session
-    let work = TestDataGenerator::create_work(Some("LLM E2E Test Work"), Some("test-project"));
-    test_app.db().create_work(&work)
-        .expect("Failed to create work session");
+    // Follow the exact manager-web homepage form flow:
+    // 1. Create the work
+    let work_request = CreateWorkRequest {
+        title: "LLM E2E Test Work".to_string(),
+        project_id: Some("test-project".to_string()),
+    };
 
-    // Create LLM agent session
-    let session_request = CreateLlmAgentSessionRequest {
+    let req = test::TestRequest::post()
+        .uri("/work")
+        .set_json(&work_request)
+        .to_request();
+
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work", web::post().to(nocodo_manager::handlers::create_work))
+    ).await;
+    let resp = test::call_service(&service, req).await;
+    assert!(resp.status().is_success(), "Failed to create work session");
+
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let work_id = body["work"]["id"].as_str().expect("No work ID returned").to_string();
+
+    println!("   ✅ Created work session: {}", work_id);
+
+    // 2. Add the initial message
+    let message_request = AddMessageRequest {
+        content: scenario.prompt.clone(),
+        content_type: MessageContentType::Text,
+        author_type: MessageAuthorType::User,
+        author_id: None,
+    };
+
+    let uri = format!("/work/{}/messages", work_id);
+    let req = test::TestRequest::post()
+        .uri(&uri)
+        .set_json(&message_request)
+        .to_request();
+
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
+    ).await;
+    let resp = test::call_service(&service, req).await;
+    assert!(resp.status().is_success(), "Failed to add message to work");
+
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let message_id = body["message"]["id"].as_str().expect("No message ID returned").to_string();
+
+    println!("   ✅ Added initial message: {}", message_id);
+
+    // 3. Create the LLM agent session
+    let llm_session_request = CreateLlmAgentSessionRequest {
         provider: provider.name.clone(),
         model: provider.default_model().to_string(),
         system_prompt: Some("You are a helpful coding assistant analyzing project tech stacks. Be concise and accurate.".to_string()),
     };
 
-    let uri = format!("/work/{}/llm-agent/sessions", work.id);
+    let uri = format!("/work/{}/llm-agent", work_id);
     let req = test::TestRequest::post()
         .uri(&uri)
-        .set_json(&session_request)
+        .set_json(&llm_session_request)
         .to_request();
 
     let service = test::init_service(
         App::new()
             .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+            .route("/work/{work_id}/llm-agent", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
     ).await;
     let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to create LLM session");
+    assert!(resp.status().is_success(), "Failed to create LLM agent session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let session_id = body["session"]["id"].as_str().expect("No session ID returned").to_string();
+    let llm_session_id = body["session"]["id"].as_str().expect("No LLM session ID returned").to_string();
 
-    println!("   ✅ Created LLM session: {}", session_id);
-    println!("   ✅ Project context created with {} files", scenario.context.files.len());
-
-    // PHASE 3: Test real LLM interaction with keyword validation
-    println!("\n🎯 Phase 3: Testing LLM interaction with keyword validation");
-
-    // Send the test scenario prompt to the real LLM
-    let message_data = json!({
-        "role": "user",
-        "content": scenario.prompt
+    // 4. Send the prompt message to the LLM agent
+    let message_data = serde_json::json!({
+        "message": scenario.prompt
     });
 
-    let uri = format!("/api/llm-agent/sessions/{}/messages", session_id);
+    let uri = format!("/llm-agent/{}/message", llm_session_id);
     let req = test::TestRequest::post()
         .uri(&uri)
         .set_json(&message_data)
         .to_request();
 
-    println!("   📤 Sending prompt to LLM: {}", scenario.prompt);
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/llm-agent/{session_id}/message", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
+    ).await;
+    let resp = test::call_service(&service, req).await;
+    assert!(resp.status().is_success(), "Failed to send message to LLM agent");
+
+    // 5. Complete the LLM agent session to ensure proper processing
+    let uri = format!("/llm-agent/{}/complete", llm_session_id);
+    let req = test::TestRequest::post()
+        .uri(&uri)
+        .to_request();
 
     let service = test::init_service(
         App::new()
             .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+            .route("/llm-agent/{session_id}/complete", web::post().to(nocodo_manager::handlers::complete_llm_agent_session))
     ).await;
     let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to send message to LLM");
+    assert!(resp.status().is_success(), "Failed to complete LLM agent session");
+
+    println!("   ✅ Created LLM agent session: {}", llm_session_id);
+    println!("   ✅ Project context created with {} files", scenario.context.files.len());
+
+    // PHASE 3: Test real LLM interaction with keyword validation
+    println!("\n🎯 Phase 3: Testing LLM interaction with keyword validation");
+    println!("   📤 Prompt sent to LLM agent: {}", scenario.prompt);
 
     // Wait for LLM processing (real API call takes time)
     println!("   ⏳ Waiting for LLM response...");
 
-    // Get the LLM response from the session messages
-    let uri = format!("/api/llm-agent/sessions/{}/messages", session_id);
-    let req = test::TestRequest::get().uri(&uri).to_request();
-    let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
-    ).await;
-    let resp = test::call_service(&service, req).await;
+    // Give the LLM some time to process (background task + real API call takes time)
+    // In real scenarios this would be done via WebSocket, but for testing we poll the database directly
+    let mut attempts = 0;
+    let max_attempts = 12; // 60 seconds total
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        attempts += 1;
 
-    assert!(resp.status().is_success(), "Failed to get LLM messages");
+        // Check LLM agent messages directly from database
+        let llm_messages = test_app.db().get_llm_agent_messages(&llm_session_id)
+            .expect("Failed to get LLM agent messages");
 
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    let messages = body["messages"].as_array().expect("No messages array");
+        // Check if we have an assistant response
+        if llm_messages.iter().any(|msg| msg.role == "assistant") {
+            println!("   ✅ LLM response received after {} attempts ({} seconds)", attempts, attempts * 5);
+            break;
+        }
 
-    // Find the assistant's response
-    let assistant_response = messages
+        if attempts >= max_attempts {
+            println!("   ⚠️  Timeout waiting for LLM response after {} seconds", max_attempts * 5);
+            break;
+        }
+        println!("   ⏳ Still waiting... (attempt {}/{})", attempts, max_attempts);
+    }
+
+    // Get the LLM response from the LLM agent messages
+    let llm_messages = test_app.db().get_llm_agent_messages(&llm_session_id)
+        .expect("Failed to get LLM agent messages");
+
+    println!("   🔍 Found {} LLM agent messages:", llm_messages.len());
+    for (i, msg) in llm_messages.iter().enumerate() {
+        println!("      Message {}: role={}, content_preview={}",
+                 i + 1,
+                 msg.role,
+                 msg.content.chars().take(50).collect::<String>());
+    }
+
+    // Find the last assistant's response (the final response after tool calls)
+    let assistant_response = llm_messages
         .iter()
-        .find(|msg| msg["role"] == "assistant")
+        .rev()  // Reverse to get the last one
+        .find(|msg| msg.role == "assistant")
         .expect("No assistant response found");
 
-    let response_content = assistant_response["content"]
-        .as_str()
-        .expect("No content in assistant response");
+    let response_content = &assistant_response.content;
 
     println!("   📥 LLM Response received ({} chars)", response_content.len());
     println!("   📝 Response preview: {}...",
@@ -253,76 +333,125 @@ async fn test_llm_multiple_scenarios() {
             .await
             .expect("Failed to create project from scenario");
 
-        let work = TestDataGenerator::create_work(
-            Some(&format!("Multi Scenario Work {}", i + 1)),
-            Some("test-project")
-        );
-        test_app.db().create_work(&work).expect("Failed to create work");
+        // Follow the exact manager-web homepage form flow:
+        // 1. Create the work
+        let work_request = CreateWorkRequest {
+            title: format!("Multi Scenario Work {}", i + 1),
+            project_id: Some("test-project".to_string()),
+        };
 
-        // Create LLM session
-        let session_request = CreateLlmAgentSessionRequest {
+        let req = test::TestRequest::post()
+            .uri("/work")
+            .set_json(&work_request)
+            .to_request();
+
+        let service = test::init_service(
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/work", web::post().to(nocodo_manager::handlers::create_work))
+        ).await;
+        let resp = test::call_service(&service, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let work_id = body["work"]["id"].as_str().unwrap().to_string();
+
+        // 2. Add the initial message
+        let message_request = AddMessageRequest {
+            content: scenario.prompt.clone(),
+            content_type: MessageContentType::Text,
+            author_type: MessageAuthorType::User,
+            author_id: None,
+        };
+
+        let uri = format!("/work/{}/messages", work_id);
+        let req = test::TestRequest::post()
+            .uri(&uri)
+            .set_json(&message_request)
+            .to_request();
+
+        let service = test::init_service(
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/work/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
+        ).await;
+        let resp = test::call_service(&service, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let message_id = body["message"]["id"].as_str().unwrap().to_string();
+
+        // 3. Create the LLM agent session
+        let llm_session_request = CreateLlmAgentSessionRequest {
             provider: provider.name.clone(),
             model: provider.default_model().to_string(),
             system_prompt: Some("You are a helpful coding assistant. Be concise and accurate.".to_string()),
         };
 
-        let uri = format!("/work/{}/llm-agent/sessions", work.id);
+        let uri = format!("/work/{}/llm-agent", work_id);
         let req = test::TestRequest::post()
             .uri(&uri)
-            .set_json(&session_request)
+            .set_json(&llm_session_request)
             .to_request();
 
         let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
-    ).await;
-    let resp = test::call_service(&service, req).await;
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/work/{work_id}/llm-agent", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
+        ).await;
+        let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
-        let session_id = body["session"]["id"].as_str().unwrap().to_string();
+        let llm_session_id = body["session"]["id"].as_str().unwrap().to_string();
 
-        // Send prompt
-        let message_data = json!({
-            "role": "user",
-            "content": scenario.prompt
+        // 4. Send the prompt message to the LLM agent
+        let message_data = serde_json::json!({
+            "message": scenario.prompt
         });
 
-        let uri = format!("/api/llm-agent/sessions/{}/messages", session_id);
+        let uri = format!("/llm-agent/{}/message", llm_session_id);
         let req = test::TestRequest::post()
             .uri(&uri)
             .set_json(&message_data)
             .to_request();
 
         let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
-    ).await;
-    let resp = test::call_service(&service, req).await;
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/llm-agent/{session_id}/message", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
+        ).await;
+        let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
-        // Get response
-        let uri = format!("/api/llm-agent/sessions/{}/messages", session_id);
-        let req = test::TestRequest::get().uri(&uri).to_request();
+        // Complete the LLM agent session
+        let uri = format!("/llm-agent/{}/complete", llm_session_id);
+        let req = test::TestRequest::post()
+            .uri(&uri)
+            .to_request();
+
         let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
-    ).await;
-    let resp = test::call_service(&service, req).await;
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/llm-agent/{session_id}/complete", web::post().to(nocodo_manager::handlers::complete_llm_agent_session))
+        ).await;
+        let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
-        let body: serde_json::Value = test::read_body_json(resp).await;
-        let messages = body["messages"].as_array().unwrap();
+        // Wait for LLM processing
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-        let assistant_response = messages
+        // Get response from LLM agent messages
+        let llm_messages = test_app.db().get_llm_agent_messages(&llm_session_id)
+            .expect("Failed to get LLM agent messages");
+
+        let assistant_response = llm_messages
             .iter()
-            .find(|msg| msg["role"] == "assistant")
+            .rev()  // Get the last assistant response
+            .find(|msg| msg.role == "assistant")
             .expect("No assistant response found");
 
-        let response_content = assistant_response["content"].as_str().unwrap();
+        let response_content = &assistant_response.content;
 
         // Validate response
         let validation_result = KeywordValidator::validate_response(

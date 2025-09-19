@@ -37,7 +37,6 @@ impl TestApp {
             database: database.database.clone(),
             start_time: SystemTime::now(),
             ws_broadcaster,
-            runner: None,      // Not needed for API tests
             llm_agent: None,   // Not needed for basic API tests
             config: Arc::new(config.config.clone()),
         });
@@ -127,7 +126,6 @@ impl TestApp {
             database: database.database.clone(),
             start_time: SystemTime::now(),
             ws_broadcaster,
-            runner: None,
             llm_agent, // Real LLM agent, not None!
             config: Arc::new(config.config.clone()),
         });
