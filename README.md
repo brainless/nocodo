@@ -112,12 +112,9 @@ Creating custom business software:
 
 Ready to empower your team with AI-assisted development?
 
-1. **Deploy**: Set up nocodo on your cloud infrastructure
-2. **Connect**: Integrate with your existing projects and tools
-3. **Collaborate**: Invite your team and start building together
-4. **Iterate**: Make unlimited changes and improvements with confidence
+Setup guides for getting started with nocodo are coming soon! In the meantime, you can read our prompt guide to understand how to effectively communicate with AI development environments.
 
-**[📚 Read the Complete Setup Guide →](https://nocodo.com/playbook)**
+**[📚 Read our Prompt Guide →](https://nocodo.com/playbook)**
 
 ## 🌍 Join the Global Community
 
