@@ -253,7 +253,7 @@ pub struct Claims {
 
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert_eq!(body["path"], *file_path);
-        assert!(body["content"].as_str().unwrap().len() > 0);
+        assert!(!body["content"].as_str().unwrap().is_empty());
     }
 
     // Phase 8: Documentation and Summary

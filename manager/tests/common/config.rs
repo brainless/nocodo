@@ -35,7 +35,7 @@ impl TestConfig {
         let socket_path = temp_dir.path().join(format!("nocodo-test-{}.sock", test_id));
 
         // Create isolated log path
-        let log_path = temp_dir.path().join(format!("nocodo-test-{}.log", test_id));
+        let _log_path = temp_dir.path().join(format!("nocodo-test-{}.log", test_id));
 
         let config = AppConfig {
             server: ServerConfig {

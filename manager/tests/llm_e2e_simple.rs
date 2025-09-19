@@ -2,8 +2,6 @@ mod common;
 
 use actix::Actor;
 use actix_web::{test, web, App};
-use serde_json::json;
-use std::env;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::tempdir;
@@ -11,7 +9,7 @@ use tempfile::tempdir;
 use nocodo_manager::{
     config::AppConfig,
     database::Database,
-    handlers::{create_llm_agent_session, health_check, AppState},
+    handlers::{create_ai_session, health_check, AppState},
     llm_agent::LlmAgent,
     models::CreateLlmAgentSessionRequest,
     websocket::{WebSocketBroadcaster, WebSocketServer},
@@ -61,7 +59,6 @@ async fn test_simple_llm_e2e() {
         database: database.clone(),
         start_time: SystemTime::now(),
         ws_broadcaster,
-        runner: None,
         llm_agent,
         config: Arc::new(AppConfig::default()),
     });
@@ -71,7 +68,7 @@ async fn test_simple_llm_e2e() {
         App::new()
             .app_data(app_state)
             .route("/api/health", web::get().to(health_check))
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(create_llm_agent_session))
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(create_ai_session))
     )
     .await;
 
@@ -127,13 +124,13 @@ async fn test_simple_llm_e2e() {
     let resp = test::call_service(&app, req).await;
     println!("📊 LLM session creation status: {}", resp.status());
 
-    if !resp.status().is_success() {
+    let is_success = resp.status().is_success();
+    if !is_success {
         let body = test::read_body(resp).await;
         let body_str = String::from_utf8_lossy(&body);
         println!("❌ Response body: {}", body_str);
+        panic!("Failed to create LLM session");
     }
-
-    assert!(resp.status().is_success(), "Failed to create LLM session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let session_id = body["session"]["id"].as_str().expect("No session ID returned");
@@ -154,7 +151,7 @@ async fn test_simple_llm_e2e() {
 
 /// Test the keyword validation system independently
 #[test]
-fn test_keyword_validation_system() {
+async fn test_keyword_validation_system() {
     println!("🧪 Testing keyword validation system");
 
     let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
@@ -173,7 +170,7 @@ fn test_keyword_validation_system() {
     assert!(result.passed, "Keyword validation should pass for good response");
     assert!(result.score >= 0.7, "Score should be at least 0.7");
     assert_eq!(result.found_required.len(), 3); // Python, FastAPI, React
-    assert!(result.found_optional.len() > 0); // Should find TypeScript
+    assert!(!result.found_optional.is_empty()); // Should find TypeScript
     assert_eq!(result.found_forbidden.len(), 0); // No forbidden keywords
 
     println!("✅ Keyword validation system working correctly");
@@ -181,7 +178,7 @@ fn test_keyword_validation_system() {
 
 /// Test LLM provider configuration
 #[test]
-fn test_llm_provider_config() {
+async fn test_llm_provider_config() {
     println!("🔧 Testing LLM provider configuration");
 
     let config = LlmTestConfig::from_environment();

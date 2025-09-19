@@ -139,7 +139,7 @@ impl KeywordValidator {
 
         let forbidden_penalty = found_forbidden.len() as f32 * 0.1;
 
-        ((required_score * 0.7) + (optional_score * 0.2) - forbidden_penalty).max(0.0).min(1.0)
+        ((required_score * 0.7) + (optional_score * 0.2) - forbidden_penalty).clamp(0.0, 1.0)
     }
 }
 

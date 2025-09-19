@@ -1363,28 +1363,6 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         }
     }
 
-    /// Complete a session
-    pub async fn complete_session(&self, session_id: &str) -> Result<()> {
-        tracing::info!(
-            session_id = %session_id,
-            "Completing LLM agent session"
-        );
-
-        let mut session = self.db.get_llm_agent_session(session_id)?;
-        let old_status = session.status.clone();
-        session.complete();
-        self.db.update_llm_agent_session(&session)?;
-
-        tracing::info!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            old_status = %old_status,
-            new_status = %session.status,
-            "LLM agent session completed successfully"
-        );
-
-        Ok(())
-    }
 
     /// Fail a session
     #[allow(dead_code)]
@@ -1470,29 +1448,6 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         ]
     }
 
-    /// Get session status
-    pub async fn get_session_status(&self, session_id: &str) -> Result<LlmAgentSession> {
-        tracing::debug!(
-            session_id = %session_id,
-            "Getting LLM agent session status"
-        );
-
-        let session = self
-            .db
-            .get_llm_agent_session(session_id)
-            .map_err(|e| anyhow::anyhow!(e))?;
-
-        tracing::debug!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            status = %session.status,
-            provider = %session.provider,
-            model = %session.model,
-            "Retrieved LLM agent session status"
-        );
-
-        Ok(session)
-    }
 
     /// Stream session progress
     #[allow(dead_code)]

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use super::config::TestConfig;
 
@@ -59,7 +59,7 @@ impl TestLogger {
 
     /// Read the current log contents
     pub fn read_logs(&self) -> std::io::Result<String> {
-        std::fs::read_to_string(&self.log_path())
+        std::fs::read_to_string(self.log_path())
     }
 
     /// Check if logs contain a specific pattern
@@ -70,7 +70,7 @@ impl TestLogger {
 
     /// Clear the log file
     pub fn clear_logs(&self) -> std::io::Result<()> {
-        std::fs::write(&self.log_path(), "")
+        std::fs::write(self.log_path(), "")
     }
 
     /// Get log lines as a vector

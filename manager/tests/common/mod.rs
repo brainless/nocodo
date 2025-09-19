@@ -12,15 +12,12 @@ pub mod llm_config;
 pub mod keyword_validation;
 
 pub use app::TestApp;
-pub use config::TestConfig;
-pub use database::TestDatabase;
 pub use fixtures::TestDataGenerator;
-pub use logging::{TestLogger, TestLoggerGuard, init_test_logging};
+pub use logging::TestLogger;
 
 #[cfg(test)]
 mod isolation_tests {
     use super::*;
-    use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
@@ -108,7 +105,7 @@ mod isolation_tests {
 
         for path in temp_paths {
             // The database file should be gone (temp directory cleanup)
-            assert!(!path.exists() || !std::fs::read(&path).is_ok());
+            assert!(!path.exists() || std::fs::read(&path).is_err());
         }
     }
 

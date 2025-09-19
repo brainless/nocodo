@@ -2,7 +2,6 @@
 ///
 /// This test validates the core keyword validation logic without requiring
 /// the full test infrastructure. It demonstrates Phase 3 implementation.
-
 use std::env;
 
 // Inline minimal implementations for testing
@@ -128,7 +127,7 @@ impl KeywordValidator {
 
         let forbidden_penalty = found_forbidden.len() as f32 * 0.1;
 
-        ((required_score * 0.7) + (optional_score * 0.2) - forbidden_penalty).max(0.0).min(1.0)
+        ((required_score * 0.7) + (optional_score * 0.2) - forbidden_penalty).clamp(0.0, 1.0)
     }
 }
 
@@ -173,8 +172,8 @@ fn test_keyword_validation_python_fastapi() {
     println!("   Forbidden found: {:?}", result.found_forbidden);
 
     assert!(!result.passed, "Bad response should fail validation");
-    assert!(result.missing_required.len() > 0); // Missing required keywords
-    assert!(result.found_forbidden.len() > 0); // Has forbidden keywords
+    assert!(!result.missing_required.is_empty()); // Missing required keywords
+    assert!(!result.found_forbidden.is_empty()); // Has forbidden keywords
 
     println!("✅ Keyword validation working correctly for Python FastAPI scenario");
 }
@@ -269,7 +268,6 @@ fn test_llm_provider_detection() {
     }
 
     // Test always passes - this is just informational
-    assert!(true);
 }
 
 /// Test comprehensive scoring system
@@ -349,5 +347,4 @@ fn test_integration_summary() {
     println!("Then run: ./run_llm_e2e_test.sh");
 
     // This is always a success - just a summary
-    assert!(true);
 }

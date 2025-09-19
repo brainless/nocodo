@@ -39,7 +39,7 @@ async fn test_llm_e2e_real_integration() {
     assert!(test_app.test_config().db_path().to_string_lossy().contains(&test_app.test_config().test_id));
 
     // Verify LLM agent is configured
-    let llm_agent = test_app.llm_agent().expect("LLM agent should be configured");
+    let _llm_agent = test_app.llm_agent().expect("LLM agent should be configured");
     println!("   ✅ Test isolation configured with ID: {}", test_app.test_config().test_id);
     println!("   ✅ LLM agent configured");
 
@@ -407,7 +407,7 @@ async fn test_llm_multiple_scenarios() {
         );
 
         assert!(
-            !validation_result.found_forbidden.is_empty() == false || validation_result.found_required.len() > 0,
+            validation_result.found_forbidden.is_empty() || !validation_result.found_required.is_empty(),
             "Scenario {} had forbidden keywords or no required keywords",
             i + 1
         );

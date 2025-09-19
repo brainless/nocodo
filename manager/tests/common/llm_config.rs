@@ -58,7 +58,7 @@ impl LlmTestConfig {
             providers.push(LlmProviderTestConfig::anthropic());
         }
 
-        let default_provider = providers.get(0).map(|p| p.name.clone());
+        let default_provider = providers.first().map(|p| p.name.clone());
 
         Self {
             enabled_providers: providers,
@@ -74,7 +74,7 @@ impl LlmTestConfig {
 
     /// Get the first available provider for simple tests
     pub fn get_default_provider(&self) -> Option<&LlmProviderTestConfig> {
-        self.enabled_providers.get(0)
+        self.enabled_providers.first()
     }
 }
 
@@ -114,7 +114,7 @@ impl LlmProviderTestConfig {
 
     /// Get the default model for this provider
     pub fn default_model(&self) -> &str {
-        self.models.get(0).map(|s| s.as_str()).unwrap_or("unknown")
+        self.models.first().map(|s| s.as_str()).unwrap_or("unknown")
     }
 
     /// Convert to app config format
