@@ -170,27 +170,6 @@ async fn main() -> AppResult<()> {
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
                         )
-                        // LLM agent endpoints for direct LLM integration
-                        .route(
-                            "/work/{work_id}/llm-agent",
-                            web::post().to(handlers::create_llm_agent_session),
-                        )
-                        .route(
-                            "/work/{work_id}/llm-agent/sessions",
-                            web::get().to(handlers::get_llm_agent_sessions),
-                        )
-                        .route(
-                            "/llm-agent/{session_id}",
-                            web::get().to(handlers::get_llm_agent_session),
-                        )
-                        .route(
-                            "/llm-agent/{session_id}/message",
-                            web::post().to(handlers::send_llm_agent_message),
-                        )
-                        .route(
-                            "/llm-agent/{session_id}/complete",
-                            web::post().to(handlers::complete_llm_agent_session),
-                        )
                         // Settings endpoint
                         .route("/settings", web::get().to(handlers::get_settings)),
                 )

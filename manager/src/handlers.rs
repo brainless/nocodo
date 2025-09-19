@@ -5,9 +5,9 @@ use crate::llm_agent::LlmAgent;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateLlmAgentSessionRequest, CreateProjectRequest, CreateWorkRequest, FileContentResponse,
+    CreateProjectRequest, CreateWorkRequest, FileContentResponse,
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
-    FileUpdateRequest, LlmAgentSessionResponse, Project, ProjectListResponse, ProjectResponse,
+    FileUpdateRequest, Project, ProjectListResponse, ProjectResponse,
     ServerStatus, SettingsResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -1801,112 +1801,6 @@ pub async fn get_work_messages(
     Ok(HttpResponse::Ok().json(response))
 }
 
-// LLM Agent Endpoints
-
-/// Create a new LLM agent session
-pub async fn create_llm_agent_session(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-    request: web::Json<CreateLlmAgentSessionRequest>,
-) -> Result<HttpResponse, AppError> {
-    let work_id = path.into_inner();
-    let req = request.into_inner();
-
-    if let Some(ref llm_agent) = data.llm_agent {
-        // Get the work to find the project path
-        let work = data.database.get_work_by_id(&work_id)?;
-        let _project_path = if let Some(ref project_id) = work.project_id {
-            let project = data.database.get_project_by_id(project_id)?;
-            PathBuf::from(project.path)
-        } else {
-            // Use current directory if no project is associated
-            std::env::current_dir().map_err(|e| {
-                AppError::Internal(format!("Failed to get current directory: {}", e))
-            })?
-        };
-
-        let session = llm_agent
-            .create_session(work_id, req.provider, req.model, req.system_prompt)
-            .await?;
-
-        Ok(HttpResponse::Ok().json(LlmAgentSessionResponse { session }))
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
-
-/// Get LLM agent session status
-pub async fn get_llm_agent_session(
-    data: web::Data<AppState>,
-    session_id: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    if let Some(ref llm_agent) = data.llm_agent {
-        let session_id = session_id.into_inner();
-        let session = llm_agent.get_session_status(&session_id).await?;
-        Ok(HttpResponse::Ok().json(LlmAgentSessionResponse { session }))
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
-
-/// Send a message to LLM agent
-pub async fn send_llm_agent_message(
-    data: web::Data<AppState>,
-    session_id: web::Path<String>,
-    request: web::Json<serde_json::Value>,
-) -> Result<HttpResponse, AppError> {
-    if let Some(ref llm_agent) = data.llm_agent {
-        let session_id = session_id.into_inner();
-
-        // Extract message from request
-        let user_message = request
-            .get("message")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| AppError::InvalidRequest("Message field required".to_string()))?
-            .to_string();
-
-        let response = llm_agent.process_message(&session_id, user_message).await?;
-
-        Ok(HttpResponse::Ok().json(serde_json::json!({
-            "response": response
-        })))
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
-
-/// Complete an LLM agent session
-pub async fn complete_llm_agent_session(
-    data: web::Data<AppState>,
-    session_id: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    if let Some(ref llm_agent) = data.llm_agent {
-        let session_id = session_id.into_inner();
-        llm_agent.complete_session(&session_id).await?;
-        Ok(HttpResponse::Ok().finish())
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
-
-/// Get LLM agent sessions for a work
-pub async fn get_llm_agent_sessions(
-    data: web::Data<AppState>,
-    work_id: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let sessions = data
-        .database
-        .get_llm_agent_sessions_by_work(&work_id.into_inner())?;
-    Ok(HttpResponse::Ok().json(sessions))
-}
 
 /// Get settings information including API key configuration
 pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
