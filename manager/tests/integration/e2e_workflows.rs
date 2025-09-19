@@ -671,7 +671,7 @@ async fn test_full_development_lifecycle_workflow() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let files = body["files"].as_array().unwrap();
-    assert!(files.len() > 0);
+    assert!(!files.is_empty());
 
     let duration = start_time.elapsed();
     println!("Full development lifecycle completed in {:?}", duration);

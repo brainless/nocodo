@@ -16,14 +16,14 @@ impl TestDatabase {
     /// Create a new isolated test database
     pub fn new() -> AppResult<Self> {
         let config = TestConfig::new();
-        let database = Arc::new(Database::new(&config.db_path())?);
+        let database = Arc::new(Database::new(config.db_path())?);
 
         Ok(Self { database, config })
     }
 
     /// Get the database path
     pub fn path(&self) -> &PathBuf {
-        &self.config.db_path()
+        self.config.db_path()
     }
 
     /// Get the test configuration
@@ -144,7 +144,7 @@ mod tests {
         // Note: This test may be flaky in some environments, but it's good to verify cleanup
         if temp_path.exists() {
             // If it still exists, at least verify the database file is gone
-            assert!(!temp_path.exists() || !fs::read(&temp_path).is_ok());
+            assert!(!temp_path.exists() || fs::read(&temp_path).is_err());
         }
     }
 }

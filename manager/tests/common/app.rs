@@ -3,7 +3,6 @@ use actix_web::{test, web, App};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use nocodo_manager::config::AppConfig;
 use nocodo_manager::database::Database;
 use nocodo_manager::handlers::AppState;
 use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
@@ -11,7 +10,7 @@ use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 use super::config::TestConfig;
 use super::database::TestDatabase;
 use super::llm_config::LlmProviderTestConfig;
-use super::keyword_validation::{LlmTestContext, LlmTestScenario};
+use super::keyword_validation::LlmTestContext;
 
 use nocodo_manager::llm_agent::LlmAgent;
 
@@ -42,7 +41,7 @@ impl TestApp {
         });
 
         // Create the test service with all routes
-        let test_service = test::init_service(
+        let _test_service = test::init_service(
             App::new()
                 .app_data(app_state.clone())
                 // Health check
@@ -127,7 +126,7 @@ impl TestApp {
         });
 
         // Create the test service with all routes
-        let test_service = test::init_service(
+        let _test_service = test::init_service(
             App::new()
                 .app_data(app_state.clone())
                 // Health check

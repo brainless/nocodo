@@ -787,11 +787,6 @@ impl LlmAgentSession {
         }
     }
 
-    pub fn complete(&mut self) {
-        self.status = "completed".to_string();
-        self.ended_at = Some(Utc::now().timestamp());
-    }
-
     #[allow(dead_code)]
     pub fn fail(&mut self) {
         self.status = "failed".to_string();
