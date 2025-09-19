@@ -1,6 +1,6 @@
 mod common;
 
-use actix_web::test;
+use actix_web::{test, web, App};
 use serde_json::json;
 
 use crate::common::{
@@ -73,7 +73,12 @@ async fn test_llm_e2e_real_integration() {
         .set_json(&session_request)
         .to_request();
 
-    let resp = test::call_service(test_app.service(), req).await;
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+    ).await;
+    let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success(), "Failed to create LLM session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
@@ -99,7 +104,12 @@ async fn test_llm_e2e_real_integration() {
 
     println!("   📤 Sending prompt to LLM: {}", scenario.prompt);
 
-    let resp = test::call_service(test_app.service(), req).await;
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+    ).await;
+    let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success(), "Failed to send message to LLM");
 
     // Wait for LLM processing (real API call takes time)
@@ -108,7 +118,12 @@ async fn test_llm_e2e_real_integration() {
     // Get the LLM response from the session messages
     let uri = format!("/api/llm-agent/sessions/{}/messages", session_id);
     let req = test::TestRequest::get().uri(&uri).to_request();
-    let resp = test::call_service(test_app.service(), req).await;
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+    ).await;
+    let resp = test::call_service(&service, req).await;
 
     assert!(resp.status().is_success(), "Failed to get LLM messages");
 
@@ -257,7 +272,12 @@ async fn test_llm_multiple_scenarios() {
             .set_json(&session_request)
             .to_request();
 
-        let resp = test::call_service(test_app.service(), req).await;
+        let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+    ).await;
+    let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
@@ -275,13 +295,23 @@ async fn test_llm_multiple_scenarios() {
             .set_json(&message_data)
             .to_request();
 
-        let resp = test::call_service(test_app.service(), req).await;
+        let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+    ).await;
+    let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
         // Get response
         let uri = format!("/api/llm-agent/sessions/{}/messages", session_id);
         let req = test::TestRequest::get().uri(&uri).to_request();
-        let resp = test::call_service(test_app.service(), req).await;
+        let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/work/{work_id}/llm-agent/sessions", web::post().to(nocodo_manager::handlers::get_llm_agent_sessions))
+    ).await;
+    let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
@@ -324,8 +354,8 @@ mod unit_tests {
     use super::*;
     use crate::common::keyword_validation::{LlmKeywordExpectations, KeywordValidator};
 
-    #[test]
-    fn test_keyword_validation_logic() {
+    #[tokio::test]
+    async fn test_keyword_validation_logic() {
         let expectations = LlmKeywordExpectations {
             required_keywords: vec!["Python".to_string(), "FastAPI".to_string()],
             optional_keywords: vec!["React".to_string()],
@@ -348,8 +378,8 @@ mod unit_tests {
         assert_eq!(result.found_forbidden.len(), 1);
     }
 
-    #[test]
-    fn test_scenario_creation() {
+    #[tokio::test]
+    async fn test_scenario_creation() {
         let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
 
         assert!(!scenario.name.is_empty());
@@ -364,8 +394,8 @@ mod unit_tests {
         assert!(scenario.expected_keywords.required_keywords.contains(&"FastAPI".to_string()));
     }
 
-    #[test]
-    fn test_llm_config_from_environment() {
+    #[tokio::test]
+    async fn test_llm_config_from_environment() {
         let config = LlmTestConfig::from_environment();
 
         // Should not panic and should return valid config

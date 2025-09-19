@@ -14,7 +14,7 @@ pub fn get_unique_test_id() -> String {
 }
 
 /// Test-specific configuration that provides complete isolation
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestConfig {
     pub temp_dir: TempDir,
     pub config: AppConfig,
