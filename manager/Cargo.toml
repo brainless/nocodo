@@ -44,6 +44,7 @@ async-stream = "0.3"
 futures-util = "0.3"
 grep = "0.3"
 regex = "1.10"
+nocodo-github-actions = { path = "../nocodo-github-actions", features = ["nocodo-integration"] }
 
 [dev-dependencies]
 actix-rt = "2.9"
