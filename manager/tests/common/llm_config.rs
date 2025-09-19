@@ -155,15 +155,6 @@ impl Default for LlmTestPrompts {
     }
 }
 
-/// Check if LLM tests should be run
-pub fn should_run_llm_tests() -> bool {
-    let has_any_key = env::var("GROK_API_KEY").is_ok() ||
-                     env::var("OPENAI_API_KEY").is_ok() ||
-                     env::var("ANTHROPIC_API_KEY").is_ok();
-
-    let disabled = env::var("SKIP_LLM_TESTS").is_ok();
-    has_any_key && !disabled
-}
 
 #[cfg(test)]
 mod tests {
