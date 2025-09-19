@@ -56,14 +56,14 @@ echo ""
 cd manager
 
 echo "🏗️  Building project..."
-cargo build --test llm_validation_only
+cargo build --test llm_e2e_real_test
 
 echo ""
 echo "🧪 Running comprehensive LLM E2E test..."
 echo ""
 
 # Run the validation tests (always working)
-cargo test --test llm_validation_only \
+cargo test --test llm_e2e_real_test test_llm_e2e_real_integration \
     -- --test-threads=1 --nocapture
 
 echo ""
