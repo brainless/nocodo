@@ -6,7 +6,7 @@
 
 > ⚠️ **Under Active Development** - This product is actively being developed. Please ⭐ star and 👀 watch this repository for updates!
 
-Built by Sumit, a software engineer from a small Himalayan village in India, nocodo is designed to help teams around the world create custom business software without needing to learn programming.
+Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help teams around the world create custom business software without technical knowledge.
 
 ![nocodo AI Session Details](./website/src/assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png)
 
