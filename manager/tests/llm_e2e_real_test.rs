@@ -1,14 +1,13 @@
 mod common;
 
 use actix_web::{test, web, App};
-use serde_json::json;
 
 use crate::common::{
-    TestApp, TestDataGenerator,
+    TestApp,
     llm_config::LlmTestConfig,
     keyword_validation::{KeywordValidator, LlmTestScenario},
 };
-use nocodo_manager::models::{CreateWorkRequest, AddMessageRequest, CreateLlmAgentSessionRequest, MessageAuthorType, MessageContentType};
+use nocodo_manager::models::{CreateWorkRequest, AddMessageRequest, CreateAiSessionRequest, MessageAuthorType, MessageContentType};
 
 /// Comprehensive end-to-end test combining phases 1, 2, and 3
 ///
@@ -107,132 +106,100 @@ async fn test_llm_e2e_real_integration() {
 
     println!("   ✅ Added initial message: {}", message_id);
 
-    // 3. Create the LLM agent session
-    let llm_session_request = CreateLlmAgentSessionRequest {
-        provider: provider.name.clone(),
-        model: provider.default_model().to_string(),
-        system_prompt: Some("You are a helpful coding assistant analyzing project tech stacks. Be concise and accurate.".to_string()),
+    // 3. Create the AI session with llm-agent tool
+    let ai_session_request = CreateAiSessionRequest {
+        message_id: message_id.clone(),
+        tool_name: "llm-agent".to_string(),
     };
 
-    let uri = format!("/work/{}/llm-agent", work_id);
+    let uri = format!("/work/{}/sessions", work_id);
     let req = test::TestRequest::post()
         .uri(&uri)
-        .set_json(&llm_session_request)
+        .set_json(&ai_session_request)
         .to_request();
 
     let service = test::init_service(
         App::new()
             .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/llm-agent", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
+            .route("/work/{work_id}/sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
     ).await;
     let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to create LLM agent session");
+    assert!(resp.status().is_success(), "Failed to create AI session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let llm_session_id = body["session"]["id"].as_str().expect("No LLM session ID returned").to_string();
+    let ai_session_id = body["session"]["id"].as_str().expect("No AI session ID returned").to_string();
 
-    // 4. Send the prompt message to the LLM agent
-    let message_data = serde_json::json!({
-        "message": scenario.prompt
-    });
-
-    let uri = format!("/llm-agent/{}/message", llm_session_id);
-    let req = test::TestRequest::post()
-        .uri(&uri)
-        .set_json(&message_data)
-        .to_request();
-
-    let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/llm-agent/{session_id}/message", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
-    ).await;
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to send message to LLM agent");
-
-    // 5. Complete the LLM agent session to ensure proper processing
-    let uri = format!("/llm-agent/{}/complete", llm_session_id);
-    let req = test::TestRequest::post()
-        .uri(&uri)
-        .to_request();
-
-    let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/llm-agent/{session_id}/complete", web::post().to(nocodo_manager::handlers::complete_llm_agent_session))
-    ).await;
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to complete LLM agent session");
-
-    println!("   ✅ Created LLM agent session: {}", llm_session_id);
+    println!("   ✅ Created AI session: {}", ai_session_id);
     println!("   ✅ Project context created with {} files", scenario.context.files.len());
 
     // PHASE 3: Test real LLM interaction with keyword validation
     println!("\n🎯 Phase 3: Testing LLM interaction with keyword validation");
-    println!("   📤 Prompt sent to LLM agent: {}", scenario.prompt);
+    println!("   📤 Prompt sent to AI session: {}", scenario.prompt);
 
-    // Wait for LLM processing (real API call takes time)
-    println!("   ⏳ Waiting for LLM response...");
+    // Wait for AI session processing (real API call takes time)
+    println!("   ⏳ Waiting for AI session response...");
 
-    // Give the LLM some time to process (background task + real API call takes time)
+    // Give the AI session some time to process (background task + real API call takes time)
     // In real scenarios this would be done via WebSocket, but for testing we poll the database directly
     let mut attempts = 0;
     let max_attempts = 12; // 60 seconds total
+    let mut response_content = String::new();
+
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         attempts += 1;
 
-        // Check LLM agent messages directly from database
-        let llm_messages = test_app.db().get_llm_agent_messages(&llm_session_id)
-            .expect("Failed to get LLM agent messages");
+        // Check AI session outputs directly from database
+        let ai_outputs = test_app.db().list_ai_session_outputs(&ai_session_id)
+            .expect("Failed to get AI session outputs");
 
-        // Check if we have an assistant response
-        if llm_messages.iter().any(|msg| msg.role == "assistant") {
-            println!("   ✅ LLM response received after {} attempts ({} seconds)", attempts, attempts * 5);
+        // Check if we have a completed output
+        if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
+            response_content = output.content.clone();
+            println!("   ✅ AI response received after {} attempts ({} seconds)", attempts, attempts * 5);
             break;
         }
 
         if attempts >= max_attempts {
-            println!("   ⚠️  Timeout waiting for LLM response after {} seconds", max_attempts * 5);
+            println!("   ⚠️  Timeout waiting for AI response after {} seconds", max_attempts * 5);
             break;
         }
         println!("   ⏳ Still waiting... (attempt {}/{})", attempts, max_attempts);
     }
 
-    // Get the LLM response from the LLM agent messages
-    let llm_messages = test_app.db().get_llm_agent_messages(&llm_session_id)
-        .expect("Failed to get LLM agent messages");
+    // Get the AI session outputs
+    let ai_outputs = test_app.db().list_ai_session_outputs(&ai_session_id)
+        .expect("Failed to get AI session outputs");
 
-    println!("   🔍 Found {} LLM agent messages:", llm_messages.len());
-    for (i, msg) in llm_messages.iter().enumerate() {
-        println!("      Message {}: role={}, content_preview={}",
+    println!("   🔍 Found {} AI session outputs:", ai_outputs.len());
+    for (i, output) in ai_outputs.iter().enumerate() {
+        println!("      Output {}: content_preview={}",
                  i + 1,
-                 msg.role,
-                 msg.content.chars().take(50).collect::<String>());
+                 output.content.chars().take(50).collect::<String>());
     }
 
-    // Find the last assistant's response (the final response after tool calls)
-    let assistant_response = llm_messages
-        .iter()
-        .rev()  // Reverse to get the last one
-        .find(|msg| msg.role == "assistant")
-        .expect("No assistant response found");
-
-    let response_content = &assistant_response.content;
+    // Find the response content from the outputs
+    if response_content.is_empty() {
+        if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
+            response_content = output.content.clone();
+        } else {
+            panic!("No AI session response found");
+        }
+    }
 
     println!("   📥 LLM Response received ({} chars)", response_content.len());
     println!("   📝 Response preview: {}...",
         if response_content.len() > 100 {
             &response_content[..100]
         } else {
-            response_content
+            &response_content
         });
 
     // PHASE 3: Validate response using keyword validation
     println!("\n🔍 Phase 3: Validating LLM response with keyword matching");
 
     let validation_result = KeywordValidator::validate_response(
-        response_content,
+        &response_content,
         &scenario.expected_keywords
     );
 
@@ -381,81 +348,52 @@ async fn test_llm_multiple_scenarios() {
         let body: serde_json::Value = test::read_body_json(resp).await;
         let message_id = body["message"]["id"].as_str().unwrap().to_string();
 
-        // 3. Create the LLM agent session
-        let llm_session_request = CreateLlmAgentSessionRequest {
-            provider: provider.name.clone(),
-            model: provider.default_model().to_string(),
-            system_prompt: Some("You are a helpful coding assistant. Be concise and accurate.".to_string()),
+        // 3. Create the AI session with llm-agent tool
+        let ai_session_request = CreateAiSessionRequest {
+            message_id: message_id.clone(),
+            tool_name: "llm-agent".to_string(),
         };
 
-        let uri = format!("/work/{}/llm-agent", work_id);
+        let uri = format!("/work/{}/sessions", work_id);
         let req = test::TestRequest::post()
             .uri(&uri)
-            .set_json(&llm_session_request)
+            .set_json(&ai_session_request)
             .to_request();
 
         let service = test::init_service(
             App::new()
                 .app_data(test_app.app_state.clone())
-                .route("/work/{work_id}/llm-agent", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
+                .route("/work/{work_id}/sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
         ).await;
         let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
-        let llm_session_id = body["session"]["id"].as_str().unwrap().to_string();
+        let ai_session_id = body["session"]["id"].as_str().unwrap().to_string();
 
-        // 4. Send the prompt message to the LLM agent
-        let message_data = serde_json::json!({
-            "message": scenario.prompt
-        });
-
-        let uri = format!("/llm-agent/{}/message", llm_session_id);
-        let req = test::TestRequest::post()
-            .uri(&uri)
-            .set_json(&message_data)
-            .to_request();
-
-        let service = test::init_service(
-            App::new()
-                .app_data(test_app.app_state.clone())
-                .route("/llm-agent/{session_id}/message", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
-        ).await;
-        let resp = test::call_service(&service, req).await;
-        assert!(resp.status().is_success());
-
-        // Complete the LLM agent session
-        let uri = format!("/llm-agent/{}/complete", llm_session_id);
-        let req = test::TestRequest::post()
-            .uri(&uri)
-            .to_request();
-
-        let service = test::init_service(
-            App::new()
-                .app_data(test_app.app_state.clone())
-                .route("/llm-agent/{session_id}/complete", web::post().to(nocodo_manager::handlers::complete_llm_agent_session))
-        ).await;
-        let resp = test::call_service(&service, req).await;
-        assert!(resp.status().is_success());
-
-        // Wait for LLM processing
+        // Wait for AI session processing
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-        // Get response from LLM agent messages
-        let llm_messages = test_app.db().get_llm_agent_messages(&llm_session_id)
-            .expect("Failed to get LLM agent messages");
+        // Get response from AI session outputs
+        let ai_outputs = test_app.db().list_ai_session_outputs(&ai_session_id)
+            .expect("Failed to get AI session outputs");
 
-        let assistant_response = llm_messages
-            .iter()
-            .rev()  // Get the last assistant response
-            .find(|msg| msg.role == "assistant")
-            .expect("No assistant response found");
-
-        let response_content = &assistant_response.content;
+        let response_content = if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
+            output.content.clone()
+        } else {
+            // If no outputs yet, wait a bit more
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            let ai_outputs = test_app.db().list_ai_session_outputs(&ai_session_id)
+                .expect("Failed to get AI session outputs");
+            ai_outputs.iter()
+                .find(|output| !output.content.is_empty())
+                .map(|output| output.content.clone())
+                .unwrap_or_else(|| "No response generated".to_string())
+        };
 
         // Validate response
         let validation_result = KeywordValidator::validate_response(
-            response_content,
+            &response_content,
             &scenario.expected_keywords
         );
 

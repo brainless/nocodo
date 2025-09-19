@@ -74,10 +74,6 @@ impl TestApp {
                 .route("/api/templates", web::get().to(nocodo_manager::handlers::get_templates))
                 // Settings
                 .route("/api/settings", web::get().to(nocodo_manager::handlers::get_settings))
-                // LLM Agent
-                .route("/api/llm-agent/sessions", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}", web::get().to(nocodo_manager::handlers::get_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}/messages", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
         )
         .await;
 
@@ -163,10 +159,6 @@ impl TestApp {
                 .route("/api/templates", web::get().to(nocodo_manager::handlers::get_templates))
                 // Settings
                 .route("/api/settings", web::get().to(nocodo_manager::handlers::get_settings))
-                // LLM Agent
-                .route("/api/llm-agent/sessions", web::post().to(nocodo_manager::handlers::create_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}", web::get().to(nocodo_manager::handlers::get_llm_agent_session))
-                .route("/api/llm-agent/sessions/{session_id}/messages", web::post().to(nocodo_manager::handlers::send_llm_agent_message))
         )
         .await;
 
