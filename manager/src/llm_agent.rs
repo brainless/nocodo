@@ -1034,6 +1034,7 @@ Examples:
 5. Use write_file to create new files by setting create_if_not_exists=true when the file doesn't exist.
 6. Use write_file with search and replace parameters to modify specific parts of existing files.
 7. Use grep to search for patterns across multiple files efficiently.
+8. **IMPORTANT**: After using tools to gather information, you MUST provide a final natural language summary or answer to the user's question. Do not stop after tool calls - always provide a complete response.
 
 The tool request MUST exactly match the TypeScript interface defined above."#,
             list_files_request_ts = list_files_request_ts,
