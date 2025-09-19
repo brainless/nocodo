@@ -11,7 +11,6 @@ mod tools;
 mod websocket;
 
 use actix::Actor;
-use actix_files as fs;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use clap::{Arg, Command};
 use config::AppConfig;
@@ -201,21 +200,6 @@ async fn main() -> AppResult<()> {
                     "/ws/work/{id}",
                     web::get().to(websocket::ai_session_websocket_handler),
                 )
-                // Serve web assets from filesystem
-                .configure(|cfg| {
-                    if std::path::Path::new("manager-web/dist").exists() {
-                        tracing::info!("Serving web assets from filesystem");
-                        cfg.service(
-                            fs::Files::new("/", "manager-web/dist")
-                                .index_file("index.html")
-                                .use_etag(true)
-                                .use_last_modified(true)
-                                .prefer_utf8(true),
-                        );
-                    } else {
-                        tracing::warn!("No web assets available - manager-web/dist not found");
-                    }
-                })
         })
         .bind(&server_addr)
         .expect("Failed to bind HTTP server")
