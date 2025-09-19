@@ -1,211 +1,137 @@
 # nocodo 🤖
 
-**A platform that takes you from idea to live full-stack MVP (no lock-in)**
+**Empowering teams worldwide to build and maintain business software without programming knowledge**
 
 🚀 [**nocodo.com →**](https://nocodo.com)
 
 > ⚠️ **Under Active Development** - This product is actively being developed. Please ⭐ star and 👀 watch this repository for updates!
 
-Transform your ideas into production-ready applications using AI coding agents, your own cloud infrastructure, and unlimited development iterations.
+Built by Sumit, a software engineer from a small Himalayan village in India, nocodo is designed to help teams around the world create custom business software without needing to learn programming.
 
 ![nocodo AI Session Details](./website/src/assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png)
 
-## ✨ What We're Solving
+## 🌟 What is nocodo?
 
-### 🤖 **Free AI Coding Agents**
-Integrated AI-powered development tools with no vendor lock-in!
+nocodo is your team's AI-powered development environment that runs securely on your own cloud server. It transforms ideas into working software while handling all the complex technical details behind the scenes.
 
-### ☁️ **Your Cloud Infrastructure**
-Your development setup is managed by nocodo on your own cloud infrastructure. You own everything.
+### 🎯 **For Teams Who Want to Build Software**
 
-### 🔓 **Complete Ownership**
-Keep your API keys for coding agents and cloud providers (DigitalOcean, Scaleway, CloudFlare). Zero lock-in!
+Whether you're a marketing team wanting to customize your WordPress site, a startup building an e-commerce platform, or any team with software needs - nocodo empowers everyone to contribute to building their business software.
 
-### 🎯 **Idea to Live App**
-Takes your idea (voice notes or written text) to live full-stack app running on your domain.
+### 🔒 **Complete Privacy & Security**
 
-### 📱 **GitHub Integration**
-Uses your GitHub account to setup projects, tickets, automation, and comprehensive testing workflows.
+- **Your server, your data**: Everything runs on your own cloud infrastructure
+- **No vendor access**: The nocodo team never accesses your projects or code
+- **Bring your own AI**: Use any AI models with your own API keys
+- **No lock-in**: Switch cloud providers or AI models anytime
 
-### ♾️ **Unlimited Changes**
-Make endless change requests using your own API credits or subscriptions.
+## ✨ How nocodo Helps Your Team
 
-## 🏗️ Architecture
+### 🤝 **Team Collaboration Made Simple**
 
-The nocodo MVP consists of two core components running locally on your Linux machine:
+- **Non-technical users welcome**: Marketing, design, and business teams can contribute ideas and request changes
+- **Real-time collaboration**: Work together through a web-based interface accessible from any device
+- **Task management**: Built-in project and issue tracking keeps everyone aligned
+- **Secure access**: SSH-based access ensures security while remaining user-friendly
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                 Linux Laptop (Local)                    │
-├─────────────────────────────────┬────────────────────┤
-│          Manager Daemon         │   Manager Web      │
-│       (Rust + Actix)           │   (SolidJS) ⚡     │
-└─────────────────────────────────┴────────────────────┘
-```
+### 🚀 **From Idea to Working Software**
 
-### 🎯 **Core Components**
+- **Natural communication**: Describe what you want in plain language
+- **Instant test deployments**: See your changes running immediately on separate test environments
+- **Any tech stack**: WordPress, e-commerce platforms, custom applications - nocodo adapts to your needs
+- **Autonomous operation**: Once configured, nocodo understands your project and works independently
 
-- **🖥️ Manager Daemon**: Local orchestration service managing projects, APIs, and coordination
-- **💻 Manager Web App**: Chat-based interface for AI interaction at `localhost:8081`
+### 🛡️ **Software Best Practices, Automatically**
 
-> ⚠️ **Note**: The CLI component has been removed as part of issue #80. The nocodo CLI is no longer included in this repository.
+nocodo handles the technical complexity so you don't have to:
 
-## 🚀 Quick Start
+- **Version control**: Automatic git branch creation and management for every task
+- **Quality assurance**: Automated testing and code quality checks
+- **Safe development**: Test new features without affecting your live software
+- **Database management**: Handles database, cache, and web server setup for testing
+- **CI/CD workflows**: Runs existing automation and creates new quality checks
 
-### 📋 Prerequisites
-- 🐧 Linux laptop (tested on CachyOS Linux)
-- 🦀 Rust toolchain
-- 📦 Node.js and npm
-- 🤖 AI tools (if using external integrations)
+## 🎯 Real-World Examples
 
-### 🔧 Installation
-```bash
-# Build Manager daemon
-cargo build --release --bin nocodo-manager
-sudo cp target/release/nocodo-manager /usr/local/bin/
+### **Marketing Team Scenario**
+Your marketing team uses WordPress for your company website. With nocodo, they can:
+- Customize layouts and features without IT department involvement
+- Test changes on separate deployments before going live
+- Collaborate with developers when needed through the built-in chat
 
-# Build Web app
-cd manager-web
-npm install && npm run build
+### **E-commerce Business**
+Building an online store using PHP, Node.js, or Python:
+- Add new features and customize workflows through natural language requests
+- Test payment integrations and checkout flows safely
+- Scale and modify your platform as your business grows
 
-# Start Manager daemon
-nocodo-manager --config ~/.config/nocodo/manager.toml
-```
+### **Startup Development**
+Creating custom business software:
+- Non-technical founders can contribute feature ideas and requirements
+- Developers can focus on complex logic while nocodo handles routine tasks
+- Rapid iteration and testing of new concepts
 
-### 💡 Usage
-```bash
-# 🌐 Access web interface
-# Navigate to http://localhost:8081
+## 🏗️ How It Works
 
-# Note: The nocodo CLI has been removed as part of issue #80
-```
+### **1. Setup & Understanding**
+- Deploy nocodo on your cloud server
+- nocodo scans your project to understand the technology stack
+- If help is needed, bring engineers into the chat to guide nocodo
 
-## 🧪 Testing
+### **2. Collaborative Development**
+- Team members request features or changes through the web interface
+- nocodo creates separate git branches and test deployments automatically
+- Review and test changes before merging to production
 
-### API-Only End-to-End Tests
+### **3. Continuous Improvement**
+- GitHub integration for issue tracking and automation
+- Continuous integration pipelines run automatically
+- Quality checks and testing happen behind the scenes
 
-nocodo includes fast, reliable API-only end-to-end tests that focus on LLM agent tool call processing without loading UI components.
+## 🛠️ Technical Foundation
 
-#### 🚀 Key Benefits
-- **10-20x faster** than browser-based tests
-- **More reliable** - no UI timing issues or DOM dependencies
-- **Better coverage** - direct API endpoint testing
-- **CI/CD friendly** - no headless browser requirements
+### **Secure Architecture**
+- Runs entirely on your own infrastructure
+- No data leaves your environment
+- SSH-only access for maximum security
+- Web-based interface accessible from any operating system
 
-#### 🏃 Running Tests
+### **Flexible Integration**
+- **Git & GitHub**: Seamless version control and issue management
+- **Multiple AI models**: Use your preferred AI providers with your own keys
+- **Any tech stack**: Adapts to existing projects and technologies
+- **Team scaling**: Invite unlimited team members
 
-```bash
-# Run all API E2E tests
-cd manager-web
-npm run test:api-e2e
+### **Development Environment**
+- **Test deployments**: Separate environments for testing new features
+- **Database management**: Automatic setup and management of development databases
+- **Automated testing**: Runs existing test suites and creates new quality checks
+- **Workflow automation**: CI/CD pipelines and quality assurance tools
 
-# Run tests in watch mode during development
-npm run test:api-e2e:watch
+## 🚀 Getting Started
 
-# Run tests with coverage reporting
-npm run test:api-e2e:coverage
+Ready to empower your team with AI-assisted development?
 
-# Run tests for CI (with JSON output)
-npm run test:api-e2e:ci
-```
+1. **Deploy**: Set up nocodo on your cloud infrastructure
+2. **Connect**: Integrate with your existing projects and tools
+3. **Collaborate**: Invite your team and start building together
+4. **Iterate**: Make unlimited changes and improvements with confidence
 
-#### 📊 Test Coverage
+**[📚 Read the Complete Setup Guide →](https://nocodo.com/playbook)**
 
-The API-only tests cover:
+## 🌍 Join the Global Community
 
-- **Project Management**: CRUD operations, validation, workflows
-- **File Operations**: Create, read, update, delete, listing, search
-- **Work Sessions**: LLM agent session management, message handling
-- **Tool Call Processing**: File operations, error handling, complex workflows
-- **WebSocket Communication**: Real-time updates, connection management
-- **State Management**: SolidJS store integration, reactive updates
-- **Performance**: Load testing, concurrent operations, memory usage
-- **Error Handling**: Edge cases, boundary conditions, recovery scenarios
+Teams worldwide are using nocodo to build:
+- Custom business applications
+- E-commerce platforms
+- Marketing websites
+- Internal tools and dashboards
+- API integrations and automations
 
-#### 🏗️ Test Architecture
-
-```
-manager-web/src/__tests__/api-e2e/
-├── setup/                    # Test infrastructure
-│   ├── api-client.ts        # HTTP client for API calls
-│   ├── test-server.ts       # Manager daemon lifecycle
-│   ├── test-database.ts     # Database setup/cleanup
-│   ├── test-data.ts         # Mock data generators
-│   └── setup.test.ts        # Framework verification
-├── workflows/               # Core workflow tests
-│   ├── project-workflow.test.ts
-│   ├── file-operations.test.ts
-│   ├── work-session.test.ts
-│   └── llm-agent.test.ts
-├── integration/             # Complex integration tests
-│   ├── end-to-end-workflow.test.ts
-│   ├── websocket-communication.test.ts
-│   ├── complex-workflows.test.ts
-│   ├── error-handling.test.ts
-│   ├── performance-testing.test.ts
-│   └── solid-integration.test.ts
-└── utils/                   # Test utilities
-    ├── websocket-client.ts
-    └── state-manager.ts
-```
-
-#### 🔄 CI/CD Integration
-
-Tests run automatically on:
-- Push to `main` or `develop` branches
-- Pull requests affecting test files
-- Scheduled runs for performance regression detection
-
-Coverage reports are uploaded to Codecov, and test results are archived for 30 days.
-
-## 📖 Vibe Coding Playbook
-
-Learn our proven methodology for building MVP web applications using terminal-based coding tools and structured prompting flows. Master the art of being both Product Owner and Project Manager in your AI-assisted development workflow.
-
-**[📚 Read the Complete Playbook →](https://nocodo.com/playbook)**
-
-## 🎓 Vibe Coding Fundamentals
-
-Master the essential fundamentals for AI-powered development:
-
-- **📖 Learn**: Master fundamentals and AI tools through structured modules
-- **🧪 Practice**: Apply concepts with hands-on projects and real-world scenarios
-- **⚡ Optimize**: Fine-tune your AI-assisted development workflow
-- **🤝 Share**: Contribute to the vibe coding community
-
-## 🛣️ Roadmap
-
-### 🎯 **Current MVP Focus**
-- ✅ Local Linux laptop deployment
-- ✅ Manager daemon with SQLite
-- ✅ Web interface at localhost:8081
-- ✅ CLI integration with AI tools
-- 🔄 Active development and testing
-
-### 🚀 **Future Features**
-- ☁️ Cloud deployment automation
-- 🌐 Public domain hosting (`*.nocodo.dev`)
-- 🔧 Infrastructure as code
-- 📊 Advanced monitoring and analytics
-- 🔒 Enhanced security features
-
-## 🤝 Contributing
-
-We're preparing for launch with early adopters!
-
-- 🐛 **Found a bug?** Open an issue
-- 💡 **Have an idea?** Start a discussion
-- 🔧 **Want to contribute?** Check our development workflow
-- ⭐ **Support us** by starring this repository
-
-## 📞 Stay Connected
-
-- 🌐 **Website**: [nocodo.com](https://nocodo.com)
-- 📖 **Documentation**: [docs.nocodo.com](https://nocodo.com/fundamentals)
-- 📋 **Playbook**: [nocodo.com/playbook](https://nocodo.com/playbook)
+**Technical details and specifications**: See `specs/PROJECT.md` and linked documentation
 
 ---
 
-**⚡ Ready to transform your development workflow?** [**Get Started →**](https://nocodo.com)
+**⚡ Ready to transform how your team builds software?** [**Get Started →**](https://nocodo.com)
 
-> 🤖 Built with AI • 🔓 No lock-in • ♾️ Unlimited possibilities
+> 🤖 Built with AI • 🔓 No lock-in • 🌍 Empowering teams worldwide
