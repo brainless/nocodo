@@ -641,19 +641,14 @@ impl ToolExecutor {
         tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
         current_path: &str,
         prefix: &str,
-        _is_last: bool,
     ) {
             let files = match tree.get(current_path) {
                 Some(files) => files,
                 None => return,
             };
 
-            for (i, file) in files.iter().enumerate() {
-                let is_last_item = i == files.len() - 1;
-                let item_prefix = if is_last_item { "└── " } else { "├── " };
-                let next_prefix = if is_last_item { "    " } else { "│   " };
-
-                output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
+            for (_i, file) in files.iter().enumerate() {
+                output.push_str(&format!("{}  {}", prefix, file.name));
 
                 if file.ignored {
                     output.push_str(" (ignored)");
@@ -668,12 +663,12 @@ impl ToolExecutor {
                     } else {
                         format!("{}/{}", current_path, file.name)
                     };
-                    build_tree_level(output, tree, &child_path, &format!("{}{}", prefix, next_prefix), is_last_item);
+                    build_tree_level(output, tree, &child_path, &format!("{}  ", prefix));
                 }
             }
         }
 
-        build_tree_level(&mut output, &file_tree, "", "", true);
+        build_tree_level(&mut output, &file_tree, "", "");
         output
     }
 
