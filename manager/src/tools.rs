@@ -167,7 +167,9 @@ impl ToolExecutor {
                 (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
                 _ => {
                     // Both are same type, sort by name case-insensitively
-                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                    a.name
+                        .to_lowercase()
+                        .cmp(&b.name.to_lowercase())
                         .then_with(|| a.name.cmp(&b.name)) // Stable sort for same lowercase names
                 }
             }
@@ -549,7 +551,9 @@ impl ToolExecutor {
                 }
                 std::path::Component::ParentDir => {
                     // Prevent directory traversal attacks
-                    if components.is_empty() || matches!(components.last(), Some(std::path::Component::ParentDir)) {
+                    if components.is_empty()
+                        || matches!(components.last(), Some(std::path::Component::ParentDir))
+                    {
                         return Err(ToolError::InvalidPath(format!(
                             "Invalid path '{}': contains directory traversal",
                             path.display()
@@ -618,10 +622,11 @@ impl ToolExecutor {
         output.push_str(&root_name);
         output.push('\n');
 
-    // Group files by their directory depth and parent
-    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> = std::collections::BTreeMap::new();
+        // Group files by their directory depth and parent
+        let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
+            std::collections::BTreeMap::new();
 
-    for file in files.iter() {
+        for file in files.iter() {
             let path_parts: Vec<&str> = file.path.split('/').collect();
             let depth = path_parts.len().saturating_sub(1);
 
@@ -632,16 +637,19 @@ impl ToolExecutor {
                 path_parts[..depth].join("/")
             };
 
-            file_tree.entry(parent_key).or_insert_with(Vec::new).push(file);
+            file_tree
+                .entry(parent_key)
+                .or_insert_with(Vec::new)
+                .push(file);
         }
 
         // Recursive function to build tree
-    fn build_tree_level(
-        output: &mut String,
-        tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
-        current_path: &str,
-        prefix: &str,
-    ) {
+        fn build_tree_level(
+            output: &mut String,
+            tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
+            current_path: &str,
+            prefix: &str,
+        ) {
             let files = match tree.get(current_path) {
                 Some(files) => files,
                 None => return,
@@ -784,9 +792,17 @@ mod tests {
         fs::write(temp_dir.path().join("normal.txt"), "Normal file").unwrap();
         fs::write(temp_dir.path().join(".hidden.txt"), "Hidden file").unwrap();
         fs::create_dir_all(temp_dir.path().join(".hidden_dir")).unwrap();
-        fs::write(temp_dir.path().join(".hidden_dir/file.txt"), "File in hidden dir").unwrap();
+        fs::write(
+            temp_dir.path().join(".hidden_dir/file.txt"),
+            "File in hidden dir",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.path().join("normal_dir")).unwrap();
-        fs::write(temp_dir.path().join("normal_dir/.hidden_in_normal.txt"), "Hidden in normal dir").unwrap();
+        fs::write(
+            temp_dir.path().join("normal_dir/.hidden_in_normal.txt"),
+            "Hidden in normal dir",
+        )
+        .unwrap();
 
         // Test without including hidden files
         let request = ListFilesRequest {
@@ -887,7 +903,11 @@ mod tests {
 
         // Create more files than the limit
         for i in 0..15 {
-            fs::write(temp_dir.path().join(format!("file_{:02}.txt", i)), format!("Content {}", i)).unwrap();
+            fs::write(
+                temp_dir.path().join(format!("file_{:02}.txt", i)),
+                format!("Content {}", i),
+            )
+            .unwrap();
         }
 
         // Test with max_files limit of 10
@@ -954,15 +974,25 @@ mod tests {
         for (input_path, expected_relative) in test_cases {
             let resolved = executor.validate_and_resolve_path(input_path).unwrap();
             let expected = temp_dir.path().join(expected_relative);
-            assert_eq!(resolved, expected, "Failed to normalize path: {}", input_path);
+            assert_eq!(
+                resolved, expected,
+                "Failed to normalize path: {}",
+                input_path
+            );
         }
 
         // Test directory traversal prevention
         let traversal_result = executor.validate_and_resolve_path("../outside");
-        assert!(traversal_result.is_err(), "Should prevent directory traversal");
+        assert!(
+            traversal_result.is_err(),
+            "Should prevent directory traversal"
+        );
 
         let traversal_result2 = executor.validate_and_resolve_path("../../../etc/passwd");
-        assert!(traversal_result2.is_err(), "Should prevent directory traversal with multiple ..");
+        assert!(
+            traversal_result2.is_err(),
+            "Should prevent directory traversal with multiple .."
+        );
     }
 
     #[tokio::test]

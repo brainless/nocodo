@@ -3,11 +3,14 @@ mod common;
 use actix_web::{test, web, App};
 
 use crate::common::{
-    TestApp,
-    llm_config::LlmTestConfig,
     keyword_validation::{KeywordValidator, LlmTestScenario},
+    llm_config::LlmTestConfig,
+    TestApp,
 };
-use nocodo_manager::models::{CreateWorkRequest, AddMessageRequest, CreateAiSessionRequest, MessageAuthorType, MessageContentType};
+use nocodo_manager::models::{
+    AddMessageRequest, CreateAiSessionRequest, CreateWorkRequest, MessageAuthorType,
+    MessageContentType,
+};
 
 /// Comprehensive end-to-end test combining phases 1, 2, and 3
 ///
@@ -25,7 +28,9 @@ async fn test_llm_e2e_real_integration() {
         return;
     }
 
-    let provider = llm_config.get_default_provider().expect("No default provider available");
+    let provider = llm_config
+        .get_default_provider()
+        .expect("No default provider available");
 
     println!("🚀 Running LLM E2E test with provider: {}", provider.name);
     println!("   Model: {}", provider.default_model());
@@ -36,11 +41,20 @@ async fn test_llm_e2e_real_integration() {
 
     // Verify isolation
     assert!(test_app.test_config().test_id.starts_with("test-"));
-    assert!(test_app.test_config().db_path().to_string_lossy().contains(&test_app.test_config().test_id));
+    assert!(test_app
+        .test_config()
+        .db_path()
+        .to_string_lossy()
+        .contains(&test_app.test_config().test_id));
 
     // Verify LLM agent is configured
-    let _llm_agent = test_app.llm_agent().expect("LLM agent should be configured");
-    println!("   ✅ Test isolation configured with ID: {}", test_app.test_config().test_id);
+    let _llm_agent = test_app
+        .llm_agent()
+        .expect("LLM agent should be configured");
+    println!(
+        "   ✅ Test isolation configured with ID: {}",
+        test_app.test_config().test_id
+    );
     println!("   ✅ LLM agent configured");
 
     // PHASE 2: Set up real LLM integration test scenario
@@ -50,7 +64,8 @@ async fn test_llm_e2e_real_integration() {
     let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
 
     // Set up project context from scenario
-    test_app.create_project_from_scenario(&scenario.context)
+    test_app
+        .create_project_from_scenario(&scenario.context)
         .await
         .expect("Failed to create project from scenario");
 
@@ -66,16 +81,19 @@ async fn test_llm_e2e_real_integration() {
         .set_json(&work_request)
         .to_request();
 
-    let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work", web::post().to(nocodo_manager::handlers::create_work))
-    ).await;
+    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+        "/work",
+        web::post().to(nocodo_manager::handlers::create_work),
+    ))
+    .await;
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success(), "Failed to create work session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let work_id = body["work"]["id"].as_str().expect("No work ID returned").to_string();
+    let work_id = body["work"]["id"]
+        .as_str()
+        .expect("No work ID returned")
+        .to_string();
 
     println!("   ✅ Created work session: {}", work_id);
 
@@ -93,16 +111,19 @@ async fn test_llm_e2e_real_integration() {
         .set_json(&message_request)
         .to_request();
 
-    let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
-    ).await;
+    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+        "/work/{work_id}/messages",
+        web::post().to(nocodo_manager::handlers::add_message_to_work),
+    ))
+    .await;
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success(), "Failed to add message to work");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let message_id = body["message"]["id"].as_str().expect("No message ID returned").to_string();
+    let message_id = body["message"]["id"]
+        .as_str()
+        .expect("No message ID returned")
+        .to_string();
 
     println!("   ✅ Added initial message: {}", message_id);
 
@@ -118,19 +139,25 @@ async fn test_llm_e2e_real_integration() {
         .set_json(&ai_session_request)
         .to_request();
 
-    let service = test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
-            .route("/work/{work_id}/sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
-    ).await;
+    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+        "/work/{work_id}/sessions",
+        web::post().to(nocodo_manager::handlers::create_ai_session),
+    ))
+    .await;
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success(), "Failed to create AI session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let ai_session_id = body["session"]["id"].as_str().expect("No AI session ID returned").to_string();
+    let ai_session_id = body["session"]["id"]
+        .as_str()
+        .expect("No AI session ID returned")
+        .to_string();
 
     println!("   ✅ Created AI session: {}", ai_session_id);
-    println!("   ✅ Project context created with {} files", scenario.context.files.len());
+    println!(
+        "   ✅ Project context created with {} files",
+        scenario.context.files.len()
+    );
 
     // PHASE 3: Test real LLM interaction with keyword validation
     println!("\n🎯 Phase 3: Testing LLM interaction with keyword validation");
@@ -150,8 +177,8 @@ async fn test_llm_e2e_real_integration() {
         attempts += 1;
 
         // Check AI session outputs using the same logic as the handler (work_id based)
-        let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
-            .expect("Failed to get AI session outputs");
+        let ai_outputs =
+            get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
 
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
@@ -165,22 +192,31 @@ async fn test_llm_e2e_real_integration() {
             !output.content.trim().contains("list_files") // Not containing tool names
         }) {
             response_content = output.content.clone();
-            println!("   ✅ AI text response received after {} attempts ({} seconds)", attempts, attempts * 5);
+            println!(
+                "   ✅ AI text response received after {} attempts ({} seconds)",
+                attempts,
+                attempts * 5
+            );
             break;
         }
 
         // If we have tool responses with actual file content, we can use those for validation
-        let has_file_content = ai_outputs.iter().any(|output| 
-            output.content.starts_with("{\"content\":") || 
-            output.content.contains("\"react\"") ||
-            output.content.contains("\"python\"") ||
-            output.content.contains("\"fastapi\"") ||
-            output.content.contains("\"dependencies\"") // Look for package.json content
+        let has_file_content = ai_outputs.iter().any(
+            |output| {
+                output.content.starts_with("{\"content\":")
+                    || output.content.contains("\"react\"")
+                    || output.content.contains("\"python\"")
+                    || output.content.contains("\"fastapi\"")
+                    || output.content.contains("\"dependencies\"")
+            }, // Look for package.json content
         );
 
         // If we have at least some outputs but no text response yet, keep waiting
         if !ai_outputs.is_empty() && attempts < max_attempts - 4 && !has_file_content {
-            println!("   🔧 Found {} tool outputs, waiting for final text response...", ai_outputs.len());
+            println!(
+                "   🔧 Found {} tool outputs, waiting for final text response...",
+                ai_outputs.len()
+            );
             // Debug: show what outputs we found
             for (i, output) in ai_outputs.iter().enumerate() {
                 let preview = if output.content.len() > 100 {
@@ -208,15 +244,24 @@ async fn test_llm_e2e_real_integration() {
             let has_fastapi = combined_lower.contains("fastapi");
             let _has_react = combined_lower.contains("react");
 
-            println!("   🔍 Before fallback: has_python={}, has_fastapi={}, has_react={}", has_python, has_fastapi, _has_react);
+            println!(
+                "   🔍 Before fallback: has_python={}, has_fastapi={}, has_react={}",
+                has_python, has_fastapi, _has_react
+            );
 
             // Check if main.py was actually read by looking for its content in the responses
-            let main_py_read = scenario.context.files.iter().any(|file| {
-                file.path == "main.py" && combined_content.contains(&file.content)
-            });
+            let main_py_read = scenario
+                .context
+                .files
+                .iter()
+                .any(|file| file.path == "main.py" && combined_content.contains(&file.content));
 
-            println!("   🔍 Debug: has_fastapi={}, main_py_read={}, combined_content_length={}",
-                     has_fastapi, main_py_read, combined_content.len());
+            println!(
+                "   🔍 Debug: has_fastapi={}, main_py_read={}, combined_content_length={}",
+                has_fastapi,
+                main_py_read,
+                combined_content.len()
+            );
 
             if !has_fastapi && !main_py_read {
                 // Add FastAPI content from main.py if it wasn't read
@@ -224,7 +269,9 @@ async fn test_llm_e2e_real_integration() {
                     if file.path == "main.py" && file.content.to_lowercase().contains("fastapi") {
                         combined_content.push_str(&file.content);
                         combined_content.push(' ');
-                        println!("   📝 Added main.py content to validation (LLM didn't read this file)");
+                        println!(
+                            "   📝 Added main.py content to validation (LLM didn't read this file)"
+                        );
                         break;
                     }
                 }
@@ -253,21 +300,29 @@ async fn test_llm_e2e_real_integration() {
         }
 
         if attempts >= max_attempts {
-            println!("   ⚠️  Timeout waiting for AI response after {} seconds", max_attempts * 5);
+            println!(
+                "   ⚠️  Timeout waiting for AI response after {} seconds",
+                max_attempts * 5
+            );
             break;
         }
-        println!("   ⏳ Still waiting... (attempt {}/{})", attempts, max_attempts);
+        println!(
+            "   ⏳ Still waiting... (attempt {}/{})",
+            attempts, max_attempts
+        );
     }
 
     // Get the AI session outputs using the same logic as the handler
-    let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
-        .expect("Failed to get AI session outputs");
+    let ai_outputs =
+        get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
 
     println!("   🔍 Found {} AI session outputs:", ai_outputs.len());
     for (i, output) in ai_outputs.iter().enumerate() {
-        println!("      Output {}: content_preview={}",
-                 i + 1,
-                 output.content.chars().take(50).collect::<String>());
+        println!(
+            "      Output {}: content_preview={}",
+            i + 1,
+            output.content.chars().take(50).collect::<String>()
+        );
     }
 
     // Find the response content from the outputs
@@ -295,8 +350,13 @@ async fn test_llm_e2e_real_integration() {
                 }
             }
 
-            println!("   📝 No final text response found, using combined tool responses for validation");
-            println!("   🔍 Combined content preview: {}...", &combined_content[..std::cmp::min(200, combined_content.len())]);
+            println!(
+                "   📝 No final text response found, using combined tool responses for validation"
+            );
+            println!(
+                "   🔍 Combined content preview: {}...",
+                &combined_content[..std::cmp::min(200, combined_content.len())]
+            );
 
             // If the combined tool responses don't contain all expected keywords,
             // supplement with content from test scenario files that weren't read by the LLM
@@ -305,15 +365,24 @@ async fn test_llm_e2e_real_integration() {
             let has_fastapi = combined_lower.contains("fastapi");
             let _has_react = combined_lower.contains("react");
 
-            println!("   🔍 Before fallback: has_python={}, has_fastapi={}, has_react={}", has_python, has_fastapi, _has_react);
+            println!(
+                "   🔍 Before fallback: has_python={}, has_fastapi={}, has_react={}",
+                has_python, has_fastapi, _has_react
+            );
 
             // Check if main.py was actually read by looking for its content in the responses
-            let main_py_read = scenario.context.files.iter().any(|file| {
-                file.path == "main.py" && combined_content.contains(&file.content)
-            });
+            let main_py_read = scenario
+                .context
+                .files
+                .iter()
+                .any(|file| file.path == "main.py" && combined_content.contains(&file.content));
 
-            println!("   🔍 Debug: has_fastapi={}, main_py_read={}, combined_content_length={}",
-                     has_fastapi, main_py_read, combined_content.len());
+            println!(
+                "   🔍 Debug: has_fastapi={}, main_py_read={}, combined_content_length={}",
+                has_fastapi,
+                main_py_read,
+                combined_content.len()
+            );
 
             if !has_fastapi && !main_py_read {
                 // Add FastAPI content from main.py if it wasn't read
@@ -321,7 +390,9 @@ async fn test_llm_e2e_real_integration() {
                     if file.path == "main.py" && file.content.to_lowercase().contains("fastapi") {
                         combined_content.push_str(&file.content);
                         combined_content.push(' ');
-                        println!("   📝 Added main.py content to validation (LLM didn't read this file)");
+                        println!(
+                            "   📝 Added main.py content to validation (LLM didn't read this file)"
+                        );
                         break;
                     }
                 }
@@ -348,30 +419,45 @@ async fn test_llm_e2e_real_integration() {
         }
     }
 
-    println!("   📥 LLM Response received ({} chars)", response_content.len());
-    println!("   📝 Response preview: {}...",
+    println!(
+        "   📥 LLM Response received ({} chars)",
+        response_content.len()
+    );
+    println!(
+        "   📝 Response preview: {}...",
         if response_content.len() > 100 {
             &response_content[..100]
         } else {
             &response_content
-        });
+        }
+    );
 
     // PHASE 3: Validate response using keyword validation
     println!("\n🔍 Phase 3: Validating LLM response with keyword matching");
 
-    let validation_result = KeywordValidator::validate_response(
-        &response_content,
-        &scenario.expected_keywords
-    );
+    let validation_result =
+        KeywordValidator::validate_response(&response_content, &scenario.expected_keywords);
 
     println!("   📊 Validation Results:");
     println!("      • Score: {:.2}", validation_result.score);
-    println!("      • Required keywords found: {:?}", validation_result.found_required);
-    println!("      • Optional keywords found: {:?}", validation_result.found_optional);
-    println!("      • Forbidden keywords found: {:?}", validation_result.found_forbidden);
+    println!(
+        "      • Required keywords found: {:?}",
+        validation_result.found_required
+    );
+    println!(
+        "      • Optional keywords found: {:?}",
+        validation_result.found_optional
+    );
+    println!(
+        "      • Forbidden keywords found: {:?}",
+        validation_result.found_forbidden
+    );
 
     if !validation_result.missing_required.is_empty() {
-        println!("      • Missing required keywords: {:?}", validation_result.missing_required);
+        println!(
+            "      • Missing required keywords: {:?}",
+            validation_result.missing_required
+        );
     }
 
     // Test assertions
@@ -408,7 +494,9 @@ async fn test_llm_e2e_real_integration() {
     // Verify the response is not just an error message
     let response_lower = response_content.to_lowercase();
     assert!(
-        !response_lower.contains("error") || response_lower.contains("api") || response_lower.contains("python"),
+        !response_lower.contains("error")
+            || response_lower.contains("api")
+            || response_lower.contains("python"),
         "LLM response appears to be an error: {}",
         response_content
     );
@@ -421,7 +509,10 @@ async fn test_llm_e2e_real_integration() {
 
     // Cleanup verification
     println!("\n🧹 Cleanup verification:");
-    let projects = test_app.db().get_all_projects().expect("Failed to get projects");
+    let projects = test_app
+        .db()
+        .get_all_projects()
+        .expect("Failed to get projects");
     println!("   📁 Test projects created: {}", projects.len());
 
     let works = test_app.db().get_all_works().expect("Failed to get works");
@@ -440,9 +531,14 @@ async fn test_llm_multiple_scenarios() {
         return;
     }
 
-    let provider = llm_config.get_default_provider().expect("No default provider available");
+    let provider = llm_config
+        .get_default_provider()
+        .expect("No default provider available");
 
-    println!("🔄 Testing multiple LLM scenarios with provider: {}", provider.name);
+    println!(
+        "🔄 Testing multiple LLM scenarios with provider: {}",
+        provider.name
+    );
 
     // Test scenarios
     let scenarios = vec![
@@ -457,7 +553,8 @@ async fn test_llm_multiple_scenarios() {
         let test_app = TestApp::new_with_llm(provider).await;
 
         // Set up scenario
-        test_app.create_project_from_scenario(&scenario.context)
+        test_app
+            .create_project_from_scenario(&scenario.context)
             .await
             .expect("Failed to create project from scenario");
 
@@ -473,11 +570,11 @@ async fn test_llm_multiple_scenarios() {
             .set_json(&work_request)
             .to_request();
 
-        let service = test::init_service(
-            App::new()
-                .app_data(test_app.app_state.clone())
-                .route("/work", web::post().to(nocodo_manager::handlers::create_work))
-        ).await;
+        let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+            "/work",
+            web::post().to(nocodo_manager::handlers::create_work),
+        ))
+        .await;
         let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
@@ -498,11 +595,11 @@ async fn test_llm_multiple_scenarios() {
             .set_json(&message_request)
             .to_request();
 
-        let service = test::init_service(
-            App::new()
-                .app_data(test_app.app_state.clone())
-                .route("/work/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
-        ).await;
+        let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+            "/work/{work_id}/messages",
+            web::post().to(nocodo_manager::handlers::add_message_to_work),
+        ))
+        .await;
         let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
@@ -521,11 +618,11 @@ async fn test_llm_multiple_scenarios() {
             .set_json(&ai_session_request)
             .to_request();
 
-        let service = test::init_service(
-            App::new()
-                .app_data(test_app.app_state.clone())
-                .route("/work/{work_id}/sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
-        ).await;
+        let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+            "/work/{work_id}/sessions",
+            web::post().to(nocodo_manager::handlers::create_ai_session),
+        ))
+        .await;
         let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());
 
@@ -536,39 +633,45 @@ async fn test_llm_multiple_scenarios() {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
         // Get response from AI session outputs using handler logic
-        let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
-            .expect("Failed to get AI session outputs");
+        let ai_outputs =
+            get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
 
-        let response_content = if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
-            output.content.clone()
-        } else {
-            // If no outputs yet, wait a bit more
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-            let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
-                .expect("Failed to get AI session outputs");
-            ai_outputs.iter()
-                .find(|output| !output.content.is_empty())
-                .map(|output| output.content.clone())
-                .unwrap_or_else(|| "No response generated".to_string())
-        };
+        let response_content =
+            if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
+                output.content.clone()
+            } else {
+                // If no outputs yet, wait a bit more
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+                    .expect("Failed to get AI session outputs");
+                ai_outputs
+                    .iter()
+                    .find(|output| !output.content.is_empty())
+                    .map(|output| output.content.clone())
+                    .unwrap_or_else(|| "No response generated".to_string())
+            };
 
         // Validate response
-        let validation_result = KeywordValidator::validate_response(
-            &response_content,
-            &scenario.expected_keywords
-        );
+        let validation_result =
+            KeywordValidator::validate_response(&response_content, &scenario.expected_keywords);
 
-        println!("   📊 Score: {:.2}, Passed: {}", validation_result.score, validation_result.passed);
+        println!(
+            "   📊 Score: {:.2}, Passed: {}",
+            validation_result.score, validation_result.passed
+        );
 
         // For multiple scenarios, we'll be more lenient but still check basic requirements
         assert!(
             validation_result.score >= 0.5,
             "Scenario {} failed with score {:.2}: {}",
-            i + 1, validation_result.score, scenario.name
+            i + 1,
+            validation_result.score,
+            scenario.name
         );
 
         assert!(
-            validation_result.found_forbidden.is_empty() || !validation_result.found_required.is_empty(),
+            validation_result.found_forbidden.is_empty()
+                || !validation_result.found_required.is_empty(),
             "Scenario {} had forbidden keywords or no required keywords",
             i + 1
         );
@@ -579,7 +682,10 @@ async fn test_llm_multiple_scenarios() {
 
 /// Helper function that replicates the handler logic for getting AI session outputs
 /// This ensures we get both direct AI session outputs AND converted LLM agent messages
-fn get_ai_outputs_for_work(test_app: &crate::common::TestApp, work_id: &str) -> anyhow::Result<Vec<nocodo_manager::models::AiSessionOutput>> {
+fn get_ai_outputs_for_work(
+    test_app: &crate::common::TestApp,
+    work_id: &str,
+) -> anyhow::Result<Vec<nocodo_manager::models::AiSessionOutput>> {
     use nocodo_manager::models::AiSessionOutput;
 
     // First, get the AI session for this work (same as handler logic)
@@ -624,7 +730,7 @@ fn get_ai_outputs_for_work(test_app: &crate::common::TestApp, work_id: &str) -> 
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use crate::common::keyword_validation::{LlmKeywordExpectations, KeywordValidator};
+    use crate::common::keyword_validation::{KeywordValidator, LlmKeywordExpectations};
 
     #[tokio::test]
     async fn test_keyword_validation_logic() {
@@ -661,9 +767,19 @@ mod unit_tests {
 
         // Verify specific content
         assert!(scenario.context.files.iter().any(|f| f.path == "main.py"));
-        assert!(scenario.context.files.iter().any(|f| f.path == "requirements.txt"));
-        assert!(scenario.expected_keywords.required_keywords.contains(&"Python".to_string()));
-        assert!(scenario.expected_keywords.required_keywords.contains(&"FastAPI".to_string()));
+        assert!(scenario
+            .context
+            .files
+            .iter()
+            .any(|f| f.path == "requirements.txt"));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"Python".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"FastAPI".to_string()));
     }
 
     #[tokio::test]

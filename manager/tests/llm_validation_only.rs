@@ -28,35 +28,44 @@ pub struct KeywordValidator;
 impl KeywordValidator {
     pub fn validate_response(
         response: &str,
-        expectations: &LlmKeywordExpectations
+        expectations: &LlmKeywordExpectations,
     ) -> LlmValidationResult {
         let response_lower = response.to_lowercase();
 
-        let found_required: Vec<_> = expectations.required_keywords
+        let found_required: Vec<_> = expectations
+            .required_keywords
             .iter()
             .filter(|k| Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
-        let found_optional: Vec<_> = expectations.optional_keywords
+        let found_optional: Vec<_> = expectations
+            .optional_keywords
             .iter()
             .filter(|k| Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
-        let found_forbidden: Vec<_> = expectations.forbidden_keywords
+        let found_forbidden: Vec<_> = expectations
+            .forbidden_keywords
             .iter()
             .filter(|k| Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
-        let missing_required: Vec<_> = expectations.required_keywords
+        let missing_required: Vec<_> = expectations
+            .required_keywords
             .iter()
             .filter(|k| !Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
-        let score = Self::calculate_score(&found_required, &found_optional, &found_forbidden, expectations);
+        let score = Self::calculate_score(
+            &found_required,
+            &found_optional,
+            &found_forbidden,
+            expectations,
+        );
 
         let passed = found_required.len() == expectations.required_keywords.len()
             && found_forbidden.is_empty()
@@ -79,7 +88,9 @@ impl KeywordValidator {
         if keyword_lower.len() == 1 {
             let words: Vec<&str> = text.split_whitespace().collect();
             return words.iter().any(|word| {
-                let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+                let clean_word = word
+                    .trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_lowercase();
                 clean_word == keyword_lower
             });
         }
@@ -87,7 +98,9 @@ impl KeywordValidator {
         // For multi-letter keywords, use contains with word boundaries and partial matching
         let words: Vec<&str> = text.split_whitespace().collect();
         if words.iter().any(|word| {
-            let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+            let clean_word = word
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase();
             clean_word == keyword_lower || clean_word.contains(&keyword_lower)
         }) {
             return true;
@@ -111,7 +124,7 @@ impl KeywordValidator {
         found_required: &[String],
         found_optional: &[String],
         found_forbidden: &[String],
-        expectations: &LlmKeywordExpectations
+        expectations: &LlmKeywordExpectations,
     ) -> f32 {
         let required_score = if expectations.required_keywords.is_empty() {
             1.0
@@ -137,8 +150,16 @@ fn test_keyword_validation_python_fastapi() {
     println!("🧪 Testing keyword validation - Python FastAPI + React");
 
     let expectations = LlmKeywordExpectations {
-        required_keywords: vec!["Python".to_string(), "FastAPI".to_string(), "React".to_string()],
-        optional_keywords: vec!["TypeScript".to_string(), "API".to_string(), "Pydantic".to_string()],
+        required_keywords: vec![
+            "Python".to_string(),
+            "FastAPI".to_string(),
+            "React".to_string(),
+        ],
+        optional_keywords: vec![
+            "TypeScript".to_string(),
+            "API".to_string(),
+            "Pydantic".to_string(),
+        ],
         forbidden_keywords: vec!["Django".to_string(), "Vue".to_string(), "Java".to_string()],
         minimum_score: 0.7,
     };
@@ -161,7 +182,8 @@ fn test_keyword_validation_python_fastapi() {
     assert_eq!(result.found_forbidden.len(), 0); // No forbidden keywords
 
     // Test failing validation
-    let bad_response = "This project uses Django web framework with Vue.js frontend and Java backend services.";
+    let bad_response =
+        "This project uses Django web framework with Vue.js frontend and Java backend services.";
 
     let result = KeywordValidator::validate_response(bad_response, &expectations);
 
@@ -186,7 +208,11 @@ fn test_keyword_validation_rust() {
     let expectations = LlmKeywordExpectations {
         required_keywords: vec!["Rust".to_string(), "Actix".to_string(), "Tokio".to_string()],
         optional_keywords: vec!["async".to_string(), "Serde".to_string(), "HTTP".to_string()],
-        forbidden_keywords: vec!["Python".to_string(), "JavaScript".to_string(), "Django".to_string()],
+        forbidden_keywords: vec![
+            "Python".to_string(),
+            "JavaScript".to_string(),
+            "Django".to_string(),
+        ],
         minimum_score: 0.6,
     };
 
@@ -201,10 +227,18 @@ fn test_keyword_validation_rust() {
     println!("   Optional found: {:?}", result.found_optional);
     println!("   Forbidden found: {:?}", result.found_forbidden);
     println!("   Missing required: {:?}", result.missing_required);
-    println!("   Required count: {}/{}", result.found_required.len(), expectations.required_keywords.len());
+    println!(
+        "   Required count: {}/{}",
+        result.found_required.len(),
+        expectations.required_keywords.len()
+    );
     println!("   Minimum score: {:.2}", expectations.minimum_score);
 
-    assert!(result.passed, "Rust response should pass validation, but got score {:.2} (passed: {})", result.score, result.passed);
+    assert!(
+        result.passed,
+        "Rust response should pass validation, but got score {:.2} (passed: {})",
+        result.score, result.passed
+    );
     assert!(result.score >= 0.6, "Score should be at least 0.6");
     assert_eq!(result.found_required.len(), 3); // Rust, Actix, Tokio
     assert!(result.found_optional.len() >= 2); // async, Serde, HTTP
@@ -218,14 +252,19 @@ fn test_fuzzy_keyword_matching() {
     println!("🧪 Testing fuzzy keyword matching");
 
     let expectations = LlmKeywordExpectations {
-        required_keywords: vec!["FastAPI".to_string(), "TypeScript".to_string(), "React".to_string()],
+        required_keywords: vec![
+            "FastAPI".to_string(),
+            "TypeScript".to_string(),
+            "React".to_string(),
+        ],
         optional_keywords: vec![],
         forbidden_keywords: vec![],
         minimum_score: 0.5,
     };
 
     // Test with alternative spellings and abbreviations
-    let fuzzy_response = "This uses Fast API framework with TS for type safety and ReactJS for the UI.";
+    let fuzzy_response =
+        "This uses Fast API framework with TS for type safety and ReactJS for the UI.";
 
     let result = KeywordValidator::validate_response(fuzzy_response, &expectations);
 
@@ -251,7 +290,10 @@ fn test_llm_provider_detection() {
     println!("Provider availability:");
     println!("   Grok: {}", if grok_available { "✅" } else { "❌" });
     println!("   OpenAI: {}", if openai_available { "✅" } else { "❌" });
-    println!("   Anthropic: {}", if anthropic_available { "✅" } else { "❌" });
+    println!(
+        "   Anthropic: {}",
+        if anthropic_available { "✅" } else { "❌" }
+    );
 
     let total_providers = [grok_available, openai_available, anthropic_available]
         .iter()
@@ -259,7 +301,10 @@ fn test_llm_provider_detection() {
         .count();
 
     if total_providers > 0 {
-        println!("✅ {} LLM provider(s) available for real integration testing", total_providers);
+        println!(
+            "✅ {} LLM provider(s) available for real integration testing",
+            total_providers
+        );
     } else {
         println!("⚠️  No LLM providers available - set API keys to test real integration");
         println!("   export GROK_API_KEY='your-key'");
@@ -299,13 +344,22 @@ fn test_scoring_system() {
     println!("Testing bad response: '{}'", bad_response);
 
     // Debug individual keyword matching
-    println!("  Checking 'A': {}", KeywordValidator::contains_keyword(&bad_response.to_lowercase(), "A"));
-    println!("  Checking 'B': {}", KeywordValidator::contains_keyword(&bad_response.to_lowercase(), "B"));
+    println!(
+        "  Checking 'A': {}",
+        KeywordValidator::contains_keyword(&bad_response.to_lowercase(), "A")
+    );
+    println!(
+        "  Checking 'B': {}",
+        KeywordValidator::contains_keyword(&bad_response.to_lowercase(), "B")
+    );
 
     let result = KeywordValidator::validate_response(bad_response, &expectations);
     println!("Bad response score: {:.2}", result.score);
     println!("Bad response found required: {:?}", result.found_required);
-    println!("Bad response missing required: {:?}", result.missing_required);
+    println!(
+        "Bad response missing required: {:?}",
+        result.missing_required
+    );
     assert!(result.score < 0.7);
 
     // Terrible score: has forbidden words

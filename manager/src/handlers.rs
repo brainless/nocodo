@@ -5,10 +5,10 @@ use crate::llm_agent::LlmAgent;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateWorkRequest, FileContentResponse,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
-    FileType, FileUpdateRequest, Project, ProjectListResponse, ProjectResponse,
-    ServerStatus, SettingsResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
+    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
+    WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -573,7 +573,7 @@ pub async fn list_files(
         current_path: relative_path.to_string(),
         total_files: files.len() as u32,
         truncated: false, // API doesn't implement truncation for now
-        limit: 1000, // Default limit
+        limit: 1000,      // Default limit
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -1792,7 +1792,6 @@ pub async fn get_work_messages(
     Ok(HttpResponse::Ok().json(response))
 }
 
-
 // Workflow handlers
 
 /// Scan workflows for a project
@@ -1991,7 +1990,8 @@ fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
     output.push('\n');
 
     // Group files by their directory depth and parent
-    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> = std::collections::BTreeMap::new();
+    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
+        std::collections::BTreeMap::new();
 
     for file in files.iter() {
         let path_parts: Vec<&str> = file.path.split('/').collect();
@@ -2004,7 +2004,10 @@ fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
             path_parts[..depth].join("/")
         };
 
-        file_tree.entry(parent_key).or_insert_with(Vec::new).push(file);
+        file_tree
+            .entry(parent_key)
+            .or_insert_with(Vec::new)
+            .push(file);
     }
 
     // Recursive function to build tree
@@ -2022,7 +2025,11 @@ fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
 
         for (i, file) in files.iter().enumerate() {
             let is_last_item = i == files.len() - 1;
-            let item_prefix = if is_last_item { "└── " } else { "├── " };
+            let item_prefix = if is_last_item {
+                "└── "
+            } else {
+                "├── "
+            };
             let next_prefix = if is_last_item { "    " } else { "│   " };
 
             output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
@@ -2040,7 +2047,13 @@ fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
                 } else {
                     format!("{}/{}", current_path, file.name)
                 };
-                build_tree_level(output, tree, &child_path, &format!("{}{}", prefix, next_prefix), is_last_item);
+                build_tree_level(
+                    output,
+                    tree,
+                    &child_path,
+                    &format!("{}{}", prefix, next_prefix),
+                    is_last_item,
+                );
             }
         }
     }

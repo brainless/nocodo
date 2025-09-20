@@ -619,8 +619,6 @@ impl LlmClient for OpenAiCompatibleClient {
             "LLM API request completed successfully"
         );
 
-
-
         Ok(completion)
     }
 

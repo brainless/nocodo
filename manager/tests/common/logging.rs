@@ -15,8 +15,8 @@ impl TestLogger {
         let config = TestConfig::new();
 
         // Create a unique log file for this test
-        let log_file = std::fs::File::create(config.log_path())
-            .expect("Failed to create test log file");
+        let log_file =
+            std::fs::File::create(config.log_path()).expect("Failed to create test log file");
 
         // Set up tracing subscriber with file output
         let file_writer = fmt::writer::BoxMakeWriter::new(log_file);
@@ -194,10 +194,7 @@ mod tests {
         thread::sleep(Duration::from_millis(10));
 
         let lines = logger.log_lines().unwrap();
-        let info_lines: Vec<_> = lines
-            .iter()
-            .filter(|line| line.contains("Line "))
-            .collect();
+        let info_lines: Vec<_> = lines.iter().filter(|line| line.contains("Line ")).collect();
 
         assert_eq!(info_lines.len(), 3);
         assert!(info_lines.iter().any(|line| line.contains("Line 1")));
