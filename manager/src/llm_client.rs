@@ -552,6 +552,17 @@ impl LlmClient for OpenAiCompatibleClient {
         // Prepare request for the specific provider
         let prepared_request = self.prepare_request_for_provider(request.clone());
 
+        // Log the raw request being sent to the LLM
+        let request_json = serde_json::to_string_pretty(&prepared_request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string());
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            api_url = %self.get_api_url(),
+            raw_request = %request_json,
+            "Raw LLM request being sent to provider"
+        );
+
         let response = self.make_request(prepared_request).await?;
 
         let response_time = start_time.elapsed();
@@ -579,8 +590,22 @@ impl LlmClient for OpenAiCompatibleClient {
             ));
         }
 
+        // Get the raw response text first for logging
+        let response_text = response.text().await?;
+
+        // Log the raw response received from the LLM
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            response_length = %response_text.len(),
+            raw_response = %response_text,
+            "Raw LLM response received from provider"
+        );
+
         // Parse the response
-        let completion: LlmCompletionResponse = response.json().await?;
+        let completion: LlmCompletionResponse = serde_json::from_str(&response_text)?;
 
         tracing::info!(
             provider = %self.config.provider,
@@ -627,6 +652,17 @@ impl LlmClient for OpenAiCompatibleClient {
         // Prepare request for the specific provider
         let prepared_request = self.prepare_request_for_provider(request.clone());
 
+        // Log the raw streaming request being sent to the LLM
+        let request_json = serde_json::to_string_pretty(&prepared_request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string());
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            api_url = %api_url,
+            raw_request = %request_json,
+            "Raw LLM streaming request being sent to provider"
+        );
+
         Box::pin(try_stream! {
             let req = client
                 .post(&api_url)
@@ -648,6 +684,17 @@ impl LlmClient for OpenAiCompatibleClient {
             while let Some(chunk) = stream.next().await {
                 let chunk = chunk?;
                 let text = String::from_utf8_lossy(&chunk);
+
+                // Log raw streaming chunk
+                if !text.trim().is_empty() {
+                    tracing::debug!(
+                        provider = %config.provider,
+                        model = %request.model,
+                        chunk_size = %chunk.len(),
+                        raw_chunk = %text,
+                        "Raw streaming chunk received from provider"
+                    );
+                }
 
                 // Process SSE-style stream
                 for line in text.lines() {

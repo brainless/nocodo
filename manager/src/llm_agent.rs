@@ -256,6 +256,58 @@ impl LlmAgent {
 
         let accumulated_tool_calls = llm_client.extract_tool_calls_from_response(&response);
 
+        // Debug logging for tool call extraction
+        tracing::info!(
+            session_id = %session_id,
+            extracted_tool_calls_count = %accumulated_tool_calls.len(),
+            response_choices_count = %response.choices.len(),
+            "Extracted tool calls from LLM response"
+        );
+
+        // Log details of response structure for debugging
+        for (choice_idx, choice) in response.choices.iter().enumerate() {
+            if let Some(message) = &choice.message {
+                let message_tool_calls_count = message.tool_calls.as_ref().map(|tc| tc.len()).unwrap_or(0);
+                tracing::info!(
+                    session_id = %session_id,
+                    choice_index = %choice_idx,
+                    message_role = %message.role,
+                    message_content_length = %message.content.as_ref().map(|c| c.len()).unwrap_or(0),
+                    message_tool_calls_count = %message_tool_calls_count,
+                    has_function_call = %message.function_call.is_some(),
+                    finish_reason = ?choice.finish_reason,
+                    "Response choice details"
+                );
+
+                // Log each tool call in the message for debugging
+                if let Some(tool_calls) = &message.tool_calls {
+                    for (tc_idx, tool_call) in tool_calls.iter().enumerate() {
+                        tracing::info!(
+                            session_id = %session_id,
+                            choice_index = %choice_idx,
+                            tool_call_index = %tc_idx,
+                            tool_call_id = %tool_call.id,
+                            tool_call_type = %tool_call.r#type,
+                            function_name = %tool_call.function.name,
+                            arguments_length = %tool_call.function.arguments.len(),
+                            "Found tool call in message"
+                        );
+                    }
+                }
+            }
+
+            // Also check choice-level tool calls (Anthropic format)
+            let choice_tool_calls_count = choice.tool_calls.as_ref().map(|tc| tc.len()).unwrap_or(0);
+            if choice_tool_calls_count > 0 {
+                tracing::info!(
+                    session_id = %session_id,
+                    choice_index = %choice_idx,
+                    choice_tool_calls_count = %choice_tool_calls_count,
+                    "Found tool calls at choice level"
+                );
+            }
+        }
+
         // Broadcast the complete response to WebSocket
         self.ws
             .broadcast_llm_agent_chunk(session_id.to_string(), assistant_response.clone())
@@ -1013,6 +1065,8 @@ impl LlmAgent {
                 .and_then(|message| message.content.clone())
                 .unwrap_or_default();
 
+            let follow_up_tool_calls = llm_client.extract_tool_calls_from_response(&response);
+
             // Broadcast the complete response to WebSocket
             self.ws
                 .broadcast_llm_agent_chunk(session_id.to_string(), assistant_response.clone())
@@ -1021,13 +1075,8 @@ impl LlmAgent {
             tracing::info!(
                 session_id = %session_id,
                 response_length = %assistant_response.len(),
+                follow_up_tool_calls_count = %follow_up_tool_calls.len(),
                 "Received complete LLM follow-up response"
-            );
-
-            tracing::info!(
-                session_id = %session_id,
-                response_length = %assistant_response.len(),
-                "Completed LLM follow-up response"
             );
 
             // Store assistant response
@@ -1042,19 +1091,38 @@ impl LlmAgent {
                 "Follow-up assistant response stored in database"
             );
 
-            // Check if the follow-up response contains tool calls
-            if self.contains_tool_calls(&assistant_response) {
-                tracing::info!(
-                    session_id = %session_id,
-                    "LLM follow-up response contains tool calls, processing them recursively"
-                );
-                self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
-                    .await?;
+            // Check for tool calls based on provider capabilities (same logic as main process_message)
+            if supports_native_tools {
+                // For native tool providers, use extracted tool calls
+                if !follow_up_tool_calls.is_empty() {
+                    tracing::info!(
+                        session_id = %session_id,
+                        tool_calls_count = %follow_up_tool_calls.len(),
+                        "Processing native tool calls from follow-up response"
+                    );
+                    self.process_native_tool_calls(session_id, &follow_up_tool_calls)
+                        .await?;
+                } else {
+                    tracing::debug!(
+                        session_id = %session_id,
+                        "No native tool calls found in follow-up response"
+                    );
+                }
             } else {
-                tracing::debug!(
-                    session_id = %session_id,
-                    "LLM follow-up response does not contain tool calls"
-                );
+                // For non-native providers, fall back to JSON parsing
+                if self.contains_tool_calls(&assistant_response) {
+                    tracing::info!(
+                        session_id = %session_id,
+                        "LLM follow-up response contains JSON tool calls, processing them recursively"
+                    );
+                    self.process_tool_calls_with_depth(session_id, &assistant_response, depth + 1)
+                        .await?;
+                } else {
+                    tracing::debug!(
+                        session_id = %session_id,
+                        "LLM follow-up response does not contain tool calls"
+                    );
+                }
             }
 
             tracing::info!(
