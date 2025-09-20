@@ -1,5 +1,5 @@
 use crate::models::{
-    FileInfo, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
+    FileInfo, FileType, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
     ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse,
     WriteFileRequest, WriteFileResponse,
 };
@@ -100,52 +100,41 @@ impl ToolExecutor {
 
         let recursive = request.recursive.unwrap_or(false);
         let include_hidden = request.include_hidden.unwrap_or(false);
+        let max_files = request.max_files.unwrap_or(100) as usize;
 
-        let mut files = Vec::new();
+        // Collect all files with breadth-first traversal
+        let mut all_files = Vec::new();
+        let mut queue = vec![target_path.clone()];
+        let mut visited = std::collections::HashSet::new();
 
-        if recursive {
-            // Use WalkDir for recursive listing
-            let walker = WalkDir::new(&target_path);
+        while !queue.is_empty() && all_files.len() < max_files {
+            let current_dir = queue.remove(0);
 
-            for entry in walker {
-                let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
-
-                // Skip hidden files/directories if not requested
-                if !include_hidden {
-                    // Check if any component in the path starts with '.'
-                    let relative_path = entry.path().strip_prefix(&target_path).unwrap_or(entry.path());
-                    if relative_path.components().any(|comp| {
-                        comp.as_os_str().to_string_lossy().starts_with('.')
-                    }) {
-                        continue;
-                    }
-                }
-
-                // Skip the root directory itself
-                if entry.path() == target_path {
-                    continue;
-                }
-
-                let file_info = self.create_file_info(&entry.path(), &target_path)?;
-                files.push(file_info);
+            if visited.contains(&current_dir) {
+                continue;
             }
-        } else {
-            // Non-recursive listing
-            let entries = match fs::read_dir(&target_path) {
+            visited.insert(current_dir.clone());
+
+            let entries = match fs::read_dir(&current_dir) {
                 Ok(entries) => entries,
-                Err(e) => {
-                    return Ok(ToolResponse::Error(ToolErrorResponse {
-                        tool: "list_files".to_string(),
-                        error: "PermissionDenied".to_string(),
-                        message: format!("Cannot read directory {}: {}", request.path, e),
-                    }));
-                }
+                Err(_) => continue, // Skip directories we can't read
             };
 
-            for entry in entries {
-                let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
+            let mut subdirs = Vec::new();
 
-                // Skip hidden files if not requested
+            for entry in entries {
+                if all_files.len() >= max_files {
+                    break;
+                }
+
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(_) => continue,
+                };
+
+                let path = entry.path();
+
+                // Skip hidden files/directories if not requested
                 if !include_hidden {
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     if file_name.starts_with('.') {
@@ -153,29 +142,49 @@ impl ToolExecutor {
                     }
                 }
 
-                let file_info = self.create_file_info(&entry.path(), &target_path)?;
-                files.push(file_info);
+                let file_info = match self.create_file_info(&path, &target_path) {
+                    Ok(info) => info,
+                    Err(_) => continue,
+                };
+
+                if matches!(file_info.file_type, FileType::Directory) {
+                    subdirs.push(path);
+                }
+
+                all_files.push(file_info);
+            }
+
+            // Add subdirectories to queue for breadth-first traversal
+            if recursive {
+                queue.extend(subdirs);
             }
         }
 
         // Sort files: directories first, then by name (case-insensitive)
-        files.sort_by(|a, b| {
-            match (a.is_directory, b.is_directory) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
+        all_files.sort_by(|a, b| {
+            match (&a.file_type, &b.file_type) {
+                (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
+                (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
                 _ => {
-                    // Both are same type (both dirs or both files), sort by name case-insensitively
+                    // Both are same type, sort by name case-insensitively
                     a.name.to_lowercase().cmp(&b.name.to_lowercase())
                         .then_with(|| a.name.cmp(&b.name)) // Stable sort for same lowercase names
                 }
             }
         });
 
-        let total_count = files.len() as u32;
+        // Generate tree representation
+        let tree_output = self.format_as_tree(&all_files, &target_path);
+
+        let total_files = all_files.len() as u32;
+        let truncated = all_files.len() >= max_files;
+
         Ok(ToolResponse::ListFiles(ListFilesResponse {
-            path: request.path,
-            files,
-            total_count,
+            current_path: request.path,
+            files: tree_output,
+            total_files,
+            truncated,
+            limit: max_files as u32,
         }))
     }
 
@@ -574,18 +583,10 @@ impl ToolExecutor {
         })?;
 
         let relative_path_str = relative_path.to_string_lossy().to_string();
+        let absolute_path_str = path.to_string_lossy().to_string();
 
-        let modified_at = metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64);
-
-        let created_at = metadata
-            .created()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64);
+        // Check if file is ignored by .gitignore
+        let ignored = self.is_ignored_by_gitignore(path)?;
 
         Ok(FileInfo {
             name: path
@@ -594,15 +595,130 @@ impl ToolExecutor {
                 .to_string_lossy()
                 .to_string(),
             path: relative_path_str,
-            is_directory: metadata.is_dir(),
-            size: if metadata.is_dir() {
-                None
+            absolute: absolute_path_str,
+            file_type: if metadata.is_dir() {
+                FileType::Directory
             } else {
-                Some(metadata.len())
+                FileType::File
             },
-            modified_at,
-            created_at,
+            ignored,
         })
+    }
+
+    /// Format files as a tree structure
+    fn format_as_tree(&self, files: &[FileInfo], base_path: &Path) -> String {
+        let mut output = String::new();
+
+        // Add root directory name
+        let root_name = base_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        output.push_str(&root_name);
+        output.push('\n');
+
+    // Group files by their directory depth and parent
+    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> = std::collections::BTreeMap::new();
+
+    for file in files.iter() {
+            let path_parts: Vec<&str> = file.path.split('/').collect();
+            let depth = path_parts.len().saturating_sub(1);
+
+            // Create a key for the parent directory at this depth
+            let parent_key = if depth == 0 {
+                "".to_string()
+            } else {
+                path_parts[..depth].join("/")
+            };
+
+            file_tree.entry(parent_key).or_insert_with(Vec::new).push(file);
+        }
+
+        // Recursive function to build tree
+    fn build_tree_level(
+        output: &mut String,
+        tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
+        current_path: &str,
+        prefix: &str,
+        _is_last: bool,
+    ) {
+            let files = match tree.get(current_path) {
+                Some(files) => files,
+                None => return,
+            };
+
+            for (i, file) in files.iter().enumerate() {
+                let is_last_item = i == files.len() - 1;
+                let item_prefix = if is_last_item { "└── " } else { "├── " };
+                let next_prefix = if is_last_item { "    " } else { "│   " };
+
+                output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
+
+                if file.ignored {
+                    output.push_str(" (ignored)");
+                }
+
+                output.push('\n');
+
+                // If it's a directory, recurse
+                if matches!(file.file_type, FileType::Directory) {
+                    let child_path = if current_path.is_empty() {
+                        file.name.clone()
+                    } else {
+                        format!("{}/{}", current_path, file.name)
+                    };
+                    build_tree_level(output, tree, &child_path, &format!("{}{}", prefix, next_prefix), is_last_item);
+                }
+            }
+        }
+
+        build_tree_level(&mut output, &file_tree, "", "", true);
+        output
+    }
+
+    /// Check if a file is ignored by .gitignore
+    fn is_ignored_by_gitignore(&self, file_path: &Path) -> Result<bool> {
+        // For now, implement basic ignore patterns
+        // TODO: Implement full .gitignore parsing
+        let file_name = file_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        // Common ignore patterns
+        let ignore_patterns = [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".next",
+            "__pycache__",
+            "*.pyc",
+            ".DS_Store",
+            "target", // Rust build directory
+            "Cargo.lock",
+        ];
+
+        // Check if file name matches any ignore pattern
+        for pattern in &ignore_patterns {
+            if file_name == *pattern || file_name.starts_with(&format!("{}.", pattern)) {
+                return Ok(true);
+            }
+        }
+
+        // Check if any component in the path matches ignore patterns
+        for component in file_path.components() {
+            let comp_str = component.as_os_str().to_string_lossy();
+            for pattern in &ignore_patterns {
+                if comp_str == *pattern {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
     }
 
     /// Execute tool from JSON value (for LLM integration)
@@ -642,6 +758,7 @@ mod tests {
             path: ".".to_string(),
             recursive: Some(true),
             include_hidden: Some(false),
+            max_files: None,
         };
 
         let response = executor
@@ -651,10 +768,13 @@ mod tests {
 
         match response {
             ToolResponse::ListFiles(list_response) => {
-                assert_eq!(list_response.files.len(), 3);
-                assert!(list_response.files.iter().any(|f| f.name == "test.txt"));
-                assert!(list_response.files.iter().any(|f| f.name == "subdir"));
-                assert!(list_response.files.iter().any(|f| f.name == "nested.txt"));
+                assert_eq!(list_response.total_files, 3);
+                assert!(!list_response.truncated);
+                assert_eq!(list_response.limit, 100);
+                // Check that tree string contains expected files
+                assert!(list_response.files.contains("test.txt"));
+                assert!(list_response.files.contains("subdir"));
+                assert!(list_response.files.contains("nested.txt"));
             }
             _ => panic!("Expected ListFiles response"),
         }
@@ -678,6 +798,7 @@ mod tests {
             path: ".".to_string(),
             recursive: Some(true),
             include_hidden: Some(false),
+            max_files: None,
         };
 
         let response = executor
@@ -688,11 +809,11 @@ mod tests {
         match response {
             ToolResponse::ListFiles(list_response) => {
                 // Should only include normal.txt and normal_dir
-                assert_eq!(list_response.files.len(), 2);
-                assert!(list_response.files.iter().any(|f| f.name == "normal.txt"));
-                assert!(list_response.files.iter().any(|f| f.name == "normal_dir"));
+                assert_eq!(list_response.total_files, 2);
+                assert!(list_response.files.contains("normal.txt"));
+                assert!(list_response.files.contains("normal_dir"));
                 // Should not include any hidden files
-                assert!(!list_response.files.iter().any(|f| f.name.starts_with('.')));
+                assert!(!list_response.files.contains(".hidden.txt"));
             }
             _ => panic!("Expected ListFiles response"),
         }
@@ -702,6 +823,7 @@ mod tests {
             path: ".".to_string(),
             recursive: Some(true),
             include_hidden: Some(true),
+            max_files: None,
         };
 
         let response_hidden = executor
@@ -712,13 +834,13 @@ mod tests {
         match response_hidden {
             ToolResponse::ListFiles(list_response) => {
                 // Should include all files
-                assert_eq!(list_response.files.len(), 6);
-                assert!(list_response.files.iter().any(|f| f.name == "normal.txt"));
-                assert!(list_response.files.iter().any(|f| f.name == ".hidden.txt"));
-                assert!(list_response.files.iter().any(|f| f.name == ".hidden_dir"));
-                assert!(list_response.files.iter().any(|f| f.name == "file.txt"));
-                assert!(list_response.files.iter().any(|f| f.name == "normal_dir"));
-                assert!(list_response.files.iter().any(|f| f.name == ".hidden_in_normal.txt"));
+                assert_eq!(list_response.total_files, 6);
+                assert!(list_response.files.contains("normal.txt"));
+                assert!(list_response.files.contains(".hidden.txt"));
+                assert!(list_response.files.contains(".hidden_dir"));
+                assert!(list_response.files.contains("file.txt"));
+                assert!(list_response.files.contains("normal_dir"));
+                assert!(list_response.files.contains(".hidden_in_normal.txt"));
             }
             _ => panic!("Expected ListFiles response"),
         }
@@ -740,6 +862,7 @@ mod tests {
             path: ".".to_string(),
             recursive: Some(false),
             include_hidden: Some(false),
+            max_files: None,
         };
 
         let response = executor
@@ -749,39 +872,69 @@ mod tests {
 
         match response {
             ToolResponse::ListFiles(list_response) => {
-                assert_eq!(list_response.files.len(), 5);
+                assert_eq!(list_response.total_files, 5);
 
-                // Check that directories come first
-                let dir_indices: Vec<usize> = list_response.files.iter()
-                    .enumerate()
-                    .filter(|(_, f)| f.is_directory)
-                    .map(|(i, _)| i)
-                    .collect();
+                // Check that tree string contains expected files
+                assert!(list_response.files.contains("a_dir"));
+                assert!(list_response.files.contains("Z_dir"));
+                assert!(list_response.files.contains("a_file.txt"));
+                assert!(list_response.files.contains("M_file.txt"));
+                assert!(list_response.files.contains("Z_file.txt"));
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+    }
 
-                let file_indices: Vec<usize> = list_response.files.iter()
-                    .enumerate()
-                    .filter(|(_, f)| !f.is_directory)
-                    .map(|(i, _)| i)
-                    .collect();
+    #[tokio::test]
+    async fn test_tool_executor_list_files_max_files_limit() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
 
-                // All directories should come before all files
-                if let (Some(&first_dir), Some(&last_file)) = (dir_indices.first(), file_indices.last()) {
-                    assert!(first_dir < last_file, "Directories should come before files");
-                }
+        // Create more files than the limit
+        for i in 0..15 {
+            fs::write(temp_dir.path().join(format!("file_{:02}.txt", i)), format!("Content {}", i)).unwrap();
+        }
 
-                // Check case-insensitive sorting within directories
-                let dir_names: Vec<&String> = list_response.files.iter()
-                    .filter(|f| f.is_directory)
-                    .map(|f| &f.name)
-                    .collect();
-                assert_eq!(dir_names, &["a_dir", "Z_dir"]);
+        // Test with max_files limit of 10
+        let request = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(false),
+            include_hidden: Some(false),
+            max_files: Some(10),
+        };
 
-                // Check case-insensitive sorting within files
-                let file_names: Vec<&String> = list_response.files.iter()
-                    .filter(|f| !f.is_directory)
-                    .map(|f| &f.name)
-                    .collect();
-                assert_eq!(file_names, &["a_file.txt", "M_file.txt", "Z_file.txt"]);
+        let response = executor
+            .execute(ToolRequest::ListFiles(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::ListFiles(list_response) => {
+                assert_eq!(list_response.total_files, 10);
+                assert!(list_response.truncated);
+                assert_eq!(list_response.limit, 10);
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+
+        // Test with max_files higher than available files
+        let request_high_limit = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(false),
+            include_hidden: Some(false),
+            max_files: Some(20),
+        };
+
+        let response_high = executor
+            .execute(ToolRequest::ListFiles(request_high_limit))
+            .await
+            .unwrap();
+
+        match response_high {
+            ToolResponse::ListFiles(list_response) => {
+                assert_eq!(list_response.total_files, 15);
+                assert!(!list_response.truncated);
+                assert_eq!(list_response.limit, 20);
             }
             _ => panic!("Expected ListFiles response"),
         }

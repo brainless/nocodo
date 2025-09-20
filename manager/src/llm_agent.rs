@@ -1709,6 +1709,7 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
             path: "src".to_string(),
             recursive: Some(true),
             include_hidden: Some(false),
+            max_files: None,
         });
 
         let json_str = serde_json::to_string(&list_request).expect("Failed to serialize");
