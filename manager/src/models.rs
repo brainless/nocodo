@@ -310,13 +310,13 @@ pub struct FileListRequest {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct FileListResponse {
-    pub files: String,           // Plain text tree representation
-    pub current_path: String,    // Current directory being listed
+    pub files: String,        // Plain text tree representation
+    pub current_path: String, // Current directory being listed
     #[ts(type = "number")]
-    pub total_files: u32,        // Total number of files found
-    pub truncated: bool,         // Whether results were limited to 100
+    pub total_files: u32, // Total number of files found
+    pub truncated: bool,      // Whether results were limited to 100
     #[ts(type = "number")]
-    pub limit: u32,              // Maximum files returned (100)
+    pub limit: u32, // Maximum files returned (100)
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -696,7 +696,7 @@ pub enum ToolResponse {
 #[ts(export)]
 pub struct ListFilesResponse {
     pub current_path: String,
-    pub files: String,           // Plain text tree representation
+    pub files: String, // Plain text tree representation
     #[ts(type = "number")]
     pub total_files: u32,
     pub truncated: bool,
