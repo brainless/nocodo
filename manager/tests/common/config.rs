@@ -2,7 +2,9 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 
-use nocodo_manager::config::{AppConfig, DatabaseConfig, ServerConfig, SocketConfig, ApiKeysConfig};
+use nocodo_manager::config::{
+    ApiKeysConfig, AppConfig, DatabaseConfig, ServerConfig, SocketConfig,
+};
 
 static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -25,14 +27,15 @@ impl TestConfig {
     /// Create a new isolated test configuration
     pub fn new() -> Self {
         let test_id = get_unique_test_id();
-        let temp_dir = tempfile::tempdir()
-            .expect("Failed to create temporary directory for test");
+        let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory for test");
 
         // Create isolated database path
         let db_path = temp_dir.path().join(format!("nocodo-test-{}.db", test_id));
 
         // Create isolated socket path
-        let socket_path = temp_dir.path().join(format!("nocodo-test-{}.sock", test_id));
+        let socket_path = temp_dir
+            .path()
+            .join(format!("nocodo-test-{}.sock", test_id));
 
         // Create isolated log path
         let _log_path = temp_dir.path().join(format!("nocodo-test-{}.log", test_id));
@@ -42,9 +45,7 @@ impl TestConfig {
                 host: "127.0.0.1".to_string(),
                 port: 0, // Use port 0 for automatic assignment
             },
-            database: DatabaseConfig {
-                path: db_path,
-            },
+            database: DatabaseConfig { path: db_path },
             socket: SocketConfig {
                 path: socket_path.to_string_lossy().to_string(),
             },
@@ -74,7 +75,9 @@ impl TestConfig {
 
     /// Get the isolated log path
     pub fn log_path(&self) -> PathBuf {
-        self.temp_dir.path().join(format!("nocodo-test-{}.log", self.test_id))
+        self.temp_dir
+            .path()
+            .join(format!("nocodo-test-{}.log", self.test_id))
     }
 
     /// Get the isolated projects directory
@@ -121,7 +124,10 @@ mod tests {
 
         // Log path should be within temp directory
         assert!(config.log_path().starts_with(config.temp_dir.path()));
-        assert!(config.log_path().to_string_lossy().contains(&config.test_id));
+        assert!(config
+            .log_path()
+            .to_string_lossy()
+            .contains(&config.test_id));
 
         // Projects directory should be within temp directory
         assert!(config.projects_dir().starts_with(config.temp_dir.path()));

@@ -7,9 +7,9 @@ pub mod app;
 pub mod config;
 pub mod database;
 pub mod fixtures;
-pub mod logging;
-pub mod llm_config;
 pub mod keyword_validation;
+pub mod llm_config;
+pub mod logging;
 
 pub use app::TestApp;
 pub use fixtures::TestDataGenerator;
@@ -28,19 +28,31 @@ mod isolation_tests {
         let test_app2 = TestApp::new().await;
 
         // Verify different test IDs
-        assert_ne!(test_app1.test_config().test_id, test_app2.test_config().test_id);
+        assert_ne!(
+            test_app1.test_config().test_id,
+            test_app2.test_config().test_id
+        );
 
         // Verify different database paths
         assert_ne!(test_app1.database.path(), test_app2.database.path());
 
         // Verify different socket paths
-        assert_ne!(test_app1.test_config().socket_path(), test_app2.test_config().socket_path());
+        assert_ne!(
+            test_app1.test_config().socket_path(),
+            test_app2.test_config().socket_path()
+        );
 
         // Verify different log paths
-        assert_ne!(test_app1.test_config().log_path(), test_app2.test_config().log_path());
+        assert_ne!(
+            test_app1.test_config().log_path(),
+            test_app2.test_config().log_path()
+        );
 
         // Verify different projects directories
-        assert_ne!(test_app1.test_config().projects_dir(), test_app2.test_config().projects_dir());
+        assert_ne!(
+            test_app1.test_config().projects_dir(),
+            test_app2.test_config().projects_dir()
+        );
 
         // Both should start with empty databases
         let projects1 = test_app1.db().get_all_projects().unwrap();
@@ -166,9 +178,18 @@ mod isolation_tests {
         assert_eq!(messages[1].sequence_order, 1);
         assert_eq!(messages[2].sequence_order, 2);
 
-        assert!(matches!(messages[0].author_type, nocodo_manager::models::MessageAuthorType::User));
-        assert!(matches!(messages[1].author_type, nocodo_manager::models::MessageAuthorType::Ai));
-        assert!(matches!(messages[2].author_type, nocodo_manager::models::MessageAuthorType::User));
+        assert!(matches!(
+            messages[0].author_type,
+            nocodo_manager::models::MessageAuthorType::User
+        ));
+        assert!(matches!(
+            messages[1].author_type,
+            nocodo_manager::models::MessageAuthorType::Ai
+        ));
+        assert!(matches!(
+            messages[2].author_type,
+            nocodo_manager::models::MessageAuthorType::User
+        ));
 
         // Verify relationships
         assert_eq!(work.project_id, Some(project.id));

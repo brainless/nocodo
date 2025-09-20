@@ -24,10 +24,10 @@ pub struct TestFile {
 /// Keyword expectations for validation
 #[derive(Debug, Clone)]
 pub struct LlmKeywordExpectations {
-    pub required_keywords: Vec<String>,   // Must contain ALL of these
-    pub optional_keywords: Vec<String>,   // Should contain SOME of these
-    pub forbidden_keywords: Vec<String>,  // Must NOT contain these
-    pub minimum_score: f32,               // Keyword coverage threshold (0.7)
+    pub required_keywords: Vec<String>,  // Must contain ALL of these
+    pub optional_keywords: Vec<String>,  // Should contain SOME of these
+    pub forbidden_keywords: Vec<String>, // Must NOT contain these
+    pub minimum_score: f32,              // Keyword coverage threshold (0.7)
 }
 
 /// Result of keyword validation
@@ -48,38 +48,47 @@ impl KeywordValidator {
     /// Validate an LLM response against keyword expectations
     pub fn validate_response(
         response: &str,
-        expectations: &LlmKeywordExpectations
+        expectations: &LlmKeywordExpectations,
     ) -> LlmValidationResult {
         let response_lower = response.to_lowercase();
 
         // Check required keywords (ALL must be present)
-        let found_required: Vec<_> = expectations.required_keywords
+        let found_required: Vec<_> = expectations
+            .required_keywords
             .iter()
             .filter(|k| Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
         // Check optional keywords (SOME should be present)
-        let found_optional: Vec<_> = expectations.optional_keywords
+        let found_optional: Vec<_> = expectations
+            .optional_keywords
             .iter()
             .filter(|k| Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
         // Check forbidden keywords (NONE should be present)
-        let found_forbidden: Vec<_> = expectations.forbidden_keywords
+        let found_forbidden: Vec<_> = expectations
+            .forbidden_keywords
             .iter()
             .filter(|k| Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
-        let missing_required: Vec<_> = expectations.required_keywords
+        let missing_required: Vec<_> = expectations
+            .required_keywords
             .iter()
             .filter(|k| !Self::contains_keyword(&response_lower, k))
             .cloned()
             .collect();
 
-        let score = Self::calculate_score(&found_required, &found_optional, &found_forbidden, expectations);
+        let score = Self::calculate_score(
+            &found_required,
+            &found_optional,
+            &found_forbidden,
+            expectations,
+        );
 
         let passed = found_required.len() == expectations.required_keywords.len()
             && found_forbidden.is_empty()
@@ -123,7 +132,7 @@ impl KeywordValidator {
         found_required: &[String],
         found_optional: &[String],
         found_forbidden: &[String],
-        expectations: &LlmKeywordExpectations
+        expectations: &LlmKeywordExpectations,
     ) -> f32 {
         let required_score = if expectations.required_keywords.is_empty() {
             1.0
@@ -252,7 +261,8 @@ mod tests {
             minimum_score: 0.7,
         };
 
-        let response = "This is a Python web application using FastAPI framework with React frontend";
+        let response =
+            "This is a Python web application using FastAPI framework with React frontend";
         let result = KeywordValidator::validate_response(response, &expectations);
 
         assert!(result.passed);
@@ -303,16 +313,32 @@ mod tests {
     fn test_tech_stack_scenario_creation() {
         let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
 
-        assert_eq!(scenario.name, "Tech Stack Analysis - Python FastAPI + React");
+        assert_eq!(
+            scenario.name,
+            "Tech Stack Analysis - Python FastAPI + React"
+        );
         assert!(scenario.prompt.contains("tech stack"));
         assert_eq!(scenario.context.files.len(), 4);
         assert!(scenario.context.files.iter().any(|f| f.path == "main.py"));
-        assert!(scenario.context.files.iter().any(|f| f.path == "package.json"));
+        assert!(scenario
+            .context
+            .files
+            .iter()
+            .any(|f| f.path == "package.json"));
 
         assert_eq!(scenario.expected_keywords.required_keywords.len(), 3);
-        assert!(scenario.expected_keywords.required_keywords.contains(&"Python".to_string()));
-        assert!(scenario.expected_keywords.required_keywords.contains(&"FastAPI".to_string()));
-        assert!(scenario.expected_keywords.required_keywords.contains(&"React".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"Python".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"FastAPI".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"React".to_string()));
     }
 
     #[test]
@@ -321,12 +347,29 @@ mod tests {
 
         assert_eq!(scenario.name, "Tech Stack Analysis - Rust Project");
         assert_eq!(scenario.context.files.len(), 2);
-        assert!(scenario.context.files.iter().any(|f| f.path == "Cargo.toml"));
-        assert!(scenario.context.files.iter().any(|f| f.path == "src/main.rs"));
+        assert!(scenario
+            .context
+            .files
+            .iter()
+            .any(|f| f.path == "Cargo.toml"));
+        assert!(scenario
+            .context
+            .files
+            .iter()
+            .any(|f| f.path == "src/main.rs"));
 
-        assert!(scenario.expected_keywords.required_keywords.contains(&"Rust".to_string()));
-        assert!(scenario.expected_keywords.required_keywords.contains(&"Actix".to_string()));
-        assert!(scenario.expected_keywords.required_keywords.contains(&"Tokio".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"Rust".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"Actix".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"Tokio".to_string()));
     }
 
     #[test]
@@ -347,7 +390,7 @@ mod tests {
             &found_required,
             &found_optional,
             &found_forbidden,
-            &expectations
+            &expectations,
         );
 
         // Required: 2/2 = 1.0 (weight 0.7)

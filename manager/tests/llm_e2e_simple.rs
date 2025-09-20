@@ -16,8 +16,8 @@ use nocodo_manager::{
 };
 
 use crate::common::{
-    llm_config::LlmTestConfig,
     keyword_validation::{KeywordValidator, LlmTestScenario},
+    llm_config::LlmTestConfig,
 };
 
 /// Simple LLM E2E test that makes real API calls
@@ -31,8 +31,13 @@ async fn test_simple_llm_e2e() {
         return;
     }
 
-    let provider = llm_config.get_default_provider().expect("No default provider available");
-    println!("🚀 Running simple LLM E2E test with provider: {}", provider.name);
+    let provider = llm_config
+        .get_default_provider()
+        .expect("No default provider available");
+    println!(
+        "🚀 Running simple LLM E2E test with provider: {}",
+        provider.name
+    );
 
     // Create isolated test environment
     let temp_dir = tempdir().unwrap();
@@ -68,7 +73,10 @@ async fn test_simple_llm_e2e() {
         App::new()
             .app_data(app_state)
             .route("/api/health", web::get().to(health_check))
-            .route("/work/{work_id}/llm-agent/sessions", web::post().to(create_ai_session))
+            .route(
+                "/work/{work_id}/llm-agent/sessions",
+                web::post().to(create_ai_session),
+            ),
     )
     .await;
 
@@ -104,15 +112,19 @@ async fn test_simple_llm_e2e() {
 
     std::fs::write(
         project_dir.join("requirements.txt"),
-        "fastapi==0.104.1\nuvicorn==0.24.0"
-    ).unwrap();
+        "fastapi==0.104.1\nuvicorn==0.24.0",
+    )
+    .unwrap();
 
     // Test LLM session creation
     println!("🤖 Creating LLM session");
     let session_request = CreateLlmAgentSessionRequest {
         provider: provider.name.clone(),
         model: provider.default_model().to_string(),
-        system_prompt: Some("You are a helpful coding assistant. Analyze the tech stack and be concise.".to_string()),
+        system_prompt: Some(
+            "You are a helpful coding assistant. Analyze the tech stack and be concise."
+                .to_string(),
+        ),
     };
 
     let uri = format!("/work/{}/llm-agent/sessions", work.id);
@@ -133,7 +145,9 @@ async fn test_simple_llm_e2e() {
     }
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let session_id = body["session"]["id"].as_str().expect("No session ID returned");
+    let session_id = body["session"]["id"]
+        .as_str()
+        .expect("No session ID returned");
     println!("✅ LLM session created: {}", session_id);
 
     // For this simple test, we'll validate that the session was created properly
@@ -167,7 +181,10 @@ async fn test_keyword_validation_system() {
     println!("   Optional found: {:?}", result.found_optional);
     println!("   Forbidden found: {:?}", result.found_forbidden);
 
-    assert!(result.passed, "Keyword validation should pass for good response");
+    assert!(
+        result.passed,
+        "Keyword validation should pass for good response"
+    );
     assert!(result.score >= 0.7, "Score should be at least 0.7");
     assert_eq!(result.found_required.len(), 3); // Python, FastAPI, React
     assert!(!result.found_optional.is_empty()); // Should find TypeScript
@@ -185,8 +202,16 @@ async fn test_llm_provider_config() {
 
     println!("Available providers: {}", config.enabled_providers.len());
     for provider in &config.enabled_providers {
-        println!("   - {}: {} ({})", provider.name, provider.default_model(),
-                if provider.enabled { "enabled" } else { "disabled" });
+        println!(
+            "   - {}: {} ({})",
+            provider.name,
+            provider.default_model(),
+            if provider.enabled {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
     }
 
     // Test that configuration is sane
