@@ -110,10 +110,13 @@ impl ToolExecutor {
             for entry in walker {
                 let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
 
-                // Skip hidden files if not requested
+                // Skip hidden files/directories if not requested
                 if !include_hidden {
-                    let file_name = entry.file_name().to_string_lossy().to_string();
-                    if file_name.starts_with('.') {
+                    // Check if any component in the path starts with '.'
+                    let relative_path = entry.path().strip_prefix(&target_path).unwrap_or(entry.path());
+                    if relative_path.components().any(|comp| {
+                        comp.as_os_str().to_string_lossy().starts_with('.')
+                    }) {
                         continue;
                     }
                 }
@@ -155,14 +158,16 @@ impl ToolExecutor {
             }
         }
 
-        // Sort files: directories first, then by name
+        // Sort files: directories first, then by name (case-insensitive)
         files.sort_by(|a, b| {
-            if a.is_directory && !b.is_directory {
-                std::cmp::Ordering::Less
-            } else if !a.is_directory && b.is_directory {
-                std::cmp::Ordering::Greater
-            } else {
-                a.name.to_lowercase().cmp(&b.name.to_lowercase())
+            match (a.is_directory, b.is_directory) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => {
+                    // Both are same type (both dirs or both files), sort by name case-insensitively
+                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                        .then_with(|| a.name.cmp(&b.name)) // Stable sort for same lowercase names
+                }
             }
         });
 
@@ -465,12 +470,15 @@ impl ToolExecutor {
 
         let input_path = Path::new(path);
 
+        // Normalize the input path to handle . and .. components
+        let normalized_input = self.normalize_path(input_path)?;
+
         // Handle absolute paths
-        if input_path.is_absolute() {
+        if normalized_input.is_absolute() {
             // If the absolute path equals our base path, allow it
-            let canonical_input = match input_path.canonicalize() {
+            let canonical_input = match normalized_input.canonicalize() {
                 Ok(path) => path,
-                Err(_) => input_path.to_path_buf(), // Fallback if it doesn't exist yet
+                Err(_) => normalized_input.to_path_buf(), // Fallback if it doesn't exist yet
             };
 
             let canonical_base = match self.base_path.canonicalize() {
@@ -492,14 +500,10 @@ impl ToolExecutor {
         }
 
         // Handle relative paths
-        // Clean the path to prevent directory traversal
-        let clean_path = path.trim_start_matches("./");
-        let clean_path = clean_path.replace("..", "");
-
-        let target_path = if clean_path.is_empty() || clean_path == "." {
+        let target_path = if normalized_input == Path::new(".") {
             self.base_path.clone()
         } else {
-            self.base_path.join(clean_path)
+            self.base_path.join(&normalized_input)
         };
 
         // Canonicalize the path to resolve any remaining relative components
@@ -511,13 +515,54 @@ impl ToolExecutor {
         // Security check: ensure the path is within the base directory
         if !canonical_path.starts_with(&self.base_path) {
             return Err(ToolError::InvalidPath(format!(
-                "Path '{}' is outside the allowed directory",
+                "Path '{}' resolves to location outside the allowed directory",
                 path
             ))
             .into());
         }
 
         Ok(canonical_path)
+    }
+
+    /// Normalize a path by resolving . and .. components while preventing directory traversal
+    fn normalize_path(&self, path: &Path) -> Result<PathBuf> {
+        let mut components = Vec::new();
+
+        for component in path.components() {
+            match component {
+                std::path::Component::Prefix(_) | std::path::Component::RootDir => {
+                    // For absolute paths, keep the prefix/root
+                    components.push(component);
+                }
+                std::path::Component::CurDir => {
+                    // Skip current directory components
+                    continue;
+                }
+                std::path::Component::ParentDir => {
+                    // Prevent directory traversal attacks
+                    if components.is_empty() || matches!(components.last(), Some(std::path::Component::ParentDir)) {
+                        return Err(ToolError::InvalidPath(format!(
+                            "Invalid path '{}': contains directory traversal",
+                            path.display()
+                        ))
+                        .into());
+                    }
+                    // Remove the last component (go up one level)
+                    components.pop();
+                }
+                std::path::Component::Normal(_name) => {
+                    components.push(component);
+                }
+            }
+        }
+
+        // Reconstruct the path from components
+        let mut result = PathBuf::new();
+        for component in components {
+            result.push(component);
+        }
+
+        Ok(result)
     }
 
     /// Create FileInfo from a path
@@ -613,6 +658,163 @@ mod tests {
             }
             _ => panic!("Expected ListFiles response"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_list_files_hidden_files_recursive() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create test files including hidden ones
+        fs::write(temp_dir.path().join("normal.txt"), "Normal file").unwrap();
+        fs::write(temp_dir.path().join(".hidden.txt"), "Hidden file").unwrap();
+        fs::create_dir_all(temp_dir.path().join(".hidden_dir")).unwrap();
+        fs::write(temp_dir.path().join(".hidden_dir/file.txt"), "File in hidden dir").unwrap();
+        fs::create_dir_all(temp_dir.path().join("normal_dir")).unwrap();
+        fs::write(temp_dir.path().join("normal_dir/.hidden_in_normal.txt"), "Hidden in normal dir").unwrap();
+
+        // Test without including hidden files
+        let request = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(true),
+            include_hidden: Some(false),
+        };
+
+        let response = executor
+            .execute(ToolRequest::ListFiles(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::ListFiles(list_response) => {
+                // Should only include normal.txt and normal_dir
+                assert_eq!(list_response.files.len(), 2);
+                assert!(list_response.files.iter().any(|f| f.name == "normal.txt"));
+                assert!(list_response.files.iter().any(|f| f.name == "normal_dir"));
+                // Should not include any hidden files
+                assert!(!list_response.files.iter().any(|f| f.name.starts_with('.')));
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+
+        // Test with including hidden files
+        let request_hidden = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(true),
+            include_hidden: Some(true),
+        };
+
+        let response_hidden = executor
+            .execute(ToolRequest::ListFiles(request_hidden))
+            .await
+            .unwrap();
+
+        match response_hidden {
+            ToolResponse::ListFiles(list_response) => {
+                // Should include all files
+                assert_eq!(list_response.files.len(), 6);
+                assert!(list_response.files.iter().any(|f| f.name == "normal.txt"));
+                assert!(list_response.files.iter().any(|f| f.name == ".hidden.txt"));
+                assert!(list_response.files.iter().any(|f| f.name == ".hidden_dir"));
+                assert!(list_response.files.iter().any(|f| f.name == "file.txt"));
+                assert!(list_response.files.iter().any(|f| f.name == "normal_dir"));
+                assert!(list_response.files.iter().any(|f| f.name == ".hidden_in_normal.txt"));
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_list_files_sorting() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create files with mixed case and types
+        fs::create_dir_all(temp_dir.path().join("Z_dir")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("a_dir")).unwrap();
+        fs::write(temp_dir.path().join("Z_file.txt"), "Z content").unwrap();
+        fs::write(temp_dir.path().join("a_file.txt"), "a content").unwrap();
+        fs::write(temp_dir.path().join("M_file.txt"), "M content").unwrap();
+
+        let request = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(false),
+            include_hidden: Some(false),
+        };
+
+        let response = executor
+            .execute(ToolRequest::ListFiles(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::ListFiles(list_response) => {
+                assert_eq!(list_response.files.len(), 5);
+
+                // Check that directories come first
+                let dir_indices: Vec<usize> = list_response.files.iter()
+                    .enumerate()
+                    .filter(|(_, f)| f.is_directory)
+                    .map(|(i, _)| i)
+                    .collect();
+
+                let file_indices: Vec<usize> = list_response.files.iter()
+                    .enumerate()
+                    .filter(|(_, f)| !f.is_directory)
+                    .map(|(i, _)| i)
+                    .collect();
+
+                // All directories should come before all files
+                if let (Some(&first_dir), Some(&last_file)) = (dir_indices.first(), file_indices.last()) {
+                    assert!(first_dir < last_file, "Directories should come before files");
+                }
+
+                // Check case-insensitive sorting within directories
+                let dir_names: Vec<&String> = list_response.files.iter()
+                    .filter(|f| f.is_directory)
+                    .map(|f| &f.name)
+                    .collect();
+                assert_eq!(dir_names, &["a_dir", "Z_dir"]);
+
+                // Check case-insensitive sorting within files
+                let file_names: Vec<&String> = list_response.files.iter()
+                    .filter(|f| !f.is_directory)
+                    .map(|f| &f.name)
+                    .collect();
+                assert_eq!(file_names, &["a_file.txt", "M_file.txt", "Z_file.txt"]);
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_path_normalization() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create test structure
+        fs::create_dir_all(temp_dir.path().join("subdir")).unwrap();
+        fs::write(temp_dir.path().join("subdir/test.txt"), "test content").unwrap();
+
+        // Test path normalization with . and .. components
+        let test_cases = vec![
+            ("./subdir/../subdir/test.txt", "subdir/test.txt"),
+            ("subdir/./test.txt", "subdir/test.txt"),
+            ("subdir//test.txt", "subdir/test.txt"), // Multiple slashes
+        ];
+
+        for (input_path, expected_relative) in test_cases {
+            let resolved = executor.validate_and_resolve_path(input_path).unwrap();
+            let expected = temp_dir.path().join(expected_relative);
+            assert_eq!(resolved, expected, "Failed to normalize path: {}", input_path);
+        }
+
+        // Test directory traversal prevention
+        let traversal_result = executor.validate_and_resolve_path("../outside");
+        assert!(traversal_result.is_err(), "Should prevent directory traversal");
+
+        let traversal_result2 = executor.validate_and_resolve_path("../../../etc/passwd");
+        assert!(traversal_result2.is_err(), "Should prevent directory traversal with multiple ..");
     }
 
     #[tokio::test]
