@@ -1129,6 +1129,7 @@ Examples:
 5. Use write_file to create new files by setting create_if_not_exists=true when the file doesn't exist.
 6. Use write_file with search and replace parameters to modify specific parts of existing files.
 7. Use grep to search for patterns across multiple files efficiently.
+8. **IMPORTANT**: After using tools to gather information, you MUST provide a final natural language summary or answer to the user's question. Do not stop after tool calls - always provide a complete response.
 
 The tool request MUST exactly match the TypeScript interface defined above."#,
             list_files_request_ts = list_files_request_ts,
@@ -1458,28 +1459,6 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         }
     }
 
-    /// Complete a session
-    pub async fn complete_session(&self, session_id: &str) -> Result<()> {
-        tracing::info!(
-            session_id = %session_id,
-            "Completing LLM agent session"
-        );
-
-        let mut session = self.db.get_llm_agent_session(session_id)?;
-        let old_status = session.status.clone();
-        session.complete();
-        self.db.update_llm_agent_session(&session)?;
-
-        tracing::info!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            old_status = %old_status,
-            new_status = %session.status,
-            "LLM agent session completed successfully"
-        );
-
-        Ok(())
-    }
 
     /// Fail a session
     #[allow(dead_code)]
@@ -1571,29 +1550,6 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         ]
     }
 
-    /// Get session status
-    pub async fn get_session_status(&self, session_id: &str) -> Result<LlmAgentSession> {
-        tracing::debug!(
-            session_id = %session_id,
-            "Getting LLM agent session status"
-        );
-
-        let session = self
-            .db
-            .get_llm_agent_session(session_id)
-            .map_err(|e| anyhow::anyhow!(e))?;
-
-        tracing::debug!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            status = %session.status,
-            provider = %session.provider,
-            model = %session.model,
-            "Retrieved LLM agent session status"
-        );
-
-        Ok(session)
-    }
 
 
 }
