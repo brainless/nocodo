@@ -52,7 +52,6 @@ async fn main() -> AppResult<()> {
     let config = AppConfig::load()?;
     tracing::info!("Loaded configuration from ~/.config/nocodo/manager.toml");
 
-
     // Initialize database
     let database = Arc::new(Database::new(&config.database.path)?);
     tracing::info!("Database initialized at {:?}", config.database.path);
@@ -78,25 +77,14 @@ async fn main() -> AppResult<()> {
 
     // Create application state with WebSocket broadcaster
 
-    // LLM agent is now enabled by default
-    // Can be explicitly disabled with NOCODO_LLM_AGENT_ENABLED=false
-    let llm_agent_disabled = std::env::var("NOCODO_LLM_AGENT_ENABLED")
-        .ok()
-        .map(|v| v.eq_ignore_ascii_case("false") || v == "0")
-        .unwrap_or(false);
-
-    let llm_agent = if !llm_agent_disabled {
-        tracing::info!("Initializing LLM agent");
-        Some(Arc::new(LlmAgent::new(
-            Arc::clone(&database),
-            Arc::clone(&broadcaster),
-            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            Arc::new(config.clone()),
-        )))
-    } else {
-        tracing::warn!("LLM agent explicitly disabled via NOCODO_LLM_AGENT_ENABLED=false");
-        None
-    };
+    // Initialize LLM agent (always enabled)
+    tracing::info!("Initializing LLM agent");
+    let llm_agent = Some(Arc::new(LlmAgent::new(
+        Arc::clone(&database),
+        Arc::clone(&broadcaster),
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        Arc::new(config.clone()),
+    )));
 
     let app_state = web::Data::new(AppState {
         database,
@@ -108,10 +96,7 @@ async fn main() -> AppResult<()> {
 
     // Start HTTP server
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
-    let _server_url = format!("http://{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
-
-
     let http_task = tokio::spawn(async move {
         HttpServer::new(move || {
             App::new()
@@ -170,6 +155,23 @@ async fn main() -> AppResult<()> {
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
                         )
+                        // Workflow endpoints
+                        .route(
+                            "/projects/{id}/workflows/scan",
+                            web::post().to(handlers::scan_workflows),
+                        )
+                        .route(
+                            "/projects/{id}/workflows/commands",
+                            web::get().to(handlers::get_workflow_commands),
+                        )
+                        .route(
+                            "/projects/{project_id}/workflows/commands/{command_id}/execute",
+                            web::post().to(handlers::execute_workflow_command),
+                        )
+                        .route(
+                            "/projects/{project_id}/workflows/commands/{command_id}/executions",
+                            web::get().to(handlers::get_command_executions),
+                        )
                         // Settings endpoint
                         .route("/settings", web::get().to(handlers::get_settings)),
                 )
@@ -187,10 +189,7 @@ async fn main() -> AppResult<()> {
         .expect("HTTP server failed")
     });
 
-
     // Wait for servers (they should run indefinitely)
-    // We don't want to exit when browser launcher completes
-    // Only exit when HTTP or socket server completes
     tokio::select! {
         _ = socket_task => tracing::info!("Socket server completed"),
         _ = http_task => tracing::info!("HTTP server completed"),

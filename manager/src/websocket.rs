@@ -96,6 +96,13 @@ pub enum WebSocketMessage {
         call_id: String,
         error: String,
     },
+
+    // Workflow execution messages
+    WorkflowExecutionCompleted {
+        project_id: String,
+        command_id: String,
+        execution: String, // JSON string of CommandExecution
+    },
 }
 
 /// WebSocket connection actor
@@ -519,5 +526,10 @@ impl WebSocketBroadcaster {
                 error,
             },
         });
+    }
+
+    /// Generic broadcast method for custom messages
+    pub fn broadcast(&self, message: WebSocketMessage) {
+        self.server.do_send(Broadcast { message });
     }
 }

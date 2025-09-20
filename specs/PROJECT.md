@@ -42,22 +42,26 @@ The nocodo MVP consists of two core components running locally on your Linux lap
 
 ### Installation
 ```bash
-# Build Manager daemon
+# Build Manager daemon (API server only)
 cargo build --release --bin nocodo-manager
 sudo cp target/release/nocodo-manager /usr/local/bin/
 
-# Build Web app
+# Install Web app dependencies
 cd manager-web
-npm install && npm run build
+npm install
 
-# Start Manager daemon
+# Start Manager daemon (API on localhost:8081)
 nocodo-manager --config ~/.config/nocodo/manager.toml
+
+# Start Web app (dev server on localhost:3000)
+cd manager-web && npm run dev
 ```
 
 ### Usage
 ```bash
 # Access web interface
-# Navigate to http://localhost:8081
+# Navigate to http://localhost:3000 (development)
+# Web app proxies API requests to manager on localhost:8081
 
 # Note: The nocodo CLI has been removed as part of issue #80
 ```
@@ -135,19 +139,19 @@ See [MANAGER_WEB.md](./MANAGER_WEB.md) for detailed technical specifications.
 
 ## MVP Workflow (Current)
 
-1. **Startup**: User starts Manager daemon on their Linux laptop
-2. **Web Interface**: Manager serves the Web app at localhost:8081
+1. **Startup**: User starts Manager daemon (API server) and Web app (dev server) separately
+2. **Web Interface**: Vite dev server serves Web app at localhost:3000, proxies API to localhost:8081
 3. **Project Creation**: User creates a new project via Web interface
 4. **Project Setup**: Each project gets its own directory, Git repo, and basic scaffolding
 5. **AI Integration**: User interacts with AI tools through:
    - Web chat interface for conversations
-6. **Development**: AI tools interact directly with Manager Daemon
+6. **Development**: AI tools interact directly with Manager Daemon via API
 7. **Project Management**: Manager coordinates between projects, handles higher-level concerns
 
 ### Key Interactions:
-- **User ↔ Web App**: Chat interface, project management
-- **AI Tools ↔ Manager Daemon**: Direct integration
-- **Web App ↔ Manager**: HTTP/WebSocket for real-time updates
+- **User ↔ Web App**: Chat interface, project management (localhost:3000)
+- **AI Tools ↔ Manager Daemon**: Direct integration (localhost:8081)
+- **Web App ↔ Manager**: HTTP/WebSocket via Vite proxy for real-time updates
 
 ---
 

@@ -5,8 +5,6 @@ use crate::models::{LlmAgentSession, LlmAgentToolCall, LlmProviderConfig, ToolRe
 use crate::tools::ToolExecutor;
 use crate::websocket::WebSocketBroadcaster;
 use anyhow::Result;
-use async_stream::try_stream;
-use futures_util::StreamExt;
 use std::boxed::Box;
 use std::future::Future;
 use std::path::PathBuf;
@@ -226,9 +224,9 @@ impl LlmAgent {
             messages,
             max_tokens: Some(4000),
             temperature: Some(0.7),
-            stream: Some(true),
+            stream: Some(false),
             tools,
-            tool_choice: None, // Let the model decide when to use tools
+            tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
             functions: None,
             function_call: None,
         };
@@ -247,42 +245,27 @@ impl LlmAgent {
             "Sending request to LLM provider"
         );
 
-        // Stream the response
-        let mut assistant_response = String::new();
-        let mut chunk_count = 0;
-        let mut accumulated_tool_calls = Vec::new();
-        let mut stream = llm_client.stream_complete(request);
+        // Get the complete response (non-streaming)
+        let response = llm_client.complete(request).await?;
 
-        while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result?;
-            chunk_count += 1;
+        let assistant_response = response.choices
+            .first()
+            .and_then(|choice| choice.message.as_ref())
+            .and_then(|message| message.content.clone())
+            .unwrap_or_default();
 
-            if !chunk.is_finished {
-                assistant_response.push_str(&chunk.content);
+        let accumulated_tool_calls = llm_client.extract_tool_calls_from_response(&response);
 
-                // Accumulate tool calls from streaming chunks
-                accumulated_tool_calls.extend(chunk.tool_calls.clone());
-
-                // Broadcast chunk to WebSocket
-                self.ws
-                    .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
-                    .await;
-
-                tracing::trace!(
-                    session_id = %session_id,
-                    chunk_number = %chunk_count,
-                    chunk_length = %chunk.content.len(),
-                    tool_calls_in_chunk = %chunk.tool_calls.len(),
-                    "Received and broadcasted LLM response chunk"
-                );
-            }
-        }
+        // Broadcast the complete response to WebSocket
+        self.ws
+            .broadcast_llm_agent_chunk(session_id.to_string(), assistant_response.clone())
+            .await;
 
         tracing::info!(
             session_id = %session_id,
-            total_chunks = %chunk_count,
             response_length = %assistant_response.len(),
-            "Completed LLM response streaming"
+            tool_calls_count = %accumulated_tool_calls.len(),
+            "Received complete LLM response"
         );
 
         // Store assistant response
@@ -297,18 +280,47 @@ impl LlmAgent {
         // Check for tool calls based on provider capabilities
         if supports_native_tools {
             // For native tool providers, use accumulated tool calls from streaming
+            tracing::info!(
+                session_id = %session_id,
+                provider = %session.provider,
+                model = %session.model,
+                accumulated_tool_calls_count = %accumulated_tool_calls.len(),
+                assistant_response_length = %assistant_response.len(),
+                "Checking for native tool calls from streaming response"
+            );
+
             if !accumulated_tool_calls.is_empty() {
                 tracing::info!(
                     session_id = %session_id,
                     tool_calls_count = %accumulated_tool_calls.len(),
                     "Processing native tool calls from streaming response"
                 );
+
+                // Log details of each tool call for debugging
+                for (i, tool_call) in accumulated_tool_calls.iter().enumerate() {
+                    tracing::info!(
+                        session_id = %session_id,
+                        tool_index = %i,
+                        tool_call_id = %tool_call.id,
+                        function_name = %tool_call.function.name,
+                        arguments_length = %tool_call.function.arguments.len(),
+                        "Tool call details"
+                    );
+                }
+
                 self.process_native_tool_calls(session_id, &accumulated_tool_calls)
                     .await?;
             } else {
-                tracing::debug!(
+                tracing::warn!(
                     session_id = %session_id,
-                    "No native tool calls found in response"
+                    provider = %session.provider,
+                    model = %session.model,
+                    assistant_response_preview = %if assistant_response.len() > 200 {
+                        format!("{}...", &assistant_response[..200])
+                    } else {
+                        assistant_response.clone()
+                    },
+                    "No native tool calls found in response - this may indicate an issue with tool calling"
                 );
             }
         } else {
@@ -376,29 +388,85 @@ impl LlmAgent {
                 "Processing native tool call"
             );
 
-            // Parse the tool arguments
-            let tool_request: crate::models::ToolRequest =
-                match serde_json::from_str(&tool_call.function.arguments) {
-                    Ok(request) => {
-                        tracing::debug!(
-                            session_id = %session_id,
-                            tool_index = %index,
-                            tool_request = ?request,
-                            "Successfully parsed native tool request"
-                        );
-                        request
+            // Parse the tool arguments based on function name for native function calling
+            let tool_request: crate::models::ToolRequest = match tool_call.function.name.as_str() {
+                "list_files" => {
+                    match serde_json::from_str::<crate::models::ListFilesRequest>(&tool_call.function.arguments) {
+                        Ok(request) => crate::models::ToolRequest::ListFiles(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse list_files arguments"
+                            );
+                            continue;
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!(
-                            session_id = %session_id,
-                            tool_index = %index,
-                            error = %e,
-                            arguments = %tool_call.function.arguments,
-                            "Failed to parse native tool request"
-                        );
-                        continue;
+                }
+                "read_file" => {
+                    match serde_json::from_str::<crate::models::ReadFileRequest>(&tool_call.function.arguments) {
+                        Ok(request) => crate::models::ToolRequest::ReadFile(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse read_file arguments"
+                            );
+                            continue;
+                        }
                     }
-                };
+                }
+                "write_file" => {
+                    match serde_json::from_str::<crate::models::WriteFileRequest>(&tool_call.function.arguments) {
+                        Ok(request) => crate::models::ToolRequest::WriteFile(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse write_file arguments"
+                            );
+                            continue;
+                        }
+                    }
+                }
+                "grep" => {
+                    match serde_json::from_str::<crate::models::GrepRequest>(&tool_call.function.arguments) {
+                        Ok(request) => crate::models::ToolRequest::Grep(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse grep arguments"
+                            );
+                            continue;
+                        }
+                    }
+                }
+                unknown_function => {
+                    tracing::error!(
+                        session_id = %session_id,
+                        tool_index = %index,
+                        function_name = %unknown_function,
+                        "Unknown function name in tool call"
+                    );
+                    continue;
+                }
+            };
+
+            tracing::debug!(
+                session_id = %session_id,
+                tool_index = %index,
+                tool_request = ?tool_request,
+                "Successfully parsed native tool request from function call"
+            );
 
             // Create tool call record
             let tool_name = match &tool_request {
@@ -511,12 +579,23 @@ impl LlmAgent {
 
             // Add tool response to conversation
             let response_json_string = serde_json::to_string(&response_value)?;
-            self.db
+            let message_id = self.db
                 .create_llm_agent_message(session_id, "tool", response_json_string)?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,
+                message_id = %message_id,
                 "Native tool response added to conversation"
+            );
+
+            // Update tool call record with message_id
+            tool_call_record.message_id = Some(message_id);
+            self.db.update_llm_agent_tool_call(&tool_call_record)?;
+            tracing::debug!(
+                session_id = %session_id,
+                tool_call_id = %tool_call_id,
+                message_id = %message_id,
+                "Tool call record updated with message_id"
             );
         }
 
@@ -845,15 +924,7 @@ impl LlmAgent {
                 })
                 .collect();
 
-            // Add tool system prompt for follow-up (same as initial request)
-            let tool_system_prompt = self.create_tool_system_prompt();
-            messages.push(LlmMessage {
-                role: "system".to_string(),
-                content: Some(tool_system_prompt),
-                tool_calls: None,
-                function_call: None,
-                tool_call_id: None,
-            });
+
 
             tracing::debug!(
                 session_id = %session_id,
@@ -883,13 +954,45 @@ impl LlmAgent {
                 );
             }
 
+            // Check if provider supports native tools for follow-up
+            let supports_native_tools =
+                self.provider_supports_native_tools(&session.provider, &session.model);
+
+            // Add tool system prompt for follow-up (only for providers that don't support native tools)
+            if !supports_native_tools {
+                let tool_system_prompt = self.create_tool_system_prompt();
+                messages.push(LlmMessage {
+                    role: "system".to_string(),
+                    content: Some(tool_system_prompt),
+                    tool_calls: None,
+                    function_call: None,
+                    tool_call_id: None,
+                });
+                tracing::debug!(
+                    session_id = %session_id,
+                    "Added JSON parsing tool system prompt for non-native provider follow-up"
+                );
+            } else {
+                tracing::debug!(
+                    session_id = %session_id,
+                    "Skipping tool system prompt for native tool provider follow-up"
+                );
+            }
+
+            // Create tool definitions for native tool calling in follow-up
+            let tools = if supports_native_tools {
+                Some(self.create_native_tool_definitions())
+            } else {
+                None
+            };
+
             let request = LlmCompletionRequest {
                 model: session.model.clone(),
                 messages,
                 max_tokens: Some(4000),
                 temperature: Some(0.7),
-                stream: Some(true),
-                tools: None, // Follow-up doesn't need tools since we're processing results
+                stream: Some(false),
+                tools,
                 tool_choice: None,
                 functions: None,
                 function_call: None,
@@ -902,37 +1005,29 @@ impl LlmAgent {
                 "Sending follow-up request to LLM provider"
             );
 
-            // Stream the response
-            let mut assistant_response = String::new();
-            let mut chunk_count = 0;
-            let mut stream = llm_client.stream_complete(request);
+            // Get the complete response (non-streaming)
+            let response = llm_client.complete(request).await?;
+            let assistant_response = response.choices
+                .first()
+                .and_then(|choice| choice.message.as_ref())
+                .and_then(|message| message.content.clone())
+                .unwrap_or_default();
 
-            while let Some(chunk_result) = stream.next().await {
-                let chunk = chunk_result?;
-                chunk_count += 1;
-
-                if !chunk.is_finished {
-                    assistant_response.push_str(&chunk.content);
-
-                    // Broadcast chunk to WebSocket
-                    self.ws
-                        .broadcast_llm_agent_chunk(session_id.to_string(), chunk.content.clone())
-                        .await;
-
-                    tracing::trace!(
-                        session_id = %session_id,
-                        chunk_number = %chunk_count,
-                        chunk_length = %chunk.content.len(),
-                        "Received and broadcasted LLM follow-up response chunk"
-                    );
-                }
-            }
+            // Broadcast the complete response to WebSocket
+            self.ws
+                .broadcast_llm_agent_chunk(session_id.to_string(), assistant_response.clone())
+                .await;
 
             tracing::info!(
                 session_id = %session_id,
-                total_chunks = %chunk_count,
                 response_length = %assistant_response.len(),
-                "Completed LLM follow-up response streaming"
+                "Received complete LLM follow-up response"
+            );
+
+            tracing::info!(
+                session_id = %session_id,
+                response_length = %assistant_response.len(),
+                "Completed LLM follow-up response"
             );
 
             // Store assistant response
@@ -1401,6 +1496,12 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
                     || model.to_lowercase().contains("sonnet")
                     || model.to_lowercase().contains("haiku")
             }
+            "grok" => {
+                // Grok Code Fast 1 and newer models support native function calling
+                model.to_lowercase().contains("grok-code-fast")
+                    || model.to_lowercase().contains("grok-2")
+                    || model.to_lowercase().contains("grok-3")
+            }
             _ => false,
         }
     }
@@ -1450,25 +1551,7 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
     }
 
 
-    /// Stream session progress
-    #[allow(dead_code)]
-    pub fn stream_session_progress(
-        &self,
-        session_id: String,
-    ) -> impl futures_util::Stream<Item = Result<String>> + use<'_> {
-        try_stream! {
-            let session = self.db.get_llm_agent_session(&session_id)?;
 
-            // Send initial status
-            yield format!("Session status: {}", session.status);
-
-            // Stream messages
-            let messages = self.db.get_llm_agent_messages(&session_id)?;
-            for message in messages {
-                yield format!("[{}] {}", message.role, message.content);
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -1777,6 +1860,45 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_provider_supports_native_tools_grok() {
+        // Test the logic directly by creating a minimal function
+        fn provider_supports_native_tools(provider: &str, model: &str) -> bool {
+            match provider.to_lowercase().as_str() {
+                "openai" => {
+                    model.to_lowercase().starts_with("gpt-4") || model.to_lowercase().contains("gpt-4")
+                }
+                "anthropic" | "claude" => {
+                    model.to_lowercase().contains("claude")
+                        || model.to_lowercase().contains("opus")
+                        || model.to_lowercase().contains("sonnet")
+                        || model.to_lowercase().contains("haiku")
+                }
+                "grok" => {
+                    // Grok Code Fast 1 and newer models support native function calling
+                    model.to_lowercase().contains("grok-code-fast")
+                        || model.to_lowercase().contains("grok-2")
+                        || model.to_lowercase().contains("grok-3")
+                }
+                _ => false,
+            }
+        }
+
+        // Test Grok support
+        assert!(provider_supports_native_tools("grok", "grok-code-fast-1"));
+        assert!(provider_supports_native_tools("grok", "grok-2-1212"));
+        assert!(provider_supports_native_tools("GROK", "grok-code-fast-1")); // Case insensitive
+
+        // Test that old/unsupported Grok models still work
+        assert!(!provider_supports_native_tools("grok", "grok-1"));
+        assert!(!provider_supports_native_tools("grok", "some-other-model"));
+
+        // Test existing providers still work
+        assert!(provider_supports_native_tools("openai", "gpt-4"));
+        assert!(provider_supports_native_tools("anthropic", "claude-3-sonnet"));
+        assert!(!provider_supports_native_tools("unknown", "model"));
     }
 
     #[test]
