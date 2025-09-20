@@ -248,7 +248,8 @@ impl LlmAgent {
         // Get the complete response (non-streaming)
         let response = llm_client.complete(request).await?;
 
-        let assistant_response = response.choices
+        let assistant_response = response
+            .choices
             .first()
             .and_then(|choice| choice.message.as_ref())
             .and_then(|message| message.content.clone())
@@ -267,7 +268,8 @@ impl LlmAgent {
         // Log details of response structure for debugging
         for (choice_idx, choice) in response.choices.iter().enumerate() {
             if let Some(message) = &choice.message {
-                let message_tool_calls_count = message.tool_calls.as_ref().map(|tc| tc.len()).unwrap_or(0);
+                let message_tool_calls_count =
+                    message.tool_calls.as_ref().map(|tc| tc.len()).unwrap_or(0);
                 tracing::info!(
                     session_id = %session_id,
                     choice_index = %choice_idx,
@@ -297,7 +299,8 @@ impl LlmAgent {
             }
 
             // Also check choice-level tool calls (Anthropic format)
-            let choice_tool_calls_count = choice.tool_calls.as_ref().map(|tc| tc.len()).unwrap_or(0);
+            let choice_tool_calls_count =
+                choice.tool_calls.as_ref().map(|tc| tc.len()).unwrap_or(0);
             if choice_tool_calls_count > 0 {
                 tracing::info!(
                     session_id = %session_id,
@@ -320,13 +323,41 @@ impl LlmAgent {
             "Received complete LLM response"
         );
 
-        // Store assistant response
-        self.db
-            .create_llm_agent_message(session_id, "assistant", assistant_response.clone())?;
+        // Store assistant response - but enhance it with tool call information if present
+        let enhanced_assistant_response = if !accumulated_tool_calls.is_empty() {
+            // If we have tool calls but the response is empty/minimal, create a descriptive message
+            if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
+                let tool_call_descriptions: Vec<String> = accumulated_tool_calls
+                    .iter()
+                    .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                    .collect();
+                format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+            } else {
+                // If response has content, append tool call info
+                let tool_call_descriptions: Vec<String> = accumulated_tool_calls
+                    .iter()
+                    .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                    .collect();
+                format!(
+                    "{}\n\nMaking tool calls:\n{}",
+                    assistant_response,
+                    tool_call_descriptions.join("\n")
+                )
+            }
+        } else {
+            assistant_response.clone()
+        };
+
+        self.db.create_llm_agent_message(
+            session_id,
+            "assistant",
+            enhanced_assistant_response.clone(),
+        )?;
         tracing::debug!(
             session_id = %session_id,
-            response_length = %assistant_response.len(),
-            "Assistant response stored in database"
+            response_length = %enhanced_assistant_response.len(),
+            tool_calls_count = %accumulated_tool_calls.len(),
+            "Assistant response with tool call info stored in database"
         );
 
         // Check for tool calls based on provider capabilities
@@ -443,7 +474,9 @@ impl LlmAgent {
             // Parse the tool arguments based on function name for native function calling
             let tool_request: crate::models::ToolRequest = match tool_call.function.name.as_str() {
                 "list_files" => {
-                    match serde_json::from_str::<crate::models::ListFilesRequest>(&tool_call.function.arguments) {
+                    match serde_json::from_str::<crate::models::ListFilesRequest>(
+                        &tool_call.function.arguments,
+                    ) {
                         Ok(request) => crate::models::ToolRequest::ListFiles(request),
                         Err(e) => {
                             tracing::error!(
@@ -458,7 +491,9 @@ impl LlmAgent {
                     }
                 }
                 "read_file" => {
-                    match serde_json::from_str::<crate::models::ReadFileRequest>(&tool_call.function.arguments) {
+                    match serde_json::from_str::<crate::models::ReadFileRequest>(
+                        &tool_call.function.arguments,
+                    ) {
                         Ok(request) => crate::models::ToolRequest::ReadFile(request),
                         Err(e) => {
                             tracing::error!(
@@ -473,7 +508,9 @@ impl LlmAgent {
                     }
                 }
                 "write_file" => {
-                    match serde_json::from_str::<crate::models::WriteFileRequest>(&tool_call.function.arguments) {
+                    match serde_json::from_str::<crate::models::WriteFileRequest>(
+                        &tool_call.function.arguments,
+                    ) {
                         Ok(request) => crate::models::ToolRequest::WriteFile(request),
                         Err(e) => {
                             tracing::error!(
@@ -488,7 +525,9 @@ impl LlmAgent {
                     }
                 }
                 "grep" => {
-                    match serde_json::from_str::<crate::models::GrepRequest>(&tool_call.function.arguments) {
+                    match serde_json::from_str::<crate::models::GrepRequest>(
+                        &tool_call.function.arguments,
+                    ) {
                         Ok(request) => crate::models::ToolRequest::Grep(request),
                         Err(e) => {
                             tracing::error!(
@@ -631,8 +670,9 @@ impl LlmAgent {
 
             // Add tool response to conversation
             let response_json_string = serde_json::to_string(&response_value)?;
-            let message_id = self.db
-                .create_llm_agent_message(session_id, "tool", response_json_string)?;
+            let message_id =
+                self.db
+                    .create_llm_agent_message(session_id, "tool", response_json_string)?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,
@@ -976,8 +1016,6 @@ impl LlmAgent {
                 })
                 .collect();
 
-
-
             tracing::debug!(
                 session_id = %session_id,
                 total_messages = %messages.len(),
@@ -1059,7 +1097,8 @@ impl LlmAgent {
 
             // Get the complete response (non-streaming)
             let response = llm_client.complete(request).await?;
-            let assistant_response = response.choices
+            let assistant_response = response
+                .choices
                 .first()
                 .and_then(|choice| choice.message.as_ref())
                 .and_then(|message| message.content.clone())
@@ -1079,16 +1118,41 @@ impl LlmAgent {
                 "Received complete LLM follow-up response"
             );
 
-            // Store assistant response
+            // Store assistant response - enhance it with tool call information if present
+            let enhanced_assistant_response = if !follow_up_tool_calls.is_empty() {
+                // If we have tool calls but the response is empty/minimal, create a descriptive message
+                if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
+                    let tool_call_descriptions: Vec<String> = follow_up_tool_calls
+                        .iter()
+                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                        .collect();
+                    format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                } else {
+                    // If response has content, append tool call info
+                    let tool_call_descriptions: Vec<String> = follow_up_tool_calls
+                        .iter()
+                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                        .collect();
+                    format!(
+                        "{}\n\nMaking tool calls:\n{}",
+                        assistant_response,
+                        tool_call_descriptions.join("\n")
+                    )
+                }
+            } else {
+                assistant_response.clone()
+            };
+
             self.db.create_llm_agent_message(
                 session_id,
                 "assistant",
-                assistant_response.clone(),
+                enhanced_assistant_response.clone(),
             )?;
             tracing::debug!(
                 session_id = %session_id,
-                response_length = %assistant_response.len(),
-                "Follow-up assistant response stored in database"
+                response_length = %enhanced_assistant_response.len(),
+                follow_up_tool_calls_count = %follow_up_tool_calls.len(),
+                "Follow-up assistant response with tool call info stored in database"
             );
 
             // Check for tool calls based on provider capabilities (same logic as main process_message)
@@ -1527,7 +1591,6 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         }
     }
 
-
     /// Fail a session
     #[allow(dead_code)]
     pub async fn fail_session(&self, session_id: &str) -> Result<()> {
@@ -1617,9 +1680,6 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
             },
         ]
     }
-
-
-
 }
 
 #[cfg(test)]
@@ -1937,7 +1997,8 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
         fn provider_supports_native_tools(provider: &str, model: &str) -> bool {
             match provider.to_lowercase().as_str() {
                 "openai" => {
-                    model.to_lowercase().starts_with("gpt-4") || model.to_lowercase().contains("gpt-4")
+                    model.to_lowercase().starts_with("gpt-4")
+                        || model.to_lowercase().contains("gpt-4")
                 }
                 "anthropic" | "claude" => {
                     model.to_lowercase().contains("claude")
@@ -1966,7 +2027,10 @@ The tool request MUST exactly match the TypeScript interface defined above."#,
 
         // Test existing providers still work
         assert!(provider_supports_native_tools("openai", "gpt-4"));
-        assert!(provider_supports_native_tools("anthropic", "claude-3-sonnet"));
+        assert!(provider_supports_native_tools(
+            "anthropic",
+            "claude-3-sonnet"
+        ));
         assert!(!provider_supports_native_tools("unknown", "model"));
     }
 
