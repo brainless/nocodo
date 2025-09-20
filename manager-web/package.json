@@ -8,13 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run --config vitest.api-e2e.config.ts",
     "test:ui": "vitest --ui",
-
-    "test:api-e2e": "vitest run --config vitest.api-e2e.config.ts",
-    "test:api-e2e:watch": "vitest --config vitest.api-e2e.config.ts",
-    "test:api-e2e:coverage": "vitest run --config vitest.api-e2e.config.ts --coverage",
-    "test:api-e2e:ci": "vitest run --config vitest.api-e2e.config.ts --reporter=json --outputFile=test-results.json",
     "sync-types": "node sync-types.js",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",

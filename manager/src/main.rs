@@ -5,7 +5,6 @@ mod handlers;
 mod llm_agent;
 mod llm_client;
 mod models;
-mod runner;
 mod socket;
 mod templates;
 mod tools;
@@ -19,7 +18,6 @@ use database::Database;
 use error::AppResult;
 use handlers::AppState;
 use llm_agent::LlmAgent;
-use runner::Runner;
 use socket::SocketServer;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -78,24 +76,6 @@ async fn main() -> AppResult<()> {
     });
 
     // Create application state with WebSocket broadcaster
-    // Optionally enable in-Manager runner via env flag
-    let runner_enabled = std::env::var("NOCODO_RUNNER_ENABLED")
-        .ok()
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-
-    tracing::info!("Runner enabled: {}", runner_enabled);
-
-    let runner = if runner_enabled {
-        tracing::info!("Initializing in-process AI runner");
-        Some(Arc::new(Runner::new(
-            Arc::clone(&database),
-            Arc::clone(&broadcaster),
-        )))
-    } else {
-        tracing::warn!("AI runner disabled - set NOCODO_RUNNER_ENABLED=1 to enable");
-        None
-    };
 
     // Initialize LLM agent (always enabled)
     tracing::info!("Initializing LLM agent");
@@ -110,7 +90,6 @@ async fn main() -> AppResult<()> {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
-        runner,
         llm_agent,
         config: Arc::new(config.clone()),
     });
@@ -118,7 +97,6 @@ async fn main() -> AppResult<()> {
     // Start HTTP server
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting HTTP server on {}", server_addr);
-
     let http_task = tokio::spawn(async move {
         HttpServer::new(move || {
             App::new()
@@ -176,27 +154,6 @@ async fn main() -> AppResult<()> {
                         .route(
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
-                        )
-                        // LLM agent endpoints for direct LLM integration
-                        .route(
-                            "/work/{work_id}/llm-agent",
-                            web::post().to(handlers::create_llm_agent_session),
-                        )
-                        .route(
-                            "/work/{work_id}/llm-agent/sessions",
-                            web::get().to(handlers::get_llm_agent_sessions),
-                        )
-                        .route(
-                            "/llm-agent/{session_id}",
-                            web::get().to(handlers::get_llm_agent_session),
-                        )
-                        .route(
-                            "/llm-agent/{session_id}/message",
-                            web::post().to(handlers::send_llm_agent_message),
-                        )
-                        .route(
-                            "/llm-agent/{session_id}/complete",
-                            web::post().to(handlers::complete_llm_agent_session),
                         )
                         // Workflow endpoints
                         .route(
