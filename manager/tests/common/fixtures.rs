@@ -17,6 +17,7 @@ fn get_unique_id(prefix: &str) -> String {
 /// Test data generator for creating consistent test fixtures
 pub struct TestDataGenerator;
 
+#[allow(dead_code)]
 impl TestDataGenerator {
     /// Create a test project with default values
     pub fn create_project(name: Option<&str>, path: Option<&str>) -> Project {

@@ -15,6 +15,7 @@ pub struct LlmTestContext {
 
 /// Test file definition
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TestFile {
     pub path: String,
     pub content: String,
@@ -220,6 +221,7 @@ impl LlmTestScenario {
     }
 
     /// Create a code generation test
+    #[allow(dead_code)]
     pub fn code_generation_rust_function() -> Self {
         Self {
             name: "Code Generation - Rust Factorial Function".to_string(),

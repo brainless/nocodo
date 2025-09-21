@@ -12,6 +12,7 @@ pub struct TestDatabase {
     pub config: TestConfig,
 }
 
+#[allow(dead_code)]
 impl TestDatabase {
     /// Create a new isolated test database
     pub fn new() -> AppResult<Self> {

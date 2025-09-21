@@ -87,6 +87,7 @@ impl Default for TestLogger {
 }
 
 /// Initialize global test logging (use once per test binary)
+#[allow(dead_code)]
 pub fn init_test_logging() {
     // Only initialize if not already initialized
     if tracing::dispatcher::has_been_set() {
