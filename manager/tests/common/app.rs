@@ -21,6 +21,7 @@ pub struct TestApp {
     pub app_state: web::Data<AppState>,
 }
 
+#[allow(dead_code)]
 impl TestApp {
     /// Create a new isolated test application
     pub async fn new() -> Self {

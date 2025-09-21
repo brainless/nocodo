@@ -2,6 +2,7 @@ use std::env;
 
 /// Configuration for LLM provider testing
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LlmTestConfig {
     pub enabled_providers: Vec<LlmProviderTestConfig>,
     pub default_provider: Option<String>,
@@ -10,6 +11,7 @@ pub struct LlmTestConfig {
 
 /// Configuration for a specific LLM provider
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LlmProviderTestConfig {
     pub name: String,        // "grok", "openai", "anthropic"
     pub models: Vec<String>, // ["grok-code-fast-1", "gpt-4", "claude-3"]

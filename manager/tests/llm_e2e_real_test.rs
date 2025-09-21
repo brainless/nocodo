@@ -627,7 +627,7 @@ async fn test_llm_multiple_scenarios() {
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
-        let ai_session_id = body["session"]["id"].as_str().unwrap().to_string();
+        let _ai_session_id = body["session"]["id"].as_str().unwrap().to_string();
 
         // Wait for AI session processing
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;

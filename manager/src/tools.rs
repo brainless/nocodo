@@ -639,7 +639,7 @@ impl ToolExecutor {
 
             file_tree
                 .entry(parent_key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(file);
         }
 
@@ -655,7 +655,7 @@ impl ToolExecutor {
                 None => return,
             };
 
-            for (_i, file) in files.iter().enumerate() {
+            for file in files.iter() {
                 output.push_str(&format!("{}  {}", prefix, file.name));
 
                 if file.ignored {

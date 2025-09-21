@@ -2006,7 +2006,7 @@ fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
 
         file_tree
             .entry(parent_key)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(file);
     }
 

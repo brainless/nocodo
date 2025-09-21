@@ -157,6 +157,7 @@ pub struct LlmCompletionChunk {
 
 /// Streaming response chunk
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct StreamChunk {
     pub content: String,
     pub is_finished: bool,
@@ -226,6 +227,7 @@ pub trait LlmClient: Send + Sync {
     async fn complete(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse>;
 
     /// Complete a prompt with streaming response
+    #[allow(dead_code)]
     fn stream_complete(
         &self,
         request: LlmCompletionRequest,
