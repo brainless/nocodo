@@ -817,6 +817,7 @@ impl LlmAgentSession {
 /// Create LLM agent session request
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct CreateLlmAgentSessionRequest {
     pub provider: String,
     pub model: String,
@@ -826,6 +827,7 @@ pub struct CreateLlmAgentSessionRequest {
 /// LLM agent session response
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct LlmAgentSessionResponse {
     pub session: LlmAgentSession,
 }
