@@ -1,5 +1,5 @@
 use crate::models::{
-    FileInfo, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
+    FileInfo, FileType, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
     ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse,
     WriteFileRequest, WriteFileResponse,
 };
@@ -100,49 +100,41 @@ impl ToolExecutor {
 
         let recursive = request.recursive.unwrap_or(false);
         let include_hidden = request.include_hidden.unwrap_or(false);
+        let max_files = request.max_files.unwrap_or(100) as usize;
 
-        let mut files = Vec::new();
+        // Collect all files with breadth-first traversal
+        let mut all_files = Vec::new();
+        let mut queue = vec![target_path.clone()];
+        let mut visited = std::collections::HashSet::new();
 
-        if recursive {
-            // Use WalkDir for recursive listing
-            let walker = WalkDir::new(&target_path);
+        while !queue.is_empty() && all_files.len() < max_files {
+            let current_dir = queue.remove(0);
 
-            for entry in walker {
-                let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
-
-                // Skip hidden files if not requested
-                if !include_hidden {
-                    let file_name = entry.file_name().to_string_lossy().to_string();
-                    if file_name.starts_with('.') {
-                        continue;
-                    }
-                }
-
-                // Skip the root directory itself
-                if entry.path() == target_path {
-                    continue;
-                }
-
-                let file_info = self.create_file_info(&entry.path(), &target_path)?;
-                files.push(file_info);
+            if visited.contains(&current_dir) {
+                continue;
             }
-        } else {
-            // Non-recursive listing
-            let entries = match fs::read_dir(&target_path) {
+            visited.insert(current_dir.clone());
+
+            let entries = match fs::read_dir(&current_dir) {
                 Ok(entries) => entries,
-                Err(e) => {
-                    return Ok(ToolResponse::Error(ToolErrorResponse {
-                        tool: "list_files".to_string(),
-                        error: "PermissionDenied".to_string(),
-                        message: format!("Cannot read directory {}: {}", request.path, e),
-                    }));
-                }
+                Err(_) => continue, // Skip directories we can't read
             };
 
-            for entry in entries {
-                let entry = entry.map_err(|e| ToolError::IoError(e.to_string()))?;
+            let mut subdirs = Vec::new();
 
-                // Skip hidden files if not requested
+            for entry in entries {
+                if all_files.len() >= max_files {
+                    break;
+                }
+
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(_) => continue,
+                };
+
+                let path = entry.path();
+
+                // Skip hidden files/directories if not requested
                 if !include_hidden {
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     if file_name.starts_with('.') {
@@ -150,27 +142,51 @@ impl ToolExecutor {
                     }
                 }
 
-                let file_info = self.create_file_info(&entry.path(), &target_path)?;
-                files.push(file_info);
+                let file_info = match self.create_file_info(&path, &target_path) {
+                    Ok(info) => info,
+                    Err(_) => continue,
+                };
+
+                if matches!(file_info.file_type, FileType::Directory) {
+                    subdirs.push(path);
+                }
+
+                all_files.push(file_info);
+            }
+
+            // Add subdirectories to queue for breadth-first traversal
+            if recursive {
+                queue.extend(subdirs);
             }
         }
 
-        // Sort files: directories first, then by name
-        files.sort_by(|a, b| {
-            if a.is_directory && !b.is_directory {
-                std::cmp::Ordering::Less
-            } else if !a.is_directory && b.is_directory {
-                std::cmp::Ordering::Greater
-            } else {
-                a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        // Sort files: directories first, then by name (case-insensitive)
+        all_files.sort_by(|a, b| {
+            match (&a.file_type, &b.file_type) {
+                (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
+                (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
+                _ => {
+                    // Both are same type, sort by name case-insensitively
+                    a.name
+                        .to_lowercase()
+                        .cmp(&b.name.to_lowercase())
+                        .then_with(|| a.name.cmp(&b.name)) // Stable sort for same lowercase names
+                }
             }
         });
 
-        let total_count = files.len() as u32;
+        // Generate tree representation
+        let tree_output = self.format_as_tree(&all_files, &target_path);
+
+        let total_files = all_files.len() as u32;
+        let truncated = all_files.len() >= max_files;
+
         Ok(ToolResponse::ListFiles(ListFilesResponse {
-            path: request.path,
-            files,
-            total_count,
+            current_path: request.path,
+            files: tree_output,
+            total_files,
+            truncated,
+            limit: max_files as u32,
         }))
     }
 
@@ -465,12 +481,15 @@ impl ToolExecutor {
 
         let input_path = Path::new(path);
 
+        // Normalize the input path to handle . and .. components
+        let normalized_input = self.normalize_path(input_path)?;
+
         // Handle absolute paths
-        if input_path.is_absolute() {
+        if normalized_input.is_absolute() {
             // If the absolute path equals our base path, allow it
-            let canonical_input = match input_path.canonicalize() {
+            let canonical_input = match normalized_input.canonicalize() {
                 Ok(path) => path,
-                Err(_) => input_path.to_path_buf(), // Fallback if it doesn't exist yet
+                Err(_) => normalized_input.to_path_buf(), // Fallback if it doesn't exist yet
             };
 
             let canonical_base = match self.base_path.canonicalize() {
@@ -492,14 +511,10 @@ impl ToolExecutor {
         }
 
         // Handle relative paths
-        // Clean the path to prevent directory traversal
-        let clean_path = path.trim_start_matches("./");
-        let clean_path = clean_path.replace("..", "");
-
-        let target_path = if clean_path.is_empty() || clean_path == "." {
+        let target_path = if normalized_input == Path::new(".") {
             self.base_path.clone()
         } else {
-            self.base_path.join(clean_path)
+            self.base_path.join(&normalized_input)
         };
 
         // Canonicalize the path to resolve any remaining relative components
@@ -511,13 +526,56 @@ impl ToolExecutor {
         // Security check: ensure the path is within the base directory
         if !canonical_path.starts_with(&self.base_path) {
             return Err(ToolError::InvalidPath(format!(
-                "Path '{}' is outside the allowed directory",
+                "Path '{}' resolves to location outside the allowed directory",
                 path
             ))
             .into());
         }
 
         Ok(canonical_path)
+    }
+
+    /// Normalize a path by resolving . and .. components while preventing directory traversal
+    fn normalize_path(&self, path: &Path) -> Result<PathBuf> {
+        let mut components = Vec::new();
+
+        for component in path.components() {
+            match component {
+                std::path::Component::Prefix(_) | std::path::Component::RootDir => {
+                    // For absolute paths, keep the prefix/root
+                    components.push(component);
+                }
+                std::path::Component::CurDir => {
+                    // Skip current directory components
+                    continue;
+                }
+                std::path::Component::ParentDir => {
+                    // Prevent directory traversal attacks
+                    if components.is_empty()
+                        || matches!(components.last(), Some(std::path::Component::ParentDir))
+                    {
+                        return Err(ToolError::InvalidPath(format!(
+                            "Invalid path '{}': contains directory traversal",
+                            path.display()
+                        ))
+                        .into());
+                    }
+                    // Remove the last component (go up one level)
+                    components.pop();
+                }
+                std::path::Component::Normal(_name) => {
+                    components.push(component);
+                }
+            }
+        }
+
+        // Reconstruct the path from components
+        let mut result = PathBuf::new();
+        for component in components {
+            result.push(component);
+        }
+
+        Ok(result)
     }
 
     /// Create FileInfo from a path
@@ -529,18 +587,10 @@ impl ToolExecutor {
         })?;
 
         let relative_path_str = relative_path.to_string_lossy().to_string();
+        let absolute_path_str = path.to_string_lossy().to_string();
 
-        let modified_at = metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64);
-
-        let created_at = metadata
-            .created()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64);
+        // Check if file is ignored by .gitignore
+        let ignored = self.is_ignored_by_gitignore(path)?;
 
         Ok(FileInfo {
             name: path
@@ -549,15 +599,126 @@ impl ToolExecutor {
                 .to_string_lossy()
                 .to_string(),
             path: relative_path_str,
-            is_directory: metadata.is_dir(),
-            size: if metadata.is_dir() {
-                None
+            absolute: absolute_path_str,
+            file_type: if metadata.is_dir() {
+                FileType::Directory
             } else {
-                Some(metadata.len())
+                FileType::File
             },
-            modified_at,
-            created_at,
+            ignored,
         })
+    }
+
+    /// Format files as a tree structure
+    fn format_as_tree(&self, files: &[FileInfo], base_path: &Path) -> String {
+        let mut output = String::new();
+
+        // Add root directory name
+        let root_name = base_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        output.push_str(&root_name);
+        output.push('\n');
+
+        // Group files by their directory depth and parent
+        let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
+            std::collections::BTreeMap::new();
+
+        for file in files.iter() {
+            let path_parts: Vec<&str> = file.path.split('/').collect();
+            let depth = path_parts.len().saturating_sub(1);
+
+            // Create a key for the parent directory at this depth
+            let parent_key = if depth == 0 {
+                "".to_string()
+            } else {
+                path_parts[..depth].join("/")
+            };
+
+            file_tree.entry(parent_key).or_default().push(file);
+        }
+
+        // Recursive function to build tree
+        fn build_tree_level(
+            output: &mut String,
+            tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
+            current_path: &str,
+            prefix: &str,
+        ) {
+            let files = match tree.get(current_path) {
+                Some(files) => files,
+                None => return,
+            };
+
+            for file in files.iter() {
+                output.push_str(&format!("{}  {}", prefix, file.name));
+
+                if file.ignored {
+                    output.push_str(" (ignored)");
+                }
+
+                output.push('\n');
+
+                // If it's a directory, recurse
+                if matches!(file.file_type, FileType::Directory) {
+                    let child_path = if current_path.is_empty() {
+                        file.name.clone()
+                    } else {
+                        format!("{}/{}", current_path, file.name)
+                    };
+                    build_tree_level(output, tree, &child_path, &format!("{}  ", prefix));
+                }
+            }
+        }
+
+        build_tree_level(&mut output, &file_tree, "", "");
+        output
+    }
+
+    /// Check if a file is ignored by .gitignore
+    fn is_ignored_by_gitignore(&self, file_path: &Path) -> Result<bool> {
+        // For now, implement basic ignore patterns
+        // TODO: Implement full .gitignore parsing
+        let file_name = file_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        // Common ignore patterns
+        let ignore_patterns = [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".next",
+            "__pycache__",
+            "*.pyc",
+            ".DS_Store",
+            "target", // Rust build directory
+            "Cargo.lock",
+        ];
+
+        // Check if file name matches any ignore pattern
+        for pattern in &ignore_patterns {
+            if file_name == *pattern || file_name.starts_with(&format!("{}.", pattern)) {
+                return Ok(true);
+            }
+        }
+
+        // Check if any component in the path matches ignore patterns
+        for component in file_path.components() {
+            let comp_str = component.as_os_str().to_string_lossy();
+            for pattern in &ignore_patterns {
+                if comp_str == *pattern {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
     }
 
     /// Execute tool from JSON value (for LLM integration)
@@ -597,6 +758,7 @@ mod tests {
             path: ".".to_string(),
             recursive: Some(true),
             include_hidden: Some(false),
+            max_files: None,
         };
 
         let response = executor
@@ -606,13 +768,228 @@ mod tests {
 
         match response {
             ToolResponse::ListFiles(list_response) => {
-                assert_eq!(list_response.files.len(), 3);
-                assert!(list_response.files.iter().any(|f| f.name == "test.txt"));
-                assert!(list_response.files.iter().any(|f| f.name == "subdir"));
-                assert!(list_response.files.iter().any(|f| f.name == "nested.txt"));
+                assert_eq!(list_response.total_files, 3);
+                assert!(!list_response.truncated);
+                assert_eq!(list_response.limit, 100);
+                // Check that tree string contains expected files
+                assert!(list_response.files.contains("test.txt"));
+                assert!(list_response.files.contains("subdir"));
+                assert!(list_response.files.contains("nested.txt"));
             }
             _ => panic!("Expected ListFiles response"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_list_files_hidden_files_recursive() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create test files including hidden ones
+        fs::write(temp_dir.path().join("normal.txt"), "Normal file").unwrap();
+        fs::write(temp_dir.path().join(".hidden.txt"), "Hidden file").unwrap();
+        fs::create_dir_all(temp_dir.path().join(".hidden_dir")).unwrap();
+        fs::write(
+            temp_dir.path().join(".hidden_dir/file.txt"),
+            "File in hidden dir",
+        )
+        .unwrap();
+        fs::create_dir_all(temp_dir.path().join("normal_dir")).unwrap();
+        fs::write(
+            temp_dir.path().join("normal_dir/.hidden_in_normal.txt"),
+            "Hidden in normal dir",
+        )
+        .unwrap();
+
+        // Test without including hidden files
+        let request = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(true),
+            include_hidden: Some(false),
+            max_files: None,
+        };
+
+        let response = executor
+            .execute(ToolRequest::ListFiles(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::ListFiles(list_response) => {
+                // Should only include normal.txt and normal_dir
+                assert_eq!(list_response.total_files, 2);
+                assert!(list_response.files.contains("normal.txt"));
+                assert!(list_response.files.contains("normal_dir"));
+                // Should not include any hidden files
+                assert!(!list_response.files.contains(".hidden.txt"));
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+
+        // Test with including hidden files
+        let request_hidden = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(true),
+            include_hidden: Some(true),
+            max_files: None,
+        };
+
+        let response_hidden = executor
+            .execute(ToolRequest::ListFiles(request_hidden))
+            .await
+            .unwrap();
+
+        match response_hidden {
+            ToolResponse::ListFiles(list_response) => {
+                // Should include all files
+                assert_eq!(list_response.total_files, 6);
+                assert!(list_response.files.contains("normal.txt"));
+                assert!(list_response.files.contains(".hidden.txt"));
+                assert!(list_response.files.contains(".hidden_dir"));
+                assert!(list_response.files.contains("file.txt"));
+                assert!(list_response.files.contains("normal_dir"));
+                assert!(list_response.files.contains(".hidden_in_normal.txt"));
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_list_files_sorting() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create files with mixed case and types
+        fs::create_dir_all(temp_dir.path().join("Z_dir")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("a_dir")).unwrap();
+        fs::write(temp_dir.path().join("Z_file.txt"), "Z content").unwrap();
+        fs::write(temp_dir.path().join("a_file.txt"), "a content").unwrap();
+        fs::write(temp_dir.path().join("M_file.txt"), "M content").unwrap();
+
+        let request = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(false),
+            include_hidden: Some(false),
+            max_files: None,
+        };
+
+        let response = executor
+            .execute(ToolRequest::ListFiles(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::ListFiles(list_response) => {
+                assert_eq!(list_response.total_files, 5);
+
+                // Check that tree string contains expected files
+                assert!(list_response.files.contains("a_dir"));
+                assert!(list_response.files.contains("Z_dir"));
+                assert!(list_response.files.contains("a_file.txt"));
+                assert!(list_response.files.contains("M_file.txt"));
+                assert!(list_response.files.contains("Z_file.txt"));
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_list_files_max_files_limit() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create more files than the limit
+        for i in 0..15 {
+            fs::write(
+                temp_dir.path().join(format!("file_{:02}.txt", i)),
+                format!("Content {}", i),
+            )
+            .unwrap();
+        }
+
+        // Test with max_files limit of 10
+        let request = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(false),
+            include_hidden: Some(false),
+            max_files: Some(10),
+        };
+
+        let response = executor
+            .execute(ToolRequest::ListFiles(request))
+            .await
+            .unwrap();
+
+        match response {
+            ToolResponse::ListFiles(list_response) => {
+                assert_eq!(list_response.total_files, 10);
+                assert!(list_response.truncated);
+                assert_eq!(list_response.limit, 10);
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+
+        // Test with max_files higher than available files
+        let request_high_limit = ListFilesRequest {
+            path: ".".to_string(),
+            recursive: Some(false),
+            include_hidden: Some(false),
+            max_files: Some(20),
+        };
+
+        let response_high = executor
+            .execute(ToolRequest::ListFiles(request_high_limit))
+            .await
+            .unwrap();
+
+        match response_high {
+            ToolResponse::ListFiles(list_response) => {
+                assert_eq!(list_response.total_files, 15);
+                assert!(!list_response.truncated);
+                assert_eq!(list_response.limit, 20);
+            }
+            _ => panic!("Expected ListFiles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_path_normalization() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create test structure
+        fs::create_dir_all(temp_dir.path().join("subdir")).unwrap();
+        fs::write(temp_dir.path().join("subdir/test.txt"), "test content").unwrap();
+
+        // Test path normalization with . and .. components
+        let test_cases = vec![
+            ("./subdir/../subdir/test.txt", "subdir/test.txt"),
+            ("subdir/./test.txt", "subdir/test.txt"),
+            ("subdir//test.txt", "subdir/test.txt"), // Multiple slashes
+        ];
+
+        for (input_path, expected_relative) in test_cases {
+            let resolved = executor.validate_and_resolve_path(input_path).unwrap();
+            let expected = temp_dir.path().join(expected_relative);
+            assert_eq!(
+                resolved, expected,
+                "Failed to normalize path: {}",
+                input_path
+            );
+        }
+
+        // Test directory traversal prevention
+        let traversal_result = executor.validate_and_resolve_path("../outside");
+        assert!(
+            traversal_result.is_err(),
+            "Should prevent directory traversal"
+        );
+
+        let traversal_result2 = executor.validate_and_resolve_path("../../../etc/passwd");
+        assert!(
+            traversal_result2.is_err(),
+            "Should prevent directory traversal with multiple .."
+        );
     }
 
     #[tokio::test]

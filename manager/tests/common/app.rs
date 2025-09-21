@@ -9,8 +9,8 @@ use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 
 use super::config::TestConfig;
 use super::database::TestDatabase;
-use super::llm_config::LlmProviderTestConfig;
 use super::keyword_validation::LlmTestContext;
+use super::llm_config::LlmProviderTestConfig;
 
 use nocodo_manager::llm_agent::LlmAgent;
 
@@ -21,6 +21,7 @@ pub struct TestApp {
     pub app_state: web::Data<AppState>,
 }
 
+#[allow(dead_code)]
 impl TestApp {
     /// Create a new isolated test application
     pub async fn new() -> Self {
@@ -36,7 +37,7 @@ impl TestApp {
             database: database.database.clone(),
             start_time: SystemTime::now(),
             ws_broadcaster,
-            llm_agent: None,   // Not needed for basic API tests
+            llm_agent: None, // Not needed for basic API tests
             config: Arc::new(config.config.clone()),
         });
 
@@ -45,34 +46,94 @@ impl TestApp {
             App::new()
                 .app_data(app_state.clone())
                 // Health check
-                .route("/api/health", web::get().to(nocodo_manager::handlers::health_check))
+                .route(
+                    "/api/health",
+                    web::get().to(nocodo_manager::handlers::health_check),
+                )
                 // Projects
-                .route("/api/projects", web::get().to(nocodo_manager::handlers::get_projects))
-                .route("/api/projects", web::post().to(nocodo_manager::handlers::create_project))
-                .route("/api/projects/{id}", web::get().to(nocodo_manager::handlers::get_project))
-                .route("/api/projects/{id}", web::delete().to(nocodo_manager::handlers::delete_project))
+                .route(
+                    "/api/projects",
+                    web::get().to(nocodo_manager::handlers::get_projects),
+                )
+                .route(
+                    "/api/projects",
+                    web::post().to(nocodo_manager::handlers::create_project),
+                )
+                .route(
+                    "/api/projects/{id}",
+                    web::get().to(nocodo_manager::handlers::get_project),
+                )
+                .route(
+                    "/api/projects/{id}",
+                    web::delete().to(nocodo_manager::handlers::delete_project),
+                )
                 // Works
-                .route("/api/works", web::get().to(nocodo_manager::handlers::list_works))
-                .route("/api/works", web::post().to(nocodo_manager::handlers::create_work))
-                .route("/api/works/{id}", web::get().to(nocodo_manager::handlers::get_work))
-                .route("/api/works/{id}", web::put().to(nocodo_manager::handlers::delete_work))
-                .route("/api/works/{id}", web::delete().to(nocodo_manager::handlers::delete_work))
+                .route(
+                    "/api/works",
+                    web::get().to(nocodo_manager::handlers::list_works),
+                )
+                .route(
+                    "/api/works",
+                    web::post().to(nocodo_manager::handlers::create_work),
+                )
+                .route(
+                    "/api/works/{id}",
+                    web::get().to(nocodo_manager::handlers::get_work),
+                )
+                .route(
+                    "/api/works/{id}",
+                    web::put().to(nocodo_manager::handlers::delete_work),
+                )
+                .route(
+                    "/api/works/{id}",
+                    web::delete().to(nocodo_manager::handlers::delete_work),
+                )
                 // Work messages
-                .route("/api/works/{work_id}/messages", web::get().to(nocodo_manager::handlers::get_work_messages))
-                .route("/api/works/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
+                .route(
+                    "/api/works/{work_id}/messages",
+                    web::get().to(nocodo_manager::handlers::get_work_messages),
+                )
+                .route(
+                    "/api/works/{work_id}/messages",
+                    web::post().to(nocodo_manager::handlers::add_message_to_work),
+                )
                 // AI Sessions
-                .route("/api/ai-sessions", web::get().to(nocodo_manager::handlers::list_ai_sessions))
-                .route("/api/ai-sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
+                .route(
+                    "/api/ai-sessions",
+                    web::get().to(nocodo_manager::handlers::list_ai_sessions),
+                )
+                .route(
+                    "/api/ai-sessions",
+                    web::post().to(nocodo_manager::handlers::create_ai_session),
+                )
                 // AI Session outputs
-                .route("/api/ai-sessions/{session_id}/outputs", web::get().to(nocodo_manager::handlers::list_ai_session_outputs))
+                .route(
+                    "/api/ai-sessions/{session_id}/outputs",
+                    web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
+                )
                 // Files
-                .route("/api/files/list", web::post().to(nocodo_manager::handlers::list_files))
-                .route("/api/files/create", web::post().to(nocodo_manager::handlers::create_file))
-                .route("/api/files/update", web::post().to(nocodo_manager::handlers::update_file))
+                .route(
+                    "/api/files/list",
+                    web::post().to(nocodo_manager::handlers::list_files),
+                )
+                .route(
+                    "/api/files/create",
+                    web::post().to(nocodo_manager::handlers::create_file),
+                )
+                .route(
+                    "/api/files/update",
+                    web::post().to(nocodo_manager::handlers::update_file),
+                )
                 // Templates
-                .route("/api/templates", web::get().to(nocodo_manager::handlers::get_templates))
+                .route(
+                    "/api/templates",
+                    web::get().to(nocodo_manager::handlers::get_templates),
+                )
                 // Settings
-                .route("/api/settings", web::get().to(nocodo_manager::handlers::get_settings))
+                .route(
+                    "/api/settings",
+                    web::get().to(nocodo_manager::handlers::get_settings),
+                ),
         )
         .await;
 
@@ -82,7 +143,6 @@ impl TestApp {
             app_state,
         }
     }
-
 
     /// Get the app state
     pub fn app_state(&self) -> &web::Data<AppState> {
@@ -130,34 +190,94 @@ impl TestApp {
             App::new()
                 .app_data(app_state.clone())
                 // Health check
-                .route("/api/health", web::get().to(nocodo_manager::handlers::health_check))
+                .route(
+                    "/api/health",
+                    web::get().to(nocodo_manager::handlers::health_check),
+                )
                 // Projects
-                .route("/api/projects", web::get().to(nocodo_manager::handlers::get_projects))
-                .route("/api/projects", web::post().to(nocodo_manager::handlers::create_project))
-                .route("/api/projects/{id}", web::get().to(nocodo_manager::handlers::get_project))
-                .route("/api/projects/{id}", web::delete().to(nocodo_manager::handlers::delete_project))
+                .route(
+                    "/api/projects",
+                    web::get().to(nocodo_manager::handlers::get_projects),
+                )
+                .route(
+                    "/api/projects",
+                    web::post().to(nocodo_manager::handlers::create_project),
+                )
+                .route(
+                    "/api/projects/{id}",
+                    web::get().to(nocodo_manager::handlers::get_project),
+                )
+                .route(
+                    "/api/projects/{id}",
+                    web::delete().to(nocodo_manager::handlers::delete_project),
+                )
                 // Works
-                .route("/api/works", web::get().to(nocodo_manager::handlers::list_works))
-                .route("/api/works", web::post().to(nocodo_manager::handlers::create_work))
-                .route("/api/works/{id}", web::get().to(nocodo_manager::handlers::get_work))
-                .route("/api/works/{id}", web::put().to(nocodo_manager::handlers::delete_work))
-                .route("/api/works/{id}", web::delete().to(nocodo_manager::handlers::delete_work))
+                .route(
+                    "/api/works",
+                    web::get().to(nocodo_manager::handlers::list_works),
+                )
+                .route(
+                    "/api/works",
+                    web::post().to(nocodo_manager::handlers::create_work),
+                )
+                .route(
+                    "/api/works/{id}",
+                    web::get().to(nocodo_manager::handlers::get_work),
+                )
+                .route(
+                    "/api/works/{id}",
+                    web::put().to(nocodo_manager::handlers::delete_work),
+                )
+                .route(
+                    "/api/works/{id}",
+                    web::delete().to(nocodo_manager::handlers::delete_work),
+                )
                 // Work messages
-                .route("/api/works/{work_id}/messages", web::get().to(nocodo_manager::handlers::get_work_messages))
-                .route("/api/works/{work_id}/messages", web::post().to(nocodo_manager::handlers::add_message_to_work))
+                .route(
+                    "/api/works/{work_id}/messages",
+                    web::get().to(nocodo_manager::handlers::get_work_messages),
+                )
+                .route(
+                    "/api/works/{work_id}/messages",
+                    web::post().to(nocodo_manager::handlers::add_message_to_work),
+                )
                 // AI Sessions
-                .route("/api/ai-sessions", web::get().to(nocodo_manager::handlers::list_ai_sessions))
-                .route("/api/ai-sessions", web::post().to(nocodo_manager::handlers::create_ai_session))
+                .route(
+                    "/api/ai-sessions",
+                    web::get().to(nocodo_manager::handlers::list_ai_sessions),
+                )
+                .route(
+                    "/api/ai-sessions",
+                    web::post().to(nocodo_manager::handlers::create_ai_session),
+                )
                 // AI Session outputs
-                .route("/api/ai-sessions/{session_id}/outputs", web::get().to(nocodo_manager::handlers::list_ai_session_outputs))
+                .route(
+                    "/api/ai-sessions/{session_id}/outputs",
+                    web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
+                )
                 // Files
-                .route("/api/files/list", web::post().to(nocodo_manager::handlers::list_files))
-                .route("/api/files/create", web::post().to(nocodo_manager::handlers::create_file))
-                .route("/api/files/update", web::post().to(nocodo_manager::handlers::update_file))
+                .route(
+                    "/api/files/list",
+                    web::post().to(nocodo_manager::handlers::list_files),
+                )
+                .route(
+                    "/api/files/create",
+                    web::post().to(nocodo_manager::handlers::create_file),
+                )
+                .route(
+                    "/api/files/update",
+                    web::post().to(nocodo_manager::handlers::update_file),
+                )
                 // Templates
-                .route("/api/templates", web::get().to(nocodo_manager::handlers::get_templates))
+                .route(
+                    "/api/templates",
+                    web::get().to(nocodo_manager::handlers::get_templates),
+                )
                 // Settings
-                .route("/api/settings", web::get().to(nocodo_manager::handlers::get_settings))
+                .route(
+                    "/api/settings",
+                    web::get().to(nocodo_manager::handlers::get_settings),
+                ),
         )
         .await;
 
@@ -169,7 +289,11 @@ impl TestApp {
     }
 
     /// Send a message to the LLM agent and get the response
-    pub async fn send_llm_message(&self, session_id: &str, message: String) -> anyhow::Result<String> {
+    pub async fn send_llm_message(
+        &self,
+        session_id: &str,
+        message: String,
+    ) -> anyhow::Result<String> {
         if let Some(llm_agent) = &self.app_state.llm_agent {
             llm_agent.process_message(session_id, message).await
         } else {
@@ -178,7 +302,10 @@ impl TestApp {
     }
 
     /// Create project from test scenario context
-    pub async fn create_project_from_scenario(&self, context: &LlmTestContext) -> anyhow::Result<()> {
+    pub async fn create_project_from_scenario(
+        &self,
+        context: &LlmTestContext,
+    ) -> anyhow::Result<()> {
         use std::fs;
 
         // Ensure projects directory exists
@@ -220,7 +347,9 @@ impl TestApp {
 
     /// Get the LLM agent if available
     pub fn llm_agent(&self) -> anyhow::Result<&Arc<LlmAgent>> {
-        self.app_state.llm_agent.as_ref()
+        self.app_state
+            .llm_agent
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No LLM agent configured"))
     }
 
@@ -248,11 +377,11 @@ mod tests {
 
         // Test health check endpoint
         let req = test::TestRequest::get().uri("/api/health").to_request();
-        let service = test::init_service(
-            App::new()
-                .app_data(test_app.app_state.clone())
-                .route("/api/health", web::get().to(nocodo_manager::handlers::health_check))
-        ).await;
+        let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+            "/api/health",
+            web::get().to(nocodo_manager::handlers::health_check),
+        ))
+        .await;
         let resp = test::call_service(&service, req).await;
 
         assert!(resp.status().is_success());

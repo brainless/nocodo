@@ -5,10 +5,10 @@ use crate::llm_agent::LlmAgent;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateWorkRequest, FileContentResponse,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
-    FileUpdateRequest, Project, ProjectListResponse, ProjectResponse,
-    ServerStatus, SettingsResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
+    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
+    WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -546,37 +546,34 @@ pub async fn list_files(
         let file_info = FileInfo {
             name,
             path: relative_file_path.to_string_lossy().to_string(),
-            is_directory: metadata.is_dir(),
-            size: if metadata.is_file() {
-                Some(metadata.len())
+            absolute: path.to_string_lossy().to_string(),
+            file_type: if metadata.is_dir() {
+                FileType::Directory
             } else {
-                None
+                FileType::File
             },
-            modified_at: metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64),
-            created_at: metadata
-                .created()
-                .ok()
-                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64),
+            ignored: false, // TODO: Implement .gitignore checking for API responses
         };
 
         files.push(file_info);
     }
 
     // Sort files: directories first, then by name
-    files.sort_by(|a, b| match (a.is_directory, b.is_directory) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
+    files.sort_by(|a, b| match (&a.file_type, &b.file_type) {
+        (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
+        (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
         _ => a.name.cmp(&b.name),
     });
 
+    // Generate tree representation
+    let tree_output = format_files_as_tree(&files, &canonical_project_path);
+
     let response = FileListResponse {
-        files,
+        files: tree_output,
         current_path: relative_path.to_string(),
+        total_files: files.len() as u32,
+        truncated: false, // API doesn't implement truncation for now
+        limit: 1000,      // Default limit
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -654,22 +651,13 @@ pub async fn create_file(
     let file_info = FileInfo {
         name: file_name,
         path: req.path.clone(),
-        is_directory: metadata.is_dir(),
-        size: if metadata.is_file() {
-            Some(metadata.len())
+        absolute: full_path.to_string_lossy().to_string(),
+        file_type: if metadata.is_dir() {
+            FileType::Directory
         } else {
-            None
+            FileType::File
         },
-        modified_at: metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64),
-        created_at: metadata
-            .created()
-            .ok()
-            .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64),
+        ignored: false, // New files are not ignored
     };
 
     tracing::info!(
@@ -1804,7 +1792,6 @@ pub async fn get_work_messages(
     Ok(HttpResponse::Ok().json(response))
 }
 
-
 // Workflow handlers
 
 /// Scan workflows for a project
@@ -1987,4 +1974,87 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
     };
 
     Ok(HttpResponse::Ok().json(response))
+}
+
+/// Format files as a tree structure for API responses
+fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
+    let mut output = String::new();
+
+    // Add root directory name
+    let root_name = base_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    output.push_str(&root_name);
+    output.push('\n');
+
+    // Group files by their directory depth and parent
+    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
+        std::collections::BTreeMap::new();
+
+    for file in files.iter() {
+        let path_parts: Vec<&str> = file.path.split('/').collect();
+        let depth = path_parts.len().saturating_sub(1);
+
+        // Create a key for the parent directory at this depth
+        let parent_key = if depth == 0 {
+            "".to_string()
+        } else {
+            path_parts[..depth].join("/")
+        };
+
+        file_tree.entry(parent_key).or_default().push(file);
+    }
+
+    // Recursive function to build tree
+    fn build_tree_level(
+        output: &mut String,
+        tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
+        current_path: &str,
+        prefix: &str,
+        _is_last: bool,
+    ) {
+        let files = match tree.get(current_path) {
+            Some(files) => files,
+            None => return,
+        };
+
+        for (i, file) in files.iter().enumerate() {
+            let is_last_item = i == files.len() - 1;
+            let item_prefix = if is_last_item {
+                "└── "
+            } else {
+                "├── "
+            };
+            let next_prefix = if is_last_item { "    " } else { "│   " };
+
+            output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
+
+            if file.ignored {
+                output.push_str(" (ignored)");
+            }
+
+            output.push('\n');
+
+            // If it's a directory, recurse
+            if matches!(file.file_type, FileType::Directory) {
+                let child_path = if current_path.is_empty() {
+                    file.name.clone()
+                } else {
+                    format!("{}/{}", current_path, file.name)
+                };
+                build_tree_level(
+                    output,
+                    tree,
+                    &child_path,
+                    &format!("{}{}", prefix, next_prefix),
+                    is_last_item,
+                );
+            }
+        }
+    }
+
+    build_tree_level(&mut output, &file_tree, "", "", true);
+    output
 }

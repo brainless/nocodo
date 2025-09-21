@@ -283,18 +283,21 @@ pub struct AddExistingProjectRequest {
 }
 
 // File operation models
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export)]
+pub enum FileType {
+    File,
+    Directory,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
 #[ts(export)]
 pub struct FileInfo {
     pub name: String,
-    pub path: String,
-    pub is_directory: bool,
-    #[ts(type = "number | null")]
-    pub size: Option<u64>,
-    #[ts(type = "number | null")]
-    pub modified_at: Option<i64>,
-    #[ts(type = "number | null")]
-    pub created_at: Option<i64>,
+    pub path: String,        // relative path
+    pub absolute: String,    // absolute path
+    pub file_type: FileType, // enum: File, Directory
+    pub ignored: bool,       // whether file is ignored by .gitignore
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -307,8 +310,13 @@ pub struct FileListRequest {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct FileListResponse {
-    pub files: Vec<FileInfo>,
-    pub current_path: String,
+    pub files: String,        // Plain text tree representation
+    pub current_path: String, // Current directory being listed
+    #[ts(type = "number")]
+    pub total_files: u32, // Total number of files found
+    pub truncated: bool,      // Whether results were limited to 100
+    #[ts(type = "number")]
+    pub limit: u32, // Maximum files returned (100)
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -469,6 +477,9 @@ pub struct ListFilesRequest {
     pub recursive: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_hidden: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number | undefined")]
+    pub max_files: Option<u32>,
 }
 
 impl ListFilesRequest {
@@ -490,6 +501,11 @@ impl ListFilesRequest {
                     "type": "boolean",
                     "description": "Whether to include hidden files",
                     "default": false
+                },
+                "max_files": {
+                    "type": "number",
+                    "description": "Maximum number of files to return (default: 1000)",
+                    "default": 1000
                 }
             },
             "required": ["path"]
@@ -679,9 +695,13 @@ pub enum ToolResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ListFilesResponse {
-    pub path: String,
-    pub files: Vec<FileInfo>,
-    pub total_count: u32,
+    pub current_path: String,
+    pub files: String, // Plain text tree representation
+    #[ts(type = "number")]
+    pub total_files: u32,
+    pub truncated: bool,
+    #[ts(type = "number")]
+    pub limit: u32,
 }
 
 /// Read file tool response
@@ -797,6 +817,7 @@ impl LlmAgentSession {
 /// Create LLM agent session request
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct CreateLlmAgentSessionRequest {
     pub provider: String,
     pub model: String,
@@ -806,6 +827,7 @@ pub struct CreateLlmAgentSessionRequest {
 /// LLM agent session response
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct LlmAgentSessionResponse {
     pub session: LlmAgentSession,
 }
