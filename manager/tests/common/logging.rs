@@ -23,7 +23,7 @@ impl TestLogger {
 
         let subscriber = tracing_subscriber::registry()
             .with(
-                EnvFilter::from_default_env()
+                EnvFilter::new("debug")
                     .add_directive("nocodo_manager=debug".parse().unwrap())
                     .add_directive("actix_web=info".parse().unwrap())
                     .add_directive("rusqlite=warn".parse().unwrap()),
