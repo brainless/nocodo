@@ -5,16 +5,18 @@ use crate::llm_agent::LlmAgent;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateLlmAgentSessionRequest, CreateProjectRequest, CreateWorkRequest, FileContentResponse,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse,
-    FileUpdateRequest, LlmAgentSessionResponse, Project, ProjectListResponse, ProjectResponse,
-    ServerStatus, SettingsResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
+    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
+    WorkMessageResponse, WorkResponse,
 };
-use crate::runner::Runner;
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
+use nocodo_github_actions::{
+    nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -27,7 +29,6 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
-    pub runner: Option<Arc<Runner>>,      // Enabled via env flag
     pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
     pub config: Arc<AppConfig>,
 }
@@ -545,37 +546,34 @@ pub async fn list_files(
         let file_info = FileInfo {
             name,
             path: relative_file_path.to_string_lossy().to_string(),
-            is_directory: metadata.is_dir(),
-            size: if metadata.is_file() {
-                Some(metadata.len())
+            absolute: path.to_string_lossy().to_string(),
+            file_type: if metadata.is_dir() {
+                FileType::Directory
             } else {
-                None
+                FileType::File
             },
-            modified_at: metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64),
-            created_at: metadata
-                .created()
-                .ok()
-                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64),
+            ignored: false, // TODO: Implement .gitignore checking for API responses
         };
 
         files.push(file_info);
     }
 
     // Sort files: directories first, then by name
-    files.sort_by(|a, b| match (a.is_directory, b.is_directory) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
+    files.sort_by(|a, b| match (&a.file_type, &b.file_type) {
+        (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
+        (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
         _ => a.name.cmp(&b.name),
     });
 
+    // Generate tree representation
+    let tree_output = format_files_as_tree(&files, &canonical_project_path);
+
     let response = FileListResponse {
-        files,
+        files: tree_output,
         current_path: relative_path.to_string(),
+        total_files: files.len() as u32,
+        truncated: false, // API doesn't implement truncation for now
+        limit: 1000,      // Default limit
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -653,22 +651,13 @@ pub async fn create_file(
     let file_info = FileInfo {
         name: file_name,
         path: req.path.clone(),
-        is_directory: metadata.is_dir(),
-        size: if metadata.is_file() {
-            Some(metadata.len())
+        absolute: full_path.to_string_lossy().to_string(),
+        file_type: if metadata.is_dir() {
+            FileType::Directory
         } else {
-            None
+            FileType::File
         },
-        modified_at: metadata
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64),
-        created_at: metadata
-            .created()
-            .ok()
-            .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64),
+        ignored: false, // New files are not ignored
     };
 
     tracing::info!(
@@ -977,53 +966,8 @@ pub async fn create_ai_session(
             );
         }
     }
-    // If runner is enabled, start streaming execution for this session in background
-    else if let Some(runner) = &data.runner {
-        tracing::info!(
-            "Runner is available, starting AI session execution for session {}",
-            session.id
-        );
-
-        // Get the prompt from the associated message
-        let message = messages
-            .iter()
-            .find(|m| m.id == session.message_id)
-            .ok_or_else(|| AppError::Internal("Message not found for session".into()))?;
-
-        // Build a simple enhanced prompt similar to CLI
-        let enhanced_prompt = if let Some(ctx) = &session.project_context {
-            format!(
-                "Project Context:\n{}\n\nUser Request:\n{}\n\nInstructions: Use the `nocodo` command to get additional context about the project structure and to validate your changes.",
-                ctx, message.content
-            )
-        } else {
-            message.content.clone()
-        };
-
-        tracing::info!(
-            "Starting runner with tool: {} for session: {}",
-            session.tool_name,
-            session.id
-        );
-
-        // Fire-and-forget - but log any errors
-        match runner.start_session(session.clone(), enhanced_prompt).await {
-            Ok(_) => tracing::info!(
-                "Successfully started runner execution for session {}",
-                session.id
-            ),
-            Err(e) => tracing::error!(
-                "Failed to start runner execution for session {}: {}",
-                session.id,
-                e
-            ),
-        }
-    } else {
-        tracing::warn!(
-            "Runner is not available - AI session {} will not be executed",
-            session.id
-        );
-    }
+    // Note: AI session created but no execution backend enabled
+    // Sessions can be executed externally or via LLM agent
 
     Ok(HttpResponse::Created().json(response))
 }
@@ -1848,111 +1792,99 @@ pub async fn get_work_messages(
     Ok(HttpResponse::Ok().json(response))
 }
 
-// LLM Agent Endpoints
+// Workflow handlers
 
-/// Create a new LLM agent session
-pub async fn create_llm_agent_session(
+/// Scan workflows for a project
+pub async fn scan_workflows(
     data: web::Data<AppState>,
-    path: web::Path<String>,
-    request: web::Json<CreateLlmAgentSessionRequest>,
+    project_id: web::Path<String>,
+    _request: web::Json<ScanWorkflowsRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id = path.into_inner();
-    let req = request.into_inner();
+    let project_id = project_id.into_inner();
 
-    if let Some(ref llm_agent) = data.llm_agent {
-        // Get the work to find the project path
-        let work = data.database.get_work_by_id(&work_id)?;
-        let _project_path = if let Some(ref project_id) = work.project_id {
-            let project = data.database.get_project_by_id(project_id)?;
-            PathBuf::from(project.path)
-        } else {
-            // Use current directory if no project is associated
-            std::env::current_dir().map_err(|e| {
-                AppError::Internal(format!("Failed to get current directory: {}", e))
-            })?
-        };
+    // Get project to verify it exists and get path
+    let project = data.database.get_project_by_id(&project_id)?;
+    let project_path = PathBuf::from(&project.path);
 
-        let session = llm_agent
-            .create_session(work_id, req.provider, req.model, req.system_prompt)
-            .await?;
+    // Create workflow service
+    let workflow_service = WorkflowService::new(data.database.connection());
 
-        Ok(HttpResponse::Ok().json(LlmAgentSessionResponse { session }))
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
+    // Scan workflows
+    let response = workflow_service
+        .scan_workflows(&project_id, &project_path)
+        .map_err(|e| AppError::Internal(format!("Failed to scan workflows: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
-/// Get LLM agent session status
-pub async fn get_llm_agent_session(
+/// Get workflow commands for a project
+pub async fn get_workflow_commands(
     data: web::Data<AppState>,
-    session_id: web::Path<String>,
+    project_id: web::Path<String>,
 ) -> Result<HttpResponse, AppError> {
-    if let Some(ref llm_agent) = data.llm_agent {
-        let session_id = session_id.into_inner();
-        let session = llm_agent.get_session_status(&session_id).await?;
-        Ok(HttpResponse::Ok().json(LlmAgentSessionResponse { session }))
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
+    let project_id = project_id.into_inner();
 
-/// Send a message to LLM agent
-pub async fn send_llm_agent_message(
-    data: web::Data<AppState>,
-    session_id: web::Path<String>,
-    request: web::Json<serde_json::Value>,
-) -> Result<HttpResponse, AppError> {
-    if let Some(ref llm_agent) = data.llm_agent {
-        let session_id = session_id.into_inner();
+    // Verify project exists
+    data.database.get_project_by_id(&project_id)?;
 
-        // Extract message from request
-        let user_message = request
-            .get("message")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| AppError::InvalidRequest("Message field required".to_string()))?
-            .to_string();
-
-        let response = llm_agent.process_message(&session_id, user_message).await?;
-
-        Ok(HttpResponse::Ok().json(serde_json::json!({
-            "response": response
-        })))
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
-
-/// Complete an LLM agent session
-pub async fn complete_llm_agent_session(
-    data: web::Data<AppState>,
-    session_id: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    if let Some(ref llm_agent) = data.llm_agent {
-        let session_id = session_id.into_inner();
-        llm_agent.complete_session(&session_id).await?;
-        Ok(HttpResponse::Ok().finish())
-    } else {
-        Err(AppError::InvalidRequest(
-            "LLM agent not available".to_string(),
-        ))
-    }
-}
-
-/// Get LLM agent sessions for a work
-pub async fn get_llm_agent_sessions(
-    data: web::Data<AppState>,
-    work_id: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let sessions = data
+    let commands = data
         .database
-        .get_llm_agent_sessions_by_work(&work_id.into_inner())?;
-    Ok(HttpResponse::Ok().json(sessions))
+        .get_workflow_commands(&project_id)
+        .map_err(|e| AppError::Internal(format!("Failed to get workflow commands: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(commands))
+}
+
+/// Execute a workflow command
+pub async fn execute_workflow_command(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+    request: web::Json<ExecuteCommandRequest>,
+) -> Result<HttpResponse, AppError> {
+    let (project_id, command_id) = path.into_inner();
+    let request = request.into_inner();
+
+    // Verify project exists
+    data.database.get_project_by_id(&project_id)?;
+
+    // Create workflow service
+    let workflow_service = WorkflowService::new(data.database.connection());
+
+    // Execute command
+    let execution = workflow_service
+        .execute_command(&command_id, request.timeout_seconds)
+        .map_err(|e| AppError::Internal(format!("Failed to execute command: {}", e)))?;
+
+    let response = ExecuteCommandResponse { execution };
+
+    // Broadcast execution result via WebSocket
+    data.ws_broadcaster.broadcast(
+        crate::websocket::WebSocketMessage::WorkflowExecutionCompleted {
+            project_id: project_id.clone(),
+            command_id: command_id.clone(),
+            execution: serde_json::to_string(&response).unwrap_or_default(),
+        },
+    );
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Get execution history for a workflow command
+pub async fn get_command_executions(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, AppError> {
+    let (project_id, command_id) = path.into_inner();
+
+    // Verify project exists
+    data.database.get_project_by_id(&project_id)?;
+
+    let executions = data
+        .database
+        .get_command_executions(&command_id)
+        .map_err(|e| AppError::Internal(format!("Failed to get command executions: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(executions))
 }
 
 /// Get settings information including API key configuration
@@ -2042,4 +1974,87 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
     };
 
     Ok(HttpResponse::Ok().json(response))
+}
+
+/// Format files as a tree structure for API responses
+fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
+    let mut output = String::new();
+
+    // Add root directory name
+    let root_name = base_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    output.push_str(&root_name);
+    output.push('\n');
+
+    // Group files by their directory depth and parent
+    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
+        std::collections::BTreeMap::new();
+
+    for file in files.iter() {
+        let path_parts: Vec<&str> = file.path.split('/').collect();
+        let depth = path_parts.len().saturating_sub(1);
+
+        // Create a key for the parent directory at this depth
+        let parent_key = if depth == 0 {
+            "".to_string()
+        } else {
+            path_parts[..depth].join("/")
+        };
+
+        file_tree.entry(parent_key).or_default().push(file);
+    }
+
+    // Recursive function to build tree
+    fn build_tree_level(
+        output: &mut String,
+        tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
+        current_path: &str,
+        prefix: &str,
+        _is_last: bool,
+    ) {
+        let files = match tree.get(current_path) {
+            Some(files) => files,
+            None => return,
+        };
+
+        for (i, file) in files.iter().enumerate() {
+            let is_last_item = i == files.len() - 1;
+            let item_prefix = if is_last_item {
+                "└── "
+            } else {
+                "├── "
+            };
+            let next_prefix = if is_last_item { "    " } else { "│   " };
+
+            output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
+
+            if file.ignored {
+                output.push_str(" (ignored)");
+            }
+
+            output.push('\n');
+
+            // If it's a directory, recurse
+            if matches!(file.file_type, FileType::Directory) {
+                let child_path = if current_path.is_empty() {
+                    file.name.clone()
+                } else {
+                    format!("{}/{}", current_path, file.name)
+                };
+                build_tree_level(
+                    output,
+                    tree,
+                    &child_path,
+                    &format!("{}{}", prefix, next_prefix),
+                    is_last_item,
+                );
+            }
+        }
+    }
+
+    build_tree_level(&mut output, &file_tree, "", "", true);
+    output
 }

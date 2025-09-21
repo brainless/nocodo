@@ -1,14 +1,16 @@
 name: Build Self-contained Manager Releases
 
+# This workflow builds binaries and creates releases ONLY when manually triggered.
+# To create a release, set create_release=true when running manually.
+
 on:
-  push:
-    branches:
-      - 'issue-*'
-      - 'feature/issue-*'
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release for this branch'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -118,7 +120,7 @@ jobs:
           retention-days: 30
 
       - name: Create release notes
-        if: steps.commit_count.outputs.is_issue_branch == 'true'
+        if: steps.commit_count.outputs.is_issue_branch == 'true' && github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
         id: release_notes
         run: |
           echo "notes=Release ${{ steps.commit_count.outputs.release_tag }} - Self-contained nocodo-manager binary" >> $GITHUB_OUTPUT
@@ -127,7 +129,7 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (contains(github.ref_name, 'issue-') || contains(github.ref_name, 'feature/issue-'))
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true' && (contains(github.ref_name, 'issue-') || contains(github.ref_name, 'feature/issue-'))
 
     steps:
       - name: Checkout code
