@@ -2,6 +2,7 @@ use std::env;
 
 /// Configuration for LLM provider testing
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LlmTestConfig {
     pub enabled_providers: Vec<LlmProviderTestConfig>,
     pub default_provider: Option<String>,
@@ -10,11 +11,12 @@ pub struct LlmTestConfig {
 
 /// Configuration for a specific LLM provider
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LlmProviderTestConfig {
-    pub name: String,           // "grok", "openai", "anthropic"
-    pub models: Vec<String>,    // ["grok-code-fast-1", "gpt-4", "claude-3"]
-    pub api_key_env: String,    // "GROK_API_KEY", "OPENAI_API_KEY"
-    pub enabled: bool,          // Skip if API key not available
+    pub name: String,        // "grok", "openai", "anthropic"
+    pub models: Vec<String>, // ["grok-code-fast-1", "gpt-4", "claude-3"]
+    pub api_key_env: String, // "GROK_API_KEY", "OPENAI_API_KEY"
+    pub enabled: bool,       // Skip if API key not available
     pub test_prompts: LlmTestPrompts,
 }
 
@@ -105,7 +107,10 @@ impl LlmProviderTestConfig {
     pub fn anthropic() -> Self {
         Self {
             name: "anthropic".to_string(),
-            models: vec!["claude-3-sonnet-20240229".to_string(), "claude-3-opus-20240229".to_string()],
+            models: vec![
+                "claude-3-sonnet-20240229".to_string(),
+                "claude-3-opus-20240229".to_string(),
+            ],
             api_key_env: "ANTHROPIC_API_KEY".to_string(),
             enabled: env::var("ANTHROPIC_API_KEY").is_ok(),
             test_prompts: LlmTestPrompts::default(),
@@ -119,7 +124,9 @@ impl LlmProviderTestConfig {
 
     /// Convert to app config format
     pub fn to_app_config(&self) -> nocodo_manager::config::AppConfig {
-        use nocodo_manager::config::{AppConfig, ApiKeysConfig, DatabaseConfig, ServerConfig, SocketConfig};
+        use nocodo_manager::config::{
+            ApiKeysConfig, AppConfig, DatabaseConfig, ServerConfig, SocketConfig,
+        };
         use std::path::PathBuf;
 
         // Get API key from environment
@@ -137,9 +144,21 @@ impl LlmProviderTestConfig {
                 path: "/tmp/test.sock".to_string(),
             },
             api_keys: Some(ApiKeysConfig {
-                grok_api_key: if self.name == "grok" { api_key.clone() } else { None },
-                openai_api_key: if self.name == "openai" { api_key.clone() } else { None },
-                anthropic_api_key: if self.name == "anthropic" { api_key.clone() } else { None },
+                grok_api_key: if self.name == "grok" {
+                    api_key.clone()
+                } else {
+                    None
+                },
+                openai_api_key: if self.name == "openai" {
+                    api_key.clone()
+                } else {
+                    None
+                },
+                anthropic_api_key: if self.name == "anthropic" {
+                    api_key.clone()
+                } else {
+                    None
+                },
             }),
         }
     }
@@ -154,7 +173,6 @@ impl Default for LlmTestPrompts {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -175,7 +193,9 @@ mod tests {
         let anthropic = LlmProviderTestConfig::anthropic();
         assert_eq!(anthropic.name, "anthropic");
         assert_eq!(anthropic.api_key_env, "ANTHROPIC_API_KEY");
-        assert!(anthropic.models.contains(&"claude-3-sonnet-20240229".to_string()));
+        assert!(anthropic
+            .models
+            .contains(&"claude-3-sonnet-20240229".to_string()));
     }
 
     #[test]

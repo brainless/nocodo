@@ -15,15 +15,15 @@ impl TestLogger {
         let config = TestConfig::new();
 
         // Create a unique log file for this test
-        let log_file = std::fs::File::create(config.log_path())
-            .expect("Failed to create test log file");
+        let log_file =
+            std::fs::File::create(config.log_path()).expect("Failed to create test log file");
 
         // Set up tracing subscriber with file output
         let file_writer = fmt::writer::BoxMakeWriter::new(log_file);
 
         let subscriber = tracing_subscriber::registry()
             .with(
-                EnvFilter::from_default_env()
+                EnvFilter::new("debug")
                     .add_directive("nocodo_manager=debug".parse().unwrap())
                     .add_directive("actix_web=info".parse().unwrap())
                     .add_directive("rusqlite=warn".parse().unwrap()),
@@ -87,6 +87,7 @@ impl Default for TestLogger {
 }
 
 /// Initialize global test logging (use once per test binary)
+#[allow(dead_code)]
 pub fn init_test_logging() {
     // Only initialize if not already initialized
     if tracing::dispatcher::has_been_set() {
@@ -194,10 +195,7 @@ mod tests {
         thread::sleep(Duration::from_millis(10));
 
         let lines = logger.log_lines().unwrap();
-        let info_lines: Vec<_> = lines
-            .iter()
-            .filter(|line| line.contains("Line "))
-            .collect();
+        let info_lines: Vec<_> = lines.iter().filter(|line| line.contains("Line ")).collect();
 
         assert_eq!(info_lines.len(), 3);
         assert!(info_lines.iter().any(|line| line.contains("Line 1")));

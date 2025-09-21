@@ -1,9 +1,9 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use nocodo_manager::models::{
-    AiSession, AiSessionResult, AiSessionOutput, LlmAgentMessage, LlmAgentSession,
-    LlmAgentToolCall, MessageAuthorType, MessageContentType, Project, ProjectComponent,
-    Work, WorkMessage,
+    AiSession, AiSessionOutput, AiSessionResult, LlmAgentMessage, LlmAgentSession,
+    LlmAgentToolCall, MessageAuthorType, MessageContentType, Project, ProjectComponent, Work,
+    WorkMessage,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -17,6 +17,7 @@ fn get_unique_id(prefix: &str) -> String {
 /// Test data generator for creating consistent test fixtures
 pub struct TestDataGenerator;
 
+#[allow(dead_code)]
 impl TestDataGenerator {
     /// Create a test project with default values
     pub fn create_project(name: Option<&str>, path: Option<&str>) -> Project {
@@ -147,7 +148,11 @@ impl TestDataGenerator {
     }
 
     /// Create a test LLM agent message
-    pub fn create_llm_agent_message(session_id: &str, role: &str, content: &str) -> LlmAgentMessage {
+    pub fn create_llm_agent_message(
+        session_id: &str,
+        role: &str,
+        content: &str,
+    ) -> LlmAgentMessage {
         LlmAgentMessage {
             id: 1, // Auto-increment in DB
             session_id: session_id.to_string(),
@@ -258,7 +263,8 @@ mod tests {
 
     #[test]
     fn test_project_creation() {
-        let project = TestDataGenerator::create_project(Some("my-test-project"), Some("/tmp/my-test"));
+        let project =
+            TestDataGenerator::create_project(Some("my-test-project"), Some("/tmp/my-test"));
 
         assert_eq!(project.name, "my-test-project");
         assert_eq!(project.path, "/tmp/my-test");
@@ -298,12 +304,8 @@ mod tests {
     #[test]
     fn test_ai_session_creation() {
         let work = TestDataGenerator::create_work(None, None);
-        let message = TestDataGenerator::create_work_message(
-            &work.id,
-            "Test",
-            MessageAuthorType::User,
-            0,
-        );
+        let message =
+            TestDataGenerator::create_work_message(&work.id, "Test", MessageAuthorType::User, 0);
         let ai_session = TestDataGenerator::create_ai_session(&work.id, &message.id, "test-tool");
 
         assert_eq!(ai_session.work_id, work.id);
