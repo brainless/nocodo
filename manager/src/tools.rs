@@ -637,10 +637,7 @@ impl ToolExecutor {
                 path_parts[..depth].join("/")
             };
 
-            file_tree
-                .entry(parent_key)
-                .or_default()
-                .push(file);
+            file_tree.entry(parent_key).or_default().push(file);
         }
 
         // Recursive function to build tree
