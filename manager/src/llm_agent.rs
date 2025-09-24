@@ -138,6 +138,14 @@ impl LlmAgent {
         let llm_client = create_llm_client(config)?;
 
         // Build conversation for LLM
+        // For Claude, we need to handle tool responses correctly by changing role from "tool" to "user"
+        // and setting the tool_call_id
+        let tool_calls = if session.provider.to_lowercase() == "anthropic" || session.provider.to_lowercase() == "claude" {
+            self.db.get_llm_agent_tool_calls(session_id).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
         let mut messages = Vec::new();
         for msg in &history {
             messages.push(LlmMessage {
@@ -1005,6 +1013,14 @@ impl LlmAgent {
             let llm_client = create_llm_client(config)?;
 
             // Build conversation for LLM
+            // For Claude, we need to handle tool responses correctly by changing role from "tool" to "user"
+            // and setting the tool_call_id
+            let tool_calls = if session.provider.to_lowercase() == "anthropic" || session.provider.to_lowercase() == "claude" {
+                self.db.get_llm_agent_tool_calls(session_id).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+
             let mut messages: Vec<_> = history
                 .into_iter()
                 .map(|msg| LlmMessage {
