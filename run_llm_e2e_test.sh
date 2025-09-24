@@ -16,7 +16,7 @@ echo "   Phase 3: Keyword-based validation system"
 echo ""
 
 # export GROK_API_KEY="your-grok-api-key-here"  # Uncomment and set your API key
-export ANTHROPIC_API_KEY="your-anthropic-api-key-here"
+# export ANTHROPIC_API_KEY="your-anthropic-api-key-here"  # Uncomment and set your API key
 
 # Check for API keys
 AVAILABLE_PROVIDERS=()
