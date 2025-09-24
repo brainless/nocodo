@@ -869,11 +869,402 @@ impl LlmClient for OpenAiCompatibleClient {
     }
 }
 
+/// Anthropic-specific request/response structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AnthropicMessage {
+    role: String,
+    content: Vec<AnthropicContent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum AnthropicContent {
+    Text { r#type: String, text: String },
+    ToolUse { r#type: String, id: String, name: String, input: serde_json::Value },
+    ToolResult { r#type: String, tool_use_id: String, content: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AnthropicRequest {
+    model: String,
+    max_tokens: u32,
+    messages: Vec<AnthropicMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<AnthropicTool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AnthropicTool {
+    name: String,
+    description: String,
+    input_schema: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AnthropicResponse {
+    id: String,
+    r#type: String,
+    role: String,
+    content: Vec<AnthropicContent>,
+    model: String,
+    stop_reason: Option<String>,
+    stop_sequence: Option<String>,
+    usage: Option<AnthropicUsage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AnthropicUsage {
+    input_tokens: u32,
+    output_tokens: u32,
+}
+
+/// Anthropic-specific LLM client
+pub struct AnthropicClient {
+    client: reqwest::Client,
+    config: LlmProviderConfig,
+}
+
+impl AnthropicClient {
+    pub fn new(config: LlmProviderConfig) -> Result<Self> {
+        let client = reqwest::Client::new();
+        Ok(Self { client, config })
+    }
+
+    fn get_api_url(&self) -> String {
+        if let Some(base_url) = &self.config.base_url {
+            format!("{}/v1/messages", base_url.trim_end_matches('/'))
+        } else {
+            "https://api.anthropic.com/v1/messages".to_string()
+        }
+    }
+
+    /// Convert OpenAI-style request to Anthropic format
+    fn convert_to_anthropic_request(&self, request: LlmCompletionRequest) -> Result<AnthropicRequest> {
+        let mut anthropic_messages = Vec::new();
+        let mut system_message = None;
+
+        for message in request.messages {
+            match message.role.as_str() {
+                "system" => {
+                    system_message = message.content;
+                }
+                "user" | "assistant" => {
+                    let mut content = Vec::new();
+
+                    // Handle tool results first (they take precedence)
+                    if let Some(tool_call_id) = &message.tool_call_id {
+                        if let Some(content_text) = &message.content {
+                            content = vec![AnthropicContent::ToolResult {
+                                r#type: "tool_result".to_string(),
+                                tool_use_id: tool_call_id.clone(),
+                                content: content_text.clone(),
+                            }];
+                        }
+                    } else {
+                        // Handle regular text content
+                        if let Some(text) = &message.content {
+                            if !text.is_empty() {
+                                content.push(AnthropicContent::Text {
+                                    r#type: "text".to_string(),
+                                    text: text.clone(),
+                                });
+                            }
+                        }
+
+                        // Handle tool calls in assistant messages
+                        if let Some(tool_calls) = message.tool_calls {
+                            for tool_call in tool_calls {
+                                if tool_call.r#type == "function" {
+                                    let input: serde_json::Value = serde_json::from_str(&tool_call.function.arguments)
+                                        .unwrap_or_else(|_| serde_json::json!({}));
+
+                                    content.push(AnthropicContent::ToolUse {
+                                        r#type: "tool_use".to_string(),
+                                        id: tool_call.id,
+                                        name: tool_call.function.name,
+                                        input,
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    if !content.is_empty() {
+                        anthropic_messages.push(AnthropicMessage {
+                            role: message.role,
+                            content,
+                        });
+                    }
+                }
+                _ => {
+                    // Skip unknown roles
+                }
+            }
+        }
+
+        // Convert tools
+        let anthropic_tools = if let Some(tools) = request.tools {
+            Some(tools.into_iter().map(|tool| {
+                AnthropicTool {
+                    name: tool.function.name,
+                    description: tool.function.description,
+                    input_schema: tool.function.parameters,
+                }
+            }).collect())
+        } else {
+            None
+        };
+
+        // Convert tool choice
+        let anthropic_tool_choice = if let Some(tool_choice) = request.tool_choice {
+            match tool_choice {
+                ToolChoice::Auto(_) => Some(serde_json::json!({"type": "auto"})),
+                ToolChoice::Required(_) => Some(serde_json::json!({"type": "any"})),
+                ToolChoice::None(_) => None,
+                ToolChoice::Specific { function, .. } => {
+                    Some(serde_json::json!({"type": "tool", "name": function.name}))
+                }
+            }
+        } else {
+            None
+        };
+
+        Ok(AnthropicRequest {
+            model: request.model,
+            max_tokens: request.max_tokens.unwrap_or(self.config.max_tokens.unwrap_or(1024)),
+            messages: anthropic_messages,
+            system: system_message,
+            tools: anthropic_tools,
+            tool_choice: anthropic_tool_choice,
+            temperature: request.temperature.or(self.config.temperature),
+            stream: request.stream,
+        })
+    }
+
+    /// Convert Anthropic response to OpenAI format
+    fn convert_from_anthropic_response(&self, response: AnthropicResponse) -> LlmCompletionResponse {
+        let mut message_content = String::new();
+        let mut tool_calls = Vec::new();
+
+        for content in response.content {
+            match content {
+                AnthropicContent::Text { text, .. } => {
+                    if !message_content.is_empty() {
+                        message_content.push(' ');
+                    }
+                    message_content.push_str(&text);
+                }
+                AnthropicContent::ToolUse { id, name, input, .. } => {
+                    tool_calls.push(LlmToolCall {
+                        id,
+                        r#type: "function".to_string(),
+                        function: LlmToolCallFunction {
+                            name,
+                            arguments: serde_json::to_string(&input).unwrap_or_else(|_| "{}".to_string()),
+                        },
+                    });
+                }
+                AnthropicContent::ToolResult { .. } => {
+                    // Tool results are usually in user messages, not assistant messages
+                }
+            }
+        }
+
+        let message = LlmMessage {
+            role: response.role,
+            content: if message_content.is_empty() { None } else { Some(message_content) },
+            tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+            function_call: None,
+            tool_call_id: None,
+        };
+
+        let usage = response.usage.map(|u| LlmUsage {
+            prompt_tokens: u.input_tokens,
+            completion_tokens: u.output_tokens,
+            total_tokens: u.input_tokens + u.output_tokens,
+        });
+
+        LlmCompletionResponse {
+            id: response.id,
+            object: "chat.completion".to_string(),
+            created: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            model: response.model,
+            choices: vec![LlmChoice {
+                index: 0,
+                message: Some(message),
+                delta: None,
+                finish_reason: response.stop_reason,
+                tool_calls: None,
+            }],
+            usage,
+        }
+    }
+
+    async fn make_request(&self, request: AnthropicRequest) -> Result<reqwest::Response> {
+        let req = self
+            .client
+            .post(self.get_api_url())
+            .header("x-api-key", &self.config.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&request);
+
+        Ok(req.send().await?)
+    }
+}
+
+#[async_trait]
+impl LlmClient for AnthropicClient {
+    async fn complete(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
+        let start_time = std::time::Instant::now();
+        let message_count = request.messages.len();
+
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            message_count = %message_count,
+            has_tools = %request.tools.is_some(),
+            "Sending completion request to Anthropic API"
+        );
+
+        // Convert to Anthropic format
+        let anthropic_request = self.convert_to_anthropic_request(request.clone())?;
+
+        // Log the raw request being sent to Anthropic
+        let request_json = serde_json::to_string_pretty(&anthropic_request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string());
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            api_url = %self.get_api_url(),
+            raw_request = %request_json,
+            "Raw Anthropic request being sent"
+        );
+
+        let response = self.make_request(anthropic_request).await?;
+
+        let response_time = start_time.elapsed();
+        let status = response.status();
+
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+
+            tracing::error!(
+                provider = %self.config.provider,
+                model = %request.model,
+                status = %status,
+                response_time_ms = %response_time.as_millis(),
+                error = %error_text,
+                "Anthropic API request failed"
+            );
+
+            return Err(anyhow::anyhow!(
+                "Anthropic API error: {} - {}",
+                status,
+                error_text
+            ));
+        }
+
+        // Get the raw response text first for logging
+        let response_text = response.text().await?;
+
+        // Log the raw response received from Anthropic
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            response_length = %response_text.len(),
+            raw_response = %response_text,
+            "Raw Anthropic response received"
+        );
+
+        // Parse the response
+        let anthropic_response: AnthropicResponse = serde_json::from_str(&response_text)?;
+
+        // Convert back to OpenAI format
+        let completion = self.convert_from_anthropic_response(anthropic_response);
+
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            completion_id = %completion.id,
+            choices_count = %completion.choices.len(),
+            usage = ?completion.usage,
+            "Anthropic API request completed successfully"
+        );
+
+        Ok(completion)
+    }
+
+    fn stream_complete(
+        &self,
+        _request: LlmCompletionRequest,
+    ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>> {
+        // For now, return an error stream - we can implement streaming later if needed
+        use futures_util::stream;
+        Box::pin(stream::once(async {
+            Err(anyhow::anyhow!("Streaming not yet implemented for Anthropic client"))
+        }))
+    }
+
+    fn extract_tool_calls_from_response(
+        &self,
+        response: &LlmCompletionResponse,
+    ) -> Vec<LlmToolCall> {
+        let mut tool_calls = Vec::new();
+
+        for choice in &response.choices {
+            if let Some(message) = &choice.message {
+                if let Some(message_tool_calls) = &message.tool_calls {
+                    tool_calls.extend(message_tool_calls.clone());
+                }
+            }
+        }
+
+        tracing::info!(
+            provider = %self.config.provider,
+            total_tool_calls = %tool_calls.len(),
+            "Extracted tool calls from Anthropic response"
+        );
+
+        tool_calls
+    }
+
+    fn provider(&self) -> &str {
+        &self.config.provider
+    }
+
+    fn model(&self) -> &str {
+        &self.config.model
+    }
+}
+
 /// Factory function to create LLM clients
 pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
     match config.provider.to_lowercase().as_str() {
-        "openai" | "grok" | "anthropic" | "claude" => {
+        "openai" | "grok" => {
             let client = OpenAiCompatibleClient::new(config)?;
+            Ok(Box::new(client))
+        }
+        "anthropic" | "claude" => {
+            let client = AnthropicClient::new(config)?;
             Ok(Box::new(client))
         }
         _ => Err(anyhow::anyhow!(

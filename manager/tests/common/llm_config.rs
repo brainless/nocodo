@@ -108,6 +108,8 @@ impl LlmProviderTestConfig {
         Self {
             name: "anthropic".to_string(),
             models: vec![
+                "claude-3-5-sonnet-20241022".to_string(),
+                "claude-3-5-haiku-20241022".to_string(),
                 "claude-3-sonnet-20240229".to_string(),
                 "claude-3-opus-20240229".to_string(),
             ],
