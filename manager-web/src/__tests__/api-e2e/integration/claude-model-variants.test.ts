@@ -55,7 +55,7 @@ describe('Claude Model Variants - API End-to-End', () => {
       it(`should create session with ${description} model`, async () => {
         const sessionData = testDataGenerator.generateLlmAgentSessionData({
           provider: 'anthropic',
-          model: model,
+          model,
           system_prompt: 'You are a helpful AI assistant with file system tools.',
         });
 
@@ -65,7 +65,9 @@ describe('Claude Model Variants - API End-to-End', () => {
         expect(session.session.work_id).toBe(testWorkId);
         expect(session.session.provider).toBe('anthropic');
         expect(session.session.model).toBe(model);
-        expect(session.session.system_prompt).toBe('You are a helpful AI assistant with file system tools.');
+        expect(session.session.system_prompt).toBe(
+          'You are a helpful AI assistant with file system tools.'
+        );
       });
     });
 
@@ -79,7 +81,10 @@ describe('Claude Model Variants - API End-to-End', () => {
         model: 'claude-3-5-haiku-20241022',
       });
 
-      const sonnetSession = await testApiClient.createLlmAgentSession(testWorkId, sonnetSessionData);
+      const sonnetSession = await testApiClient.createLlmAgentSession(
+        testWorkId,
+        sonnetSessionData
+      );
       const haikuSession = await testApiClient.createLlmAgentSession(testWorkId, haikuSessionData);
 
       expect(sonnetSession.session.id).not.toBe(haikuSession.session.id);
@@ -126,7 +131,7 @@ describe('Claude Model Variants - API End-to-End', () => {
       for (const model of models) {
         const sessionData = testDataGenerator.generateLlmAgentSessionData({
           provider: 'anthropic',
-          model: model,
+          model,
           system_prompt: 'You are a helpful AI assistant with tools.',
         });
 
@@ -146,7 +151,7 @@ describe('Claude Model Variants - API End-to-End', () => {
       for (const model of genericModels) {
         const sessionData = testDataGenerator.generateLlmAgentSessionData({
           provider: 'anthropic',
-          model: model,
+          model,
         });
 
         const session = await testApiClient.createLlmAgentSession(testWorkId, sessionData);
