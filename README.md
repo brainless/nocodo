@@ -132,3 +132,4 @@ Teams worldwide are using nocodo to build:
 **⚡ Ready to transform how your team builds software?** [**Get Started →**](https://nocodo.com)
 
 > 🤖 Built with AI • 🔓 No lock-in • 🌍 Empowering teams worldwide
+# Force CI trigger
