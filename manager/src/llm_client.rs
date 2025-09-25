@@ -977,12 +977,100 @@ impl ClaudeClient {
 
     /// Convert LlmMessage to ClaudeMessage
     fn convert_to_claude_message(&self, message: &LlmMessage) -> ClaudeMessage {
-        let content = if let Some(content_str) = &message.content {
+        let content = if message.role == "tool" {
+            // Handle tool result messages - parse the stored tool result data
+            if let Some(content_str) = &message.content {
+                if let Ok(tool_result_data) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    // Check for Claude-specific tool result format (with tool_use_id)
+                    if let (Some(tool_use_id), Some(content_value)) = (
+                        tool_result_data.get("tool_use_id").and_then(|v| v.as_str()),
+                        tool_result_data.get("content")
+                    ) {
+                        // Convert the content value to a string
+                        let content_string = match content_value {
+                            serde_json::Value::String(s) => s.clone(),
+                            _ => content_value.to_string(),
+                        };
+
+                        return ClaudeMessage {
+                            role: "user".to_string(), // Tool results are sent as user messages in Claude
+                            content: vec![ClaudeContentBlock::ToolResult {
+                                tool_use_id: tool_use_id.to_string(),
+                                content: content_string,
+                                is_error: None,
+                            }],
+                        };
+                    }
+                    // If no tool_use_id, treat as simple tool result content
+                    else {
+                        return ClaudeMessage {
+                            role: "user".to_string(),
+                            content: vec![ClaudeContentBlock::Text {
+                                text: tool_result_data.to_string(),
+                            }],
+                        };
+                    }
+                }
+            }
+            // Fallback for malformed tool results
+            vec![ClaudeContentBlock::Text {
+                text: message.content.as_deref().unwrap_or("").to_string(),
+            }]
+        } else if message.role == "assistant" {
+            // Handle assistant messages - check if they contain structured tool call data
+            if let Some(content_str) = &message.content {
+                // Try to parse as structured tool call data first
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    if let (Some(text), Some(tool_calls_array)) = (
+                        assistant_data.get("text").and_then(|v| v.as_str()),
+                        assistant_data.get("tool_calls").and_then(|v| v.as_array())
+                    ) {
+                        // Build content blocks with text + tool_use blocks
+                        let mut content_blocks = vec![];
+
+                        // Add text block if present
+                        if !text.trim().is_empty() {
+                            content_blocks.push(ClaudeContentBlock::Text {
+                                text: text.to_string(),
+                            });
+                        }
+
+                        // Add tool_use blocks
+                        for tool_call in tool_calls_array {
+                            if let (Some(id), Some(name), Some(args_str)) = (
+                                tool_call.get("id").and_then(|v| v.as_str()),
+                                tool_call.get("function").and_then(|f| f.get("name")).and_then(|v| v.as_str()),
+                                tool_call.get("function").and_then(|f| f.get("arguments")).and_then(|v| v.as_str()),
+                            ) {
+                                if let Ok(input) = serde_json::from_str::<serde_json::Value>(args_str) {
+                                    content_blocks.push(ClaudeContentBlock::ToolUse {
+                                        id: id.to_string(),
+                                        name: name.to_string(),
+                                        input,
+                                    });
+                                }
+                            }
+                        }
+
+                        return ClaudeMessage {
+                            role: message.role.clone(),
+                            content: content_blocks,
+                        };
+                    }
+                }
+                // Fallback to text content
+                vec![ClaudeContentBlock::Text {
+                    text: content_str.clone(),
+                }]
+            } else {
+                vec![]
+            }
+        } else if let Some(content_str) = &message.content {
             vec![ClaudeContentBlock::Text {
                 text: content_str.clone(),
             }]
         } else if let Some(tool_calls) = &message.tool_calls {
-            // Convert tool calls to tool_result blocks
+            // Convert tool calls to tool_result blocks (this seems wrong, but keeping for compatibility)
             tool_calls
                 .iter()
                 .map(|tool_call| ClaudeContentBlock::ToolResult {

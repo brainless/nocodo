@@ -925,15 +925,15 @@ pub async fn create_ai_session(
 
             // Update work with tool_name and model info
             let mut updated_work = work.clone();
-            updated_work.tool_name = Some("LLM Agent (Grok Code Fast 1)".to_string());
+            updated_work.tool_name = Some("LLM Agent (Claude Sonnet 4)".to_string());
             data.database.update_work(&updated_work)?;
 
             // Create LLM agent session with default provider/model
             let llm_session = llm_agent
                 .create_session(
                     work_id.clone(),
-                    "grok".to_string(),             // Default provider
-                    "grok-code-fast-1".to_string(), // Default model
+                    "anthropic".to_string(),             // Default provider
+                    "claude-sonnet-4-20250514".to_string(), // Default model
                     session.project_context.clone(),
                 )
                 .await?;
