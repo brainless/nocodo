@@ -108,7 +108,8 @@ impl LlmProviderTestConfig {
         Self {
             name: "anthropic".to_string(),
             models: vec![
-                "claude-3-sonnet-20240229".to_string(),
+                "claude-3-sonnet-20240229".to_string(), // Use known working model first
+                "claude-sonnet-4-20250514".to_string(),
                 "claude-3-opus-20240229".to_string(),
             ],
             api_key_env: "ANTHROPIC_API_KEY".to_string(),
