@@ -223,7 +223,7 @@ impl LlmAgent {
             model: session.model.clone(),
             messages,
             max_tokens: Some(4000),
-            temperature: Some(0.7),
+            temperature: Some(0.3),
             stream: Some(false),
             tools,
             tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
@@ -715,9 +715,13 @@ impl LlmAgent {
         // After processing all tool calls, follow up with LLM
         tracing::info!(
             session_id = %session_id,
-            "Following up with LLM after native tool execution"
+            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth"
         );
         self.follow_up_with_llm_with_depth(session_id, 1).await?;
+        tracing::info!(
+            session_id = %session_id,
+            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed"
+        );
 
         tracing::info!(
             session_id = %session_id,
@@ -985,7 +989,7 @@ impl LlmAgent {
             tracing::info!(
                 session_id = %session_id,
                 current_depth = %depth,
-                "Following up with LLM after tool execution"
+                "FOLLOW_UP_DEBUG: Starting follow-up with LLM after tool execution"
             );
 
             // Get updated conversation history
@@ -1063,6 +1067,24 @@ impl LlmAgent {
                     message_length = %content_length,
                     "Sending follow-up message to LLM"
                 );
+            }
+
+            // CLAUDE_DEBUG: Log the exact conversation sent to Claude for debugging
+            if session.provider == "anthropic" {
+                tracing::info!(
+                    session_id = %session_id,
+                    "CLAUDE_DEBUG: Follow-up conversation history for Claude:"
+                );
+                for (i, msg) in messages.iter().enumerate() {
+                    tracing::info!(
+                        session_id = %session_id,
+                        message_index = %i,
+                        role = %msg.role,
+                        content_length = %msg.content.as_ref().map(|c| c.len()).unwrap_or(0),
+                        content_preview = %msg.content.as_ref().unwrap_or(&"<no content>".to_string()).chars().take(100).collect::<String>(),
+                        "CLAUDE_DEBUG: Message in follow-up conversation"
+                    );
+                }
             }
 
             // Check if provider supports native tools for follow-up
