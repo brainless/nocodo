@@ -863,11 +863,547 @@ impl LlmClient for OpenAiCompatibleClient {
     }
 }
 
+/// Claude-specific message content blocks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ClaudeContentBlock {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "tool_use")]
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    #[serde(rename = "tool_result")]
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_error: Option<bool>,
+    },
+}
+
+/// Claude-specific message structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeMessage {
+    pub role: String,
+    pub content: Vec<ClaudeContentBlock>,
+}
+
+/// Claude API request structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeCompletionRequest {
+    pub model: String,
+    pub messages: Vec<ClaudeMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ClaudeToolDefinition>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<ClaudeToolChoice>,
+}
+
+/// Claude tool definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}
+
+/// Claude tool choice
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ClaudeToolChoice {
+    Auto { r#type: String }, // {"type": "auto"}
+    Any { r#type: String },  // {"type": "any"}
+    Tool { r#type: String, name: String }, // {"type": "tool", "name": "tool_name"}
+}
+
+/// Claude API response structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeCompletionResponse {
+    pub id: String,
+    pub r#type: String,
+    pub role: String,
+    pub content: Vec<ClaudeContentBlock>,
+    pub model: String,
+    pub stop_reason: Option<String>,
+    pub stop_sequence: Option<String>,
+    pub usage: ClaudeUsage,
+}
+
+/// Claude usage statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeUsage {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+/// Claude LLM client
+pub struct ClaudeClient {
+    client: reqwest::Client,
+    config: LlmProviderConfig,
+}
+
+impl ClaudeClient {
+    pub fn new(config: LlmProviderConfig) -> Result<Self> {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()?;
+        Ok(Self { client, config })
+    }
+
+    fn get_api_url(&self) -> String {
+        if let Some(base_url) = &self.config.base_url {
+            format!("{}/v1/messages", base_url.trim_end_matches('/'))
+        } else {
+            "https://api.anthropic.com/v1/messages".to_string()
+        }
+    }
+
+    /// Check if the provider supports native tool calling
+    fn supports_native_tools(&self) -> bool {
+        self.config.model.to_lowercase().contains("claude")
+            || self.config.model.to_lowercase().contains("opus")
+            || self.config.model.to_lowercase().contains("sonnet")
+            || self.config.model.to_lowercase().contains("haiku")
+    }
+
+    /// Convert LlmMessage to ClaudeMessage
+    fn convert_to_claude_message(&self, message: &LlmMessage) -> ClaudeMessage {
+        let content = if message.role == "tool" {
+            // Handle tool result messages - parse the stored tool result data
+            if let Some(content_str) = &message.content {
+                if let Ok(tool_result_data) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    // Check for Claude-specific tool result format (with tool_use_id)
+                    if let (Some(tool_use_id), Some(content_value)) = (
+                        tool_result_data.get("tool_use_id").and_then(|v| v.as_str()),
+                        tool_result_data.get("content")
+                    ) {
+                        // Convert the content value to a string
+                        let content_string = match content_value {
+                            serde_json::Value::String(s) => s.clone(),
+                            _ => content_value.to_string(),
+                        };
+
+                        return ClaudeMessage {
+                            role: "user".to_string(), // Tool results are sent as user messages in Claude
+                            content: vec![ClaudeContentBlock::ToolResult {
+                                tool_use_id: tool_use_id.to_string(),
+                                content: content_string,
+                                is_error: None,
+                            }],
+                        };
+                    }
+                    // If no tool_use_id, treat as simple tool result content
+                    else {
+                        return ClaudeMessage {
+                            role: "user".to_string(),
+                            content: vec![ClaudeContentBlock::Text {
+                                text: tool_result_data.to_string(),
+                            }],
+                        };
+                    }
+                }
+            }
+            // Fallback for malformed tool results
+            vec![ClaudeContentBlock::Text {
+                text: message.content.as_deref().unwrap_or("").to_string(),
+            }]
+        } else if message.role == "assistant" {
+            // Handle assistant messages - check if they contain structured tool call data
+            if let Some(content_str) = &message.content {
+                // Try to parse as structured tool call data first
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    if let (Some(text), Some(tool_calls_array)) = (
+                        assistant_data.get("text").and_then(|v| v.as_str()),
+                        assistant_data.get("tool_calls").and_then(|v| v.as_array())
+                    ) {
+                        // Build content blocks with text + tool_use blocks
+                        let mut content_blocks = vec![];
+
+                        // Add text block if present
+                        if !text.trim().is_empty() {
+                            content_blocks.push(ClaudeContentBlock::Text {
+                                text: text.to_string(),
+                            });
+                        }
+
+                        // Add tool_use blocks
+                        for tool_call in tool_calls_array {
+                            if let (Some(id), Some(name), Some(args_str)) = (
+                                tool_call.get("id").and_then(|v| v.as_str()),
+                                tool_call.get("function").and_then(|f| f.get("name")).and_then(|v| v.as_str()),
+                                tool_call.get("function").and_then(|f| f.get("arguments")).and_then(|v| v.as_str()),
+                            ) {
+                                if let Ok(input) = serde_json::from_str::<serde_json::Value>(args_str) {
+                                    content_blocks.push(ClaudeContentBlock::ToolUse {
+                                        id: id.to_string(),
+                                        name: name.to_string(),
+                                        input,
+                                    });
+                                }
+                            }
+                        }
+
+                        return ClaudeMessage {
+                            role: message.role.clone(),
+                            content: content_blocks,
+                        };
+                    }
+                }
+                // Fallback to text content
+                vec![ClaudeContentBlock::Text {
+                    text: content_str.clone(),
+                }]
+            } else {
+                vec![]
+            }
+        } else if let Some(content_str) = &message.content {
+            vec![ClaudeContentBlock::Text {
+                text: content_str.clone(),
+            }]
+        } else if let Some(tool_calls) = &message.tool_calls {
+            // Convert tool calls to tool_result blocks (this seems wrong, but keeping for compatibility)
+            tool_calls
+                .iter()
+                .map(|tool_call| ClaudeContentBlock::ToolResult {
+                    tool_use_id: tool_call.id.clone(),
+                    content: format!("Tool call: {} with args {}", tool_call.function.name, tool_call.function.arguments),
+                    is_error: None,
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
+        ClaudeMessage {
+            role: message.role.clone(),
+            content,
+        }
+    }
+
+    /// Convert LlmCompletionRequest to ClaudeCompletionRequest
+    fn convert_request(&self, request: LlmCompletionRequest) -> ClaudeCompletionRequest {
+        // Separate system messages from regular messages
+        let mut system_content = String::new();
+        let mut regular_messages = Vec::new();
+
+        for message in &request.messages {
+            if message.role == "system" {
+                if let Some(content) = &message.content {
+                    if !system_content.is_empty() {
+                        system_content.push('\n');
+                    }
+                    system_content.push_str(content);
+                }
+            } else {
+                regular_messages.push(self.convert_to_claude_message(message));
+            }
+        }
+
+        let tools = if self.supports_native_tools() && request.tools.is_some() {
+            Some(
+                request
+                    .tools
+                    .unwrap()
+                    .into_iter()
+                    .map(|tool| ClaudeToolDefinition {
+                        name: tool.function.name,
+                        description: tool.function.description,
+                        input_schema: tool.function.parameters,
+                    })
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
+        let tool_choice = if self.supports_native_tools() && request.tool_choice.is_some() {
+            match request.tool_choice.unwrap() {
+                ToolChoice::Auto(_) => Some(ClaudeToolChoice::Auto {
+                    r#type: "auto".to_string(),
+                }),
+                ToolChoice::Required(_) => Some(ClaudeToolChoice::Any {
+                    r#type: "any".to_string(),
+                }),
+                ToolChoice::Specific { function, .. } => Some(ClaudeToolChoice::Tool {
+                    r#type: "tool".to_string(),
+                    name: function.name,
+                }),
+                ToolChoice::None(_) => None,
+            }
+        } else {
+            None
+        };
+
+        ClaudeCompletionRequest {
+            model: request.model,
+            messages: regular_messages,
+            max_tokens: request.max_tokens,
+            temperature: request.temperature,
+            system: if system_content.is_empty() { None } else { Some(system_content) },
+            tools,
+            tool_choice,
+        }
+    }
+
+    /// Convert ClaudeCompletionResponse to LlmCompletionResponse
+    fn convert_response(&self, response: ClaudeCompletionResponse) -> LlmCompletionResponse {
+        // Extract text content and tool calls from Claude content blocks
+        let mut content = String::new();
+        let mut tool_calls = Vec::new();
+
+        for block in response.content {
+            match block {
+                ClaudeContentBlock::Text { text } => {
+                    content.push_str(&text);
+                }
+                ClaudeContentBlock::ToolUse { id, name, input } => {
+                    tool_calls.push(LlmToolCall {
+                        id,
+                        r#type: "function".to_string(),
+                        function: LlmToolCallFunction {
+                            name,
+                            arguments: serde_json::to_string(&input).unwrap_or_default(),
+                        },
+                    });
+                }
+                ClaudeContentBlock::ToolResult { .. } => {
+                    // Tool results are handled in the message conversion
+                }
+            }
+        }
+
+        LlmCompletionResponse {
+            id: response.id,
+            object: "chat.completion".to_string(), // Mimic OpenAI format
+            created: 0, // Claude doesn't provide this
+            model: response.model,
+            choices: vec![LlmChoice {
+                index: 0,
+                message: Some(LlmMessage {
+                    role: "assistant".to_string(),
+                    content: if content.is_empty() { None } else { Some(content) },
+                    tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+                    function_call: None,
+                    tool_call_id: None,
+                }),
+                delta: None,
+                finish_reason: response.stop_reason.map(|reason| match reason.as_str() {
+                    "end_turn" => "stop".to_string(),
+                    "max_tokens" => "length".to_string(),
+                    "stop_sequence" => "stop".to_string(),
+                    "tool_use" => "tool_calls".to_string(),
+                    _ => "stop".to_string(),
+                }),
+                tool_calls: None, // Claude puts tool calls in the message, not at choice level
+            }],
+            usage: Some(LlmUsage {
+                prompt_tokens: response.usage.input_tokens,
+                completion_tokens: response.usage.output_tokens,
+                total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+            }),
+        }
+    }
+}
+
+#[async_trait]
+impl LlmClient for ClaudeClient {
+    async fn complete(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
+        // Apply config defaults
+        let mut request = request;
+        if request.max_tokens.is_none() {
+            request.max_tokens = self.config.max_tokens;
+        }
+        if request.temperature.is_none() {
+            request.temperature = self.config.temperature;
+        }
+
+        let start_time = std::time::Instant::now();
+        let message_count = request.messages.len();
+        let total_input_tokens: usize = request
+            .messages
+            .iter()
+            .map(|m| m.content.as_ref().map(|c| c.len()).unwrap_or(0))
+            .sum();
+
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            message_count = %message_count,
+            estimated_input_tokens = %total_input_tokens,
+            max_tokens = ?request.max_tokens,
+            temperature = ?request.temperature,
+            has_tools = %request.tools.is_some(),
+            "Sending Claude completion request"
+        );
+
+        // Convert to Claude format
+        let claude_request = self.convert_request(request.clone());
+
+        // Log the raw request
+        let request_json = serde_json::to_string_pretty(&claude_request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string());
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            api_url = %self.get_api_url(),
+            raw_request = %request_json,
+            "Raw Claude request being sent"
+        );
+
+        // Make the request
+        let response = self
+            .client
+            .post(&self.get_api_url())
+            .header("x-api-key", &self.config.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("Content-Type", "application/json")
+            .json(&claude_request)
+            .send()
+            .await?;
+
+        let response_time = start_time.elapsed();
+        let status = response.status();
+
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+
+            tracing::error!(
+                provider = %self.config.provider,
+                model = %request.model,
+                status = %status,
+                response_time_ms = %response_time.as_millis(),
+                error = %error_text,
+                "Claude API request failed"
+            );
+
+            return Err(anyhow::anyhow!(
+                "Claude API error: {} - {}",
+                status,
+                error_text
+            ));
+        }
+
+        // Parse response
+        let response_text = response.text().await?;
+
+        // Log raw response for debugging
+        tracing::debug!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            raw_response = %response_text,
+            "Raw Claude API response received"
+        );
+
+        // Check if response contains an error
+        if let Ok(error_response) = serde_json::from_str::<serde_json::Value>(&response_text) {
+            if let Some(error) = error_response.get("error") {
+                tracing::error!(
+                    provider = %self.config.provider,
+                    model = %request.model,
+                    status = %status,
+                    response_time_ms = %response_time.as_millis(),
+                    error = %error,
+                    raw_response = %response_text,
+                    "Claude API returned error in response body"
+                );
+                return Err(anyhow::anyhow!(
+                    "Claude API error: {}",
+                    error
+                ));
+            }
+        }
+
+        let claude_response: ClaudeCompletionResponse = match serde_json::from_str(&response_text) {
+            Ok(response) => response,
+            Err(e) => {
+                tracing::error!(
+                    provider = %self.config.provider,
+                    model = %request.model,
+                    status = %status,
+                    response_time_ms = %response_time.as_millis(),
+                    parse_error = %e,
+                    raw_response = %response_text,
+                    "Failed to parse Claude API response"
+                );
+                return Err(anyhow::anyhow!(
+                    "Failed to parse Claude API response: {} - Response: {}",
+                    e,
+                    response_text
+                ));
+            }
+        };
+
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            completion_id = %claude_response.id,
+            usage = ?claude_response.usage,
+            "Claude API request completed successfully"
+        );
+
+        // Convert back to standard format
+        let llm_response = self.convert_response(claude_response);
+        Ok(llm_response)
+    }
+
+    fn stream_complete(
+        &self,
+        _request: LlmCompletionRequest,
+    ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>> {
+        // TODO: Implement streaming for Claude
+        // For now, return an error stream
+        Box::pin(futures_util::stream::once(async {
+            Err(anyhow::anyhow!("Claude streaming not yet implemented"))
+        }))
+    }
+
+    fn extract_tool_calls_from_response(
+        &self,
+        response: &LlmCompletionResponse,
+    ) -> Vec<LlmToolCall> {
+        // Tool calls are already extracted in convert_response
+        response
+            .choices
+            .first()
+            .and_then(|choice| choice.message.as_ref())
+            .and_then(|message| message.tool_calls.clone())
+            .unwrap_or_default()
+    }
+
+    fn provider(&self) -> &str {
+        &self.config.provider
+    }
+
+    fn model(&self) -> &str {
+        &self.config.model
+    }
+}
+
 /// Factory function to create LLM clients
 pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
     match config.provider.to_lowercase().as_str() {
-        "openai" | "grok" | "anthropic" | "claude" => {
+        "openai" | "grok" => {
             let client = OpenAiCompatibleClient::new(config)?;
+            Ok(Box::new(client))
+        }
+        "anthropic" | "claude" => {
+            let client = ClaudeClient::new(config)?;
             Ok(Box::new(client))
         }
         _ => Err(anyhow::anyhow!(

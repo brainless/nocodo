@@ -223,7 +223,7 @@ impl LlmAgent {
             model: session.model.clone(),
             messages,
             max_tokens: Some(4000),
-            temperature: Some(0.7),
+            temperature: Some(0.3),
             stream: Some(false),
             tools,
             tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
@@ -323,26 +323,35 @@ impl LlmAgent {
             "Received complete LLM response"
         );
 
-        // Store assistant response - but enhance it with tool call information if present
+        // Store assistant response with tool call information for proper conversation reconstruction
         let enhanced_assistant_response = if !accumulated_tool_calls.is_empty() {
-            // If we have tool calls but the response is empty/minimal, create a descriptive message
-            if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
-                let tool_call_descriptions: Vec<String> = accumulated_tool_calls
-                    .iter()
-                    .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
-                    .collect();
-                format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+            // For Claude, we need to store the tool calls in a structured format for reconstruction
+            if session.provider == "anthropic" {
+                // Store as structured data that can be reconstructed as tool_use blocks
+                let assistant_data = serde_json::json!({
+                    "text": assistant_response,
+                    "tool_calls": accumulated_tool_calls
+                });
+                serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
             } else {
-                // If response has content, append tool call info
-                let tool_call_descriptions: Vec<String> = accumulated_tool_calls
-                    .iter()
-                    .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
-                    .collect();
-                format!(
-                    "{}\n\nMaking tool calls:\n{}",
-                    assistant_response,
-                    tool_call_descriptions.join("\n")
-                )
+                // For other providers, use the enhanced text format
+                if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
+                    let tool_call_descriptions: Vec<String> = accumulated_tool_calls
+                        .iter()
+                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                        .collect();
+                    format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                } else {
+                    let tool_call_descriptions: Vec<String> = accumulated_tool_calls
+                        .iter()
+                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                        .collect();
+                    format!(
+                        "{}\n\nMaking tool calls:\n{}",
+                        assistant_response,
+                        tool_call_descriptions.join("\n")
+                    )
+                }
             }
         } else {
             assistant_response.clone()
@@ -456,6 +465,8 @@ impl LlmAgent {
         session_id: &str,
         tool_calls: &[crate::llm_client::LlmToolCall],
     ) -> Result<()> {
+        // Get session info for provider-specific handling
+        let session = self.db.get_llm_agent_session(session_id)?;
         tracing::info!(
             session_id = %session_id,
             tool_calls_count = %tool_calls.len(),
@@ -669,10 +680,20 @@ impl LlmAgent {
             );
 
             // Add tool response to conversation
-            let response_json_string = serde_json::to_string(&response_value)?;
+            let tool_result_string = if session.provider == "anthropic" {
+                // For Claude, we need to store tool results with the tool_use_id for proper formatting
+                let tool_result_content = serde_json::json!({
+                    "tool_use_id": tool_call.id,
+                    "content": response_value
+                });
+                serde_json::to_string(&tool_result_content)?
+            } else {
+                // For other providers, store tool results as simple JSON
+                serde_json::to_string(&response_value)?
+            };
             let message_id =
                 self.db
-                    .create_llm_agent_message(session_id, "tool", response_json_string)?;
+                    .create_llm_agent_message(session_id, "tool", tool_result_string)?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,
@@ -694,9 +715,13 @@ impl LlmAgent {
         // After processing all tool calls, follow up with LLM
         tracing::info!(
             session_id = %session_id,
-            "Following up with LLM after native tool execution"
+            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth"
         );
         self.follow_up_with_llm_with_depth(session_id, 1).await?;
+        tracing::info!(
+            session_id = %session_id,
+            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed"
+        );
 
         tracing::info!(
             session_id = %session_id,
@@ -964,7 +989,7 @@ impl LlmAgent {
             tracing::info!(
                 session_id = %session_id,
                 current_depth = %depth,
-                "Following up with LLM after tool execution"
+                "FOLLOW_UP_DEBUG: Starting follow-up with LLM after tool execution"
             );
 
             // Get updated conversation history
@@ -1044,6 +1069,24 @@ impl LlmAgent {
                 );
             }
 
+            // CLAUDE_DEBUG: Log the exact conversation sent to Claude for debugging
+            if session.provider == "anthropic" {
+                tracing::info!(
+                    session_id = %session_id,
+                    "CLAUDE_DEBUG: Follow-up conversation history for Claude:"
+                );
+                for (i, msg) in messages.iter().enumerate() {
+                    tracing::info!(
+                        session_id = %session_id,
+                        message_index = %i,
+                        role = %msg.role,
+                        content_length = %msg.content.as_ref().map(|c| c.len()).unwrap_or(0),
+                        content_preview = %msg.content.as_ref().unwrap_or(&"<no content>".to_string()).chars().take(100).collect::<String>(),
+                        "CLAUDE_DEBUG: Message in follow-up conversation"
+                    );
+                }
+            }
+
             // Check if provider supports native tools for follow-up
             let supports_native_tools =
                 self.provider_supports_native_tools(&session.provider, &session.model);
@@ -1118,26 +1161,35 @@ impl LlmAgent {
                 "Received complete LLM follow-up response"
             );
 
-            // Store assistant response - enhance it with tool call information if present
+            // Store assistant response with tool call information for proper conversation reconstruction
             let enhanced_assistant_response = if !follow_up_tool_calls.is_empty() {
-                // If we have tool calls but the response is empty/minimal, create a descriptive message
-                if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
-                    let tool_call_descriptions: Vec<String> = follow_up_tool_calls
-                        .iter()
-                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
-                        .collect();
-                    format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                // For Claude, we need to store the tool calls in a structured format for reconstruction
+                if session.provider == "anthropic" {
+                    // Store as structured data that can be reconstructed as tool_use blocks
+                    let assistant_data = serde_json::json!({
+                        "text": assistant_response,
+                        "tool_calls": follow_up_tool_calls
+                    });
+                    serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
                 } else {
-                    // If response has content, append tool call info
-                    let tool_call_descriptions: Vec<String> = follow_up_tool_calls
-                        .iter()
-                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
-                        .collect();
-                    format!(
-                        "{}\n\nMaking tool calls:\n{}",
-                        assistant_response,
-                        tool_call_descriptions.join("\n")
-                    )
+                    // For other providers, use the enhanced text format
+                    if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
+                        let tool_call_descriptions: Vec<String> = follow_up_tool_calls
+                            .iter()
+                            .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                            .collect();
+                        format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                    } else {
+                        let tool_call_descriptions: Vec<String> = follow_up_tool_calls
+                            .iter()
+                            .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                            .collect();
+                        format!(
+                            "{}\n\nMaking tool calls:\n{}",
+                            assistant_response,
+                            tool_call_descriptions.join("\n")
+                        )
+                    }
                 }
             } else {
                 assistant_response.clone()

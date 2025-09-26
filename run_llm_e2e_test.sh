@@ -15,41 +15,105 @@ echo "   Phase 2: Real LLM integration framework"
 echo "   Phase 3: Keyword-based validation system"
 echo ""
 
-# export GROK_API_KEY="your-grok-api-key-here"  # Uncomment and set your API key
+# Test will use API keys from nocodo config (~/.config/nocodo/manager.toml)
+# Set the provider to test (options: "anthropic", "openai", "grok")
+PROVIDER="anthropic"
 
-# Check for API keys
+# Check nocodo config for API keys
+CONFIG_FILE="$HOME/.config/nocodo/manager.toml"
 AVAILABLE_PROVIDERS=()
 
-if [[ -n "${GROK_API_KEY:-}" ]]; then
-    AVAILABLE_PROVIDERS+=("Grok")
-    echo "✅ GROK_API_KEY found"
+echo "📁 Checking nocodo config at: $CONFIG_FILE"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+    # Parse TOML config file to check for API keys
+    if grep -q '^grok_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*grok_api_key' "$CONFIG_FILE"; then
+        AVAILABLE_PROVIDERS+=("grok")
+        echo "✅ grok_api_key found in config"
+    fi
+
+    if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
+        AVAILABLE_PROVIDERS+=("openai")
+        echo "✅ openai_api_key found in config"
+    fi
+
+    if grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_api_key' "$CONFIG_FILE"; then
+        AVAILABLE_PROVIDERS+=("anthropic")
+        echo "✅ anthropic_api_key found in config"
+    fi
+else
+    echo "⚠️  Config file not found at $CONFIG_FILE"
+    echo "   Run nocodo-manager once to create the default config"
 fi
 
-if [[ -n "${OPENAI_API_KEY:-}" ]]; then
-    AVAILABLE_PROVIDERS+=("OpenAI")
-    echo "✅ OPENAI_API_KEY found"
-fi
-
-if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-    AVAILABLE_PROVIDERS+=("Anthropic")
-    echo "✅ ANTHROPIC_API_KEY found"
-fi
-
-if [[ ${#AVAILABLE_PROVIDERS[@]} -eq 0 ]]; then
+# Set environment variables from config file for the test
+if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
     echo ""
-    echo "⚠️  No LLM API keys found!"
+    echo "🔑 Setting environment variables from nocodo config..."
+
+    # Only set the API key for the selected provider to ensure test uses the right one
+    if [[ "$PROVIDER" == "grok" ]] && grep -q '^grok_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*grok_api_key' "$CONFIG_FILE"; then
+        GROK_KEY=$(grep '^grok_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+        export GROK_API_KEY="$GROK_KEY"
+        echo "   ✅ Set GROK_API_KEY from config (selected provider)"
+    elif [[ "$PROVIDER" == "openai" ]] && grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
+        OPENAI_KEY=$(grep '^openai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+        export OPENAI_API_KEY="$OPENAI_KEY"
+        echo "   ✅ Set OPENAI_API_KEY from config (selected provider)"
+    elif [[ "$PROVIDER" == "anthropic" ]] && grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_api_key' "$CONFIG_FILE"; then
+        ANTHROPIC_KEY=$(grep '^anthropic_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+        export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
+        echo "   ✅ Set ANTHROPIC_API_KEY from config (selected provider)"
+    else
+        echo "   ⚠️  Selected provider '$PROVIDER' API key not found in config"
+        echo "   Available providers: ${AVAILABLE_PROVIDERS[*]}"
+        # Fallback: set all available keys
+        if grep -q '^grok_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*grok_api_key' "$CONFIG_FILE"; then
+            GROK_KEY=$(grep '^grok_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+            export GROK_API_KEY="$GROK_KEY"
+            echo "   ✅ Set GROK_API_KEY from config (fallback)"
+        fi
+        if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
+            OPENAI_KEY=$(grep '^openai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+            export OPENAI_API_KEY="$OPENAI_KEY"
+            echo "   ✅ Set OPENAI_API_KEY from config (fallback)"
+        fi
+        if grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_api_key' "$CONFIG_FILE"; then
+            ANTHROPIC_KEY=$(grep '^anthropic_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+            export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
+            echo "   ✅ Set ANTHROPIC_API_KEY from config (fallback)"
+        fi
+    fi
+else
     echo ""
-    echo "To run the real LLM E2E test, set at least one of:"
-    echo "   export GROK_API_KEY='your-grok-key'"
-    echo "   export OPENAI_API_KEY='your-openai-key'"
-    echo "   export ANTHROPIC_API_KEY='your-anthropic-key'"
+    echo "⚠️  No LLM API keys found in nocodo config!"
+    echo ""
+    echo "To run the real LLM E2E test, add API keys to: $CONFIG_FILE"
+    echo ""
+    echo "[api_keys]"
+    echo "anthropic_api_key = \"your-anthropic-key\""
+    echo "openai_api_key = \"your-openai-key\""
+    echo "grok_api_key = \"your-grok-key\""
     echo ""
     echo "Without API keys, only unit tests and infrastructure tests will run."
     echo ""
 fi
 
+# Check if selected provider is available
+if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
+    if [[ " ${AVAILABLE_PROVIDERS[@]} " =~ " ${PROVIDER} " ]]; then
+        echo "🎯 Selected provider '$PROVIDER' is available"
+    else
+        echo "⚠️  Selected provider '$PROVIDER' not found in config"
+        echo "   Available providers: ${AVAILABLE_PROVIDERS[*]}"
+        PROVIDER="${AVAILABLE_PROVIDERS[0]}"
+        echo "   Defaulting to: $PROVIDER"
+    fi
+fi
+
 echo ""
 echo "🔧 Available LLM Providers: ${AVAILABLE_PROVIDERS[*]:-None}"
+echo "🚀 Using Provider: ${PROVIDER:-None}"
 echo ""
 
 # Navigate to manager directory
@@ -75,12 +139,11 @@ echo ""
 
 # Note about full E2E test with real LLM calls
 if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
-    echo "🤖 API keys detected! You could run real LLM integration tests."
-    echo "   The infrastructure is ready - just fix any remaining compilation issues"
-    echo "   in the llm_e2e_simple.rs test file if you want to test with real API calls."
+    echo "🤖 API keys detected! Running real LLM integration tests with $PROVIDER provider."
+    echo "   The infrastructure is ready and configured to use nocodo's config system."
 else
     echo "⚠️  No API keys available for real LLM integration testing"
-    echo "   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to test real LLM calls"
+    echo "   Add API keys to $CONFIG_FILE to test real LLM calls"
 fi
 
 echo ""
@@ -101,16 +164,17 @@ echo "   ✅ Comprehensive E2E test with real LLM calls"
 echo ""
 
 if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
-    echo "🤖 LLM Provider Used: ${AVAILABLE_PROVIDERS[0]}"
+    echo "🤖 LLM Provider Used: $PROVIDER"
+    echo "🔑 API Key Source: nocodo config ($CONFIG_FILE)"
     echo ""
     echo "The test successfully:"
     echo "   • Created isolated test environment"
     echo "   • Set up project files for analysis"
-    echo "   • Made real API calls to ${AVAILABLE_PROVIDERS[0]} LLM"
+    echo "   • Made real API calls to $PROVIDER LLM using nocodo config"
     echo "   • Validated responses using keyword matching"
     echo "   • Cleaned up test resources automatically"
 else
-    echo "⚠️  LLM integration tests were skipped due to missing API keys"
+    echo "⚠️  LLM integration tests were skipped due to missing API keys in config"
 fi
 
 echo ""

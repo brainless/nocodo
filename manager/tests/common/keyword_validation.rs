@@ -175,14 +175,14 @@ impl LlmTestScenario {
                         content: r#"{"dependencies": {"react": "^18.2.0", "typescript": "^5.0.0", "@types/react": "^18.2.0"}}"#.to_string(),
                         language: "json".to_string(),
                     },
-                    TestFile {
-                        path: "src/App.tsx".to_string(),
-                        content: "import React from 'react';\n\nfunction App() {\n  return (\n    <div className=\"App\">\n      <h1>Hello FastAPI + React!</h1>\n    </div>\n  );\n}\n\nexport default App;".to_string(),
-                        language: "typescript".to_string(),
-                    },
-                ],
-            },
-            prompt: "Analyze the tech stack of this project. What technologies and frameworks are being used?".to_string(),
+                     TestFile {
+                         path: "src/App.tsx".to_string(),
+                         content: "import React from 'react';\n\nfunction App() {\n  return (\n    <div className=\"App\">\n      <h1>Hello FastAPI + React!</h1>\n    </div>\n  );\n}\n\nexport default App;".to_string(),
+                         language: "typescript".to_string(),
+                     },
+                 ],
+             },
+             prompt: "Analyze the tech stack of this project. First list the files in the root directory, then read the package.json and requirements.txt files to identify the technologies used.".to_string(),
             expected_keywords: LlmKeywordExpectations {
                 required_keywords: vec!["Python".to_string(), "FastAPI".to_string(), "React".to_string()],
                 optional_keywords: vec!["TypeScript".to_string(), "full-stack".to_string(), "API".to_string(), "Pydantic".to_string(), "Uvicorn".to_string()],
