@@ -248,12 +248,15 @@ impl LlmAgent {
         // Get the complete response (non-streaming)
         let response = llm_client.complete(request).await?;
 
-        let assistant_response = response
+        let raw_assistant_response = response
             .choices
             .first()
             .and_then(|choice| choice.message.as_ref())
             .and_then(|message| message.content.clone())
             .unwrap_or_default();
+
+        // Clean up the assistant response by removing unwanted prefixes
+        let assistant_response = self.clean_assistant_response(&raw_assistant_response);
 
         let accumulated_tool_calls = llm_client.extract_tool_calls_from_response(&response);
 
@@ -332,7 +335,8 @@ impl LlmAgent {
                     "text": assistant_response,
                     "tool_calls": accumulated_tool_calls
                 });
-                serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
+                serde_json::to_string(&assistant_data)
+                    .unwrap_or_else(|_| assistant_response.clone())
             } else {
                 // For other providers, use the enhanced text format
                 if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
@@ -340,14 +344,14 @@ impl LlmAgent {
                         .iter()
                         .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
                         .collect();
-                    format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                    tool_call_descriptions.join("\n")
                 } else {
                     let tool_call_descriptions: Vec<String> = accumulated_tool_calls
                         .iter()
                         .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
                         .collect();
                     format!(
-                        "{}\n\nMaking tool calls:\n{}",
+                        "{}\n\n{}",
                         assistant_response,
                         tool_call_descriptions.join("\n")
                     )
@@ -1140,12 +1144,15 @@ impl LlmAgent {
 
             // Get the complete response (non-streaming)
             let response = llm_client.complete(request).await?;
-            let assistant_response = response
+            let raw_assistant_response = response
                 .choices
                 .first()
                 .and_then(|choice| choice.message.as_ref())
                 .and_then(|message| message.content.clone())
                 .unwrap_or_default();
+
+            // Clean up the assistant response by removing unwanted prefixes
+            let assistant_response = self.clean_assistant_response(&raw_assistant_response);
 
             let follow_up_tool_calls = llm_client.extract_tool_calls_from_response(&response);
 
@@ -1170,22 +1177,27 @@ impl LlmAgent {
                         "text": assistant_response,
                         "tool_calls": follow_up_tool_calls
                     });
-                    serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
+                    serde_json::to_string(&assistant_data)
+                        .unwrap_or_else(|_| assistant_response.clone())
                 } else {
                     // For other providers, use the enhanced text format
                     if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
                         let tool_call_descriptions: Vec<String> = follow_up_tool_calls
                             .iter()
-                            .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                            .map(|tc| {
+                                format!("🔧 **{}**({})", tc.function.name, tc.function.arguments)
+                            })
                             .collect();
-                        format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                        tool_call_descriptions.join("\n")
                     } else {
                         let tool_call_descriptions: Vec<String> = follow_up_tool_calls
                             .iter()
-                            .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                            .map(|tc| {
+                                format!("🔧 **{}**({})", tc.function.name, tc.function.arguments)
+                            })
                             .collect();
                         format!(
-                            "{}\n\nMaking tool calls:\n{}",
+                            "{}\n\n{}",
                             assistant_response,
                             tool_call_descriptions.join("\n")
                         )
@@ -1249,6 +1261,21 @@ impl LlmAgent {
 
             Ok(assistant_response)
         })
+    }
+
+    /// Clean up assistant response by removing unwanted prefixes
+    fn clean_assistant_response(&self, response: &str) -> String {
+        let cleaned = response.trim();
+        
+        // Remove "Making tool calls:" prefix if present
+        let without_prefix = if cleaned.starts_with("Making tool calls:") {
+            cleaned["Making tool calls:".len()..].trim()
+        } else {
+            cleaned
+        };
+        
+        // Remove any leading/trailing whitespace and return
+        without_prefix.trim().to_string()
     }
 
     /// Create system prompt for tool usage
