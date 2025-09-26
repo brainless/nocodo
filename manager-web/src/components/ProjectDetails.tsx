@@ -4,6 +4,7 @@ import { ExtendedAiSession, Project } from '../types';
 import { apiClient } from '../api';
 import FileBrowser from './FileBrowser';
 import FileEditor from './FileEditor';
+import AiSessionCard from './AiSessionCard';
 
 interface ProjectComponentInfo {
   id: string;
@@ -115,8 +116,8 @@ const ProjectDetails: Component = () => {
         </nav>
       </div>
 
-      {/* Content - inside white box */}
-      <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
+      {/* Content */}
+      <div>
         <Show when={!loading()} fallback={<div class='text-gray-500'>Loading...</div>}>
           <Show
             when={!error()}
@@ -128,28 +129,15 @@ const ProjectDetails: Component = () => {
           >
           {/* Work Tab */}
           <Show when={currentTab() === 'work'}>
-            <div class='space-y-3'>
+            <div class='space-y-6'>
               <Show
                 when={sessions().length > 0}
                 fallback={<div class='text-gray-500'>No sessions found for this project.</div>}
               >
-                <div class='space-y-2'>
+                <div class='grid grid-cols-1 gap-6'>
                   <For each={sessions()}>
                     {s => (
-                      <A
-                        href={`/work/${s.id}`}
-                        class='block p-3 bg-white border border-gray-200 rounded hover:bg-gray-50'
-                      >
-                        <div class='flex items-center justify-between'>
-                          <div>
-                            <div class='text-sm font-medium text-gray-900'>{s.tool_name}</div>
-                            <div class='text-xs text-gray-500 truncate max-w-xl'>{s.prompt}</div>
-                          </div>
-                          <div class='text-xs text-gray-500'>
-                            {new Date(s.started_at * 1000).toLocaleString()}
-                          </div>
-                        </div>
-                      </A>
+                      <AiSessionCard session={s} project={project()} showPrompt={true} />
                     )}
                   </For>
                 </div>
