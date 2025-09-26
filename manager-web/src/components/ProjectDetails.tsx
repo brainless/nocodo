@@ -99,15 +99,7 @@ const ProjectDetails: Component = () => {
 
   return (
     <div class='space-y-6'>
-      {/* Back to Projects link */}
-      <div class='flex justify-end'>
-        <A
-          href='/projects'
-          class='px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors'
-        >
-          ← Back to Projects
-        </A>
-      </div>
+
 
       {/* Tabs */}
       <div class='border-b border-gray-200'>

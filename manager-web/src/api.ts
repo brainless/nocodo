@@ -200,6 +200,7 @@ class ApiClient {
       ended_at: work.updated_at !== work.created_at ? work.updated_at : null,
       prompt: work.title, // Use title as prompt for list view
       project_id: work.project_id,
+      model: work.model || null, // Include model information if available
     }));
   }
 
@@ -228,6 +229,7 @@ class ApiClient {
         workData.work.updated_at !== workData.work.created_at ? workData.work.updated_at : null,
       prompt: firstMessage?.content || workData.work.title,
       project_id: workData.work.project_id,
+      model: workData.work.model || null,
     } as ExtendedAiSession;
   }
 
