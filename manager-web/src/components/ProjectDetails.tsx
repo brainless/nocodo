@@ -99,9 +99,7 @@ const ProjectDetails: Component = () => {
 
   return (
     <div class='space-y-6'>
-
-
-      {/* Tabs */}
+      {/* Tabs - outside white box */}
       <div class='border-b border-gray-200'>
         <nav class='-mb-px flex space-x-6' aria-label='Tabs'>
           <For each={Tabs as unknown as TabKey[]}>
@@ -117,16 +115,17 @@ const ProjectDetails: Component = () => {
         </nav>
       </div>
 
-      {/* Content */}
-      <Show when={!loading()} fallback={<div class='text-gray-500'>Loading...</div>}>
-        <Show
-          when={!error()}
-          fallback={
-            <div class='p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded'>
-              {error()}
-            </div>
-          }
-        >
+      {/* Content - inside white box */}
+      <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
+        <Show when={!loading()} fallback={<div class='text-gray-500'>Loading...</div>}>
+          <Show
+            when={!error()}
+            fallback={
+              <div class='p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded'>
+                {error()}
+              </div>
+            }
+          >
           {/* Work Tab */}
           <Show when={currentTab() === 'work'}>
             <div class='space-y-3'>
@@ -411,6 +410,7 @@ const ProjectDetails: Component = () => {
           </Show>
         </Show>
       </Show>
+      </div>
     </div>
   );
 };
