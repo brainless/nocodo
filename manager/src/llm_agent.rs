@@ -382,14 +382,14 @@ impl LlmAgent {
                 model = %session.model,
                 accumulated_tool_calls_count = %accumulated_tool_calls.len(),
                 assistant_response_length = %assistant_response.len(),
-                "Checking for native tool calls from streaming response"
+                "MAIN_DEBUG: Checking for native tool calls from streaming response"
             );
 
             if !accumulated_tool_calls.is_empty() {
                 tracing::info!(
                     session_id = %session_id,
                     tool_calls_count = %accumulated_tool_calls.len(),
-                    "Processing native tool calls from streaming response"
+                    "MAIN_DEBUG: Processing native tool calls from streaming response"
                 );
 
                 // Log details of each tool call for debugging
@@ -404,8 +404,18 @@ impl LlmAgent {
                     );
                 }
 
+                tracing::info!(
+                    session_id = %session_id,
+                    "MAIN_DEBUG: About to call follow_up_with_llm after processing tool calls"
+                );
+                
                 self.process_native_tool_calls(session_id, &accumulated_tool_calls)
                     .await?;
+                    
+                tracing::info!(
+                    session_id = %session_id,
+                    "MAIN_DEBUG: Completed process_native_tool_calls, follow_up_with_llm should be called next"
+                );
             } else {
                 tracing::warn!(
                     session_id = %session_id,
@@ -416,7 +426,7 @@ impl LlmAgent {
                     } else {
                         assistant_response.clone()
                     },
-                    "No native tool calls found in response - this may indicate an issue with tool calling"
+                    "MAIN_DEBUG: No native tool calls found in response - this may indicate an issue with tool calling"
                 );
             }
         } else {
@@ -717,14 +727,16 @@ impl LlmAgent {
         }
 
         // After processing all tool calls, follow up with LLM
-        tracing::info!(
+        tracing::warn!(  // Use warn to make it more visible
             session_id = %session_id,
-            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth"
+            tool_calls_count = %tool_calls.len(),
+            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls",
+            tool_calls.len()
         );
         self.follow_up_with_llm_with_depth(session_id, 1).await?;
-        tracing::info!(
+        tracing::warn!(  // Use warn to make it more visible
             session_id = %session_id,
-            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed"
+            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed successfully"
         );
 
         tracing::info!(
@@ -1021,7 +1033,7 @@ impl LlmAgent {
                 api_key: self.get_api_key(&session.provider)?,
                 base_url: self.get_base_url(&session.provider),
                 max_tokens: Some(4000),
-                temperature: Some(0.7),
+                temperature: Some(0.3), // Use same temperature as initial request for consistency
             };
 
             tracing::debug!(
@@ -1054,8 +1066,8 @@ impl LlmAgent {
             // Log the follow-up conversation being sent to LLM (truncated for large messages)
             for (i, msg) in messages.iter().enumerate() {
                 let content_preview = if let Some(content) = &msg.content {
-                    if content.len() > 200 {
-                        format!("{}...", &content[..200])
+                    if content.len() > 500 {
+                        format!("{}...", &content[..500])
                     } else {
                         content.clone()
                     }
@@ -1063,13 +1075,13 @@ impl LlmAgent {
                     "<no content>".to_string()
                 };
                 let content_length = msg.content.as_ref().map(|c| c.len()).unwrap_or(0);
-                tracing::info!(
+                tracing::warn!(  // Use warn to make it more visible
                     session_id = %session_id,
                     message_index = %i,
                     message_role = %msg.role,
                     message_content = %content_preview,
                     message_length = %content_length,
-                    "Sending follow-up message to LLM"
+                    "FOLLOW_UP_DEBUG: Sending follow-up message to LLM"
                 );
             }
 
@@ -1226,14 +1238,14 @@ impl LlmAgent {
                     tracing::info!(
                         session_id = %session_id,
                         tool_calls_count = %follow_up_tool_calls.len(),
-                        "Processing native tool calls from follow-up response"
+                        "FOLLOW_UP_DEBUG: Processing native tool calls from follow-up response"
                     );
                     self.process_native_tool_calls(session_id, &follow_up_tool_calls)
                         .await?;
                 } else {
-                    tracing::debug!(
+                    tracing::warn!(
                         session_id = %session_id,
-                        "No native tool calls found in follow-up response"
+                        "FOLLOW_UP_DEBUG: No native tool calls found in follow-up response - follow-up completed without additional tool calls"
                     );
                 }
             } else {

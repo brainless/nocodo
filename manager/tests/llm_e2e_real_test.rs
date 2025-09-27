@@ -97,11 +97,11 @@ async fn test_llm_e2e_saleor() {
 
     println!("   ✅ Created work session: {}", work_id);
 
-    // 2. Add the initial message
+    // 2. Add the initial message (using same values as browser: {"content_type":"text","author_type":"user"})
     let message_request = AddMessageRequest {
         content: scenario.prompt.clone(),
-        content_type: MessageContentType::Text,
-        author_type: MessageAuthorType::User,
+        content_type: MessageContentType::Text, // serializes to "text"
+        author_type: MessageAuthorType::User,   // serializes to "user"
         author_id: None,
     };
 
@@ -169,7 +169,7 @@ async fn test_llm_e2e_saleor() {
     // Give the AI session some time to process (background task + real API call takes time)
     // In real scenarios this would be done via WebSocket, but for testing we poll the database directly
     let mut attempts = 0;
-    let max_attempts = 24; // 120 seconds total
+    let max_attempts = 48; // 240 seconds total - give more time for tool calls
     let mut response_content = String::new();
     let mut printed_output_ids = std::collections::HashSet::new(); // Track which outputs we've printed
 
@@ -227,8 +227,8 @@ async fn test_llm_e2e_saleor() {
             }, // Look for package.json content
         );
 
-        // If we have at least some outputs but no text response yet, keep waiting
-        if !ai_outputs.is_empty() && attempts < max_attempts - 4 && !has_file_content {
+        // If we have at least some outputs but no text response yet, keep waiting longer
+        if !ai_outputs.is_empty() && attempts < max_attempts - 8 && !has_file_content {
             if has_new_outputs {
                 println!(
                     "   🔧 Found {} total outputs, waiting for final text response...",

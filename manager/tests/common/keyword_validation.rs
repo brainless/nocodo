@@ -154,7 +154,7 @@ impl LlmTestScenario {
             context: LlmTestContext {
                 git_repo: "git@github.com:saleor/saleor.git".to_string(),
             },
-            prompt: "What is the tech stack of this project? Please return simple array of technologies only.".to_string(),
+            prompt: "What is the tech stack of this project? You must examine at least 3 different configuration files (such as package.json, pyproject.toml, manage.py, requirements.txt, or setup.py) before providing your final answer. Please read each file individually and then provide a comprehensive analysis of all technologies found. Return a simple array of technologies only at the end.".to_string(),
             expected_keywords: LlmKeywordExpectations {
                 required_keywords: vec!["Django".to_string(), "Python".to_string(), "PostgreSQL".to_string(), "GraphQL".to_string()],
                 optional_keywords: vec!["JavaScript".to_string(), "Node".to_string()],
