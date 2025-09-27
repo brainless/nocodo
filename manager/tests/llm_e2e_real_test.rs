@@ -177,9 +177,9 @@ async fn test_llm_e2e_saleor() {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         attempts += 1;
 
-        // Check AI session outputs using the same logic as the handler (work_id based)
+        // Check AI session outputs using the manager API
         let ai_outputs =
-            get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
+            get_ai_outputs_for_work(&test_app, &work_id).await.expect("Failed to get AI session outputs");
 
         // Print any new outputs that haven't been printed yet
         let mut has_new_outputs = false;
@@ -274,9 +274,9 @@ async fn test_llm_e2e_saleor() {
         }
     }
 
-    // Get the AI session outputs using the same logic as the handler
+    // Get the AI session outputs using the manager API
     let ai_outputs =
-        get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
+        get_ai_outputs_for_work(&test_app, &work_id).await.expect("Failed to get AI session outputs");
 
     println!("   🔍 Found {} AI session outputs:", ai_outputs.len());
     for (i, output) in ai_outputs.iter().enumerate() {
@@ -543,9 +543,9 @@ async fn test_llm_multiple_scenarios() {
         // Wait for AI session processing
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-        // Get response from AI session outputs using handler logic
+        // Get response from AI session outputs using manager API
         let ai_outputs =
-            get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
+            get_ai_outputs_for_work(&test_app, &work_id).await.expect("Failed to get AI session outputs");
 
         let response_content =
             if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
@@ -553,7 +553,7 @@ async fn test_llm_multiple_scenarios() {
             } else {
                 // If no outputs yet, wait a bit more
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+                let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id).await
                     .expect("Failed to get AI session outputs");
                 ai_outputs
                     .iter()
@@ -591,51 +591,39 @@ async fn test_llm_multiple_scenarios() {
     println!("\n✅ All scenarios completed successfully!");
 }
 
-/// Helper function that replicates the handler logic for getting AI session outputs
-/// This ensures we get both direct AI session outputs AND converted LLM agent messages
-fn get_ai_outputs_for_work(
+/// Helper function that gets AI session outputs using the manager API
+/// This ensures we test the actual API endpoints instead of reading directly from database
+async fn get_ai_outputs_for_work(
     test_app: &crate::common::TestApp,
     work_id: &str,
 ) -> anyhow::Result<Vec<nocodo_manager::models::AiSessionOutput>> {
-    use nocodo_manager::models::AiSessionOutput;
+    use actix_web::test;
+    
+    // Make API call to get AI session outputs using the manager API endpoint
+    let uri = format!("/work/{}/outputs", work_id);
+    let req = test::TestRequest::get()
+        .uri(&uri)
+        .to_request();
 
-    // First, get the AI session for this work (same as handler logic)
-    let sessions = test_app.db().get_ai_sessions_by_work_id(work_id)?;
-    if sessions.is_empty() {
-        return Ok(vec![]);
+    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
+        "/work/{id}/outputs",
+        web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
+    ))
+    .await;
+    
+    let resp = test::call_service(&service, req).await;
+    
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Failed to get AI outputs from API: {}",
+            resp.status()
+        ));
     }
 
-    // Get the most recent AI session (in case there are multiple)
-    let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
+    let body: nocodo_manager::models::AiSessionOutputListResponse = 
+        test::read_body_json(resp).await;
 
-    // Get outputs for this session
-    let mut outputs = test_app.db().list_ai_session_outputs(&session.id)?;
-
-    // If this is an LLM agent session, also fetch LLM agent messages
-    if session.tool_name == "llm-agent" {
-        if let Ok(llm_agent_session) = test_app.db().get_llm_agent_session_by_work_id(work_id) {
-            if let Ok(llm_messages) = test_app.db().get_llm_agent_messages(&llm_agent_session.id) {
-                // Convert LLM agent messages to AiSessionOutput format
-                for msg in llm_messages {
-                    // Only include assistant messages (responses) and tool messages (results)
-                    if msg.role == "assistant" || msg.role == "tool" {
-                        let output = AiSessionOutput {
-                            id: msg.id,
-                            session_id: session.id.clone(),
-                            content: msg.content,
-                            created_at: msg.created_at,
-                        };
-                        outputs.push(output);
-                    }
-                }
-            }
-        }
-    }
-
-    // Sort outputs by created_at
-    outputs.sort_by_key(|o| o.created_at);
-
-    Ok(outputs)
+    Ok(body.outputs)
 }
 
 #[cfg(test)]
