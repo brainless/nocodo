@@ -157,7 +157,7 @@ impl LlmTestScenario {
             prompt: "What is the tech stack of this project? Please return simple array of technologies only.".to_string(),
             expected_keywords: LlmKeywordExpectations {
                 required_keywords: vec!["Django".to_string(), "Python".to_string(), "PostgreSQL".to_string(), "GraphQL".to_string()],
-                optional_keywords: vec![],
+                optional_keywords: vec!["JavaScript".to_string(), "Node".to_string()],
                 forbidden_keywords: vec![],
                 minimum_score: 0.7,
             },
@@ -254,7 +254,7 @@ mod tests {
             .required_keywords
             .contains(&"GraphQL".to_string()));
         
-        assert_eq!(scenario.expected_keywords.optional_keywords.len(), 0);
+        assert_eq!(scenario.expected_keywords.optional_keywords.len(), 2);
         assert_eq!(scenario.expected_keywords.forbidden_keywords.len(), 0);
     }
 

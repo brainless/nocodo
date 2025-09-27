@@ -1127,10 +1127,10 @@ impl LlmAgent {
                 model: session.model.clone(),
                 messages,
                 max_tokens: Some(4000),
-                temperature: Some(0.7),
+                temperature: Some(0.3), // Use same temperature as initial request for consistency
                 stream: Some(false),
                 tools,
-                tool_choice: None,
+                tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
                 functions: None,
                 function_call: None,
             };
