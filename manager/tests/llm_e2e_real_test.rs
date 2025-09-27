@@ -19,7 +19,7 @@ use nocodo_manager::models::{
 /// - Phase 2: Real LLM integration
 /// - Phase 3: Keyword-based validation
 #[actix_rt::test]
-async fn test_llm_e2e_real_integration() {
+async fn test_llm_e2e_saleor() {
     // Get LLM configuration from environment and skip if no providers available
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
@@ -61,10 +61,10 @@ async fn test_llm_e2e_real_integration() {
     println!("\n🤖 Phase 2: Setting up real LLM integration");
 
     // Create test scenario with project context
-    let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
+    let scenario = LlmTestScenario::tech_stack_analysis_saleor();
 
     // Set up project context from scenario
-    test_app
+    let project_id = test_app
         .create_project_from_scenario(&scenario.context)
         .await
         .expect("Failed to create project from scenario");
@@ -73,7 +73,7 @@ async fn test_llm_e2e_real_integration() {
     // 1. Create the work
     let work_request = CreateWorkRequest {
         title: "LLM E2E Test Work".to_string(),
-        project_id: Some("test-project".to_string()),
+        project_id: Some(project_id.clone()),
     };
 
     let req = test::TestRequest::post()
@@ -155,8 +155,8 @@ async fn test_llm_e2e_real_integration() {
 
     println!("   ✅ Created AI session: {}", ai_session_id);
     println!(
-        "   ✅ Project context created with {} files",
-        scenario.context.files.len()
+        "   ✅ Project context created from git repository: {}",
+        scenario.context.git_repo
     );
 
     // PHASE 3: Test real LLM interaction with keyword validation
@@ -171,6 +171,7 @@ async fn test_llm_e2e_real_integration() {
     let mut attempts = 0;
     let max_attempts = 24; // 120 seconds total
     let mut response_content = String::new();
+    let mut printed_output_ids = std::collections::HashSet::new(); // Track which outputs we've printed
 
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -179,6 +180,21 @@ async fn test_llm_e2e_real_integration() {
         // Check AI session outputs using the same logic as the handler (work_id based)
         let ai_outputs =
             get_ai_outputs_for_work(&test_app, &work_id).expect("Failed to get AI session outputs");
+
+        // Print any new outputs that haven't been printed yet
+        let mut has_new_outputs = false;
+        for output in &ai_outputs {
+            if !printed_output_ids.contains(&output.id) && !output.content.is_empty() {
+                let preview = if output.content.len() > 100 {
+                    format!("{}...", &output.content[..100])
+                } else {
+                    output.content.clone()
+                };
+                println!("   📝 New AI output: {}", preview);
+                printed_output_ids.insert(output.id.clone());
+                has_new_outputs = true;
+            }
+        }
 
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
@@ -213,18 +229,11 @@ async fn test_llm_e2e_real_integration() {
 
         // If we have at least some outputs but no text response yet, keep waiting
         if !ai_outputs.is_empty() && attempts < max_attempts - 4 && !has_file_content {
-            println!(
-                "   🔧 Found {} tool outputs, waiting for final text response...",
-                ai_outputs.len()
-            );
-            // Debug: show what outputs we found
-            for (i, output) in ai_outputs.iter().enumerate() {
-                let preview = if output.content.len() > 100 {
-                    format!("{}...", &output.content[..100])
-                } else {
-                    output.content.clone()
-                };
-                println!("      Output {}: {}", i + 1, preview);
+            if has_new_outputs {
+                println!(
+                    "   🔧 Found {} total outputs, waiting for final text response...",
+                    ai_outputs.len()
+                );
             }
         } else if !ai_outputs.is_empty() {
             // We have tool outputs but no final text - this might be the final state
@@ -237,62 +246,11 @@ async fn test_llm_e2e_real_integration() {
                 }
             }
 
-            // If the combined tool responses don't contain all expected keywords,
-            // supplement with content from test scenario files that weren't read by the LLM
-            let combined_lower = combined_content.to_lowercase();
-            let has_python = combined_lower.contains("python") || combined_lower.contains("py");
-            let has_fastapi = combined_lower.contains("fastapi");
-            let _has_react = combined_lower.contains("react");
-
+            // For git-based approach, we rely on the LLM to analyze the cloned repository
+            let _combined_lower = combined_content.to_lowercase();
             println!(
-                "   🔍 Before fallback: has_python={}, has_fastapi={}, has_react={}",
-                has_python, has_fastapi, _has_react
+                "   🔍 Analyzing response content for tech stack keywords"
             );
-
-            // Check if main.py was actually read by looking for its content in the responses
-            let main_py_read = scenario
-                .context
-                .files
-                .iter()
-                .any(|file| file.path == "main.py" && combined_content.contains(&file.content));
-
-            println!(
-                "   🔍 Debug: has_fastapi={}, main_py_read={}, combined_content_length={}",
-                has_fastapi,
-                main_py_read,
-                combined_content.len()
-            );
-
-            if !has_fastapi && !main_py_read {
-                // Add FastAPI content from main.py if it wasn't read
-                for file in &scenario.context.files {
-                    if file.path == "main.py" && file.content.to_lowercase().contains("fastapi") {
-                        combined_content.push_str(&file.content);
-                        combined_content.push(' ');
-                        println!(
-                            "   📝 Added main.py content to validation (LLM didn't read this file)"
-                        );
-                        break;
-                    }
-                }
-            }
-
-            // Also check for requirements.txt content
-            let requirements_read = scenario.context.files.iter().any(|file| {
-                file.path == "requirements.txt" && combined_content.contains(&file.content)
-            });
-
-            if !has_python && !requirements_read {
-                // Add requirements.txt content if it contains Python-related info
-                for file in &scenario.context.files {
-                    if file.path == "requirements.txt" {
-                        combined_content.push_str(&file.content);
-                        combined_content.push(' ');
-                        println!("   📝 Added requirements.txt content to validation (LLM didn't read this file)");
-                        break;
-                    }
-                }
-            }
 
             response_content = combined_content;
             println!("   📝 No final text response found, using combined tool responses for validation after {} attempts", attempts);
@@ -306,10 +264,14 @@ async fn test_llm_e2e_real_integration() {
             );
             break;
         }
-        println!(
-            "   ⏳ Still waiting... (attempt {}/{})",
-            attempts, max_attempts
-        );
+        
+        // Only print waiting message if we didn't just print new outputs
+        if !has_new_outputs {
+            println!(
+                "   ⏳ Waiting for AI response... (attempt {}/{})",
+                attempts, max_attempts
+            );
+        }
     }
 
     // Get the AI session outputs using the same logic as the handler
@@ -359,61 +321,11 @@ async fn test_llm_e2e_real_integration() {
             );
 
             // If the combined tool responses don't contain all expected keywords,
-            // supplement with content from test scenario files that weren't read by the LLM
-            let combined_lower = combined_content.to_lowercase();
-            let has_python = combined_lower.contains("python") || combined_lower.contains("py");
-            let has_fastapi = combined_lower.contains("fastapi");
-            let _has_react = combined_lower.contains("react");
-
+            // For git-based approach, we rely on the LLM to analyze the cloned repository
+            let _combined_lower = combined_content.to_lowercase();
             println!(
-                "   🔍 Before fallback: has_python={}, has_fastapi={}, has_react={}",
-                has_python, has_fastapi, _has_react
+                "   🔍 Analyzing response content for tech stack keywords"
             );
-
-            // Check if main.py was actually read by looking for its content in the responses
-            let main_py_read = scenario
-                .context
-                .files
-                .iter()
-                .any(|file| file.path == "main.py" && combined_content.contains(&file.content));
-
-            println!(
-                "   🔍 Debug: has_fastapi={}, main_py_read={}, combined_content_length={}",
-                has_fastapi,
-                main_py_read,
-                combined_content.len()
-            );
-
-            if !has_fastapi && !main_py_read {
-                // Add FastAPI content from main.py if it wasn't read
-                for file in &scenario.context.files {
-                    if file.path == "main.py" && file.content.to_lowercase().contains("fastapi") {
-                        combined_content.push_str(&file.content);
-                        combined_content.push(' ');
-                        println!(
-                            "   📝 Added main.py content to validation (LLM didn't read this file)"
-                        );
-                        break;
-                    }
-                }
-            }
-
-            // Also check for requirements.txt content
-            let requirements_read = scenario.context.files.iter().any(|file| {
-                file.path == "requirements.txt" && combined_content.contains(&file.content)
-            });
-
-            if !has_python && !requirements_read {
-                // Add requirements.txt content if it contains Python-related info
-                for file in &scenario.context.files {
-                    if file.path == "requirements.txt" {
-                        combined_content.push_str(&file.content);
-                        combined_content.push(' ');
-                        println!("   📝 Added requirements.txt content to validation (LLM didn't read this file)");
-                        break;
-                    }
-                }
-            }
 
             response_content = combined_content;
         }
@@ -542,8 +454,7 @@ async fn test_llm_multiple_scenarios() {
 
     // Test scenarios
     let scenarios = vec![
-        LlmTestScenario::tech_stack_analysis_python_fastapi(),
-        LlmTestScenario::tech_stack_analysis_rust(),
+        LlmTestScenario::tech_stack_analysis_saleor(),
     ];
 
     for (i, scenario) in scenarios.iter().enumerate() {
@@ -553,7 +464,7 @@ async fn test_llm_multiple_scenarios() {
         let test_app = TestApp::new_with_llm(provider).await;
 
         // Set up scenario
-        test_app
+        let project_id = test_app
             .create_project_from_scenario(&scenario.context)
             .await
             .expect("Failed to create project from scenario");
@@ -562,7 +473,7 @@ async fn test_llm_multiple_scenarios() {
         // 1. Create the work
         let work_request = CreateWorkRequest {
             title: format!("Multi Scenario Work {}", i + 1),
-            project_id: Some("test-project".to_string()),
+            project_id: Some(project_id.clone()),
         };
 
         let req = test::TestRequest::post()
@@ -758,20 +669,20 @@ mod unit_tests {
 
     #[tokio::test]
     async fn test_scenario_creation() {
-        let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
+        let scenario = LlmTestScenario::tech_stack_analysis_saleor();
 
         assert!(!scenario.name.is_empty());
         assert!(!scenario.prompt.is_empty());
-        assert!(!scenario.context.files.is_empty());
+        assert!(!scenario.context.git_repo.is_empty());
         assert!(!scenario.expected_keywords.required_keywords.is_empty());
 
         // Verify specific content
-        assert!(scenario.context.files.iter().any(|f| f.path == "main.py"));
+        assert!(scenario.context.git_repo.contains("saleor"));
+        assert!(scenario.context.git_repo.starts_with("git@github.com:"));
         assert!(scenario
-            .context
-            .files
-            .iter()
-            .any(|f| f.path == "requirements.txt"));
+            .expected_keywords
+            .required_keywords
+            .contains(&"Django".to_string()));
         assert!(scenario
             .expected_keywords
             .required_keywords
@@ -779,7 +690,50 @@ mod unit_tests {
         assert!(scenario
             .expected_keywords
             .required_keywords
-            .contains(&"FastAPI".to_string()));
+            .contains(&"PostgreSQL".to_string()));
+        assert!(scenario
+            .expected_keywords
+            .required_keywords
+            .contains(&"GraphQL".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_dynamic_project_naming() {
+        use crate::common::{app::TestApp, keyword_validation::LlmTestScenario};
+        
+        let llm_config = crate::common::llm_config::LlmTestConfig::from_environment();
+        let provider = llm_config.get_default_provider();
+        
+        // Skip test if no provider available
+        if provider.is_none() {
+            return;
+        }
+        
+        let provider = provider.unwrap();
+        let test_app = TestApp::new_with_llm(provider).await;
+        let scenario = LlmTestScenario::tech_stack_analysis_saleor();
+        
+        // Test that create_project_from_scenario returns a dynamic project name
+        let project_id = test_app
+            .create_project_from_scenario(&scenario.context)
+            .await
+            .expect("Failed to create project from scenario");
+        
+        // Verify the project name follows the expected pattern
+        assert!(project_id.starts_with("nocodo-test-"));
+        assert!(project_id.contains("saleor"));
+        
+        // Verify the project was created in the database with the dynamic ID
+        let projects = test_app.db().get_all_projects().expect("Failed to get projects");
+        assert!(!projects.is_empty());
+        
+        let created_project = projects.iter().find(|p| p.id == project_id);
+        assert!(created_project.is_some(), "Project with dynamic ID should exist");
+        
+        let project = created_project.unwrap();
+        assert_eq!(project.id, project_id);
+        assert!(project.name.contains("Saleor"));
+        assert!(project.path.contains(&project_id));
     }
 
     #[tokio::test]

@@ -7,20 +7,13 @@ pub struct LlmTestScenario {
     pub expected_keywords: LlmKeywordExpectations,
 }
 
-/// Context for LLM test (project files and structure)
+/// Context for LLM test (git repository)
 #[derive(Debug, Clone)]
 pub struct LlmTestContext {
-    pub files: Vec<TestFile>,
+    pub git_repo: String,
 }
 
-/// Test file definition
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct TestFile {
-    pub path: String,
-    pub content: String,
-    pub language: String,
-}
+
 
 /// Keyword expectations for validation
 #[derive(Debug, Clone)]
@@ -154,100 +147,24 @@ impl KeywordValidator {
 }
 
 impl LlmTestScenario {
-    /// Create a tech stack analysis test for Python FastAPI + React
-    pub fn tech_stack_analysis_python_fastapi() -> Self {
+    /// Create a tech stack analysis test for Saleor
+    pub fn tech_stack_analysis_saleor() -> Self {
         Self {
-            name: "Tech Stack Analysis - Python FastAPI + React".to_string(),
+            name: "Tech Stack Analysis - Saleor".to_string(),
             context: LlmTestContext {
-                files: vec![
-                    TestFile {
-                        path: "requirements.txt".to_string(),
-                        content: "fastapi==0.104.1\nuvicorn==0.24.0\npydantic==2.4.0".to_string(),
-                        language: "text".to_string(),
-                    },
-                    TestFile {
-                        path: "main.py".to_string(),
-                        content: "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Item(BaseModel):\n    name: str\n    price: float\n\n@app.get(\"/\")\ndef read_root():\n    return {\"Hello\": \"World\"}".to_string(),
-                        language: "python".to_string(),
-                    },
-                    TestFile {
-                        path: "package.json".to_string(),
-                        content: r#"{"dependencies": {"react": "^18.2.0", "typescript": "^5.0.0", "@types/react": "^18.2.0"}}"#.to_string(),
-                        language: "json".to_string(),
-                    },
-                     TestFile {
-                         path: "src/App.tsx".to_string(),
-                         content: "import React from 'react';\n\nfunction App() {\n  return (\n    <div className=\"App\">\n      <h1>Hello FastAPI + React!</h1>\n    </div>\n  );\n}\n\nexport default App;".to_string(),
-                         language: "typescript".to_string(),
-                     },
-                 ],
-             },
-             prompt: "Analyze the tech stack of this project. First list the files in the root directory, then read the package.json and requirements.txt files to identify the technologies used.".to_string(),
+                git_repo: "git@github.com:saleor/saleor.git".to_string(),
+            },
+            prompt: "What is the tech stack of this project? Please return simple array of technologies only.".to_string(),
             expected_keywords: LlmKeywordExpectations {
-                required_keywords: vec!["Python".to_string(), "FastAPI".to_string(), "React".to_string()],
-                optional_keywords: vec!["TypeScript".to_string(), "full-stack".to_string(), "API".to_string(), "Pydantic".to_string(), "Uvicorn".to_string()],
-                forbidden_keywords: vec!["Django".to_string(), "Vue".to_string(), "Java".to_string(), "Spring".to_string()],
+                required_keywords: vec!["Django".to_string(), "Python".to_string(), "PostgreSQL".to_string(), "GraphQL".to_string()],
+                optional_keywords: vec![],
+                forbidden_keywords: vec![],
                 minimum_score: 0.7,
             },
         }
     }
 
-    /// Create a Rust project analysis test
-    pub fn tech_stack_analysis_rust() -> Self {
-        Self {
-            name: "Tech Stack Analysis - Rust Project".to_string(),
-            context: LlmTestContext {
-                files: vec![
-                    TestFile {
-                        path: "Cargo.toml".to_string(),
-                        content: "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\ntokio = { version = \"1.0\", features = [\"full\"] }\nserde = { version = \"1.0\", features = [\"derive\"] }\nactix-web = \"4.4\"".to_string(),
-                        language: "toml".to_string(),
-                    },
-                    TestFile {
-                        path: "src/main.rs".to_string(),
-                        content: "use actix_web::{web, App, HttpServer, Result};\nuse serde::{Deserialize, Serialize};\n\n#[derive(Serialize, Deserialize)]\nstruct ApiResponse {\n    message: String,\n}\n\nasync fn hello() -> Result<web::Json<ApiResponse>> {\n    Ok(web::Json(ApiResponse {\n        message: \"Hello, Rust!\".to_string(),\n    }))\n}\n\n#[actix_web::main]\nasync fn main() -> std::io::Result<()> {\n    HttpServer::new(|| {\n        App::new()\n            .route(\"/\", web::get().to(hello))\n    })\n    .bind(\"127.0.0.1:8080\")?\n    .run()\n    .await\n}".to_string(),
-                        language: "rust".to_string(),
-                    },
-                ],
-            },
-            prompt: "Analyze the tech stack of this project. What technologies and frameworks are being used?".to_string(),
-            expected_keywords: LlmKeywordExpectations {
-                required_keywords: vec!["Rust".to_string(), "Actix".to_string(), "Tokio".to_string()],
-                optional_keywords: vec!["web server".to_string(), "async".to_string(), "Serde".to_string(), "HTTP".to_string()],
-                forbidden_keywords: vec!["Python".to_string(), "JavaScript".to_string(), "Django".to_string(), "Express".to_string()],
-                minimum_score: 0.7,
-            },
-        }
-    }
-
-    /// Create a code generation test
-    #[allow(dead_code)]
-    pub fn code_generation_rust_function() -> Self {
-        Self {
-            name: "Code Generation - Rust Factorial Function".to_string(),
-            context: LlmTestContext {
-                files: vec![
-                    TestFile {
-                        path: "Cargo.toml".to_string(),
-                        content: "[package]\nname = \"factorial-project\"\nversion = \"0.1.0\"\nedition = \"2021\"".to_string(),
-                        language: "toml".to_string(),
-                    },
-                    TestFile {
-                        path: "src/lib.rs".to_string(),
-                        content: "// Empty library file for factorial function".to_string(),
-                        language: "rust".to_string(),
-                    },
-                ],
-            },
-            prompt: "Write a factorial function in Rust that calculates n! for a given number n.".to_string(),
-            expected_keywords: LlmKeywordExpectations {
-                required_keywords: vec!["fn".to_string(), "factorial".to_string()],
-                optional_keywords: vec!["recursion".to_string(), "u64".to_string(), "match".to_string(), "loop".to_string(), "pub".to_string()],
-                forbidden_keywords: vec!["function".to_string(), "def".to_string(), "public".to_string(), "int".to_string()],
-                minimum_score: 0.6,
-            },
-        }
-    }
+    
 }
 
 #[cfg(test)]
@@ -312,23 +229,18 @@ mod tests {
     }
 
     #[test]
-    fn test_tech_stack_scenario_creation() {
-        let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
+    fn test_saleor_scenario_creation() {
+        let scenario = LlmTestScenario::tech_stack_analysis_saleor();
 
-        assert_eq!(
-            scenario.name,
-            "Tech Stack Analysis - Python FastAPI + React"
-        );
-        assert!(scenario.prompt.contains("tech stack"));
-        assert_eq!(scenario.context.files.len(), 4);
-        assert!(scenario.context.files.iter().any(|f| f.path == "main.py"));
+        assert_eq!(scenario.name, "Tech Stack Analysis - Saleor");
+        assert_eq!(scenario.context.git_repo, "git@github.com:saleor/saleor.git");
+        assert_eq!(scenario.prompt, "What is the tech stack of this project? Please return simple array of technologies only.");
+
+        assert_eq!(scenario.expected_keywords.required_keywords.len(), 4);
         assert!(scenario
-            .context
-            .files
-            .iter()
-            .any(|f| f.path == "package.json"));
-
-        assert_eq!(scenario.expected_keywords.required_keywords.len(), 3);
+            .expected_keywords
+            .required_keywords
+            .contains(&"Django".to_string()));
         assert!(scenario
             .expected_keywords
             .required_keywords
@@ -336,42 +248,14 @@ mod tests {
         assert!(scenario
             .expected_keywords
             .required_keywords
-            .contains(&"FastAPI".to_string()));
+            .contains(&"PostgreSQL".to_string()));
         assert!(scenario
             .expected_keywords
             .required_keywords
-            .contains(&"React".to_string()));
-    }
-
-    #[test]
-    fn test_rust_scenario_creation() {
-        let scenario = LlmTestScenario::tech_stack_analysis_rust();
-
-        assert_eq!(scenario.name, "Tech Stack Analysis - Rust Project");
-        assert_eq!(scenario.context.files.len(), 2);
-        assert!(scenario
-            .context
-            .files
-            .iter()
-            .any(|f| f.path == "Cargo.toml"));
-        assert!(scenario
-            .context
-            .files
-            .iter()
-            .any(|f| f.path == "src/main.rs"));
-
-        assert!(scenario
-            .expected_keywords
-            .required_keywords
-            .contains(&"Rust".to_string()));
-        assert!(scenario
-            .expected_keywords
-            .required_keywords
-            .contains(&"Actix".to_string()));
-        assert!(scenario
-            .expected_keywords
-            .required_keywords
-            .contains(&"Tokio".to_string()));
+            .contains(&"GraphQL".to_string()));
+        
+        assert_eq!(scenario.expected_keywords.optional_keywords.len(), 0);
+        assert_eq!(scenario.expected_keywords.forbidden_keywords.len(), 0);
     }
 
     #[test]
