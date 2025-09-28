@@ -28,7 +28,7 @@ async fn test_real_manager_startup() {
     // Test health endpoint
     let client = manager.http_client();
     let health_response = client
-        .get(&manager.api_url("/health"))
+        .get(manager.api_url("/health"))
         .send()
         .await
         .expect("Failed to call health endpoint");

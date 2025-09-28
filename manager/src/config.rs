@@ -1,6 +1,6 @@
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
@@ -103,7 +103,7 @@ path = "/tmp/nocodo-manager.sock"
         Ok(config)
     }
 
-    pub fn load_from_file(config_path: &PathBuf) -> Result<Self, ConfigError> {
+    pub fn load_from_file(config_path: &Path) -> Result<Self, ConfigError> {
         if !config_path.exists() {
             return Err(ConfigError::Message(format!(
                 "Configuration file not found: {}",
@@ -112,7 +112,7 @@ path = "/tmp/nocodo-manager.sock"
         }
 
         let builder = Config::builder()
-            .add_source(File::from(config_path.clone()))
+            .add_source(File::from(config_path.to_path_buf()))
             .build()?;
 
         let mut config: AppConfig = builder.try_deserialize()?;

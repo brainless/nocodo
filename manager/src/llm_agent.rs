@@ -408,10 +408,10 @@ impl LlmAgent {
                     session_id = %session_id,
                     "MAIN_DEBUG: About to call follow_up_with_llm after processing tool calls"
                 );
-                
+
                 self.process_native_tool_calls(session_id, &accumulated_tool_calls)
                     .await?;
-                    
+
                 tracing::info!(
                     session_id = %session_id,
                     "MAIN_DEBUG: Completed process_native_tool_calls, follow_up_with_llm should be called next"
@@ -1006,7 +1006,6 @@ impl LlmAgent {
                 "FOLLOW_UP_DEBUG: ENTERED follow_up_with_llm_with_depth method - this should appear in both manual and E2E test"
             );
 
-
             if depth >= MAX_RECURSION_DEPTH {
                 tracing::warn!(
                     session_id = %session_id,
@@ -1194,7 +1193,6 @@ impl LlmAgent {
                 "Received complete LLM follow-up response"
             );
 
-
             // Store assistant response with tool call information for proper conversation reconstruction
             let enhanced_assistant_response = if !follow_up_tool_calls.is_empty() {
                 // For Claude, we need to store the tool calls in a structured format for reconstruction
@@ -1293,14 +1291,14 @@ impl LlmAgent {
     /// Clean up assistant response by removing unwanted prefixes
     fn clean_assistant_response(&self, response: &str) -> String {
         let cleaned = response.trim();
-        
+
         // Remove "Making tool calls:" prefix if present
-        let without_prefix = if cleaned.starts_with("Making tool calls:") {
-            cleaned["Making tool calls:".len()..].trim()
+        let without_prefix = if let Some(stripped) = cleaned.strip_prefix("Making tool calls:") {
+            stripped.trim()
         } else {
             cleaned
         };
-        
+
         // Remove any leading/trailing whitespace and return
         without_prefix.trim().to_string()
     }

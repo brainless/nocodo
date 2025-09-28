@@ -178,8 +178,9 @@ async fn test_llm_e2e_saleor() {
         attempts += 1;
 
         // Check AI session outputs using the manager API
-        let ai_outputs =
-            get_ai_outputs_for_work(&test_app, &work_id).await.expect("Failed to get AI session outputs");
+        let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+            .await
+            .expect("Failed to get AI session outputs");
 
         // Print any new outputs that haven't been printed yet
         let mut has_new_outputs = false;
@@ -191,17 +192,24 @@ async fn test_llm_e2e_saleor() {
                     output.content.clone()
                 };
                 println!("   📝 New AI output: {}", preview);
-                printed_output_ids.insert(output.id.clone());
+                printed_output_ids.insert(output.id);
                 has_new_outputs = true;
             }
         }
 
         // Debug: Print all outputs for analysis
-        if attempts == 5 { // Print detailed debug info after 25 seconds
-            println!("   🔍 DEBUG: Total AI outputs after {} attempts: {}", attempts, ai_outputs.len());
+        if attempts == 5 {
+            // Print detailed debug info after 25 seconds
+            println!(
+                "   🔍 DEBUG: Total AI outputs after {} attempts: {}",
+                attempts,
+                ai_outputs.len()
+            );
             for (i, output) in ai_outputs.iter().enumerate() {
-                println!("   🔍 DEBUG: Output {}: content_len={}, preview={}",
-                    i, output.content.len(),
+                println!(
+                    "   🔍 DEBUG: Output {}: content_len={}, preview={}",
+                    i,
+                    output.content.len(),
                     if output.content.len() > 100 {
                         format!("{}...", &output.content[..100])
                     } else {
@@ -270,9 +278,7 @@ async fn test_llm_e2e_saleor() {
 
             // For git-based approach, we rely on the LLM to analyze the cloned repository
             let _combined_lower = combined_content.to_lowercase();
-            println!(
-                "   🔍 Analyzing response content for tech stack keywords"
-            );
+            println!("   🔍 Analyzing response content for tech stack keywords");
 
             response_content = combined_content;
             println!("   📝 No final text response found, using combined tool responses for validation after {} attempts", attempts);
@@ -286,7 +292,7 @@ async fn test_llm_e2e_saleor() {
             );
             break;
         }
-        
+
         // Only print waiting message if we didn't just print new outputs
         if !has_new_outputs {
             println!(
@@ -297,8 +303,9 @@ async fn test_llm_e2e_saleor() {
     }
 
     // Get the AI session outputs using the manager API
-    let ai_outputs =
-        get_ai_outputs_for_work(&test_app, &work_id).await.expect("Failed to get AI session outputs");
+    let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+        .await
+        .expect("Failed to get AI session outputs");
 
     println!("   🔍 Found {} AI session outputs:", ai_outputs.len());
     for (i, output) in ai_outputs.iter().enumerate() {
@@ -345,9 +352,7 @@ async fn test_llm_e2e_saleor() {
             // If the combined tool responses don't contain all expected keywords,
             // For git-based approach, we rely on the LLM to analyze the cloned repository
             let _combined_lower = combined_content.to_lowercase();
-            println!(
-                "   🔍 Analyzing response content for tech stack keywords"
-            );
+            println!("   🔍 Analyzing response content for tech stack keywords");
 
             response_content = combined_content;
         }
@@ -475,9 +480,7 @@ async fn test_llm_multiple_scenarios() {
     );
 
     // Test scenarios
-    let scenarios = vec![
-        LlmTestScenario::tech_stack_analysis_saleor(),
-    ];
+    let scenarios = [LlmTestScenario::tech_stack_analysis_saleor()];
 
     for (i, scenario) in scenarios.iter().enumerate() {
         println!("\n🧪 Scenario {}: {}", i + 1, scenario.name);
@@ -566,8 +569,9 @@ async fn test_llm_multiple_scenarios() {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
         // Get response from AI session outputs using manager API
-        let ai_outputs =
-            get_ai_outputs_for_work(&test_app, &work_id).await.expect("Failed to get AI session outputs");
+        let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+            .await
+            .expect("Failed to get AI session outputs");
 
         let response_content =
             if let Some(output) = ai_outputs.iter().find(|output| !output.content.is_empty()) {
@@ -575,7 +579,8 @@ async fn test_llm_multiple_scenarios() {
             } else {
                 // If no outputs yet, wait a bit more
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id).await
+                let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+                    .await
                     .expect("Failed to get AI session outputs");
                 ai_outputs
                     .iter()
@@ -620,21 +625,19 @@ async fn get_ai_outputs_for_work(
     work_id: &str,
 ) -> anyhow::Result<Vec<nocodo_manager::models::AiSessionOutput>> {
     use actix_web::test;
-    
+
     // Make API call to get AI session outputs using the manager API endpoint
     let uri = format!("/work/{}/outputs", work_id);
-    let req = test::TestRequest::get()
-        .uri(&uri)
-        .to_request();
+    let req = test::TestRequest::get().uri(&uri).to_request();
 
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
         "/work/{id}/outputs",
         web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
     ))
     .await;
-    
+
     let resp = test::call_service(&service, req).await;
-    
+
     if !resp.status().is_success() {
         return Err(anyhow::anyhow!(
             "Failed to get AI outputs from API: {}",
@@ -642,7 +645,7 @@ async fn get_ai_outputs_for_work(
         ));
     }
 
-    let body: nocodo_manager::models::AiSessionOutputListResponse = 
+    let body: nocodo_manager::models::AiSessionOutputListResponse =
         test::read_body_json(resp).await;
 
     Ok(body.outputs)
@@ -710,36 +713,42 @@ mod unit_tests {
     #[tokio::test]
     async fn test_dynamic_project_naming() {
         use crate::common::{app::TestApp, keyword_validation::LlmTestScenario};
-        
+
         let llm_config = crate::common::llm_config::LlmTestConfig::from_environment();
         let provider = llm_config.get_default_provider();
-        
+
         // Skip test if no provider available
         if provider.is_none() {
             return;
         }
-        
+
         let provider = provider.unwrap();
         let test_app = TestApp::new_with_llm(provider).await;
         let scenario = LlmTestScenario::tech_stack_analysis_saleor();
-        
+
         // Test that create_project_from_scenario returns a dynamic project name
         let project_id = test_app
             .create_project_from_scenario(&scenario.context)
             .await
             .expect("Failed to create project from scenario");
-        
+
         // Verify the project name follows the expected pattern
         assert!(project_id.starts_with("nocodo-test-"));
         assert!(project_id.contains("saleor"));
-        
+
         // Verify the project was created in the database with the dynamic ID
-        let projects = test_app.db().get_all_projects().expect("Failed to get projects");
+        let projects = test_app
+            .db()
+            .get_all_projects()
+            .expect("Failed to get projects");
         assert!(!projects.is_empty());
-        
+
         let created_project = projects.iter().find(|p| p.id == project_id);
-        assert!(created_project.is_some(), "Project with dynamic ID should exist");
-        
+        assert!(
+            created_project.is_some(),
+            "Project with dynamic ID should exist"
+        );
+
         let project = created_project.unwrap();
         assert_eq!(project.id, project_id);
         assert!(project.name.contains("Saleor"));

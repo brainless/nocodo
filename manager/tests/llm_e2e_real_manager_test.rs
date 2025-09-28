@@ -39,7 +39,15 @@ async fn test_llm_e2e_real_manager_saleor() {
     let scenario = LlmTestScenario::tech_stack_analysis_saleor();
 
     // Create project context using git repository clone
-    let project_name = format!("nocodo-test-{}", scenario.context.git_repo.split('/').last().unwrap_or("saleor"));
+    let project_name = format!(
+        "nocodo-test-{}",
+        scenario
+            .context
+            .git_repo
+            .split('/')
+            .next_back()
+            .unwrap_or("saleor")
+    );
     let project_path = manager.config.temp_dir_path().join(&project_name);
 
     // Create project via manager API first (this validates the path doesn't exist)
@@ -58,7 +66,8 @@ async fn test_llm_e2e_real_manager_saleor() {
     let clone_result = std::process::Command::new("git")
         .args([
             "clone",
-            "--depth", "1", // Shallow clone for faster setup
+            "--depth",
+            "1", // Shallow clone for faster setup
             &scenario.context.git_repo,
             temp_clone_path.to_str().unwrap(),
         ])
@@ -87,7 +96,11 @@ async fn test_llm_e2e_real_manager_saleor() {
         let move_result2 = std::process::Command::new("bash")
             .args([
                 "-c",
-                &format!("cp -r {}/* {}/", temp_clone_path.to_str().unwrap(), project_path.to_str().unwrap()),
+                &format!(
+                    "cp -r {}/* {}/",
+                    temp_clone_path.to_str().unwrap(),
+                    project_path.to_str().unwrap()
+                ),
             ])
             .output()
             .expect("Failed to copy cloned repository contents");
@@ -172,11 +185,17 @@ async fn test_llm_e2e_real_manager_saleor() {
 
         // Debug output after 5 attempts (25 seconds)
         if attempts == 5 {
-            println!("   🔍 DEBUG: Total AI outputs after {} attempts: {}", attempts, ai_outputs.len());
+            println!(
+                "   🔍 DEBUG: Total AI outputs after {} attempts: {}",
+                attempts,
+                ai_outputs.len()
+            );
             for (i, output) in ai_outputs.iter().enumerate() {
                 let content = output["content"].as_str().unwrap_or("");
-                println!("   🔍 DEBUG: Output {}: content_len={}, preview={}",
-                    i, content.len(),
+                println!(
+                    "   🔍 DEBUG: Output {}: content_len={}, preview={}",
+                    i,
+                    content.len(),
                     if content.len() > 100 {
                         format!("{}...", &content[..100])
                     } else {
@@ -250,12 +269,18 @@ async fn test_llm_e2e_real_manager_saleor() {
         }
 
         if attempts >= max_attempts {
-            println!("   ⚠️  Timeout waiting for AI response after {} seconds", max_attempts * 5);
+            println!(
+                "   ⚠️  Timeout waiting for AI response after {} seconds",
+                max_attempts * 5
+            );
             break;
         }
 
         if !has_new_outputs {
-            println!("   ⏳ Waiting for AI response... (attempt {}/{})", attempts, max_attempts);
+            println!(
+                "   ⏳ Waiting for AI response... (attempt {}/{})",
+                attempts, max_attempts
+            );
         }
     }
 
@@ -350,7 +375,9 @@ async fn test_llm_e2e_real_manager_saleor() {
 
     let response_lower = response_content.to_lowercase();
     assert!(
-        !response_lower.contains("error") || response_lower.contains("api") || response_lower.contains("python"),
+        !response_lower.contains("error")
+            || response_lower.contains("api")
+            || response_lower.contains("python"),
         "LLM response appears to be an error: {}",
         response_content
     );

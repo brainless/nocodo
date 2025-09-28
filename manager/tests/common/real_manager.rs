@@ -49,7 +49,10 @@ impl RealManagerInstance {
         }
 
         // Start the manager daemon
-        tracing::info!("Starting manager with config: {}", config_file_path.display());
+        tracing::info!(
+            "Starting manager with config: {}",
+            config_file_path.display()
+        );
         let mut process = Command::new("cargo")
             .args([
                 "run",
@@ -81,7 +84,10 @@ impl RealManagerInstance {
                 tracing::error!("Manager stderr: {}", output);
             }
 
-            return Err(anyhow::anyhow!("Manager process exited with status: {}", status));
+            return Err(anyhow::anyhow!(
+                "Manager process exited with status: {}",
+                status
+            ));
         }
 
         let mut instance = RealManagerInstance {
@@ -118,8 +124,9 @@ impl RealManagerInstance {
         port: u16,
         llm_provider: &LlmProviderTestConfig,
     ) -> anyhow::Result<String> {
-        let api_key = std::env::var(&llm_provider.api_key_env)
-            .map_err(|_| anyhow::anyhow!("API key not found for provider: {}", llm_provider.name))?;
+        let api_key = std::env::var(&llm_provider.api_key_env).map_err(|_| {
+            anyhow::anyhow!("API key not found for provider: {}", llm_provider.name)
+        })?;
 
         let config_toml = format!(
             r#"[server]
@@ -173,7 +180,9 @@ path = "{}"
             }
         }
 
-        Err(anyhow::anyhow!("Manager failed to become ready within 30 seconds"))
+        Err(anyhow::anyhow!(
+            "Manager failed to become ready within 30 seconds"
+        ))
     }
 
     /// Create an HTTP client for making API calls
@@ -190,7 +199,7 @@ path = "{}"
     pub async fn create_project(&self, name: &str, path: &str) -> anyhow::Result<String> {
         let client = self.http_client();
         let response = client
-            .post(&self.api_url("/projects"))
+            .post(self.api_url("/projects"))
             .json(&serde_json::json!({
                 "name": name,
                 "path": path,
@@ -203,7 +212,10 @@ path = "{}"
 
         let status = response.status();
         if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_else(|_| "Unable to read error body".to_string());
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unable to read error body".to_string());
             return Err(anyhow::anyhow!(
                 "Failed to create project: {} - {}",
                 status,
@@ -220,10 +232,14 @@ path = "{}"
     }
 
     /// Create work using the real API
-    pub async fn create_work(&self, title: &str, project_id: Option<String>) -> anyhow::Result<String> {
+    pub async fn create_work(
+        &self,
+        title: &str,
+        project_id: Option<String>,
+    ) -> anyhow::Result<String> {
         let client = self.http_client();
         let response = client
-            .post(&self.api_url("/work"))
+            .post(self.api_url("/work"))
             .json(&serde_json::json!({
                 "title": title,
                 "project_id": project_id
@@ -232,7 +248,10 @@ path = "{}"
             .await?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("Failed to create work: {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "Failed to create work: {}",
+                response.status()
+            ));
         }
 
         let body: serde_json::Value = response.json().await?;
@@ -247,7 +266,7 @@ path = "{}"
     pub async fn add_message(&self, work_id: &str, content: &str) -> anyhow::Result<String> {
         let client = self.http_client();
         let response = client
-            .post(&self.api_url(&format!("/work/{}/messages", work_id)))
+            .post(self.api_url(&format!("/work/{}/messages", work_id)))
             .json(&serde_json::json!({
                 "content": content,
                 "content_type": "text",
@@ -272,10 +291,14 @@ path = "{}"
     }
 
     /// Create AI session using the real API
-    pub async fn create_ai_session(&self, work_id: &str, message_id: &str) -> anyhow::Result<String> {
+    pub async fn create_ai_session(
+        &self,
+        work_id: &str,
+        message_id: &str,
+    ) -> anyhow::Result<String> {
         let client = self.http_client();
         let response = client
-            .post(&self.api_url(&format!("/work/{}/sessions", work_id)))
+            .post(self.api_url(&format!("/work/{}/sessions", work_id)))
             .json(&serde_json::json!({
                 "message_id": message_id,
                 "tool_name": "llm-agent"
@@ -302,7 +325,7 @@ path = "{}"
     pub async fn get_ai_outputs(&self, work_id: &str) -> anyhow::Result<Vec<serde_json::Value>> {
         let client = self.http_client();
         let response = client
-            .get(&self.api_url(&format!("/work/{}/outputs", work_id)))
+            .get(self.api_url(&format!("/work/{}/outputs", work_id)))
             .send()
             .await?;
 

@@ -1286,7 +1286,7 @@ impl LlmClient for ClaudeClient {
         // Make the request
         let response = self
             .client
-            .post(&self.get_api_url())
+            .post(self.get_api_url())
             .header("x-api-key", &self.config.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")

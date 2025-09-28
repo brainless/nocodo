@@ -318,10 +318,10 @@ impl TestApp {
             // Remove .git suffix
             let without_git = &repo_url[..repo_url.len() - 4];
             // Extract the last part of the path
-            without_git.split('/').last().unwrap_or("unknown")
+            without_git.split('/').next_back().unwrap_or("unknown")
         } else {
             // Extract the last part of the path
-            repo_url.split('/').last().unwrap_or("unknown")
+            repo_url.split('/').next_back().unwrap_or("unknown")
         };
 
         // Create a test project directory in /tmp with dynamic naming
@@ -336,7 +336,13 @@ impl TestApp {
 
         // Clone the git repository with depth 1 for faster testing
         let output = Command::new("git")
-            .args(&["clone", "--depth", "1", &context.git_repo, project_path.to_str().unwrap()])
+            .args([
+                "clone",
+                "--depth",
+                "1",
+                &context.git_repo,
+                project_path.to_str().unwrap(),
+            ])
             .output()?;
 
         if !output.status.success() {
