@@ -39,7 +39,11 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
 };
 
 // Tool icon component with support for different AI tools
-const ToolIcon: Component<{ toolName: string | null | undefined; model?: string | null; className?: string }> = props => {
+const ToolIcon: Component<{
+  toolName: string | null | undefined;
+  model?: string | null;
+  className?: string;
+}> = props => {
   const getToolDisplayName = (tool: string | null | undefined, model?: string | null) => {
     if (!tool) return 'Unknown';
     const toolLower = tool.toLowerCase();
@@ -58,7 +62,7 @@ const ToolIcon: Component<{ toolName: string | null | undefined; model?: string 
 
   return (
     <WorkWidget
-      type="model"
+      type='model'
       value={getToolDisplayName(props.toolName, props.model)}
       className={props.className}
     />
@@ -72,6 +76,7 @@ const WorkWidget: Component<{
   status?: AiSessionStatus;
   project?: Project | null;
   projectId?: string;
+  className?: string;
 }> = props => {
   const getWidgetColor = () => {
     switch (props.type) {
@@ -118,7 +123,7 @@ const WorkWidget: Component<{
 
   return (
     <span
-      class='px-2 py-1 text-xs font-medium rounded-full border inline-flex items-center'
+      class={`px-2 py-1 text-xs font-medium rounded-full border inline-flex items-center ${props.className || ''}`}
       classList={{
         [getWidgetColor()]: true,
         'animate-pulse': props.type === 'status' && props.status === 'running',
@@ -196,11 +201,12 @@ const ProjectBadge: Component<{
   project: Project | null;
   projectId?: string;
 }> = props => {
-  const projectName = props.project?.name || (props.projectId ? `Project ${props.projectId}` : 'No Project');
+  const projectName =
+    props.project?.name || (props.projectId ? `Project ${props.projectId}` : 'No Project');
 
   return (
     <WorkWidget
-      type="project"
+      type='project'
       value={projectName}
       project={props.project}
       projectId={props.projectId}

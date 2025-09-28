@@ -9,8 +9,6 @@ interface AiSessionCardProps {
   showPrompt?: boolean;
 }
 
-
-
 const AiSessionCard: Component<AiSessionCardProps> = props => {
   return (
     <div class='bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow'>
@@ -30,7 +28,7 @@ const AiSessionCard: Component<AiSessionCardProps> = props => {
         {/* Second line: Rounded widgets */}
         <div class='flex flex-wrap gap-2'>
           <WorkWidget
-            type="status"
+            type='status'
             value={props.session.status}
             status={props.session.status as AiSessionStatus}
           />

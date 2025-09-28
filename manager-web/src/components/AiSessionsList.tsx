@@ -208,16 +208,16 @@ const AiSessionsList: Component = () => {
         </div>
       </Show>
 
-       <Show when={!store.loading && filteredSessions().length > 0}>
-         <div class='grid grid-cols-1 gap-6'>
-           <For each={filteredSessions()}>
-             {session => {
-               const project = projects().find(p => p.id === session.project_id);
-               return <AiSessionCard session={session} project={project} showPrompt={true} />;
-             }}
-           </For>
-         </div>
-       </Show>
+      <Show when={!store.loading && filteredSessions().length > 0}>
+        <div class='grid grid-cols-1 gap-6'>
+          <For each={filteredSessions()}>
+            {session => {
+              const project = projects().find(p => p.id === session.project_id);
+              return <AiSessionCard session={session} project={project} showPrompt={true} />;
+            }}
+          </For>
+        </div>
+      </Show>
     </div>
   );
 };

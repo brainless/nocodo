@@ -13,8 +13,6 @@ pub struct LlmTestContext {
     pub git_repo: String,
 }
 
-
-
 /// Keyword expectations for validation
 #[derive(Debug, Clone)]
 pub struct LlmKeywordExpectations {
@@ -163,8 +161,6 @@ impl LlmTestScenario {
             },
         }
     }
-
-    
 }
 
 #[cfg(test)]
@@ -233,8 +229,11 @@ mod tests {
         let scenario = LlmTestScenario::tech_stack_analysis_saleor();
 
         assert_eq!(scenario.name, "Tech Stack Analysis - Saleor");
-        assert_eq!(scenario.context.git_repo, "git@github.com:saleor/saleor.git");
-        assert_eq!(scenario.prompt, "What is the tech stack of this project? Please return simple array of technologies only.");
+        assert_eq!(
+            scenario.context.git_repo,
+            "git@github.com:saleor/saleor.git"
+        );
+        assert_eq!(scenario.prompt, "What is the tech stack of this project? You must examine at least 3 different configuration files (such as package.json, pyproject.toml, manage.py, requirements.txt, or setup.py) before providing your final answer. Please read each file individually and then provide a comprehensive analysis of all technologies found. Return a simple array of technologies only at the end.");
 
         assert_eq!(scenario.expected_keywords.required_keywords.len(), 4);
         assert!(scenario
@@ -253,7 +252,7 @@ mod tests {
             .expected_keywords
             .required_keywords
             .contains(&"GraphQL".to_string()));
-        
+
         assert_eq!(scenario.expected_keywords.optional_keywords.len(), 2);
         assert_eq!(scenario.expected_keywords.forbidden_keywords.len(), 0);
     }

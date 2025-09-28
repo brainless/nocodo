@@ -317,7 +317,7 @@ const AiSessionDetail: Component = () => {
                 <div class='flex items-center justify-between'>
                   <div class='flex flex-col space-y-2'>
                     <WorkWidget
-                      type="status"
+                      type='status'
                       value={session()!.status}
                       status={session()!.status as AiSessionStatus}
                     />

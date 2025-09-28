@@ -246,14 +246,14 @@ const SessionsCard: Component = () => {
             <p class='text-gray-500 mb-4'>Start your first work session using the nocodo CLI</p>
           </div>
         </div>
-       ) : (
-         <div class='grid grid-cols-1 gap-6'>
-           <For each={recentSessions()}>
-             {session => {
-               const project = projects().find(p => p.id === session.project_id);
-               return <AiSessionCard session={session} project={project} showPrompt={true} />;
-             }}
-           </For>
+      ) : (
+        <div class='grid grid-cols-1 gap-6'>
+          <For each={recentSessions()}>
+            {session => {
+              const project = projects().find(p => p.id === session.project_id);
+              return <AiSessionCard session={session} project={project} showPrompt={true} />;
+            }}
+          </For>
 
           {/* Show more sessions if there are more than 5 */}
           {store.list.length > 5 && (
