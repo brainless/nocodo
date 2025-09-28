@@ -168,10 +168,10 @@ async fn test_simple_llm_e2e() {
 async fn test_keyword_validation_system() {
     println!("🧪 Testing keyword validation system");
 
-    let scenario = LlmTestScenario::tech_stack_analysis_python_fastapi();
+    let scenario = LlmTestScenario::tech_stack_analysis_saleor();
 
     // Simulate a good LLM response
-    let good_response = "This project uses Python with the FastAPI framework for the backend API, and React for the frontend user interface. The setup includes TypeScript for type safety.";
+    let good_response = "This project uses Django, Python, PostgreSQL, and GraphQL";
 
     let result = KeywordValidator::validate_response(good_response, &scenario.expected_keywords);
 
@@ -186,8 +186,8 @@ async fn test_keyword_validation_system() {
         "Keyword validation should pass for good response"
     );
     assert!(result.score >= 0.7, "Score should be at least 0.7");
-    assert_eq!(result.found_required.len(), 3); // Python, FastAPI, React
-    assert!(!result.found_optional.is_empty()); // Should find TypeScript
+    assert_eq!(result.found_required.len(), 4); // Django, Python, PostgreSQL, GraphQL
+    assert_eq!(result.found_optional.len(), 0); // No optional keywords
     assert_eq!(result.found_forbidden.len(), 0); // No forbidden keywords
 
     println!("✅ Keyword validation system working correctly");

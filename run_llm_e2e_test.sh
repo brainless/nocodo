@@ -2,6 +2,7 @@
 
 # LLM E2E Test Runner for Issue #133
 # Runs the comprehensive end-to-end test that combines phases 1, 2, and 3
+# Tests real-world git repository analysis with Saleor project
 
 set -e
 
@@ -123,11 +124,11 @@ echo "🏗️  Building project..."
 cargo build --test llm_e2e_real_test
 
 echo ""
-echo "🧪 Running comprehensive LLM E2E test..."
+echo "🧪 Running comprehensive LLM E2E test with Saleor repository..."
 echo ""
 
 # Run the validation tests (always working)
-cargo test --test llm_e2e_real_test test_llm_e2e_real_integration \
+cargo test --test llm_e2e_real_test test_llm_e2e_saleor \
     -- --test-threads=1 --nocapture
 
 echo ""

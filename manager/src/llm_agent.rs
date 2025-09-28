@@ -248,12 +248,15 @@ impl LlmAgent {
         // Get the complete response (non-streaming)
         let response = llm_client.complete(request).await?;
 
-        let assistant_response = response
+        let raw_assistant_response = response
             .choices
             .first()
             .and_then(|choice| choice.message.as_ref())
             .and_then(|message| message.content.clone())
             .unwrap_or_default();
+
+        // Clean up the assistant response by removing unwanted prefixes
+        let assistant_response = self.clean_assistant_response(&raw_assistant_response);
 
         let accumulated_tool_calls = llm_client.extract_tool_calls_from_response(&response);
 
@@ -332,7 +335,8 @@ impl LlmAgent {
                     "text": assistant_response,
                     "tool_calls": accumulated_tool_calls
                 });
-                serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
+                serde_json::to_string(&assistant_data)
+                    .unwrap_or_else(|_| assistant_response.clone())
             } else {
                 // For other providers, use the enhanced text format
                 if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
@@ -340,14 +344,14 @@ impl LlmAgent {
                         .iter()
                         .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
                         .collect();
-                    format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                    tool_call_descriptions.join("\n")
                 } else {
                     let tool_call_descriptions: Vec<String> = accumulated_tool_calls
                         .iter()
                         .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
                         .collect();
                     format!(
-                        "{}\n\nMaking tool calls:\n{}",
+                        "{}\n\n{}",
                         assistant_response,
                         tool_call_descriptions.join("\n")
                     )
@@ -378,14 +382,14 @@ impl LlmAgent {
                 model = %session.model,
                 accumulated_tool_calls_count = %accumulated_tool_calls.len(),
                 assistant_response_length = %assistant_response.len(),
-                "Checking for native tool calls from streaming response"
+                "MAIN_DEBUG: Checking for native tool calls from streaming response"
             );
 
             if !accumulated_tool_calls.is_empty() {
                 tracing::info!(
                     session_id = %session_id,
                     tool_calls_count = %accumulated_tool_calls.len(),
-                    "Processing native tool calls from streaming response"
+                    "MAIN_DEBUG: Processing native tool calls from streaming response"
                 );
 
                 // Log details of each tool call for debugging
@@ -400,8 +404,18 @@ impl LlmAgent {
                     );
                 }
 
+                tracing::info!(
+                    session_id = %session_id,
+                    "MAIN_DEBUG: About to call follow_up_with_llm after processing tool calls"
+                );
+
                 self.process_native_tool_calls(session_id, &accumulated_tool_calls)
                     .await?;
+
+                tracing::info!(
+                    session_id = %session_id,
+                    "MAIN_DEBUG: Completed process_native_tool_calls, follow_up_with_llm should be called next"
+                );
             } else {
                 tracing::warn!(
                     session_id = %session_id,
@@ -412,7 +426,7 @@ impl LlmAgent {
                     } else {
                         assistant_response.clone()
                     },
-                    "No native tool calls found in response - this may indicate an issue with tool calling"
+                    "MAIN_DEBUG: No native tool calls found in response - this may indicate an issue with tool calling"
                 );
             }
         } else {
@@ -713,14 +727,23 @@ impl LlmAgent {
         }
 
         // After processing all tool calls, follow up with LLM
-        tracing::info!(
+        tracing::warn!(  // Use warn to make it more visible
             session_id = %session_id,
-            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth"
+            tool_calls_count = %tool_calls.len(),
+            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls",
+            tool_calls.len()
         );
-        self.follow_up_with_llm_with_depth(session_id, 1).await?;
-        tracing::info!(
+
+        // Add extra debug to see if follow-up is enabled/available
+        tracing::warn!(
             session_id = %session_id,
-            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed"
+            "FOLLOW_UP_DEBUG: Checking if follow-up calls are enabled and agent is available"
+        );
+
+        self.follow_up_with_llm_with_depth(session_id, 1).await?;
+        tracing::warn!(  // Use warn to make it more visible
+            session_id = %session_id,
+            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed successfully"
         );
 
         tracing::info!(
@@ -977,6 +1000,12 @@ impl LlmAgent {
         Box::pin(async move {
             const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
+            tracing::warn!(
+                session_id = %session_id,
+                current_depth = %depth,
+                "FOLLOW_UP_DEBUG: ENTERED follow_up_with_llm_with_depth method - this should appear in both manual and E2E test"
+            );
+
             if depth >= MAX_RECURSION_DEPTH {
                 tracing::warn!(
                     session_id = %session_id,
@@ -1017,7 +1046,7 @@ impl LlmAgent {
                 api_key: self.get_api_key(&session.provider)?,
                 base_url: self.get_base_url(&session.provider),
                 max_tokens: Some(4000),
-                temperature: Some(0.7),
+                temperature: Some(0.3), // Use same temperature as initial request for consistency
             };
 
             tracing::debug!(
@@ -1029,7 +1058,7 @@ impl LlmAgent {
 
             let llm_client = create_llm_client(config)?;
 
-            // Build conversation for LLM
+            // Build conversation for LLM (simplified to avoid conversation corruption)
             let mut messages: Vec<_> = history
                 .into_iter()
                 .map(|msg| LlmMessage {
@@ -1050,8 +1079,8 @@ impl LlmAgent {
             // Log the follow-up conversation being sent to LLM (truncated for large messages)
             for (i, msg) in messages.iter().enumerate() {
                 let content_preview = if let Some(content) = &msg.content {
-                    if content.len() > 200 {
-                        format!("{}...", &content[..200])
+                    if content.len() > 500 {
+                        format!("{}...", &content[..500])
                     } else {
                         content.clone()
                     }
@@ -1059,13 +1088,13 @@ impl LlmAgent {
                     "<no content>".to_string()
                 };
                 let content_length = msg.content.as_ref().map(|c| c.len()).unwrap_or(0);
-                tracing::info!(
+                tracing::warn!(  // Use warn to make it more visible
                     session_id = %session_id,
                     message_index = %i,
                     message_role = %msg.role,
                     message_content = %content_preview,
                     message_length = %content_length,
-                    "Sending follow-up message to LLM"
+                    "FOLLOW_UP_DEBUG: Sending follow-up message to LLM"
                 );
             }
 
@@ -1123,10 +1152,10 @@ impl LlmAgent {
                 model: session.model.clone(),
                 messages,
                 max_tokens: Some(4000),
-                temperature: Some(0.7),
+                temperature: Some(0.3), // Use same temperature as initial request for consistency
                 stream: Some(false),
                 tools,
-                tool_choice: None,
+                tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
                 functions: None,
                 function_call: None,
             };
@@ -1140,12 +1169,15 @@ impl LlmAgent {
 
             // Get the complete response (non-streaming)
             let response = llm_client.complete(request).await?;
-            let assistant_response = response
+            let raw_assistant_response = response
                 .choices
                 .first()
                 .and_then(|choice| choice.message.as_ref())
                 .and_then(|message| message.content.clone())
                 .unwrap_or_default();
+
+            // Clean up the assistant response by removing unwanted prefixes
+            let assistant_response = self.clean_assistant_response(&raw_assistant_response);
 
             let follow_up_tool_calls = llm_client.extract_tool_calls_from_response(&response);
 
@@ -1170,22 +1202,27 @@ impl LlmAgent {
                         "text": assistant_response,
                         "tool_calls": follow_up_tool_calls
                     });
-                    serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
+                    serde_json::to_string(&assistant_data)
+                        .unwrap_or_else(|_| assistant_response.clone())
                 } else {
                     // For other providers, use the enhanced text format
                     if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
                         let tool_call_descriptions: Vec<String> = follow_up_tool_calls
                             .iter()
-                            .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                            .map(|tc| {
+                                format!("🔧 **{}**({})", tc.function.name, tc.function.arguments)
+                            })
                             .collect();
-                        format!("Making tool calls:\n{}", tool_call_descriptions.join("\n"))
+                        tool_call_descriptions.join("\n")
                     } else {
                         let tool_call_descriptions: Vec<String> = follow_up_tool_calls
                             .iter()
-                            .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
+                            .map(|tc| {
+                                format!("🔧 **{}**({})", tc.function.name, tc.function.arguments)
+                            })
                             .collect();
                         format!(
-                            "{}\n\nMaking tool calls:\n{}",
+                            "{}\n\n{}",
                             assistant_response,
                             tool_call_descriptions.join("\n")
                         )
@@ -1214,14 +1251,14 @@ impl LlmAgent {
                     tracing::info!(
                         session_id = %session_id,
                         tool_calls_count = %follow_up_tool_calls.len(),
-                        "Processing native tool calls from follow-up response"
+                        "FOLLOW_UP_DEBUG: Processing native tool calls from follow-up response"
                     );
                     self.process_native_tool_calls(session_id, &follow_up_tool_calls)
                         .await?;
                 } else {
-                    tracing::debug!(
+                    tracing::warn!(
                         session_id = %session_id,
-                        "No native tool calls found in follow-up response"
+                        "FOLLOW_UP_DEBUG: No native tool calls found in follow-up response - follow-up completed without additional tool calls"
                     );
                 }
             } else {
@@ -1249,6 +1286,21 @@ impl LlmAgent {
 
             Ok(assistant_response)
         })
+    }
+
+    /// Clean up assistant response by removing unwanted prefixes
+    fn clean_assistant_response(&self, response: &str) -> String {
+        let cleaned = response.trim();
+
+        // Remove "Making tool calls:" prefix if present
+        let without_prefix = if let Some(stripped) = cleaned.strip_prefix("Making tool calls:") {
+            stripped.trim()
+        } else {
+            cleaned
+        };
+
+        // Remove any leading/trailing whitespace and return
+        without_prefix.trim().to_string()
     }
 
     /// Create system prompt for tool usage

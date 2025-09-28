@@ -31,7 +31,9 @@ pub struct LlmTestPrompts {
 /// Timeout configurations for LLM tests
 #[derive(Debug, Clone)]
 pub struct LlmTestTimeouts {
+    #[allow(dead_code)]
     pub request_timeout_secs: u64,
+    #[allow(dead_code)]
     pub total_test_timeout_secs: u64,
 }
 
@@ -119,6 +121,7 @@ impl LlmProviderTestConfig {
     }
 
     /// Get the default model for this provider
+    #[allow(dead_code)]
     pub fn default_model(&self) -> &str {
         self.models.first().map(|s| s.as_str()).unwrap_or("unknown")
     }

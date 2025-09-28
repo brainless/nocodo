@@ -10,10 +10,13 @@ pub mod fixtures;
 pub mod keyword_validation;
 pub mod llm_config;
 pub mod logging;
+pub mod real_manager;
 
 pub use app::TestApp;
 pub use fixtures::TestDataGenerator;
 pub use logging::TestLogger;
+#[allow(unused_imports)]
+pub use real_manager::RealManagerInstance;
 
 #[cfg(test)]
 mod isolation_tests {

@@ -48,5 +48,6 @@ nocodo-github-actions = { path = "../nocodo-github-actions", features = ["nocodo
 
 [dev-dependencies]
 actix-rt = "2.9"
+rand = "0.8"
 tempfile = "3.12"
 tokio-test = "0.4"

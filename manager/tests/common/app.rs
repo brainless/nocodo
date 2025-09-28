@@ -305,35 +305,60 @@ impl TestApp {
     pub async fn create_project_from_scenario(
         &self,
         context: &LlmTestContext,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<String> {
         use std::fs;
+        use std::process::Command;
 
         // Ensure projects directory exists
         self.config.ensure_projects_dir()?;
 
-        // Create a test project directory
-        let project_path = self.config.projects_dir().join("test-project");
-        fs::create_dir_all(&project_path)?;
+        // Extract project name from git repo URL
+        let repo_url = &context.git_repo;
+        let project_name = if repo_url.ends_with(".git") {
+            // Remove .git suffix
+            let without_git = &repo_url[..repo_url.len() - 4];
+            // Extract the last part of the path
+            without_git.split('/').next_back().unwrap_or("unknown")
+        } else {
+            // Extract the last part of the path
+            repo_url.split('/').next_back().unwrap_or("unknown")
+        };
 
-        // Create files from scenario context
-        for test_file in &context.files {
-            let file_path = project_path.join(&test_file.path);
+        // Create a test project directory in /tmp with dynamic naming
+        let temp_dir = std::env::temp_dir();
+        let project_dir_name = format!("nocodo-test-{}", project_name);
+        let project_path = temp_dir.join(&project_dir_name);
 
-            // Create parent directories if needed
-            if let Some(parent) = file_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
+        // Remove existing directory if it exists
+        if project_path.exists() {
+            fs::remove_dir_all(&project_path)?;
+        }
 
-            fs::write(file_path, &test_file.content)?;
+        // Clone the git repository with depth 1 for faster testing
+        let output = Command::new("git")
+            .args([
+                "clone",
+                "--depth",
+                "1",
+                &context.git_repo,
+                project_path.to_str().unwrap(),
+            ])
+            .output()?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "Failed to clone repository: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
 
         // Create a project record in the database
         let project = nocodo_manager::models::Project {
-            id: "test-project".to_string(),
-            name: "Test Project".to_string(),
+            id: project_dir_name.clone(),
+            name: format!("{} Test Project", project_name),
             path: project_path.to_string_lossy().to_string(),
-            language: Some("mixed".to_string()),
-            framework: None,
+            language: Some("python".to_string()),
+            framework: Some("django".to_string()),
             status: "initialized".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
@@ -342,7 +367,7 @@ impl TestApp {
 
         self.db().create_project(&project)?;
 
-        Ok(())
+        Ok(project_dir_name)
     }
 
     /// Get the LLM agent if available

@@ -3,7 +3,7 @@ import { A, useParams } from '@solidjs/router';
 import { AiSessionStatus, Project } from '../types';
 import { apiClient } from '../api';
 import { useSessionOutputs, useSessions } from '../stores/sessionsStore';
-import { ProjectBadge, StatusBadge, ToolIcon } from './SessionRow';
+import { ProjectBadge, ToolIcon, WorkWidget } from './SessionRow';
 import SessionTimeline from './SessionTimeline';
 import ToolCallProgress from './ToolCallProgress';
 
@@ -316,13 +316,13 @@ const AiSessionDetail: Component = () => {
                 {/* Status and Tool */}
                 <div class='flex items-center justify-between'>
                   <div class='flex flex-col space-y-2'>
-                    <StatusBadge
+                    <WorkWidget
+                      type='status'
+                      value={session()!.status}
                       status={session()!.status as AiSessionStatus}
-                      size='md'
-                      showIcon={true}
                     />
                   </div>
-                  <ToolIcon toolName={session()!.tool_name} />
+                  <ToolIcon toolName={session()!.tool_name} model={session()!.model} />
                 </div>
 
                 {/* Work ID */}

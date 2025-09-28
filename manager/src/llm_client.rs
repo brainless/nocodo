@@ -920,8 +920,8 @@ pub struct ClaudeToolDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ClaudeToolChoice {
-    Auto { r#type: String }, // {"type": "auto"}
-    Any { r#type: String },  // {"type": "any"}
+    Auto { r#type: String },               // {"type": "auto"}
+    Any { r#type: String },                // {"type": "any"}
     Tool { r#type: String, name: String }, // {"type": "tool", "name": "tool_name"}
 }
 
@@ -980,11 +980,12 @@ impl ClaudeClient {
         let content = if message.role == "tool" {
             // Handle tool result messages - parse the stored tool result data
             if let Some(content_str) = &message.content {
-                if let Ok(tool_result_data) = serde_json::from_str::<serde_json::Value>(content_str) {
+                if let Ok(tool_result_data) = serde_json::from_str::<serde_json::Value>(content_str)
+                {
                     // Check for Claude-specific tool result format (with tool_use_id)
                     if let (Some(tool_use_id), Some(content_value)) = (
                         tool_result_data.get("tool_use_id").and_then(|v| v.as_str()),
-                        tool_result_data.get("content")
+                        tool_result_data.get("content"),
                     ) {
                         // Convert the content value to a string
                         let content_string = match content_value {
@@ -1023,7 +1024,7 @@ impl ClaudeClient {
                 if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(content_str) {
                     if let (Some(text), Some(tool_calls_array)) = (
                         assistant_data.get("text").and_then(|v| v.as_str()),
-                        assistant_data.get("tool_calls").and_then(|v| v.as_array())
+                        assistant_data.get("tool_calls").and_then(|v| v.as_array()),
                     ) {
                         // Build content blocks with text + tool_use blocks
                         let mut content_blocks = vec![];
@@ -1039,10 +1040,18 @@ impl ClaudeClient {
                         for tool_call in tool_calls_array {
                             if let (Some(id), Some(name), Some(args_str)) = (
                                 tool_call.get("id").and_then(|v| v.as_str()),
-                                tool_call.get("function").and_then(|f| f.get("name")).and_then(|v| v.as_str()),
-                                tool_call.get("function").and_then(|f| f.get("arguments")).and_then(|v| v.as_str()),
+                                tool_call
+                                    .get("function")
+                                    .and_then(|f| f.get("name"))
+                                    .and_then(|v| v.as_str()),
+                                tool_call
+                                    .get("function")
+                                    .and_then(|f| f.get("arguments"))
+                                    .and_then(|v| v.as_str()),
                             ) {
-                                if let Ok(input) = serde_json::from_str::<serde_json::Value>(args_str) {
+                                if let Ok(input) =
+                                    serde_json::from_str::<serde_json::Value>(args_str)
+                                {
                                     content_blocks.push(ClaudeContentBlock::ToolUse {
                                         id: id.to_string(),
                                         name: name.to_string(),
@@ -1075,7 +1084,10 @@ impl ClaudeClient {
                 .iter()
                 .map(|tool_call| ClaudeContentBlock::ToolResult {
                     tool_use_id: tool_call.id.clone(),
-                    content: format!("Tool call: {} with args {}", tool_call.function.name, tool_call.function.arguments),
+                    content: format!(
+                        "Tool call: {} with args {}",
+                        tool_call.function.name, tool_call.function.arguments
+                    ),
                     is_error: None,
                 })
                 .collect()
@@ -1148,7 +1160,11 @@ impl ClaudeClient {
             messages: regular_messages,
             max_tokens: request.max_tokens,
             temperature: request.temperature,
-            system: if system_content.is_empty() { None } else { Some(system_content) },
+            system: if system_content.is_empty() {
+                None
+            } else {
+                Some(system_content)
+            },
             tools,
             tool_choice,
         }
@@ -1184,14 +1200,22 @@ impl ClaudeClient {
         LlmCompletionResponse {
             id: response.id,
             object: "chat.completion".to_string(), // Mimic OpenAI format
-            created: 0, // Claude doesn't provide this
+            created: 0,                            // Claude doesn't provide this
             model: response.model,
             choices: vec![LlmChoice {
                 index: 0,
                 message: Some(LlmMessage {
                     role: "assistant".to_string(),
-                    content: if content.is_empty() { None } else { Some(content) },
-                    tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+                    content: if content.is_empty() {
+                        None
+                    } else {
+                        Some(content)
+                    },
+                    tool_calls: if tool_calls.is_empty() {
+                        None
+                    } else {
+                        Some(tool_calls)
+                    },
                     function_call: None,
                     tool_call_id: None,
                 }),
@@ -1262,7 +1286,7 @@ impl LlmClient for ClaudeClient {
         // Make the request
         let response = self
             .client
-            .post(&self.get_api_url())
+            .post(self.get_api_url())
             .header("x-api-key", &self.config.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")
@@ -1320,10 +1344,7 @@ impl LlmClient for ClaudeClient {
                     raw_response = %response_text,
                     "Claude API returned error in response body"
                 );
-                return Err(anyhow::anyhow!(
-                    "Claude API error: {}",
-                    error
-                ));
+                return Err(anyhow::anyhow!("Claude API error: {}", error));
             }
         }
 

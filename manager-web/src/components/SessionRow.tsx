@@ -39,60 +39,100 @@ const formatDuration = (startedAt: number, endedAt?: number): string => {
 };
 
 // Tool icon component with support for different AI tools
-const ToolIcon: Component<{ toolName: string | null | undefined; className?: string }> = props => {
-  const getToolIcon = (tool: string) => {
-    if (!tool) return '🔧'; // Default icon for undefined/null tools
+const ToolIcon: Component<{
+  toolName: string | null | undefined;
+  model?: string | null;
+  className?: string;
+}> = props => {
+  const getToolDisplayName = (tool: string | null | undefined, model?: string | null) => {
+    if (!tool) return 'Unknown';
     const toolLower = tool.toLowerCase();
-    if (toolLower.includes('claude')) {
-      return '🤖'; // Claude icon
-    }
-    if (toolLower.includes('gpt') || toolLower.includes('openai')) {
-      return '🧠'; // GPT icon
-    }
-    if (toolLower.includes('gemini')) {
-      return '💎'; // Gemini icon
-    }
-    if (toolLower.includes('qwen')) {
-      return '🔷'; // Qwen icon
-    }
-    if (toolLower.includes('grok') || toolLower.includes('llm-agent')) {
-      return '🚀'; // Grok/LLM Agent icon
-    }
-    return '⚡'; // Default AI icon
-  };
 
-  const getToolColor = (tool: string | null | undefined) => {
-    if (!tool) return 'bg-gray-100 text-gray-800 border-gray-200';
-    const toolLower = tool.toLowerCase();
-    if (toolLower.includes('claude')) {
-      return 'bg-orange-100 text-orange-800 border-orange-200';
+    // Check if tool_name contains "LLM Agent (model-name)" format
+    const llmAgentMatch = tool.match(/^LLM Agent \((.+)\)$/i);
+    if (llmAgentMatch) {
+      return llmAgentMatch[1]; // Extract the model name
     }
-    if (toolLower.includes('gpt') || toolLower.includes('openai')) {
-      return 'bg-green-100 text-green-800 border-green-200';
+
+    if (toolLower.includes('llm-agent')) {
+      return model || 'Model';
     }
-    if (toolLower.includes('gemini')) {
-      return 'bg-purple-100 text-purple-800 border-purple-200';
-    }
-    if (toolLower.includes('qwen')) {
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-    if (toolLower.includes('grok') || toolLower.includes('llm-agent')) {
-      return 'bg-red-100 text-red-800 border-red-200';
-    }
-    return 'bg-gray-100 text-gray-800 border-gray-200';
+    return tool;
   };
 
   return (
-    <div
-      class={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getToolColor(props.toolName)} ${props.className || ''}`}
-      title={`AI Tool: ${props.toolName || 'Unknown'}`}
-      aria-label={`AI Tool: ${props.toolName || 'Unknown'}`}
+    <WorkWidget
+      type='model'
+      value={getToolDisplayName(props.toolName, props.model)}
+      className={props.className}
+    />
+  );
+};
+
+// Unified widget component for Status, Model, and Project badges
+const WorkWidget: Component<{
+  type: 'status' | 'model' | 'project';
+  value: string;
+  status?: AiSessionStatus;
+  project?: Project | null;
+  projectId?: string;
+  className?: string;
+}> = props => {
+  const getWidgetColor = () => {
+    switch (props.type) {
+      case 'status':
+        switch (props.status) {
+          case 'completed':
+            return 'bg-green-100 text-green-800 border-green-200';
+          case 'running':
+          case 'started':
+            return 'bg-blue-100 text-blue-800 border-blue-200';
+          case 'failed':
+            return 'bg-red-100 text-red-800 border-red-200';
+          case 'cancelled':
+            return 'bg-gray-100 text-gray-800 border-gray-200';
+          case 'pending':
+            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+          default:
+            return 'bg-gray-100 text-gray-800 border-gray-200';
+        }
+      case 'model':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'project':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getDisplayText = () => {
+    switch (props.type) {
+      case 'status':
+        return props.value.charAt(0).toUpperCase() + props.value.slice(1);
+      case 'model':
+        return props.value;
+      case 'project':
+        if (props.project) {
+          return props.project.name;
+        }
+        return props.projectId ? `Project ${props.projectId}` : 'No Project';
+      default:
+        return props.value;
+    }
+  };
+
+  return (
+    <span
+      class={`px-2 py-1 text-xs font-medium rounded-full border inline-flex items-center ${props.className || ''}`}
+      classList={{
+        [getWidgetColor()]: true,
+        'animate-pulse': props.type === 'status' && props.status === 'running',
+      }}
+      title={`${props.type.charAt(0).toUpperCase() + props.type.slice(1)}: ${getDisplayText()}`}
+      aria-label={`${props.type.charAt(0).toUpperCase() + props.type.slice(1)}: ${getDisplayText()}`}
     >
-      <span class='mr-1' aria-hidden='true'>
-        {getToolIcon(props.toolName || 'unknown')}
-      </span>
-      <span class='truncate max-w-24'>{props.toolName || 'Unknown'}</span>
-    </div>
+      <span class='truncate max-w-24'>{getDisplayText()}</span>
+    </span>
   );
 };
 
@@ -161,26 +201,16 @@ const ProjectBadge: Component<{
   project: Project | null;
   projectId?: string;
 }> = props => {
-  if (!props.project && !props.projectId) {
-    return (
-      <span class='inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200'>
-        <span class='mr-1' aria-hidden='true'>
-          📁
-        </span>
-        No Project
-      </span>
-    );
-  }
-
-  const projectName = props.project?.name || `Project ${props.projectId}`;
+  const projectName =
+    props.project?.name || (props.projectId ? `Project ${props.projectId}` : 'No Project');
 
   return (
-    <span class='inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200'>
-      <span class='mr-1' aria-hidden='true'>
-        📂
-      </span>
-      <span class='truncate max-w-32'>{projectName}</span>
-    </span>
+    <WorkWidget
+      type='project'
+      value={projectName}
+      project={props.project}
+      projectId={props.projectId}
+    />
   );
 };
 
@@ -209,7 +239,7 @@ const SessionRow: Component<SessionRowProps> = props => {
           <div class='flex items-center justify-between mb-2'>
             <div class='flex items-center space-x-3'>
               <StatusBadge status={session().status as AiSessionStatus} size='sm' showIcon={true} />
-              <ToolIcon toolName={session().tool_name} />
+              <ToolIcon toolName={session().tool_name} model={session().model} />
             </div>
             <div class='flex items-center space-x-2 text-sm text-gray-500'>
               <time
@@ -266,4 +296,4 @@ const SessionRow: Component<SessionRowProps> = props => {
 };
 
 export default SessionRow;
-export { StatusBadge, ToolIcon, ProjectBadge };
+export { StatusBadge, ToolIcon, ProjectBadge, WorkWidget };

@@ -28,7 +28,7 @@ use websocket::{WebSocketBroadcaster, WebSocketServer};
 #[actix_web::main]
 async fn main() -> AppResult<()> {
     // Parse command line arguments
-    let _matches = Command::new("nocodo-manager")
+    let matches = Command::new("nocodo-manager")
         .version("0.1.0")
         .about("nocodo Manager - AI-assisted development environment daemon")
         .arg(
@@ -49,8 +49,14 @@ async fn main() -> AppResult<()> {
     tracing::info!("Starting nocodo Manager daemon");
 
     // Load configuration
-    let config = AppConfig::load()?;
-    tracing::info!("Loaded configuration from ~/.config/nocodo/manager.toml");
+    let config = if let Some(config_path) = matches.get_one::<String>("config") {
+        let path = PathBuf::from(config_path);
+        tracing::info!("Loading configuration from {}", path.display());
+        AppConfig::load_from_file(&path)?
+    } else {
+        tracing::info!("Loading configuration from default location");
+        AppConfig::load()?
+    };
 
     // Initialize database
     let database = Arc::new(Database::new(&config.database.path)?);

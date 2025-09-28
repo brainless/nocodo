@@ -51,6 +51,7 @@ export interface ExtendedAiSession {
   // Extended fields for frontend use
   project_id?: string | null;
   prompt?: string;
+  model?: string | null;
 }
 
 // Additional types not generated from Rust

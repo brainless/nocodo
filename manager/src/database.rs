@@ -22,6 +22,9 @@ impl Database {
 
         let conn = Connection::open(db_path)?;
 
+        // Enable foreign key constraints (SQLite3 has them disabled by default)
+        conn.execute("PRAGMA foreign_keys = ON", [])?;
+
         let database = Database {
             connection: Arc::new(Mutex::new(conn)),
         };

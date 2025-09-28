@@ -209,7 +209,7 @@ const AiSessionsList: Component = () => {
       </Show>
 
       <Show when={!store.loading && filteredSessions().length > 0}>
-        <div class='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+        <div class='grid grid-cols-1 gap-6'>
           <For each={filteredSessions()}>
             {session => {
               const project = projects().find(p => p.id === session.project_id);

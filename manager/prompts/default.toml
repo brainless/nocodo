@@ -1,0 +1,2 @@
+[tech_stack_analysis]
+prompt = "What is the tech stack of this project? You must list and examine configuration files like package.json, pyproject.toml, manage.py, requirements.txt, etc. before providing your final answer. Please read each file individually and then provide a comprehensive analysis of all technologies found. Return a simple array of technologies only at the end"

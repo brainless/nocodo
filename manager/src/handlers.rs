@@ -932,7 +932,7 @@ pub async fn create_ai_session(
             let llm_session = llm_agent
                 .create_session(
                     work_id.clone(),
-                    "anthropic".to_string(),             // Default provider
+                    "anthropic".to_string(), // Default provider
                     "claude-sonnet-4-20250514".to_string(), // Default model
                     session.project_context.clone(),
                 )

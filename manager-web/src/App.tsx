@@ -256,7 +256,7 @@ const ProjectDetailsWrapper: Component = () => {
   });
 
   return (
-    <Layout title={project()?.name || 'Project'} subtitle='Project Dashboard'>
+    <Layout title={project()?.name || 'Project'} noBox>
       <ProjectDetails />
     </Layout>
   );
