@@ -138,7 +138,7 @@ async fn test_llm_e2e_real_manager_saleor() {
     println!("\n📊 Phase 4: Monitoring LLM processing");
 
     let mut attempts = 0;
-    let max_attempts = 48; // 240 seconds total
+    let max_attempts = 12; // 60 seconds total
     let mut response_content = String::new();
     let mut printed_output_ids = std::collections::HashSet::new();
 
@@ -223,7 +223,7 @@ async fn test_llm_e2e_real_manager_saleor() {
         });
 
         // Continue waiting if we have outputs but no meaningful content yet
-        if !ai_outputs.is_empty() && attempts < max_attempts - 8 && !has_meaningful_content {
+        if !ai_outputs.is_empty() && attempts < max_attempts - 2 && !has_meaningful_content {
             if has_new_outputs {
                 println!(
                     "   🔧 Found {} total outputs, waiting for meaningful analysis...",

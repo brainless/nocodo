@@ -1059,69 +1059,15 @@ impl LlmAgent {
 
             let llm_client = create_llm_client(config)?;
 
-            // Build conversation for LLM
+            // Build conversation for LLM (simplified to avoid conversation corruption)
             let mut messages: Vec<_> = history
                 .into_iter()
-                .map(|msg| {
-                    // For Claude, parse structured assistant messages to reconstruct tool calls
-                    if msg.role == "assistant" && session.provider == "anthropic" {
-                        if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
-                            if let (Some(text), Some(tool_calls)) = (
-                                assistant_data.get("text").and_then(|t| t.as_str()),
-                                assistant_data.get("tool_calls").and_then(|tc| tc.as_array())
-                            ) {
-                                // Parse tool calls from stored data
-                                let reconstructed_tool_calls: Vec<crate::llm_client::LlmToolCall> = tool_calls
-                                    .iter()
-                                    .filter_map(|tc| {
-                                        serde_json::from_value(tc.clone()).ok()
-                                    })
-                                    .collect();
-                                
-                                tracing::info!(
-                                    session_id = %session_id,
-                                    reconstructed_tool_calls_count = %reconstructed_tool_calls.len(),
-                                    "Reconstructed tool calls from assistant message for Claude"
-                                );
-                                
-                                return LlmMessage {
-                                    role: msg.role,
-                                    content: Some(text.to_string()),
-                                    tool_calls: Some(reconstructed_tool_calls),
-                                    function_call: None,
-                                    tool_call_id: None,
-                                };
-                            }
-                        }
-                    }
-                    
-                    // For tool messages from Claude, parse the structured format
-                    if msg.role == "tool" && session.provider == "anthropic" {
-                        if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content) {
-                            if let (Some(tool_use_id), Some(content)) = (
-                                tool_result.get("tool_use_id").and_then(|id| id.as_str()),
-                                tool_result.get("content")
-                            ) {
-                                // For Claude, tool results should be reconstructed as tool_result messages
-                                return LlmMessage {
-                                    role: "tool_result".to_string(), // Claude uses tool_result role
-                                    content: Some(serde_json::to_string(content).unwrap_or_default()),
-                                    tool_calls: None,
-                                    function_call: None,
-                                    tool_call_id: Some(tool_use_id.to_string()),
-                                };
-                            }
-                        }
-                    }
-                    
-                    // Default case: treat as simple message
-                    LlmMessage {
-                        role: msg.role,
-                        content: Some(msg.content),
-                        tool_calls: None,
-                        function_call: None,
-                        tool_call_id: None,
-                    }
+                .map(|msg| LlmMessage {
+                    role: msg.role,
+                    content: Some(msg.content),
+                    tool_calls: None,
+                    function_call: None,
+                    tool_call_id: None,
                 })
                 .collect();
 

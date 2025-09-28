@@ -7,14 +7,18 @@ use tokio::time::sleep;
 use crate::common::{config::TestConfig, llm_config::LlmProviderTestConfig};
 
 /// RealManagerInstance manages a real nocodo-manager daemon for E2E testing
+#[allow(dead_code)]
 pub struct RealManagerInstance {
     pub process: Child,
     pub base_url: String,
+    #[allow(dead_code)]
     pub port: u16,
+    #[allow(dead_code)]
     pub config: TestConfig,
     pub config_file_path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl RealManagerInstance {
     /// Start a real nocodo-manager instance with test configuration
     pub async fn start(llm_provider: &LlmProviderTestConfig) -> anyhow::Result<Self> {

@@ -15,6 +15,7 @@ pub mod real_manager;
 pub use app::TestApp;
 pub use fixtures::TestDataGenerator;
 pub use logging::TestLogger;
+#[allow(unused_imports)]
 pub use real_manager::RealManagerInstance;
 
 #[cfg(test)]

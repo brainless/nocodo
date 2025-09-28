@@ -86,6 +86,7 @@ impl TestConfig {
     }
 
     /// Get the temp directory path
+    #[allow(dead_code)]
     pub fn temp_dir_path(&self) -> &std::path::Path {
         self.temp_dir.path()
     }
