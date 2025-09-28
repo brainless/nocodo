@@ -1,3 +1,36 @@
+use config::{Config, ConfigError, File};
+use serde::Deserialize;
+use std::path::Path;
+
+/// Configuration structure for prompts loaded from TOML
+#[derive(Debug, Deserialize, Clone)]
+pub struct PromptsConfig {
+    pub tech_stack_analysis: TechStackAnalysisPrompt,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TechStackAnalysisPrompt {
+    pub prompt: String,
+}
+
+impl PromptsConfig {
+    /// Load prompts from TOML file
+    pub fn load_from_file(config_path: &Path) -> Result<Self, ConfigError> {
+        if !config_path.exists() {
+            return Err(ConfigError::Message(format!(
+                "Prompts configuration file not found: {}",
+                config_path.display()
+            )));
+        }
+
+        let builder = Config::builder()
+            .add_source(File::from(config_path.to_path_buf()))
+            .build()?;
+
+        builder.try_deserialize()
+    }
+}
+
 /// Test scenario with expected keywords for validation
 #[derive(Debug, Clone)]
 pub struct LlmTestScenario {
@@ -147,12 +180,21 @@ impl KeywordValidator {
 impl LlmTestScenario {
     /// Create a tech stack analysis test for Saleor
     pub fn tech_stack_analysis_saleor() -> Self {
+        // Load prompt from TOML file - fixed path relative to manager directory
+        let prompts_path = std::path::Path::new("prompts/default.toml");
+        let prompt = PromptsConfig::load_from_file(prompts_path)
+            .map(|config| config.tech_stack_analysis.prompt)
+            .unwrap_or_else(|_| {
+                // Fallback to hardcoded prompt if TOML loading fails
+                "What is the tech stack of this project? You must examine at least 3 different configuration files (such as package.json, pyproject.toml, manage.py, requirements.txt, or setup.py) before providing your final answer. Please read each file individually and then provide a comprehensive analysis of all technologies found. Return a simple array of technologies only at the end.".to_string()
+            });
+
         Self {
             name: "Tech Stack Analysis - Saleor".to_string(),
             context: LlmTestContext {
                 git_repo: "git@github.com:saleor/saleor.git".to_string(),
             },
-            prompt: "What is the tech stack of this project? You must examine at least 3 different configuration files (such as package.json, pyproject.toml, manage.py, requirements.txt, or setup.py) before providing your final answer. Please read each file individually and then provide a comprehensive analysis of all technologies found. Return a simple array of technologies only at the end.".to_string(),
+            prompt,
             expected_keywords: LlmKeywordExpectations {
                 required_keywords: vec!["Django".to_string(), "Python".to_string(), "PostgreSQL".to_string(), "GraphQL".to_string()],
                 optional_keywords: vec!["JavaScript".to_string(), "Node".to_string()],
@@ -233,7 +275,10 @@ mod tests {
             scenario.context.git_repo,
             "git@github.com:saleor/saleor.git"
         );
-        assert_eq!(scenario.prompt, "What is the tech stack of this project? You must examine at least 3 different configuration files (such as package.json, pyproject.toml, manage.py, requirements.txt, or setup.py) before providing your final answer. Please read each file individually and then provide a comprehensive analysis of all technologies found. Return a simple array of technologies only at the end.");
+
+        // The prompt should now be loaded from TOML or use fallback
+        assert!(!scenario.prompt.is_empty());
+        assert!(scenario.prompt.contains("tech stack"));
 
         assert_eq!(scenario.expected_keywords.required_keywords.len(), 4);
         assert!(scenario
@@ -255,6 +300,20 @@ mod tests {
 
         assert_eq!(scenario.expected_keywords.optional_keywords.len(), 2);
         assert_eq!(scenario.expected_keywords.forbidden_keywords.len(), 0);
+    }
+
+    #[test]
+    fn test_prompts_config_loading() {
+        // Fixed path relative to manager directory
+        let prompts_path = std::path::Path::new("prompts/default.toml");
+        let result = PromptsConfig::load_from_file(prompts_path);
+
+        // Should be able to load the TOML file
+        assert!(result.is_ok(), "Failed to load prompts config: {:?}", result.err());
+
+        let config = result.unwrap();
+        assert!(!config.tech_stack_analysis.prompt.is_empty());
+        assert!(config.tech_stack_analysis.prompt.contains("tech stack"));
     }
 
     #[test]
