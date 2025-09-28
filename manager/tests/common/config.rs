@@ -85,6 +85,11 @@ impl TestConfig {
         self.temp_dir.path().join("projects")
     }
 
+    /// Get the temp directory path
+    pub fn temp_dir_path(&self) -> &std::path::Path {
+        self.temp_dir.path()
+    }
+
     /// Create the projects directory if it doesn't exist
     pub fn ensure_projects_dir(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(self.projects_dir())

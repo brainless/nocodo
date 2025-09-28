@@ -196,6 +196,21 @@ async fn test_llm_e2e_saleor() {
             }
         }
 
+        // Debug: Print all outputs for analysis
+        if attempts == 5 { // Print detailed debug info after 25 seconds
+            println!("   🔍 DEBUG: Total AI outputs after {} attempts: {}", attempts, ai_outputs.len());
+            for (i, output) in ai_outputs.iter().enumerate() {
+                println!("   🔍 DEBUG: Output {}: content_len={}, preview={}",
+                    i, output.content.len(),
+                    if output.content.len() > 100 {
+                        format!("{}...", &output.content[..100])
+                    } else {
+                        output.content.clone()
+                    }
+                );
+            }
+        }
+
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
             !output.content.is_empty() &&
@@ -216,15 +231,22 @@ async fn test_llm_e2e_saleor() {
             break;
         }
 
-        // If we have tool responses with actual file content, we can use those for validation
+        // If we have tool responses with actual file content (not just directory listings), we can use those for validation
         let has_file_content = ai_outputs.iter().any(
             |output| {
-                output.content.starts_with("{\"content\":")
-                    || output.content.contains("\"react\"")
-                    || output.content.contains("\"python\"")
-                    || output.content.contains("\"fastapi\"")
-                    || output.content.contains("\"dependencies\"")
-            }, // Look for package.json content
+                // Look for actual file reads that contain configuration content (not just directory listings)
+                (output.content.contains("\"type\":\"read_file\"") && (
+                    output.content.contains("package.json") ||
+                    output.content.contains("pyproject.toml") ||
+                    output.content.contains("requirements") ||
+                    output.content.contains("django") ||
+                    output.content.contains("graphql") ||
+                    output.content.contains("postgresql") ||
+                    output.content.contains("uvicorn")
+                )) ||
+                // Or if we have a final text response with tech stack keywords
+                (output.content.contains("Django") && output.content.contains("Python") && output.content.contains("GraphQL"))
+            }
         );
 
         // If we have at least some outputs but no text response yet, keep waiting longer

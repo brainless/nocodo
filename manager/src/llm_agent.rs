@@ -733,6 +733,13 @@ impl LlmAgent {
             "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls",
             tool_calls.len()
         );
+
+        // Add extra debug to see if follow-up is enabled/available
+        tracing::warn!(
+            session_id = %session_id,
+            "FOLLOW_UP_DEBUG: Checking if follow-up calls are enabled and agent is available"
+        );
+
         self.follow_up_with_llm_with_depth(session_id, 1).await?;
         tracing::warn!(  // Use warn to make it more visible
             session_id = %session_id,
@@ -993,6 +1000,13 @@ impl LlmAgent {
         Box::pin(async move {
             const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
+            tracing::warn!(
+                session_id = %session_id,
+                current_depth = %depth,
+                "FOLLOW_UP_DEBUG: ENTERED follow_up_with_llm_with_depth method - this should appear in both manual and E2E test"
+            );
+
+
             if depth >= MAX_RECURSION_DEPTH {
                 tracing::warn!(
                     session_id = %session_id,
@@ -1048,12 +1062,66 @@ impl LlmAgent {
             // Build conversation for LLM
             let mut messages: Vec<_> = history
                 .into_iter()
-                .map(|msg| LlmMessage {
-                    role: msg.role,
-                    content: Some(msg.content),
-                    tool_calls: None,
-                    function_call: None,
-                    tool_call_id: None,
+                .map(|msg| {
+                    // For Claude, parse structured assistant messages to reconstruct tool calls
+                    if msg.role == "assistant" && session.provider == "anthropic" {
+                        if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                            if let (Some(text), Some(tool_calls)) = (
+                                assistant_data.get("text").and_then(|t| t.as_str()),
+                                assistant_data.get("tool_calls").and_then(|tc| tc.as_array())
+                            ) {
+                                // Parse tool calls from stored data
+                                let reconstructed_tool_calls: Vec<crate::llm_client::LlmToolCall> = tool_calls
+                                    .iter()
+                                    .filter_map(|tc| {
+                                        serde_json::from_value(tc.clone()).ok()
+                                    })
+                                    .collect();
+                                
+                                tracing::info!(
+                                    session_id = %session_id,
+                                    reconstructed_tool_calls_count = %reconstructed_tool_calls.len(),
+                                    "Reconstructed tool calls from assistant message for Claude"
+                                );
+                                
+                                return LlmMessage {
+                                    role: msg.role,
+                                    content: Some(text.to_string()),
+                                    tool_calls: Some(reconstructed_tool_calls),
+                                    function_call: None,
+                                    tool_call_id: None,
+                                };
+                            }
+                        }
+                    }
+                    
+                    // For tool messages from Claude, parse the structured format
+                    if msg.role == "tool" && session.provider == "anthropic" {
+                        if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                            if let (Some(tool_use_id), Some(content)) = (
+                                tool_result.get("tool_use_id").and_then(|id| id.as_str()),
+                                tool_result.get("content")
+                            ) {
+                                // For Claude, tool results should be reconstructed as tool_result messages
+                                return LlmMessage {
+                                    role: "tool_result".to_string(), // Claude uses tool_result role
+                                    content: Some(serde_json::to_string(content).unwrap_or_default()),
+                                    tool_calls: None,
+                                    function_call: None,
+                                    tool_call_id: Some(tool_use_id.to_string()),
+                                };
+                            }
+                        }
+                    }
+                    
+                    // Default case: treat as simple message
+                    LlmMessage {
+                        role: msg.role,
+                        content: Some(msg.content),
+                        tool_calls: None,
+                        function_call: None,
+                        tool_call_id: None,
+                    }
                 })
                 .collect();
 
@@ -1179,6 +1247,7 @@ impl LlmAgent {
                 follow_up_tool_calls_count = %follow_up_tool_calls.len(),
                 "Received complete LLM follow-up response"
             );
+
 
             // Store assistant response with tool call information for proper conversation reconstruction
             let enhanced_assistant_response = if !follow_up_tool_calls.is_empty() {

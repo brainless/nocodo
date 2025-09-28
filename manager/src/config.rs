@@ -102,6 +102,32 @@ path = "/tmp/nocodo-manager.sock"
 
         Ok(config)
     }
+
+    pub fn load_from_file(config_path: &PathBuf) -> Result<Self, ConfigError> {
+        if !config_path.exists() {
+            return Err(ConfigError::Message(format!(
+                "Configuration file not found: {}",
+                config_path.display()
+            )));
+        }
+
+        let builder = Config::builder()
+            .add_source(File::from(config_path.clone()))
+            .build()?;
+
+        let mut config: AppConfig = builder.try_deserialize()?;
+
+        // Expand tilde in database path
+        if config.database.path.starts_with("~") {
+            if let Some(home) = home::home_dir() {
+                let path_str = config.database.path.to_string_lossy();
+                let expanded = path_str.replacen("~", &home.to_string_lossy(), 1);
+                config.database.path = PathBuf::from(expanded);
+            }
+        }
+
+        Ok(config)
+    }
 }
 
 fn get_config_path() -> PathBuf {

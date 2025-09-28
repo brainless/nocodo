@@ -18,7 +18,7 @@ echo ""
 
 # Test will use API keys from nocodo config (~/.config/nocodo/manager.toml)
 # Set the provider to test (options: "anthropic", "openai", "grok")
-PROVIDER="grok"
+PROVIDER="anthropic"
 
 # Check nocodo config for API keys
 CONFIG_FILE="$HOME/.config/nocodo/manager.toml"
