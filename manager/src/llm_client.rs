@@ -6,7 +6,7 @@ use futures_util::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::pin::Pin;
-
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Provider type enumeration
@@ -78,8 +78,8 @@ pub trait LlmProvider: Send + Sync {
     fn supports_vision(&self) -> bool;
 
     /// Model management
-    async fn list_available_models(&self) -> Result<Vec<Box<dyn LlmModel>>, anyhow::Error>;
-    fn get_model(&self, model_id: &str) -> Option<Box<dyn LlmModel>>;
+    async fn list_available_models(&self) -> Result<Vec<Arc<dyn LlmModel>>, anyhow::Error>;
+    fn get_model(&self, model_id: &str) -> Option<Arc<dyn LlmModel>>;
 
     /// Connection testing
     async fn test_connection(&self) -> Result<(), anyhow::Error>;
@@ -358,7 +358,7 @@ pub trait LlmClient: Send + Sync {
 pub struct OpenAiCompatibleClient {
     client: reqwest::Client,
     config: LlmProviderConfig,
-    model: Option<Box<dyn LlmModel>>,
+    model: Option<Arc<dyn LlmModel>>,
 }
 
 impl OpenAiCompatibleClient {
@@ -368,7 +368,7 @@ impl OpenAiCompatibleClient {
         Ok(Self { client, config, model })
     }
 
-    pub fn with_model(mut self, model: Box<dyn LlmModel>) -> Self {
+    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
         self.model = Some(model);
         self
     }
@@ -1059,7 +1059,7 @@ pub struct ClaudeUsage {
 pub struct ClaudeClient {
     client: reqwest::Client,
     config: LlmProviderConfig,
-    model: Option<Box<dyn LlmModel>>,
+    model: Option<Arc<dyn LlmModel>>,
 }
 
 impl ClaudeClient {
@@ -1071,7 +1071,7 @@ impl ClaudeClient {
         Ok(Self { client, config, model })
     }
 
-    pub fn with_model(mut self, model: Box<dyn LlmModel>) -> Self {
+    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
         self.model = Some(model);
         self
     }

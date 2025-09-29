@@ -3,11 +3,12 @@ use crate::models::LlmProviderConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Anthropic provider implementation
 pub struct AnthropicProvider {
     config: LlmProviderConfig,
-    models: HashMap<String, Box<dyn LlmModel>>,
+    models: HashMap<String, Arc<dyn LlmModel>>,
 }
 
 impl AnthropicProvider {
@@ -22,10 +23,10 @@ impl AnthropicProvider {
 
     fn initialize_models(&mut self) {
         // Initialize common Anthropic models
-        let models: Vec<Box<dyn LlmModel>> = vec![
-            Box::new(Claude3OpusModel::new()),
-            Box::new(Claude3SonnetModel::new()),
-            Box::new(Claude3HaikuModel::new()),
+        let models: Vec<Arc<dyn LlmModel>> = vec![
+            Arc::new(Claude3OpusModel::new()),
+            Arc::new(Claude3SonnetModel::new()),
+            Arc::new(Claude3HaikuModel::new()),
         ];
 
         for model in models {
@@ -60,14 +61,12 @@ impl LlmProvider for AnthropicProvider {
         true
     }
 
-    async fn list_available_models(&self) -> Result<Vec<Box<dyn LlmModel>>, anyhow::Error> {
+    async fn list_available_models(&self) -> Result<Vec<Arc<dyn LlmModel>>, anyhow::Error> {
         Ok(self.models.values().cloned().collect())
     }
 
-    fn get_model(&self, _model_id: &str) -> Option<Box<dyn LlmModel>> {
-        // For now, return None to avoid cloning issues
-        // TODO: Implement proper model retrieval without cloning
-        None
+    fn get_model(&self, model_id: &str) -> Option<Arc<dyn LlmModel>> {
+        self.models.get(model_id).cloned()
     }
 
     async fn test_connection(&self) -> Result<(), anyhow::Error> {
