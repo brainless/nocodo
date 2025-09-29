@@ -395,6 +395,7 @@ pub struct Work {
     pub title: String,
     pub project_id: Option<String>,
     pub tool_name: Option<String>,
+    pub model: Option<String>, // Model ID for the work
     pub status: String,
     #[ts(type = "number")]
     pub created_at: i64,
@@ -425,6 +426,7 @@ pub struct AddMessageRequest {
 pub struct CreateWorkRequest {
     pub title: String,
     pub project_id: Option<String>,
+    pub model: Option<String>, // Model ID for the work (e.g., "gpt-4", "claude-3-opus-20240229")
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -911,4 +913,29 @@ pub struct ApiKeyConfig {
 pub struct SettingsResponse {
     pub config_file_path: String,
     pub api_keys: Vec<ApiKeyConfig>,
+}
+
+/// Supported model information
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SupportedModel {
+    pub provider: String,
+    pub model_id: String,
+    pub name: String,
+    pub context_length: u32,
+    pub supports_streaming: bool,
+    pub supports_tool_calling: bool,
+    pub supports_vision: bool,
+    pub supports_reasoning: bool,
+    pub input_cost_per_token: Option<f64>,
+    pub output_cost_per_token: Option<f64>,
+    pub default_temperature: Option<f32>,
+    pub default_max_tokens: Option<u32>,
+}
+
+/// Response containing list of supported models
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SupportedModelsResponse {
+    pub models: Vec<SupportedModel>,
 }

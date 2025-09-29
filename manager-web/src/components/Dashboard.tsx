@@ -2,6 +2,7 @@ import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js
 import { A, useNavigate } from '@solidjs/router';
 import { Project } from '../types';
 import type { MessageAuthorType, MessageContentType } from '../types';
+import type { SupportedModel } from '../types/generated';
 import { apiClient } from '../api';
 import { useSessions } from '../stores/sessionsStore';
 
@@ -16,6 +17,8 @@ const StartAiSessionForm: Component = () => {
 
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
+  const [models, setModels] = createSignal<SupportedModel[]>([]);
+  const [selectedModel, setSelectedModel] = createSignal<string>('');
   const [prompt, setPrompt] = createSignal<string>('');
   const [submitting, setSubmitting] = createSignal<boolean>(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -35,6 +38,17 @@ const StartAiSessionForm: Component = () => {
       setProjects(list);
     } catch (e) {
       console.error('Failed to load projects for session form', e);
+    }
+
+    try {
+      const modelsList = await apiClient.fetchSupportedModels();
+      setModels(modelsList.models);
+      // Set default model if available
+      if (modelsList.models.length > 0) {
+        setSelectedModel(modelsList.models[0].model_id);
+      }
+    } catch (e) {
+      console.error('Failed to load supported models', e);
     }
 
     document.addEventListener('mousedown', onDocMouseDown);
@@ -60,6 +74,7 @@ const StartAiSessionForm: Component = () => {
       const workResp = await apiClient.createWork({
         title: prompt().trim(),
         project_id: selectedProjectId().trim() || null,
+        model: selectedModel().trim() || null,
       });
       const workId = workResp.work.id;
 
@@ -169,6 +184,29 @@ const StartAiSessionForm: Component = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        <div>
+          <label for='model' class='block text-sm font-medium text-gray-700'>
+            Model (optional)
+          </label>
+          <div class='mt-1'>
+            <select
+              id='model'
+              class='block w-full px-3 py-2 text-sm text-gray-700 bg-white border border-border rounded-md hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring'
+              value={selectedModel()}
+              onInput={e => setSelectedModel(e.currentTarget.value)}
+            >
+              <option value=''>Default Model</option>
+              <For each={models()}>
+                {model => (
+                  <option value={model.model_id}>
+                    {model.name} ({model.provider})
+                  </option>
+                )}
+              </For>
+            </select>
           </div>
         </div>
 

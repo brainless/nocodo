@@ -10,6 +10,9 @@ use crate::models::{
     ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
     WorkMessageResponse, WorkResponse,
 };
+use crate::llm_providers::{OpenAiProvider, AnthropicProvider};
+use crate::llm_client::LlmProvider;
+use crate::models::LlmProviderConfig;
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
@@ -1671,6 +1674,7 @@ pub async fn create_work(
         title: req.title,
         project_id: req.project_id,
         tool_name: None,
+        model: req.model,
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
@@ -1973,6 +1977,117 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
         api_keys,
     };
 
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Get list of supported and enabled models
+pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let config = &data.config;
+    let mut models = Vec::new();
+
+    // Check if API keys are configured and add enabled models
+    if let Some(api_key_config) = &config.api_keys {
+        // OpenAI models
+        if api_key_config.openai_api_key.is_some() && !api_key_config.openai_api_key.as_ref().unwrap().is_empty() {
+            let openai_config = LlmProviderConfig {
+                provider: "openai".to_string(),
+                model: "gpt-4".to_string(), // Default model for checking
+                api_key: api_key_config.openai_api_key.as_ref().unwrap().clone(),
+                base_url: None,
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
+            };
+
+            if let Ok(provider) = crate::llm_providers::OpenAiProvider::new(openai_config) {
+                if let Ok(available_models) = provider.list_available_models().await {
+                    for model in available_models {
+                        models.push(crate::models::SupportedModel {
+                            provider: "openai".to_string(),
+                            model_id: model.id().to_string(),
+                            name: model.name().to_string(),
+                            context_length: model.context_length(),
+                            supports_streaming: model.supports_streaming(),
+                            supports_tool_calling: model.supports_tool_calling(),
+                            supports_vision: model.supports_vision(),
+                            supports_reasoning: model.supports_reasoning(),
+                            input_cost_per_token: model.input_cost_per_token(),
+                            output_cost_per_token: model.output_cost_per_token(),
+                            default_temperature: model.default_temperature(),
+                            default_max_tokens: model.default_max_tokens(),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Anthropic models
+        if api_key_config.anthropic_api_key.is_some() && !api_key_config.anthropic_api_key.as_ref().unwrap().is_empty() {
+            let anthropic_config = LlmProviderConfig {
+                provider: "anthropic".to_string(),
+                model: "claude-3-opus-20240229".to_string(), // Default model for checking
+                api_key: api_key_config.anthropic_api_key.as_ref().unwrap().clone(),
+                base_url: None,
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
+            };
+
+            if let Ok(provider) = crate::llm_providers::AnthropicProvider::new(anthropic_config) {
+                if let Ok(available_models) = provider.list_available_models().await {
+                    for model in available_models {
+                        models.push(crate::models::SupportedModel {
+                            provider: "anthropic".to_string(),
+                            model_id: model.id().to_string(),
+                            name: model.name().to_string(),
+                            context_length: model.context_length(),
+                            supports_streaming: model.supports_streaming(),
+                            supports_tool_calling: model.supports_tool_calling(),
+                            supports_vision: model.supports_vision(),
+                            supports_reasoning: model.supports_reasoning(),
+                            input_cost_per_token: model.input_cost_per_token(),
+                            output_cost_per_token: model.output_cost_per_token(),
+                            default_temperature: model.default_temperature(),
+                            default_max_tokens: model.default_max_tokens(),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Grok models (treated as OpenAI-compatible)
+        if api_key_config.grok_api_key.is_some() && !api_key_config.grok_api_key.as_ref().unwrap().is_empty() {
+            let grok_config = LlmProviderConfig {
+                provider: "grok".to_string(),
+                model: "grok-code-fast-1".to_string(), // Default model for checking
+                api_key: api_key_config.grok_api_key.as_ref().unwrap().clone(),
+                base_url: Some("https://api.x.ai".to_string()),
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
+            };
+
+            if let Ok(provider) = crate::llm_providers::OpenAiProvider::new(grok_config) {
+                if let Ok(available_models) = provider.list_available_models().await {
+                    for model in available_models {
+                        models.push(crate::models::SupportedModel {
+                            provider: "grok".to_string(),
+                            model_id: model.id().to_string(),
+                            name: model.name().to_string(),
+                            context_length: model.context_length(),
+                            supports_streaming: model.supports_streaming(),
+                            supports_tool_calling: model.supports_tool_calling(),
+                            supports_vision: model.supports_vision(),
+                            supports_reasoning: model.supports_reasoning(),
+                            input_cost_per_token: model.input_cost_per_token(),
+                            output_cost_per_token: model.output_cost_per_token(),
+                            default_temperature: model.default_temperature(),
+                            default_max_tokens: model.default_max_tokens(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    let response = crate::models::SupportedModelsResponse { models };
     Ok(HttpResponse::Ok().json(response))
 }
 
