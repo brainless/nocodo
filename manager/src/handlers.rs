@@ -10,7 +10,6 @@ use crate::models::{
     ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
     WorkMessageResponse, WorkResponse,
 };
-use crate::llm_providers::{OpenAiProvider, AnthropicProvider};
 use crate::llm_client::LlmProvider;
 use crate::models::LlmProviderConfig;
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -931,12 +930,16 @@ pub async fn create_ai_session(
             updated_work.tool_name = Some("LLM Agent (Claude Sonnet 4)".to_string());
             data.database.update_work(&updated_work)?;
 
-            // Create LLM agent session with default provider/model
+            // Get provider from environment or use default
+            let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+            let model = std::env::var("MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+
+            // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
                 .create_session(
                     work_id.clone(),
-                    "anthropic".to_string(), // Default provider
-                    "claude-sonnet-4-20250514".to_string(), // Default model
+                    provider,
+                    model,
                     session.project_context.clone(),
                 )
                 .await?;
