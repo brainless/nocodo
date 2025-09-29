@@ -74,6 +74,7 @@ async fn test_llm_e2e_saleor() {
     let work_request = CreateWorkRequest {
         title: "LLM E2E Test Work".to_string(),
         project_id: Some(project_id.clone()),
+        model: Some("gpt-5".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -499,6 +500,7 @@ async fn test_llm_multiple_scenarios() {
         let work_request = CreateWorkRequest {
             title: format!("Multi Scenario Work {}", i + 1),
             project_id: Some(project_id.clone()),
+            model: Some("gpt-5".to_string()),
         };
 
         let req = test::TestRequest::post()

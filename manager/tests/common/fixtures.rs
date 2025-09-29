@@ -68,6 +68,7 @@ impl TestDataGenerator {
             title,
             project_id,
             tool_name: Some("test-tool".to_string()),
+            model: Some("gpt-5".to_string()),
             status: "active".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
