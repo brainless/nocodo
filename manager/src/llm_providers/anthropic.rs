@@ -61,9 +61,7 @@ impl LlmProvider for AnthropicProvider {
     }
 
     async fn list_available_models(&self) -> Result<Vec<Box<dyn LlmModel>>, anyhow::Error> {
-        // For now, return empty list to avoid cloning issues
-        // TODO: Implement proper model listing without cloning
-        Ok(Vec::new())
+        Ok(self.models.values().cloned().collect())
     }
 
     fn get_model(&self, _model_id: &str) -> Option<Box<dyn LlmModel>> {

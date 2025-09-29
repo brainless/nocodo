@@ -1954,6 +1954,7 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                     .is_empty(),
         });
     } else {
+        tracing::info!("No API keys config section found");
         // If no API keys config section exists, show as not configured
         api_keys.push(ApiKeyConfig {
             name: "Grok API Key".to_string(),
@@ -1982,13 +1983,18 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
 
 /// Get list of supported and enabled models
 pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    tracing::info!("get_supported_models endpoint called");
     let config = &data.config;
     let mut models = Vec::new();
 
+    tracing::info!("Checking for configured API keys in get_supported_models");
+
     // Check if API keys are configured and add enabled models
     if let Some(api_key_config) = &config.api_keys {
+        tracing::info!("API keys config found, checking individual keys");
         // OpenAI models
         if api_key_config.openai_api_key.is_some() && !api_key_config.openai_api_key.as_ref().unwrap().is_empty() {
+            tracing::info!("OpenAI API key is configured, creating provider");
             let openai_config = LlmProviderConfig {
                 provider: "openai".to_string(),
                 model: "gpt-4".to_string(), // Default model for checking
@@ -1998,30 +2004,43 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
                 temperature: Some(0.7),
             };
 
-            if let Ok(provider) = crate::llm_providers::OpenAiProvider::new(openai_config) {
-                if let Ok(available_models) = provider.list_available_models().await {
-                    for model in available_models {
-                        models.push(crate::models::SupportedModel {
-                            provider: "openai".to_string(),
-                            model_id: model.id().to_string(),
-                            name: model.name().to_string(),
-                            context_length: model.context_length(),
-                            supports_streaming: model.supports_streaming(),
-                            supports_tool_calling: model.supports_tool_calling(),
-                            supports_vision: model.supports_vision(),
-                            supports_reasoning: model.supports_reasoning(),
-                            input_cost_per_token: model.input_cost_per_token(),
-                            output_cost_per_token: model.output_cost_per_token(),
-                            default_temperature: model.default_temperature(),
-                            default_max_tokens: model.default_max_tokens(),
-                        });
+            match crate::llm_providers::OpenAiProvider::new(openai_config) {
+                Ok(provider) => {
+                    tracing::info!("OpenAI provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} OpenAI models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "openai".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list OpenAI models: {}", e);
+                        }
                     }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create OpenAI provider: {}", e);
                 }
             }
         }
 
         // Anthropic models
         if api_key_config.anthropic_api_key.is_some() && !api_key_config.anthropic_api_key.as_ref().unwrap().is_empty() {
+            tracing::info!("Anthropic API key is configured, creating provider");
             let anthropic_config = LlmProviderConfig {
                 provider: "anthropic".to_string(),
                 model: "claude-3-opus-20240229".to_string(), // Default model for checking
@@ -2031,30 +2050,45 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
                 temperature: Some(0.7),
             };
 
-            if let Ok(provider) = crate::llm_providers::AnthropicProvider::new(anthropic_config) {
-                if let Ok(available_models) = provider.list_available_models().await {
-                    for model in available_models {
-                        models.push(crate::models::SupportedModel {
-                            provider: "anthropic".to_string(),
-                            model_id: model.id().to_string(),
-                            name: model.name().to_string(),
-                            context_length: model.context_length(),
-                            supports_streaming: model.supports_streaming(),
-                            supports_tool_calling: model.supports_tool_calling(),
-                            supports_vision: model.supports_vision(),
-                            supports_reasoning: model.supports_reasoning(),
-                            input_cost_per_token: model.input_cost_per_token(),
-                            output_cost_per_token: model.output_cost_per_token(),
-                            default_temperature: model.default_temperature(),
-                            default_max_tokens: model.default_max_tokens(),
-                        });
+            match crate::llm_providers::AnthropicProvider::new(anthropic_config) {
+                Ok(provider) => {
+                    tracing::info!("Anthropic provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} Anthropic models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "anthropic".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list Anthropic models: {}", e);
+                        }
                     }
                 }
+                Err(e) => {
+                    tracing::error!("Failed to create Anthropic provider: {}", e);
+                }
             }
+        } else {
+            tracing::info!("Anthropic API key not configured");
         }
 
         // Grok models (treated as OpenAI-compatible)
         if api_key_config.grok_api_key.is_some() && !api_key_config.grok_api_key.as_ref().unwrap().is_empty() {
+            tracing::info!("Grok API key is configured, creating provider");
             let grok_config = LlmProviderConfig {
                 provider: "grok".to_string(),
                 model: "grok-code-fast-1".to_string(), // Default model for checking
@@ -2064,29 +2098,78 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
                 temperature: Some(0.7),
             };
 
-            if let Ok(provider) = crate::llm_providers::OpenAiProvider::new(grok_config) {
-                if let Ok(available_models) = provider.list_available_models().await {
-                    for model in available_models {
-                        models.push(crate::models::SupportedModel {
-                            provider: "grok".to_string(),
-                            model_id: model.id().to_string(),
-                            name: model.name().to_string(),
-                            context_length: model.context_length(),
-                            supports_streaming: model.supports_streaming(),
-                            supports_tool_calling: model.supports_tool_calling(),
-                            supports_vision: model.supports_vision(),
-                            supports_reasoning: model.supports_reasoning(),
-                            input_cost_per_token: model.input_cost_per_token(),
-                            output_cost_per_token: model.output_cost_per_token(),
-                            default_temperature: model.default_temperature(),
-                            default_max_tokens: model.default_max_tokens(),
-                        });
+            match crate::llm_providers::OpenAiProvider::new(grok_config) {
+                Ok(provider) => {
+                    tracing::info!("Grok provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} Grok models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "grok".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list Grok models: {}", e);
+                        }
                     }
                 }
+                Err(e) => {
+                    tracing::error!("Failed to create Grok provider: {}", e);
+                }
             }
+        } else {
+            tracing::info!("Grok API key not configured");
         }
     }
 
+    // If no models were found but we have API keys configured, try to return default models
+    if models.is_empty() && config.api_keys.is_some() {
+        tracing::info!("No models found from providers, adding default models");
+        // Add some default models for development/testing
+        models.push(crate::models::SupportedModel {
+            provider: "openai".to_string(),
+            model_id: "gpt-4".to_string(),
+            name: "GPT-4".to_string(),
+            context_length: 8192,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: false,
+            input_cost_per_token: Some(0.03),
+            output_cost_per_token: Some(0.06),
+            default_temperature: Some(0.7),
+            default_max_tokens: Some(1000),
+        });
+        models.push(crate::models::SupportedModel {
+            provider: "anthropic".to_string(),
+            model_id: "claude-3-opus-20240229".to_string(),
+            name: "Claude 3 Opus".to_string(),
+            context_length: 200000,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: false,
+            input_cost_per_token: Some(0.015),
+            output_cost_per_token: Some(0.075),
+            default_temperature: Some(0.7),
+            default_max_tokens: Some(1000),
+        });
+    }
+
+    tracing::info!("Returning {} supported models", models.len());
     let response = crate::models::SupportedModelsResponse { models };
     Ok(HttpResponse::Ok().json(response))
 }
