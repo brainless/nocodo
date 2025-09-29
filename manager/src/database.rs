@@ -830,7 +830,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, tool_name, status, created_at, updated_at
+            "SELECT id, title, project_id, tool_name, model, status, created_at, updated_at
              FROM works WHERE id = ?",
         )?;
 
@@ -948,22 +948,26 @@ impl Database {
             crate::models::MessageContentType::Json => ("json", None),
         };
 
+        // Debug logging to understand parameter types
+        let author_type_str = match &message.author_type {
+            crate::models::MessageAuthorType::User => "user",
+            crate::models::MessageAuthorType::Ai => "ai",
+        };
+
+
         conn.execute(
             "INSERT INTO work_messages (id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            params![
-                message.id,
-                message.work_id,
-                message.content,
-                content_type_str,
-                code_language,
-                match &message.author_type {
-                    crate::models::MessageAuthorType::User => "user",
-                    crate::models::MessageAuthorType::Ai => "ai",
-                },
-                message.author_id,
-                message.sequence_order,
-                message.created_at
+            &[
+                &message.id as &dyn rusqlite::ToSql,
+                &message.work_id as &dyn rusqlite::ToSql,
+                &message.content as &dyn rusqlite::ToSql,
+                &content_type_str as &dyn rusqlite::ToSql,
+                &code_language as &dyn rusqlite::ToSql,
+                &author_type_str as &dyn rusqlite::ToSql,
+                &message.author_id as &dyn rusqlite::ToSql,
+                &message.sequence_order as &dyn rusqlite::ToSql,
+                &message.created_at as &dyn rusqlite::ToSql,
             ],
         )?;
 

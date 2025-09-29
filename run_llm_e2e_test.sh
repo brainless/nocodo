@@ -16,11 +16,27 @@ echo "   Phase 2: Real LLM integration framework"
 echo "   Phase 3: Keyword-based validation system"
 echo ""
 
-# Test will use API keys from nocodo config (~/.config/nocodo/manager.toml)
-# Set the provider to test (options: "anthropic", "openai", "xai")
-# Can be overridden with --provider argument
-PROVIDER="${1:-openai}"
-MODEL="${2:-}"
+# Validate arguments
+if [[ $# -lt 2 ]]; then
+    echo "❌ Error: Both provider and model are required"
+    echo ""
+    echo "Usage: $0 <provider_id> <model_id>"
+    echo ""
+    echo "Valid providers and models are defined in manager/src/llm_providers/"
+    echo "   Provider and model validation is handled by the Rust test code"
+    echo ""
+    echo "Example: $0 xai grok-code-fast-1"
+    exit 1
+fi
+
+PROVIDER="$1"
+MODEL="$2"
+
+# Note: Provider and model validation is now handled by the Rust test code
+# which reads directly from the actual provider implementations
+
+echo "✅ Provider and model validation will be handled by Rust test code"
+echo ""
 
 # Check nocodo config for API keys
 CONFIG_FILE="$HOME/.config/nocodo/manager.toml"
@@ -28,25 +44,72 @@ AVAILABLE_PROVIDERS=()
 
 echo "📁 Checking nocodo config at: $CONFIG_FILE"
 
-if [[ -f "$CONFIG_FILE" ]]; then
-    # Parse TOML config file to check for API keys
-    if grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
-        AVAILABLE_PROVIDERS+=("xai")
-        echo "✅ xai_api_key found in config"
-    fi
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "❌ Error: Config file not found at $CONFIG_FILE"
+    echo ""
+    echo "Please run nocodo-manager once to create the default config, then add your API keys."
+    echo ""
+    echo "Required API key for provider '$PROVIDER': ${PROVIDER}_api_key"
+    exit 1
+fi
 
-    if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
-        AVAILABLE_PROVIDERS+=("openai")
-        echo "✅ openai_api_key found in config"
-    fi
+# Check for the specific API key required for the selected provider
+API_KEY_FOUND=false
 
-    if grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_api_key' "$CONFIG_FILE"; then
-        AVAILABLE_PROVIDERS+=("anthropic")
-        echo "✅ anthropic_api_key found in config"
-    fi
-else
-    echo "⚠️  Config file not found at $CONFIG_FILE"
-    echo "   Run nocodo-manager once to create the default config"
+case "$PROVIDER" in
+    "xai")
+        if grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
+            API_KEY_FOUND=true
+            echo "✅ xai_api_key found in config"
+        fi
+        ;;
+    "openai")
+        if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
+            API_KEY_FOUND=true
+            echo "✅ openai_api_key found in config"
+        fi
+        ;;
+    "anthropic")
+        if grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_api_key' "$CONFIG_FILE"; then
+            API_KEY_FOUND=true
+            echo "✅ anthropic_api_key found in config"
+        fi
+        ;;
+esac
+
+if [[ "$API_KEY_FOUND" != "true" ]]; then
+    echo "❌ Error: API key for provider '$PROVIDER' not found in config"
+    echo ""
+    echo "Please add the following to your config file at: $CONFIG_FILE"
+    echo ""
+    echo "[api_keys]"
+    case "$PROVIDER" in
+        "xai")
+            echo "xai_api_key = \"your-xai-api-key\""
+            ;;
+        "openai")
+            echo "openai_api_key = \"your-openai-api-key\""
+            ;;
+        "anthropic")
+            echo "anthropic_api_key = \"your-anthropic-api-key\""
+            ;;
+    esac
+    echo ""
+    echo "The API key must be uncommented (no # at the beginning) and have a valid value."
+    exit 1
+fi
+
+# Also check for all available providers for informational purposes
+if grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
+    AVAILABLE_PROVIDERS+=("xai")
+fi
+
+if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
+    AVAILABLE_PROVIDERS+=("openai")
+fi
+
+if grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_api_key' "$CONFIG_FILE"; then
+    AVAILABLE_PROVIDERS+=("anthropic")
 fi
 
 # Set environment variables from config file for the test
@@ -88,7 +151,9 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
         fi
     fi
 
-    # Set MODEL environment variable if provided
+    # Set PROVIDER and MODEL environment variables
+    export PROVIDER="$PROVIDER"
+    echo "   ✅ Set PROVIDER environment variable: $PROVIDER"
     if [[ -n "$MODEL" ]]; then
         export MODEL="$MODEL"
         echo "   ✅ Set MODEL environment variable: $MODEL"

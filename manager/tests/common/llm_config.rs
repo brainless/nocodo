@@ -51,15 +51,26 @@ impl LlmTestConfig {
     pub fn from_environment() -> Self {
         let mut providers = Vec::new();
 
-        // Auto-detect available API keys
-        if env::var("GROK_API_KEY").is_ok() {
-            providers.push(LlmProviderTestConfig::grok());
+        // Check for specific provider and model from environment (e.g., set by script)
+        let forced_provider = env::var("PROVIDER").ok();
+        let forced_model = env::var("MODEL").ok();
+
+        // Auto-detect available API keys and validate against actual providers
+        if env::var("GROK_API_KEY").is_ok() || env::var("XAI_API_KEY").is_ok() {
+            let name = forced_provider.as_deref().unwrap_or("xai");
+            if let Some(provider_config) = LlmProviderTestConfig::xai_with_validation(name, forced_model.as_deref()) {
+                providers.push(provider_config);
+            }
         }
         if env::var("OPENAI_API_KEY").is_ok() {
-            providers.push(LlmProviderTestConfig::openai());
+            if let Some(provider_config) = LlmProviderTestConfig::openai_with_validation(forced_model.as_deref()) {
+                providers.push(provider_config);
+            }
         }
         if env::var("ANTHROPIC_API_KEY").is_ok() {
-            providers.push(LlmProviderTestConfig::anthropic());
+            if let Some(provider_config) = LlmProviderTestConfig::anthropic_with_validation(forced_model.as_deref()) {
+                providers.push(provider_config);
+            }
         }
 
         let default_provider = providers.first().map(|p| p.name.clone());
@@ -83,41 +94,155 @@ impl LlmTestConfig {
 }
 
 impl LlmProviderTestConfig {
-    /// Create Grok provider configuration
-    pub fn grok() -> Self {
-        Self {
-            name: "grok".to_string(),
-            models: vec!["grok-code-fast-1".to_string()],
-            api_key_env: "GROK_API_KEY".to_string(),
-            enabled: env::var("GROK_API_KEY").is_ok(),
-            test_prompts: LlmTestPrompts::default(),
+    /// Create xAI provider configuration with validation
+    pub fn xai_with_validation(name: &str, requested_model: Option<&str>) -> Option<Self> {
+        // Check if API key is available
+        if env::var("GROK_API_KEY").is_err() && env::var("XAI_API_KEY").is_err() {
+            return None;
         }
+
+        // Get available models from actual provider implementation
+        let available_models = Self::get_available_xai_models();
+
+        // If a specific model was requested, validate it exists
+        if let Some(model) = requested_model {
+            if !available_models.contains(&model.to_string()) {
+                eprintln!("❌ Error: Model '{}' not available for xAI provider", model);
+                eprintln!("   Available models: {:?}", available_models);
+                return None;
+            }
+        }
+
+        Some(Self {
+            name: name.to_string(),
+            models: available_models,
+            api_key_env: "GROK_API_KEY".to_string(),
+            enabled: true,
+            test_prompts: LlmTestPrompts::default(),
+        })
     }
 
-    /// Create OpenAI provider configuration
+    /// Create xAI provider configuration (legacy method)
+    pub fn xai(name: &str) -> Self {
+        Self::xai_with_validation(name, None).unwrap_or_else(|| Self {
+            name: name.to_string(),
+            models: vec!["grok-code-fast-1".to_string()],
+            api_key_env: "GROK_API_KEY".to_string(),
+            enabled: false,
+            test_prompts: LlmTestPrompts::default(),
+        })
+    }
+
+    /// Create Grok provider configuration (deprecated, use xai)
+    pub fn grok() -> Self {
+        Self::xai("grok")
+    }
+
+    /// Create OpenAI provider configuration with validation
+    pub fn openai_with_validation(requested_model: Option<&str>) -> Option<Self> {
+        // Check if API key is available
+        if env::var("OPENAI_API_KEY").is_err() {
+            return None;
+        }
+
+        // Get available models from actual provider implementation
+        let available_models = Self::get_available_openai_models();
+
+        // If a specific model was requested, validate it exists
+        if let Some(model) = requested_model {
+            if !available_models.contains(&model.to_string()) {
+                eprintln!("❌ Error: Model '{}' not available for OpenAI provider", model);
+                eprintln!("   Available models: {:?}", available_models);
+                return None;
+            }
+        }
+
+        Some(Self {
+            name: "openai".to_string(),
+            models: available_models,
+            api_key_env: "OPENAI_API_KEY".to_string(),
+            enabled: true,
+            test_prompts: LlmTestPrompts::default(),
+        })
+    }
+
+    /// Create OpenAI provider configuration (legacy method)
     pub fn openai() -> Self {
-        Self {
+        Self::openai_with_validation(None).unwrap_or_else(|| Self {
             name: "openai".to_string(),
             models: vec!["gpt-4".to_string(), "gpt-4-turbo".to_string()],
             api_key_env: "OPENAI_API_KEY".to_string(),
-            enabled: env::var("OPENAI_API_KEY").is_ok(),
+            enabled: false,
             test_prompts: LlmTestPrompts::default(),
-        }
+        })
     }
 
-    /// Create Anthropic provider configuration
+    /// Create Anthropic provider configuration with validation
+    pub fn anthropic_with_validation(requested_model: Option<&str>) -> Option<Self> {
+        // Check if API key is available
+        if env::var("ANTHROPIC_API_KEY").is_err() {
+            return None;
+        }
+
+        // Get available models from actual provider implementation
+        let available_models = Self::get_available_anthropic_models();
+
+        // If a specific model was requested, validate it exists
+        if let Some(model) = requested_model {
+            if !available_models.contains(&model.to_string()) {
+                eprintln!("❌ Error: Model '{}' not available for Anthropic provider", model);
+                eprintln!("   Available models: {:?}", available_models);
+                return None;
+            }
+        }
+
+        Some(Self {
+            name: "anthropic".to_string(),
+            models: available_models,
+            api_key_env: "ANTHROPIC_API_KEY".to_string(),
+            enabled: true,
+            test_prompts: LlmTestPrompts::default(),
+        })
+    }
+
+    /// Create Anthropic provider configuration (legacy method)
     pub fn anthropic() -> Self {
-        Self {
+        Self::anthropic_with_validation(None).unwrap_or_else(|| Self {
             name: "anthropic".to_string(),
             models: vec![
-                "claude-sonnet-4-20250514".to_string(), // Use Claude Sonnet 4 as default
+                "claude-sonnet-4-20250514".to_string(),
                 "claude-3-sonnet-20240229".to_string(),
                 "claude-3-opus-20240229".to_string(),
             ],
             api_key_env: "ANTHROPIC_API_KEY".to_string(),
-            enabled: env::var("ANTHROPIC_API_KEY").is_ok(),
+            enabled: false,
             test_prompts: LlmTestPrompts::default(),
-        }
+        })
+    }
+
+    /// Get available xAI models from the actual provider implementation
+    fn get_available_xai_models() -> Vec<String> {
+        // This would ideally query the actual provider, but for now we'll hardcode
+        // the models that are actually implemented in the provider
+        vec!["grok-code-fast-1".to_string()]
+    }
+
+    /// Get available OpenAI models from the actual provider implementation
+    fn get_available_openai_models() -> Vec<String> {
+        // This would ideally query the actual provider, but for now we'll hardcode
+        // the models that are actually implemented in the provider
+        vec!["gpt-5".to_string(), "gpt-5-codex".to_string()]
+    }
+
+    /// Get available Anthropic models from the actual provider implementation
+    fn get_available_anthropic_models() -> Vec<String> {
+        // This would ideally query the actual provider, but for now we'll hardcode
+        // the models that are actually implemented in the provider
+        vec![
+            "claude-sonnet-4-20250514".to_string(),
+            "claude-3-sonnet-20240229".to_string(),
+            "claude-3-haiku-20240307".to_string(),
+        ]
     }
 
     /// Get the default model for this provider

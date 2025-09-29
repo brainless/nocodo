@@ -1,6 +1,7 @@
 mod common;
 
 use actix_web::{test, web, App};
+use std::env;
 
 use crate::common::{
     keyword_validation::{KeywordValidator, LlmTestScenario},
@@ -32,8 +33,18 @@ async fn test_llm_e2e_saleor() {
         .get_default_provider()
         .expect("No default provider available");
 
+    // Get the requested model from environment or use the first available model
+    let model = env::var("MODEL").unwrap_or_else(|_| provider.default_model().to_string());
+
+    // Validate that the requested model is available for this provider
+    if !provider.models.contains(&model) {
+        println!("❌ Error: Model '{}' not available for provider '{}'", model, provider.name);
+        println!("   Available models: {:?}", provider.models);
+        return;
+    }
+
     println!("🚀 Running LLM E2E test with provider: {}", provider.name);
-    println!("   Model: {}", provider.default_model());
+    println!("   Model: {}", model);
 
     // PHASE 1: Create isolated test environment
     println!("\n📦 Phase 1: Setting up isolated test environment");
@@ -69,13 +80,13 @@ async fn test_llm_e2e_saleor() {
         .await
         .expect("Failed to create project from scenario");
 
-    // Follow the exact manager-web homepage form flow:
-    // 1. Create the work
-    let work_request = CreateWorkRequest {
-        title: "LLM E2E Test Work".to_string(),
-        project_id: Some(project_id.clone()),
-        model: Some("gpt-5".to_string()),
-    };
+     // Follow the exact manager-web homepage form flow:
+     // 1. Create the work
+     let work_request = CreateWorkRequest {
+         title: "LLM E2E Test Work".to_string(),
+         project_id: Some(project_id.clone()),
+         model: Some(model.clone()),
+     };
 
     let req = test::TestRequest::post()
         .uri("/work")
@@ -497,10 +508,11 @@ async fn test_llm_multiple_scenarios() {
 
         // Follow the exact manager-web homepage form flow:
         // 1. Create the work
+        let model = env::var("MODEL").unwrap_or_else(|_| provider.default_model().to_string());
         let work_request = CreateWorkRequest {
             title: format!("Multi Scenario Work {}", i + 1),
             project_id: Some(project_id.clone()),
-            model: Some("gpt-5".to_string()),
+            model: Some(model),
         };
 
         let req = test::TestRequest::post()

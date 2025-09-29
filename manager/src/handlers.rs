@@ -1749,6 +1749,7 @@ pub async fn add_message_to_work(
     let work_id = path.into_inner();
     let req = request.into_inner();
 
+
     // Verify work exists
     let _work = data.database.get_work_by_id(&work_id)?;
 
@@ -1771,6 +1772,7 @@ pub async fn add_message_to_work(
         sequence_order,
         created_at: now,
     };
+
 
     // Save to database
     data.database.create_work_message(&message)?;
