@@ -1911,15 +1911,15 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
         // Grok API Key
         api_keys.push(ApiKeyConfig {
             name: "Grok API Key".to_string(),
-            key: api_key_config.grok_api_key.as_ref().map(|key| {
+            key: api_key_config.xai_api_key.as_ref().map(|key| {
                 if key.is_empty() {
                     "".to_string()
                 } else {
                     format!("{}****", &key[..key.len().min(4)])
                 }
             }),
-            is_configured: api_key_config.grok_api_key.is_some()
-                && !api_key_config.grok_api_key.as_ref().unwrap().is_empty(),
+            is_configured: api_key_config.xai_api_key.is_some()
+                && !api_key_config.xai_api_key.as_ref().unwrap().is_empty(),
         });
 
         // OpenAI API Key
@@ -2087,12 +2087,12 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
         }
 
         // xAI models
-        if api_key_config.grok_api_key.is_some() && !api_key_config.grok_api_key.as_ref().unwrap().is_empty() {
+        if api_key_config.xai_api_key.is_some() && !api_key_config.xai_api_key.as_ref().unwrap().is_empty() {
             tracing::info!("xAI API key is configured, creating provider");
             let xai_config = LlmProviderConfig {
                 provider: "xai".to_string(),
                 model: "grok-code-fast-1".to_string(), // Default model for checking
-                api_key: api_key_config.grok_api_key.as_ref().unwrap().clone(),
+                api_key: api_key_config.xai_api_key.as_ref().unwrap().clone(),
                 base_url: Some("https://api.x.ai".to_string()),
                 max_tokens: Some(1000),
                 temperature: Some(0.7),

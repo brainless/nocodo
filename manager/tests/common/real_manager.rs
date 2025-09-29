@@ -146,7 +146,7 @@ path = "{}"
             config.db_path().display(),
             config.temp_dir_path().join("test.sock").display(),
             match llm_provider.name.as_str() {
-                "grok" => format!("grok_api_key = \"{}\"", api_key),
+                "xai" => format!("xai_api_key = \"{}\"", api_key),
                 "openai" => format!("openai_api_key = \"{}\"", api_key),
                 "anthropic" => format!("anthropic_api_key = \"{}\"", api_key),
                 _ => return Err(anyhow::anyhow!("Unknown provider: {}", llm_provider.name)),

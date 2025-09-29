@@ -50,7 +50,7 @@ impl TestConfig {
                 path: socket_path.to_string_lossy().to_string(),
             },
             api_keys: Some(ApiKeysConfig {
-                grok_api_key: Some("test-grok-key".to_string()),
+                xai_api_key: Some("test-xai-key".to_string()),
                 openai_api_key: Some("test-openai-key".to_string()),
                 anthropic_api_key: Some("test-anthropic-key".to_string()),
             }),

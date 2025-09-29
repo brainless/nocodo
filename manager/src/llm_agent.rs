@@ -1652,7 +1652,7 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
         // First try to get from config file
         if let Some(api_keys) = &self.config.api_keys {
             let config_key = match provider_lower.as_str() {
-                "grok" => &api_keys.grok_api_key,
+                "xai" => &api_keys.xai_api_key,
                 "openai" => &api_keys.openai_api_key,
                 "anthropic" | "claude" => &api_keys.anthropic_api_key,
                 _ => &None,

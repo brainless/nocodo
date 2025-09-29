@@ -112,7 +112,7 @@ const Settings: Component = () => {
                   </p>
                   <pre class='bg-gray-800 text-gray-100 p-4 rounded-md text-sm overflow-x-auto'>
                     {`[api_keys]
-grok_api_key = "your-grok-api-key-here"
+xai_api_key = "your-xai-api-key-here"
 openai_api_key = "your-openai-api-key-here"
 anthropic_api_key = "your-anthropic-api-key-here"`}
                   </pre>

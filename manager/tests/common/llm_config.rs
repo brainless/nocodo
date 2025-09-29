@@ -148,7 +148,7 @@ impl LlmProviderTestConfig {
                 path: "/tmp/test.sock".to_string(),
             },
             api_keys: Some(ApiKeysConfig {
-                grok_api_key: if self.name == "grok" {
+                xai_api_key: if self.name == "xai" {
                     api_key.clone()
                 } else {
                     None

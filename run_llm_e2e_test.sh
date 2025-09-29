@@ -17,8 +17,10 @@ echo "   Phase 3: Keyword-based validation system"
 echo ""
 
 # Test will use API keys from nocodo config (~/.config/nocodo/manager.toml)
-# Set the provider to test (options: "anthropic", "openai", "grok")
-PROVIDER="anthropic"
+# Set the provider to test (options: "anthropic", "openai", "xai")
+# Can be overridden with --provider argument
+PROVIDER="${1:-openai}"
+MODEL="${2:-}"
 
 # Check nocodo config for API keys
 CONFIG_FILE="$HOME/.config/nocodo/manager.toml"
@@ -28,9 +30,9 @@ echo "📁 Checking nocodo config at: $CONFIG_FILE"
 
 if [[ -f "$CONFIG_FILE" ]]; then
     # Parse TOML config file to check for API keys
-    if grep -q '^grok_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*grok_api_key' "$CONFIG_FILE"; then
-        AVAILABLE_PROVIDERS+=("grok")
-        echo "✅ grok_api_key found in config"
+    if grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
+        AVAILABLE_PROVIDERS+=("xai")
+        echo "✅ xai_api_key found in config"
     fi
 
     if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
@@ -53,8 +55,8 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
     echo "🔑 Setting environment variables from nocodo config..."
 
     # Only set the API key for the selected provider to ensure test uses the right one
-    if [[ "$PROVIDER" == "grok" ]] && grep -q '^grok_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*grok_api_key' "$CONFIG_FILE"; then
-        GROK_KEY=$(grep '^grok_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+    if [[ "$PROVIDER" == "xai" ]] && grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
+        GROK_KEY=$(grep '^xai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
         export GROK_API_KEY="$GROK_KEY"
         echo "   ✅ Set GROK_API_KEY from config (selected provider)"
     elif [[ "$PROVIDER" == "openai" ]] && grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
@@ -69,8 +71,8 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
         echo "   ⚠️  Selected provider '$PROVIDER' API key not found in config"
         echo "   Available providers: ${AVAILABLE_PROVIDERS[*]}"
         # Fallback: set all available keys
-        if grep -q '^grok_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*grok_api_key' "$CONFIG_FILE"; then
-            GROK_KEY=$(grep '^grok_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+        if grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
+            GROK_KEY=$(grep '^xai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
             export GROK_API_KEY="$GROK_KEY"
             echo "   ✅ Set GROK_API_KEY from config (fallback)"
         fi
@@ -85,6 +87,12 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
             echo "   ✅ Set ANTHROPIC_API_KEY from config (fallback)"
         fi
     fi
+
+    # Set MODEL environment variable if provided
+    if [[ -n "$MODEL" ]]; then
+        export MODEL="$MODEL"
+        echo "   ✅ Set MODEL environment variable: $MODEL"
+    fi
 else
     echo ""
     echo "⚠️  No LLM API keys found in nocodo config!"
@@ -94,7 +102,7 @@ else
     echo "[api_keys]"
     echo "anthropic_api_key = \"your-anthropic-key\""
     echo "openai_api_key = \"your-openai-key\""
-    echo "grok_api_key = \"your-grok-key\""
+    echo "xai_api_key = \"your-xai-key\""
     echo ""
     echo "Without API keys, only unit tests and infrastructure tests will run."
     echo ""
@@ -115,6 +123,7 @@ fi
 echo ""
 echo "🔧 Available LLM Providers: ${AVAILABLE_PROVIDERS[*]:-None}"
 echo "🚀 Using Provider: ${PROVIDER:-None}"
+echo "🤖 Using Model: ${MODEL:-default}"
 echo ""
 
 # Navigate to manager directory
@@ -166,6 +175,7 @@ echo ""
 
 if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
     echo "🤖 LLM Provider Used: $PROVIDER"
+    echo "🧠 Model Used: ${MODEL:-default}"
     echo "🔑 API Key Source: nocodo config ($CONFIG_FILE)"
     echo ""
     echo "The test successfully:"
