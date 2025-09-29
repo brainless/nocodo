@@ -1577,9 +1577,8 @@ pub fn create_llm_provider(config: LlmProviderConfig) -> Result<Box<dyn LlmProvi
             let provider = crate::llm_providers::AnthropicProvider::new(config)?;
             Ok(Box::new(provider))
         }
-        "grok" => {
-            // For now, treat Grok as OpenAI-compatible
-            let provider = crate::llm_providers::OpenAiProvider::new(config)?;
+        "xai" | "grok" => {
+            let provider = crate::llm_providers::XaiProvider::new(config)?;
             Ok(Box::new(provider))
         }
         _ => Err(anyhow::anyhow!(

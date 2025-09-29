@@ -2086,11 +2086,11 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
             tracing::info!("Anthropic API key not configured");
         }
 
-        // Grok models (treated as OpenAI-compatible)
+        // xAI models
         if api_key_config.grok_api_key.is_some() && !api_key_config.grok_api_key.as_ref().unwrap().is_empty() {
-            tracing::info!("Grok API key is configured, creating provider");
-            let grok_config = LlmProviderConfig {
-                provider: "grok".to_string(),
+            tracing::info!("xAI API key is configured, creating provider");
+            let xai_config = LlmProviderConfig {
+                provider: "xai".to_string(),
                 model: "grok-code-fast-1".to_string(), // Default model for checking
                 api_key: api_key_config.grok_api_key.as_ref().unwrap().clone(),
                 base_url: Some("https://api.x.ai".to_string()),
@@ -2098,15 +2098,15 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
                 temperature: Some(0.7),
             };
 
-            match crate::llm_providers::OpenAiProvider::new(grok_config) {
+            match crate::llm_providers::XaiProvider::new(xai_config) {
                 Ok(provider) => {
-                    tracing::info!("Grok provider created successfully");
+                    tracing::info!("xAI provider created successfully");
                     match provider.list_available_models().await {
                         Ok(available_models) => {
-                            tracing::info!("Found {} Grok models", available_models.len());
+                            tracing::info!("Found {} xAI models", available_models.len());
                             for model in available_models {
                                 models.push(crate::models::SupportedModel {
-                                    provider: "grok".to_string(),
+                                    provider: "xai".to_string(),
                                     model_id: model.id().to_string(),
                                     name: model.name().to_string(),
                                     context_length: model.context_length(),
@@ -2122,16 +2122,16 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
                             }
                         }
                         Err(e) => {
-                            tracing::error!("Failed to list Grok models: {}", e);
+                            tracing::error!("Failed to list xAI models: {}", e);
                         }
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Failed to create Grok provider: {}", e);
+                    tracing::error!("Failed to create xAI provider: {}", e);
                 }
             }
         } else {
-            tracing::info!("Grok API key not configured");
+            tracing::info!("xAI API key not configured");
         }
     }
 
@@ -2141,31 +2141,45 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
         // Add some default models for development/testing
         models.push(crate::models::SupportedModel {
             provider: "openai".to_string(),
-            model_id: "gpt-4".to_string(),
-            name: "GPT-4".to_string(),
-            context_length: 8192,
+            model_id: "gpt-5".to_string(),
+            name: "GPT-5".to_string(),
+            context_length: 262144,
             supports_streaming: true,
             supports_tool_calling: true,
             supports_vision: true,
-            supports_reasoning: false,
-            input_cost_per_token: Some(0.03),
-            output_cost_per_token: Some(0.06),
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.002),
+            output_cost_per_token: Some(0.008),
             default_temperature: Some(0.7),
-            default_max_tokens: Some(1000),
+            default_max_tokens: Some(2000),
         });
         models.push(crate::models::SupportedModel {
             provider: "anthropic".to_string(),
-            model_id: "claude-3-opus-20240229".to_string(),
-            name: "Claude 3 Opus".to_string(),
+            model_id: "claude-3-sonnet-20240229".to_string(),
+            name: "Claude 3 Sonnet".to_string(),
             context_length: 200000,
             supports_streaming: true,
             supports_tool_calling: true,
             supports_vision: true,
             supports_reasoning: false,
-            input_cost_per_token: Some(0.015),
-            output_cost_per_token: Some(0.075),
+            input_cost_per_token: Some(0.003),
+            output_cost_per_token: Some(0.015),
             default_temperature: Some(0.7),
             default_max_tokens: Some(1000),
+        });
+        models.push(crate::models::SupportedModel {
+            provider: "xai".to_string(),
+            model_id: "grok-code-fast-1".to_string(),
+            name: "Grok Code Fast 1".to_string(),
+            context_length: 131072,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: false,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.002),
+            output_cost_per_token: Some(0.01),
+            default_temperature: Some(0.7),
+            default_max_tokens: Some(2000),
         });
     }
 

@@ -24,7 +24,6 @@ impl AnthropicProvider {
     fn initialize_models(&mut self) {
         // Initialize common Anthropic models
         let models: Vec<Arc<dyn LlmModel>> = vec![
-            Arc::new(Claude3OpusModel::new()),
             Arc::new(Claude3SonnetModel::new()),
             Arc::new(Claude3HaikuModel::new()),
         ];
@@ -93,89 +92,7 @@ impl LlmProvider for AnthropicProvider {
     }
 }
 
-/// Claude 3 Opus model implementation
-pub struct Claude3OpusModel {
-    capabilities: ModelCapabilities,
-    pricing: Option<ModelPricing>,
-}
 
-impl Claude3OpusModel {
-    pub fn new() -> Self {
-        Self {
-            capabilities: ModelCapabilities {
-                supports_streaming: true,
-                supports_tool_calling: true,
-                supports_vision: true,
-                supports_reasoning: false,
-                supports_json_mode: true,
-            },
-            pricing: Some(ModelPricing {
-                input_cost_per_million_tokens: 15.0,
-                output_cost_per_million_tokens: 75.0,
-                reasoning_cost_per_million_tokens: None,
-            }),
-        }
-    }
-}
-
-impl LlmModel for Claude3OpusModel {
-    fn id(&self) -> &str {
-        "claude-3-opus-20240229"
-    }
-
-    fn name(&self) -> &str {
-        "Claude 3 Opus"
-    }
-
-    fn provider_id(&self) -> &str {
-        "anthropic"
-    }
-
-    fn context_length(&self) -> u32 {
-        200000
-    }
-
-    fn max_output_tokens(&self) -> Option<u32> {
-        Some(4096)
-    }
-
-    fn supports_streaming(&self) -> bool {
-        self.capabilities.supports_streaming
-    }
-
-    fn supports_tool_calling(&self) -> bool {
-        self.capabilities.supports_tool_calling
-    }
-
-    fn supports_vision(&self) -> bool {
-        self.capabilities.supports_vision
-    }
-
-    fn supports_reasoning(&self) -> bool {
-        self.capabilities.supports_reasoning
-    }
-
-    fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
-    }
-
-    fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
-    }
-
-    fn default_temperature(&self) -> Option<f32> {
-        Some(0.7)
-    }
-
-    fn default_max_tokens(&self) -> Option<u32> {
-        Some(1000)
-    }
-
-    fn estimate_tokens(&self, text: &str) -> u32 {
-        // Simple token estimation (rough approximation)
-        text.len() as u32 / 4
-    }
-}
 
 /// Claude 3 Sonnet model implementation
 pub struct Claude3SonnetModel {
