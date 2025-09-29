@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 /// Anthropic provider implementation
 pub struct AnthropicProvider {
+    #[allow(dead_code)]
     config: LlmProviderConfig,
     models: HashMap<String, Arc<dyn LlmModel>>,
 }

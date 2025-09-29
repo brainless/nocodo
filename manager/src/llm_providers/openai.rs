@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 /// OpenAI provider implementation
 pub struct OpenAiProvider {
+    #[allow(dead_code)]
     config: LlmProviderConfig,
     models: HashMap<String, Arc<dyn LlmModel>>,
 }

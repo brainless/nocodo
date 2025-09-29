@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 /// xAI provider implementation
 pub struct XaiProvider {
+    #[allow(dead_code)]
     config: LlmProviderConfig,
     models: HashMap<String, Arc<dyn LlmModel>>,
 }
