@@ -4,6 +4,7 @@ pub mod error;
 pub mod handlers;
 pub mod llm_agent;
 pub mod llm_client;
+pub mod llm_providers;
 pub mod models;
 pub mod socket;
 pub mod templates;

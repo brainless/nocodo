@@ -6,7 +6,102 @@ use futures_util::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::pin::Pin;
+
 use uuid::Uuid;
+
+/// Provider type enumeration
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ProviderType {
+    OpenAI,
+    Anthropic,
+    Grok,
+    Google,
+    Custom,
+}
+
+/// Model capabilities structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelCapabilities {
+    pub supports_streaming: bool,
+    pub supports_tool_calling: bool,
+    pub supports_vision: bool,
+    pub supports_reasoning: bool,
+    pub supports_json_mode: bool,
+}
+
+/// Model pricing information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPricing {
+    pub input_cost_per_million_tokens: f64,
+    pub output_cost_per_million_tokens: f64,
+    pub reasoning_cost_per_million_tokens: Option<f64>,
+}
+
+/// LLM Model trait for model-specific information
+pub trait LlmModel: Send + Sync {
+    /// Model identity
+    fn id(&self) -> &str;
+    fn name(&self) -> &str;
+    fn provider_id(&self) -> &str;
+
+    /// Model specifications
+    fn context_length(&self) -> u32;
+    fn max_output_tokens(&self) -> Option<u32>;
+    fn supports_streaming(&self) -> bool;
+    fn supports_tool_calling(&self) -> bool;
+    fn supports_vision(&self) -> bool;
+    fn supports_reasoning(&self) -> bool;
+
+    /// Cost information (if available)
+    fn input_cost_per_token(&self) -> Option<f64>;
+    fn output_cost_per_token(&self) -> Option<f64>;
+
+    /// Model-specific defaults
+    fn default_temperature(&self) -> Option<f32>;
+    fn default_max_tokens(&self) -> Option<u32>;
+
+    /// Token counting (model-specific tokenization)
+    fn estimate_tokens(&self, text: &str) -> u32;
+}
+
+/// LLM Provider trait for high-level provider management
+#[async_trait]
+pub trait LlmProvider: Send + Sync {
+    /// Get provider information
+    fn id(&self) -> &str;
+    fn name(&self) -> &str;
+    fn provider_type(&self) -> ProviderType;
+
+    /// Provider capabilities
+    fn supports_streaming(&self) -> bool;
+    fn supports_tool_calling(&self) -> bool;
+    fn supports_vision(&self) -> bool;
+
+    /// Model management
+    async fn list_available_models(&self) -> Result<Vec<Box<dyn LlmModel>>, anyhow::Error>;
+    fn get_model(&self, model_id: &str) -> Option<Box<dyn LlmModel>>;
+
+    /// Connection testing
+    async fn test_connection(&self) -> Result<(), anyhow::Error>;
+
+    /// Create client for specific model
+    fn create_client(&self, model_id: &str) -> Result<Box<dyn LlmClient>, anyhow::Error>;
+}
+
+/// Provider error type
+#[derive(Debug, thiserror::Error)]
+pub enum ProviderError {
+    #[error("Authentication failed: {0}")]
+    Authentication(String),
+    #[error("Network error: {0}")]
+    Network(#[from] reqwest::Error),
+    #[error("API error: {0}")]
+    Api(String),
+    #[error("Model not found: {0}")]
+    ModelNotFound(String),
+    #[error("Unsupported operation: {0}")]
+    UnsupportedOperation(String),
+}
 
 /// LLM message structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,12 +358,19 @@ pub trait LlmClient: Send + Sync {
 pub struct OpenAiCompatibleClient {
     client: reqwest::Client,
     config: LlmProviderConfig,
+    model: Option<Box<dyn LlmModel>>,
 }
 
 impl OpenAiCompatibleClient {
     pub fn new(config: LlmProviderConfig) -> Result<Self> {
         let client = reqwest::Client::new();
-        Ok(Self { client, config })
+        let model = None; // Will be set later if needed
+        Ok(Self { client, config, model })
+    }
+
+    pub fn with_model(mut self, model: Box<dyn LlmModel>) -> Self {
+        self.model = Some(model);
+        self
     }
 
     fn get_api_url(&self) -> String {
@@ -281,6 +383,11 @@ impl OpenAiCompatibleClient {
 
     /// Check if the provider supports native tool calling
     fn supports_native_tools(&self) -> bool {
+        if let Some(model) = &self.model {
+            return model.supports_tool_calling();
+        }
+
+        // Fallback to old logic if no model is set
         match self.config.provider.to_lowercase().as_str() {
             "openai" => {
                 // OpenAI supports native tools for GPT-4 and newer models
@@ -859,6 +966,9 @@ impl LlmClient for OpenAiCompatibleClient {
     }
 
     fn model(&self) -> &str {
+        if let Some(model) = &self.model {
+            return model.id();
+        }
         &self.config.model
     }
 }
@@ -949,6 +1059,7 @@ pub struct ClaudeUsage {
 pub struct ClaudeClient {
     client: reqwest::Client,
     config: LlmProviderConfig,
+    model: Option<Box<dyn LlmModel>>,
 }
 
 impl ClaudeClient {
@@ -956,7 +1067,13 @@ impl ClaudeClient {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
-        Ok(Self { client, config })
+        let model = None; // Will be set later if needed
+        Ok(Self { client, config, model })
+    }
+
+    pub fn with_model(mut self, model: Box<dyn LlmModel>) -> Self {
+        self.model = Some(model);
+        self
     }
 
     fn get_api_url(&self) -> String {
@@ -969,6 +1086,11 @@ impl ClaudeClient {
 
     /// Check if the provider supports native tool calling
     fn supports_native_tools(&self) -> bool {
+        if let Some(model) = &self.model {
+            return model.supports_tool_calling();
+        }
+
+        // Fallback to old logic if no model is set
         self.config.model.to_lowercase().contains("claude")
             || self.config.model.to_lowercase().contains("opus")
             || self.config.model.to_lowercase().contains("sonnet")
@@ -1412,6 +1534,9 @@ impl LlmClient for ClaudeClient {
     }
 
     fn model(&self) -> &str {
+        if let Some(model) = &self.model {
+            return model.id();
+        }
         &self.config.model
     }
 }
@@ -1426,6 +1551,36 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
         "anthropic" | "claude" => {
             let client = ClaudeClient::new(config)?;
             Ok(Box::new(client))
+        }
+        _ => Err(anyhow::anyhow!(
+            "Unsupported LLM provider: {}",
+            config.provider
+        )),
+    }
+}
+
+/// Factory function to create LLM clients with model information
+pub fn create_llm_client_with_model(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
+    // For now, just use the regular create_llm_client
+    // TODO: Implement proper model-aware client creation
+    create_llm_client(config)
+}
+
+/// Factory function to create LLM providers
+pub fn create_llm_provider(config: LlmProviderConfig) -> Result<Box<dyn LlmProvider>> {
+    match config.provider.to_lowercase().as_str() {
+        "openai" => {
+            let provider = crate::llm_providers::OpenAiProvider::new(config)?;
+            Ok(Box::new(provider))
+        }
+        "anthropic" | "claude" => {
+            let provider = crate::llm_providers::AnthropicProvider::new(config)?;
+            Ok(Box::new(provider))
+        }
+        "grok" => {
+            // For now, treat Grok as OpenAI-compatible
+            let provider = crate::llm_providers::OpenAiProvider::new(config)?;
+            Ok(Box::new(provider))
         }
         _ => Err(anyhow::anyhow!(
             "Unsupported LLM provider: {}",
