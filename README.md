@@ -8,7 +8,7 @@
 
 Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help teams around the world create custom business software without technical knowledge.
 
-![nocodo AI Session Details](./website/src/assets/nocodo_AI_Session_Details_Redesigned_26_August_2025.png)
+![User prompt and choice of LL Model](./website/src/assets/nocodo_tech_stack_work_model_dropdown_open.png)
 
 ## 🌟 What is nocodo?
 
