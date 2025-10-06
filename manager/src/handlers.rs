@@ -36,6 +36,108 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
 }
 
+/// Helper function to infer the provider from a model ID
+fn infer_provider_from_model(model_id: &str) -> &str {
+    let model_lower = model_id.to_lowercase();
+
+    if model_lower.contains("gpt") || model_lower.contains("o1") || model_lower.starts_with("gpt-")
+    {
+        "openai"
+    } else if model_lower.contains("claude")
+        || model_lower.contains("opus")
+        || model_lower.contains("sonnet")
+        || model_lower.contains("haiku")
+    {
+        "anthropic"
+    } else if model_lower.contains("grok") {
+        "xai"
+    } else {
+        // Default to anthropic if we can't determine
+        "anthropic"
+    }
+}
+
+/// Helper function to get a user-friendly display name from a model ID by looking it up in the provider
+async fn get_model_display_name(model_id: &str, provider: &str, config: &AppConfig) -> String {
+    // Try to get the model name from the provider
+    if let Some(api_key_config) = &config.api_keys {
+        let model_name = match provider {
+            "anthropic" => {
+                if let Some(api_key) = &api_key_config.anthropic_api_key {
+                    if !api_key.is_empty() {
+                        let anthropic_config = LlmProviderConfig {
+                            provider: "anthropic".to_string(),
+                            model: model_id.to_string(),
+                            api_key: api_key.clone(),
+                            base_url: None,
+                            max_tokens: Some(1000),
+                            temperature: Some(0.7),
+                        };
+                        if let Ok(provider) =
+                            crate::llm_providers::AnthropicProvider::new(anthropic_config)
+                        {
+                            if let Some(model) = provider.get_model(model_id) {
+                                return model.name().to_string();
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            "openai" => {
+                if let Some(api_key) = &api_key_config.openai_api_key {
+                    if !api_key.is_empty() {
+                        let openai_config = LlmProviderConfig {
+                            provider: "openai".to_string(),
+                            model: model_id.to_string(),
+                            api_key: api_key.clone(),
+                            base_url: None,
+                            max_tokens: Some(1000),
+                            temperature: Some(0.7),
+                        };
+                        if let Ok(provider) =
+                            crate::llm_providers::OpenAiProvider::new(openai_config)
+                        {
+                            if let Some(model) = provider.get_model(model_id) {
+                                return model.name().to_string();
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            "xai" => {
+                if let Some(api_key) = &api_key_config.xai_api_key {
+                    if !api_key.is_empty() {
+                        let xai_config = LlmProviderConfig {
+                            provider: "xai".to_string(),
+                            model: model_id.to_string(),
+                            api_key: api_key.clone(),
+                            base_url: Some("https://api.x.ai".to_string()),
+                            max_tokens: Some(1000),
+                            temperature: Some(0.7),
+                        };
+                        if let Ok(provider) = crate::llm_providers::XaiProvider::new(xai_config) {
+                            if let Some(model) = provider.get_model(model_id) {
+                                return model.name().to_string();
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        };
+
+        if model_name.is_some() {
+            return model_name.unwrap();
+        }
+    }
+
+    // Fall back to the model ID itself if we can't look it up
+    model_id.to_string()
+}
+
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let projects = data.database.get_all_projects()?;
     let response = ProjectListResponse { projects };
@@ -953,15 +1055,26 @@ pub async fn create_ai_session(
                 })?
             };
 
+            // Determine provider and model from work.model or fall back to environment/defaults
+            let (provider, model) = if let Some(ref model_id) = work.model {
+                let provider = infer_provider_from_model(model_id);
+                (provider.to_string(), model_id.clone())
+            } else {
+                // Fall back to environment variables or defaults
+                let provider =
+                    std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+                let model = std::env::var("MODEL")
+                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                (provider, model)
+            };
+
+            // Get the model name for display from the provider's model definition
+            let model_display_name = get_model_display_name(&model, &provider, &data.config).await;
+
             // Update work with tool_name and model info
             let mut updated_work = work.clone();
-            updated_work.tool_name = Some("LLM Agent (Claude Sonnet 4)".to_string());
+            updated_work.tool_name = Some(format!("LLM Agent ({})", model_display_name));
             data.database.update_work(&updated_work)?;
-
-            // Get provider from environment or use default
-            let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-            let model =
-                std::env::var("MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
 
             // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
