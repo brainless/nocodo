@@ -234,7 +234,7 @@ const FileBrowser: Component<FileBrowserProps> = props => {
                       {file.is_directory ? '-' : formatSize(file.size ?? 0)}
                     </td>
                     <td class='px-4 py-2 text-sm text-gray-600'>
-                      {formatDate(file.modified_at ?? Date.now() / 1000)}
+                      {formatDate(file.modified_at ? Number(file.modified_at) : undefined)}
                     </td>
                     {!props.hideDelete && (
                       <td class='px-4 py-2 text-right'>

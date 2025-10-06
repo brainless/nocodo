@@ -16,6 +16,7 @@ use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
+use std::time::UNIX_EPOCH;
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
 };
@@ -545,38 +546,42 @@ pub async fn list_files(
             .strip_prefix(&canonical_project_path)
             .map_err(|_| AppError::Internal("Failed to calculate relative path".to_string()))?;
 
-        let file_info = FileInfo {
-            name,
-            path: relative_file_path.to_string_lossy().to_string(),
-            absolute: path.to_string_lossy().to_string(),
-            file_type: if metadata.is_dir() {
-                FileType::Directory
-            } else {
-                FileType::File
-            },
-            ignored: false, // TODO: Implement .gitignore checking for API responses
-        };
+         let is_directory = metadata.is_dir();
+         let file_info = FileInfo {
+             name,
+             path: relative_file_path.to_string_lossy().to_string(),
+             absolute: path.to_string_lossy().to_string(),
+             file_type: if is_directory {
+                 FileType::Directory
+             } else {
+                 FileType::File
+             },
+             ignored: false, // TODO: Implement .gitignore checking for API responses
+             is_directory,
+             size: if is_directory { None } else { metadata.len().into() },
+             modified_at: if is_directory { None } else {
+                 metadata.modified().ok().map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs().to_string())
+             },
+         };
 
         files.push(file_info);
     }
 
-    // Sort files: directories first, then by name
-    files.sort_by(|a, b| match (&a.file_type, &b.file_type) {
-        (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
-        (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
-        _ => a.name.cmp(&b.name),
-    });
+     // Sort files: directories first, then by name
+     files.sort_by(|a, b| match (&a.file_type, &b.file_type) {
+         (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
+         (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
+         _ => a.name.cmp(&b.name),
+     });
 
-    // Generate tree representation
-    let tree_output = format_files_as_tree(&files, &canonical_project_path);
-
-    let response = FileListResponse {
-        files: tree_output,
-        current_path: relative_path.to_string(),
-        total_files: files.len() as u32,
-        truncated: false, // API doesn't implement truncation for now
-        limit: 1000,      // Default limit
-    };
+     let total_files = files.len() as u32;
+     let response = FileListResponse {
+         files,
+         current_path: relative_path.to_string(),
+         total_files,
+         truncated: false, // API doesn't implement truncation for now
+         limit: 1000,      // Default limit
+     };
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -650,17 +655,23 @@ pub async fn create_file(
         .unwrap_or("<invalid>")
         .to_string();
 
-    let file_info = FileInfo {
-        name: file_name,
-        path: req.path.clone(),
-        absolute: full_path.to_string_lossy().to_string(),
-        file_type: if metadata.is_dir() {
-            FileType::Directory
-        } else {
-            FileType::File
-        },
-        ignored: false, // New files are not ignored
-    };
+     let is_directory = metadata.is_dir();
+     let file_info = FileInfo {
+         name: file_name,
+         path: req.path.clone(),
+         absolute: full_path.to_string_lossy().to_string(),
+         file_type: if is_directory {
+             FileType::Directory
+         } else {
+             FileType::File
+         },
+         ignored: false, // New files are not ignored
+         is_directory,
+         size: if is_directory { None } else { metadata.len().into() },
+         modified_at: if is_directory { None } else {
+             metadata.modified().ok().map(|t| format!("{:?}", t))
+         },
+     };
 
     tracing::info!(
         "Created {} '{}' in project '{}'",

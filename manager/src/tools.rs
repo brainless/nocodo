@@ -8,6 +8,7 @@ use base64::Engine;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
 #[allow(clippy::needless_borrow)]
@@ -589,24 +590,30 @@ impl ToolExecutor {
         let relative_path_str = relative_path.to_string_lossy().to_string();
         let absolute_path_str = path.to_string_lossy().to_string();
 
-        // Check if file is ignored by .gitignore
-        let ignored = self.is_ignored_by_gitignore(path)?;
+         // Check if file is ignored by .gitignore
+         let ignored = self.is_ignored_by_gitignore(path)?;
+         let is_directory = metadata.is_dir();
 
-        Ok(FileInfo {
-            name: path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
-            path: relative_path_str,
-            absolute: absolute_path_str,
-            file_type: if metadata.is_dir() {
-                FileType::Directory
-            } else {
-                FileType::File
-            },
-            ignored,
-        })
+         Ok(FileInfo {
+             name: path
+                 .file_name()
+                 .unwrap_or_default()
+                 .to_string_lossy()
+                 .to_string(),
+             path: relative_path_str,
+             absolute: absolute_path_str,
+             file_type: if is_directory {
+                 FileType::Directory
+             } else {
+                 FileType::File
+             },
+             ignored,
+             is_directory,
+             size: if is_directory { None } else { metadata.len().into() },
+             modified_at: if is_directory { None } else {
+                 metadata.modified().ok().map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs().to_string())
+             },
+         })
     }
 
     /// Format files as a tree structure
