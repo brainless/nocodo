@@ -38,7 +38,10 @@ async fn test_llm_e2e_saleor() {
 
     // Validate that the requested model is available for this provider
     if !provider.models.contains(&model) {
-        println!("❌ Error: Model '{}' not available for provider '{}'", model, provider.name);
+        println!(
+            "❌ Error: Model '{}' not available for provider '{}'",
+            model, provider.name
+        );
         println!("   Available models: {:?}", provider.models);
         return;
     }
@@ -80,13 +83,13 @@ async fn test_llm_e2e_saleor() {
         .await
         .expect("Failed to create project from scenario");
 
-     // Follow the exact manager-web homepage form flow:
-     // 1. Create the work
-     let work_request = CreateWorkRequest {
-         title: "LLM E2E Test Work".to_string(),
-         project_id: Some(project_id.clone()),
-         model: Some(model.clone()),
-     };
+    // Follow the exact manager-web homepage form flow:
+    // 1. Create the work
+    let work_request = CreateWorkRequest {
+        title: "LLM E2E Test Work".to_string(),
+        project_id: Some(project_id.clone()),
+        model: Some(model.clone()),
+    };
 
     let req = test::TestRequest::post()
         .uri("/work")

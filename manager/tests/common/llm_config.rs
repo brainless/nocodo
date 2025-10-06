@@ -58,17 +58,23 @@ impl LlmTestConfig {
         // Auto-detect available API keys and validate against actual providers
         if env::var("GROK_API_KEY").is_ok() || env::var("XAI_API_KEY").is_ok() {
             let name = forced_provider.as_deref().unwrap_or("xai");
-            if let Some(provider_config) = LlmProviderTestConfig::xai_with_validation(name, forced_model.as_deref()) {
+            if let Some(provider_config) =
+                LlmProviderTestConfig::xai_with_validation(name, forced_model.as_deref())
+            {
                 providers.push(provider_config);
             }
         }
         if env::var("OPENAI_API_KEY").is_ok() {
-            if let Some(provider_config) = LlmProviderTestConfig::openai_with_validation(forced_model.as_deref()) {
+            if let Some(provider_config) =
+                LlmProviderTestConfig::openai_with_validation(forced_model.as_deref())
+            {
                 providers.push(provider_config);
             }
         }
         if env::var("ANTHROPIC_API_KEY").is_ok() {
-            if let Some(provider_config) = LlmProviderTestConfig::anthropic_with_validation(forced_model.as_deref()) {
+            if let Some(provider_config) =
+                LlmProviderTestConfig::anthropic_with_validation(forced_model.as_deref())
+            {
                 providers.push(provider_config);
             }
         }
@@ -151,7 +157,10 @@ impl LlmProviderTestConfig {
         // If a specific model was requested, validate it exists
         if let Some(model) = requested_model {
             if !available_models.contains(&model.to_string()) {
-                eprintln!("❌ Error: Model '{}' not available for OpenAI provider", model);
+                eprintln!(
+                    "❌ Error: Model '{}' not available for OpenAI provider",
+                    model
+                );
                 eprintln!("   Available models: {:?}", available_models);
                 return None;
             }
@@ -190,7 +199,10 @@ impl LlmProviderTestConfig {
         // If a specific model was requested, validate it exists
         if let Some(model) = requested_model {
             if !available_models.contains(&model.to_string()) {
-                eprintln!("❌ Error: Model '{}' not available for Anthropic provider", model);
+                eprintln!(
+                    "❌ Error: Model '{}' not available for Anthropic provider",
+                    model
+                );
                 eprintln!("   Available models: {:?}", available_models);
                 return None;
             }

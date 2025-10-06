@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 /// Provider type enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum ProviderType {
     OpenAI,
     Anthropic,
@@ -42,10 +43,12 @@ pub trait LlmModel: Send + Sync {
     /// Model identity
     fn id(&self) -> &str;
     fn name(&self) -> &str;
+    #[allow(dead_code)]
     fn provider_id(&self) -> &str;
 
     /// Model specifications
     fn context_length(&self) -> u32;
+    #[allow(dead_code)]
     fn max_output_tokens(&self) -> Option<u32>;
     fn supports_streaming(&self) -> bool;
     fn supports_tool_calling(&self) -> bool;
@@ -61,6 +64,7 @@ pub trait LlmModel: Send + Sync {
     fn default_max_tokens(&self) -> Option<u32>;
 
     /// Token counting (model-specific tokenization)
+    #[allow(dead_code)]
     fn estimate_tokens(&self, text: &str) -> u32;
 }
 
@@ -68,28 +72,38 @@ pub trait LlmModel: Send + Sync {
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
     /// Get provider information
+    #[allow(dead_code)]
     fn id(&self) -> &str;
+    #[allow(dead_code)]
     fn name(&self) -> &str;
+    #[allow(dead_code)]
     fn provider_type(&self) -> ProviderType;
 
     /// Provider capabilities
+    #[allow(dead_code)]
     fn supports_streaming(&self) -> bool;
+    #[allow(dead_code)]
     fn supports_tool_calling(&self) -> bool;
+    #[allow(dead_code)]
     fn supports_vision(&self) -> bool;
 
     /// Model management
     async fn list_available_models(&self) -> Result<Vec<Arc<dyn LlmModel>>, anyhow::Error>;
+    #[allow(dead_code)]
     fn get_model(&self, model_id: &str) -> Option<Arc<dyn LlmModel>>;
 
     /// Connection testing
+    #[allow(dead_code)]
     async fn test_connection(&self) -> Result<(), anyhow::Error>;
 
     /// Create client for specific model
+    #[allow(dead_code)]
     fn create_client(&self, model_id: &str) -> Result<Box<dyn LlmClient>, anyhow::Error>;
 }
 
 /// Provider error type
 #[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
 pub enum ProviderError {
     #[error("Authentication failed: {0}")]
     Authentication(String),
@@ -362,13 +376,18 @@ pub struct OpenAiCompatibleClient {
 }
 
 impl OpenAiCompatibleClient {
-    pub fn new(config: LlmProviderConfig) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let model = None; // Will be set later if needed
-        Ok(Self { client, config, model })
-    }
+     pub fn new(config: LlmProviderConfig) -> Result<Self> {
+         let client = reqwest::Client::new();
+         let model = None; // Will be set later if needed
+         Ok(Self {
+             client,
+             config,
+             model,
+         })
+     }
 
-    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
+     #[allow(dead_code)]
+     pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
         self.model = Some(model);
         self
     }
@@ -1068,15 +1087,20 @@ impl ClaudeClient {
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
         let model = None; // Will be set later if needed
-        Ok(Self { client, config, model })
-    }
+        Ok(Self {
+            client,
+            config,
+            model,
+        })
+     }
 
-    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
-        self.model = Some(model);
-        self
-    }
+     #[allow(dead_code)]
+     pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
+         self.model = Some(model);
+         self
+     }
 
-    fn get_api_url(&self) -> String {
+     fn get_api_url(&self) -> String {
         if let Some(base_url) = &self.config.base_url {
             format!("{}/v1/messages", base_url.trim_end_matches('/'))
         } else {
@@ -1560,6 +1584,7 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
 }
 
 /// Factory function to create LLM clients with model information
+#[allow(dead_code)]
 pub fn create_llm_client_with_model(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
     // For now, just use the regular create_llm_client
     // TODO: Implement proper model-aware client creation
@@ -1567,6 +1592,7 @@ pub fn create_llm_client_with_model(config: LlmProviderConfig) -> Result<Box<dyn
 }
 
 /// Factory function to create LLM providers
+#[allow(dead_code)]
 pub fn create_llm_provider(config: LlmProviderConfig) -> Result<Box<dyn LlmProvider>> {
     match config.provider.to_lowercase().as_str() {
         "openai" => {

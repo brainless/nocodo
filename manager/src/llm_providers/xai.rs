@@ -1,4 +1,7 @@
-use crate::llm_client::{LlmProvider, LlmModel, LlmClient, ProviderType, ModelCapabilities, ModelPricing, ProviderError, create_llm_client};
+use crate::llm_client::{
+    create_llm_client, LlmClient, LlmModel, LlmProvider, ModelCapabilities, ModelPricing,
+    ProviderError, ProviderType,
+};
 use crate::models::LlmProviderConfig;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -24,9 +27,7 @@ impl XaiProvider {
 
     fn initialize_models(&mut self) {
         // Initialize xAI models
-        let models: Vec<Arc<dyn LlmModel>> = vec![
-            Arc::new(GrokCodeFast1Model::new()),
-        ];
+        let models: Vec<Arc<dyn LlmModel>> = vec![Arc::new(GrokCodeFast1Model::new())];
 
         for model in models {
             self.models.insert(model.id().to_string(), model);
@@ -114,6 +115,12 @@ impl GrokCodeFast1Model {
             }),
         }
     }
+ }
+
+impl Default for GrokCodeFast1Model {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LlmModel for GrokCodeFast1Model {
@@ -154,11 +161,15 @@ impl LlmModel for GrokCodeFast1Model {
     }
 
     fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn default_temperature(&self) -> Option<f32> {

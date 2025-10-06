@@ -290,18 +290,18 @@ pub enum FileType {
     Directory,
 }
 
- #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
- #[ts(export)]
- pub struct FileInfo {
-     pub name: String,
-     pub path: String,        // relative path
-     pub absolute: String,    // absolute path
-     pub file_type: FileType, // enum: File, Directory
-     pub ignored: bool,       // whether file is ignored by .gitignore
-     pub is_directory: bool,  // computed from file_type
-     pub size: Option<u64>,   // file size in bytes, None for directories
-     pub modified_at: Option<String>, // ISO 8601 timestamp, None for directories
- }
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export)]
+pub struct FileInfo {
+    pub name: String,
+    pub path: String,                // relative path
+    pub absolute: String,            // absolute path
+    pub file_type: FileType,         // enum: File, Directory
+    pub ignored: bool,               // whether file is ignored by .gitignore
+    pub is_directory: bool,          // computed from file_type
+    pub size: Option<u64>,           // file size in bytes, None for directories
+    pub modified_at: Option<String>, // ISO 8601 timestamp, None for directories
+}
 
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -310,17 +310,17 @@ pub struct FileListRequest {
     pub path: Option<String>, // Relative path within project, defaults to root
 }
 
- #[derive(Debug, Serialize, Deserialize, TS)]
- #[ts(export)]
- pub struct FileListResponse {
-     pub files: Vec<FileInfo>, // List of files and directories
-     pub current_path: String, // Current directory being listed
-     #[ts(type = "number")]
-     pub total_files: u32, // Total number of files found
-     pub truncated: bool,      // Whether results were limited to 100
-     #[ts(type = "number")]
-     pub limit: u32, // Maximum files returned (100)
- }
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileListResponse {
+    pub files: Vec<FileInfo>, // List of files and directories
+    pub current_path: String, // Current directory being listed
+    #[ts(type = "number")]
+    pub total_files: u32, // Total number of files found
+    pub truncated: bool,      // Whether results were limited to 100
+    #[ts(type = "number")]
+    pub limit: u32, // Maximum files returned (100)
+}
 
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]

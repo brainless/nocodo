@@ -1,4 +1,7 @@
-use crate::llm_client::{LlmProvider, LlmModel, LlmClient, ProviderType, ModelCapabilities, ModelPricing, ProviderError, create_llm_client};
+use crate::llm_client::{
+    create_llm_client, LlmClient, LlmModel, LlmProvider, ModelCapabilities, ModelPricing,
+    ProviderError, ProviderType,
+};
 use crate::models::LlmProviderConfig;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -24,10 +27,8 @@ impl OpenAiProvider {
 
     fn initialize_models(&mut self) {
         // Initialize OpenAI models
-        let models: Vec<Arc<dyn LlmModel>> = vec![
-            Arc::new(Gpt5Model::new()),
-            Arc::new(Gpt5CodexModel::new()),
-        ];
+        let models: Vec<Arc<dyn LlmModel>> =
+            vec![Arc::new(Gpt5Model::new()), Arc::new(Gpt5CodexModel::new())];
 
         for model in models {
             self.models.insert(model.id().to_string(), model);
@@ -115,6 +116,12 @@ impl Gpt5Model {
             }),
         }
     }
+ }
+
+impl Default for Gpt5Model {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LlmModel for Gpt5Model {
@@ -155,11 +162,15 @@ impl LlmModel for Gpt5Model {
     }
 
     fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn default_temperature(&self) -> Option<f32> {
@@ -197,6 +208,12 @@ impl Gpt5CodexModel {
                 reasoning_cost_per_million_tokens: Some(3.0),
             }),
         }
+    }
+ }
+
+impl Default for Gpt5CodexModel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -238,11 +255,15 @@ impl LlmModel for Gpt5CodexModel {
     }
 
     fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn default_temperature(&self) -> Option<f32> {

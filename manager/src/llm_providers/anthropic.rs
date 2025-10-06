@@ -1,4 +1,7 @@
-use crate::llm_client::{LlmProvider, LlmModel, LlmClient, ProviderType, ModelCapabilities, ModelPricing, ProviderError, create_llm_client};
+use crate::llm_client::{
+    create_llm_client, LlmClient, LlmModel, LlmProvider, ModelCapabilities, ModelPricing,
+    ProviderError, ProviderType,
+};
 use crate::models::LlmProviderConfig;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -117,6 +120,12 @@ impl ClaudeSonnet4Model {
             }),
         }
     }
+ }
+
+impl Default for ClaudeSonnet4Model {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LlmModel for ClaudeSonnet4Model {
@@ -157,11 +166,15 @@ impl LlmModel for ClaudeSonnet4Model {
     }
 
     fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn default_temperature(&self) -> Option<f32> {
@@ -199,6 +212,12 @@ impl Claude3SonnetModel {
                 reasoning_cost_per_million_tokens: None,
             }),
         }
+    }
+ }
+
+impl Default for Claude3SonnetModel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -240,11 +259,15 @@ impl LlmModel for Claude3SonnetModel {
     }
 
     fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn default_temperature(&self) -> Option<f32> {
@@ -282,6 +305,12 @@ impl Claude3HaikuModel {
                 reasoning_cost_per_million_tokens: None,
             }),
         }
+    }
+ }
+
+impl Default for Claude3HaikuModel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -323,11 +352,15 @@ impl LlmModel for Claude3HaikuModel {
     }
 
     fn input_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn output_cost_per_token(&self) -> Option<f64> {
-        self.pricing.as_ref().map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
     }
 
     fn default_temperature(&self) -> Option<f32> {

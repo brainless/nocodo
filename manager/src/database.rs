@@ -954,21 +954,20 @@ impl Database {
             crate::models::MessageAuthorType::Ai => "ai",
         };
 
-
         conn.execute(
             "INSERT INTO work_messages (id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            &[
-                &message.id as &dyn rusqlite::ToSql,
-                &message.work_id as &dyn rusqlite::ToSql,
-                &message.content as &dyn rusqlite::ToSql,
-                &content_type_str as &dyn rusqlite::ToSql,
-                &code_language as &dyn rusqlite::ToSql,
-                &author_type_str as &dyn rusqlite::ToSql,
-                &message.author_id as &dyn rusqlite::ToSql,
-                &message.sequence_order as &dyn rusqlite::ToSql,
-                &message.created_at as &dyn rusqlite::ToSql,
-            ],
+             [
+                 &message.id as &dyn rusqlite::ToSql,
+                 &message.work_id as &dyn rusqlite::ToSql,
+                 &message.content as &dyn rusqlite::ToSql,
+                 &content_type_str as &dyn rusqlite::ToSql,
+                 &code_language as &dyn rusqlite::ToSql,
+                 &author_type_str as &dyn rusqlite::ToSql,
+                 &message.author_id as &dyn rusqlite::ToSql,
+                 &message.sequence_order as &dyn rusqlite::ToSql,
+                 &message.created_at as &dyn rusqlite::ToSql,
+             ],
         )?;
 
         tracing::info!(

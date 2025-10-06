@@ -2,6 +2,8 @@ use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
 use crate::llm_agent::LlmAgent;
+use crate::llm_client::LlmProvider;
+use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
@@ -10,13 +12,10 @@ use crate::models::{
     ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
     WorkMessageResponse, WorkResponse,
 };
-use crate::llm_client::LlmProvider;
-use crate::models::LlmProviderConfig;
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpResponse, Result};
 use handlebars::Handlebars;
-use std::time::UNIX_EPOCH;
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
 };
@@ -27,6 +26,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 pub struct AppState {
     pub database: Arc<Database>,
@@ -546,42 +546,53 @@ pub async fn list_files(
             .strip_prefix(&canonical_project_path)
             .map_err(|_| AppError::Internal("Failed to calculate relative path".to_string()))?;
 
-         let is_directory = metadata.is_dir();
-         let file_info = FileInfo {
-             name,
-             path: relative_file_path.to_string_lossy().to_string(),
-             absolute: path.to_string_lossy().to_string(),
-             file_type: if is_directory {
-                 FileType::Directory
-             } else {
-                 FileType::File
-             },
-             ignored: false, // TODO: Implement .gitignore checking for API responses
-             is_directory,
-             size: if is_directory { None } else { metadata.len().into() },
-             modified_at: if is_directory { None } else {
-                 metadata.modified().ok().map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs().to_string())
-             },
-         };
+        let is_directory = metadata.is_dir();
+        let file_info = FileInfo {
+            name,
+            path: relative_file_path.to_string_lossy().to_string(),
+            absolute: path.to_string_lossy().to_string(),
+            file_type: if is_directory {
+                FileType::Directory
+            } else {
+                FileType::File
+            },
+            ignored: false, // TODO: Implement .gitignore checking for API responses
+            is_directory,
+            size: if is_directory {
+                None
+            } else {
+                metadata.len().into()
+            },
+            modified_at: if is_directory {
+                None
+            } else {
+                metadata.modified().ok().map(|t| {
+                    t.duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string()
+                })
+            },
+        };
 
         files.push(file_info);
     }
 
-     // Sort files: directories first, then by name
-     files.sort_by(|a, b| match (&a.file_type, &b.file_type) {
-         (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
-         (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
-         _ => a.name.cmp(&b.name),
-     });
+    // Sort files: directories first, then by name
+    files.sort_by(|a, b| match (&a.file_type, &b.file_type) {
+        (FileType::Directory, FileType::File) => std::cmp::Ordering::Less,
+        (FileType::File, FileType::Directory) => std::cmp::Ordering::Greater,
+        _ => a.name.cmp(&b.name),
+    });
 
-     let total_files = files.len() as u32;
-     let response = FileListResponse {
-         files,
-         current_path: relative_path.to_string(),
-         total_files,
-         truncated: false, // API doesn't implement truncation for now
-         limit: 1000,      // Default limit
-     };
+    let total_files = files.len() as u32;
+    let response = FileListResponse {
+        files,
+        current_path: relative_path.to_string(),
+        total_files,
+        truncated: false, // API doesn't implement truncation for now
+        limit: 1000,      // Default limit
+    };
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -655,23 +666,29 @@ pub async fn create_file(
         .unwrap_or("<invalid>")
         .to_string();
 
-     let is_directory = metadata.is_dir();
-     let file_info = FileInfo {
-         name: file_name,
-         path: req.path.clone(),
-         absolute: full_path.to_string_lossy().to_string(),
-         file_type: if is_directory {
-             FileType::Directory
-         } else {
-             FileType::File
-         },
-         ignored: false, // New files are not ignored
-         is_directory,
-         size: if is_directory { None } else { metadata.len().into() },
-         modified_at: if is_directory { None } else {
-             metadata.modified().ok().map(|t| format!("{:?}", t))
-         },
-     };
+    let is_directory = metadata.is_dir();
+    let file_info = FileInfo {
+        name: file_name,
+        path: req.path.clone(),
+        absolute: full_path.to_string_lossy().to_string(),
+        file_type: if is_directory {
+            FileType::Directory
+        } else {
+            FileType::File
+        },
+        ignored: false, // New files are not ignored
+        is_directory,
+        size: if is_directory {
+            None
+        } else {
+            metadata.len().into()
+        },
+        modified_at: if is_directory {
+            None
+        } else {
+            metadata.modified().ok().map(|t| format!("{:?}", t))
+        },
+    };
 
     tracing::info!(
         "Created {} '{}' in project '{}'",
@@ -943,7 +960,8 @@ pub async fn create_ai_session(
 
             // Get provider from environment or use default
             let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-            let model = std::env::var("MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+            let model =
+                std::env::var("MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
 
             // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
@@ -1760,7 +1778,6 @@ pub async fn add_message_to_work(
     let work_id = path.into_inner();
     let req = request.into_inner();
 
-
     // Verify work exists
     let _work = data.database.get_work_by_id(&work_id)?;
 
@@ -1783,7 +1800,6 @@ pub async fn add_message_to_work(
         sequence_order,
         created_at: now,
     };
-
 
     // Save to database
     data.database.create_work_message(&message)?;
@@ -2009,7 +2025,9 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
     if let Some(api_key_config) = &config.api_keys {
         tracing::info!("API keys config found, checking individual keys");
         // OpenAI models
-        if api_key_config.openai_api_key.is_some() && !api_key_config.openai_api_key.as_ref().unwrap().is_empty() {
+        if api_key_config.openai_api_key.is_some()
+            && !api_key_config.openai_api_key.as_ref().unwrap().is_empty()
+        {
             tracing::info!("OpenAI API key is configured, creating provider");
             let openai_config = LlmProviderConfig {
                 provider: "openai".to_string(),
@@ -2055,7 +2073,13 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
         }
 
         // Anthropic models
-        if api_key_config.anthropic_api_key.is_some() && !api_key_config.anthropic_api_key.as_ref().unwrap().is_empty() {
+        if api_key_config.anthropic_api_key.is_some()
+            && !api_key_config
+                .anthropic_api_key
+                .as_ref()
+                .unwrap()
+                .is_empty()
+        {
             tracing::info!("Anthropic API key is configured, creating provider");
             let anthropic_config = LlmProviderConfig {
                 provider: "anthropic".to_string(),
@@ -2103,7 +2127,9 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
         }
 
         // xAI models
-        if api_key_config.xai_api_key.is_some() && !api_key_config.xai_api_key.as_ref().unwrap().is_empty() {
+        if api_key_config.xai_api_key.is_some()
+            && !api_key_config.xai_api_key.as_ref().unwrap().is_empty()
+        {
             tracing::info!("xAI API key is configured, creating provider");
             let xai_config = LlmProviderConfig {
                 provider: "xai".to_string(),
@@ -2204,85 +2230,4 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Format files as a tree structure for API responses
-fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
-    let mut output = String::new();
 
-    // Add root directory name
-    let root_name = base_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    output.push_str(&root_name);
-    output.push('\n');
-
-    // Group files by their directory depth and parent
-    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
-        std::collections::BTreeMap::new();
-
-    for file in files.iter() {
-        let path_parts: Vec<&str> = file.path.split('/').collect();
-        let depth = path_parts.len().saturating_sub(1);
-
-        // Create a key for the parent directory at this depth
-        let parent_key = if depth == 0 {
-            "".to_string()
-        } else {
-            path_parts[..depth].join("/")
-        };
-
-        file_tree.entry(parent_key).or_default().push(file);
-    }
-
-    // Recursive function to build tree
-    fn build_tree_level(
-        output: &mut String,
-        tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
-        current_path: &str,
-        prefix: &str,
-        _is_last: bool,
-    ) {
-        let files = match tree.get(current_path) {
-            Some(files) => files,
-            None => return,
-        };
-
-        for (i, file) in files.iter().enumerate() {
-            let is_last_item = i == files.len() - 1;
-            let item_prefix = if is_last_item {
-                "└── "
-            } else {
-                "├── "
-            };
-            let next_prefix = if is_last_item { "    " } else { "│   " };
-
-            output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
-
-            if file.ignored {
-                output.push_str(" (ignored)");
-            }
-
-            output.push('\n');
-
-            // If it's a directory, recurse
-            if matches!(file.file_type, FileType::Directory) {
-                let child_path = if current_path.is_empty() {
-                    file.name.clone()
-                } else {
-                    format!("{}/{}", current_path, file.name)
-                };
-                build_tree_level(
-                    output,
-                    tree,
-                    &child_path,
-                    &format!("{}{}", prefix, next_prefix),
-                    is_last_item,
-                );
-            }
-        }
-    }
-
-    build_tree_level(&mut output, &file_tree, "", "", true);
-    output
-}
