@@ -1667,7 +1667,7 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
 
         // Fallback to environment variables
         let env_var = match provider_lower.as_str() {
-            "grok" => "GROK_API_KEY",
+            "grok" | "xai" => "XAI_API_KEY",
             "openai" => "OPENAI_API_KEY",
             "anthropic" | "claude" => "ANTHROPIC_API_KEY",
             _ => {
@@ -1688,7 +1688,7 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
     /// Get base URL for provider
     fn get_base_url(&self, provider: &str) -> Option<String> {
         match provider.to_lowercase().as_str() {
-            "grok" => Some("https://api.x.ai".to_string()),
+            "grok" | "xai" => Some("https://api.x.ai".to_string()),
             "openai" => None, // Use default OpenAI URL
             "anthropic" | "claude" => Some("https://api.anthropic.com".to_string()),
             _ => None,
@@ -1731,8 +1731,8 @@ Please provide a corrected JSON tool call that follows the exact TypeScript inte
                     || model.to_lowercase().contains("sonnet")
                     || model.to_lowercase().contains("haiku")
             }
-            "grok" => {
-                // Grok Code Fast 1 and newer models support native function calling
+            "grok" | "xai" => {
+                // xAI Grok Code Fast 1 and newer models support native function calling
                 model.to_lowercase().contains("grok-code-fast")
                     || model.to_lowercase().contains("grok-2")
                     || model.to_lowercase().contains("grok-3")
