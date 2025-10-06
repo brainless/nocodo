@@ -2229,5 +2229,3 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
     let response = crate::models::SupportedModelsResponse { models };
     Ok(HttpResponse::Ok().json(response))
 }
-
-

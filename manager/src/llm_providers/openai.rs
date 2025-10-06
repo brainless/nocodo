@@ -116,7 +116,7 @@ impl Gpt5Model {
             }),
         }
     }
- }
+}
 
 impl Default for Gpt5Model {
     fn default() -> Self {
@@ -209,7 +209,7 @@ impl Gpt5CodexModel {
             }),
         }
     }
- }
+}
 
 impl Default for Gpt5CodexModel {
     fn default() -> Self {

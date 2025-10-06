@@ -376,18 +376,18 @@ pub struct OpenAiCompatibleClient {
 }
 
 impl OpenAiCompatibleClient {
-     pub fn new(config: LlmProviderConfig) -> Result<Self> {
-         let client = reqwest::Client::new();
-         let model = None; // Will be set later if needed
-         Ok(Self {
-             client,
-             config,
-             model,
-         })
-     }
+    pub fn new(config: LlmProviderConfig) -> Result<Self> {
+        let client = reqwest::Client::new();
+        let model = None; // Will be set later if needed
+        Ok(Self {
+            client,
+            config,
+            model,
+        })
+    }
 
-     #[allow(dead_code)]
-     pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
+    #[allow(dead_code)]
+    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
         self.model = Some(model);
         self
     }
@@ -1092,15 +1092,15 @@ impl ClaudeClient {
             config,
             model,
         })
-     }
+    }
 
-     #[allow(dead_code)]
-     pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
-         self.model = Some(model);
-         self
-     }
+    #[allow(dead_code)]
+    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
+        self.model = Some(model);
+        self
+    }
 
-     fn get_api_url(&self) -> String {
+    fn get_api_url(&self) -> String {
         if let Some(base_url) = &self.config.base_url {
             format!("{}/v1/messages", base_url.trim_end_matches('/'))
         } else {

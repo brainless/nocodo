@@ -120,7 +120,7 @@ impl ClaudeSonnet4Model {
             }),
         }
     }
- }
+}
 
 impl Default for ClaudeSonnet4Model {
     fn default() -> Self {
@@ -213,7 +213,7 @@ impl Claude3SonnetModel {
             }),
         }
     }
- }
+}
 
 impl Default for Claude3SonnetModel {
     fn default() -> Self {
@@ -306,7 +306,7 @@ impl Claude3HaikuModel {
             }),
         }
     }
- }
+}
 
 impl Default for Claude3HaikuModel {
     fn default() -> Self {

@@ -64,7 +64,7 @@ const ToolIcon: Component<{
     <WorkWidget
       type='model'
       value={getToolDisplayName(props.toolName, props.model)}
-      className={props.className}
+      class={props.className}
     />
   );
 };

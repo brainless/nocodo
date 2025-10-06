@@ -115,7 +115,7 @@ impl GrokCodeFast1Model {
             }),
         }
     }
- }
+}
 
 impl Default for GrokCodeFast1Model {
     fn default() -> Self {
