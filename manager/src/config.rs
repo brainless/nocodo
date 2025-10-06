@@ -12,7 +12,7 @@ pub struct AppConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ApiKeysConfig {
-    pub grok_api_key: Option<String>,
+    pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
 }
@@ -76,7 +76,7 @@ path = "~/.local/share/nocodo/manager.db"
 path = "/tmp/nocodo-manager.sock"
 
 [api_keys]
-# grok_api_key = "your-grok-key"
+# xai_api_key = "your-xai-key"
 # openai_api_key = "your-openai-key"
 # anthropic_api_key = "your-anthropic-key"
 "#;

@@ -324,6 +324,7 @@ impl SocketServer {
                     title: req.title,
                     project_id: req.project_id,
                     tool_name: None,
+                    model: req.model,
                     status: "active".to_string(),
                     created_at: now,
                     updated_at: now,

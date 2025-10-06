@@ -5,6 +5,7 @@ export interface Work {
   title: string;
   project_id: string | null;
   tool_name: string | null;
+  model: string | null;
   status: string;
   created_at: number;
   updated_at: number;

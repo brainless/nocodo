@@ -4,4 +4,5 @@ export interface ListFilesRequest {
   path: string;
   recursive?: boolean;
   include_hidden?: boolean;
+  max_files?: number | undefined;
 }

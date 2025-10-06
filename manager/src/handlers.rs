@@ -2,6 +2,8 @@ use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
 use crate::llm_agent::LlmAgent;
+use crate::llm_client::LlmProvider;
+use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
@@ -24,6 +26,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 pub struct AppState {
     pub database: Arc<Database>,
@@ -543,16 +546,33 @@ pub async fn list_files(
             .strip_prefix(&canonical_project_path)
             .map_err(|_| AppError::Internal("Failed to calculate relative path".to_string()))?;
 
+        let is_directory = metadata.is_dir();
         let file_info = FileInfo {
             name,
             path: relative_file_path.to_string_lossy().to_string(),
             absolute: path.to_string_lossy().to_string(),
-            file_type: if metadata.is_dir() {
+            file_type: if is_directory {
                 FileType::Directory
             } else {
                 FileType::File
             },
             ignored: false, // TODO: Implement .gitignore checking for API responses
+            is_directory,
+            size: if is_directory {
+                None
+            } else {
+                metadata.len().into()
+            },
+            modified_at: if is_directory {
+                None
+            } else {
+                metadata.modified().ok().map(|t| {
+                    t.duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string()
+                })
+            },
         };
 
         files.push(file_info);
@@ -565,13 +585,11 @@ pub async fn list_files(
         _ => a.name.cmp(&b.name),
     });
 
-    // Generate tree representation
-    let tree_output = format_files_as_tree(&files, &canonical_project_path);
-
+    let total_files = files.len() as u32;
     let response = FileListResponse {
-        files: tree_output,
+        files,
         current_path: relative_path.to_string(),
-        total_files: files.len() as u32,
+        total_files,
         truncated: false, // API doesn't implement truncation for now
         limit: 1000,      // Default limit
     };
@@ -648,16 +666,28 @@ pub async fn create_file(
         .unwrap_or("<invalid>")
         .to_string();
 
+    let is_directory = metadata.is_dir();
     let file_info = FileInfo {
         name: file_name,
         path: req.path.clone(),
         absolute: full_path.to_string_lossy().to_string(),
-        file_type: if metadata.is_dir() {
+        file_type: if is_directory {
             FileType::Directory
         } else {
             FileType::File
         },
         ignored: false, // New files are not ignored
+        is_directory,
+        size: if is_directory {
+            None
+        } else {
+            metadata.len().into()
+        },
+        modified_at: if is_directory {
+            None
+        } else {
+            metadata.modified().ok().map(|t| format!("{:?}", t))
+        },
     };
 
     tracing::info!(
@@ -928,12 +958,17 @@ pub async fn create_ai_session(
             updated_work.tool_name = Some("LLM Agent (Claude Sonnet 4)".to_string());
             data.database.update_work(&updated_work)?;
 
-            // Create LLM agent session with default provider/model
+            // Get provider from environment or use default
+            let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+            let model =
+                std::env::var("MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+
+            // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
                 .create_session(
                     work_id.clone(),
-                    "anthropic".to_string(), // Default provider
-                    "claude-sonnet-4-20250514".to_string(), // Default model
+                    provider,
+                    model,
                     session.project_context.clone(),
                 )
                 .await?;
@@ -1671,6 +1706,7 @@ pub async fn create_work(
         title: req.title,
         project_id: req.project_id,
         tool_name: None,
+        model: req.model,
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
@@ -1907,15 +1943,15 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
         // Grok API Key
         api_keys.push(ApiKeyConfig {
             name: "Grok API Key".to_string(),
-            key: api_key_config.grok_api_key.as_ref().map(|key| {
+            key: api_key_config.xai_api_key.as_ref().map(|key| {
                 if key.is_empty() {
                     "".to_string()
                 } else {
                     format!("{}****", &key[..key.len().min(4)])
                 }
             }),
-            is_configured: api_key_config.grok_api_key.is_some()
-                && !api_key_config.grok_api_key.as_ref().unwrap().is_empty(),
+            is_configured: api_key_config.xai_api_key.is_some()
+                && !api_key_config.xai_api_key.as_ref().unwrap().is_empty(),
         });
 
         // OpenAI API Key
@@ -1950,6 +1986,7 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                     .is_empty(),
         });
     } else {
+        tracing::info!("No API keys config section found");
         // If no API keys config section exists, show as not configured
         api_keys.push(ApiKeyConfig {
             name: "Grok API Key".to_string(),
@@ -1976,85 +2013,219 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Format files as a tree structure for API responses
-fn format_files_as_tree(files: &[FileInfo], base_path: &Path) -> String {
-    let mut output = String::new();
+/// Get list of supported and enabled models
+pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    tracing::info!("get_supported_models endpoint called");
+    let config = &data.config;
+    let mut models = Vec::new();
 
-    // Add root directory name
-    let root_name = base_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    output.push_str(&root_name);
-    output.push('\n');
+    tracing::info!("Checking for configured API keys in get_supported_models");
 
-    // Group files by their directory depth and parent
-    let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
-        std::collections::BTreeMap::new();
-
-    for file in files.iter() {
-        let path_parts: Vec<&str> = file.path.split('/').collect();
-        let depth = path_parts.len().saturating_sub(1);
-
-        // Create a key for the parent directory at this depth
-        let parent_key = if depth == 0 {
-            "".to_string()
-        } else {
-            path_parts[..depth].join("/")
-        };
-
-        file_tree.entry(parent_key).or_default().push(file);
-    }
-
-    // Recursive function to build tree
-    fn build_tree_level(
-        output: &mut String,
-        tree: &std::collections::BTreeMap<String, Vec<&FileInfo>>,
-        current_path: &str,
-        prefix: &str,
-        _is_last: bool,
-    ) {
-        let files = match tree.get(current_path) {
-            Some(files) => files,
-            None => return,
-        };
-
-        for (i, file) in files.iter().enumerate() {
-            let is_last_item = i == files.len() - 1;
-            let item_prefix = if is_last_item {
-                "└── "
-            } else {
-                "├── "
+    // Check if API keys are configured and add enabled models
+    if let Some(api_key_config) = &config.api_keys {
+        tracing::info!("API keys config found, checking individual keys");
+        // OpenAI models
+        if api_key_config.openai_api_key.is_some()
+            && !api_key_config.openai_api_key.as_ref().unwrap().is_empty()
+        {
+            tracing::info!("OpenAI API key is configured, creating provider");
+            let openai_config = LlmProviderConfig {
+                provider: "openai".to_string(),
+                model: "gpt-4".to_string(), // Default model for checking
+                api_key: api_key_config.openai_api_key.as_ref().unwrap().clone(),
+                base_url: None,
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
             };
-            let next_prefix = if is_last_item { "    " } else { "│   " };
 
-            output.push_str(&format!("{}{}{}", prefix, item_prefix, file.name));
-
-            if file.ignored {
-                output.push_str(" (ignored)");
+            match crate::llm_providers::OpenAiProvider::new(openai_config) {
+                Ok(provider) => {
+                    tracing::info!("OpenAI provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} OpenAI models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "openai".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list OpenAI models: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create OpenAI provider: {}", e);
+                }
             }
+        }
 
-            output.push('\n');
+        // Anthropic models
+        if api_key_config.anthropic_api_key.is_some()
+            && !api_key_config
+                .anthropic_api_key
+                .as_ref()
+                .unwrap()
+                .is_empty()
+        {
+            tracing::info!("Anthropic API key is configured, creating provider");
+            let anthropic_config = LlmProviderConfig {
+                provider: "anthropic".to_string(),
+                model: "claude-3-opus-20240229".to_string(), // Default model for checking
+                api_key: api_key_config.anthropic_api_key.as_ref().unwrap().clone(),
+                base_url: None,
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
+            };
 
-            // If it's a directory, recurse
-            if matches!(file.file_type, FileType::Directory) {
-                let child_path = if current_path.is_empty() {
-                    file.name.clone()
-                } else {
-                    format!("{}/{}", current_path, file.name)
-                };
-                build_tree_level(
-                    output,
-                    tree,
-                    &child_path,
-                    &format!("{}{}", prefix, next_prefix),
-                    is_last_item,
-                );
+            match crate::llm_providers::AnthropicProvider::new(anthropic_config) {
+                Ok(provider) => {
+                    tracing::info!("Anthropic provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} Anthropic models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "anthropic".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list Anthropic models: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create Anthropic provider: {}", e);
+                }
             }
+        } else {
+            tracing::info!("Anthropic API key not configured");
+        }
+
+        // xAI models
+        if api_key_config.xai_api_key.is_some()
+            && !api_key_config.xai_api_key.as_ref().unwrap().is_empty()
+        {
+            tracing::info!("xAI API key is configured, creating provider");
+            let xai_config = LlmProviderConfig {
+                provider: "xai".to_string(),
+                model: "grok-code-fast-1".to_string(), // Default model for checking
+                api_key: api_key_config.xai_api_key.as_ref().unwrap().clone(),
+                base_url: Some("https://api.x.ai".to_string()),
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
+            };
+
+            match crate::llm_providers::XaiProvider::new(xai_config) {
+                Ok(provider) => {
+                    tracing::info!("xAI provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} xAI models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "xai".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list xAI models: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create xAI provider: {}", e);
+                }
+            }
+        } else {
+            tracing::info!("xAI API key not configured");
         }
     }
 
-    build_tree_level(&mut output, &file_tree, "", "", true);
-    output
+    // If no models were found but we have API keys configured, try to return default models
+    if models.is_empty() && config.api_keys.is_some() {
+        tracing::info!("No models found from providers, adding default models");
+        // Add some default models for development/testing
+        models.push(crate::models::SupportedModel {
+            provider: "openai".to_string(),
+            model_id: "gpt-5".to_string(),
+            name: "GPT-5".to_string(),
+            context_length: 262144,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.002),
+            output_cost_per_token: Some(0.008),
+            default_temperature: Some(0.7),
+            default_max_tokens: Some(2000),
+        });
+        models.push(crate::models::SupportedModel {
+            provider: "anthropic".to_string(),
+            model_id: "claude-3-sonnet-20240229".to_string(),
+            name: "Claude 3 Sonnet".to_string(),
+            context_length: 200000,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: false,
+            input_cost_per_token: Some(0.003),
+            output_cost_per_token: Some(0.015),
+            default_temperature: Some(0.7),
+            default_max_tokens: Some(1000),
+        });
+        models.push(crate::models::SupportedModel {
+            provider: "xai".to_string(),
+            model_id: "grok-code-fast-1".to_string(),
+            name: "Grok Code Fast 1".to_string(),
+            context_length: 131072,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: false,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.002),
+            output_cost_per_token: Some(0.01),
+            default_temperature: Some(0.7),
+            default_max_tokens: Some(2000),
+        });
+    }
+
+    tracing::info!("Returning {} supported models", models.len());
+    let response = crate::models::SupportedModelsResponse { models };
+    Ok(HttpResponse::Ok().json(response))
 }

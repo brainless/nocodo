@@ -4,6 +4,7 @@ pub mod error;
 pub mod handlers;
 pub mod llm_agent;
 pub mod llm_client;
+pub mod llm_providers;
 pub mod models;
 pub mod socket;
 pub mod templates;
@@ -57,5 +58,8 @@ mod ts_bindings_tests {
         WorkMessageListResponse::export()
             .expect("Failed to export WorkMessageListResponse bindings");
         AddMessageRequest::export().expect("Failed to export AddMessageRequest bindings");
+        SupportedModel::export().expect("Failed to export SupportedModel bindings");
+        SupportedModelsResponse::export()
+            .expect("Failed to export SupportedModelsResponse bindings");
     }
 }

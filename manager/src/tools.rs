@@ -8,6 +8,7 @@ use base64::Engine;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
 #[allow(clippy::needless_borrow)]
@@ -591,6 +592,7 @@ impl ToolExecutor {
 
         // Check if file is ignored by .gitignore
         let ignored = self.is_ignored_by_gitignore(path)?;
+        let is_directory = metadata.is_dir();
 
         Ok(FileInfo {
             name: path
@@ -600,12 +602,28 @@ impl ToolExecutor {
                 .to_string(),
             path: relative_path_str,
             absolute: absolute_path_str,
-            file_type: if metadata.is_dir() {
+            file_type: if is_directory {
                 FileType::Directory
             } else {
                 FileType::File
             },
             ignored,
+            is_directory,
+            size: if is_directory {
+                None
+            } else {
+                metadata.len().into()
+            },
+            modified_at: if is_directory {
+                None
+            } else {
+                metadata.modified().ok().map(|t| {
+                    t.duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string()
+                })
+            },
         })
     }
 

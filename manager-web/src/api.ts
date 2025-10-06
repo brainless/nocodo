@@ -17,6 +17,7 @@ import {
   FileUpdateRequest,
   Project,
   SettingsResponse,
+  SupportedModelsResponse,
   WorkMessageResponse,
   WorkResponse,
 } from './types';
@@ -296,6 +297,11 @@ class ApiClient {
   // Settings endpoint
   async getSettings(): Promise<SettingsResponse> {
     return this.request<SettingsResponse>('/settings');
+  }
+
+  // Supported models endpoint
+  async fetchSupportedModels(): Promise<SupportedModelsResponse> {
+    return this.request<SupportedModelsResponse>('/models');
   }
 }
 

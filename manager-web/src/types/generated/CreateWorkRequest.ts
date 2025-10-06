@@ -3,4 +3,5 @@
 export interface CreateWorkRequest {
   title: string;
   project_id: string | null;
+  model: string | null;
 }

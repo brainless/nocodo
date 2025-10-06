@@ -23,4 +23,8 @@ export type WebSocketMessage =
   | { type: 'LlmAgentChunk'; payload: { session_id: string; content: string } }
   | { type: 'ToolCallStarted'; payload: { session_id: string; call_id: string; tool_name: string } }
   | { type: 'ToolCallCompleted'; payload: { session_id: string; call_id: string; result: string } }
-  | { type: 'ToolCallFailed'; payload: { session_id: string; call_id: string; error: string } };
+  | { type: 'ToolCallFailed'; payload: { session_id: string; call_id: string; error: string } }
+  | {
+      type: 'WorkflowExecutionCompleted';
+      payload: { project_id: string; command_id: string; execution: string };
+    };

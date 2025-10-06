@@ -162,6 +162,7 @@ impl Database {
                 title TEXT NOT NULL,
                 project_id TEXT,
                 tool_name TEXT,
+                model TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
@@ -804,13 +805,14 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         conn.execute(
-            "INSERT INTO works (id, title, project_id, tool_name, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO works (id, title, project_id, tool_name, model, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 work.id,
                 work.title,
                 work.project_id,
                 work.tool_name,
+                work.model,
                 work.status,
                 work.created_at,
                 work.updated_at
@@ -828,7 +830,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, tool_name, status, created_at, updated_at
+            "SELECT id, title, project_id, tool_name, model, status, created_at, updated_at
              FROM works WHERE id = ?",
         )?;
 
@@ -839,9 +841,10 @@ impl Database {
                     title: row.get(1)?,
                     project_id: row.get(2)?,
                     tool_name: row.get(3)?,
-                    status: row.get(4)?,
-                    created_at: row.get(5)?,
-                    updated_at: row.get(6)?,
+                    model: row.get(4)?,
+                    status: row.get(5)?,
+                    created_at: row.get(6)?,
+                    updated_at: row.get(7)?,
                 })
             })
             .map_err(|e| match e {
@@ -861,7 +864,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, tool_name, status, created_at, updated_at
+            "SELECT id, title, project_id, tool_name, model, status, created_at, updated_at
              FROM works ORDER BY created_at DESC",
         )?;
 
@@ -871,9 +874,10 @@ impl Database {
                 title: row.get(1)?,
                 project_id: row.get(2)?,
                 tool_name: row.get(3)?,
-                status: row.get(4)?,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
+                model: row.get(4)?,
+                status: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         })?;
 
@@ -944,23 +948,26 @@ impl Database {
             crate::models::MessageContentType::Json => ("json", None),
         };
 
+        // Debug logging to understand parameter types
+        let author_type_str = match &message.author_type {
+            crate::models::MessageAuthorType::User => "user",
+            crate::models::MessageAuthorType::Ai => "ai",
+        };
+
         conn.execute(
             "INSERT INTO work_messages (id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            params![
-                message.id,
-                message.work_id,
-                message.content,
-                content_type_str,
-                code_language,
-                match &message.author_type {
-                    crate::models::MessageAuthorType::User => "user",
-                    crate::models::MessageAuthorType::Ai => "ai",
-                },
-                message.author_id,
-                message.sequence_order,
-                message.created_at
-            ],
+             [
+                 &message.id as &dyn rusqlite::ToSql,
+                 &message.work_id as &dyn rusqlite::ToSql,
+                 &message.content as &dyn rusqlite::ToSql,
+                 &content_type_str as &dyn rusqlite::ToSql,
+                 &code_language as &dyn rusqlite::ToSql,
+                 &author_type_str as &dyn rusqlite::ToSql,
+                 &message.author_id as &dyn rusqlite::ToSql,
+                 &message.sequence_order as &dyn rusqlite::ToSql,
+                 &message.created_at as &dyn rusqlite::ToSql,
+             ],
         )?;
 
         tracing::info!(

@@ -196,7 +196,12 @@ impl LlmTestScenario {
             },
             prompt,
             expected_keywords: LlmKeywordExpectations {
-                required_keywords: vec!["Django".to_string(), "Python".to_string(), "PostgreSQL".to_string(), "GraphQL".to_string()],
+                required_keywords: vec![
+                    "Django".to_string(),
+                    "Python".to_string(),
+                    "PostgreSQL".to_string(),
+                    "GraphQL".to_string(),
+                ],
                 optional_keywords: vec!["JavaScript".to_string(), "Node".to_string()],
                 forbidden_keywords: vec![],
                 minimum_score: 0.7,
@@ -309,7 +314,11 @@ mod tests {
         let result = PromptsConfig::load_from_file(prompts_path);
 
         // Should be able to load the TOML file
-        assert!(result.is_ok(), "Failed to load prompts config: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to load prompts config: {:?}",
+            result.err()
+        );
 
         let config = result.unwrap();
         assert!(!config.tech_stack_analysis.prompt.is_empty());

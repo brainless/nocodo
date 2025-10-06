@@ -1,0 +1,377 @@
+use crate::llm_client::{
+    create_llm_client, LlmClient, LlmModel, LlmProvider, ModelCapabilities, ModelPricing,
+    ProviderError, ProviderType,
+};
+use crate::models::LlmProviderConfig;
+use anyhow::Result;
+use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+/// Anthropic provider implementation
+pub struct AnthropicProvider {
+    #[allow(dead_code)]
+    config: LlmProviderConfig,
+    models: HashMap<String, Arc<dyn LlmModel>>,
+}
+
+impl AnthropicProvider {
+    pub fn new(config: LlmProviderConfig) -> Result<Self> {
+        let mut provider = Self {
+            config,
+            models: HashMap::new(),
+        };
+        provider.initialize_models();
+        Ok(provider)
+    }
+
+    fn initialize_models(&mut self) {
+        // Initialize common Anthropic models
+        let models: Vec<Arc<dyn LlmModel>> = vec![
+            Arc::new(ClaudeSonnet4Model::new()),
+            Arc::new(Claude3SonnetModel::new()),
+            Arc::new(Claude3HaikuModel::new()),
+        ];
+
+        for model in models {
+            self.models.insert(model.id().to_string(), model);
+        }
+    }
+}
+
+#[async_trait]
+impl LlmProvider for AnthropicProvider {
+    fn id(&self) -> &str {
+        &self.config.provider
+    }
+
+    fn name(&self) -> &str {
+        "Anthropic"
+    }
+
+    fn provider_type(&self) -> ProviderType {
+        ProviderType::Anthropic
+    }
+
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+
+    fn supports_tool_calling(&self) -> bool {
+        true
+    }
+
+    fn supports_vision(&self) -> bool {
+        true
+    }
+
+    async fn list_available_models(&self) -> Result<Vec<Arc<dyn LlmModel>>, anyhow::Error> {
+        Ok(self.models.values().cloned().collect())
+    }
+
+    fn get_model(&self, model_id: &str) -> Option<Arc<dyn LlmModel>> {
+        self.models.get(model_id).cloned()
+    }
+
+    async fn test_connection(&self) -> Result<(), anyhow::Error> {
+        // Test connection by making a simple API call
+        let client = reqwest::Client::new();
+        let response = client
+            .get("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.config.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(ProviderError::Authentication("Invalid API key".to_string()).into())
+        }
+    }
+
+    fn create_client(&self, model_id: &str) -> Result<Box<dyn LlmClient>, anyhow::Error> {
+        let mut config = self.config.clone();
+        config.model = model_id.to_string();
+        create_llm_client(config)
+    }
+}
+
+/// Claude Sonnet 4 model implementation
+pub struct ClaudeSonnet4Model {
+    capabilities: ModelCapabilities,
+    pricing: Option<ModelPricing>,
+}
+
+impl ClaudeSonnet4Model {
+    pub fn new() -> Self {
+        Self {
+            capabilities: ModelCapabilities {
+                supports_streaming: true,
+                supports_tool_calling: true,
+                supports_vision: true,
+                supports_reasoning: true, // Claude Sonnet 4 supports extended thinking
+                supports_json_mode: true,
+            },
+            pricing: Some(ModelPricing {
+                input_cost_per_million_tokens: 3.0,
+                output_cost_per_million_tokens: 15.0,
+                reasoning_cost_per_million_tokens: None,
+            }),
+        }
+    }
+}
+
+impl Default for ClaudeSonnet4Model {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LlmModel for ClaudeSonnet4Model {
+    fn id(&self) -> &str {
+        "claude-sonnet-4-20250514"
+    }
+
+    fn name(&self) -> &str {
+        "Claude Sonnet 4"
+    }
+
+    fn provider_id(&self) -> &str {
+        "anthropic"
+    }
+
+    fn context_length(&self) -> u32 {
+        200000 // 200K tokens, with 1M beta available
+    }
+
+    fn max_output_tokens(&self) -> Option<u32> {
+        Some(64000) // 64K max output tokens according to the docs
+    }
+
+    fn supports_streaming(&self) -> bool {
+        self.capabilities.supports_streaming
+    }
+
+    fn supports_tool_calling(&self) -> bool {
+        self.capabilities.supports_tool_calling
+    }
+
+    fn supports_vision(&self) -> bool {
+        self.capabilities.supports_vision
+    }
+
+    fn supports_reasoning(&self) -> bool {
+        self.capabilities.supports_reasoning
+    }
+
+    fn input_cost_per_token(&self) -> Option<f64> {
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+    }
+
+    fn output_cost_per_token(&self) -> Option<f64> {
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+    }
+
+    fn default_temperature(&self) -> Option<f32> {
+        Some(0.7)
+    }
+
+    fn default_max_tokens(&self) -> Option<u32> {
+        Some(4000)
+    }
+
+    fn estimate_tokens(&self, text: &str) -> u32 {
+        text.len() as u32 / 4
+    }
+}
+
+/// Claude 3 Sonnet model implementation
+pub struct Claude3SonnetModel {
+    capabilities: ModelCapabilities,
+    pricing: Option<ModelPricing>,
+}
+
+impl Claude3SonnetModel {
+    pub fn new() -> Self {
+        Self {
+            capabilities: ModelCapabilities {
+                supports_streaming: true,
+                supports_tool_calling: true,
+                supports_vision: true,
+                supports_reasoning: false,
+                supports_json_mode: true,
+            },
+            pricing: Some(ModelPricing {
+                input_cost_per_million_tokens: 3.0,
+                output_cost_per_million_tokens: 15.0,
+                reasoning_cost_per_million_tokens: None,
+            }),
+        }
+    }
+}
+
+impl Default for Claude3SonnetModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LlmModel for Claude3SonnetModel {
+    fn id(&self) -> &str {
+        "claude-3-sonnet-20240229"
+    }
+
+    fn name(&self) -> &str {
+        "Claude 3 Sonnet"
+    }
+
+    fn provider_id(&self) -> &str {
+        "anthropic"
+    }
+
+    fn context_length(&self) -> u32 {
+        200000
+    }
+
+    fn max_output_tokens(&self) -> Option<u32> {
+        Some(4096)
+    }
+
+    fn supports_streaming(&self) -> bool {
+        self.capabilities.supports_streaming
+    }
+
+    fn supports_tool_calling(&self) -> bool {
+        self.capabilities.supports_tool_calling
+    }
+
+    fn supports_vision(&self) -> bool {
+        self.capabilities.supports_vision
+    }
+
+    fn supports_reasoning(&self) -> bool {
+        self.capabilities.supports_reasoning
+    }
+
+    fn input_cost_per_token(&self) -> Option<f64> {
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+    }
+
+    fn output_cost_per_token(&self) -> Option<f64> {
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+    }
+
+    fn default_temperature(&self) -> Option<f32> {
+        Some(0.7)
+    }
+
+    fn default_max_tokens(&self) -> Option<u32> {
+        Some(1000)
+    }
+
+    fn estimate_tokens(&self, text: &str) -> u32 {
+        text.len() as u32 / 4
+    }
+}
+
+/// Claude 3 Haiku model implementation
+pub struct Claude3HaikuModel {
+    capabilities: ModelCapabilities,
+    pricing: Option<ModelPricing>,
+}
+
+impl Claude3HaikuModel {
+    pub fn new() -> Self {
+        Self {
+            capabilities: ModelCapabilities {
+                supports_streaming: true,
+                supports_tool_calling: true,
+                supports_vision: true,
+                supports_reasoning: false,
+                supports_json_mode: true,
+            },
+            pricing: Some(ModelPricing {
+                input_cost_per_million_tokens: 0.25,
+                output_cost_per_million_tokens: 1.25,
+                reasoning_cost_per_million_tokens: None,
+            }),
+        }
+    }
+}
+
+impl Default for Claude3HaikuModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LlmModel for Claude3HaikuModel {
+    fn id(&self) -> &str {
+        "claude-3-haiku-20240307"
+    }
+
+    fn name(&self) -> &str {
+        "Claude 3 Haiku"
+    }
+
+    fn provider_id(&self) -> &str {
+        "anthropic"
+    }
+
+    fn context_length(&self) -> u32 {
+        200000
+    }
+
+    fn max_output_tokens(&self) -> Option<u32> {
+        Some(4096)
+    }
+
+    fn supports_streaming(&self) -> bool {
+        self.capabilities.supports_streaming
+    }
+
+    fn supports_tool_calling(&self) -> bool {
+        self.capabilities.supports_tool_calling
+    }
+
+    fn supports_vision(&self) -> bool {
+        self.capabilities.supports_vision
+    }
+
+    fn supports_reasoning(&self) -> bool {
+        self.capabilities.supports_reasoning
+    }
+
+    fn input_cost_per_token(&self) -> Option<f64> {
+        self.pricing
+            .as_ref()
+            .map(|p| p.input_cost_per_million_tokens / 1_000_000.0)
+    }
+
+    fn output_cost_per_token(&self) -> Option<f64> {
+        self.pricing
+            .as_ref()
+            .map(|p| p.output_cost_per_million_tokens / 1_000_000.0)
+    }
+
+    fn default_temperature(&self) -> Option<f32> {
+        Some(0.7)
+    }
+
+    fn default_max_tokens(&self) -> Option<u32> {
+        Some(1000)
+    }
+
+    fn estimate_tokens(&self, text: &str) -> u32 {
+        text.len() as u32 / 4
+    }
+}
