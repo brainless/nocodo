@@ -78,20 +78,15 @@ const LiveStatusIndicator: Component<{
   );
 };
 
-// Parse output content to handle structured JSON format
-const parseOutputContent = (content: string): { text: string; toolCalls?: any[] } => {
+// Parse output content to detect if it's JSON
+const parseOutputContent = (content: string): { isJson: boolean; content: string } => {
   try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object' && 'text' in parsed) {
-      return {
-        text: parsed.text || '',
-        toolCalls: parsed.tool_calls || undefined,
-      };
-    }
+    JSON.parse(content);
+    return { isJson: true, content };
   } catch {
     // Not JSON, return as-is
   }
-  return { text: content };
+  return { isJson: false, content };
 };
 
 // Output panel component - simplified card-based display
@@ -118,32 +113,9 @@ const OutputPanel: Component<{ sessionId: string }> = props => {
                   chunk.stream === 'stderr' ? 'border-red-200 bg-red-50' : 'border-gray-200'
                 }`}
               >
-                <div class='flex items-start justify-between mb-2'>
-                  <span
-                    class={`text-xs font-medium px-2 py-1 rounded ${
-                      chunk.stream === 'stderr'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {chunk.stream === 'stderr' ? 'Error' : 'Output'}
-                  </span>
-                </div>
-                <div class='text-sm text-gray-900 whitespace-pre-wrap font-mono leading-relaxed'>
-                  {parsed.text}
-                </div>
-                <Show when={parsed.toolCalls && parsed.toolCalls.length > 0}>
-                  <div class='mt-3 pt-3 border-t border-gray-300 space-y-2'>
-                    <For each={parsed.toolCalls}>
-                      {toolCall => (
-                        <div class='text-xs text-gray-700'>
-                          <span class='font-semibold'>{toolCall.function?.name || 'tool'}</span>
-                          <span class='text-gray-500'>({toolCall.function?.arguments || ''})</span>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
+                <pre class='text-sm text-gray-900 whitespace-pre-wrap font-mono leading-relaxed'>
+                  {parsed.content}
+                </pre>
               </div>
             );
           }}
