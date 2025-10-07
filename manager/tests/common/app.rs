@@ -291,7 +291,7 @@ impl TestApp {
     /// Send a message to the LLM agent and get the response
     pub async fn send_llm_message(
         &self,
-        session_id: &str,
+        session_id: i64,
         message: String,
     ) -> anyhow::Result<String> {
         if let Some(llm_agent) = &self.app_state.llm_agent {
@@ -305,7 +305,7 @@ impl TestApp {
     pub async fn create_project_from_scenario(
         &self,
         context: &LlmTestContext,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<i64> {
         use std::fs;
         use std::process::Command;
 
@@ -354,7 +354,7 @@ impl TestApp {
 
         // Create a project record in the database
         let project = nocodo_manager::models::Project {
-            id: project_dir_name.clone(),
+            id: 100, // Test ID
             name: format!("{} Test Project", project_name),
             path: project_path.to_string_lossy().to_string(),
             language: Some("python".to_string()),
@@ -367,7 +367,7 @@ impl TestApp {
 
         self.db().create_project(&project)?;
 
-        Ok(project_dir_name)
+        Ok(project.id)
     }
 
     /// Get the LLM agent if available
@@ -441,7 +441,7 @@ mod tests {
 
         // Create a project in app1
         let project = nocodo_manager::models::Project {
-            id: "isolation-test".to_string(),
+            id: 200, // Test ID
             name: "Isolation Test".to_string(),
             path: "/tmp/isolation-test".to_string(),
             language: Some("rust".to_string()),
