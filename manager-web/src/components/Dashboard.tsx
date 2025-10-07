@@ -16,7 +16,7 @@ const StartAiSessionForm: Component = () => {
   const toolName = 'llm-agent';
 
   const [projects, setProjects] = createSignal<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = createSignal<string>('');
+  const [selectedProjectId, setSelectedProjectId] = createSignal<number | null>(null);
   const [models, setModels] = createSignal<SupportedModel[]>([]);
   const [selectedModel, setSelectedModel] = createSignal<string>('');
   const [prompt, setPrompt] = createSignal<string>('');
@@ -73,7 +73,7 @@ const StartAiSessionForm: Component = () => {
       // 1. Create the work
       const workResp = await apiClient.createWork({
         title: prompt().trim(),
-        project_id: selectedProjectId().trim() || null,
+        project_id: selectedProjectId(),
         model: selectedModel().trim() || null,
       });
       const workId = workResp.work.id;
@@ -89,7 +89,7 @@ const StartAiSessionForm: Component = () => {
 
       // 3. Create the AI session with LLM agent
       await apiClient.createAiSession(workId, {
-        message_id: messageId,
+        message_id: messageId.toString(),
         tool_name: toolName,
       });
 
@@ -160,7 +160,7 @@ const StartAiSessionForm: Component = () => {
                     role='option'
                     class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
                     onClick={() => {
-                      setSelectedProjectId('');
+                      setSelectedProjectId(null);
                       setProjectOpen(false);
                     }}
                   >
