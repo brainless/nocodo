@@ -2,4 +2,4 @@
 import type { MessageAuthorType } from "./MessageAuthorType";
 import type { MessageContentType } from "./MessageContentType";
 
-export interface WorkMessage { id: string, work_id: string, content: string, content_type: MessageContentType, author_type: MessageAuthorType, author_id: string | null, sequence_order: number, created_at: number, }
+export interface WorkMessage { id: number, work_id: number, content: string, content_type: MessageContentType, author_type: MessageAuthorType, author_id: string | null, sequence_order: number, created_at: number, }

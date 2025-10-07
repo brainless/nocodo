@@ -1,12 +1,12 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Project {
-    pub id: String,
+    #[ts(type = "number")]
+    pub id: i64,
     pub name: String,
     pub path: String,
     pub language: Option<String>,
@@ -24,7 +24,7 @@ impl Project {
     pub fn new(name: String, path: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: 0, // Will be set by database AUTOINCREMENT
             name,
             path,
             language: None,
@@ -46,8 +46,10 @@ impl Project {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ProjectComponent {
-    pub id: String,
-    pub project_id: String,
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub project_id: i64,
     pub name: String,
     /// Path relative to project root
     pub path: String,
@@ -59,7 +61,7 @@ pub struct ProjectComponent {
 
 impl ProjectComponent {
     pub fn new(
-        project_id: String,
+        project_id: i64,
         name: String,
         path: String,
         language: String,
@@ -67,7 +69,7 @@ impl ProjectComponent {
     ) -> Self {
         let now = Utc::now().timestamp();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: 0, // Will be set by database AUTOINCREMENT
             project_id,
             name,
             path,
@@ -138,9 +140,12 @@ pub struct ServerStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AiSession {
-    pub id: String,
-    pub work_id: String,
-    pub message_id: String,
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub work_id: i64,
+    #[ts(type = "number")]
+    pub message_id: i64,
     pub tool_name: String,
     pub status: String,
     pub project_context: Option<String>,
@@ -152,14 +157,14 @@ pub struct AiSession {
 
 impl AiSession {
     pub fn new(
-        work_id: String,
-        message_id: String,
+        work_id: i64,
+        message_id: i64,
         tool_name: String,
         project_context: Option<String>,
     ) -> Self {
         let now = Utc::now().timestamp();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: 0, // Will be set by database AUTOINCREMENT
             work_id,
             message_id,
             tool_name,
@@ -205,7 +210,8 @@ pub struct AiSessionListResponse {
 pub struct AiSessionOutput {
     #[ts(type = "number")]
     pub id: i64,
-    pub session_id: String,
+    #[ts(type = "number")]
+    pub session_id: i64,
     pub content: String,
     #[ts(type = "number")]
     pub created_at: i64,
@@ -215,9 +221,12 @@ pub struct AiSessionOutput {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AiSessionResult {
-    pub id: String,
-    pub session_id: String,
-    pub response_message_id: String,
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub session_id: i64,
+    #[ts(type = "number")]
+    pub response_message_id: i64,
     pub status: String,
     #[ts(type = "number")]
     pub created_at: i64,
@@ -227,10 +236,10 @@ pub struct AiSessionResult {
 
 impl AiSessionResult {
     #[allow(dead_code)]
-    pub fn new(session_id: String, response_message_id: String) -> Self {
+    pub fn new(session_id: i64, response_message_id: i64) -> Self {
         let now = Utc::now().timestamp();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: 0, // Will be set by database AUTOINCREMENT
             session_id,
             response_message_id,
             status: "processing".to_string(),
@@ -306,7 +315,8 @@ pub struct FileInfo {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct FileListRequest {
-    pub project_id: Option<String>,
+    #[ts(type = "number | undefined")]
+    pub project_id: Option<i64>,
     pub path: Option<String>, // Relative path within project, defaults to root
 }
 
@@ -325,7 +335,8 @@ pub struct FileListResponse {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct FileCreateRequest {
-    pub project_id: String,
+    #[ts(type = "number")]
+    pub project_id: i64,
     pub path: String,            // Relative path within project
     pub content: Option<String>, // None for directories
     pub is_directory: bool,
@@ -334,7 +345,8 @@ pub struct FileCreateRequest {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct FileUpdateRequest {
-    pub project_id: String,
+    #[ts(type = "number")]
+    pub project_id: i64,
     pub content: String,
 }
 
@@ -379,8 +391,10 @@ pub enum MessageAuthorType {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct WorkMessage {
-    pub id: String,
-    pub work_id: String,
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub work_id: i64,
     pub content: String,
     pub content_type: MessageContentType,
     pub author_type: MessageAuthorType,
@@ -394,9 +408,11 @@ pub struct WorkMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Work {
-    pub id: String,
+    #[ts(type = "number")]
+    pub id: i64,
     pub title: String,
-    pub project_id: Option<String>,
+    #[ts(type = "number | null")]
+    pub project_id: Option<i64>,
     pub tool_name: Option<String>,
     pub model: Option<String>, // Model ID for the work
     pub status: String,
@@ -428,7 +444,8 @@ pub struct AddMessageRequest {
 #[ts(export)]
 pub struct CreateWorkRequest {
     pub title: String,
-    pub project_id: Option<String>,
+    #[ts(type = "number | undefined")]
+    pub project_id: Option<i64>,
     pub model: Option<String>, // Model ID for the work (e.g., "gpt-4", "claude-3-opus-20240229")
 }
 
@@ -785,8 +802,10 @@ pub struct LlmProviderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct LlmAgentSession {
-    pub id: String,
-    pub work_id: String,
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub work_id: i64,
     pub provider: String,
     pub model: String,
     pub status: String,
@@ -798,10 +817,10 @@ pub struct LlmAgentSession {
 }
 
 impl LlmAgentSession {
-    pub fn new(work_id: String, provider: String, model: String) -> Self {
+    pub fn new(work_id: i64, provider: String, model: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: 0, // Will be set by database AUTOINCREMENT
             work_id,
             provider,
             model,
@@ -843,7 +862,8 @@ pub struct LlmAgentSessionResponse {
 pub struct LlmAgentMessage {
     #[ts(type = "number")]
     pub id: i64,
-    pub session_id: String,
+    #[ts(type = "number")]
+    pub session_id: i64,
     pub role: String, // "user" | "assistant" | "system"
     pub content: String,
     #[ts(type = "number")]
@@ -854,7 +874,7 @@ pub struct LlmAgentMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAgentToolCall {
     pub id: i64,
-    pub session_id: String,
+    pub session_id: i64,
     pub message_id: Option<i64>,
     pub tool_name: String,
     pub request: serde_json::Value,
@@ -868,7 +888,7 @@ pub struct LlmAgentToolCall {
 }
 
 impl LlmAgentToolCall {
-    pub fn new(session_id: String, tool_name: String, request: serde_json::Value) -> Self {
+    pub fn new(session_id: i64, tool_name: String, request: serde_json::Value) -> Self {
         let now = Utc::now().timestamp();
         Self {
             id: now, // Simple ID based on timestamp
