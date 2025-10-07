@@ -326,37 +326,15 @@ impl LlmAgent {
             "Received complete LLM response"
         );
 
-        // Store assistant response with tool call information for proper conversation reconstruction
+        // Store assistant response with tool call information in structured JSON format
+        // This allows proper conversation reconstruction and consistent UI display
         let enhanced_assistant_response = if !accumulated_tool_calls.is_empty() {
-            // For Claude, we need to store the tool calls in a structured format for reconstruction
-            if session.provider == "anthropic" {
-                // Store as structured data that can be reconstructed as tool_use blocks
-                let assistant_data = serde_json::json!({
-                    "text": assistant_response,
-                    "tool_calls": accumulated_tool_calls
-                });
-                serde_json::to_string(&assistant_data)
-                    .unwrap_or_else(|_| assistant_response.clone())
-            } else {
-                // For other providers, use the enhanced text format
-                if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
-                    let tool_call_descriptions: Vec<String> = accumulated_tool_calls
-                        .iter()
-                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
-                        .collect();
-                    tool_call_descriptions.join("\n")
-                } else {
-                    let tool_call_descriptions: Vec<String> = accumulated_tool_calls
-                        .iter()
-                        .map(|tc| format!("🔧 **{}**({})", tc.function.name, tc.function.arguments))
-                        .collect();
-                    format!(
-                        "{}\n\n{}",
-                        assistant_response,
-                        tool_call_descriptions.join("\n")
-                    )
-                }
-            }
+            // Store all providers in the same structured JSON format
+            let assistant_data = serde_json::json!({
+                "text": assistant_response,
+                "tool_calls": accumulated_tool_calls
+            });
+            serde_json::to_string(&assistant_data).unwrap_or_else(|_| assistant_response.clone())
         } else {
             assistant_response.clone()
         };
@@ -1193,41 +1171,16 @@ impl LlmAgent {
                 "Received complete LLM follow-up response"
             );
 
-            // Store assistant response with tool call information for proper conversation reconstruction
+            // Store assistant response with tool call information in structured JSON format
+            // This allows proper conversation reconstruction and consistent UI display
             let enhanced_assistant_response = if !follow_up_tool_calls.is_empty() {
-                // For Claude, we need to store the tool calls in a structured format for reconstruction
-                if session.provider == "anthropic" {
-                    // Store as structured data that can be reconstructed as tool_use blocks
-                    let assistant_data = serde_json::json!({
-                        "text": assistant_response,
-                        "tool_calls": follow_up_tool_calls
-                    });
-                    serde_json::to_string(&assistant_data)
-                        .unwrap_or_else(|_| assistant_response.clone())
-                } else {
-                    // For other providers, use the enhanced text format
-                    if assistant_response.trim().is_empty() || assistant_response.len() < 20 {
-                        let tool_call_descriptions: Vec<String> = follow_up_tool_calls
-                            .iter()
-                            .map(|tc| {
-                                format!("🔧 **{}**({})", tc.function.name, tc.function.arguments)
-                            })
-                            .collect();
-                        tool_call_descriptions.join("\n")
-                    } else {
-                        let tool_call_descriptions: Vec<String> = follow_up_tool_calls
-                            .iter()
-                            .map(|tc| {
-                                format!("🔧 **{}**({})", tc.function.name, tc.function.arguments)
-                            })
-                            .collect();
-                        format!(
-                            "{}\n\n{}",
-                            assistant_response,
-                            tool_call_descriptions.join("\n")
-                        )
-                    }
-                }
+                // Store all providers in the same structured JSON format
+                let assistant_data = serde_json::json!({
+                    "text": assistant_response,
+                    "tool_calls": follow_up_tool_calls
+                });
+                serde_json::to_string(&assistant_data)
+                    .unwrap_or_else(|_| assistant_response.clone())
             } else {
                 assistant_response.clone()
             };
