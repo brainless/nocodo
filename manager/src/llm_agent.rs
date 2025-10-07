@@ -37,7 +37,7 @@ impl LlmAgent {
     /// Create a new LLM agent session
     pub async fn create_session(
         &self,
-        work_id: String,
+        work_id: i64,
         provider: String,
         model: String,
         system_prompt: Option<String>,
@@ -50,10 +50,11 @@ impl LlmAgent {
             "Creating LLM agent session"
         );
 
-        let session = LlmAgentSession::new(work_id, provider, model);
+        let mut session = LlmAgentSession::new(work_id, provider, model);
 
         // Store session in database
-        self.db.create_llm_agent_session(&session)?;
+        let session_id = self.db.create_llm_agent_session(&session)?;
+        session.id = session_id;
         tracing::debug!(
             session_id = %session.id,
             work_id = %session.work_id,
@@ -63,7 +64,7 @@ impl LlmAgent {
         // Create system message if provided
         if let Some(system_prompt) = system_prompt {
             self.db
-                .create_llm_agent_message(&session.id, "system", system_prompt)?;
+                .create_llm_agent_message(session.id, "system", system_prompt)?;
             tracing::debug!(
                 session_id = %session.id,
                 "System prompt added to LLM agent session"
@@ -82,7 +83,7 @@ impl LlmAgent {
     }
 
     /// Process a user message with the LLM agent
-    pub async fn process_message(&self, session_id: &str, user_message: String) -> Result<String> {
+    pub async fn process_message(&self, session_id: i64, user_message: String) -> Result<String> {
         tracing::info!(
             session_id = %session_id,
             user_message_length = %user_message.len(),
@@ -270,7 +271,7 @@ impl LlmAgent {
 
         // Broadcast the complete response to WebSocket
         self.ws
-            .broadcast_llm_agent_chunk(session_id.to_string(), assistant_response.clone())
+            .broadcast_llm_agent_chunk(session_id, assistant_response.clone())
             .await;
 
         tracing::info!(
@@ -349,16 +350,16 @@ impl LlmAgent {
     }
 
     /// Get the tool executor for a specific session's project
-    async fn get_tool_executor_for_session(&self, session_id: &str) -> Result<ToolExecutor> {
+    async fn get_tool_executor_for_session(&self, session_id: i64) -> Result<ToolExecutor> {
         // Get session to find work_id
         let session = self.db.get_llm_agent_session(session_id)?;
 
         // Get work to find project_id
-        let work = self.db.get_work_by_id(&session.work_id)?;
+        let work = self.db.get_work_by_id(session.work_id)?;
 
         if let Some(project_id) = work.project_id {
             // Get project to find project path
-            let project = self.db.get_project_by_id(&project_id)?;
+            let project = self.db.get_project_by_id(project_id)?;
             Ok(ToolExecutor::new(PathBuf::from(project.path)))
         } else {
             // Fallback to the default tool executor
@@ -369,7 +370,7 @@ impl LlmAgent {
     /// Process native tool calls from LLM response
     async fn process_native_tool_calls(
         &self,
-        session_id: &str,
+        session_id: i64,
         tool_calls: &[crate::llm_client::LlmToolCall],
     ) -> Result<()> {
         // Get session info for provider-specific handling
@@ -493,7 +494,7 @@ impl LlmAgent {
             );
 
             let mut tool_call_record = LlmAgentToolCall::new(
-                session_id.to_string(),
+                session_id,
                 tool_name.to_string(),
                 serde_json::to_value(&tool_request)?,
             );
@@ -511,7 +512,7 @@ impl LlmAgent {
             // Broadcast tool call started
             self.ws
                 .broadcast_tool_call_started(
-                    session_id.to_string(),
+                    session_id,
                     tool_call_id.to_string(),
                     tool_name.to_string(),
                 )
@@ -544,7 +545,7 @@ impl LlmAgent {
                     // Broadcast tool call completed
                     self.ws
                         .broadcast_tool_call_completed(
-                            session_id.to_string(),
+                            session_id,
                             tool_call_id.to_string(),
                             response_json.clone(),
                         )
@@ -569,7 +570,7 @@ impl LlmAgent {
                     // Broadcast tool call failed
                     self.ws
                         .broadcast_tool_call_failed(
-                            session_id.to_string(),
+                            session_id,
                             tool_call_id.to_string(),
                             e.to_string(),
                         )
@@ -598,9 +599,11 @@ impl LlmAgent {
                 // For other providers, store tool results as simple JSON
                 serde_json::to_string(&response_value)?
             };
-            let message_id =
-                self.db
-                    .create_llm_agent_message(session_id, "tool", tool_result_string)?;
+            let message_id = self.db.create_llm_agent_message(
+                session_id,
+                "tool",
+                tool_result_string,
+            )?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,
@@ -649,14 +652,14 @@ impl LlmAgent {
 
     /// Follow up with LLM after tool execution
     #[allow(dead_code)]
-    async fn follow_up_with_llm(&self, session_id: &str) -> Result<String> {
+    async fn follow_up_with_llm(&self, session_id: i64) -> Result<String> {
         self.follow_up_with_llm_with_depth(session_id, 0).await
     }
 
     /// Follow up with LLM after tool execution with recursion depth tracking
     fn follow_up_with_llm_with_depth<'a>(
         &'a self,
-        session_id: &'a str,
+        session_id: i64,
         depth: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
         Box::pin(async move {
@@ -816,7 +819,7 @@ impl LlmAgent {
 
             // Broadcast the complete response to WebSocket
             self.ws
-                .broadcast_llm_agent_chunk(session_id.to_string(), assistant_response.clone())
+                .broadcast_llm_agent_chunk(session_id, assistant_response.clone())
                 .await;
 
             tracing::info!(
@@ -945,7 +948,7 @@ impl LlmAgent {
 
     /// Fail a session
     #[allow(dead_code)]
-    pub async fn fail_session(&self, session_id: &str) -> Result<()> {
+    pub async fn fail_session(&self, session_id: i64) -> Result<()> {
         tracing::info!(
             session_id = %session_id,
             "Failing LLM agent session"
