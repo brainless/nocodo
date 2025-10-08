@@ -460,7 +460,11 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if project.id == 0 { None } else { Some(project.id) };
+        let id_param = if project.id == 0 {
+            None
+        } else {
+            Some(project.id)
+        };
 
         conn.execute(
             "INSERT INTO projects (id, name, path, language, framework, status, created_at, updated_at, technologies)
@@ -539,7 +543,11 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if component.id == 0 { None } else { Some(component.id) };
+        let id_param = if component.id == 0 {
+            None
+        } else {
+            Some(component.id)
+        };
 
         conn.execute(
             "INSERT INTO project_components (id, project_id, name, path, language, framework, created_at)
@@ -595,7 +603,11 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if session.id == 0 { None } else { Some(session.id) };
+        let id_param = if session.id == 0 {
+            None
+        } else {
+            Some(session.id)
+        };
 
         conn.execute(
             "INSERT INTO ai_sessions (id, work_id, message_id, tool_name, status, project_context, started_at, ended_at)
@@ -966,7 +978,11 @@ impl Database {
             crate::models::MessageAuthorType::Ai => "ai",
         };
 
-        let id_param = if message.id == 0 { None } else { Some(message.id) };
+        let id_param = if message.id == 0 {
+            None
+        } else {
+            Some(message.id)
+        };
 
         conn.execute(
             "INSERT INTO work_messages (id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at)
@@ -1082,7 +1098,11 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if result.id == 0 { None } else { Some(result.id) };
+        let id_param = if result.id == 0 {
+            None
+        } else {
+            Some(result.id)
+        };
 
         conn.execute(
             "INSERT INTO ai_session_results (id, session_id, response_message_id, status, created_at, completed_at)
@@ -1171,7 +1191,11 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if session.id == 0 { None } else { Some(session.id) };
+        let id_param = if session.id == 0 {
+            None
+        } else {
+            Some(session.id)
+        };
 
         conn.execute(
             "INSERT INTO llm_agent_sessions (id, work_id, provider, model, status, system_prompt, started_at, ended_at)

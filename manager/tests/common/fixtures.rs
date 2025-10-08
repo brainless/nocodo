@@ -147,11 +147,7 @@ impl TestDataGenerator {
     }
 
     /// Create a test LLM agent message
-    pub fn create_llm_agent_message(
-        session_id: i64,
-        role: &str,
-        content: &str,
-    ) -> LlmAgentMessage {
+    pub fn create_llm_agent_message(session_id: i64, role: &str, content: &str) -> LlmAgentMessage {
         LlmAgentMessage {
             id: 1, // Auto-increment in DB
             session_id,

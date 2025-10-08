@@ -247,7 +247,8 @@ const ProjectDetailsWrapper: Component = () => {
     try {
       const projectId = (params as { id: string }).id;
       if (projectId) {
-        const details = await apiClient.fetchProjectDetails(projectId);
+        const projectIdNum = parseInt(projectId, 10);
+        const details = await apiClient.fetchProjectDetails(projectIdNum);
         setProject(details.project);
       }
     } catch (e) {

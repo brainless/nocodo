@@ -102,11 +102,12 @@ export const SessionsProvider: ParentComponent = props => {
       try {
         setStore('error', null);
 
-        const session = await apiClient.getSession(id);
+        const sessionId = parseInt(id, 10);
+        const session = await apiClient.getSession(sessionId);
 
         setStore('byId', id, session);
 
-        const existingIndex = store.list.findIndex(s => s.id === id);
+        const existingIndex = store.list.findIndex(s => s.id.toString() === id);
         if (existingIndex >= 0) {
           setStore('list', existingIndex, session);
         } else {
@@ -125,7 +126,8 @@ export const SessionsProvider: ParentComponent = props => {
     fetchOutputs: async (id: string) => {
       try {
         console.debug(`Fetching outputs for work ${id}`);
-        const listResp = await apiClient.listAiOutputs(id);
+        const sessionId = parseInt(id, 10);
+        const listResp = await apiClient.listAiOutputs(sessionId);
         const chunks = (listResp.outputs || []).map((o, idx) => ({
           content: o.content,
           created_at: o.created_at,
@@ -155,8 +157,9 @@ export const SessionsProvider: ParentComponent = props => {
       try {
         setStore('connectionStatus', id, 'connected');
 
+        const sessionId = parseInt(id, 10);
         const subscription = apiClient.subscribeSession(
-          id,
+          sessionId,
           data => {
             // WebSocket is working, stop any fallback polling
             actions.stopPolling(id);
@@ -171,7 +174,7 @@ export const SessionsProvider: ParentComponent = props => {
             }
             if (data.type === 'session_data' && data.session) {
               setStore('byId', id, data.session);
-              const existingIndex = store.list.findIndex(s => s.id === id);
+              const existingIndex = store.list.findIndex(s => s.id.toString() === id);
               if (existingIndex >= 0) {
                 setStore('list', existingIndex, data.session);
               }
@@ -327,7 +330,7 @@ export const SessionsProvider: ParentComponent = props => {
     updateSessionStatus: (id: string, status: AiSessionStatus) => {
       setStore('byId', id, 'status', status);
 
-      const existingIndex = store.list.findIndex(s => s.id === id);
+      const existingIndex = store.list.findIndex(s => s.id.toString() === id);
       if (existingIndex >= 0) {
         setStore('list', existingIndex, 'status', status);
       }
@@ -346,11 +349,12 @@ export const SessionsProvider: ParentComponent = props => {
 
       const pollSession = async () => {
         try {
-          const session = await apiClient.getSession(id);
+          const sessionId = parseInt(id, 10);
+          const session = await apiClient.getSession(sessionId);
           if (session) {
             // Update the session data
             setStore('byId', id, session);
-            const existingIndex = store.list.findIndex(s => s.id === id);
+            const existingIndex = store.list.findIndex(s => s.id.toString() === id);
             if (existingIndex >= 0) {
               setStore('list', existingIndex, session);
             }

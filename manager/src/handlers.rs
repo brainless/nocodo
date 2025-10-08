@@ -281,7 +281,9 @@ A new project created with nocodo.
         updated_project.path
     );
 
-    let response = ProjectResponse { project: updated_project };
+    let response = ProjectResponse {
+        project: updated_project,
+    };
     Ok(HttpResponse::Created().json(response))
 }
 
@@ -1093,12 +1095,7 @@ pub async fn create_ai_session(
 
             // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
-                .create_session(
-                    work_id,
-                    provider,
-                    model,
-                    session.project_context.clone(),
-                )
+                .create_session(work_id, provider, model, session.project_context.clone())
                 .await?;
 
             // Process the message in background task to avoid blocking HTTP response
@@ -1160,9 +1157,7 @@ pub async fn list_ai_session_outputs(
     let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
 
     // Get outputs for this session
-    let mut outputs = data
-        .database
-        .list_ai_session_outputs(session.id)?;
+    let mut outputs = data.database.list_ai_session_outputs(session.id)?;
 
     // If this is an LLM agent session, also fetch LLM agent messages
     if session.tool_name == "llm-agent" {

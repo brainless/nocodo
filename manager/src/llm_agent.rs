@@ -599,11 +599,9 @@ impl LlmAgent {
                 // For other providers, store tool results as simple JSON
                 serde_json::to_string(&response_value)?
             };
-            let message_id = self.db.create_llm_agent_message(
-                session_id,
-                "tool",
-                tool_result_string,
-            )?;
+            let message_id =
+                self.db
+                    .create_llm_agent_message(session_id, "tool", tool_result_string)?;
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,

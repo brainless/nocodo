@@ -105,9 +105,7 @@ async fn test_llm_e2e_saleor() {
     assert!(resp.status().is_success(), "Failed to create work session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let work_id = body["work"]["id"]
-        .as_i64()
-        .expect("No work ID returned");
+    let work_id = body["work"]["id"].as_i64().expect("No work ID returned");
 
     println!("   ✅ Created work session: {}", work_id);
 
@@ -511,7 +509,7 @@ async fn test_llm_multiple_scenarios() {
         let model = env::var("MODEL").unwrap_or_else(|_| provider.default_model().to_string());
         let work_request = CreateWorkRequest {
             title: format!("Multi Scenario Work {}", i + 1),
-        project_id: Some(project_id),
+            project_id: Some(project_id),
             model: Some(model),
         };
 

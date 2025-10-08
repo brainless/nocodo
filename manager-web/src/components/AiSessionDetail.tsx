@@ -135,7 +135,7 @@ const AiSessionDetail: Component = () => {
   const toolCalls = () => actions.getToolCalls(params.id);
 
   // Fetch project details when session is loaded
-  const fetchProject = async (projectId: string) => {
+  const fetchProject = async (projectId: number) => {
     try {
       const projectData = await apiClient.fetchProject(projectId);
       setProject(projectData);

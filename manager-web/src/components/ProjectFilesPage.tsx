@@ -23,7 +23,8 @@ const ProjectFilesPage: Component = () => {
 
     try {
       setLoading(true);
-      const proj = await apiClient.fetchProject(projectId);
+      const projectIdNum = parseInt(projectId, 10);
+      const proj = await apiClient.fetchProject(projectIdNum);
       setProject(proj);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load project');

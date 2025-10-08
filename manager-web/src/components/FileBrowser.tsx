@@ -3,7 +3,7 @@ import { FileInfo, FileListResponse } from '../types';
 import { apiClient } from '../api';
 
 interface FileBrowserProps {
-  projectId: string;
+  projectId: string | number;
   projectName?: string;
   onFileSelect?: (file: FileInfo) => void;
   hideDelete?: boolean; // hide actions column (delete)
@@ -27,8 +27,12 @@ const FileBrowser: Component<FileBrowserProps> = props => {
     setError(null);
 
     try {
+      const projectIdNum = typeof props.projectId === 'string'
+        ? parseInt(props.projectId, 10)
+        : props.projectId;
+
       const response: FileListResponse = await apiClient.listFiles({
-        project_id: props.projectId,
+        project_id: projectIdNum,
         path: path || null,
       });
 
@@ -75,9 +79,12 @@ const FileBrowser: Component<FileBrowserProps> = props => {
     try {
       const fileName = newFileName().trim();
       const filePath = currentPath() ? `${currentPath()}/${fileName}` : fileName;
+      const projectIdNum = typeof props.projectId === 'string'
+        ? parseInt(props.projectId, 10)
+        : props.projectId;
 
       await apiClient.createFile({
-        project_id: props.projectId,
+        project_id: projectIdNum,
         path: filePath,
         content: newFileIsDirectory() ? null : '',
         is_directory: newFileIsDirectory(),
@@ -102,7 +109,10 @@ const FileBrowser: Component<FileBrowserProps> = props => {
     }
 
     try {
-      await apiClient.deleteFile(file.path, props.projectId);
+      const projectIdNum = typeof props.projectId === 'string'
+        ? parseInt(props.projectId, 10)
+        : props.projectId;
+      await apiClient.deleteFile(file.path, projectIdNum);
 
       // Reload current directory
       loadFiles(currentPath());

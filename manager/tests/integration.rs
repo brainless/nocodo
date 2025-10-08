@@ -118,8 +118,8 @@ async fn test_create_project() {
 
     // Debug output for failing test
     let status = resp.status();
+    let body: serde_json::Value = test::read_body_json(resp).await;
     if !status.is_success() {
-        let body: serde_json::Value = test::read_body_json(resp).await;
         eprintln!("Response status: {status}");
         eprintln!(
             "Response body: {}",
@@ -127,11 +127,11 @@ async fn test_create_project() {
         );
         panic!("Request failed with status: {status}");
     }
+    
+    
 
     assert!(status.is_success());
     assert_eq!(status, 201); // Created
-
-    let body: serde_json::Value = test::read_body_json(resp).await;
     let project = &body["project"];
 
     assert_eq!(project["name"], "test-project");
@@ -139,7 +139,7 @@ async fn test_create_project() {
     assert_eq!(project["language"], "rust");
     assert_eq!(project["framework"], "actix-web");
     assert_eq!(project["status"], "initialized");
-    assert!(project["id"].as_str().is_some());
+    assert!(project["id"].as_u64().is_some());
     assert!(project["created_at"].as_i64().is_some());
     assert!(project["updated_at"].as_i64().is_some());
 }
