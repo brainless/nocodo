@@ -46,34 +46,35 @@ The Manager app is a Linux daemon that runs on the Operator server, orchestratin
 
 ## Core Features
 
-### 1. System Orchestration
+### 1. Project Management
 
 **Responsibilities**:
-- Server initialization and configuration
-- System service management (nginx, PostgreSQL, etc.)
-- Security hardening and maintenance
-- System monitoring and health checks
-- Automatic updates and maintenance tasks
+- Project CRUD operations and lifecycle management
+- File system operations and project structure
+- Project templates and scaffolding
+- Project analysis and metadata management
 
 ```rust
 #[derive(Debug, Clone)]
-pub struct SystemOrchestrator {
-    services: HashMap<String, ServiceConfig>,
-    health_monitor: HealthMonitor,
-    update_scheduler: UpdateScheduler,
+pub struct ProjectManager {
+    projects: HashMap<String, Project>,
+    templates: TemplateRegistry,
+    file_system: FileSystemManager,
 }
 
-impl SystemOrchestrator {
-    pub async fn initialize_system(&self) -> Result<(), SystemError> {
-        self.setup_development_environment().await?;
-        self.configure_security().await?;
-        self.start_core_services().await?;
-        self.setup_monitoring().await?;
-        Ok(())
+impl ProjectManager {
+    pub async fn create_project(&self, request: CreateProjectRequest) -> Result<Project, ProjectError> {
+        // Create new project with scaffolding
+        self.setup_project_structure(&request.name, &request.path).await?;
+        self.initialize_git_repo(&request.path).await?;
+        Ok(Project::new(request))
     }
     
-    pub async fn install_development_tools(&self) -> Result<(), SystemError> {
-        // Install Git, Python, Node.js, Rust, Docker, etc.
+    pub async fn analyze_project(&self, project_id: &str) -> Result<ProjectAnalysis, ProjectError> {
+        // Analyze project structure and dependencies
+        let project = self.get_project(project_id).await?;
+        let structure = self.scan_project_structure(&project.path).await?;
+        Ok(ProjectAnalysis { structure, project })
     }
 }
 ```
@@ -127,33 +128,31 @@ async fn execute_ai_request(
 }
 ```
 
-### 3. Development Environment Management
+### 3. AI Session Management
 
-**Tool Installation & Management**:
+**AI Tool Integration & Session Tracking**:
 ```rust
 #[derive(Debug, Clone)]
-pub struct DevelopmentEnvironment {
-    installed_tools: HashMap<String, ToolVersion>,
-    package_managers: Vec<PackageManager>,
-    containers: DockerManager,
+pub struct AiSessionManager {
+    sessions: HashMap<String, AiSession>,
+    tools: HashMap<String, AiToolConfig>,
+    project_context: ContextManager,
 }
 
-impl DevelopmentEnvironment {
-    pub async fn install_base_tools(&mut self) -> Result<(), EnvError> {
-        self.install_git().await?;
-        self.install_python().await?;
-        self.install_nodejs().await?;
-        self.install_rust().await?;
-        self.install_docker().await?;
-        self.install_ai_tools().await?; // Claude Code, Gemini CLI, etc.
-        Ok(())
+impl AiSessionManager {
+    pub async fn create_session(&self, request: CreateAiSessionRequest) -> Result<AiSession, AiError> {
+        // Create new AI session with project context
+        let context = self.project_context.get_context(&request.work_id).await?;
+        let session = AiSession::new(request, context);
+        self.sessions.insert(session.id.clone(), session.clone());
+        Ok(session)
     }
     
-    pub async fn install_ai_tools(&mut self) -> Result<(), EnvError> {
-        // Install Claude Code, Gemini CLI, OpenAI CLI, etc.
-        self.install_tool("claude-code", "latest").await?;
-        self.install_tool("gemini-cli", "latest").await?;
-        Ok(())
+    pub async fn process_ai_request(&self, session_id: &str, message: &str) -> Result<AiResponse, AiError> {
+        // Process AI request with context and guardrails
+        let session = self.sessions.get(session_id).ok_or(AiError::SessionNotFound)?;
+        let response = self.call_ai_tool(&session.tool_name, message, &session.context).await?;
+        Ok(response)
     }
 }
 ```
@@ -248,129 +247,53 @@ impl ProjectManager {
 }
 ```
 
-### 6. Security Management
+### 6. Security Model
 
-**Authentication & Authorization**:
-```rust
-#[derive(Debug)]
-pub struct SecurityManager {
-    auth_tokens: HashMap<String, AuthToken>,
-    permissions: PermissionMatrix,
-    audit_log: AuditLogger,
-}
+**Current Security Approach**:
+- **SSH-based access**: Users access the system via SSH to the Linux server
+- **Localhost-only services**: Both manager (8081) and manager-web (3000) listen on localhost only
+- **SSH port forwarding**: Users forward ports 3000 and 8081 over SSH for access
+- **No public HTTP exposure**: Services are not accessible from the internet
+- **Trusted environment**: Local-only MVP assumes trusted user with SSH access
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AuthToken {
-    pub token: String,
-    pub user_id: String,
-    pub expires_at: DateTime<Utc>,
-    pub permissions: Vec<Permission>,
-}
-
-impl SecurityManager {
-    pub fn validate_token(&self, token: &str) -> Result<AuthToken, SecurityError> {
-        // Validate JWT token from Bootstrap app
-    }
-    
-    pub fn check_permission(&self, token: &str, action: &str) -> Result<bool, SecurityError> {
-        // Check if token has permission for action
-    }
-    
-    pub async fn audit_action(&self, user_id: &str, action: &str, details: &str) {
-        self.audit_log.log_action(user_id, action, details).await;
-    }
-}
-```
+**Future Security (Post-MVP)**:
+- Authentication and authorization features are planned for cloud deployment phase
+- JWT-based authentication, TLS certificates, and audit logging will be added when needed
+- Current MVP focuses on functionality without complex security requirements
 
 ## Configuration Management
 
 ### Main Configuration File
 
 ```toml
-# /etc/nocodo/manager.toml
+# ~/.config/nocodo/manager.toml
 
 [server]
-http_port = 8081
-https_port = 8443
-max_connections = 1000
+host = "127.0.0.1"
+port = 8081
 
-[security]
-jwt_secret_file = "/etc/nocodo/jwt.secret"
-tls_cert_file = "/etc/nocodo/ssl/cert.pem"
-tls_key_file = "/etc/nocodo/ssl/key.pem"
-audit_log_file = "/var/log/nocodo/audit.log"
+[database]
+path = "~/.local/share/nocodo/nocodo.db"
 
-[development]
-workspace_root = "/home/developer/projects"
-ai_tools_path = "/usr/local/bin"
-default_shell = "/bin/bash"
+[socket]
+path = "/tmp/nocodo-manager.sock"
 
-[services]
-nginx_config_path = "/etc/nginx/sites-available"
-postgresql_data_path = "/var/lib/postgresql/data"
-redis_config_path = "/etc/redis/redis.conf"
-
-[monitoring]
-metrics_port = 9090
-health_check_interval = 30
-log_level = "info"
-log_file = "/var/log/nocodo/manager.log"
-
-[ai_tools]
-claude_code_path = "/usr/local/bin/claude"
-gemini_cli_path = "/usr/local/bin/gemini"
-timeout_seconds = 300
-max_concurrent_sessions = 5
+[api_keys]
+xai = ""          # XAI API key for Claude/Grok
+openai = ""        # OpenAI API key for GPT models
+anthropic = ""     # Anthropic API key for Claude models
 ```
 
 ## Database Schema
 
-```sql
--- Projects table
-CREATE TABLE projects (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    path TEXT NOT NULL,
-    language TEXT,
-    framework TEXT,
-    status TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-);
+The database schema is defined in the code at `manager/src/database.rs`. Please refer to the source code for the current schema implementation, which includes:
 
--- AI sessions table
-CREATE TABLE ai_sessions (
-    id TEXT PRIMARY KEY,
-    project_id TEXT,
-    tool_name TEXT NOT NULL,
-    status TEXT NOT NULL,
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    FOREIGN KEY (project_id) REFERENCES projects (id)
-);
+- Projects table for project management
+- AI sessions table linked to work sessions and messages
+- Work messages table for conversation tracking
+- Other supporting tables for the application state
 
--- Process registry
-CREATE TABLE managed_processes (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    command TEXT NOT NULL,
-    working_dir TEXT,
-    status TEXT NOT NULL,
-    pid INTEGER,
-    started_at INTEGER NOT NULL,
-    stopped_at INTEGER
-);
-
--- Audit log
-CREATE TABLE audit_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT,
-    action TEXT NOT NULL,
-    resource TEXT,
-    details TEXT,
-    timestamp INTEGER NOT NULL
-);
-```
+The schema is managed through Rust migrations and may evolve over time.
 
 ## API Specification
 
@@ -383,26 +306,29 @@ POST   /api/projects                    // Create new project
 GET    /api/projects/{id}               // Get project details
 PUT    /api/projects/{id}               // Update project
 DELETE /api/projects/{id}               // Delete project
-GET    /api/projects/{id}/status        // Get project status
-POST   /api/projects/{id}/analyze       // Analyze project structure
 
 // Work Management
-POST   /api/work                        // Start work session
-GET    /api/work/{id}                   // Get work session status
-POST   /api/work/{id}/query             // Send query to work session
-DELETE /api/work/{id}                   // End work session
+POST   /api/work                        // Create new work session
+GET    /api/work                        // List all work sessions
+GET    /api/work/{id}                   // Get work session details
+DELETE /api/work/{id}                   // Delete work session
+POST   /api/work/{id}/messages          // Add message to work session
+GET    /api/work/{id}/messages          // Get messages for work session
 
-// System Management
-GET    /api/system/status               // Get system status
-GET    /api/system/services             // List system services
-POST   /api/system/services/{name}/start // Start service
-POST   /api/system/services/{name}/stop  // Stop service
+// AI Sessions
+POST   /api/ai/sessions                 // Create new AI session
+GET    /api/ai/sessions                 // List AI sessions
+GET    /api/ai/sessions/{id}            // Get AI session details
 
-// File System
+// File Operations
 GET    /api/files                       // Browse file system
 POST   /api/files                       // Create file/directory
 PUT    /api/files/{path}                // Update file content
 DELETE /api/files/{path}                // Delete file/directory
+
+// Health Check
+GET    /api/health                      // Service health check
+GET    /api/version                     // Service version info
 ```
 
 ### WebSocket Endpoints
@@ -417,78 +343,33 @@ WS /ws/logs                            // Real-time log streaming
 
 ## System Integration
 
-### Systemd Service
+### Development Setup
 
-```ini
-# /etc/systemd/system/nocodo-manager.service
-[Unit]
-Description=Nocodo Manager Daemon
-After=network.target
+For local development, the Manager daemon and Web app are run manually:
 
-[Service]
-Type=notify
-User=nocodo
-Group=nocodo
-ExecStart=/usr/local/bin/nocodo-manager --config /etc/nocodo/manager.toml
-Restart=on-failure
-RestartSec=5
+```bash
+# Start Manager daemon (API server on localhost:8081)
+nocodo-manager --config ~/.config/nocodo/manager.toml
 
-# Security
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/nocodo /var/log/nocodo /tmp
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
+# Start Web app (dev server on localhost:3000)
+cd manager-web && npm run dev
 ```
 
-### Nginx Configuration
+### Access Pattern
 
-```nginx
-# /etc/nginx/sites-available/nocodo-manager
-server {
-    listen 80;
-    server_name manager.local;
-    
-    # Redirect to HTTPS
-    return 301 https://$server_name$request_uri;
-}
+Users access the system through SSH port forwarding:
 
-server {
-    listen 443 ssl http2;
-    server_name manager.local;
-    
-    ssl_certificate /etc/nocodo/ssl/cert.pem;
-    ssl_certificate_key /etc/nocodo/ssl/key.pem;
-    
-    # Static files (Manager Web App)
-    location / {
-        root /var/www/nocodo-manager;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # API proxy
-    location /api/ {
-        proxy_pass http://localhost:8081;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    
-    # WebSocket proxy
-    location /ws/ {
-        proxy_pass http://localhost:8081;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-    }
-}
+```bash
+# Forward ports from local machine to remote server
+ssh -L 3000:localhost:3000 -L 8081:localhost:8081 user@server
+
+# Access web interface at http://localhost:3000
+# Web app proxies API requests to http://localhost:8081
 ```
+
+### Production Deployment (Future)
+
+Production deployment scripts and configurations will be provided post-MVP when cloud deployment features are implemented.
 
 ## Monitoring & Observability
 
@@ -674,6 +555,8 @@ echo "Nocodo Manager installed successfully!"
 
 ## Future Enhancements
 
+- Bootstrap app for cloud deployment
+- Authentication and security features for cloud deployment
 - Docker container support for project isolation
 - Kubernetes integration for scalable deployments
 - Advanced project templates and scaffolding
