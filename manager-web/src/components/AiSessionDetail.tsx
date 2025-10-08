@@ -354,7 +354,7 @@ const AiSessionDetail: Component = () => {
                       <div class='space-y-1'>
                         <ProjectBadge project={project()} />
                         <A
-                          href={`/projects/${project()!.id}/files`}
+                          href={`/projects/${project()!.id}/code`}
                           class='text-xs text-blue-600 hover:text-blue-800 font-medium block focus:outline-none focus:underline'
                         >
                           View project files →
@@ -431,7 +431,7 @@ const AiSessionDetail: Component = () => {
         </A>
         <Show when={session() && session()!.project_id}>
           <A
-            href={`/projects/${session()!.project_id}/files`}
+            href={`/projects/${session()!.project_id}/code`}
             class='inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer'
           >
             View Project
