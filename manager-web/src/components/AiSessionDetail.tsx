@@ -347,7 +347,7 @@ const AiSessionDetail: Component = () => {
                       fallback={
                         <ProjectBadge
                           project={null}
-                          projectId={session()!.project_id ?? undefined}
+                          projectId={session()!.project_id?.toString() ?? undefined}
                         />
                       }
                     >
@@ -457,7 +457,7 @@ const SessionInputBox: Component<{ sessionId: string }> = props => {
     setSending(true);
     setError(null);
     try {
-      await apiClient.sendAiInput(props.sessionId, content().trim());
+      await apiClient.sendAiInput(parseInt(props.sessionId), content().trim());
       setContent('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send input');

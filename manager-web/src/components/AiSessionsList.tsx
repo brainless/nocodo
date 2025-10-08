@@ -212,7 +212,9 @@ const AiSessionsList: Component = () => {
         <div class='grid grid-cols-1 gap-6'>
           <For each={filteredSessions()}>
             {session => {
-              const project = projects().find(p => p.id === session.project_id);
+              const project = session.project_id
+                ? projects().find(p => p.id === Number(session.project_id))
+                : undefined;
               return <AiSessionCard session={session} project={project} showPrompt={true} />;
             }}
           </For>

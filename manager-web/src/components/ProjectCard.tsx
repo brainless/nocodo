@@ -5,7 +5,7 @@ import { Project } from '../types';
 interface ProjectCardProps {
   project: Project;
   showActions?: boolean; // Show delete button etc.
-  onDelete?: (id: string) => void;
+  onDelete?: (id: number) => void;
 }
 
 const ProjectCard: Component<ProjectCardProps> = props => {

@@ -227,8 +227,6 @@ const CreateProjectPage: Component = () => {
   );
 };
 
-
-
 // Project Details Page
 import ProjectDetails from './components/ProjectDetails';
 const ProjectDetailsWrapper: Component = () => {
@@ -293,7 +291,7 @@ const App: Component = () => {
           <Route path='/projects/create' component={CreateProjectPage} />
           <Route path='/projects/:id' component={ProjectDetailsWrapper} />
           <Route path='/projects/:id/:tab' component={ProjectDetailsWrapper} />
-          
+
           <Route path='/work' component={AiSessionsPage} />
           <Route path='/work/:id' component={AiSessionDetailPage} />
           <Route path='/settings' component={SettingsPage} />

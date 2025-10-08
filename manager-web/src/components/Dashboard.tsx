@@ -73,7 +73,7 @@ const StartAiSessionForm: Component = () => {
       // 1. Create the work
       const workResp = await apiClient.createWork({
         title: prompt().trim(),
-        project_id: selectedProjectId(),
+        project_id: selectedProjectId() ?? undefined,
         model: selectedModel().trim() || null,
       });
       const workId = workResp.work.id;
@@ -135,8 +135,8 @@ const StartAiSessionForm: Component = () => {
             >
               <span class='truncate'>
                 {selectedProjectId()
-                  ? projects().find(p => p.id === selectedProjectId())?.name ||
-                    `Project ${selectedProjectId()}`
+                  ? projects().find(p => p.id === Number(selectedProjectId()))?.name ||
+                    `Project ${selectedProjectId()!}`
                   : 'No Project'}
               </span>
               <svg
@@ -167,12 +167,12 @@ const StartAiSessionForm: Component = () => {
                     No Project
                   </div>
                   <For each={projects()}>
-                    {p => (
+                    {(p: Project) => (
                       <div
                         role='option'
                         class='block px-4 py-2 text-sm text-gray-700 hover:bg-muted cursor-pointer'
                         onClick={() => {
-                          setSelectedProjectId(p.id);
+                          setSelectedProjectId(Number(p.id));
                           setProjectOpen(false);
                         }}
                       >
@@ -288,7 +288,9 @@ const SessionsCard: Component = () => {
         <div class='grid grid-cols-1 gap-6'>
           <For each={recentSessions()}>
             {session => {
-              const project = projects().find(p => p.id === session.project_id);
+              const project = session.project_id
+                ? projects().find(p => p.id === Number(session.project_id))
+                : undefined;
               return <AiSessionCard session={session} project={project} showPrompt={true} />;
             }}
           </For>

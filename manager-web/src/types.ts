@@ -107,4 +107,3 @@ export interface WebSocketClient {
   onStateChange(callback: (state: WebSocketConnectionState) => void): void;
   getState(): WebSocketConnectionState;
 }
-export type { Project } from './types/Project';
