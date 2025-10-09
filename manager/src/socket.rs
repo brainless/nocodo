@@ -225,7 +225,7 @@ impl SocketServer {
                         match database.update_ai_session(&session) {
                             Ok(()) => {
                                 // Broadcast AI session completion via WebSocket
-                                ws_broadcaster.broadcast_ai_session_completed(session.id.clone());
+                                ws_broadcaster.broadcast_ai_session_completed(session.id);
 
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
@@ -256,7 +256,7 @@ impl SocketServer {
                         match database.update_ai_session(&session) {
                             Ok(()) => {
                                 // Broadcast AI session failure via WebSocket
-                                ws_broadcaster.broadcast_ai_session_failed(session.id.clone());
+                                ws_broadcaster.broadcast_ai_session_failed(session.id);
 
                                 let data = serde_json::to_value(&session).unwrap_or_default();
                                 SocketResponse::Success { data }
@@ -320,7 +320,7 @@ impl SocketServer {
                     .as_secs() as i64;
 
                 let work = crate::models::Work {
-                    id: uuid::Uuid::new_v4().to_string(),
+                    id: 0, // Will be set by database AUTOINCREMENT
                     title: req.title,
                     project_id: req.project_id,
                     tool_name: None,
@@ -331,7 +331,9 @@ impl SocketServer {
                 };
 
                 match database.create_work(&work) {
-                    Ok(()) => {
+                    Ok(work_id) => {
+                        let mut work = work;
+                        work.id = work_id;
                         let data = serde_json::to_value(&work).unwrap_or_default();
                         SocketResponse::Success { data }
                     }
@@ -347,7 +349,8 @@ impl SocketServer {
             SocketRequest::GetWorkWithHistory { work_id } => {
                 info!("Getting work with history: {}", work_id);
 
-                match database.get_work_with_messages(&work_id) {
+                let work_id_i64 = work_id.parse::<i64>().unwrap_or(0);
+                match database.get_work_with_messages(work_id_i64) {
                     Ok(work_with_history) => {
                         let data = serde_json::to_value(&work_with_history).unwrap_or_default();
                         SocketResponse::Success { data }

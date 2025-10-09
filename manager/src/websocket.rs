@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use ts_rs::TS;
-use uuid::Uuid;
 
 /// WebSocket message types for real-time communication
 #[derive(Debug, Clone, Serialize, Deserialize, TS, Message)]
@@ -32,12 +31,14 @@ pub enum WebSocketMessage {
         project: Project,
     },
     ProjectDeleted {
-        project_id: String,
+        #[ts(type = "number")]
+        project_id: i64,
     },
 
     // Status updates
     ProjectStatusChanged {
-        project_id: String,
+        #[ts(type = "number")]
+        project_id: i64,
         status: String,
     },
 
@@ -46,19 +47,23 @@ pub enum WebSocketMessage {
         session: AiSession,
     },
     AiSessionStatusChanged {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
         status: String,
     },
     AiSessionCompleted {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
     },
     AiSessionFailed {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
     },
 
     // Streaming output chunks for sessions (stdout/stderr)
     AiSessionOutputChunk {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
         stream: String, // "stdout" | "stderr"
         content: String,
         #[serde(default)]
@@ -76,23 +81,27 @@ pub enum WebSocketMessage {
 
     // LLM Agent messages
     LlmAgentChunk {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
         content: String,
     },
 
     // Tool call lifecycle messages
     ToolCallStarted {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
         call_id: String,
         tool_name: String,
     },
     ToolCallCompleted {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
         call_id: String,
         result: String, // JSON string
     },
     ToolCallFailed {
-        session_id: String,
+        #[ts(type = "number")]
+        session_id: i64,
         call_id: String,
         error: String,
     },
@@ -118,7 +127,7 @@ pub struct WebSocketConnection {
 impl WebSocketConnection {
     pub fn new(server: Addr<WebSocketServer>) -> Self {
         Self {
-            client_id: Uuid::new_v4().to_string(),
+            client_id: format!("client_{}", chrono::Utc::now().timestamp_millis()),
             hb: Instant::now(),
             server,
         }
@@ -363,7 +372,7 @@ pub async fn ai_session_websocket_handler(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<WebSocketServer>>,
-    session_id: web::Path<String>,
+    session_id: web::Path<i64>,
 ) -> Result<HttpResponse, Error> {
     let session_id = session_id.into_inner();
     tracing::debug!(
@@ -411,14 +420,14 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast project deletion
-    pub fn broadcast_project_deleted(&self, project_id: String) {
+    pub fn broadcast_project_deleted(&self, project_id: i64) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::ProjectDeleted { project_id },
         });
     }
 
     /// Broadcast project status change
-    pub fn broadcast_project_status_change(&self, project_id: String, status: String) {
+    pub fn broadcast_project_status_change(&self, project_id: i64, status: String) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::ProjectStatusChanged { project_id, status },
         });
@@ -432,21 +441,21 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast AI session status change
-    pub fn broadcast_ai_session_status_change(&self, session_id: String, status: String) {
+    pub fn broadcast_ai_session_status_change(&self, session_id: i64, status: String) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::AiSessionStatusChanged { session_id, status },
         });
     }
 
     /// Broadcast AI session completion
-    pub fn broadcast_ai_session_completed(&self, session_id: String) {
+    pub fn broadcast_ai_session_completed(&self, session_id: i64) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::AiSessionCompleted { session_id },
         });
     }
 
     /// Broadcast AI session failure
-    pub fn broadcast_ai_session_failed(&self, session_id: String) {
+    pub fn broadcast_ai_session_failed(&self, session_id: i64) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::AiSessionFailed { session_id },
         });
@@ -455,7 +464,7 @@ impl WebSocketBroadcaster {
     /// Broadcast a single output chunk for a session
     pub fn broadcast_ai_output_chunk(
         &self,
-        session_id: String,
+        session_id: i64,
         stream: &str,
         content: &str,
         seq: u64,
@@ -471,7 +480,7 @@ impl WebSocketBroadcaster {
     }
 
     /// Broadcast LLM agent chunk
-    pub async fn broadcast_llm_agent_chunk(&self, session_id: String, content: String) {
+    pub async fn broadcast_llm_agent_chunk(&self, session_id: i64, content: String) {
         self.server.do_send(Broadcast {
             message: WebSocketMessage::LlmAgentChunk {
                 session_id,
@@ -483,7 +492,7 @@ impl WebSocketBroadcaster {
     /// Broadcast tool call started
     pub async fn broadcast_tool_call_started(
         &self,
-        session_id: String,
+        session_id: i64,
         call_id: String,
         tool_name: String,
     ) {
@@ -499,7 +508,7 @@ impl WebSocketBroadcaster {
     /// Broadcast tool call completed
     pub async fn broadcast_tool_call_completed(
         &self,
-        session_id: String,
+        session_id: i64,
         call_id: String,
         result: serde_json::Value,
     ) {
@@ -515,7 +524,7 @@ impl WebSocketBroadcaster {
     /// Broadcast tool call failed
     pub async fn broadcast_tool_call_failed(
         &self,
-        session_id: String,
+        session_id: i64,
         call_id: String,
         error: String,
     ) {

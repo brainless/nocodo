@@ -89,7 +89,7 @@ async fn test_simple_llm_e2e() {
     // Create a test work session in the database
     println!("✅ Creating test work session");
     let work = nocodo_manager::models::Work {
-        id: "test-work-123".to_string(),
+        id: 300, // Test ID
         title: "Test Work".to_string(),
         tool_name: Some("llm_e2e_test".to_string()),
         model: Some("gpt-5".to_string()),
@@ -147,7 +147,7 @@ async fn test_simple_llm_e2e() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let session_id = body["session"]["id"]
-        .as_str()
+        .as_i64()
         .expect("No session ID returned");
     println!("✅ LLM session created: {}", session_id);
 

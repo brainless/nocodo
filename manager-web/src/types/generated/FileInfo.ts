@@ -8,6 +8,6 @@ export interface FileInfo {
   file_type: FileType;
   ignored: boolean;
   is_directory: boolean;
-  size: number | null;
+  size: bigint | null;
   modified_at: string | null;
 }

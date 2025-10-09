@@ -24,13 +24,13 @@ The nocodo MVP consists of two core components running locally on your Linux lap
 
 ### Core Components:
 
-- **Manager Daemon**: Local orchestration service that manages projects and provides APIs
-- **Manager Web App**: Chat-based interface for AI interaction and project management (runs at localhost:8081)
+- **Manager Daemon**: Local orchestration service that manages projects and provides APIs (runs on localhost:8081)
+- **Manager Web App**: Chat-based interface for AI interaction and project management (runs on localhost:3000)
 
 ### Communication:
 
-- **AI Tools ↔ Manager Daemon**: Direct integration
-- **Manager Web App ↔ Manager Daemon**: HTTP/WebSocket communication
+- **AI Tools ↔ Manager Daemon**: Direct HTTP API integration (localhost:8081)
+- **Manager Web App ↔ Manager Daemon**: HTTP/WebSocket via Vite proxy (localhost:3000 → localhost:8081)
 
 ## MVP Quick Start
 
@@ -59,11 +59,9 @@ cd manager-web && npm run dev
 
 ### Usage
 ```bash
-# Access web interface
-# Navigate to http://localhost:3000 (development)
+# Access web interface at http://localhost:3000
 # Web app proxies API requests to manager on localhost:8081
-
-# Note: The nocodo CLI has been removed as part of issue #80
+# Users access port 3000 for web interface, which communicates with API on 8081
 ```
 
 ---
@@ -72,40 +70,39 @@ cd manager-web && npm run dev
 
 > The following sections describe planned features that will be implemented after the MVP is complete.
 
-### Bootstrap app (Future)
+### Bootstrap app (Future Enhancement)
 
-The Bootstrap app will allow users to deploy nocodo to cloud servers. Written in Rust, Actix Web, SQLite.
+The Bootstrap app will allow users to deploy nocodo to cloud servers. This is planned for post-MVP development.
 
-**Planned Features:**
+**Planned Features**:
 - Cloud provider integration (Scaleway, DigitalOcean, Vultr, Linode)
 - Server provisioning and management
 - Authentication with nocodo.com
 - Encrypted API key storage
 - Server image creation and reuse
 
-### Bootstrap Web app (Future)
+### Bootstrap Web app (Future Enhancement)
 
-Web interface for Bootstrap app management.
+Web interface for Bootstrap app management. This is planned for post-MVP development.
 
-**Planned Features:**
+**Planned Features**:
 - Cloud provider API key management
 - Server dashboard and monitoring
 - Remote server controls
 
 ## Manager app
 
-The Manager app is a Linux daemon, installed through the scripts in `Bootstrap` app. It manages the Ubuntu `Operator`, installs all dependencies for a typical developer environment, like Git, Python, Rust, cURL, nginx, PostgreSQL and so on.
+The Manager app is a Linux daemon that provides project management and API services for AI-assisted development. It runs locally and manages projects, AI sessions, and file operations.
 
 Features:
 
-- System orchestration and server management
-- Development environment setup and maintenance
-- Process management for AI tools
-- Project structure and guardrails enforcement
-- File system management and project organization
-- Security hardening and system updates
-- Service monitoring and health checks
-- RESTful API server for Web app communication
+- Project CRUD operations and lifecycle management
+- AI session orchestration and tracking
+- File system operations and project structure management
+- HTTP API and WebSocket communication
+- SQLite database for data persistence
+- Configuration management
+- Process management for AI tool integration
 
 See [MANAGER.md](./MANAGER.md) for detailed technical specifications.
 
@@ -150,8 +147,8 @@ See [MANAGER_WEB.md](./MANAGER_WEB.md) for detailed technical specifications.
 
 ### Key Interactions:
 - **User ↔ Web App**: Chat interface, project management (localhost:3000)
-- **AI Tools ↔ Manager Daemon**: Direct integration (localhost:8081)
-- **Web App ↔ Manager**: HTTP/WebSocket via Vite proxy for real-time updates
+- **AI Tools ↔ Manager Daemon**: Direct HTTP API integration (localhost:8081)
+- **Web App ↔ Manager Daemon**: HTTP/WebSocket via Vite proxy (localhost:3000 → localhost:8081)
 
 ---
 

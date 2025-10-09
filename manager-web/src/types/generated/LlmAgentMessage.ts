@@ -2,7 +2,7 @@
 
 export interface LlmAgentMessage {
   id: number;
-  session_id: string;
+  session_id: number;
   role: string;
   content: string;
   created_at: number;

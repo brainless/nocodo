@@ -2,7 +2,7 @@ import { Component, For, createSignal, onMount } from 'solid-js';
 import { A, Route, Router, useParams } from '@solidjs/router';
 import ProjectList from './components/ProjectList';
 import CreateProjectForm from './components/CreateProjectForm';
-import ProjectFilesPage from './components/ProjectFilesPage';
+
 import AiSessionsList from './components/AiSessionsList';
 import AiSessionDetail from './components/AiSessionDetail';
 import Dashboard from './components/Dashboard';
@@ -227,15 +227,6 @@ const CreateProjectPage: Component = () => {
   );
 };
 
-// Files Page - now uses Layout for consistency
-const FilesPageWrapper: Component = () => {
-  return (
-    <Layout>
-      <ProjectFilesPage />
-    </Layout>
-  );
-};
-
 // Project Details Page
 import ProjectDetails from './components/ProjectDetails';
 const ProjectDetailsWrapper: Component = () => {
@@ -247,7 +238,8 @@ const ProjectDetailsWrapper: Component = () => {
     try {
       const projectId = (params as { id: string }).id;
       if (projectId) {
-        const details = await apiClient.fetchProjectDetails(projectId);
+        const projectIdNum = parseInt(projectId, 10);
+        const details = await apiClient.fetchProjectDetails(projectIdNum);
         setProject(details.project);
       }
     } catch (e) {
@@ -299,7 +291,7 @@ const App: Component = () => {
           <Route path='/projects/create' component={CreateProjectPage} />
           <Route path='/projects/:id' component={ProjectDetailsWrapper} />
           <Route path='/projects/:id/:tab' component={ProjectDetailsWrapper} />
-          <Route path='/projects/:id/files' component={FilesPageWrapper} />
+
           <Route path='/work' component={AiSessionsPage} />
           <Route path='/work/:id' component={AiSessionDetailPage} />
           <Route path='/settings' component={SettingsPage} />

@@ -2,7 +2,7 @@
 
 export interface AiSessionOutput {
   id: number;
-  session_id: string;
+  session_id: number;
   content: string;
   created_at: number;
 }

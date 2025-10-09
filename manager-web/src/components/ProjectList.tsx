@@ -32,7 +32,7 @@ const ProjectList: Component<ProjectListProps> = props => {
     }
   };
 
-  const deleteProject = async (id: string) => {
+  const deleteProject = async (id: number) => {
     if (!confirm('Are you sure you want to delete this project?')) {
       return;
     }

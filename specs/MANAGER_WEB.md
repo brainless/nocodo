@@ -11,11 +11,9 @@ The Manager Web app is a single-page application that provides a Lovable-like ch
 1. **Chat Interface** - The primary user interface for interacting with the AI
 2. **Project Dashboard** - Overview of projects, status, and recent activity
 3. **File Explorer** - Browse, view, and edit project files
-4. **Code Editor** - Integrated Monaco editor for code viewing and editing
-5. **Terminal Emulator** - Xterm.js-based terminal for direct command execution
-6. **Real-time Engine** - WebSocket client for real-time updates
-7. **State Management** - Solid Store for managing application state
-8. **API Client** - Native fetch with Solid Query for communicating with the Manager daemon
+4. **Real-time Engine** - WebSocket client for real-time updates
+5. **State Management** - Solid Store for managing application state
+6. **API Client** - Native fetch for communicating with the Manager daemon
 
 ### Technology Stack
 
@@ -24,9 +22,7 @@ The Manager Web app is a single-page application that provides a Lovable-like ch
 - **Styling**: Tailwind CSS
 - **UI Components**: Solid UI components
 - **State Management**: Solid Store
-- **API Communication**: Solid Query + native fetch (REST), WebSocket (real-time)
-- **Code Editor**: Monaco Editor
-- **Terminal**: Xterm.js
+- **API Communication**: Native fetch (REST), WebSocket (real-time)
 - **Routing**: Solid Router
 - **Build Tool**: Vite
 - **Type Safety**: Generated types from Manager app via ts-rs
@@ -63,20 +59,12 @@ The Manager Web app is a single-page application that provides a Lovable-like ch
 - Quick links to common project actions
 - Resource usage monitoring (CPU, memory)
 
-#### 3. File Explorer & Code Editor
+#### 3. File Explorer
 
 - Tree-based file explorer
-- Monaco-based code editor with syntax highlighting
-- In-editor diff view for AI-suggested changes
+- File viewing and basic editing capabilities
 - File operations (create, rename, delete)
-- Real-time collaborative editing (future)
-
-#### 4. Integrated Terminal
-
-- Xterm.js-based terminal emulator
-- Direct access to the Operator server shell
-- Secure WebSocket communication
-- Multiple terminal tabs
+- Project structure navigation
 
 ## Component Architecture
 
@@ -131,15 +119,13 @@ const ProjectDashboard: Component<DashboardProps> = (props) => {
   );
 };
 
-// Code Editor Component
-interface CodeEditorProps {
+// File Viewer Component
+interface FileViewerProps {
   file: ProjectFile;
-  onChange: (content: string) => void;
 }
 
-const CodeEditor: Component<CodeEditorProps> = (props) => {
+const FileViewer: Component<FileViewerProps> = (props) => {
   const [content, setContent] = createSignal('');
-  let editorRef: HTMLDivElement;
   
   createEffect(() => {
     // Load file content when file changes
@@ -149,11 +135,9 @@ const CodeEditor: Component<CodeEditorProps> = (props) => {
   });
   
   return (
-    <div 
-      ref={editorRef} 
-      class="monaco-editor-container"
-      // Monaco editor will be mounted here
-    />
+    <div class="file-viewer">
+      <pre>{content()}</pre>
+    </div>
   );
 };
 ```
@@ -181,10 +165,7 @@ interface AppState {
     openFiles: ProjectFile[];
     activeFile: ProjectFile | null;
   };
-  terminal: {
-    sessions: TerminalSession[];
-    activeSession: string | null;
-  };
+  
   ui: {
     sidebarOpen: boolean;
     theme: 'light' | 'dark';
@@ -202,7 +183,7 @@ const AppStateProvider: ParentComponent = (props) => {
     chat: { messages: [], isTyping: false, session: null },
     projects: { list: [], current: null, loading: false },
     files: { tree: [], openFiles: [], activeFile: null },
-    terminal: { sessions: [], activeSession: null },
+    
     ui: { sidebarOpen: true, theme: 'light', notifications: [] },
   });
 
@@ -281,14 +262,22 @@ class ApiClient {
 
 const apiClient = new ApiClient();
 
-// Solid Query integration for reactive data fetching
-import { createQuery } from '@tanstack/solid-query';
-
+// Simple reactive data fetching with SolidJS signals
 export const useProjects = () => {
-  return createQuery({
-    queryKey: ['projects'],
-    queryFn: () => apiClient.fetchProjects(),
-  });
+  const [projects, setProjects] = createSignal<Project[]>([]);
+  const [loading, setLoading] = createSignal(false);
+  
+  const fetchProjects = async () => {
+    setLoading(true);
+    try {
+      const data = await apiClient.fetchProjects();
+      setProjects(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return { projects, loading, fetchProjects };
 };
 ```
 
@@ -343,7 +332,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const FilesPage = lazy(() => import('./pages/FilesPage'));
-const TerminalPage = lazy(() => import('./pages/TerminalPage'));
+
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 const App: Component = () => {
@@ -356,7 +345,7 @@ const App: Component = () => {
           <Route path="/project/:id" component={ProjectLayout}>
             <Route path="/chat" component={ChatPage} />
             <Route path="/files" component={FilesPage} />
-            <Route path="/terminal" component={TerminalPage} />
+            
           </Route>
           <Route path="/settings" component={SettingsPage} />
         </Route>
@@ -380,10 +369,10 @@ export default App;
 
 ## Testing Strategy
 
-### Unit Tests (Solid Testing Library)
+### Unit Tests (@solidjs/testing-library)
 
 ```typescript
-import { render, screen, fireEvent } from 'solid-testing-library';
+import { render, screen, fireEvent } from '@solidjs/testing-library';
 import { ChatInput } from './ChatInput';
 
 describe('ChatInput', () => {
@@ -432,6 +421,8 @@ describe('Chat functionality', () => {
 
 ## Future Enhancements
 
+- Monaco Editor integration for advanced code editing
+- Terminal emulator integration for command execution
 - Real-time collaborative editing in the code editor
 - Advanced data visualization and dashboards
 - Voice-to-text input for chat

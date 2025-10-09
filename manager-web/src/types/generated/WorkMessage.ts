@@ -3,8 +3,8 @@ import type { MessageAuthorType } from './MessageAuthorType';
 import type { MessageContentType } from './MessageContentType';
 
 export interface WorkMessage {
-  id: string;
-  work_id: string;
+  id: number;
+  work_id: number;
   content: string;
   content_type: MessageContentType;
   author_type: MessageAuthorType;

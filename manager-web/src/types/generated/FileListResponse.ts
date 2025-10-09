@@ -2,7 +2,7 @@
 import type { FileInfo } from './FileInfo';
 
 export interface FileListResponse {
-  files: FileInfo[];
+  files: Array<FileInfo>;
   current_path: string;
   total_files: number;
   truncated: boolean;

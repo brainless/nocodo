@@ -37,7 +37,7 @@ const FileEditor: Component<FileEditorProps> = props => {
     try {
       const response: FileContentResponse = await apiClient.getFileContent(
         props.file.path,
-        props.project.id
+        Number(props.project.id)
       );
 
       setContent(response.content);
@@ -57,7 +57,7 @@ const FileEditor: Component<FileEditorProps> = props => {
 
     try {
       await apiClient.updateFile(props.file.path, {
-        project_id: props.project.id,
+        project_id: Number(props.project.id),
         content: content(),
       });
 

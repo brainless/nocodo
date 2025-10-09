@@ -2,6 +2,6 @@
 
 export interface CreateWorkRequest {
   title: string;
-  project_id: string | null;
+  project_id: number | undefined;
   model: string | null;
 }

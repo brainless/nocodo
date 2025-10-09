@@ -92,7 +92,7 @@ mod tests {
 
         // Create a test project
         let project = nocodo_manager::models::Project {
-            id: "test-project-id".to_string(),
+            id: 1,
             name: "Test Project".to_string(),
             path: "/tmp/test-path".to_string(),
             language: Some("rust".to_string()),
@@ -107,7 +107,7 @@ mod tests {
         test_db.db().create_project(&project).unwrap();
 
         // Retrieve project
-        let retrieved = test_db.db().get_project_by_id("test-project-id").unwrap();
+        let retrieved = test_db.db().get_project_by_id(1).unwrap();
         assert_eq!(retrieved.name, "Test Project");
         assert_eq!(retrieved.language, Some("rust".to_string()));
 
@@ -129,7 +129,7 @@ mod tests {
 
             // Create some data
             let project = nocodo_manager::models::Project {
-                id: "cleanup-test".to_string(),
+                id: 2,
                 name: "Cleanup Test".to_string(),
                 path: "/tmp/cleanup".to_string(),
                 language: Some("rust".to_string()),

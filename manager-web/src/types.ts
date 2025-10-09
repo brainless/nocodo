@@ -40,16 +40,16 @@ export * from './types/generated/LlmAgentMessage';
 // Extended AiSession that includes all base fields plus additional frontend fields
 export interface ExtendedAiSession {
   // Base AiSession fields
-  id: string;
-  work_id: string;
-  message_id: string;
+  id: number;
+  work_id: number;
+  message_id: number;
   tool_name: string;
   status: string;
   project_context: string | null;
   started_at: number;
   ended_at: number | null;
   // Extended fields for frontend use
-  project_id?: string | null;
+  project_id?: number | null;
   prompt?: string;
   model?: string | null;
 }
@@ -77,20 +77,20 @@ export type WebSocketMessage =
   | { type: 'Disconnected'; payload: { client_id: string } }
   | { type: 'ProjectCreated'; payload: { project: Project } }
   | { type: 'ProjectUpdated'; payload: { project: Project } }
-  | { type: 'ProjectDeleted'; payload: { project_id: string } }
-  | { type: 'ProjectStatusChanged'; payload: { project_id: string; status: string } }
+  | { type: 'ProjectDeleted'; payload: { project_id: number } }
+  | { type: 'ProjectStatusChanged'; payload: { project_id: number; status: string } }
   | { type: 'AiSessionCreated'; payload: { session: AiSession } }
-  | { type: 'AiSessionStatusChanged'; payload: { session_id: string; status: string } }
-  | { type: 'AiSessionCompleted'; payload: { session_id: string } }
-  | { type: 'AiSessionFailed'; payload: { session_id: string } }
+  | { type: 'AiSessionStatusChanged'; payload: { session_id: number; status: string } }
+  | { type: 'AiSessionCompleted'; payload: { session_id: number } }
+  | { type: 'AiSessionFailed'; payload: { session_id: number } }
   | {
       type: 'AiSessionOutputChunk';
-      payload: { session_id: string; stream: string; content: string; seq: number };
+      payload: { session_id: number; stream: string; content: string; seq: number };
     }
-  | { type: 'LlmAgentChunk'; payload: { session_id: string; content: string } }
-  | { type: 'ToolCallStarted'; payload: { session_id: string; call_id: string; tool_name: string } }
-  | { type: 'ToolCallCompleted'; payload: { session_id: string; call_id: string; result: any } }
-  | { type: 'ToolCallFailed'; payload: { session_id: string; call_id: string; error: string } }
+  | { type: 'LlmAgentChunk'; payload: { session_id: number; content: string } }
+  | { type: 'ToolCallStarted'; payload: { session_id: number; call_id: string; tool_name: string } }
+  | { type: 'ToolCallCompleted'; payload: { session_id: number; call_id: string; result: any } }
+  | { type: 'ToolCallFailed'; payload: { session_id: number; call_id: string; error: string } }
   | { type: 'Error'; payload: { message: string } }
   | { type: 'Ping' }
   | { type: 'Pong' };
@@ -107,4 +107,3 @@ export interface WebSocketClient {
   onStateChange(callback: (state: WebSocketConnectionState) => void): void;
   getState(): WebSocketConnectionState;
 }
-export type { Project } from './types/Project';

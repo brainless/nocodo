@@ -35,7 +35,7 @@ const AiSessionCard: Component<AiSessionCardProps> = props => {
           <ToolIcon toolName={props.session.tool_name} model={props.session.model} />
           <ProjectBadge
             project={props.project ?? null}
-            projectId={props.session.project_id ?? undefined}
+            projectId={props.session.project_id?.toString() ?? undefined}
           />
         </div>
 

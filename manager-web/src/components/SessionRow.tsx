@@ -64,7 +64,7 @@ const ToolIcon: Component<{
     <WorkWidget
       type='model'
       value={getToolDisplayName(props.toolName, props.model)}
-      class={props.className}
+      className={props.className}
     />
   );
 };
@@ -255,7 +255,7 @@ const SessionRow: Component<SessionRowProps> = props => {
           <div class='flex items-center justify-between mb-2'>
             <ProjectBadge
               project={props.project ?? null}
-              projectId={session().project_id ?? undefined}
+              projectId={session().project_id?.toString() ?? undefined}
             />
             <div class='text-xs text-gray-500'>
               <span title='Work duration'>

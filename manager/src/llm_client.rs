@@ -635,8 +635,9 @@ impl OpenAiCompatibleClient {
             .json(&request);
 
         // Add custom headers for different providers
-        if self.config.provider.to_lowercase() == "grok" {
-            // Grok uses Bearer token authentication, no additional headers needed
+        let provider_lower = self.config.provider.to_lowercase();
+        if provider_lower == "grok" || provider_lower == "xai" {
+            // xAI/Grok uses Bearer token authentication, no additional headers needed
             // API documented at https://docs.x.ai/docs/api-reference
             // OpenAI-compatible API, uses standard Authorization header only
         }
@@ -797,8 +798,9 @@ impl LlmClient for OpenAiCompatibleClient {
                 .json(&prepared_request);
 
             // Add custom headers for different providers
-            if config.provider.to_lowercase() == "grok" {
-                // Grok uses Bearer token authentication, no additional headers needed
+            let provider_lower = config.provider.to_lowercase();
+            if provider_lower == "grok" || provider_lower == "xai" {
+                // xAI/Grok uses Bearer token authentication, no additional headers needed
                 // API documented at https://docs.x.ai/docs/api-reference
                 // OpenAI-compatible API, uses standard Authorization header only
             }
@@ -1568,7 +1570,7 @@ impl LlmClient for ClaudeClient {
 /// Factory function to create LLM clients
 pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
     match config.provider.to_lowercase().as_str() {
-        "openai" | "grok" => {
+        "openai" | "grok" | "xai" => {
             let client = OpenAiCompatibleClient::new(config)?;
             Ok(Box::new(client))
         }
@@ -1659,5 +1661,47 @@ mod tests {
 
         let client_old = OpenAiCompatibleClient::new(config_old).unwrap();
         assert!(!client_old.supports_native_tools());
+    }
+
+    #[test]
+    fn test_xai_supports_native_tools() {
+        // Test xAI provider with grok-code-fast-1
+        let config_xai = LlmProviderConfig {
+            provider: "xai".to_string(),
+            model: "grok-code-fast-1".to_string(),
+            api_key: "test".to_string(),
+            base_url: Some("https://api.x.ai".to_string()),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let client_xai = OpenAiCompatibleClient::new(config_xai).unwrap();
+        assert!(client_xai.supports_native_tools());
+
+        // Test case insensitive
+        let config_xai_upper = LlmProviderConfig {
+            provider: "XAI".to_string(),
+            model: "grok-code-fast-1".to_string(),
+            api_key: "test".to_string(),
+            base_url: Some("https://api.x.ai".to_string()),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let client_xai_upper = OpenAiCompatibleClient::new(config_xai_upper).unwrap();
+        assert!(client_xai_upper.supports_native_tools());
+
+        // Test that older grok models don't support native tools
+        let config_xai_old = LlmProviderConfig {
+            provider: "xai".to_string(),
+            model: "grok-1".to_string(),
+            api_key: "test".to_string(),
+            base_url: Some("https://api.x.ai".to_string()),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let client_xai_old = OpenAiCompatibleClient::new(config_xai_old).unwrap();
+        assert!(!client_xai_old.supports_native_tools());
     }
 }

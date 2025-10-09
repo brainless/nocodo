@@ -48,16 +48,16 @@ impl Database {
         // Create projects table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS projects (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                path TEXT NOT NULL,
-                language TEXT,
-                framework TEXT,
-                status TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                technologies TEXT
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 name TEXT NOT NULL,
+                 path TEXT NOT NULL,
+                 language TEXT,
+                 framework TEXT,
+                 status TEXT NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 updated_at INTEGER NOT NULL,
+                 technologies TEXT
+             )",
             [],
         )?;
 
@@ -70,32 +70,32 @@ impl Database {
         // Create AI sessions table - now links to Work and Message instead of storing prompt directly
         conn.execute(
             "CREATE TABLE IF NOT EXISTS ai_sessions (
-                id TEXT PRIMARY KEY,
-                work_id TEXT NOT NULL,
-                message_id TEXT NOT NULL,
-                tool_name TEXT NOT NULL,
-                status TEXT NOT NULL,
-                project_context TEXT,
-                started_at INTEGER NOT NULL,
-                ended_at INTEGER,
-                FOREIGN KEY (work_id) REFERENCES works (id),
-                FOREIGN KEY (message_id) REFERENCES work_messages (id)
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 work_id INTEGER NOT NULL,
+                 message_id INTEGER NOT NULL,
+                 tool_name TEXT NOT NULL,
+                 status TEXT NOT NULL,
+                 project_context TEXT,
+                 started_at INTEGER NOT NULL,
+                 ended_at INTEGER,
+                 FOREIGN KEY (work_id) REFERENCES works (id),
+                 FOREIGN KEY (message_id) REFERENCES work_messages (id)
+             )",
             [],
         )?;
 
         // Create project components table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS project_components (
-                id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                path TEXT NOT NULL,
-                language TEXT NOT NULL,
-                framework TEXT,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY (project_id) REFERENCES projects (id)
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 project_id INTEGER NOT NULL,
+                 name TEXT NOT NULL,
+                 path TEXT NOT NULL,
+                 language TEXT NOT NULL,
+                 framework TEXT,
+                 created_at INTEGER NOT NULL,
+                 FOREIGN KEY (project_id) REFERENCES projects (id)
+             )",
             [],
         )?;
 
@@ -119,15 +119,15 @@ impl Database {
         // Create AI session results table to track AI responses
         conn.execute(
             "CREATE TABLE IF NOT EXISTS ai_session_results (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                response_message_id TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                completed_at INTEGER,
-                FOREIGN KEY (session_id) REFERENCES ai_sessions (id),
-                FOREIGN KEY (response_message_id) REFERENCES work_messages (id)
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 session_id INTEGER NOT NULL,
+                 response_message_id INTEGER NOT NULL,
+                 status TEXT NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 completed_at INTEGER,
+                 FOREIGN KEY (session_id) REFERENCES ai_sessions (id),
+                 FOREIGN KEY (response_message_id) REFERENCES work_messages (id)
+             )",
             [],
         )?;
 
@@ -140,12 +140,12 @@ impl Database {
         // Create AI session outputs table for one-shot output capture
         conn.execute(
             "CREATE TABLE IF NOT EXISTS ai_session_outputs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES ai_sessions (id)
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 session_id INTEGER NOT NULL,
+                 content TEXT NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 FOREIGN KEY (session_id) REFERENCES ai_sessions (id)
+             )",
             [],
         )?;
 
@@ -158,16 +158,16 @@ impl Database {
         // Create works table (sessions/conversations)
         conn.execute(
             "CREATE TABLE IF NOT EXISTS works (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                project_id TEXT,
-                tool_name TEXT,
-                model TEXT,
-                status TEXT NOT NULL DEFAULT 'active',
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                FOREIGN KEY (project_id) REFERENCES projects (id)
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 title TEXT NOT NULL,
+                 project_id INTEGER,
+                 tool_name TEXT,
+                 model TEXT,
+                 status TEXT NOT NULL DEFAULT 'active',
+                 created_at INTEGER NOT NULL,
+                 updated_at INTEGER NOT NULL,
+                 FOREIGN KEY (project_id) REFERENCES projects (id)
+             )",
             [],
         )?;
 
@@ -184,20 +184,20 @@ impl Database {
 
         // Create work messages with content types and history
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS work_messages (
-                id TEXT PRIMARY KEY,
-                work_id TEXT NOT NULL,
-                content TEXT NOT NULL,
-                content_type TEXT NOT NULL CHECK (content_type IN ('text', 'markdown', 'json', 'code')),
-                code_language TEXT, -- Only for code content type
-                author_type TEXT NOT NULL CHECK (author_type IN ('user', 'ai')),
-                author_id TEXT, -- User ID or AI tool identifier
-                sequence_order INTEGER NOT NULL,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY (work_id) REFERENCES works (id) ON DELETE CASCADE
-            )",
-            [],
-        )?;
+             "CREATE TABLE IF NOT EXISTS work_messages (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 work_id INTEGER NOT NULL,
+                 content TEXT NOT NULL,
+                 content_type TEXT NOT NULL CHECK (content_type IN ('text', 'markdown', 'json', 'code')),
+                 code_language TEXT, -- Only for code content type
+                 author_type TEXT NOT NULL CHECK (author_type IN ('user', 'ai')),
+                 author_id TEXT, -- User ID or AI tool identifier
+                 sequence_order INTEGER NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 FOREIGN KEY (work_id) REFERENCES works (id) ON DELETE CASCADE
+             )",
+             [],
+         )?;
 
         // Index for efficient history retrieval
         conn.execute(
@@ -208,16 +208,16 @@ impl Database {
         // Create LLM agent sessions table for direct LLM integration
         conn.execute(
             "CREATE TABLE IF NOT EXISTS llm_agent_sessions (
-                id TEXT PRIMARY KEY,
-                work_id TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                model TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'running',
-                system_prompt TEXT,
-                started_at INTEGER NOT NULL,
-                ended_at INTEGER,
-                FOREIGN KEY (work_id) REFERENCES works (id)
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 work_id INTEGER NOT NULL,
+                 provider TEXT NOT NULL,
+                 model TEXT NOT NULL,
+                 status TEXT NOT NULL DEFAULT 'running',
+                 system_prompt TEXT,
+                 started_at INTEGER NOT NULL,
+                 ended_at INTEGER,
+                 FOREIGN KEY (work_id) REFERENCES works (id)
+             )",
             [],
         )?;
 
@@ -230,13 +230,13 @@ impl Database {
         // Create LLM agent messages table for conversation history
         conn.execute(
             "CREATE TABLE IF NOT EXISTS llm_agent_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
-                content TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES llm_agent_sessions (id) ON DELETE CASCADE
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 session_id INTEGER NOT NULL,
+                 role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+                 content TEXT NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 FOREIGN KEY (session_id) REFERENCES llm_agent_sessions (id) ON DELETE CASCADE
+             )",
             [],
         )?;
 
@@ -249,18 +249,18 @@ impl Database {
         // Create LLM agent tool calls table for tool execution tracking
         conn.execute(
             "CREATE TABLE IF NOT EXISTS llm_agent_tool_calls (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                message_id INTEGER,
-                tool_name TEXT NOT NULL,
-                request TEXT NOT NULL,
-                response TEXT,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at INTEGER NOT NULL,
-                completed_at INTEGER,
-                FOREIGN KEY (session_id) REFERENCES llm_agent_sessions (id) ON DELETE CASCADE,
-                FOREIGN KEY (message_id) REFERENCES llm_agent_messages (id) ON DELETE SET NULL
-            )",
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 session_id INTEGER NOT NULL,
+                 message_id INTEGER,
+                 tool_name TEXT NOT NULL,
+                 request TEXT NOT NULL,
+                 response TEXT,
+                 status TEXT NOT NULL DEFAULT 'pending',
+                 created_at INTEGER NOT NULL,
+                 completed_at INTEGER,
+                 FOREIGN KEY (session_id) REFERENCES llm_agent_sessions (id) ON DELETE CASCADE,
+                 FOREIGN KEY (message_id) REFERENCES llm_agent_messages (id) ON DELETE SET NULL
+             )",
             [],
         )?;
 
@@ -303,38 +303,38 @@ impl Database {
         // GitHub Actions workflow tables
         conn.execute(
             r#"
-            CREATE TABLE IF NOT EXISTS workflow_commands (
-                id TEXT PRIMARY KEY,
-                workflow_name TEXT NOT NULL,
-                job_name TEXT NOT NULL,
-                step_name TEXT,
-                command TEXT NOT NULL,
-                shell TEXT,
-                working_directory TEXT,
-                environment TEXT, -- JSON string
-                file_path TEXT NOT NULL,
-                project_id TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
-            )
-            "#,
+             CREATE TABLE IF NOT EXISTS workflow_commands (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 workflow_name TEXT NOT NULL,
+                 job_name TEXT NOT NULL,
+                 step_name TEXT,
+                 command TEXT NOT NULL,
+                 shell TEXT,
+                 working_directory TEXT,
+                 environment TEXT, -- JSON string
+                 file_path TEXT NOT NULL,
+                 project_id INTEGER NOT NULL,
+                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                 FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+             )
+             "#,
             [],
         )?;
 
         conn.execute(
             r#"
-            CREATE TABLE IF NOT EXISTS command_executions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                command_id TEXT NOT NULL,
-                exit_code INTEGER,
-                stdout TEXT NOT NULL,
-                stderr TEXT NOT NULL,
-                duration_ms INTEGER NOT NULL,
-                executed_at DATETIME NOT NULL,
-                success BOOLEAN NOT NULL,
-                FOREIGN KEY (command_id) REFERENCES workflow_commands (id) ON DELETE CASCADE
-            )
-            "#,
+             CREATE TABLE IF NOT EXISTS command_executions (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 command_id INTEGER NOT NULL,
+                 exit_code INTEGER,
+                 stdout TEXT NOT NULL,
+                 stderr TEXT NOT NULL,
+                 duration_ms INTEGER NOT NULL,
+                 executed_at DATETIME NOT NULL,
+                 success BOOLEAN NOT NULL,
+                 FOREIGN KEY (command_id) REFERENCES workflow_commands (id) ON DELETE CASCADE
+             )
+             "#,
             [],
         )?;
 
@@ -386,7 +386,7 @@ impl Database {
         Ok(projects)
     }
 
-    pub fn get_project_by_id(&self, id: &str) -> AppResult<Project> {
+    pub fn get_project_by_id(&self, id: i64) -> AppResult<Project> {
         let conn = self
             .connection
             .lock()
@@ -454,17 +454,23 @@ impl Database {
         Ok(project)
     }
 
-    pub fn create_project(&self, project: &Project) -> AppResult<()> {
+    pub fn create_project(&self, project: &Project) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if project.id == 0 {
+            None
+        } else {
+            Some(project.id)
+        };
+
         conn.execute(
             "INSERT INTO projects (id, name, path, language, framework, status, created_at, updated_at, technologies)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
-                project.id,
+                id_param,
                 project.name,
                 project.path,
                 project.language,
@@ -476,8 +482,9 @@ impl Database {
             ],
         )?;
 
-        tracing::info!("Created project: {} ({})", project.name, project.id);
-        Ok(())
+        let project_id = conn.last_insert_rowid();
+        tracing::info!("Created project: {} ({})", project.name, project_id);
+        Ok(project_id)
     }
 
     #[allow(dead_code)]
@@ -503,14 +510,14 @@ impl Database {
         )?;
 
         if rows_affected == 0 {
-            return Err(AppError::ProjectNotFound(project.id.clone()));
+            return Err(AppError::ProjectNotFound(project.id.to_string()));
         }
 
         tracing::info!("Updated project: {} ({})", project.name, project.id);
         Ok(())
     }
 
-    pub fn delete_project(&self, id: &str) -> AppResult<()> {
+    pub fn delete_project(&self, id: i64) -> AppResult<()> {
         let conn = self
             .connection
             .lock()
@@ -536,11 +543,17 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if component.id == 0 {
+            None
+        } else {
+            Some(component.id)
+        };
+
         conn.execute(
             "INSERT INTO project_components (id, project_id, name, path, language, framework, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)",
             params![
-                component.id,
+                id_param,
                 component.project_id,
                 component.name,
                 component.path,
@@ -553,7 +566,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_components_for_project(&self, project_id: &str) -> AppResult<Vec<ProjectComponent>> {
+    pub fn get_components_for_project(&self, project_id: i64) -> AppResult<Vec<ProjectComponent>> {
         let conn = self
             .connection
             .lock()
@@ -584,17 +597,23 @@ impl Database {
     }
 
     // AI Session methods
-    pub fn create_ai_session(&self, session: &AiSession) -> AppResult<()> {
+    pub fn create_ai_session(&self, session: &AiSession) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if session.id == 0 {
+            None
+        } else {
+            Some(session.id)
+        };
+
         conn.execute(
             "INSERT INTO ai_sessions (id, work_id, message_id, tool_name, status, project_context, started_at, ended_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
-                session.id,
+                id_param,
                 session.work_id,
                 session.message_id,
                 session.tool_name,
@@ -605,12 +624,14 @@ impl Database {
             ],
         )?;
 
+        let session_id = conn.last_insert_rowid();
+
         tracing::info!(
             "Created AI session: {} with tool {}",
-            session.id,
+            session_id,
             session.tool_name
         );
-        Ok(())
+        Ok(session_id)
     }
 
     pub fn get_ai_session_by_id(&self, id: &str) -> AppResult<AiSession> {
@@ -705,7 +726,7 @@ impl Database {
         Ok(sessions)
     }
 
-    pub fn get_ai_sessions_by_work_id(&self, work_id: &str) -> AppResult<Vec<AiSession>> {
+    pub fn get_ai_sessions_by_work_id(&self, work_id: i64) -> AppResult<Vec<AiSession>> {
         let conn = self
             .connection
             .lock()
@@ -764,7 +785,7 @@ impl Database {
 
     pub fn list_ai_session_outputs(
         &self,
-        session_id: &str,
+        session_id: i64,
     ) -> AppResult<Vec<crate::models::AiSessionOutput>> {
         let conn = self
             .connection
@@ -798,17 +819,19 @@ impl Database {
     }
 
     // Work management methods
-    pub fn create_work(&self, work: &crate::models::Work) -> AppResult<()> {
+    pub fn create_work(&self, work: &crate::models::Work) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if work.id == 0 { None } else { Some(work.id) };
+
         conn.execute(
             "INSERT INTO works (id, title, project_id, tool_name, model, status, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
-                work.id,
+                id_param,
                 work.title,
                 work.project_id,
                 work.tool_name,
@@ -819,11 +842,12 @@ impl Database {
             ],
         )?;
 
-        tracing::info!("Created work: {} ({})", work.title, work.id);
-        Ok(())
+        let work_id = conn.last_insert_rowid();
+        tracing::info!("Created work: {} ({})", work.title, work_id);
+        Ok(work_id)
     }
 
-    pub fn get_work_by_id(&self, id: &str) -> AppResult<crate::models::Work> {
+    pub fn get_work_by_id(&self, id: i64) -> AppResult<crate::models::Work> {
         let conn = self
             .connection
             .lock()
@@ -932,7 +956,7 @@ impl Database {
     }
 
     // Work message management methods
-    pub fn create_work_message(&self, message: &crate::models::WorkMessage) -> AppResult<()> {
+    pub fn create_work_message(&self, message: &crate::models::WorkMessage) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
@@ -954,31 +978,39 @@ impl Database {
             crate::models::MessageAuthorType::Ai => "ai",
         };
 
+        let id_param = if message.id == 0 {
+            None
+        } else {
+            Some(message.id)
+        };
+
         conn.execute(
             "INSERT INTO work_messages (id, work_id, content, content_type, code_language, author_type, author_id, sequence_order, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-             [
-                 &message.id as &dyn rusqlite::ToSql,
-                 &message.work_id as &dyn rusqlite::ToSql,
-                 &message.content as &dyn rusqlite::ToSql,
-                 &content_type_str as &dyn rusqlite::ToSql,
-                 &code_language as &dyn rusqlite::ToSql,
-                 &author_type_str as &dyn rusqlite::ToSql,
-                 &message.author_id as &dyn rusqlite::ToSql,
-                 &message.sequence_order as &dyn rusqlite::ToSql,
-                 &message.created_at as &dyn rusqlite::ToSql,
-             ],
+            params![
+                id_param,
+                message.work_id,
+                message.content,
+                content_type_str,
+                code_language,
+                author_type_str,
+                message.author_id,
+                message.sequence_order,
+                message.created_at
+            ],
         )?;
+
+        let message_id = conn.last_insert_rowid();
 
         tracing::info!(
             "Created work message: {} for work {}",
-            message.id,
+            message_id,
             message.work_id
         );
-        Ok(())
+        Ok(message_id)
     }
 
-    pub fn get_work_messages(&self, work_id: &str) -> AppResult<Vec<crate::models::WorkMessage>> {
+    pub fn get_work_messages(&self, work_id: i64) -> AppResult<Vec<crate::models::WorkMessage>> {
         let conn = self
             .connection
             .lock()
@@ -1031,7 +1063,7 @@ impl Database {
 
     pub fn get_work_with_messages(
         &self,
-        work_id: &str,
+        work_id: i64,
     ) -> AppResult<crate::models::WorkWithHistory> {
         let work = self.get_work_by_id(work_id)?;
         let messages = self.get_work_messages(work_id)?;
@@ -1044,7 +1076,7 @@ impl Database {
         })
     }
 
-    pub fn get_next_message_sequence(&self, work_id: &str) -> AppResult<i32> {
+    pub fn get_next_message_sequence(&self, work_id: i64) -> AppResult<i32> {
         let conn = self
             .connection
             .lock()
@@ -1066,11 +1098,17 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if result.id == 0 {
+            None
+        } else {
+            Some(result.id)
+        };
+
         conn.execute(
             "INSERT INTO ai_session_results (id, session_id, response_message_id, status, created_at, completed_at)
              VALUES (?, ?, ?, ?, ?, ?)",
             params![
-                result.id,
+                id_param,
                 result.session_id,
                 result.response_message_id,
                 result.status,
@@ -1147,17 +1185,23 @@ impl Database {
 
     // LLM Agent Methods
 
-    pub fn create_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<()> {
+    pub fn create_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if session.id == 0 {
+            None
+        } else {
+            Some(session.id)
+        };
+
         conn.execute(
-            "INSERT INTO llm_agent_sessions (id, work_id, provider, model, status, system_prompt, started_at, ended_at) 
+            "INSERT INTO llm_agent_sessions (id, work_id, provider, model, status, system_prompt, started_at, ended_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
-                session.id,
+                id_param,
                 session.work_id,
                 session.provider,
                 session.model,
@@ -1168,11 +1212,13 @@ impl Database {
             ],
         )?;
 
-        tracing::info!("Created LLM agent session: {}", session.id);
-        Ok(())
+        let session_id = conn.last_insert_rowid();
+
+        tracing::info!("Created LLM agent session: {}", session_id);
+        Ok(session_id)
     }
 
-    pub fn get_llm_agent_session(&self, session_id: &str) -> AppResult<LlmAgentSession> {
+    pub fn get_llm_agent_session(&self, session_id: i64) -> AppResult<LlmAgentSession> {
         let conn = self
             .connection
             .lock()
@@ -1233,7 +1279,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_llm_agent_sessions_by_work(&self, work_id: &str) -> AppResult<Vec<LlmAgentSession>> {
+    pub fn get_llm_agent_sessions_by_work(&self, work_id: i64) -> AppResult<Vec<LlmAgentSession>> {
         let conn = self
             .connection
             .lock()
@@ -1261,7 +1307,7 @@ impl Database {
         sessions.map_err(AppError::from)
     }
 
-    pub fn get_llm_agent_session_by_work_id(&self, work_id: &str) -> AppResult<LlmAgentSession> {
+    pub fn get_llm_agent_session_by_work_id(&self, work_id: i64) -> AppResult<LlmAgentSession> {
         let sessions = self.get_llm_agent_sessions_by_work(work_id)?;
 
         match sessions.first() {
@@ -1275,7 +1321,7 @@ impl Database {
 
     pub fn create_llm_agent_message(
         &self,
-        session_id: &str,
+        session_id: i64,
         role: &str,
         content: String,
     ) -> AppResult<i64> {
@@ -1300,7 +1346,7 @@ impl Database {
         Ok(message_id)
     }
 
-    pub fn get_llm_agent_messages(&self, session_id: &str) -> AppResult<Vec<LlmAgentMessage>> {
+    pub fn get_llm_agent_messages(&self, session_id: i64) -> AppResult<Vec<LlmAgentMessage>> {
         let conn = self
             .connection
             .lock()
@@ -1473,7 +1519,7 @@ impl Database {
 
     pub fn get_workflow_commands(
         &self,
-        project_id: &str,
+        project_id: i64,
     ) -> AppResult<Vec<nocodo_github_actions::WorkflowCommand>> {
         let conn = self
             .connection
@@ -1556,7 +1602,7 @@ impl Database {
 
     pub fn get_command_executions(
         &self,
-        command_id: &str,
+        command_id: i64,
     ) -> AppResult<Vec<nocodo_github_actions::CommandExecution>> {
         let conn = self
             .connection

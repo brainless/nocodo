@@ -36,6 +36,108 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
 }
 
+/// Helper function to infer the provider from a model ID
+fn infer_provider_from_model(model_id: &str) -> &str {
+    let model_lower = model_id.to_lowercase();
+
+    if model_lower.contains("gpt") || model_lower.contains("o1") || model_lower.starts_with("gpt-")
+    {
+        "openai"
+    } else if model_lower.contains("claude")
+        || model_lower.contains("opus")
+        || model_lower.contains("sonnet")
+        || model_lower.contains("haiku")
+    {
+        "anthropic"
+    } else if model_lower.contains("grok") {
+        "xai"
+    } else {
+        // Default to anthropic if we can't determine
+        "anthropic"
+    }
+}
+
+/// Helper function to get a user-friendly display name from a model ID by looking it up in the provider
+async fn get_model_display_name(model_id: &str, provider: &str, config: &AppConfig) -> String {
+    // Try to get the model name from the provider
+    if let Some(api_key_config) = &config.api_keys {
+        let model_name = match provider {
+            "anthropic" => {
+                if let Some(api_key) = &api_key_config.anthropic_api_key {
+                    if !api_key.is_empty() {
+                        let anthropic_config = LlmProviderConfig {
+                            provider: "anthropic".to_string(),
+                            model: model_id.to_string(),
+                            api_key: api_key.clone(),
+                            base_url: None,
+                            max_tokens: Some(1000),
+                            temperature: Some(0.7),
+                        };
+                        if let Ok(provider) =
+                            crate::llm_providers::AnthropicProvider::new(anthropic_config)
+                        {
+                            if let Some(model) = provider.get_model(model_id) {
+                                return model.name().to_string();
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            "openai" => {
+                if let Some(api_key) = &api_key_config.openai_api_key {
+                    if !api_key.is_empty() {
+                        let openai_config = LlmProviderConfig {
+                            provider: "openai".to_string(),
+                            model: model_id.to_string(),
+                            api_key: api_key.clone(),
+                            base_url: None,
+                            max_tokens: Some(1000),
+                            temperature: Some(0.7),
+                        };
+                        if let Ok(provider) =
+                            crate::llm_providers::OpenAiProvider::new(openai_config)
+                        {
+                            if let Some(model) = provider.get_model(model_id) {
+                                return model.name().to_string();
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            "xai" => {
+                if let Some(api_key) = &api_key_config.xai_api_key {
+                    if !api_key.is_empty() {
+                        let xai_config = LlmProviderConfig {
+                            provider: "xai".to_string(),
+                            model: model_id.to_string(),
+                            api_key: api_key.clone(),
+                            base_url: Some("https://api.x.ai".to_string()),
+                            max_tokens: Some(1000),
+                            temperature: Some(0.7),
+                        };
+                        if let Ok(provider) = crate::llm_providers::XaiProvider::new(xai_config) {
+                            if let Some(model) = provider.get_model(model_id) {
+                                return model.name().to_string();
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        };
+
+        if let Some(model) = model_name {
+            return model;
+        }
+    }
+
+    // Fall back to the model ID itself if we can't look it up
+    model_id.to_string()
+}
+
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let projects = data.database.get_all_projects()?;
     let response = ProjectListResponse { projects };
@@ -137,7 +239,8 @@ A new project created with nocodo.
     project.status = "initialized".to_string();
 
     // Save to database
-    data.database.create_project(&project)?;
+    let project_id = data.database.create_project(&project)?;
+    project.id = project_id;
 
     // Analyze project to detect language/framework and components
     let analysis = analyze_project_path(&absolute_project_path).map_err(AppError::Internal)?;
@@ -165,28 +268,31 @@ A new project created with nocodo.
     updated_project.technologies = Some(technologies_json);
 
     updated_project.update_timestamp();
+    updated_project.id = project_id;
     data.database.update_project(&updated_project)?;
 
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
-        .broadcast_project_created(project.clone());
+        .broadcast_project_created(updated_project.clone());
 
     tracing::info!(
         "Successfully created project '{}' at {}",
-        project.name,
-        project.path
+        updated_project.name,
+        updated_project.path
     );
 
-    let response = ProjectResponse { project };
+    let response = ProjectResponse {
+        project: updated_project,
+    };
     Ok(HttpResponse::Created().json(response))
 }
 
 pub async fn get_project(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = path.into_inner();
-    let project = data.database.get_project_by_id(&project_id)?;
+    let project = data.database.get_project_by_id(project_id)?;
     let response = ProjectResponse { project };
     Ok(HttpResponse::Ok().json(response))
 }
@@ -194,11 +300,11 @@ pub async fn get_project(
 /// Detailed project info including detected component apps
 pub async fn get_project_details(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = path.into_inner();
-    let project = data.database.get_project_by_id(&project_id)?;
-    let components = data.database.get_components_for_project(&project_id)?;
+    let project = data.database.get_project_by_id(project_id)?;
+    let components = data.database.get_components_for_project(project_id)?;
     let response = crate::models::ProjectDetailsResponse {
         project,
         components,
@@ -208,12 +314,12 @@ pub async fn get_project_details(
 
 pub async fn delete_project(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = path.into_inner();
 
     // Delete from database
-    data.database.delete_project(&project_id)?;
+    data.database.delete_project(project_id)?;
 
     // Broadcast project deletion via WebSocket
     data.ws_broadcaster.broadcast_project_deleted(project_id);
@@ -412,7 +518,8 @@ pub async fn add_existing_project(
     project.status = "registered".to_string(); // Different status to distinguish from created projects
 
     // Save to database
-    data.database.create_project(&project)?;
+    let project_id = data.database.create_project(&project)?;
+    project.id = project_id;
 
     // Analyze project to detect language/framework and components
     let analysis = analyze_project_path(&absolute_path).map_err(AppError::Internal)?;
@@ -440,13 +547,14 @@ pub async fn add_existing_project(
     updated_project.technologies = Some(technologies_json);
 
     updated_project.update_timestamp();
+    updated_project.id = project_id;
     data.database.update_project(&updated_project)?;
 
     // Store detected components
     for comp in analysis.components {
         // Attach project_id
         let component = crate::models::ProjectComponent::new(
-            updated_project.id.clone(),
+            updated_project.id,
             comp.name,
             comp.path,
             comp.language,
@@ -485,7 +593,7 @@ pub async fn list_files(
 
     // Get the project to determine the base path
     let project = if let Some(project_id) = &request.project_id {
-        data.database.get_project_by_id(project_id)?
+        data.database.get_project_by_id(*project_id)?
     } else {
         return Err(AppError::InvalidRequest(
             "project_id is required".to_string(),
@@ -604,7 +712,7 @@ pub async fn create_file(
     let req = request.into_inner();
 
     // Get the project to determine the base path
-    let project = data.database.get_project_by_id(&req.project_id)?;
+    let project = data.database.get_project_by_id(req.project_id)?;
     let project_path = Path::new(&project.path);
     let full_path = project_path.join(&req.path);
 
@@ -711,9 +819,12 @@ pub async fn get_file_content(
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
     let file_path = path_param.into_inner();
-    let project_id = query
+    let project_id_str = query
         .get("project_id")
         .ok_or_else(|| AppError::InvalidRequest("project_id is required".to_string()))?;
+    let project_id = project_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid project_id".to_string()))?;
 
     // Get the project to determine the base path
     let project = data.database.get_project_by_id(project_id)?;
@@ -771,7 +882,7 @@ pub async fn update_file(
     let req = request.into_inner();
 
     // Get the project to determine the base path
-    let project = data.database.get_project_by_id(&req.project_id)?;
+    let project = data.database.get_project_by_id(req.project_id)?;
     let project_path = Path::new(&project.path);
     let full_path = project_path.join(&file_path);
 
@@ -825,9 +936,12 @@ pub async fn delete_file(
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
     let file_path = path_param.into_inner();
-    let project_id = query
+    let project_id_str = query
         .get("project_id")
         .ok_or_else(|| AppError::InvalidRequest("project_id is required".to_string()))?;
+    let project_id = project_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid project_id".to_string()))?;
 
     // Get the project to determine the base path
     let project = data.database.get_project_by_id(project_id)?;
@@ -879,7 +993,7 @@ pub async fn delete_file(
 // AI session HTTP handlers
 pub async fn create_ai_session(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
     request: web::Json<CreateAiSessionRequest>,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
@@ -894,31 +1008,36 @@ pub async fn create_ai_session(
     }
 
     // Validate that work and message exist
-    let work = data.database.get_work_by_id(&work_id)?;
-    let messages = data.database.get_work_messages(&work_id)?;
-    if !messages.iter().any(|m| m.id == req.message_id) {
+    let work = data.database.get_work_by_id(work_id)?;
+    let messages = data.database.get_work_messages(work_id)?;
+    let message_id_i64 = req
+        .message_id
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid message_id".to_string()))?;
+    if !messages.iter().any(|m| m.id == message_id_i64) {
         return Err(AppError::InvalidRequest(
             "message_id not found in work".into(),
         ));
     }
 
     // Generate project context if work is associated with a project
-    let project_context = if let Some(ref project_id) = work.project_id {
+    let project_context = if let Some(project_id) = work.project_id {
         let project = data.database.get_project_by_id(project_id)?;
         Some(format!("Project: {}\nPath: {}", project.name, project.path))
     } else {
         None
     };
 
-    let session = crate::models::AiSession::new(
-        work_id.clone(),
-        req.message_id,
+    let mut session = crate::models::AiSession::new(
+        work_id,
+        message_id_i64,
         req.tool_name.clone(),
         project_context,
     );
 
     // Persist
-    data.database.create_ai_session(&session)?;
+    let session_id = data.database.create_ai_session(&session)?;
+    session.id = session_id;
 
     // Broadcast AI session creation via WebSocket
     data.ws_broadcaster
@@ -945,7 +1064,7 @@ pub async fn create_ai_session(
 
             // Get project path for LLM agent
             let _project_path = if let Some(ref project_id) = work.project_id {
-                let project = data.database.get_project_by_id(project_id)?;
+                let project = data.database.get_project_by_id(*project_id)?;
                 std::path::PathBuf::from(project.path)
             } else {
                 std::env::current_dir().map_err(|e| {
@@ -953,33 +1072,39 @@ pub async fn create_ai_session(
                 })?
             };
 
+            // Determine provider and model from work.model or fall back to environment/defaults
+            let (provider, model) = if let Some(ref model_id) = work.model {
+                let provider = infer_provider_from_model(model_id);
+                (provider.to_string(), model_id.clone())
+            } else {
+                // Fall back to environment variables or defaults
+                let provider =
+                    std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+                let model = std::env::var("MODEL")
+                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                (provider, model)
+            };
+
+            // Get the model name for display from the provider's model definition
+            let model_display_name = get_model_display_name(&model, &provider, &data.config).await;
+
             // Update work with tool_name and model info
             let mut updated_work = work.clone();
-            updated_work.tool_name = Some("LLM Agent (Claude Sonnet 4)".to_string());
+            updated_work.tool_name = Some(format!("LLM Agent ({})", model_display_name));
             data.database.update_work(&updated_work)?;
-
-            // Get provider from environment or use default
-            let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-            let model =
-                std::env::var("MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
 
             // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
-                .create_session(
-                    work_id.clone(),
-                    provider,
-                    model,
-                    session.project_context.clone(),
-                )
+                .create_session(work_id, provider, model, session.project_context.clone())
                 .await?;
 
             // Process the message in background task to avoid blocking HTTP response
             let llm_agent_clone = llm_agent.clone();
-            let session_id = llm_session.id.clone();
+            let session_id = llm_session.id;
             let message_content = message.content.clone();
             tokio::spawn(async move {
                 if let Err(e) = llm_agent_clone
-                    .process_message(&session_id, message_content)
+                    .process_message(session_id, message_content)
                     .await
                 {
                     tracing::error!(
@@ -1014,13 +1139,13 @@ pub async fn list_ai_sessions(data: web::Data<AppState>) -> Result<HttpResponse,
 }
 
 pub async fn list_ai_session_outputs(
-    path: web::Path<String>,
+    path: web::Path<i64>,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
 
     // First, get the AI session for this work
-    let sessions = data.database.get_ai_sessions_by_work_id(&work_id)?;
+    let sessions = data.database.get_ai_sessions_by_work_id(work_id)?;
 
     if sessions.is_empty() {
         // No AI session found for this work, return empty outputs
@@ -1032,19 +1157,19 @@ pub async fn list_ai_session_outputs(
     let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
 
     // Get outputs for this session
-    let mut outputs = data.database.list_ai_session_outputs(&session.id)?;
+    let mut outputs = data.database.list_ai_session_outputs(session.id)?;
 
     // If this is an LLM agent session, also fetch LLM agent messages
     if session.tool_name == "llm-agent" {
-        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(&work_id) {
-            if let Ok(llm_messages) = data.database.get_llm_agent_messages(&llm_agent_session.id) {
+        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
+            if let Ok(llm_messages) = data.database.get_llm_agent_messages(llm_agent_session.id) {
                 // Convert LLM agent messages to AiSessionOutput format
                 for msg in llm_messages {
                     // Only include assistant messages (responses) and tool messages (results)
                     if msg.role == "assistant" || msg.role == "tool" {
                         let output = AiSessionOutput {
                             id: msg.id,
-                            session_id: session.id.clone(),
+                            session_id: session.id,
                             content: msg.content,
                             created_at: msg.created_at,
                         };
@@ -1565,7 +1690,7 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
 
                 // placeholder project_id will be replaced by caller
                 let component = crate::models::ProjectComponent::new(
-                    "".to_string(),
+                    0, // Will be set by database AUTOINCREMENT
                     name,
                     rel(&dir),
                     language,
@@ -1610,7 +1735,7 @@ fn analyze_project_path(project_path: &Path) -> Result<ProjectAnalysisResult, St
             }
 
             let component = crate::models::ProjectComponent::new(
-                "".to_string(),
+                0, // Will be set by database AUTOINCREMENT
                 name,
                 rel(&dir),
                 "rust".to_string(),
@@ -1702,7 +1827,7 @@ pub async fn create_work(
         .as_secs() as i64;
 
     let work = crate::models::Work {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: 0, // Will be set by database AUTOINCREMENT
         title: req.title,
         project_id: req.project_id,
         tool_name: None,
@@ -1713,11 +1838,13 @@ pub async fn create_work(
     };
 
     // Save to database
-    data.database.create_work(&work)?;
+    let work_id = data.database.create_work(&work)?;
+    let mut work = work;
+    work.id = work_id;
 
     // Broadcast work creation via WebSocket
     data.ws_broadcaster.broadcast_project_created(Project {
-        id: work.id.clone(),
+        id: work.id,
         name: work.title.clone(),
         path: "".to_string(), // Works don't have a path like projects
         language: None,
@@ -1742,8 +1869,11 @@ pub async fn get_work(
     data: web::Data<AppState>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id = path.into_inner();
-    let work_with_history = data.database.get_work_with_messages(&work_id)?;
+    let work_id_str = path.into_inner();
+    let work_id = work_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?;
+    let work_with_history = data.database.get_work_with_messages(work_id)?;
     Ok(HttpResponse::Ok().json(work_with_history))
 }
 
@@ -1763,8 +1893,11 @@ pub async fn delete_work(
     data.database.delete_work(&work_id)?;
 
     // Broadcast work deletion via WebSocket
-    data.ws_broadcaster
-        .broadcast_project_deleted(work_id.clone());
+    data.ws_broadcaster.broadcast_project_deleted(
+        work_id
+            .parse::<i64>()
+            .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?,
+    );
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1775,14 +1908,17 @@ pub async fn add_message_to_work(
     path: web::Path<String>,
     request: web::Json<AddMessageRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id = path.into_inner();
+    let work_id_str = path.into_inner();
+    let work_id = work_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?;
     let req = request.into_inner();
 
     // Verify work exists
-    let _work = data.database.get_work_by_id(&work_id)?;
+    let _work = data.database.get_work_by_id(work_id)?;
 
     // Get next sequence number
-    let sequence_order = data.database.get_next_message_sequence(&work_id)?;
+    let sequence_order = data.database.get_next_message_sequence(work_id)?;
 
     // Create the message object
     let now = SystemTime::now()
@@ -1790,9 +1926,9 @@ pub async fn add_message_to_work(
         .map_err(|e| AppError::Internal(format!("Failed to get timestamp: {e}")))?
         .as_secs() as i64;
 
-    let message = crate::models::WorkMessage {
-        id: uuid::Uuid::new_v4().to_string(),
-        work_id: work_id.clone(),
+    let mut message = crate::models::WorkMessage {
+        id: 0, // Will be set by database AUTOINCREMENT
+        work_id,
         content: req.content,
         content_type: req.content_type,
         author_type: req.author_type,
@@ -1802,7 +1938,8 @@ pub async fn add_message_to_work(
     };
 
     // Save to database
-    data.database.create_work_message(&message)?;
+    let message_id = data.database.create_work_message(&message)?;
+    message.id = message_id;
 
     tracing::info!(
         "Successfully added message {} to work {}",
@@ -1818,12 +1955,15 @@ pub async fn get_work_messages(
     data: web::Data<AppState>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id = path.into_inner();
+    let work_id_str = path.into_inner();
+    let work_id = work_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?;
 
     // Verify work exists
-    let _work = data.database.get_work_by_id(&work_id)?;
+    let _work = data.database.get_work_by_id(work_id)?;
 
-    let messages = data.database.get_work_messages(&work_id)?;
+    let messages = data.database.get_work_messages(work_id)?;
     let response = crate::models::WorkMessageListResponse { messages };
     Ok(HttpResponse::Ok().json(response))
 }
@@ -1833,13 +1973,13 @@ pub async fn get_work_messages(
 /// Scan workflows for a project
 pub async fn scan_workflows(
     data: web::Data<AppState>,
-    project_id: web::Path<String>,
+    project_id: web::Path<i64>,
     _request: web::Json<ScanWorkflowsRequest>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
 
     // Get project to verify it exists and get path
-    let project = data.database.get_project_by_id(&project_id)?;
+    let project = data.database.get_project_by_id(project_id)?;
     let project_path = PathBuf::from(&project.path);
 
     // Create workflow service
@@ -1847,7 +1987,7 @@ pub async fn scan_workflows(
 
     // Scan workflows
     let response = workflow_service
-        .scan_workflows(&project_id, &project_path)
+        .scan_workflows(&project_id.to_string(), &project_path)
         .map_err(|e| AppError::Internal(format!("Failed to scan workflows: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(response))
@@ -1856,16 +1996,16 @@ pub async fn scan_workflows(
 /// Get workflow commands for a project
 pub async fn get_workflow_commands(
     data: web::Data<AppState>,
-    project_id: web::Path<String>,
+    project_id: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
 
     // Verify project exists
-    data.database.get_project_by_id(&project_id)?;
+    data.database.get_project_by_id(project_id)?;
 
     let commands = data
         .database
-        .get_workflow_commands(&project_id)
+        .get_workflow_commands(project_id)
         .map_err(|e| AppError::Internal(format!("Failed to get workflow commands: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(commands))
@@ -1877,11 +2017,14 @@ pub async fn execute_workflow_command(
     path: web::Path<(String, String)>,
     request: web::Json<ExecuteCommandRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let (project_id, command_id) = path.into_inner();
+    let (project_id_str, command_id) = path.into_inner();
+    let project_id = project_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid project_id".to_string()))?;
     let request = request.into_inner();
 
     // Verify project exists
-    data.database.get_project_by_id(&project_id)?;
+    data.database.get_project_by_id(project_id)?;
 
     // Create workflow service
     let workflow_service = WorkflowService::new(data.database.connection());
@@ -1896,7 +2039,7 @@ pub async fn execute_workflow_command(
     // Broadcast execution result via WebSocket
     data.ws_broadcaster.broadcast(
         crate::websocket::WebSocketMessage::WorkflowExecutionCompleted {
-            project_id: project_id.clone(),
+            project_id: project_id.to_string(),
             command_id: command_id.clone(),
             execution: serde_json::to_string(&response).unwrap_or_default(),
         },
@@ -1910,14 +2053,21 @@ pub async fn get_command_executions(
     data: web::Data<AppState>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, AppError> {
-    let (project_id, command_id) = path.into_inner();
+    let (project_id_str, command_id) = path.into_inner();
+    let project_id = project_id_str
+        .parse::<i64>()
+        .map_err(|_| AppError::InvalidRequest("Invalid project_id".to_string()))?;
 
     // Verify project exists
-    data.database.get_project_by_id(&project_id)?;
+    data.database.get_project_by_id(project_id)?;
 
     let executions = data
         .database
-        .get_command_executions(&command_id)
+        .get_command_executions(
+            command_id
+                .parse::<i64>()
+                .map_err(|_| AppError::InvalidRequest("Invalid command_id".to_string()))?,
+        )
         .map_err(|e| AppError::Internal(format!("Failed to get command executions: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(executions))

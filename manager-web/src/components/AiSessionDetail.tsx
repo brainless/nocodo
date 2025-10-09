@@ -78,6 +78,17 @@ const LiveStatusIndicator: Component<{
   );
 };
 
+// Parse output content to detect if it's JSON
+const parseOutputContent = (content: string): { isJson: boolean; content: string } => {
+  try {
+    JSON.parse(content);
+    return { isJson: true, content };
+  } catch {
+    // Not JSON, return as-is
+  }
+  return { isJson: false, content };
+};
+
 // Output panel component - simplified card-based display
 const OutputPanel: Component<{ sessionId: string }> = props => {
   const outputs = useSessionOutputs(props.sessionId);
@@ -94,28 +105,20 @@ const OutputPanel: Component<{ sessionId: string }> = props => {
     >
       <div class='space-y-3'>
         <For each={outputs.get()}>
-          {chunk => (
-            <div
-              class={`bg-gray-50 border rounded-lg p-4 ${
-                chunk.stream === 'stderr' ? 'border-red-200 bg-red-50' : 'border-gray-200'
-              }`}
-            >
-              <div class='flex items-start justify-between mb-2'>
-                <span
-                  class={`text-xs font-medium px-2 py-1 rounded ${
-                    chunk.stream === 'stderr'
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {chunk.stream === 'stderr' ? 'Error' : 'Output'}
-                </span>
+          {chunk => {
+            const parsed = parseOutputContent(chunk.content);
+            return (
+              <div
+                class={`bg-gray-50 border rounded-lg p-4 ${
+                  chunk.stream === 'stderr' ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                }`}
+              >
+                <pre class='text-sm text-gray-900 whitespace-pre-wrap font-mono leading-relaxed'>
+                  {parsed.content}
+                </pre>
               </div>
-              <div class='text-sm text-gray-900 whitespace-pre-wrap font-mono leading-relaxed'>
-                {chunk.content}
-              </div>
-            </div>
-          )}
+            );
+          }}
         </For>
       </div>
     </Show>
@@ -132,7 +135,7 @@ const AiSessionDetail: Component = () => {
   const toolCalls = () => actions.getToolCalls(params.id);
 
   // Fetch project details when session is loaded
-  const fetchProject = async (projectId: string) => {
+  const fetchProject = async (projectId: number) => {
     try {
       const projectData = await apiClient.fetchProject(projectId);
       setProject(projectData);
@@ -344,14 +347,14 @@ const AiSessionDetail: Component = () => {
                       fallback={
                         <ProjectBadge
                           project={null}
-                          projectId={session()!.project_id ?? undefined}
+                          projectId={session()!.project_id?.toString() ?? undefined}
                         />
                       }
                     >
                       <div class='space-y-1'>
                         <ProjectBadge project={project()} />
                         <A
-                          href={`/projects/${project()!.id}/files`}
+                          href={`/projects/${project()!.id}/code`}
                           class='text-xs text-blue-600 hover:text-blue-800 font-medium block focus:outline-none focus:underline'
                         >
                           View project files →
@@ -428,7 +431,7 @@ const AiSessionDetail: Component = () => {
         </A>
         <Show when={session() && session()!.project_id}>
           <A
-            href={`/projects/${session()!.project_id}/files`}
+            href={`/projects/${session()!.project_id}/code`}
             class='inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer'
           >
             View Project
@@ -454,7 +457,7 @@ const SessionInputBox: Component<{ sessionId: string }> = props => {
     setSending(true);
     setError(null);
     try {
-      await apiClient.sendAiInput(props.sessionId, content().trim());
+      await apiClient.sendAiInput(parseInt(props.sessionId), content().trim());
       setContent('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send input');

@@ -3,7 +3,7 @@ import { FileInfo, FileListResponse } from '../types';
 import { apiClient } from '../api';
 
 interface FileBrowserProps {
-  projectId: string;
+  projectId: string | number;
   projectName?: string;
   onFileSelect?: (file: FileInfo) => void;
   hideDelete?: boolean; // hide actions column (delete)
@@ -27,8 +27,11 @@ const FileBrowser: Component<FileBrowserProps> = props => {
     setError(null);
 
     try {
+      const projectIdNum =
+        typeof props.projectId === 'string' ? parseInt(props.projectId, 10) : props.projectId;
+
       const response: FileListResponse = await apiClient.listFiles({
-        project_id: props.projectId,
+        project_id: projectIdNum,
         path: path || null,
       });
 
@@ -75,9 +78,11 @@ const FileBrowser: Component<FileBrowserProps> = props => {
     try {
       const fileName = newFileName().trim();
       const filePath = currentPath() ? `${currentPath()}/${fileName}` : fileName;
+      const projectIdNum =
+        typeof props.projectId === 'string' ? parseInt(props.projectId, 10) : props.projectId;
 
       await apiClient.createFile({
-        project_id: props.projectId,
+        project_id: projectIdNum,
         path: filePath,
         content: newFileIsDirectory() ? null : '',
         is_directory: newFileIsDirectory(),
@@ -102,7 +107,9 @@ const FileBrowser: Component<FileBrowserProps> = props => {
     }
 
     try {
-      await apiClient.deleteFile(file.path, props.projectId);
+      const projectIdNum =
+        typeof props.projectId === 'string' ? parseInt(props.projectId, 10) : props.projectId;
+      await apiClient.deleteFile(file.path, projectIdNum);
 
       // Reload current directory
       loadFiles(currentPath());
@@ -231,10 +238,10 @@ const FileBrowser: Component<FileBrowserProps> = props => {
                       </button>
                     </td>
                     <td class='px-4 py-2 text-sm text-gray-600'>
-                      {file.is_directory ? '-' : formatSize(file.size ?? 0)}
+                      {file.is_directory ? '-' : formatSize(Number(file.size ?? 0n))}
                     </td>
                     <td class='px-4 py-2 text-sm text-gray-600'>
-                      {formatDate(file.modified_at ? Number(file.modified_at) : undefined)}
+                      {formatDate(file.modified_at ? parseInt(file.modified_at) : undefined)}
                     </td>
                     {!props.hideDelete && (
                       <td class='px-4 py-2 text-right'>

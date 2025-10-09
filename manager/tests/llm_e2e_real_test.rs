@@ -87,7 +87,7 @@ async fn test_llm_e2e_saleor() {
     // 1. Create the work
     let work_request = CreateWorkRequest {
         title: "LLM E2E Test Work".to_string(),
-        project_id: Some(project_id.clone()),
+        project_id: Some(project_id),
         model: Some(model.clone()),
     };
 
@@ -105,10 +105,7 @@ async fn test_llm_e2e_saleor() {
     assert!(resp.status().is_success(), "Failed to create work session");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let work_id = body["work"]["id"]
-        .as_str()
-        .expect("No work ID returned")
-        .to_string();
+    let work_id = body["work"]["id"].as_i64().expect("No work ID returned");
 
     println!("   ✅ Created work session: {}", work_id);
 
@@ -136,15 +133,14 @@ async fn test_llm_e2e_saleor() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let message_id = body["message"]["id"]
-        .as_str()
-        .expect("No message ID returned")
-        .to_string();
+        .as_i64()
+        .expect("No message ID returned");
 
     println!("   ✅ Added initial message: {}", message_id);
 
     // 3. Create the AI session with llm-agent tool
     let ai_session_request = CreateAiSessionRequest {
-        message_id: message_id.clone(),
+        message_id: message_id.to_string(),
         tool_name: "llm-agent".to_string(),
     };
 
@@ -164,9 +160,8 @@ async fn test_llm_e2e_saleor() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let ai_session_id = body["session"]["id"]
-        .as_str()
-        .expect("No AI session ID returned")
-        .to_string();
+        .as_i64()
+        .expect("No AI session ID returned");
 
     println!("   ✅ Created AI session: {}", ai_session_id);
     println!(
@@ -193,7 +188,7 @@ async fn test_llm_e2e_saleor() {
         attempts += 1;
 
         // Check AI session outputs using the manager API
-        let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+        let ai_outputs = get_ai_outputs_for_work(&test_app, work_id)
             .await
             .expect("Failed to get AI session outputs");
 
@@ -318,7 +313,7 @@ async fn test_llm_e2e_saleor() {
     }
 
     // Get the AI session outputs using the manager API
-    let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+    let ai_outputs = get_ai_outputs_for_work(&test_app, work_id)
         .await
         .expect("Failed to get AI session outputs");
 
@@ -514,7 +509,7 @@ async fn test_llm_multiple_scenarios() {
         let model = env::var("MODEL").unwrap_or_else(|_| provider.default_model().to_string());
         let work_request = CreateWorkRequest {
             title: format!("Multi Scenario Work {}", i + 1),
-            project_id: Some(project_id.clone()),
+            project_id: Some(project_id),
             model: Some(model),
         };
 
@@ -532,7 +527,7 @@ async fn test_llm_multiple_scenarios() {
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
-        let work_id = body["work"]["id"].as_str().unwrap().to_string();
+        let work_id = body["work"]["id"].as_i64().unwrap();
 
         // 2. Add the initial message
         let message_request = AddMessageRequest {
@@ -557,11 +552,11 @@ async fn test_llm_multiple_scenarios() {
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
-        let message_id = body["message"]["id"].as_str().unwrap().to_string();
+        let message_id = body["message"]["id"].as_i64().unwrap();
 
         // 3. Create the AI session with llm-agent tool
         let ai_session_request = CreateAiSessionRequest {
-            message_id: message_id.clone(),
+            message_id: message_id.to_string(),
             tool_name: "llm-agent".to_string(),
         };
 
@@ -580,13 +575,13 @@ async fn test_llm_multiple_scenarios() {
         assert!(resp.status().is_success());
 
         let body: serde_json::Value = test::read_body_json(resp).await;
-        let _ai_session_id = body["session"]["id"].as_str().unwrap().to_string();
+        let _ai_session_id = body["session"]["id"].as_i64().unwrap();
 
         // Wait for AI session processing
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
         // Get response from AI session outputs using manager API
-        let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+        let ai_outputs = get_ai_outputs_for_work(&test_app, work_id)
             .await
             .expect("Failed to get AI session outputs");
 
@@ -596,7 +591,7 @@ async fn test_llm_multiple_scenarios() {
             } else {
                 // If no outputs yet, wait a bit more
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                let ai_outputs = get_ai_outputs_for_work(&test_app, &work_id)
+                let ai_outputs = get_ai_outputs_for_work(&test_app, work_id)
                     .await
                     .expect("Failed to get AI session outputs");
                 ai_outputs
@@ -639,7 +634,7 @@ async fn test_llm_multiple_scenarios() {
 /// This ensures we test the actual API endpoints instead of reading directly from database
 async fn get_ai_outputs_for_work(
     test_app: &crate::common::TestApp,
-    work_id: &str,
+    work_id: i64,
 ) -> anyhow::Result<Vec<nocodo_manager::models::AiSessionOutput>> {
     use actix_web::test;
 
@@ -749,9 +744,8 @@ mod unit_tests {
             .await
             .expect("Failed to create project from scenario");
 
-        // Verify the project name follows the expected pattern
-        assert!(project_id.starts_with("nocodo-test-"));
-        assert!(project_id.contains("saleor"));
+        // Verify the project ID is valid
+        assert!(project_id > 0);
 
         // Verify the project was created in the database with the dynamic ID
         let projects = test_app
@@ -769,7 +763,6 @@ mod unit_tests {
         let project = created_project.unwrap();
         assert_eq!(project.id, project_id);
         assert!(project.name.contains("Saleor"));
-        assert!(project.path.contains(&project_id));
     }
 
     #[tokio::test]

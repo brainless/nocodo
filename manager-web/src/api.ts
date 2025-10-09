@@ -52,12 +52,12 @@ class ApiClient {
     return response.projects;
   }
 
-  async fetchProject(id: string): Promise<Project> {
+  async fetchProject(id: number): Promise<Project> {
     const response = await this.request<{ project: Project }>(`/projects/${id}`);
     return response.project;
   }
 
-  async fetchProjectDetails(id: string): Promise<{ project: Project; components: any[] }> {
+  async fetchProjectDetails(id: number): Promise<{ project: Project; components: any[] }> {
     return this.request(`/projects/${id}/details`);
   }
 
@@ -75,7 +75,7 @@ class ApiClient {
     });
   }
 
-  async deleteProject(id: string): Promise<void> {
+  async deleteProject(id: number): Promise<void> {
     return this.request(`/projects/${id}`, {
       method: 'DELETE',
     });
@@ -84,7 +84,7 @@ class ApiClient {
   // File operations
   async listFiles(params: FileListRequest): Promise<FileListResponse> {
     const queryParams = new URLSearchParams();
-    if (params.project_id) queryParams.set('project_id', params.project_id);
+    if (params.project_id) queryParams.set('project_id', params.project_id.toString());
     if (params.path) queryParams.set('path', params.path);
 
     const queryString = queryParams.toString();
@@ -99,9 +99,9 @@ class ApiClient {
     });
   }
 
-  async getFileContent(filePath: string, projectId: string): Promise<FileContentResponse> {
+  async getFileContent(filePath: string, projectId: number): Promise<FileContentResponse> {
     const queryParams = new URLSearchParams();
-    queryParams.set('project_id', projectId);
+    queryParams.set('project_id', projectId.toString());
 
     return this.request<FileContentResponse>(
       `/files/${encodeURIComponent(filePath)}?${queryParams.toString()}`
@@ -115,16 +115,16 @@ class ApiClient {
     });
   }
 
-  async deleteFile(filePath: string, projectId: string): Promise<void> {
+  async deleteFile(filePath: string, projectId: number): Promise<void> {
     const queryParams = new URLSearchParams();
-    queryParams.set('project_id', projectId);
+    queryParams.set('project_id', projectId.toString());
 
     return this.request(`/files/${encodeURIComponent(filePath)}?${queryParams.toString()}`, {
       method: 'DELETE',
     });
   }
 
-  async addMessageToWork(workId: string, data: AddMessageRequest): Promise<WorkMessageResponse> {
+  async addMessageToWork(workId: number, data: AddMessageRequest): Promise<WorkMessageResponse> {
     return this.request(`/work/${workId}/messages`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -139,7 +139,7 @@ class ApiClient {
     });
   }
 
-  async createAiSession(workId: string, data: CreateAiSessionRequest): Promise<AiSessionResponse> {
+  async createAiSession(workId: number, data: CreateAiSessionRequest): Promise<AiSessionResponse> {
     return this.request(`/work/${workId}/sessions`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -150,18 +150,18 @@ class ApiClient {
     return this.request('/work');
   }
 
-  async getAiSession(id: string): Promise<AiSessionResponse> {
+  async getAiSession(id: number): Promise<AiSessionResponse> {
     return this.request(`/work/${id}`);
   }
 
-  async recordAiOutput(id: string, content: string): Promise<{ ok: boolean }> {
+  async recordAiOutput(id: number, content: string): Promise<{ ok: boolean }> {
     return this.request(`/work/${id}/outputs`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
   }
 
-  async listAiOutputs(id: string): Promise<AiSessionOutputListResponse> {
+  async listAiOutputs(id: number): Promise<AiSessionOutputListResponse> {
     try {
       const result = await this.request<AiSessionOutputListResponse>(`/work/${id}/outputs`);
       return result;
@@ -173,7 +173,7 @@ class ApiClient {
   }
 
   // Issue #59: Send input to a running AI session (stdin)
-  async sendAiInput(id: string, content: string): Promise<{ ok: boolean }> {
+  async sendAiInput(id: number, content: string): Promise<{ ok: boolean }> {
     return this.request(`/work/${id}/input`, {
       method: 'POST',
       body: JSON.stringify({ content }),
@@ -210,7 +210,7 @@ class ApiClient {
    * @param id - The session ID
    * @returns Promise resolving to an ExtendedAiSession object
    */
-  async getSession(id: string): Promise<ExtendedAiSession> {
+  async getSession(id: number): Promise<ExtendedAiSession> {
     const response = await this.getAiSession(id);
     const workData = response as any;
 
@@ -244,7 +244,7 @@ class ApiClient {
    * @returns WebSocket connection object with close method
    */
   subscribeSession(
-    id: string,
+    id: number,
     onMessage: (data: any) => void,
     onError?: (error: Error) => void,
     onOpen?: () => void,
