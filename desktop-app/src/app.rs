@@ -72,6 +72,14 @@ impl DesktopApp {
         // Load configuration
         app.config = crate::config::DesktopConfig::load().unwrap_or_default();
 
+        // Always start disconnected - never restore connection state
+        app.connection_state = ConnectionState::Disconnected;
+        app.tunnel = None;
+        app.api_client = None;
+        app.projects.clear();
+        app.connection_error = None;
+        app.loading_projects = false;
+
         app
     }
 

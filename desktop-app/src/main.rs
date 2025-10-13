@@ -12,17 +12,24 @@ fn main() -> eframe::Result {
         return run_test_mode();
     }
 
-    let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 600.0])
-            .with_min_inner_size([600.0, 400.0]),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "nocodo Desktop App",
-        native_options,
-        Box::new(|cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::new(cc)))),
-    )
+    // Create tokio runtime that will live for the entire program
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+
+    // Run the GUI on the tokio runtime
+    rt.block_on(async {
+        let native_options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_inner_size([800.0, 600.0])
+                .with_min_inner_size([600.0, 400.0]),
+            ..Default::default()
+        };
+
+        eframe::run_native(
+            "nocodo Desktop App",
+            native_options,
+            Box::new(|cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::new(cc)))),
+        )
+    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
