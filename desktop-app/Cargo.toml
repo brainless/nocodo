@@ -15,8 +15,7 @@ eframe = { version = "0.33.0", default-features = false, features = [
 ] }
 
 # SSH
-russh = "0.40"
-russh-keys = "0.40"
+ssh2 = "0.9"
 
 # HTTP Client
 reqwest = { version = "0.11", features = ["json"] }
