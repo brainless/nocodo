@@ -90,10 +90,19 @@ impl DesktopApp {
 
         let server = self.config.ssh.server.clone();
         let username = self.config.ssh.username.clone();
+
+        // Expand tilde in SSH key path
         let key_path = if self.config.ssh.ssh_key_path.is_empty() {
             None
         } else {
-            Some(self.config.ssh.ssh_key_path.clone())
+            let expanded_path = if self.config.ssh.ssh_key_path.starts_with("~/") {
+                let home = std::env::var("HOME").unwrap_or_default();
+                self.config.ssh.ssh_key_path.replacen("~", &home, 1)
+            } else {
+                self.config.ssh.ssh_key_path.clone()
+            };
+            tracing::info!("Using SSH key: {}", expanded_path);
+            Some(expanded_path)
         };
         let result_clone = Arc::clone(&self.connection_result);
 
