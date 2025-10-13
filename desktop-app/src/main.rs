@@ -9,7 +9,11 @@ fn main() -> eframe::Result {
     // Check for CLI test mode
     let args: Vec<String> = std::env::args().collect();
     if args.len() > 1 && args[1] == "--test" {
-        return run_test_mode();
+        // Parse optional arguments: --test [server] [username] [keypath]
+        let server = args.get(2).map(|s| s.as_str());
+        let username = args.get(3).map(|s| s.as_str());
+        let keypath = args.get(4).map(|s| s.as_str());
+        return run_test_mode(server, username, keypath);
     }
 
     // Create tokio runtime that will live for the entire program
@@ -33,7 +37,11 @@ fn main() -> eframe::Result {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn run_test_mode() -> eframe::Result {
+fn run_test_mode(
+    server_arg: Option<&str>,
+    username_arg: Option<&str>,
+    keypath_arg: Option<&str>,
+) -> eframe::Result {
     use nocodo_desktop_app::{api_client, config, ssh};
 
     println!("=== nocodo Desktop App - Test Mode ===\n");
@@ -44,27 +52,54 @@ fn run_test_mode() -> eframe::Result {
     rt.block_on(async {
         // Load configuration
         println!("1. Loading configuration...");
-        let config = match config::DesktopConfig::load() {
+        let mut config = match config::DesktopConfig::load() {
             Ok(cfg) => {
-                println!("   ✓ Configuration loaded:");
-                println!("     - Server: {}", cfg.ssh.server);
-                println!("     - Username: {}", cfg.ssh.username);
-                println!("     - SSH Key: {}", cfg.ssh.ssh_key_path);
-                println!("     - Remote Port: {}\n", cfg.ssh.remote_port);
+                println!("   ✓ Configuration loaded");
                 cfg
             }
             Err(e) => {
-                println!("   ✗ Failed to load configuration: {}", e);
-                println!("   Using default configuration\n");
+                println!("   ⚠ Failed to load configuration: {}", e);
+                println!("   Using default configuration");
                 config::DesktopConfig::default()
             }
         };
 
+        // Override with CLI arguments if provided
+        if let Some(server) = server_arg {
+            println!("   → Overriding server with CLI arg: {}", server);
+            config.ssh.server = server.to_string();
+        }
+        if let Some(username) = username_arg {
+            println!("   → Overriding username with CLI arg: {}", username);
+            config.ssh.username = username.to_string();
+        }
+        if let Some(keypath) = keypath_arg {
+            println!("   → Overriding key path with CLI arg: {}", keypath);
+            config.ssh.ssh_key_path = keypath.to_string();
+        }
+
+        println!("\n   Final configuration:");
+        println!("     - Server: {}", config.ssh.server);
+        println!("     - Username: {}", config.ssh.username);
+        println!("     - SSH Key: {}", config.ssh.ssh_key_path);
+        println!("     - Remote Port: {}\n", config.ssh.remote_port);
+
         // Test SSH connection
         println!("2. Attempting SSH connection...");
         let key_path = if config.ssh.ssh_key_path.is_empty() {
+            println!("   → No key path specified, will try default locations");
             None
         } else {
+            println!("   → Using key: {}", config.ssh.ssh_key_path);
+            // Expand tilde in path
+            let expanded_path = if config.ssh.ssh_key_path.starts_with("~/") {
+                let home = std::env::var("HOME").unwrap_or_default();
+                config.ssh.ssh_key_path.replacen("~", &home, 1)
+            } else {
+                config.ssh.ssh_key_path.clone()
+            };
+            println!("   → Expanded path: {}", expanded_path);
+            config.ssh.ssh_key_path = expanded_path;
             Some(config.ssh.ssh_key_path.as_str())
         };
 
