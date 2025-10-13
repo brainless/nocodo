@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "manager",
+    "manager-models",
     "services",
     "manager-runner",
     "nocodo-github-actions",
