@@ -1,14 +1,15 @@
 use russh::client;
 use std::net::TcpListener;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
 
-#[derive(Debug)]
 pub struct SshTunnel {
     pub local_port: u16,
     pub server: String,
     pub remote_port: u16,
-    #[allow(dead_code)]
-    handle: Option<Box<dyn std::any::Any + Send>>, // Placeholder for connection handle
+    session: Arc<client::Handle<Client>>,
+    shutdown_tx: tokio::sync::mpsc::Sender<()>,
 }
 
 #[derive(Debug)]
@@ -37,8 +38,11 @@ impl SshTunnel {
 
         let client = Client;
 
-        let mut session = russh::client::connect(Arc::new(config), (server, 22), client).await
-            .map_err(|e| SshError::ConnectionFailed(format!("Failed to connect to {}: {}", server, e)))?;
+        let mut session = russh::client::connect(Arc::new(config), (server, 22), client)
+            .await
+            .map_err(|e| {
+                SshError::ConnectionFailed(format!("Failed to connect to {}: {}", server, e))
+            })?;
 
         // Authenticate
         let key_paths = if let Some(key_path) = key_path {
@@ -59,14 +63,24 @@ impl SshTunnel {
                 tracing::info!("Trying SSH key: {}", key_path);
                 match russh_keys::load_secret_key(key_path, None) {
                     Ok(key_pair) => {
-                        match session.authenticate_publickey(username, Arc::new(key_pair)).await {
+                        match session
+                            .authenticate_publickey(username, Arc::new(key_pair))
+                            .await
+                        {
                             Ok(_) => {
-                                tracing::info!("SSH authentication successful with key: {}", key_path);
+                                tracing::info!(
+                                    "SSH authentication successful with key: {}",
+                                    key_path
+                                );
                                 auth_success = true;
                                 break;
                             }
                             Err(e) => {
-                                tracing::warn!("Authentication failed with key {}: {}", key_path, e);
+                                tracing::warn!(
+                                    "Authentication failed with key {}: {}",
+                                    key_path,
+                                    e
+                                );
                                 continue;
                             }
                         }
@@ -83,19 +97,69 @@ impl SshTunnel {
 
         if !auth_success {
             return Err(SshError::AuthenticationFailed(
-                "No valid SSH keys found or authentication failed".to_string()
+                "No valid SSH keys found or authentication failed".to_string(),
             ));
         }
 
-        // For now, we'll just establish the connection without port forwarding
-        // TODO: Implement proper port forwarding
-        tracing::info!("SSH connection established to {}@{} (port forwarding not yet implemented)", username, server);
+        tracing::info!(
+            "SSH connection established to {}@{}, setting up port forwarding",
+            username,
+            server
+        );
+
+        // Create shutdown channel
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
+
+        // Start local TCP listener for port forwarding
+        let listener = TokioTcpListener::bind(format!("127.0.0.1:{}", local_port))
+            .await
+            .map_err(SshError::Io)?;
+
+        let session_arc = Arc::new(session);
+        let session_clone = Arc::clone(&session_arc);
+        let remote_port = 8081u32;
+
+        // Spawn task to handle incoming connections
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    result = listener.accept() => {
+                        match result {
+                            Ok((stream, addr)) => {
+                                tracing::debug!("Accepted local connection from {}", addr);
+                                let session = Arc::clone(&session_clone);
+                                tokio::spawn(async move {
+                                    if let Err(e) = handle_tunnel_connection(stream, session, remote_port).await {
+                                        tracing::error!("Error handling tunnel connection: {}", e);
+                                    }
+                                });
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to accept connection: {}", e);
+                            }
+                        }
+                    }
+                    _ = shutdown_rx.recv() => {
+                        tracing::info!("Shutting down port forwarding listener");
+                        break;
+                    }
+                }
+            }
+        });
+
+        tracing::info!(
+            "Port forwarding active: localhost:{} -> {}:{}",
+            local_port,
+            server,
+            remote_port
+        );
 
         Ok(Self {
             local_port,
             server: server.to_string(),
             remote_port: 8081,
-            handle: None, // TODO: Store session handle
+            session: session_arc,
+            shutdown_tx,
         })
     }
 
@@ -104,10 +168,92 @@ impl SshTunnel {
     }
 
     pub async fn disconnect(&mut self) -> Result<(), SshError> {
-        // TODO: Implement proper disconnect
-        tracing::info!("SSH tunnel disconnect requested (not yet implemented)");
+        tracing::info!("Disconnecting SSH tunnel");
+
+        // Send shutdown signal to port forwarding listener
+        if let Err(e) = self.shutdown_tx.send(()).await {
+            tracing::warn!("Failed to send shutdown signal: {}", e);
+        }
+
+        // Disconnect SSH session
+        self.session
+            .disconnect(russh::Disconnect::ByApplication, "", "")
+            .await?;
+
+        tracing::info!("SSH tunnel disconnected");
         Ok(())
     }
+}
+
+/// Handle a single tunnel connection by forwarding data between local and remote
+async fn handle_tunnel_connection(
+    mut local_stream: TcpStream,
+    session: Arc<client::Handle<Client>>,
+    remote_port: u32,
+) -> Result<(), SshError> {
+    // Open direct-tcpip channel for port forwarding
+    let channel = session
+        .channel_open_direct_tcpip("localhost", remote_port, "localhost", 0)
+        .await?;
+
+    tracing::debug!("Opened SSH channel for port forwarding");
+
+    // Split streams for bidirectional forwarding
+    let (mut local_read, mut local_write) = local_stream.split();
+    let mut ssh_channel = channel;
+
+    // Forward data bidirectionally
+    let mut buf = vec![0u8; 8192];
+    loop {
+        tokio::select! {
+            // Local to SSH
+            result = local_read.read(&mut buf) => {
+                match result {
+                    Ok(0) => {
+                        tracing::debug!("Local connection closed");
+                        break;
+                    }
+                    Ok(n) => {
+                        if let Err(e) = ssh_channel.data(&buf[..n]).await {
+                            tracing::error!("Failed to write to SSH channel: {}", e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Error reading from local stream: {}", e);
+                        break;
+                    }
+                }
+            }
+            // SSH to Local
+            msg = ssh_channel.wait() => {
+                match msg {
+                    Some(russh::ChannelMsg::Data { ref data }) => {
+                        if let Err(e) = local_write.write_all(data).await {
+                            tracing::error!("Failed to write to local stream: {}", e);
+                            break;
+                        }
+                    }
+                    Some(russh::ChannelMsg::Eof) => {
+                        tracing::debug!("SSH channel EOF");
+                        break;
+                    }
+                    Some(russh::ChannelMsg::Close) => {
+                        tracing::debug!("SSH channel closed");
+                        break;
+                    }
+                    None => {
+                        tracing::debug!("SSH channel stream ended");
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    tracing::debug!("Tunnel connection closed");
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]

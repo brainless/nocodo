@@ -24,6 +24,11 @@ pub struct DesktopApp {
     api_client: Option<crate::api_client::ApiClient>,
     #[serde(skip)]
     connection_result: Arc<std::sync::Mutex<Option<Result<crate::ssh::SshTunnel, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    projects_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
+    #[serde(skip)]
+    loading_projects: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -44,6 +49,8 @@ impl Default for DesktopApp {
             tunnel: None,
             api_client: None,
             connection_result: Arc::new(std::sync::Mutex::new(None)),
+            projects_result: Arc::new(std::sync::Mutex::new(None)),
+            loading_projects: false,
         }
     }
 }
@@ -84,7 +91,8 @@ impl DesktopApp {
 
         // Spawn async task for SSH connection
         tokio::spawn(async move {
-            let result = crate::ssh::SshTunnel::connect(&server, &username, key_path.as_deref()).await;
+            let result =
+                crate::ssh::SshTunnel::connect(&server, &username, key_path.as_deref()).await;
             let mut connection_result = result_clone.lock().unwrap();
             *connection_result = Some(result.map_err(|e| e.to_string()));
         });
@@ -109,10 +117,18 @@ impl DesktopApp {
 
     fn refresh_projects(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref _api_client) = self.api_client {
-                // TODO: Implement actual API call
-                // For now, just clear projects
-                self.projects.clear();
+            if let Some(ref api_client) = self.api_client {
+                self.loading_projects = true;
+                self.projects_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.projects_result);
+
+                tokio::spawn(async move {
+                    let result = api_client.list_projects().await;
+                    let mut projects_result = result_clone.lock().unwrap();
+                    *projects_result = Some(result.map_err(|e| e.to_string()));
+                });
             }
         }
     }
@@ -126,15 +142,25 @@ impl eframe::App for DesktopApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut should_refresh_projects = false;
+
         // Check for connection results
         if let Ok(mut result) = self.connection_result.try_lock() {
             if let Some(connection_result) = result.take() {
                 match connection_result {
                     Ok(tunnel) => {
-                        tracing::info!("SSH tunnel established successfully on port {}", tunnel.local_port());
+                        tracing::info!(
+                            "SSH tunnel established successfully on port {}",
+                            tunnel.local_port()
+                        );
                         self.tunnel = Some(tunnel);
-                        self.api_client = Some(crate::api_client::ApiClient::new(format!("http://localhost:{}", self.tunnel.as_ref().unwrap().local_port())));
+                        self.api_client = Some(crate::api_client::ApiClient::new(format!(
+                            "http://localhost:{}",
+                            self.tunnel.as_ref().unwrap().local_port()
+                        )));
                         self.connection_state = ConnectionState::Connected;
+                        // Mark that we should refresh projects after this block
+                        should_refresh_projects = true;
                     }
                     Err(e) => {
                         tracing::error!("SSH connection failed: {}", e);
@@ -143,6 +169,28 @@ impl eframe::App for DesktopApp {
                     }
                 }
             }
+        }
+
+        // Check for projects results
+        if let Ok(mut result) = self.projects_result.try_lock() {
+            if let Some(projects_result) = result.take() {
+                self.loading_projects = false;
+                match projects_result {
+                    Ok(projects) => {
+                        tracing::info!("Loaded {} projects", projects.len());
+                        self.projects = projects;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load projects: {}", e);
+                        self.connection_error = Some(format!("Failed to load projects: {}", e));
+                    }
+                }
+            }
+        }
+
+        // Auto-refresh projects after connection
+        if should_refresh_projects {
+            self.refresh_projects();
         }
         // Top panel with menu
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -180,9 +228,9 @@ impl eframe::App for DesktopApp {
                     ConnectionState::Connecting => {
                         ui.colored_label(egui::Color32::YELLOW, "● Connecting...");
                     }
-                    ConnectionState::Connected { .. } => {
+                    ConnectionState::Connected => {
                         ui.colored_label(egui::Color32::GREEN, "● Connected");
-                        ui.label(&format!("Projects: {}", self.projects.len()));
+                        ui.label(format!("Projects: {}", self.projects.len()));
                     }
                 }
 
@@ -211,8 +259,13 @@ impl eframe::App for DesktopApp {
                         ui.add(egui::Spinner::new());
                     });
                 }
-                ConnectionState::Connected { .. } => {
-                    if self.projects.is_empty() {
+                ConnectionState::Connected => {
+                    if self.loading_projects {
+                        ui.vertical_centered(|ui| {
+                            ui.label("Loading projects...");
+                            ui.add(egui::Spinner::new());
+                        });
+                    } else if self.projects.is_empty() {
                         ui.vertical_centered(|ui| {
                             ui.label("No projects found");
                             if ui.button("Refresh").clicked() {
@@ -221,15 +274,20 @@ impl eframe::App for DesktopApp {
                         });
                     } else {
                         ui.label("Projects:");
-                        for project in &self.projects {
-                            ui.horizontal(|ui| {
-                                ui.label(&project.name);
-                                ui.label(&project.path);
-                                if let Some(language) = &project.language {
-                                    ui.label(language);
-                                }
-                            });
-                        }
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            for project in &self.projects {
+                                ui.horizontal(|ui| {
+                                    ui.label(&project.name);
+                                    ui.separator();
+                                    ui.label(&project.path);
+                                    if let Some(language) = &project.language {
+                                        ui.separator();
+                                        ui.label(language);
+                                    }
+                                });
+                                ui.separator();
+                            }
+                        });
                     }
                 }
             }

@@ -16,7 +16,8 @@ impl ApiClient {
 
     pub async fn list_projects(&self) -> Result<Vec<Project>, ApiError> {
         let url = format!("{}/api/projects", self.base_url);
-        let response = self.client()
+        let response = self
+            .client()
             .get(&url)
             .send()
             .await
