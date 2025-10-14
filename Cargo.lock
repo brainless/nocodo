@@ -3119,6 +3119,7 @@ dependencies = [
  "egui",
  "manager-models",
  "reqwest",
+ "rusqlite",
  "russh",
  "serde",
  "thiserror 1.0.69",

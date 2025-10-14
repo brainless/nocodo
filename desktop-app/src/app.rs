@@ -311,28 +311,80 @@ impl eframe::App for DesktopApp {
 
         // Left sidebar
         egui::SidePanel::left("sidebar").exact_width(300.0).show(ctx, |ui| {
+            ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
             ui.vertical(|ui| {
+                let button_bg = ui.style().visuals.widgets.inactive.bg_fill;
                 // Top navigation
-                if ui.button("Projects").clicked() {
-                    self.current_page = Page::Projects;
-                }
-                if ui.button("Work").clicked() {
-                    self.current_page = Page::Work;
-                }
-                if ui.button("Mentions").clicked() {
-                    self.current_page = Page::Mentions;
-                }
+                ui.horizontal(|ui| {
+                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
+                    frame.show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Projects");
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
+                                    self.current_page = Page::Projects;
+                                }
+                            });
+                        });
+                    });
+                });
+                ui.horizontal(|ui| {
+                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
+                    frame.show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Work");
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
+                                    self.current_page = Page::Work;
+                                }
+                            });
+                        });
+                    });
+                });
+                ui.horizontal(|ui| {
+                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
+                    frame.show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Mentions");
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
+                                    self.current_page = Page::Mentions;
+                                }
+                            });
+                        });
+                    });
+                });
 
                 // Empty space
                 ui.add_space(50.0);
 
                 // Bottom navigation
-                if ui.button("Servers").clicked() {
-                    self.current_page = Page::Servers;
-                }
-                if ui.button("Settings").clicked() {
-                    self.current_page = Page::Settings;
-                }
+                ui.horizontal(|ui| {
+                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
+                    frame.show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Servers");
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
+                                    self.current_page = Page::Servers;
+                                }
+                            });
+                        });
+                    });
+                });
+                ui.horizontal(|ui| {
+                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
+                    frame.show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Settings");
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
+                                    self.current_page = Page::Settings;
+                                }
+                            });
+                        });
+                    });
+                });
             });
         });
 
