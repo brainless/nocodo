@@ -1,17 +1,36 @@
-use ssh2::Session;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use russh::*;
+use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key};
+use std::net::TcpListener;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpSocket, TcpStream};
+use tokio::sync::Mutex;
 
 pub struct SshTunnel {
-    pub local_port: u16,
+    local_port: u16,
     pub server: String,
     pub remote_port: u16,
-    shutdown: Arc<AtomicBool>,
-    _thread_handle: Option<thread::JoinHandle<()>>,
+    session: Arc<Mutex<Option<client::Handle<ClientHandler>>>>,
+    shutdown: Arc<tokio::sync::Notify>,
+    _task_handle: Option<tokio::task::JoinHandle<()>>,
+}
+
+// Simple client handler that accepts all server keys for development
+struct ClientHandler;
+
+impl client::Handler for ClientHandler {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        _server_public_key: &ssh_key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        // For development: accept all server keys
+        // TODO: In production, verify against known_hosts
+        tracing::debug!("Server key accepted (development mode)");
+        Ok(true)
+    }
 }
 
 impl SshTunnel {
@@ -27,23 +46,77 @@ impl SshTunnel {
         let local_port = listener.local_addr()?.port();
         drop(listener); // Free the port
 
-        // Establish SSH connection (blocking, so we do it in a spawned task)
-        let server_owned = server.to_string();
-        let username_owned = username.to_string();
-        let key_path_owned = key_path.map(|s| s.to_string());
+        // Load SSH key
+        let key_paths: Vec<String> = if let Some(key_path) = key_path {
+            vec![key_path.to_string()]
+        } else {
+            // Try default key locations
+            let home = std::env::var("HOME").unwrap_or_default();
+            vec![
+                format!("{}/.ssh/id_rsa", home),
+                format!("{}/.ssh/id_ed25519", home),
+                format!("{}/.ssh/id_ecdsa", home),
+            ]
+        };
 
-        let (tx, rx) = std::sync::mpsc::channel();
+        let mut key_pair = None;
+        for key_path in &key_paths {
+            if Path::new(key_path).exists() {
+                tracing::info!("Trying SSH key: {}", key_path);
+                match load_secret_key(key_path, None) {
+                    Ok(key) => {
+                        tracing::info!("SSH key loaded successfully: {}", key_path);
+                        key_pair = Some(key);
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load key {}: {}", key_path, e);
+                        continue;
+                    }
+                }
+            } else {
+                tracing::debug!("Key file does not exist: {}", key_path);
+            }
+        }
 
-        // Spawn blocking connection task
-        tokio::task::spawn_blocking(move || {
-            let result =
-                establish_ssh_connection(&server_owned, &username_owned, key_path_owned.as_deref());
-            tx.send(result).ok();
-        });
+        let key_pair = key_pair.ok_or_else(|| {
+            SshError::AuthenticationFailed("No valid SSH keys found".to_string())
+        })?;
 
-        let session = rx.recv().map_err(|e| {
-            SshError::ConnectionFailed(format!("Failed to receive connection result: {}", e))
-        })??;
+        // Create SSH client configuration
+        let config = client::Config {
+            inactivity_timeout: Some(std::time::Duration::from_secs(300)),
+            ..Default::default()
+        };
+
+        let config = Arc::new(config);
+        let handler = ClientHandler;
+
+        // Connect to SSH server
+        tracing::info!("Connecting to SSH server {}:22", server);
+        let mut session = client::connect(config, (server, 22), handler)
+            .await
+            .map_err(|e| SshError::ConnectionFailed(format!("Connection failed: {}", e)))?;
+
+        // Authenticate with public key
+        tracing::info!("Authenticating with public key");
+        let best_hash = session.best_supported_rsa_hash().await
+            .map_err(|e| SshError::AuthenticationFailed(format!("Failed to get RSA hash: {}", e)))?
+            .flatten();
+
+        let auth_result = session
+            .authenticate_publickey(
+                username,
+                PrivateKeyWithHashAlg::new(Arc::new(key_pair), best_hash),
+            )
+            .await
+            .map_err(|e| SshError::AuthenticationFailed(format!("Authentication failed: {}", e)))?;
+
+        if !auth_result.success() {
+            return Err(SshError::AuthenticationFailed(
+                "Authentication rejected by server".to_string(),
+            ));
+        }
 
         tracing::info!(
             "SSH connection established to {}@{}, setting up port forwarding",
@@ -51,15 +124,17 @@ impl SshTunnel {
             server
         );
 
-        // Set up port forwarding in a background thread
-        let session = Arc::new(std::sync::Mutex::new(session));
+        let session = Arc::new(Mutex::new(Some(session)));
         let session_clone = Arc::clone(&session);
-        let server_clone = server.to_string();
-        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown = Arc::new(tokio::sync::Notify::new());
         let shutdown_clone = Arc::clone(&shutdown);
+        let server_clone = server.to_string();
 
-        let thread_handle = thread::spawn(move || {
-            if let Err(e) = run_port_forward_loop(local_port, session_clone, 8081, shutdown_clone) {
+        // Start port forwarding task
+        let task_handle = tokio::spawn(async move {
+            if let Err(e) =
+                run_port_forward_loop(local_port, session_clone, 8081, shutdown_clone).await
+            {
                 tracing::error!("Port forwarding error: {}", e);
             }
         });
@@ -75,8 +150,9 @@ impl SshTunnel {
             local_port,
             server: server_clone,
             remote_port: 8081,
+            session,
             shutdown,
-            _thread_handle: Some(thread_handle),
+            _task_handle: Some(task_handle),
         })
     }
 
@@ -86,102 +162,56 @@ impl SshTunnel {
 
     pub async fn disconnect(&mut self) -> Result<(), SshError> {
         tracing::info!("Disconnecting SSH tunnel");
-        self.shutdown.store(true, Ordering::Relaxed);
+
+        // Signal shutdown
+        self.shutdown.notify_waiters();
+
+        // Close session
+        if let Some(session) = self.session.lock().await.take() {
+            if let Err(e) = session.disconnect(Disconnect::ByApplication, "", "English").await {
+                tracing::warn!("Error during disconnect: {}", e);
+            }
+        }
+
         tracing::info!("SSH tunnel disconnected");
         Ok(())
     }
 }
 
-fn establish_ssh_connection(
-    server: &str,
-    username: &str,
-    key_path: Option<&str>,
-) -> Result<Session, SshError> {
-    // Connect to SSH server
-    let tcp = TcpStream::connect(format!("{}:22", server)).map_err(|e| {
-        SshError::ConnectionFailed(format!("Failed to connect to {}: {}", server, e))
-    })?;
-
-    let mut session =
-        Session::new().map_err(|e| SshError::Ssh(format!("Failed to create session: {}", e)))?;
-
-    session.set_tcp_stream(tcp);
-    session
-        .handshake()
-        .map_err(|e| SshError::ConnectionFailed(format!("SSH handshake failed: {}", e)))?;
-
-    // Try to authenticate with SSH keys
-    let key_paths: Vec<String> = if let Some(key_path) = key_path {
-        vec![key_path.to_string()]
-    } else {
-        // Try default key locations
-        let home = std::env::var("HOME").unwrap_or_default();
-        vec![
-            format!("{}/.ssh/id_rsa", home),
-            format!("{}/.ssh/id_ed25519", home),
-            format!("{}/.ssh/id_ecdsa", home),
-        ]
-    };
-
-    let mut auth_success = false;
-    for key_path in &key_paths {
-        if Path::new(key_path).exists() {
-            tracing::info!("Trying SSH key: {}", key_path);
-            match session.userauth_pubkey_file(username, None, Path::new(key_path), None) {
-                Ok(_) => {
-                    tracing::info!("SSH authentication successful with key: {}", key_path);
-                    auth_success = true;
-                    break;
-                }
-                Err(e) => {
-                    tracing::warn!("Authentication failed with key {}: {}", key_path, e);
-                    continue;
-                }
-            }
-        } else {
-            tracing::debug!("Key file does not exist: {}", key_path);
-        }
-    }
-
-    if !auth_success {
-        return Err(SshError::AuthenticationFailed(
-            "No valid SSH keys found or authentication failed".to_string(),
-        ));
-    }
-
-    Ok(session)
-}
-
-fn run_port_forward_loop(
+async fn run_port_forward_loop(
     local_port: u16,
-    session: Arc<std::sync::Mutex<Session>>,
+    session: Arc<Mutex<Option<client::Handle<ClientHandler>>>>,
     remote_port: u16,
-    shutdown: Arc<AtomicBool>,
+    shutdown: Arc<tokio::sync::Notify>,
 ) -> Result<(), SshError> {
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port))?;
-    listener.set_nonblocking(true)?;
+    let socket = TcpSocket::new_v4()?;
+    socket.set_reuseaddr(true)?;
+    socket.bind(format!("127.0.0.1:{}", local_port).parse().unwrap())?;
+    let listener = socket.listen(128)?;
 
     tracing::info!("Listening for connections on localhost:{}", local_port);
 
-    while !shutdown.load(Ordering::Relaxed) {
-        match listener.accept() {
-            Ok((local_stream, addr)) => {
-                tracing::debug!("Accepted connection from {}", addr);
-                let session_clone = Arc::clone(&session);
-                thread::spawn(move || {
-                    if let Err(e) =
-                        handle_tunnel_connection(local_stream, session_clone, remote_port)
-                    {
-                        tracing::error!("Tunnel connection error: {}", e);
+    loop {
+        tokio::select! {
+            result = listener.accept() => {
+                match result {
+                    Ok((local_stream, addr)) => {
+                        tracing::debug!("Accepted connection from {}", addr);
+                        let session_clone = Arc::clone(&session);
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_tunnel_connection(local_stream, session_clone, remote_port).await {
+                                tracing::error!("Tunnel connection error: {}", e);
+                            }
+                        });
                     }
-                });
+                    Err(e) => {
+                        tracing::error!("Error accepting connection: {}", e);
+                    }
+                }
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                // No connections available, sleep briefly
-                thread::sleep(std::time::Duration::from_millis(100));
-            }
-            Err(e) => {
-                tracing::error!("Error accepting connection: {}", e);
+            _ = shutdown.notified() => {
+                tracing::info!("Port forwarding loop shutting down");
+                break;
             }
         }
     }
@@ -189,66 +219,80 @@ fn run_port_forward_loop(
     Ok(())
 }
 
-fn handle_tunnel_connection(
+async fn handle_tunnel_connection(
     mut local_stream: TcpStream,
-    session: Arc<std::sync::Mutex<Session>>,
+    session: Arc<Mutex<Option<client::Handle<ClientHandler>>>>,
     remote_port: u16,
 ) -> Result<(), SshError> {
-    let mut channel = session
-        .lock()
-        .unwrap()
-        .channel_direct_tcpip("localhost", remote_port, None)
+    let session_guard = session.lock().await;
+    let session_handle = session_guard
+        .as_ref()
+        .ok_or_else(|| SshError::Ssh("Session closed".to_string()))?;
+
+    let mut channel = session_handle
+        .channel_open_direct_tcpip("localhost", remote_port as u32, "localhost", 0)
+        .await
         .map_err(|e| SshError::Ssh(format!("Failed to open channel: {}", e)))?;
+
+    drop(session_guard); // Release the lock
 
     tracing::debug!("Opened SSH channel for port forwarding");
 
     // Forward data bidirectionally
+    let mut stream_closed = false;
     let mut buf = vec![0u8; 8192];
+
     loop {
-        // Try reading from local
-        match local_stream.read(&mut buf) {
-            Ok(0) => {
-                tracing::debug!("Local connection closed");
-                break;
-            }
-            Ok(n) => {
-                if let Err(e) = channel.write_all(&buf[..n]) {
-                    tracing::error!("Failed to write to SSH channel: {}", e);
-                    break;
+        tokio::select! {
+            // Read from local stream, write to SSH channel
+            result = local_stream.read(&mut buf), if !stream_closed => {
+                match result {
+                    Ok(0) => {
+                        tracing::debug!("Local connection closed");
+                        stream_closed = true;
+                        if let Err(e) = channel.eof().await {
+                            tracing::error!("Failed to send EOF to channel: {}", e);
+                        }
+                    }
+                    Ok(n) => {
+                        if let Err(e) = channel.data(&buf[..n]).await {
+                            tracing::error!("Failed to send data to SSH channel: {}", e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Error reading from local stream: {}", e);
+                        break;
+                    }
                 }
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                // No data available, try reading from channel
-            }
-            Err(e) => {
-                tracing::error!("Error reading from local stream: {}", e);
-                break;
-            }
-        }
-
-        // Try reading from SSH channel
-        match channel.read(&mut buf) {
-            Ok(0) => {
-                tracing::debug!("SSH channel closed");
-                break;
-            }
-            Ok(n) => {
-                if let Err(e) = local_stream.write_all(&buf[..n]) {
-                    tracing::error!("Failed to write to local stream: {}", e);
-                    break;
+            // Read from SSH channel, write to local stream
+            Some(msg) = channel.wait() => {
+                match msg {
+                    ChannelMsg::Data { ref data } => {
+                        if let Err(e) = local_stream.write_all(data).await {
+                            tracing::error!("Failed to write to local stream: {}", e);
+                            break;
+                        }
+                    }
+                    ChannelMsg::Eof => {
+                        tracing::debug!("SSH channel EOF received");
+                        if !stream_closed {
+                            if let Err(e) = channel.eof().await {
+                                tracing::error!("Failed to send EOF to channel: {}", e);
+                            }
+                        }
+                        break;
+                    }
+                    ChannelMsg::WindowAdjusted { .. } => {
+                        // Ignore window adjustment messages
+                    }
+                    _ => {
+                        tracing::debug!("Received other channel message: {:?}", msg);
+                    }
                 }
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                // No data available
-            }
-            Err(e) => {
-                tracing::error!("Error reading from SSH channel: {}", e);
-                break;
-            }
         }
-
-        // Brief sleep to avoid busy loop
-        thread::sleep(std::time::Duration::from_millis(1));
     }
 
     tracing::debug!("Tunnel connection closed");
