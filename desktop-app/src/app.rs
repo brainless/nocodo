@@ -18,6 +18,7 @@ pub struct DesktopApp {
 
     // Data
     projects: Vec<manager_models::Project>,
+    works: Vec<manager_models::Work>,
     servers: Vec<Server>,
     current_page: Page,
 
@@ -32,7 +33,12 @@ pub struct DesktopApp {
     #[allow(clippy::type_complexity)]
     projects_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
     #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
+    #[serde(skip)]
     loading_projects: bool,
+    #[serde(skip)]
+    loading_works: bool,
     #[serde(skip)]
     db: Option<Connection>,
 }
@@ -69,13 +75,16 @@ impl Default for DesktopApp {
             connection_error: None,
             connected_host: None,
             projects: Vec::new(),
+            works: Vec::new(),
             servers: Vec::new(),
             current_page: Page::Projects,
             tunnel: None,
             api_client: None,
             connection_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
+            works_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
+            loading_works: false,
             db: None,
         }
     }
@@ -138,8 +147,10 @@ impl DesktopApp {
         app.tunnel = None;
         app.api_client = None;
         app.projects.clear();
+        app.works.clear();
         app.connection_error = None;
         app.loading_projects = false;
+        app.loading_works = false;
 
         app
     }
@@ -193,6 +204,7 @@ impl DesktopApp {
 
         self.api_client = None;
         self.projects.clear();
+        self.works.clear();
         self.connection_error = None;
     }
 
@@ -212,6 +224,66 @@ impl DesktopApp {
                 });
             }
         }
+    }
+
+    fn refresh_works(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.loading_works = true;
+                self.works_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.works_result);
+
+                tokio::spawn(async move {
+                    let result = api_client.list_works().await;
+                    let mut works_result = result_clone.lock().unwrap();
+                    *works_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
+    /// Helper function to create a sidebar link with proper styling
+    fn sidebar_link(
+        &self,
+        ui: &mut egui::Ui,
+        text: &str,
+        default_bg: egui::Color32,
+        hover_bg: egui::Color32,
+    ) -> bool {
+        let available_width = ui.available_width();
+        let (rect, response) = ui.allocate_exact_size(
+            egui::vec2(available_width, 24.0),
+            egui::Sense::click(),
+        );
+
+        // Change cursor to pointer on hover
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        // Determine background color based on hover state
+        let bg_color = if response.hovered() {
+            hover_bg
+        } else {
+            default_bg
+        };
+
+        // Draw background
+        ui.painter().rect_filled(rect, 0.0, bg_color);
+
+        // Draw text (non-selectable)
+        let text_pos = rect.min + egui::vec2(8.0, 4.0);
+        ui.painter().text(
+            text_pos,
+            egui::Align2::LEFT_TOP,
+            text,
+            egui::FontId::default(),
+            ui.style().visuals.text_color(),
+        );
+
+        response.clicked()
     }
 }
 
@@ -277,9 +349,27 @@ impl eframe::App for DesktopApp {
             }
         }
 
-        // Auto-refresh projects after connection
+        // Check for works results
+        if let Ok(mut result) = self.works_result.try_lock() {
+            if let Some(works_result) = result.take() {
+                self.loading_works = false;
+                match works_result {
+                    Ok(works) => {
+                        tracing::info!("Loaded {} works", works.len());
+                        self.works = works;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load works: {}", e);
+                        self.connection_error = Some(format!("Failed to load works: {}", e));
+                    }
+                }
+            }
+        }
+
+        // Auto-refresh projects and works after connection
         if should_refresh_projects {
             self.refresh_projects();
+            self.refresh_works();
         }
 
         // Connection status bar
@@ -313,78 +403,35 @@ impl eframe::App for DesktopApp {
         egui::SidePanel::left("sidebar").exact_width(300.0).show(ctx, |ui| {
             ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
             ui.vertical(|ui| {
+                let sidebar_bg = ui.style().visuals.panel_fill;
                 let button_bg = ui.style().visuals.widgets.inactive.bg_fill;
+
+                // Branding
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("nocodo").size(20.0).strong());
+                ui.add_space(20.0);
+
                 // Top navigation
-                ui.horizontal(|ui| {
-                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
-                    frame.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Projects");
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
-                                    self.current_page = Page::Projects;
-                                }
-                            });
-                        });
-                    });
-                });
-                ui.horizontal(|ui| {
-                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
-                    frame.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Work");
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
-                                    self.current_page = Page::Work;
-                                }
-                            });
-                        });
-                    });
-                });
-                ui.horizontal(|ui| {
-                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
-                    frame.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Mentions");
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
-                                    self.current_page = Page::Mentions;
-                                }
-                            });
-                        });
-                    });
-                });
+                if self.sidebar_link(ui, "Projects", sidebar_bg, button_bg) {
+                    self.current_page = Page::Projects;
+                }
+                if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
+                    self.current_page = Page::Work;
+                }
+                if self.sidebar_link(ui, "Mentions", sidebar_bg, button_bg) {
+                    self.current_page = Page::Mentions;
+                }
 
                 // Empty space
                 ui.add_space(50.0);
 
                 // Bottom navigation
-                ui.horizontal(|ui| {
-                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
-                    frame.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Servers");
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
-                                    self.current_page = Page::Servers;
-                                }
-                            });
-                        });
-                    });
-                });
-                ui.horizontal(|ui| {
-                    let frame = egui::Frame::NONE.fill(button_bg).inner_margin(egui::Margin::symmetric(4, 2));
-                    frame.show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Settings");
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.add_sized([ui.available_width(), ui.available_height()], egui::Button::new("").fill(egui::Color32::TRANSPARENT).stroke(egui::Stroke::NONE)).clicked() {
-                                    self.current_page = Page::Settings;
-                                }
-                            });
-                        });
-                    });
-                });
+                if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg) {
+                    self.current_page = Page::Servers;
+                }
+                if self.sidebar_link(ui, "Settings", sidebar_bg, button_bg) {
+                    self.current_page = Page::Settings;
+                }
             });
         });
 
@@ -392,7 +439,7 @@ impl eframe::App for DesktopApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.current_page {
                 Page::Projects => {
-                    ui.heading("nocodo Projects");
+                    ui.heading("Projects");
 
                     match &self.connection_state {
                         ConnectionState::Disconnected => {
@@ -423,19 +470,40 @@ impl eframe::App for DesktopApp {
                                     }
                                 });
                             } else {
-                                ui.label("Projects:");
                                 egui::ScrollArea::vertical().show(ui, |ui| {
+                                    ui.add_space(8.0);
                                     for project in &self.projects {
-                                        ui.horizontal(|ui| {
-                                            ui.label(&project.name);
-                                            ui.separator();
-                                            ui.label(&project.path);
-                                            if let Some(language) = &project.language {
-                                                ui.separator();
-                                                ui.label(language);
-                                            }
-                                        });
-                                        ui.separator();
+                                        // Card frame with padding and rounded corners
+                                        egui::Frame::NONE
+                                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                            .corner_radius(8.0)
+                                            .inner_margin(egui::Margin::same(12))
+                                            .show(ui, |ui| {
+                                                ui.vertical(|ui| {
+                                                    // Project name - larger and bold
+                                                    ui.label(egui::RichText::new(&project.name).size(16.0).strong());
+
+                                                    ui.add_space(4.0);
+
+                                                    // Project path - smaller, muted color
+                                                    ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
+
+                                                    // Language badge if present
+                                                    if let Some(language) = &project.language {
+                                                        ui.add_space(6.0);
+                                                        ui.horizontal(|ui| {
+                                                            egui::Frame::NONE
+                                                                .fill(ui.style().visuals.selection.bg_fill)
+                                                                .corner_radius(4.0)
+                                                                .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                .show(ui, |ui| {
+                                                                    ui.label(egui::RichText::new(language).size(11.0));
+                                                                });
+                                                        });
+                                                    }
+                                                });
+                                            });
+                                        ui.add_space(8.0);
                                     }
                                 });
                             }
@@ -444,7 +512,112 @@ impl eframe::App for DesktopApp {
                 }
                 Page::Work => {
                     ui.heading("Work");
-                    ui.label("Dummy Work page");
+
+                    match &self.connection_state {
+                        ConnectionState::Disconnected => {
+                            ui.vertical_centered(|ui| {
+                                ui.label("Not connected to server");
+                                if ui.button("Connect").clicked() {
+                                    self.show_connection_dialog = true;
+                                }
+                            });
+                        }
+                        ConnectionState::Connecting => {
+                            ui.vertical_centered(|ui| {
+                                ui.label("Connecting...");
+                                ui.add(egui::Spinner::new());
+                            });
+                        }
+                        ConnectionState::Connected => {
+                            if self.loading_works {
+                                ui.vertical_centered(|ui| {
+                                    ui.label("Loading work...");
+                                    ui.add(egui::Spinner::new());
+                                });
+                            } else if self.works.is_empty() {
+                                ui.vertical_centered(|ui| {
+                                    ui.label("No work found");
+                                    if ui.button("Refresh").clicked() {
+                                        self.refresh_works();
+                                    }
+                                });
+                            } else {
+                                egui::ScrollArea::vertical().show(ui, |ui| {
+                                    ui.add_space(8.0);
+
+                                    // Sort works by created_at (most recent first)
+                                    let mut sorted_works = self.works.clone();
+                                    sorted_works.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+                                    for work in &sorted_works {
+                                        // Full-width card frame with padding and rounded corners
+                                        egui::Frame::NONE
+                                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                            .corner_radius(8.0)
+                                            .inner_margin(egui::Margin::same(12))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.vertical(|ui| {
+                                                        // Work title - larger and bold
+                                                        ui.label(egui::RichText::new(&work.title).size(16.0).strong());
+
+                                                        ui.add_space(4.0);
+
+                                                        // Metadata row
+                                                        ui.horizontal(|ui| {
+                                                            // Status badge
+                                                            egui::Frame::NONE
+                                                                .fill(ui.style().visuals.selection.bg_fill)
+                                                                .corner_radius(4.0)
+                                                                .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                .show(ui, |ui| {
+                                                                    ui.label(egui::RichText::new(&work.status).size(11.0));
+                                                                });
+
+                                                            // Tool name if present
+                                                            if let Some(tool_name) = &work.tool_name {
+                                                                egui::Frame::NONE
+                                                                    .fill(ui.style().visuals.selection.bg_fill)
+                                                                    .corner_radius(4.0)
+                                                                    .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                    .show(ui, |ui| {
+                                                                        ui.label(egui::RichText::new(tool_name).size(11.0));
+                                                                    });
+                                                            }
+
+                                                            // Model if present
+                                                            if let Some(model) = &work.model {
+                                                                egui::Frame::NONE
+                                                                    .fill(ui.style().visuals.selection.bg_fill)
+                                                                    .corner_radius(4.0)
+                                                                    .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                    .show(ui, |ui| {
+                                                                        ui.label(egui::RichText::new(model).size(11.0));
+                                                                    });
+                                                            }
+
+                                                            // Project if linked
+                                                            if let Some(project_id) = work.project_id {
+                                                                if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                                                    egui::Frame::NONE
+                                                                        .fill(ui.style().visuals.selection.bg_fill)
+                                                                        .corner_radius(4.0)
+                                                                        .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                        .show(ui, |ui| {
+                                                                            ui.label(egui::RichText::new(&project.name).size(11.0));
+                                                                        });
+                                                                }
+                                                            }
+                                                        });
+                                                    });
+                                                });
+                                            });
+                                        ui.add_space(8.0);
+                                    }
+                                });
+                            }
+                        }
+                    }
                 }
                 Page::Mentions => {
                     ui.heading("Mentions");
