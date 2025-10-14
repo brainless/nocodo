@@ -39,3 +39,6 @@ dirs = "5.0"
 
 # Error handling
 thiserror = "1.0"
+
+# SQLite
+rusqlite = "0.32"

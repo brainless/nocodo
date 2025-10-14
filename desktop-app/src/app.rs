@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use rusqlite::Connection;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -13,9 +14,12 @@ pub struct DesktopApp {
     // UI state
     show_connection_dialog: bool,
     connection_error: Option<String>,
+    connected_host: Option<String>,
 
     // Data
     projects: Vec<manager_models::Project>,
+    servers: Vec<Server>,
+    current_page: Page,
 
     // Runtime state (not serialized)
     #[serde(skip)]
@@ -29,6 +33,8 @@ pub struct DesktopApp {
     projects_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
     #[serde(skip)]
     loading_projects: bool,
+    #[serde(skip)]
+    db: Option<Connection>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -38,6 +44,22 @@ enum ConnectionState {
     Connected,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+enum Page {
+    Projects,
+    Work,
+    Mentions,
+    Servers,
+    Settings,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct Server {
+    host: String,
+    user: String,
+    key_path: Option<String>,
+}
+
 impl Default for DesktopApp {
     fn default() -> Self {
         Self {
@@ -45,12 +67,16 @@ impl Default for DesktopApp {
             config: crate::config::DesktopConfig::default(),
             show_connection_dialog: false,
             connection_error: None,
+            connected_host: None,
             projects: Vec::new(),
+            servers: Vec::new(),
+            current_page: Page::Projects,
             tunnel: None,
             api_client: None,
             connection_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
+            db: None,
         }
     }
 }
@@ -71,6 +97,41 @@ impl DesktopApp {
 
         // Load configuration
         app.config = crate::config::DesktopConfig::load().unwrap_or_default();
+
+        // Initialize local database
+        let config_dir = dirs::config_dir().expect("Could not find config dir");
+        let nocodo_dir = config_dir.join("nocodo");
+        std::fs::create_dir_all(&nocodo_dir).expect("Could not create nocodo config dir");
+        let db_path = nocodo_dir.join("local.sqlite3");
+        let db = Connection::open(&db_path).expect("Could not open DB");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS servers (
+                id INTEGER PRIMARY KEY,
+                host TEXT NOT NULL,
+                user TEXT NOT NULL,
+                key_path TEXT
+            )",
+            [],
+        ).expect("Could not create servers table");
+        db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_unique ON servers (host, user, key_path)",
+            [],
+        ).expect("Could not create unique index");
+
+        // Load existing servers
+        {
+            let mut stmt = db.prepare("SELECT host, user, key_path FROM servers").expect("Could not prepare statement");
+            let server_iter = stmt.query_map([], |row| {
+                Ok(Server {
+                    host: row.get(0)?,
+                    user: row.get(1)?,
+                    key_path: row.get(2)?,
+                })
+            }).expect("Could not query servers");
+            app.servers = server_iter.filter_map(|s| s.ok()).collect();
+        }
+
+        app.db = Some(db);
 
         // Always start disconnected - never restore connection state
         app.connection_state = ConnectionState::Disconnected;
@@ -102,6 +163,8 @@ impl DesktopApp {
                 self.config.ssh.ssh_key_path.clone()
             };
             tracing::info!("Using SSH key: {}", expanded_path);
+            // Update config with expanded path
+            self.config.ssh.ssh_key_path = expanded_path.clone();
             Some(expanded_path)
         };
         let result_clone = Arc::clone(&self.connection_result);
@@ -117,6 +180,7 @@ impl DesktopApp {
 
     fn disconnect(&mut self) {
         self.connection_state = ConnectionState::Disconnected;
+        self.connected_host = None;
 
         // Disconnect SSH tunnel if it exists
         if let Some(mut tunnel) = self.tunnel.take() {
@@ -171,13 +235,21 @@ impl eframe::App for DesktopApp {
                             tunnel.local_port()
                         );
                         self.tunnel = Some(tunnel);
-                        self.api_client = Some(crate::api_client::ApiClient::new(format!(
-                            "http://localhost:{}",
-                            self.tunnel.as_ref().unwrap().local_port()
-                        )));
-                        self.connection_state = ConnectionState::Connected;
-                        // Mark that we should refresh projects after this block
-                        should_refresh_projects = true;
+                         self.api_client = Some(crate::api_client::ApiClient::new(format!(
+                             "http://localhost:{}",
+                             self.tunnel.as_ref().unwrap().local_port()
+                         )));
+                         self.connection_state = ConnectionState::Connected;
+                         self.connected_host = Some(self.config.ssh.server.clone());
+                         // Store server in local DB
+                         if let Some(ref db) = self.db {
+                             db.execute(
+                                 "INSERT OR IGNORE INTO servers (host, user, key_path) VALUES (?1, ?2, ?3)",
+                                 &[&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
+                             ).expect("Could not insert server");
+                         }
+                         // Mark that we should refresh projects after this block
+                         should_refresh_projects = true;
                     }
                     Err(e) => {
                         tracing::error!("SSH connection failed: {}", e);
@@ -209,31 +281,6 @@ impl eframe::App for DesktopApp {
         if should_refresh_projects {
             self.refresh_projects();
         }
-        // Top panel with menu
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::MenuBar::new().ui(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Connect...").clicked() {
-                        self.show_connection_dialog = true;
-                    }
-                    if ui.button("Disconnect").clicked() {
-                        self.disconnect();
-                    }
-                    ui.separator();
-                    if ui.button("Quit").clicked() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
-                });
-
-                ui.menu_button("View", |ui| {
-                    if ui.button("Refresh Projects").clicked() {
-                        self.refresh_projects();
-                    }
-                });
-
-                egui::widgets::global_theme_preference_buttons(ui);
-            });
-        });
 
         // Connection status bar
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
@@ -246,7 +293,12 @@ impl eframe::App for DesktopApp {
                         ui.colored_label(egui::Color32::YELLOW, "● Connecting...");
                     }
                     ConnectionState::Connected => {
-                        ui.colored_label(egui::Color32::GREEN, "● Connected");
+                        let label = if let Some(host) = &self.connected_host {
+                            format!("● Connected: {}", host)
+                        } else {
+                            "● Connected".to_string()
+                        };
+                        ui.colored_label(egui::Color32::GREEN, label);
                         ui.label(format!("Projects: {}", self.projects.len()));
                     }
                 }
@@ -257,55 +309,126 @@ impl eframe::App for DesktopApp {
             });
         });
 
-        // Central panel with projects list
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("nocodo Projects");
+        // Left sidebar
+        egui::SidePanel::left("sidebar").exact_width(300.0).show(ctx, |ui| {
+            ui.vertical(|ui| {
+                // Top navigation
+                if ui.button("Projects").clicked() {
+                    self.current_page = Page::Projects;
+                }
+                if ui.button("Work").clicked() {
+                    self.current_page = Page::Work;
+                }
+                if ui.button("Mentions").clicked() {
+                    self.current_page = Page::Mentions;
+                }
 
-            match &self.connection_state {
-                ConnectionState::Disconnected => {
-                    ui.vertical_centered(|ui| {
-                        ui.label("Not connected to server");
-                        if ui.button("Connect").clicked() {
-                            self.show_connection_dialog = true;
+                // Empty space
+                ui.add_space(50.0);
+
+                // Bottom navigation
+                if ui.button("Servers").clicked() {
+                    self.current_page = Page::Servers;
+                }
+                if ui.button("Settings").clicked() {
+                    self.current_page = Page::Settings;
+                }
+            });
+        });
+
+        // Central panel
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match self.current_page {
+                Page::Projects => {
+                    ui.heading("nocodo Projects");
+
+                    match &self.connection_state {
+                        ConnectionState::Disconnected => {
+                            ui.vertical_centered(|ui| {
+                                ui.label("Not connected to server");
+                                if ui.button("Connect").clicked() {
+                                    self.show_connection_dialog = true;
+                                }
+                            });
                         }
-                    });
-                }
-                ConnectionState::Connecting => {
-                    ui.vertical_centered(|ui| {
-                        ui.label("Connecting...");
-                        ui.add(egui::Spinner::new());
-                    });
-                }
-                ConnectionState::Connected => {
-                    if self.loading_projects {
-                        ui.vertical_centered(|ui| {
-                            ui.label("Loading projects...");
-                            ui.add(egui::Spinner::new());
-                        });
-                    } else if self.projects.is_empty() {
-                        ui.vertical_centered(|ui| {
-                            ui.label("No projects found");
-                            if ui.button("Refresh").clicked() {
-                                self.refresh_projects();
-                            }
-                        });
-                    } else {
-                        ui.label("Projects:");
-                        egui::ScrollArea::vertical().show(ui, |ui| {
-                            for project in &self.projects {
-                                ui.horizontal(|ui| {
-                                    ui.label(&project.name);
-                                    ui.separator();
-                                    ui.label(&project.path);
-                                    if let Some(language) = &project.language {
-                                        ui.separator();
-                                        ui.label(language);
+                        ConnectionState::Connecting => {
+                            ui.vertical_centered(|ui| {
+                                ui.label("Connecting...");
+                                ui.add(egui::Spinner::new());
+                            });
+                        }
+                        ConnectionState::Connected => {
+                            if self.loading_projects {
+                                ui.vertical_centered(|ui| {
+                                    ui.label("Loading projects...");
+                                    ui.add(egui::Spinner::new());
+                                });
+                            } else if self.projects.is_empty() {
+                                ui.vertical_centered(|ui| {
+                                    ui.label("No projects found");
+                                    if ui.button("Refresh").clicked() {
+                                        self.refresh_projects();
                                     }
+                                });
+                            } else {
+                                ui.label("Projects:");
+                                egui::ScrollArea::vertical().show(ui, |ui| {
+                                    for project in &self.projects {
+                                        ui.horizontal(|ui| {
+                                            ui.label(&project.name);
+                                            ui.separator();
+                                            ui.label(&project.path);
+                                            if let Some(language) = &project.language {
+                                                ui.separator();
+                                                ui.label(language);
+                                            }
+                                        });
+                                        ui.separator();
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+                Page::Work => {
+                    ui.heading("Work");
+                    ui.label("Dummy Work page");
+                }
+                Page::Mentions => {
+                    ui.heading("Mentions");
+                    ui.label("Dummy Mentions page");
+                }
+                Page::Servers => {
+                    ui.heading("Servers");
+                    if self.servers.is_empty() {
+                        ui.label("No servers saved");
+                    } else {
+                        ui.label("Saved servers:");
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            for server in &self.servers {
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("{}@{}", server.user, server.host));
+                                    if let Some(key_path) = &server.key_path {
+                                        ui.separator();
+                                        ui.label(format!("Key: {}", key_path));
+                                    }
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        if ui.button("Connect").clicked() {
+                                            self.config.ssh.server = server.host.clone();
+                                            self.config.ssh.username = server.user.clone();
+                                            self.config.ssh.ssh_key_path = server.key_path.clone().unwrap_or_default();
+                                            self.show_connection_dialog = true;
+                                        }
+                                    });
                                 });
                                 ui.separator();
                             }
                         });
                     }
+                }
+                Page::Settings => {
+                    ui.heading("Settings");
+                    ui.label("Dummy Settings page");
                 }
             }
         });
