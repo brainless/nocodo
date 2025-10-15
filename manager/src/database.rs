@@ -634,7 +634,7 @@ impl Database {
         Ok(session_id)
     }
 
-    pub fn get_ai_session_by_id(&self, id: &str) -> AppResult<AiSession> {
+    pub fn get_ai_session_by_id(&self, id: i64) -> AppResult<AiSession> {
         let conn = self
             .connection
             .lock()
@@ -660,7 +660,7 @@ impl Database {
             })
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => {
-                    AppError::Internal(format!("AI session not found: {id}"))
+                    AppError::Internal(format!("AI session not found: {}", id))
                 }
                 _ => AppError::Database(e),
             })?;
@@ -764,7 +764,7 @@ impl Database {
     }
 
     // Store one-shot AI output content for a session
-    pub fn create_ai_session_output(&self, session_id: &str, content: &str) -> AppResult<()> {
+    pub fn create_ai_session_output(&self, session_id: i64, content: &str) -> AppResult<()> {
         let conn = self
             .connection
             .lock()
@@ -939,7 +939,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn delete_work(&self, id: &str) -> AppResult<()> {
+    pub fn delete_work(&self, id: i64) -> AppResult<()> {
         let conn = self
             .connection
             .lock()
@@ -1435,7 +1435,7 @@ impl Database {
     }
 
     #[allow(dead_code)]
-    pub fn get_llm_agent_tool_calls(&self, session_id: &str) -> AppResult<Vec<LlmAgentToolCall>> {
+    pub fn get_llm_agent_tool_calls(&self, session_id: i64) -> AppResult<Vec<LlmAgentToolCall>> {
         let conn = self
             .connection
             .lock()

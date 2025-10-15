@@ -219,62 +219,72 @@ impl SocketServer {
             SocketRequest::CompleteAiSession { session_id } => {
                 info!("Completing AI session: {}", session_id);
 
-                match database.get_ai_session_by_id(&session_id) {
-                    Ok(mut session) => {
-                        session.complete();
-                        match database.update_ai_session(&session) {
-                            Ok(()) => {
-                                // Broadcast AI session completion via WebSocket
-                                ws_broadcaster.broadcast_ai_session_completed(session.id);
+                match session_id.parse::<i64>() {
+                    Ok(session_id_int) => match database.get_ai_session_by_id(session_id_int) {
+                        Ok(mut session) => {
+                            session.complete();
+                            match database.update_ai_session(&session) {
+                                Ok(()) => {
+                                    // Broadcast AI session completion via WebSocket
+                                    ws_broadcaster.broadcast_ai_session_completed(session.id);
 
-                                let data = serde_json::to_value(&session).unwrap_or_default();
-                                SocketResponse::Success { data }
-                            }
-                            Err(e) => {
-                                error!("Failed to update AI session: {}", e);
-                                SocketResponse::Error {
-                                    message: format!("Failed to complete session: {e}"),
+                                    let data = serde_json::to_value(&session).unwrap_or_default();
+                                    SocketResponse::Success { data }
+                                }
+                                Err(e) => {
+                                    error!("Failed to update AI session: {}", e);
+                                    SocketResponse::Error {
+                                        message: format!("Failed to complete session: {e}"),
+                                    }
                                 }
                             }
                         }
-                    }
-                    Err(e) => {
-                        error!("AI session not found: {}", e);
-                        SocketResponse::Error {
-                            message: format!("Session not found: {session_id}"),
+                        Err(e) => {
+                            error!("AI session not found: {}", e);
+                            SocketResponse::Error {
+                                message: format!("Session not found: {session_id}"),
+                            }
                         }
                     }
+                    Err(_) => SocketResponse::Error {
+                        message: format!("Invalid session ID: {session_id}"),
+                    },
                 }
             }
 
             SocketRequest::FailAiSession { session_id } => {
                 info!("Marking AI session as failed: {}", session_id);
 
-                match database.get_ai_session_by_id(&session_id) {
-                    Ok(mut session) => {
-                        session.fail();
-                        match database.update_ai_session(&session) {
-                            Ok(()) => {
-                                // Broadcast AI session failure via WebSocket
-                                ws_broadcaster.broadcast_ai_session_failed(session.id);
+                match session_id.parse::<i64>() {
+                    Ok(session_id_int) => match database.get_ai_session_by_id(session_id_int) {
+                        Ok(mut session) => {
+                            session.fail();
+                            match database.update_ai_session(&session) {
+                                Ok(()) => {
+                                    // Broadcast AI session failure via WebSocket
+                                    ws_broadcaster.broadcast_ai_session_failed(session.id);
 
-                                let data = serde_json::to_value(&session).unwrap_or_default();
-                                SocketResponse::Success { data }
-                            }
-                            Err(e) => {
-                                error!("Failed to update AI session: {}", e);
-                                SocketResponse::Error {
-                                    message: format!("Failed to fail session: {e}"),
+                                    let data = serde_json::to_value(&session).unwrap_or_default();
+                                    SocketResponse::Success { data }
+                                }
+                                Err(e) => {
+                                    error!("Failed to update AI session: {}", e);
+                                    SocketResponse::Error {
+                                        message: format!("Failed to fail session: {e}"),
+                                    }
                                 }
                             }
                         }
-                    }
-                    Err(e) => {
-                        error!("AI session not found: {}", e);
-                        SocketResponse::Error {
-                            message: format!("Session not found: {session_id}"),
+                        Err(e) => {
+                            error!("AI session not found: {}", e);
+                            SocketResponse::Error {
+                                message: format!("Session not found: {session_id}"),
+                            }
                         }
                     }
+                    Err(_) => SocketResponse::Error {
+                        message: format!("Invalid session ID: {session_id}"),
+                    },
                 }
             }
 
@@ -285,26 +295,33 @@ impl SocketServer {
                     output.len()
                 );
 
-                // Ensure session exists
-                match database.get_ai_session_by_id(&session_id) {
-                    Ok(_session) => match database.create_ai_session_output(&session_id, &output) {
-                        Ok(()) => {
-                            let data = serde_json::json!({ "ok": true, "session_id": session_id });
-                            SocketResponse::Success { data }
-                        }
-                        Err(e) => {
-                            error!("Failed to record AI output: {}", e);
-                            SocketResponse::Error {
-                                message: format!("Failed to record output: {e}"),
+                match session_id.parse::<i64>() {
+                    Ok(session_id_int) => {
+                        // Ensure session exists
+                        match database.get_ai_session_by_id(session_id_int) {
+                            Ok(_session) => match database.create_ai_session_output(session_id_int, &output) {
+                                Ok(()) => {
+                                    let data = serde_json::json!({ "ok": true, "session_id": session_id });
+                                    SocketResponse::Success { data }
+                                }
+                                Err(e) => {
+                                    error!("Failed to record AI output: {}", e);
+                                    SocketResponse::Error {
+                                        message: format!("Failed to record output: {e}"),
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                error!("AI session not found for recording output: {}", e);
+                                SocketResponse::Error {
+                                    message: format!("Session not found: {session_id}"),
+                                }
                             }
                         }
-                    },
-                    Err(e) => {
-                        error!("AI session not found for recording output: {}", e);
-                        SocketResponse::Error {
-                            message: format!("Session not found: {session_id}"),
-                        }
                     }
+                    Err(_) => SocketResponse::Error {
+                        message: format!("Invalid session ID: {session_id}"),
+                    },
                 }
             }
 
