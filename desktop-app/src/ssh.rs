@@ -1,5 +1,5 @@
-use russh::*;
 use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key};
+use russh::*;
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::Arc;
@@ -79,9 +79,8 @@ impl SshTunnel {
             }
         }
 
-        let key_pair = key_pair.ok_or_else(|| {
-            SshError::AuthenticationFailed("No valid SSH keys found".to_string())
-        })?;
+        let key_pair = key_pair
+            .ok_or_else(|| SshError::AuthenticationFailed("No valid SSH keys found".to_string()))?;
 
         // Create SSH client configuration
         let config = client::Config {
@@ -100,7 +99,9 @@ impl SshTunnel {
 
         // Authenticate with public key
         tracing::info!("Authenticating with public key");
-        let best_hash = session.best_supported_rsa_hash().await
+        let best_hash = session
+            .best_supported_rsa_hash()
+            .await
             .map_err(|e| SshError::AuthenticationFailed(format!("Failed to get RSA hash: {}", e)))?
             .flatten();
 
@@ -168,7 +169,10 @@ impl SshTunnel {
 
         // Close session
         if let Some(session) = self.session.lock().await.take() {
-            if let Err(e) = session.disconnect(Disconnect::ByApplication, "", "English").await {
+            if let Err(e) = session
+                .disconnect(Disconnect::ByApplication, "", "English")
+                .await
+            {
                 tracing::warn!("Error during disconnect: {}", e);
             }
         }
