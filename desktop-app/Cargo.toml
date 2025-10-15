@@ -42,3 +42,6 @@ thiserror = "1.0"
 
 # SQLite
 rusqlite = "0.32"
+
+# Date/Time formatting
+chrono = "0.4"

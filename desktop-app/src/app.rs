@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use rusqlite::Connection;
+use std::sync::Arc;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -19,6 +19,8 @@ pub struct DesktopApp {
     // Data
     projects: Vec<manager_models::Project>,
     works: Vec<manager_models::Work>,
+    work_messages: Vec<manager_models::WorkMessage>,
+    ai_session_outputs: Vec<manager_models::AiSessionOutput>,
     servers: Vec<Server>,
     current_page: Page,
 
@@ -36,9 +38,21 @@ pub struct DesktopApp {
     #[allow(clippy::type_complexity)]
     works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
     #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    work_messages_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::WorkMessage>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    ai_session_outputs_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::AiSessionOutput>, String>>>>,
+    #[serde(skip)]
     loading_projects: bool,
     #[serde(skip)]
     loading_works: bool,
+    #[serde(skip)]
+    loading_work_messages: bool,
+    #[serde(skip)]
+    loading_ai_session_outputs: bool,
     #[serde(skip)]
     db: Option<Connection>,
 }
@@ -54,6 +68,7 @@ enum ConnectionState {
 enum Page {
     Projects,
     Work,
+    WorkDetail(i64), // Work ID
     Mentions,
     Servers,
     Settings,
@@ -76,6 +91,8 @@ impl Default for DesktopApp {
             connected_host: None,
             projects: Vec::new(),
             works: Vec::new(),
+            work_messages: Vec::new(),
+            ai_session_outputs: Vec::new(),
             servers: Vec::new(),
             current_page: Page::Projects,
             tunnel: None,
@@ -83,8 +100,12 @@ impl Default for DesktopApp {
             connection_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
+            work_messages_result: Arc::new(std::sync::Mutex::new(None)),
+            ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
             loading_works: false,
+            loading_work_messages: false,
+            loading_ai_session_outputs: false,
             db: None,
         }
     }
@@ -121,7 +142,8 @@ impl DesktopApp {
                 key_path TEXT
             )",
             [],
-        ).expect("Could not create servers table");
+        )
+        .expect("Could not create servers table");
         db.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_unique ON servers (host, user, key_path)",
             [],
@@ -129,14 +151,18 @@ impl DesktopApp {
 
         // Load existing servers
         {
-            let mut stmt = db.prepare("SELECT host, user, key_path FROM servers").expect("Could not prepare statement");
-            let server_iter = stmt.query_map([], |row| {
-                Ok(Server {
-                    host: row.get(0)?,
-                    user: row.get(1)?,
-                    key_path: row.get(2)?,
+            let mut stmt = db
+                .prepare("SELECT host, user, key_path FROM servers")
+                .expect("Could not prepare statement");
+            let server_iter = stmt
+                .query_map([], |row| {
+                    Ok(Server {
+                        host: row.get(0)?,
+                        user: row.get(1)?,
+                        key_path: row.get(2)?,
+                    })
                 })
-            }).expect("Could not query servers");
+                .expect("Could not query servers");
             app.servers = server_iter.filter_map(|s| s.ok()).collect();
         }
 
@@ -148,9 +174,13 @@ impl DesktopApp {
         app.api_client = None;
         app.projects.clear();
         app.works.clear();
+        app.work_messages.clear();
+        app.ai_session_outputs.clear();
         app.connection_error = None;
         app.loading_projects = false;
         app.loading_works = false;
+        app.loading_work_messages = false;
+        app.loading_ai_session_outputs = false;
 
         app
     }
@@ -205,6 +235,8 @@ impl DesktopApp {
         self.api_client = None;
         self.projects.clear();
         self.works.clear();
+        self.work_messages.clear();
+        self.ai_session_outputs.clear();
         self.connection_error = None;
     }
 
@@ -244,6 +276,37 @@ impl DesktopApp {
         }
     }
 
+    fn refresh_work_messages(&mut self, work_id: i64) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                // Fetch both work messages and AI session outputs
+                self.loading_work_messages = true;
+                self.loading_ai_session_outputs = true;
+                self.work_messages_result = Arc::new(std::sync::Mutex::new(None));
+                self.ai_session_outputs_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client_clone1 = api_client.clone();
+                let api_client_clone2 = api_client.clone();
+                let messages_result_clone = Arc::clone(&self.work_messages_result);
+                let outputs_result_clone = Arc::clone(&self.ai_session_outputs_result);
+
+                // Fetch work messages (user input)
+                tokio::spawn(async move {
+                    let result = api_client_clone1.get_work_messages(work_id).await;
+                    let mut work_messages_result = messages_result_clone.lock().unwrap();
+                    *work_messages_result = Some(result.map_err(|e| e.to_string()));
+                });
+
+                // Fetch AI session outputs (AI responses and tool results)
+                tokio::spawn(async move {
+                    let result = api_client_clone2.get_ai_session_outputs(work_id).await;
+                    let mut ai_session_outputs_result = outputs_result_clone.lock().unwrap();
+                    *ai_session_outputs_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
     /// Helper function to create a sidebar link with proper styling
     fn sidebar_link(
         &self,
@@ -253,10 +316,8 @@ impl DesktopApp {
         hover_bg: egui::Color32,
     ) -> bool {
         let available_width = ui.available_width();
-        let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(available_width, 24.0),
-            egui::Sense::click(),
-        );
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(available_width, 24.0), egui::Sense::click());
 
         // Change cursor to pointer on hover
         if response.hovered() {
@@ -307,21 +368,21 @@ impl eframe::App for DesktopApp {
                             tunnel.local_port()
                         );
                         self.tunnel = Some(tunnel);
-                         self.api_client = Some(crate::api_client::ApiClient::new(format!(
-                             "http://localhost:{}",
-                             self.tunnel.as_ref().unwrap().local_port()
-                         )));
-                         self.connection_state = ConnectionState::Connected;
-                         self.connected_host = Some(self.config.ssh.server.clone());
-                         // Store server in local DB
-                         if let Some(ref db) = self.db {
-                             db.execute(
+                        self.api_client = Some(crate::api_client::ApiClient::new(format!(
+                            "http://localhost:{}",
+                            self.tunnel.as_ref().unwrap().local_port()
+                        )));
+                        self.connection_state = ConnectionState::Connected;
+                        self.connected_host = Some(self.config.ssh.server.clone());
+                        // Store server in local DB
+                        if let Some(ref db) = self.db {
+                            db.execute(
                                  "INSERT OR IGNORE INTO servers (host, user, key_path) VALUES (?1, ?2, ?3)",
                                  &[&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
                              ).expect("Could not insert server");
-                         }
-                         // Mark that we should refresh projects after this block
-                         should_refresh_projects = true;
+                        }
+                        // Mark that we should refresh projects after this block
+                        should_refresh_projects = true;
                     }
                     Err(e) => {
                         tracing::error!("SSH connection failed: {}", e);
@@ -366,6 +427,42 @@ impl eframe::App for DesktopApp {
             }
         }
 
+        // Check for work messages results
+        if let Ok(mut result) = self.work_messages_result.try_lock() {
+            if let Some(work_messages_result) = result.take() {
+                self.loading_work_messages = false;
+                match work_messages_result {
+                    Ok(messages) => {
+                        tracing::info!("Loaded {} work messages", messages.len());
+                        self.work_messages = messages;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load work messages: {}", e);
+                        self.connection_error =
+                            Some(format!("Failed to load work messages: {}", e));
+                    }
+                }
+            }
+        }
+
+        // Check for AI session outputs results
+        if let Ok(mut result) = self.ai_session_outputs_result.try_lock() {
+            if let Some(ai_session_outputs_result) = result.take() {
+                self.loading_ai_session_outputs = false;
+                match ai_session_outputs_result {
+                    Ok(outputs) => {
+                        tracing::info!("Loaded {} AI session outputs", outputs.len());
+                        self.ai_session_outputs = outputs;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load AI session outputs: {}", e);
+                        self.connection_error =
+                            Some(format!("Failed to load AI session outputs: {}", e));
+                    }
+                }
+            }
+        }
+
         // Auto-refresh projects and works after connection
         if should_refresh_projects {
             self.refresh_projects();
@@ -400,40 +497,42 @@ impl eframe::App for DesktopApp {
         });
 
         // Left sidebar
-        egui::SidePanel::left("sidebar").exact_width(300.0).show(ctx, |ui| {
-            ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
-            ui.vertical(|ui| {
-                let sidebar_bg = ui.style().visuals.panel_fill;
-                let button_bg = ui.style().visuals.widgets.inactive.bg_fill;
+        egui::SidePanel::left("sidebar")
+            .exact_width(300.0)
+            .show(ctx, |ui| {
+                ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
+                ui.vertical(|ui| {
+                    let sidebar_bg = ui.style().visuals.panel_fill;
+                    let button_bg = ui.style().visuals.widgets.inactive.bg_fill;
 
-                // Branding
-                ui.add_space(8.0);
-                ui.label(egui::RichText::new("nocodo").size(20.0).strong());
-                ui.add_space(20.0);
+                    // Branding
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new("nocodo").size(20.0).strong());
+                    ui.add_space(20.0);
 
-                // Top navigation
-                if self.sidebar_link(ui, "Projects", sidebar_bg, button_bg) {
-                    self.current_page = Page::Projects;
-                }
-                if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
-                    self.current_page = Page::Work;
-                }
-                if self.sidebar_link(ui, "Mentions", sidebar_bg, button_bg) {
-                    self.current_page = Page::Mentions;
-                }
+                    // Top navigation
+                    if self.sidebar_link(ui, "Projects", sidebar_bg, button_bg) {
+                        self.current_page = Page::Projects;
+                    }
+                    if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
+                        self.current_page = Page::Work;
+                    }
+                    if self.sidebar_link(ui, "Mentions", sidebar_bg, button_bg) {
+                        self.current_page = Page::Mentions;
+                    }
 
-                // Empty space
-                ui.add_space(50.0);
+                    // Empty space
+                    ui.add_space(50.0);
 
-                // Bottom navigation
-                if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg) {
-                    self.current_page = Page::Servers;
-                }
-                if self.sidebar_link(ui, "Settings", sidebar_bg, button_bg) {
-                    self.current_page = Page::Settings;
-                }
+                    // Bottom navigation
+                    if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg) {
+                        self.current_page = Page::Servers;
+                    }
+                    if self.sidebar_link(ui, "Settings", sidebar_bg, button_bg) {
+                        self.current_page = Page::Settings;
+                    }
+                });
             });
-        });
 
         // Central panel
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -550,8 +649,10 @@ impl eframe::App for DesktopApp {
                                     sorted_works.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
                                     for work in &sorted_works {
+                                        let work_id = work.id;
+
                                         // Full-width card frame with padding and rounded corners
-                                        egui::Frame::NONE
+                                        let response = egui::Frame::NONE
                                             .fill(ui.style().visuals.widgets.inactive.bg_fill)
                                             .corner_radius(8.0)
                                             .inner_margin(egui::Margin::same(12))
@@ -612,11 +713,190 @@ impl eframe::App for DesktopApp {
                                                     });
                                                 });
                                             });
+
+                                        // Make the entire card clickable
+                                        if response.response.interact(egui::Sense::click()).clicked() {
+                                            self.current_page = Page::WorkDetail(work_id);
+                                            self.refresh_work_messages(work_id);
+                                        }
+
+                                        // Change cursor to pointer on hover
+                                        if response.response.hovered() {
+                                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                        }
+
                                         ui.add_space(8.0);
                                     }
                                 });
                             }
                         }
+                    }
+                }
+                Page::WorkDetail(work_id) => {
+                    // Find the work
+                    let work = self.works.iter().find(|w| w.id == work_id).cloned();
+
+                    if let Some(work) = work {
+                        // Header with back button
+                        ui.horizontal(|ui| {
+                            if ui.button("← Back to Work List").clicked() {
+                                self.current_page = Page::Work;
+                            }
+                        });
+
+                        ui.add_space(8.0);
+
+                        // Work title
+                        ui.heading(&work.title);
+
+                        ui.add_space(4.0);
+
+                        // Work metadata
+                        ui.horizontal(|ui| {
+                            ui.label("Status:");
+                            ui.label(&work.status);
+
+                            if let Some(tool_name) = &work.tool_name {
+                                ui.separator();
+                                ui.label("Tool:");
+                                ui.label(tool_name);
+                            }
+
+                            if let Some(model) = &work.model {
+                                ui.separator();
+                                ui.label("Model:");
+                                ui.label(model);
+                            }
+
+                            if let Some(project_id) = work.project_id {
+                                if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                    ui.separator();
+                                    ui.label("Project:");
+                                    ui.label(&project.name);
+                                }
+                            }
+                        });
+
+                        ui.separator();
+
+                        // Message history
+                        ui.heading("Message History");
+
+                        match &self.connection_state {
+                            ConnectionState::Disconnected => {
+                                ui.vertical_centered(|ui| {
+                                    ui.label("Not connected to server");
+                                });
+                            }
+                            ConnectionState::Connecting => {
+                                ui.vertical_centered(|ui| {
+                                    ui.label("Connecting...");
+                                    ui.add(egui::Spinner::new());
+                                });
+                            }
+                            ConnectionState::Connected => {
+                                if self.loading_work_messages || self.loading_ai_session_outputs {
+                                    ui.vertical_centered(|ui| {
+                                        ui.label("Loading messages...");
+                                        ui.add(egui::Spinner::new());
+                                    });
+                                } else if self.work_messages.is_empty() && self.ai_session_outputs.is_empty() {
+                                    ui.vertical_centered(|ui| {
+                                        ui.label("No messages found");
+                                        if ui.button("Refresh").clicked() {
+                                            self.refresh_work_messages(work_id);
+                                        }
+                                    });
+                                } else {
+                                    egui::ScrollArea::vertical().show(ui, |ui| {
+                                        ui.add_space(8.0);
+
+                                        // Combine and sort all messages by timestamp
+                                        #[derive(Clone)]
+                                        enum DisplayMessage {
+                                            WorkMessage(manager_models::WorkMessage),
+                                            AiOutput(manager_models::AiSessionOutput),
+                                        }
+
+                                        let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
+
+                                        // Add work messages (user input)
+                                        for msg in &self.work_messages {
+                                            all_messages.push((msg.created_at, DisplayMessage::WorkMessage(msg.clone())));
+                                        }
+
+                                        // Add AI session outputs (AI responses)
+                                        for output in &self.ai_session_outputs {
+                                            all_messages.push((output.created_at, DisplayMessage::AiOutput(output.clone())));
+                                        }
+
+                                        // Sort by timestamp
+                                        all_messages.sort_by_key(|(timestamp, _)| *timestamp);
+
+                                        for (_timestamp, message) in &all_messages {
+                                            match message {
+                                                DisplayMessage::WorkMessage(msg) => {
+                                                    // User message
+                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                    egui::Frame::NONE
+                                                        .fill(bg_color)
+                                                        .corner_radius(8.0)
+                                                        .inner_margin(egui::Margin::same(12))
+                                                        .show(ui, |ui| {
+                                                            ui.vertical(|ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new("User").size(12.0).strong());
+                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                        let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
+                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                            .unwrap_or_else(|| "Unknown".to_string());
+                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                    });
+                                                                });
+                                                                ui.add_space(4.0);
+                                                                ui.label(&msg.content);
+                                                            });
+                                                        });
+                                                }
+                                                DisplayMessage::AiOutput(output) => {
+                                                    // AI response message
+                                                    let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
+
+                                                    egui::Frame::NONE
+                                                        .fill(bg_color)
+                                                        .corner_radius(8.0)
+                                                        .inner_margin(egui::Margin::same(12))
+                                                        .show(ui, |ui| {
+                                                            ui.vertical(|ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new("AI").size(12.0).strong());
+                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                        let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
+                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                            .unwrap_or_else(|| "Unknown".to_string());
+                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                    });
+                                                                });
+                                                                ui.add_space(4.0);
+                                                                ui.label(&output.content);
+                                                            });
+                                                        });
+                                                }
+                                            }
+                                            ui.add_space(8.0);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+                        ui.vertical_centered(|ui| {
+                            ui.label("Work not found");
+                            if ui.button("Back to Work List").clicked() {
+                                self.current_page = Page::Work;
+                            }
+                        });
                     }
                 }
                 Page::Mentions => {

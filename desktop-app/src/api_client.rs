@@ -55,6 +55,54 @@ impl ApiClient {
 
         Ok(work_response.works)
     }
+
+    pub async fn get_work_messages(
+        &self,
+        work_id: i64,
+    ) -> Result<Vec<manager_models::WorkMessage>, ApiError> {
+        let url = format!("{}/api/work/{}/messages", self.base_url, work_id);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let messages_response: manager_models::WorkMessageListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(messages_response.messages)
+    }
+
+    pub async fn get_ai_session_outputs(
+        &self,
+        work_id: i64,
+    ) -> Result<Vec<manager_models::AiSessionOutput>, ApiError> {
+        let url = format!("{}/api/work/{}/outputs", self.base_url, work_id);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let outputs_response: manager_models::AiSessionOutputListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(outputs_response.outputs)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
