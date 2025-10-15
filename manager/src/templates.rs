@@ -2,10 +2,8 @@ use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTemplate {
     pub name: String,
     pub description: String,
@@ -14,8 +12,7 @@ pub struct ProjectTemplate {
     pub files: Vec<TemplateFile>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateFile {
     pub path: String,
     pub content: String,
@@ -121,10 +118,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
                     path: "src/main.rs".to_string(),
                     content: r#"use actix_web::{web, App, HttpResponse, HttpServer, Result};
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 
-#[derive(Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Serialize, Deserialize)]
 struct ApiResponse {
     message: String,
     timestamp: i64,

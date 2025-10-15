@@ -30,7 +30,6 @@ actix = "0.13"
 thiserror = "1.0"
 
  chrono = { version = "0.4", features = ["serde"] }
- ts-rs = "7.1"
  uuid = { version = "1.6", features = ["v4", "serde"] }
 async-trait = "0.1"
 home = "0.5"

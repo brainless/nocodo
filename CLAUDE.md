@@ -1,10 +1,10 @@
 # nocodo
 
-Local AI-assisted development environment providing guardrails and software engineering practices.
+AI-assisted development environment deployed on cloud servers with secure desktop client access.
 
 ## Project Structure
-- **manager/**: Rust daemon with Actix Web, SQLite, Unix socket server (API only)
-- **manager-web/**: SolidJS web interface with Vite dev server (proxies to manager API)
+- **manager/**: Rust daemon with Actix Web, SQLite (runs on cloud server, provides API)
+- **desktop-app/**: Cross-platform desktop client with egui (SSH connection, port forwarding, GUI)
 
 ## Development Workflow
 
@@ -21,22 +21,22 @@ Local AI-assisted development environment providing guardrails and software engi
 
 ## Build Commands
 ```bash
-# Build Manager daemon only (no web embedding)
+# Build Manager daemon (for cloud deployment)
 cargo build --release --bin nocodo-manager
 
-# Build Web app (for production deployment)
-cd manager-web && npm install && npm run build
+# Build Desktop App (for local distribution)
+cargo build --release --bin nocodo-desktop-app
 ```
 
-## Quick Start
+## Quick Start (Development)
 1. Start Manager daemon: `nocodo-manager --config ~/.config/nocodo/manager.toml` (runs on http://localhost:8081)
-2. Start Web app: `cd manager-web && npm run dev` (runs on http://localhost:3000 with API proxy)
-3. Access Web interface at http://localhost:3000
-4. AI-powered development environment with separate frontend and backend
+2. Start Desktop app: `nocodo-desktop-app` (connects via SSH, opens GUI)
+3. AI-powered development environment with cloud backend and native desktop UI
 
 ## Tech Stack
-- Rust + Actix Web for backends (API only, no web asset serving)
-- SQLite for data storage
-- SolidJS + TailwindCSS for web interfaces (separate Vite dev server)
-- HTTP/WebSocket API communication with Vite proxy
-- Manager: localhost:8081 (API server), Web: localhost:3000 (dev server)
+- **Backend**: Rust + Actix Web (API only, no web asset serving)
+- **Database**: SQLite for data storage
+- **Desktop UI**: Rust + egui/eframe (cross-platform native GUI)
+- **Communication**: HTTP/WebSocket API over SSH tunnel
+- Manager: Cloud server (API on port 8081)
+- Desktop: Local machine (SSH client, port forwarding, native UI)

@@ -7,11 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use ts_rs::TS;
 
 /// WebSocket message types for real-time communication
-#[derive(Debug, Clone, Serialize, Deserialize, TS, Message)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize, Message)]
 #[serde(tag = "type", content = "payload")]
 #[rtype(result = "()")]
 pub enum WebSocketMessage {
@@ -31,13 +29,11 @@ pub enum WebSocketMessage {
         project: Project,
     },
     ProjectDeleted {
-        #[ts(type = "number")]
         project_id: i64,
     },
 
     // Status updates
     ProjectStatusChanged {
-        #[ts(type = "number")]
         project_id: i64,
         status: String,
     },
@@ -47,22 +43,18 @@ pub enum WebSocketMessage {
         session: AiSession,
     },
     AiSessionStatusChanged {
-        #[ts(type = "number")]
         session_id: i64,
         status: String,
     },
     AiSessionCompleted {
-        #[ts(type = "number")]
         session_id: i64,
     },
     AiSessionFailed {
-        #[ts(type = "number")]
         session_id: i64,
     },
 
     // Streaming output chunks for sessions (stdout/stderr)
     AiSessionOutputChunk {
-        #[ts(type = "number")]
         session_id: i64,
         stream: String, // "stdout" | "stderr"
         content: String,
@@ -81,26 +73,22 @@ pub enum WebSocketMessage {
 
     // LLM Agent messages
     LlmAgentChunk {
-        #[ts(type = "number")]
         session_id: i64,
         content: String,
     },
 
     // Tool call lifecycle messages
     ToolCallStarted {
-        #[ts(type = "number")]
         session_id: i64,
         call_id: String,
         tool_name: String,
     },
     ToolCallCompleted {
-        #[ts(type = "number")]
         session_id: i64,
         call_id: String,
         result: String, // JSON string
     },
     ToolCallFailed {
-        #[ts(type = "number")]
         session_id: i64,
         call_id: String,
         error: String,

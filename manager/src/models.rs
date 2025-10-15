@@ -1,20 +1,15 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
-    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
     pub path: String,
     pub language: Option<String>,
     pub framework: Option<String>,
     pub status: String,
-    #[ts(type = "number")]
     pub created_at: i64,
-    #[ts(type = "number")]
     pub updated_at: i64,
     /// Enhanced technology detection - JSON serialized list of technologies
     pub technologies: Option<String>,
@@ -43,19 +38,15 @@ impl Project {
 }
 
 /// Component app within a project (e.g., backend API, web frontend, mobile app)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectComponent {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub project_id: i64,
     pub name: String,
     /// Path relative to project root
     pub path: String,
     pub language: String,
     pub framework: Option<String>,
-    #[ts(type = "number")]
     pub created_at: i64,
 }
 
@@ -81,8 +72,7 @@ impl ProjectComponent {
 }
 
 /// Enhanced technology information for a project
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTechnology {
     pub language: String,
     pub framework: Option<String>,
@@ -90,8 +80,7 @@ pub struct ProjectTechnology {
     pub confidence: f32, // 0.0 - 1.0
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDetectionResult {
     pub primary_language: String,
     pub technologies: Vec<ProjectTechnology>,
@@ -100,15 +89,13 @@ pub struct ProjectDetectionResult {
     pub deployment_configs: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectDetailsResponse {
     pub project: Project,
     pub components: Vec<ProjectComponent>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateProjectRequest {
     pub name: String,
     pub path: Option<String>,
@@ -117,41 +104,32 @@ pub struct CreateProjectRequest {
     pub template: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectResponse {
     pub project: Project,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectListResponse {
     pub projects: Vec<Project>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ServerStatus {
     pub status: String,
     pub version: String,
     pub uptime: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiSession {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub work_id: i64,
-    #[ts(type = "number")]
     pub message_id: i64,
     pub tool_name: String,
     pub status: String,
     pub project_context: Option<String>,
-    #[ts(type = "number")]
     pub started_at: i64,
-    #[ts(type = "number | null")]
     pub ended_at: Option<i64>,
 }
 
@@ -186,51 +164,38 @@ impl AiSession {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateAiSessionRequest {
     pub message_id: String,
     pub tool_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AiSessionResponse {
     pub session: AiSession,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AiSessionListResponse {
     pub sessions: Vec<AiSession>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiSessionOutput {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub session_id: i64,
     pub content: String,
-    #[ts(type = "number")]
     pub created_at: i64,
 }
 
 /// Represents an AI session result that stores the response in a WorkMessage
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiSessionResult {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub session_id: i64,
-    #[ts(type = "number")]
     pub response_message_id: i64,
     pub status: String,
-    #[ts(type = "number")]
     pub created_at: i64,
-    #[ts(type = "number | null")]
     pub completed_at: Option<i64>,
 }
 
@@ -261,29 +226,25 @@ impl AiSessionResult {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AiSessionOutputListResponse {
     pub outputs: Vec<AiSessionOutput>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct RecordAiOutputRequest {
     pub content: String,
 }
 
 /// Send interactive input to a running AI session (Phase 1 streaming)
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct AiSessionInputRequest {
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
     pub name: String,
     pub path: String, // Required - must be existing directory
@@ -292,15 +253,13 @@ pub struct AddExistingProjectRequest {
 }
 
 // File operation models
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FileType {
     File,
     Directory,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileInfo {
     pub name: String,
     pub path: String,                // relative path
@@ -312,62 +271,49 @@ pub struct FileInfo {
     pub modified_at: Option<String>, // ISO 8601 timestamp, None for directories
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileListRequest {
-    #[ts(type = "number | undefined")]
     pub project_id: Option<i64>,
     pub path: Option<String>, // Relative path within project, defaults to root
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileListResponse {
     pub files: Vec<FileInfo>, // List of files and directories
     pub current_path: String, // Current directory being listed
-    #[ts(type = "number")]
     pub total_files: u32, // Total number of files found
     pub truncated: bool,      // Whether results were limited to 100
-    #[ts(type = "number")]
     pub limit: u32, // Maximum files returned (100)
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileCreateRequest {
-    #[ts(type = "number")]
     pub project_id: i64,
     pub path: String,            // Relative path within project
     pub content: Option<String>, // None for directories
     pub is_directory: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileUpdateRequest {
-    #[ts(type = "number")]
     pub project_id: i64,
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileContentResponse {
     pub path: String,
     pub content: String,
-    #[ts(type = "number | null")]
     pub modified_at: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileResponse {
     pub file: FileInfo,
 }
 
 // Work history models
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageContentType {
     #[serde(rename = "text")]
     Text,
@@ -379,8 +325,7 @@ pub enum MessageContentType {
     Code { language: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageAuthorType {
     #[serde(rename = "user")]
     User,
@@ -388,51 +333,38 @@ pub enum MessageAuthorType {
     Ai,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkMessage {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub work_id: i64,
     pub content: String,
     pub content_type: MessageContentType,
     pub author_type: MessageAuthorType,
     pub author_id: Option<String>,
-    #[ts(type = "number")]
     pub sequence_order: i32,
-    #[ts(type = "number")]
     pub created_at: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Work {
-    #[ts(type = "number")]
     pub id: i64,
     pub title: String,
-    #[ts(type = "number | null")]
     pub project_id: Option<i64>,
     pub tool_name: Option<String>,
     pub model: Option<String>, // Model ID for the work
     pub status: String,
-    #[ts(type = "number")]
     pub created_at: i64,
-    #[ts(type = "number")]
     pub updated_at: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorkWithHistory {
     pub work: Work,
     pub messages: Vec<WorkMessage>,
-    #[ts(type = "number")]
     pub total_messages: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddMessageRequest {
     pub content: String,
     pub content_type: MessageContentType,
@@ -440,35 +372,29 @@ pub struct AddMessageRequest {
     pub author_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateWorkRequest {
     pub title: String,
-    #[ts(type = "number | undefined")]
     pub project_id: Option<i64>,
     pub model: Option<String>, // Model ID for the work (e.g., "gpt-4", "claude-3-opus-20240229")
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorkResponse {
     pub work: Work,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorkListResponse {
     pub works: Vec<Work>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorkMessageResponse {
     pub message: WorkMessage,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorkMessageListResponse {
     pub messages: Vec<WorkMessage>,
 }
@@ -476,8 +402,7 @@ pub struct WorkMessageListResponse {
 // LLM Agent Types for Issue 99
 
 /// Tool request from LLM (typed JSON)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ToolRequest {
     #[serde(rename = "list_files")]
@@ -491,8 +416,7 @@ pub enum ToolRequest {
 }
 
 /// List files tool request
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListFilesRequest {
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -500,7 +424,6 @@ pub struct ListFilesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_hidden: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(type = "number | undefined")]
     pub max_files: Option<u32>,
 }
 
@@ -536,12 +459,10 @@ impl ListFilesRequest {
 }
 
 /// Read file tool request
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadFileRequest {
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(type = "number | undefined")]
     pub max_size: Option<u64>,
 }
 
@@ -567,8 +488,7 @@ impl ReadFileRequest {
 }
 
 /// Write file tool request
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WriteFileRequest {
     pub path: String,
     pub content: String,
@@ -627,8 +547,7 @@ impl WriteFileRequest {
 }
 
 /// Grep search tool request
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrepRequest {
     pub pattern: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -643,7 +562,6 @@ pub struct GrepRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_line_numbers: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(type = "number | undefined")]
     pub max_results: Option<u32>,
 }
 
@@ -697,8 +615,7 @@ impl GrepRequest {
 }
 
 /// Tool response to LLM (typed JSON)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ToolResponse {
     #[serde(rename = "list_files")]
@@ -714,21 +631,17 @@ pub enum ToolResponse {
 }
 
 /// List files tool response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListFilesResponse {
     pub current_path: String,
     pub files: String, // Plain text tree representation
-    #[ts(type = "number")]
     pub total_files: u32,
     pub truncated: bool,
-    #[ts(type = "number")]
     pub limit: u32,
 }
 
 /// Read file tool response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadFileResponse {
     pub path: String,
     pub content: String,
@@ -737,49 +650,39 @@ pub struct ReadFileResponse {
 }
 
 /// Write file tool response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WriteFileResponse {
     pub path: String,
     pub success: bool,
-    #[ts(type = "number")]
     pub bytes_written: u64,
     pub created: bool,
     pub modified: bool,
 }
 
 /// Grep match result
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrepMatch {
     pub file_path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(type = "number | undefined")]
     pub line_number: Option<u32>,
     pub line_content: String,
-    #[ts(type = "number")]
     pub match_start: u32,
-    #[ts(type = "number")]
     pub match_end: u32,
     pub matched_text: String,
 }
 
 /// Grep search tool response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrepResponse {
     pub pattern: String,
     pub matches: Vec<GrepMatch>,
-    #[ts(type = "number")]
     pub total_matches: u32,
-    #[ts(type = "number")]
     pub files_searched: u32,
     pub truncated: bool,
 }
 
 /// Tool error response
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolErrorResponse {
     pub tool: String,
     pub error: String,
@@ -787,8 +690,7 @@ pub struct ToolErrorResponse {
 }
 
 /// LLM provider configuration
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProviderConfig {
     pub provider: String,
     pub model: String,
@@ -799,20 +701,15 @@ pub struct LlmProviderConfig {
 }
 
 /// LLM agent session
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAgentSession {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub work_id: i64,
     pub provider: String,
     pub model: String,
     pub status: String,
     pub system_prompt: Option<String>,
-    #[ts(type = "number")]
     pub started_at: i64,
-    #[ts(type = "number | null")]
     pub ended_at: Option<i64>,
 }
 
@@ -839,8 +736,7 @@ impl LlmAgentSession {
 }
 
 /// Create LLM agent session request
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct CreateLlmAgentSessionRequest {
     pub provider: String,
@@ -849,30 +745,24 @@ pub struct CreateLlmAgentSessionRequest {
 }
 
 /// LLM agent session response
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct LlmAgentSessionResponse {
     pub session: LlmAgentSession,
 }
 
 /// LLM agent message
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAgentMessage {
-    #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
     pub session_id: i64,
     pub role: String, // "user" | "assistant" | "system"
     pub content: String,
-    #[ts(type = "number")]
     pub created_at: i64,
 }
 
 /// API key configuration for the settings page
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiKeyConfig {
     pub name: String,
     pub key: Option<String>, // Will be masked for security
@@ -880,16 +770,14 @@ pub struct ApiKeyConfig {
 }
 
 /// Settings response containing API keys and configuration info
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingsResponse {
     pub config_file_path: String,
     pub api_keys: Vec<ApiKeyConfig>,
 }
 
 /// Supported model information
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupportedModel {
     pub provider: String,
     pub model_id: String,
@@ -906,8 +794,7 @@ pub struct SupportedModel {
 }
 
 /// Response containing list of supported models
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupportedModelsResponse {
     pub models: Vec<SupportedModel>,
 }

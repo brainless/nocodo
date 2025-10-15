@@ -3182,7 +3182,6 @@ dependencies = [
  "tokio-test",
  "tracing",
  "tracing-subscriber",
- "ts-rs",
  "uuid",
  "walkdir",
 ]
