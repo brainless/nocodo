@@ -1867,12 +1867,9 @@ pub async fn create_work(
 
 pub async fn get_work(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id_str = path.into_inner();
-    let work_id = work_id_str
-        .parse::<i64>()
-        .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?;
+    let work_id = path.into_inner();
     let work_with_history = data.database.get_work_with_messages(work_id)?;
     Ok(HttpResponse::Ok().json(work_with_history))
 }
@@ -1885,19 +1882,15 @@ pub async fn list_works(data: web::Data<AppState>) -> Result<HttpResponse, AppEr
 
 pub async fn delete_work(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
 
     // Delete from database
-    data.database.delete_work(&work_id)?;
+    data.database.delete_work(work_id)?;
 
     // Broadcast work deletion via WebSocket
-    data.ws_broadcaster.broadcast_project_deleted(
-        work_id
-            .parse::<i64>()
-            .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?,
-    );
+    data.ws_broadcaster.broadcast_project_deleted(work_id);
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1905,13 +1898,10 @@ pub async fn delete_work(
 // Work message handlers
 pub async fn add_message_to_work(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
     request: web::Json<AddMessageRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id_str = path.into_inner();
-    let work_id = work_id_str
-        .parse::<i64>()
-        .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?;
+    let work_id = path.into_inner();
     let req = request.into_inner();
 
     // Verify work exists
@@ -1953,12 +1943,9 @@ pub async fn add_message_to_work(
 
 pub async fn get_work_messages(
     data: web::Data<AppState>,
-    path: web::Path<String>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
-    let work_id_str = path.into_inner();
-    let work_id = work_id_str
-        .parse::<i64>()
-        .map_err(|_| AppError::InvalidRequest("Invalid work_id".to_string()))?;
+    let work_id = path.into_inner();
 
     // Verify work exists
     let _work = data.database.get_work_by_id(work_id)?;
