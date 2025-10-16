@@ -27,12 +27,10 @@ impl TestDataGenerator {
             id: get_unique_id("project"),
             name,
             path,
-            language: Some("rust".to_string()),
-            framework: Some("actix-web".to_string()),
-            
+            description: None,
+            parent_id: None,
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            "technologies":["actix-web"],"build_tools":["cargo"],"package_managers":[],"deployment_configs":[]}"#.to_string()),
         }
     }
 
@@ -40,20 +38,17 @@ impl TestDataGenerator {
     pub fn create_project_custom(
         name: &str,
         path: &str,
-        language: Option<&str>,
-        framework: Option<&str>,
-        
+        description: Option<&str>,
+        parent_id: Option<i64>,
     ) -> Project {
         Project {
             id: get_unique_id("project"),
             name: name.to_string(),
             path: path.to_string(),
-            language: language.map(|s| s.to_string()),
-            framework: framework.map(|s| s.to_string()),
-            
+            description: description.map(|s| s.to_string()),
+            parent_id,
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            
         }
     }
 
@@ -67,7 +62,7 @@ impl TestDataGenerator {
             project_id,
             tool_name: Some("test-tool".to_string()),
             model: Some("gpt-5".to_string()),
-            
+            status: "active".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
         }
@@ -99,7 +94,7 @@ impl TestDataGenerator {
             work_id,
             message_id,
             tool_name: tool_name.to_string(),
-            
+            status: "running".to_string(),
             project_context: Some("test context".to_string()),
             started_at: chrono::Utc::now().timestamp(),
             ended_at: None,
@@ -120,13 +115,12 @@ impl TestDataGenerator {
     pub fn create_ai_session_result(
         session_id: i64,
         response_message_id: i64,
-        
     ) -> AiSessionResult {
         AiSessionResult {
             id: get_unique_id("ai-result"),
             session_id,
             response_message_id,
-            
+            status: "completed".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             completed_at: Some(chrono::Utc::now().timestamp()),
         }
@@ -139,7 +133,7 @@ impl TestDataGenerator {
             work_id,
             provider: provider.to_string(),
             model: model.to_string(),
-            
+            status: "running".to_string(),
             system_prompt: Some("You are a helpful assistant.".to_string()),
             started_at: chrono::Utc::now().timestamp(),
             ended_at: None,
@@ -170,7 +164,7 @@ impl TestDataGenerator {
             tool_name: tool_name.to_string(),
             request,
             response: None,
-            
+            status: "pending".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             completed_at: None,
             execution_time_ms: None,
@@ -204,9 +198,8 @@ impl TestDataGenerator {
                 Self::create_project_custom(
                     &format!("test-project-{}", i),
                     &format!("/tmp/test-project-{}", i),
-                    Some("rust"),
-                    Some("actix-web"),
-                    Some("initialized"),
+                    None,
+                    None,
                 )
             })
             .collect()
@@ -263,9 +256,8 @@ mod tests {
 
         assert_eq!(project.name, "my-test-project");
         assert_eq!(project.path, "/tmp/my-test");
-        assert_eq!(project.language, Some("rust".to_string()));
-        assert_eq!(project.framework, Some("actix-web".to_string()));
-        assert_eq!(project.status, "initialized");
+        assert_eq!(project.description, None);
+        assert_eq!(project.parent_id, None);
         assert!(project.id > 0);
     }
 

@@ -135,7 +135,7 @@ async fn test_simple_llm_e2e() {
         .to_request();
 
     let resp = test::call_service(&app, req).await;
-    println!("📊 LLM session creation  resp.status());
+    println!("📊 LLM session creation status: {:?}", resp.status());
 
     let is_success = resp.status().is_success();
     if !is_success {
