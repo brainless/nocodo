@@ -656,18 +656,10 @@ impl eframe::App for DesktopApp {
                                                     // Project path - smaller, muted color
                                                     ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
 
-                                                    // Language badge if present
-                                                    if let Some(language) = &project.language {
+                                                    // Description if present
+                                                    if let Some(description) = &project.description {
                                                         ui.add_space(6.0);
-                                                        ui.horizontal(|ui| {
-                                                            egui::Frame::NONE
-                                                                .fill(ui.style().visuals.selection.bg_fill)
-                                                                .corner_radius(4.0)
-                                                                .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                .show(ui, |ui| {
-                                                                    ui.label(egui::RichText::new(language).size(11.0));
-                                                                });
-                                                        });
+                                                        ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
                                                     }
                                                 });
                                             });

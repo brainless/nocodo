@@ -23,11 +23,8 @@ impl ProjectsView {
                 ui.horizontal(|ui| {
                     ui.label(&project.name);
                     ui.label(&project.path);
-                    if let Some(language) = &project.language {
-                        ui.label(language);
-                    }
-                    if let Some(framework) = &project.framework {
-                        ui.label(framework);
+                    if let Some(description) = &project.description {
+                        ui.label(format!("({})", description));
                     }
                 });
                 ui.separator();
