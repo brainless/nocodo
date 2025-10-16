@@ -8,13 +8,10 @@ pub struct Project {
     pub id: i64,
     pub name: String,
     pub path: String,
-    pub language: Option<String>,
-    pub framework: Option<String>,
-    pub status: String,
+    pub description: Option<String>,
+    pub parent_id: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
-    /// Enhanced technology detection - JSON serialized list of technologies
-    pub technologies: Option<String>,
 }
 
 impl Project {
@@ -24,12 +21,10 @@ impl Project {
             id: 0, // Will be set by database AUTOINCREMENT
             name,
             path,
-            language: None,
-            framework: None,
-            status: "created".to_string(),
+            description: None,
+            parent_id: None,
             created_at: now,
             updated_at: now,
-            technologies: None,
         }
     }
 

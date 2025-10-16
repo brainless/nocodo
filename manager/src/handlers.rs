@@ -202,14 +202,8 @@ pub async fn create_project(
 
     // Create the project object with absolute path
     let mut project = Project::new(req.name.clone(), absolute_project_path_string.clone());
-    project.language = req.language.clone();
-    project.framework = req.framework.clone();
-
-    // If template is provided, set language and framework from template
-    if let Some(ref template) = template {
-        project.language = Some(template.language.clone());
-        project.framework = template.framework.clone();
-    }
+    project.description = req.description.clone();
+    project.parent_id = req.parent_id;
 
     // Apply template if provided
     if let Some(template) = template {
@@ -235,54 +229,22 @@ A new project created with nocodo.
     // Initialize Git repository
     initialize_git_repository(&absolute_project_path)?;
 
-    // Update project status
-    project.status = "initialized".to_string();
-
     // Save to database
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
 
-    // Analyze project to detect language/framework and components
-    let analysis = analyze_project_path(&absolute_project_path).map_err(AppError::Internal)?;
-
-    // Update project metadata if detected
-    let mut updated_project = project.clone();
-    if updated_project.language.is_none() {
-        updated_project.language = analysis.primary_language.clone();
-    }
-    if updated_project.framework.is_none() {
-        updated_project.framework = analysis.primary_framework.clone();
-    }
-
-    // Store enhanced technology information as JSON
-    let detection_result = crate::models::ProjectDetectionResult {
-        primary_language: analysis.primary_language.clone().unwrap_or_default(),
-        technologies: analysis.technologies.clone(),
-        build_tools: analysis.build_tools.clone(),
-        package_managers: analysis.package_managers.clone(),
-        deployment_configs: analysis.deployment_configs.clone(),
-    };
-
-    let technologies_json = serde_json::to_string(&detection_result)
-        .map_err(|e| AppError::Internal(format!("Failed to serialize technologies: {e}")))?;
-    updated_project.technologies = Some(technologies_json);
-
-    updated_project.update_timestamp();
-    updated_project.id = project_id;
-    data.database.update_project(&updated_project)?;
-
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
-        .broadcast_project_created(updated_project.clone());
+        .broadcast_project_created(project.clone());
 
     tracing::info!(
         "Successfully created project '{}' at {}",
-        updated_project.name,
-        updated_project.path
+        project.name,
+        project.path
     );
 
     let response = ProjectResponse {
-        project: updated_project,
+        project,
     };
     Ok(HttpResponse::Created().json(response))
 }
@@ -513,68 +475,25 @@ pub async fn add_existing_project(
 
     // Create the project object
     let mut project = Project::new(req.name.clone(), absolute_path_str);
-    project.language = req.language;
-    project.framework = req.framework;
-    project.status = "registered".to_string(); // Different status to distinguish from created projects
+    project.description = req.description;
+    project.parent_id = req.parent_id;
 
     // Save to database
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
 
-    // Analyze project to detect language/framework and components
-    let analysis = analyze_project_path(&absolute_path).map_err(AppError::Internal)?;
-
-    // Update project metadata if detected
-    let mut updated_project = project.clone();
-    if updated_project.language.is_none() {
-        updated_project.language = analysis.primary_language.clone();
-    }
-    if updated_project.framework.is_none() {
-        updated_project.framework = analysis.primary_framework.clone();
-    }
-
-    // Store enhanced technology information as JSON
-    let detection_result = crate::models::ProjectDetectionResult {
-        primary_language: analysis.primary_language.clone().unwrap_or_default(),
-        technologies: analysis.technologies.clone(),
-        build_tools: analysis.build_tools.clone(),
-        package_managers: analysis.package_managers.clone(),
-        deployment_configs: analysis.deployment_configs.clone(),
-    };
-
-    let technologies_json = serde_json::to_string(&detection_result)
-        .map_err(|e| AppError::Internal(format!("Failed to serialize technologies: {e}")))?;
-    updated_project.technologies = Some(technologies_json);
-
-    updated_project.update_timestamp();
-    updated_project.id = project_id;
-    data.database.update_project(&updated_project)?;
-
-    // Store detected components
-    for comp in analysis.components {
-        // Attach project_id
-        let component = crate::models::ProjectComponent::new(
-            updated_project.id,
-            comp.name,
-            comp.path,
-            comp.language,
-            comp.framework,
-        );
-        data.database.create_project_component(&component)?;
-    }
-
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
-        .broadcast_project_created(updated_project.clone());
+        .broadcast_project_created(project.clone());
 
     tracing::info!(
         "Successfully registered existing project '{}' at {}",
-        updated_project.name,
-        updated_project.path
+        project.name,
+        project.path
     );
 
     let response = ProjectResponse {
-        project: updated_project,
+        project,
     };
     Ok(HttpResponse::Created().json(response))
 }
@@ -1853,12 +1772,10 @@ pub async fn create_work(
         id: work.id,
         name: work.title.clone(),
         path: "".to_string(), // Works don't have a path like projects
-        language: None,
-        framework: None,
-        status: work.status.clone(),
+        description: None,
+        parent_id: None,
         created_at: work.created_at,
         updated_at: work.updated_at,
-        technologies: None,
     });
 
     tracing::info!(

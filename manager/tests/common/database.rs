@@ -97,10 +97,10 @@ mod tests {
             path: "/tmp/test-path".to_string(),
             language: Some("rust".to_string()),
             framework: Some("actix-web".to_string()),
-            status: "initialized".to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            technologies: None,
+            
         };
 
         // Insert project
@@ -133,11 +133,11 @@ mod tests {
                 name: "Cleanup Test".to_string(),
                 path: "/tmp/cleanup".to_string(),
                 language: Some("rust".to_string()),
-                framework: None,
-                status: "initialized".to_string(),
+                parent_id: None,
+                
                 created_at: chrono::Utc::now().timestamp(),
                 updated_at: chrono::Utc::now().timestamp(),
-                technologies: None,
+                
             };
             test_db.db().create_project(&project).unwrap();
         }

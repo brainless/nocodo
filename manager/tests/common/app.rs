@@ -359,10 +359,10 @@ impl TestApp {
             path: project_path.to_string_lossy().to_string(),
             language: Some("python".to_string()),
             framework: Some("django".to_string()),
-            status: "initialized".to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            technologies: None,
+            
         };
 
         self.db().create_project(&project)?;
@@ -445,11 +445,11 @@ mod tests {
             name: "Isolation Test".to_string(),
             path: "/tmp/isolation-test".to_string(),
             language: Some("rust".to_string()),
-            framework: None,
-            status: "initialized".to_string(),
+            parent_id: None,
+            
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            technologies: None,
+            
         };
 
         test_app1.db().create_project(&project).unwrap();

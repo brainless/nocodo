@@ -50,13 +50,12 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS projects (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  name TEXT NOT NULL,
-                 path TEXT NOT NULL,
-                 language TEXT,
-                 framework TEXT,
-                 status TEXT NOT NULL,
+                 path TEXT NOT NULL UNIQUE,
+                 description TEXT,
+                 parent_id INTEGER,
                  created_at INTEGER NOT NULL,
                  updated_at INTEGER NOT NULL,
-                 technologies TEXT
+                 FOREIGN KEY (parent_id) REFERENCES projects (id)
              )",
             [],
         )?;
@@ -66,6 +65,56 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)",
             [],
         )?;
+
+        // Migration: Add new columns if they don't exist (for existing databases)
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN description TEXT", []);
+        let _ = conn.execute("ALTER TABLE projects ADD COLUMN parent_id INTEGER REFERENCES projects(id)", []);
+
+        // Migration: Drop old columns if they exist (SQLite doesn't support DROP COLUMN before 3.35.0)
+        // We'll handle this by creating a new table and migrating data
+        let has_old_columns: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name IN ('language', 'framework', 'status', 'technologies')",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        if has_old_columns {
+            // Create new table with correct schema
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS projects_new (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     name TEXT NOT NULL,
+                     path TEXT NOT NULL UNIQUE,
+                     description TEXT,
+                     parent_id INTEGER,
+                     created_at INTEGER NOT NULL,
+                     updated_at INTEGER NOT NULL,
+                     FOREIGN KEY (parent_id) REFERENCES projects (id)
+                 )",
+                [],
+            )?;
+
+            // Copy data from old table to new table
+            conn.execute(
+                "INSERT INTO projects_new (id, name, path, description, parent_id, created_at, updated_at)
+                 SELECT id, name, path, NULL, NULL, created_at, updated_at FROM projects",
+                [],
+            )?;
+
+            // Drop old table
+            conn.execute("DROP TABLE projects", [])?;
+
+            // Rename new table to old table name
+            conn.execute("ALTER TABLE projects_new RENAME TO projects", [])?;
+
+            // Recreate index
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)",
+                [],
+            )?;
+        }
 
         // Create AI sessions table - now links to Work and Message instead of storing prompt directly
         conn.execute(
@@ -360,8 +409,8 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, language, framework, status, created_at, updated_at, technologies 
-             FROM projects ORDER BY created_at DESC",
+            "SELECT id, name, path, description, parent_id, created_at, updated_at
+             FROM projects WHERE parent_id IS NULL ORDER BY created_at DESC",
         )?;
 
         let project_iter = stmt.query_map([], |row| {
@@ -369,12 +418,10 @@ impl Database {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 path: row.get(2)?,
-                language: row.get(3)?,
-                framework: row.get(4)?,
-                status: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-                technologies: row.get(8)?,
+                description: row.get(3)?,
+                parent_id: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         })?;
 
@@ -393,7 +440,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, language, framework, status, created_at, updated_at, technologies 
+            "SELECT id, name, path, description, parent_id, created_at, updated_at
              FROM projects WHERE id = ?",
         )?;
 
@@ -403,12 +450,10 @@ impl Database {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     path: row.get(2)?,
-                    language: row.get(3)?,
-                    framework: row.get(4)?,
-                    status: row.get(5)?,
-                    created_at: row.get(6)?,
-                    updated_at: row.get(7)?,
-                    technologies: row.get(8)?,
+                    description: row.get(3)?,
+                    parent_id: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
                 })
             })
             .map_err(|e| match e {
@@ -426,7 +471,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, path, language, framework, status, created_at, updated_at, technologies 
+            "SELECT id, name, path, description, parent_id, created_at, updated_at
              FROM projects WHERE path = ?",
         )?;
 
@@ -436,12 +481,10 @@ impl Database {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     path: row.get(2)?,
-                    language: row.get(3)?,
-                    framework: row.get(4)?,
-                    status: row.get(5)?,
-                    created_at: row.get(6)?,
-                    updated_at: row.get(7)?,
-                    technologies: row.get(8)?,
+                    description: row.get(3)?,
+                    parent_id: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
                 })
             })
             .map_err(|e| match e {
@@ -467,18 +510,16 @@ impl Database {
         };
 
         conn.execute(
-            "INSERT INTO projects (id, name, path, language, framework, status, created_at, updated_at, technologies)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (id, name, path, description, parent_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             params![
                 id_param,
                 project.name,
                 project.path,
-                project.language,
-                project.framework,
-                project.status,
+                project.description,
+                project.parent_id,
                 project.created_at,
                 project.updated_at,
-                project.technologies,
             ],
         )?;
 
@@ -495,16 +536,13 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let rows_affected = conn.execute(
-            "UPDATE projects SET name = ?, path = ?, language = ?, framework = ?, 
-             status = ?, updated_at = ?, technologies = ? WHERE id = ?",
+            "UPDATE projects SET name = ?, path = ?, description = ?, parent_id = ?, updated_at = ? WHERE id = ?",
             params![
                 project.name,
                 project.path,
-                project.language,
-                project.framework,
-                project.status,
+                project.description,
+                project.parent_id,
                 project.updated_at,
-                project.technologies,
                 project.id
             ],
         )?;

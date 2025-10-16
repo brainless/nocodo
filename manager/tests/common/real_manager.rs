@@ -85,7 +85,7 @@ impl RealManagerInstance {
             }
 
             return Err(anyhow::anyhow!(
-                "Manager process exited with status: {}",
+                "Manager process exited with 
                 status
             ));
         }

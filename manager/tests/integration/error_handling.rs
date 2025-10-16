@@ -81,8 +81,8 @@ async fn test_project_creation_errors() {
     let invalid_template_request = CreateProjectRequest {
         name: "invalid-template-project".to_string(),
         path: Some("/tmp/invalid-template".to_string()),
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: Some("non-existent-template".to_string()),
     };
 
@@ -513,11 +513,11 @@ async fn test_database_constraint_errors() {
         name: "different-name".to_string(),
         path: "/tmp/different-path".to_string(),
         language: Some("javascript".to_string()),
-        framework: None,
-        status: "initialized".to_string(),
+        parent_id: None,
+        
         created_at: chrono::Utc::now().timestamp(),
         updated_at: chrono::Utc::now().timestamp(),
-        technologies: None,
+        
     };
 
     // This should fail at the database level

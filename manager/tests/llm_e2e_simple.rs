@@ -93,7 +93,7 @@ async fn test_simple_llm_e2e() {
         title: "Test Work".to_string(),
         tool_name: Some("llm_e2e_test".to_string()),
         model: Some("gpt-5".to_string()),
-        status: "active".to_string(),
+        
         project_id: None,
         created_at: chrono::Utc::now().timestamp(),
         updated_at: chrono::Utc::now().timestamp(),
@@ -135,7 +135,7 @@ async fn test_simple_llm_e2e() {
         .to_request();
 
     let resp = test::call_service(&app, req).await;
-    println!("📊 LLM session creation status: {}", resp.status());
+    println!("📊 LLM session creation  resp.status());
 
     let is_success = resp.status().is_success();
     if !is_success {

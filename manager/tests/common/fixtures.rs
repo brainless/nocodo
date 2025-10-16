@@ -29,10 +29,10 @@ impl TestDataGenerator {
             path,
             language: Some("rust".to_string()),
             framework: Some("actix-web".to_string()),
-            status: "initialized".to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            technologies: Some(r#"{"primary_language":"rust","technologies":["actix-web"],"build_tools":["cargo"],"package_managers":[],"deployment_configs":[]}"#.to_string()),
+            "technologies":["actix-web"],"build_tools":["cargo"],"package_managers":[],"deployment_configs":[]}"#.to_string()),
         }
     }
 
@@ -42,7 +42,7 @@ impl TestDataGenerator {
         path: &str,
         language: Option<&str>,
         framework: Option<&str>,
-        status: Option<&str>,
+        
     ) -> Project {
         Project {
             id: get_unique_id("project"),
@@ -50,10 +50,10 @@ impl TestDataGenerator {
             path: path.to_string(),
             language: language.map(|s| s.to_string()),
             framework: framework.map(|s| s.to_string()),
-            status: status.unwrap_or("initialized").to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            technologies: None,
+            
         }
     }
 
@@ -67,7 +67,7 @@ impl TestDataGenerator {
             project_id,
             tool_name: Some("test-tool".to_string()),
             model: Some("gpt-5".to_string()),
-            status: "active".to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
         }
@@ -99,7 +99,7 @@ impl TestDataGenerator {
             work_id,
             message_id,
             tool_name: tool_name.to_string(),
-            status: "running".to_string(),
+            
             project_context: Some("test context".to_string()),
             started_at: chrono::Utc::now().timestamp(),
             ended_at: None,
@@ -120,13 +120,13 @@ impl TestDataGenerator {
     pub fn create_ai_session_result(
         session_id: i64,
         response_message_id: i64,
-        status: &str,
+        
     ) -> AiSessionResult {
         AiSessionResult {
             id: get_unique_id("ai-result"),
             session_id,
             response_message_id,
-            status: status.to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             completed_at: Some(chrono::Utc::now().timestamp()),
         }
@@ -139,7 +139,7 @@ impl TestDataGenerator {
             work_id,
             provider: provider.to_string(),
             model: model.to_string(),
-            status: "running".to_string(),
+            
             system_prompt: Some("You are a helpful assistant.".to_string()),
             started_at: chrono::Utc::now().timestamp(),
             ended_at: None,
@@ -170,7 +170,7 @@ impl TestDataGenerator {
             tool_name: tool_name.to_string(),
             request,
             response: None,
-            status: "pending".to_string(),
+            
             created_at: chrono::Utc::now().timestamp(),
             completed_at: None,
             execution_time_ms: None,

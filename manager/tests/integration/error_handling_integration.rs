@@ -470,8 +470,8 @@ async fn test_resource_cleanup_on_errors() {
     let invalid_template_req = CreateProjectRequest {
         name: "cleanup-test-project".to_string(),
         path: Some("/tmp/cleanup-test-project".to_string()),
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: Some("non-existent-template".to_string()),
     };
 
