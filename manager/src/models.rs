@@ -45,45 +45,6 @@ pub struct ProjectComponent {
     pub created_at: i64,
 }
 
-impl ProjectComponent {
-    pub fn new(
-        project_id: i64,
-        name: String,
-        path: String,
-        language: String,
-        framework: Option<String>,
-    ) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: 0, // Will be set by database AUTOINCREMENT
-            project_id,
-            name,
-            path,
-            language,
-            framework,
-            created_at: now,
-        }
-    }
-}
-
-/// Enhanced technology information for a project
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectTechnology {
-    pub language: String,
-    pub framework: Option<String>,
-    pub file_count: u32,
-    pub confidence: f32, // 0.0 - 1.0
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectDetectionResult {
-    pub primary_language: String,
-    pub technologies: Vec<ProjectTechnology>,
-    pub build_tools: Vec<String>,
-    pub package_managers: Vec<String>,
-    pub deployment_configs: Vec<String>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectDetailsResponse {
     pub project: Project,

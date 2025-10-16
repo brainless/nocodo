@@ -575,35 +575,6 @@ impl Database {
     }
 
     // Project components methods
-    pub fn create_project_component(&self, component: &ProjectComponent) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let id_param = if component.id == 0 {
-            None
-        } else {
-            Some(component.id)
-        };
-
-        conn.execute(
-            "INSERT INTO project_components (id, project_id, name, path, language, framework, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
-            params![
-                id_param,
-                component.project_id,
-                component.name,
-                component.path,
-                component.language,
-                component.framework,
-                component.created_at
-            ],
-        )?;
-
-        Ok(())
-    }
-
     pub fn get_components_for_project(&self, project_id: i64) -> AppResult<Vec<ProjectComponent>> {
         let conn = self
             .connection

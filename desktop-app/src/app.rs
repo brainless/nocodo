@@ -234,27 +234,6 @@ impl DesktopApp {
         });
     }
 
-    fn disconnect(&mut self) {
-        self.connection_state = ConnectionState::Disconnected;
-        self.connected_host = None;
-
-        // Disconnect SSH tunnel if it exists
-        if let Some(mut tunnel) = self.tunnel.take() {
-            tokio::spawn(async move {
-                if let Err(e) = tunnel.disconnect().await {
-                    tracing::error!("Error disconnecting SSH tunnel: {}", e);
-                }
-            });
-        }
-
-        self.api_client = None;
-        self.projects.clear();
-        self.works.clear();
-        self.work_messages.clear();
-        self.ai_session_outputs.clear();
-        self.connection_error = None;
-    }
-
     fn refresh_projects(&mut self) {
         if self.connection_state == ConnectionState::Connected {
             if let Some(ref api_client) = self.api_client {
