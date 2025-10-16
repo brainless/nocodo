@@ -802,6 +802,8 @@ impl Database {
                 session_id: row.get(1)?,
                 content: row.get(2)?,
                 created_at: row.get(3)?,
+                role: None, // Old outputs don't have role information
+                model: None, // Old outputs don't have model information
             })
         })?;
 

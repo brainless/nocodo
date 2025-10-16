@@ -13,6 +13,10 @@ pub struct DesktopApp {
 
     // UI state
     show_connection_dialog: bool,
+    show_new_work_dialog: bool,
+    new_work_title: String,
+    new_work_project_id: Option<i64>,
+    new_work_model: String,
     connection_error: Option<String>,
     connected_host: Option<String>,
 
@@ -54,6 +58,11 @@ pub struct DesktopApp {
     #[serde(skip)]
     loading_ai_session_outputs: bool,
     #[serde(skip)]
+    creating_work: bool,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
+    #[serde(skip)]
     db: Option<Connection>,
 }
 
@@ -87,6 +96,10 @@ impl Default for DesktopApp {
             connection_state: ConnectionState::Disconnected,
             config: crate::config::DesktopConfig::default(),
             show_connection_dialog: false,
+            show_new_work_dialog: false,
+            new_work_title: String::new(),
+            new_work_project_id: None,
+            new_work_model: String::new(),
             connection_error: None,
             connected_host: None,
             projects: Vec::new(),
@@ -106,6 +119,8 @@ impl Default for DesktopApp {
             loading_works: false,
             loading_work_messages: false,
             loading_ai_session_outputs: false,
+            creating_work: false,
+            create_work_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
         }
     }
@@ -307,6 +322,37 @@ impl DesktopApp {
         }
     }
 
+    fn create_work(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.creating_work = true;
+                self.create_work_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.create_work_result);
+
+                let title = self.new_work_title.clone();
+                let project_id = self.new_work_project_id;
+                let model = if self.new_work_model.is_empty() {
+                    None
+                } else {
+                    Some(self.new_work_model.clone())
+                };
+
+                tokio::spawn(async move {
+                    let request = manager_models::CreateWorkRequest {
+                        title,
+                        project_id,
+                        model,
+                    };
+                    let result = api_client.create_work(request).await;
+                    let mut create_work_result = result_clone.lock().unwrap();
+                    *create_work_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
     /// Helper function to create a sidebar link with proper styling
     fn sidebar_link(
         &self,
@@ -463,6 +509,29 @@ impl eframe::App for DesktopApp {
             }
         }
 
+        // Check for create work results
+        if let Ok(mut result) = self.create_work_result.try_lock() {
+            if let Some(create_work_result) = result.take() {
+                self.creating_work = false;
+                match create_work_result {
+                    Ok(work) => {
+                        tracing::info!("Created work: {} ({})", work.title, work.id);
+                        // Add the new work to the list
+                        self.works.push(work);
+                        // Close the dialog and clear the form
+                        self.show_new_work_dialog = false;
+                        self.new_work_title.clear();
+                        self.new_work_project_id = None;
+                        self.new_work_model.clear();
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to create work: {}", e);
+                        self.connection_error = Some(format!("Failed to create work: {}", e));
+                    }
+                }
+            }
+        }
+
         // Auto-refresh projects and works after connection
         if should_refresh_projects {
             self.refresh_projects();
@@ -610,7 +679,14 @@ impl eframe::App for DesktopApp {
                     }
                 }
                 Page::Work => {
-                    ui.heading("Work");
+                    ui.horizontal(|ui| {
+                        ui.heading("Work");
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("+ New Work").clicked() {
+                                self.show_new_work_dialog = true;
+                            }
+                        });
+                    });
 
                     match &self.connection_state {
                         ConnectionState::Disconnected => {
@@ -870,7 +946,13 @@ impl eframe::App for DesktopApp {
                                                         .show(ui, |ui| {
                                                             ui.vertical(|ui| {
                                                                 ui.horizontal(|ui| {
-                                                                    ui.label(egui::RichText::new("AI").size(12.0).strong());
+                                                                    // Determine label based on role and model
+                                                                    let label = match (output.role.as_deref(), output.model.as_deref()) {
+                                                                        (Some("tool"), _) => "nocodo".to_string(),
+                                                                        (Some("assistant"), Some(model)) => format!("AI - {}", model),
+                                                                        _ => "AI".to_string(),
+                                                                    };
+                                                                    ui.label(egui::RichText::new(label).size(12.0).strong());
                                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                                         let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
                                                                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
@@ -962,6 +1044,57 @@ impl eframe::App for DesktopApp {
                             self.show_connection_dialog = false;
                         }
                     });
+                });
+        }
+
+        // New Work dialog
+        if self.show_new_work_dialog {
+            egui::Window::new("Create New Work")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label("Title:");
+                    ui.text_edit_singleline(&mut self.new_work_title);
+
+                    ui.label("Project (optional):");
+                    egui::ComboBox::from_label("")
+                        .selected_text(
+                            self.new_work_project_id
+                                .and_then(|id| self.projects.iter().find(|p| p.id == id))
+                                .map(|p| p.name.clone())
+                                .unwrap_or_else(|| "None".to_string()),
+                        )
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.new_work_project_id, None, "None");
+                            for project in &self.projects {
+                                ui.selectable_value(
+                                    &mut self.new_work_project_id,
+                                    Some(project.id),
+                                    &project.name,
+                                );
+                            }
+                        });
+
+                    ui.label("Model (optional):");
+                    ui.text_edit_singleline(&mut self.new_work_model);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Create").clicked() {
+                            if !self.new_work_title.trim().is_empty() {
+                                self.create_work();
+                            }
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.show_new_work_dialog = false;
+                            self.new_work_title.clear();
+                            self.new_work_project_id = None;
+                            self.new_work_model.clear();
+                        }
+                    });
+
+                    if self.creating_work {
+                        ui.add(egui::Spinner::new());
+                    }
                 });
         }
     }

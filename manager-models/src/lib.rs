@@ -188,6 +188,10 @@ pub struct AiSessionOutput {
     pub session_id: i64,
     pub content: String,
     pub created_at: i64,
+    /// Role of the message author: "assistant" for LLM responses, "tool" for tool responses
+    pub role: Option<String>,
+    /// Model name/ID used for this message (only for assistant messages)
+    pub model: Option<String>,
 }
 
 /// Represents an AI session result that stores the response in a WorkMessage

@@ -1,4 +1,6 @@
-use manager_models::{Project, ProjectListResponse, Work, WorkListResponse};
+use manager_models::{
+    CreateWorkRequest, Project, ProjectListResponse, Work, WorkListResponse, WorkResponse,
+};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiClient {
@@ -102,6 +104,28 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(outputs_response.outputs)
+    }
+
+    pub async fn create_work(&self, request: CreateWorkRequest) -> Result<Work, ApiError> {
+        let url = format!("{}/api/work", self.base_url);
+        let response = self
+            .client()
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let work_response: WorkResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(work_response.work)
     }
 }
 

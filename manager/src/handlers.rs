@@ -1172,6 +1172,12 @@ pub async fn list_ai_session_outputs(
                             session_id: session.id,
                             content: msg.content,
                             created_at: msg.created_at,
+                            role: Some(msg.role.clone()),
+                            model: if msg.role == "assistant" {
+                                Some(llm_agent_session.model.clone())
+                            } else {
+                                None
+                            },
                         };
                         outputs.push(output);
                     }
