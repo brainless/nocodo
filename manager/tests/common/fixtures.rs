@@ -108,6 +108,8 @@ impl TestDataGenerator {
             session_id,
             content: content.to_string(),
             created_at: chrono::Utc::now().timestamp(),
+            role: Some("assistant".to_string()),
+            model: Some("test-model".to_string()),
         }
     }
 

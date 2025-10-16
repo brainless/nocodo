@@ -77,9 +77,8 @@ mod isolation_tests {
             let project = TestDataGenerator::create_project_custom(
                 &format!("sequential-project-{}", i),
                 &format!("/tmp/sequential-project-{}", i),
-                Some("rust"),
-                Some("actix-web"),
-                Some("initialized"),
+                Some("Test project for sequential isolation"),
+                None,
             );
 
             test_app.db().create_project(&project).unwrap();
@@ -201,9 +200,8 @@ mod isolation_tests {
             let project = TestDataGenerator::create_project_custom(
                 &format!("perf-project-{}", i),
                 &format!("/tmp/perf-project-{}", i),
-                Some("rust"),
-                Some("actix-web"),
-                Some("initialized"),
+                Some("Performance test project"),
+                None,
             );
             test_app.db().create_project(&project).unwrap();
         }
