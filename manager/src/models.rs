@@ -6,13 +6,10 @@ pub struct Project {
     pub id: i64,
     pub name: String,
     pub path: String,
-    pub language: Option<String>,
-    pub framework: Option<String>,
-    pub status: String,
+    pub description: Option<String>,
+    pub parent_id: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
-    /// Enhanced technology detection - JSON serialized list of technologies
-    pub technologies: Option<String>,
 }
 
 impl Project {
@@ -22,12 +19,10 @@ impl Project {
             id: 0, // Will be set by database AUTOINCREMENT
             name,
             path,
-            language: None,
-            framework: None,
-            status: "created".to_string(),
+            description: None,
+            parent_id: None,
             created_at: now,
             updated_at: now,
-            technologies: None,
         }
     }
 
@@ -50,45 +45,6 @@ pub struct ProjectComponent {
     pub created_at: i64,
 }
 
-impl ProjectComponent {
-    pub fn new(
-        project_id: i64,
-        name: String,
-        path: String,
-        language: String,
-        framework: Option<String>,
-    ) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: 0, // Will be set by database AUTOINCREMENT
-            project_id,
-            name,
-            path,
-            language,
-            framework,
-            created_at: now,
-        }
-    }
-}
-
-/// Enhanced technology information for a project
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectTechnology {
-    pub language: String,
-    pub framework: Option<String>,
-    pub file_count: u32,
-    pub confidence: f32, // 0.0 - 1.0
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectDetectionResult {
-    pub primary_language: String,
-    pub technologies: Vec<ProjectTechnology>,
-    pub build_tools: Vec<String>,
-    pub package_managers: Vec<String>,
-    pub deployment_configs: Vec<String>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectDetailsResponse {
     pub project: Project,
@@ -99,8 +55,8 @@ pub struct ProjectDetailsResponse {
 pub struct CreateProjectRequest {
     pub name: String,
     pub path: Option<String>,
-    pub language: Option<String>,
-    pub framework: Option<String>,
+    pub description: Option<String>,
+    pub parent_id: Option<i64>,
     pub template: Option<String>,
 }
 
@@ -252,8 +208,8 @@ pub struct AiSessionInputRequest {
 pub struct AddExistingProjectRequest {
     pub name: String,
     pub path: String, // Required - must be existing directory
-    pub language: Option<String>,
-    pub framework: Option<String>,
+    pub description: Option<String>,
+    pub parent_id: Option<i64>,
 }
 
 // File operation models
@@ -285,9 +241,9 @@ pub struct FileListRequest {
 pub struct FileListResponse {
     pub files: Vec<FileInfo>, // List of files and directories
     pub current_path: String, // Current directory being listed
-    pub total_files: u32, // Total number of files found
+    pub total_files: u32,     // Total number of files found
     pub truncated: bool,      // Whether results were limited to 100
-    pub limit: u32, // Maximum files returned (100)
+    pub limit: u32,           // Maximum files returned (100)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

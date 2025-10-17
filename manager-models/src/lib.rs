@@ -8,13 +8,10 @@ pub struct Project {
     pub id: i64,
     pub name: String,
     pub path: String,
-    pub language: Option<String>,
-    pub framework: Option<String>,
-    pub status: String,
+    pub description: Option<String>,
+    pub parent_id: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
-    /// Enhanced technology detection - JSON serialized list of technologies
-    pub technologies: Option<String>,
 }
 
 impl Project {
@@ -24,12 +21,10 @@ impl Project {
             id: 0, // Will be set by database AUTOINCREMENT
             name,
             path,
-            language: None,
-            framework: None,
-            status: "created".to_string(),
+            description: None,
+            parent_id: None,
             created_at: now,
             updated_at: now,
-            technologies: None,
         }
     }
 
@@ -287,9 +282,9 @@ pub struct FileListRequest {
 pub struct FileListResponse {
     pub files: Vec<FileInfo>, // List of files and directories
     pub current_path: String, // Current directory being listed
-    pub total_files: u32, // Total number of files found
+    pub total_files: u32,     // Total number of files found
     pub truncated: bool,      // Whether results were limited to 100
-    pub limit: u32, // Maximum files returned (100)
+    pub limit: u32,           // Maximum files returned (100)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

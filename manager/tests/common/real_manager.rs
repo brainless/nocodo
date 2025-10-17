@@ -85,7 +85,7 @@ impl RealManagerInstance {
             }
 
             return Err(anyhow::anyhow!(
-                "Manager process exited with status: {}",
+                "Manager process exited with status: {:?}",
                 status
             ));
         }
@@ -146,9 +146,9 @@ path = "{}"
             config.db_path().display(),
             config.temp_dir_path().join("test.sock").display(),
             match llm_provider.name.as_str() {
-                "xai" => format!("xai_api_key = \"{}\"", api_key),
-                "openai" => format!("openai_api_key = \"{}\"", api_key),
-                "anthropic" => format!("anthropic_api_key = \"{}\"", api_key),
+                "xai" => format!(r#"xai_api_key = "{}""#, api_key),
+                "openai" => format!(r#"openai_api_key = "{}""#, api_key),
+                "anthropic" => format!(r#"anthropic_api_key = "{}""#, api_key),
                 _ => return Err(anyhow::anyhow!("Unknown provider: {}", llm_provider.name)),
             }
         );

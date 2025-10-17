@@ -95,12 +95,10 @@ mod tests {
             id: 1,
             name: "Test Project".to_string(),
             path: "/tmp/test-path".to_string(),
-            language: Some("rust".to_string()),
-            framework: Some("actix-web".to_string()),
-            status: "initialized".to_string(),
+            description: None,
+            parent_id: None,
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            technologies: None,
         };
 
         // Insert project
@@ -109,7 +107,6 @@ mod tests {
         // Retrieve project
         let retrieved = test_db.db().get_project_by_id(1).unwrap();
         assert_eq!(retrieved.name, "Test Project");
-        assert_eq!(retrieved.language, Some("rust".to_string()));
 
         // List all projects
         let projects = test_db.db().get_all_projects().unwrap();
@@ -132,12 +129,10 @@ mod tests {
                 id: 2,
                 name: "Cleanup Test".to_string(),
                 path: "/tmp/cleanup".to_string(),
-                language: Some("rust".to_string()),
-                framework: None,
-                status: "initialized".to_string(),
+                description: None,
+                parent_id: None,
                 created_at: chrono::Utc::now().timestamp(),
                 updated_at: chrono::Utc::now().timestamp(),
-                technologies: None,
             };
             test_db.db().create_project(&project).unwrap();
         }

@@ -140,11 +140,8 @@ fn run_test_mode(
                         for (i, project) in projects.iter().enumerate() {
                             println!("  {}. {}", i + 1, project.name);
                             println!("     Path: {}", project.path);
-                            if let Some(language) = &project.language {
-                                println!("     Language: {}", language);
-                            }
-                            if let Some(framework) = &project.framework {
-                                println!("     Framework: {}", framework);
+                            if let Some(description) = &project.description {
+                                println!("     Description: {}", description);
                             }
                             println!();
                         }

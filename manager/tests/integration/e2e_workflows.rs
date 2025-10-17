@@ -19,8 +19,8 @@ async fn test_complete_project_creation_workflow() {
     let create_project_req = CreateProjectRequest {
         name: "e2e-project".to_string(),
         path: Some(project_temp_dir.to_string_lossy().to_string()),
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: Some("rust-web-api".to_string()),
     };
 

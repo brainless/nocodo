@@ -104,8 +104,8 @@ async fn test_create_project() {
     let create_request = CreateProjectRequest {
         name: "test-project".to_string(),
         path: Some(project_path.to_string_lossy().to_string()),
-        language: Some("rust".to_string()),
-        framework: Some("actix-web".to_string()),
+        description: None,
+        parent_id: None,
         template: None,
     };
 
@@ -127,8 +127,6 @@ async fn test_create_project() {
         );
         panic!("Request failed with status: {status}");
     }
-    
-    
 
     assert!(status.is_success());
     assert_eq!(status, 201); // Created
@@ -136,9 +134,6 @@ async fn test_create_project() {
 
     assert_eq!(project["name"], "test-project");
     assert_eq!(project["path"], project_path.to_string_lossy().to_string());
-    assert_eq!(project["language"], "rust");
-    assert_eq!(project["framework"], "actix-web");
-    assert_eq!(project["status"], "initialized");
     assert!(project["id"].as_u64().is_some());
     assert!(project["created_at"].as_i64().is_some());
     assert!(project["updated_at"].as_i64().is_some());
@@ -174,8 +169,8 @@ async fn test_create_project_with_default_path() {
     let create_request = CreateProjectRequest {
         name: "default-path-project".to_string(),
         path: Some(default_path_project_dir.to_string_lossy().to_string()),
-        language: Some("javascript".to_string()),
-        framework: None,
+        description: None,
+        parent_id: None,
         template: None,
     };
 
@@ -204,8 +199,6 @@ async fn test_create_project_with_default_path() {
     let project = &body["project"];
 
     assert_eq!(project["name"], "default-path-project");
-    assert_eq!(project["language"], "javascript");
-    assert!(project["framework"].is_null());
     // Path should contain the project name
     assert!(project["path"]
         .as_str()
@@ -238,8 +231,8 @@ async fn test_create_project_invalid_name() {
     let create_request = CreateProjectRequest {
         name: "   ".to_string(), // Empty/whitespace name
         path: None,
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: None,
     };
 
@@ -292,8 +285,8 @@ async fn test_get_projects_after_creation() {
                 .to_string_lossy()
                 .to_string(),
         ),
-        language: Some("python".to_string()),
-        framework: Some("django".to_string()),
+        description: None,
+        parent_id: None,
         template: None,
     };
 
@@ -317,8 +310,6 @@ async fn test_get_projects_after_creation() {
 
     let project = &projects[0];
     assert_eq!(project["name"], "list-test-project");
-    assert_eq!(project["language"], "python");
-    assert_eq!(project["framework"], "django");
 }
 
 #[actix_rt::test]
@@ -343,13 +334,13 @@ async fn test_technology_detection_for_rust_project() {
     )
     .await;
 
-    // Create a project without specifying language/framework to trigger detection
+    // Create a project with rust template
     let project_path = temp_dir.path().join("rust-detection-test");
     let create_request = CreateProjectRequest {
         name: "rust-detection-test".to_string(),
         path: Some(project_path.to_string_lossy().to_string()),
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: Some("rust-web-api".to_string()),
     };
 
@@ -364,23 +355,6 @@ async fn test_technology_detection_for_rust_project() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let project = &body["project"];
 
-    // Verify detection worked
+    // Verify project was created
     assert_eq!(project["name"], "rust-detection-test");
-    assert_eq!(project["language"], "rust");
-    assert_eq!(project["framework"], "actix-web");
-    // Technologies field should be present
-    assert!(project["technologies"].is_string() || project["technologies"].is_null());
-
-    // If technologies is a string, parse it to verify structure
-    if project["technologies"].is_string() {
-        let technologies_str = project["technologies"].as_str().unwrap();
-        let detection_result: serde_json::Value = serde_json::from_str(technologies_str).unwrap();
-
-        // Verify the detection result has the expected fields
-        assert!(detection_result["primary_language"].is_string());
-        assert!(detection_result["technologies"].is_array());
-        assert!(detection_result["build_tools"].is_array());
-        assert!(detection_result["package_managers"].is_array());
-        assert!(detection_result["deployment_configs"].is_array());
-    }
 }

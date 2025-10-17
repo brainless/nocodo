@@ -234,27 +234,6 @@ impl DesktopApp {
         });
     }
 
-    fn disconnect(&mut self) {
-        self.connection_state = ConnectionState::Disconnected;
-        self.connected_host = None;
-
-        // Disconnect SSH tunnel if it exists
-        if let Some(mut tunnel) = self.tunnel.take() {
-            tokio::spawn(async move {
-                if let Err(e) = tunnel.disconnect().await {
-                    tracing::error!("Error disconnecting SSH tunnel: {}", e);
-                }
-            });
-        }
-
-        self.api_client = None;
-        self.projects.clear();
-        self.works.clear();
-        self.work_messages.clear();
-        self.ai_session_outputs.clear();
-        self.connection_error = None;
-    }
-
     fn refresh_projects(&mut self) {
         if self.connection_state == ConnectionState::Connected {
             if let Some(ref api_client) = self.api_client {
@@ -424,7 +403,7 @@ impl eframe::App for DesktopApp {
                         if let Some(ref db) = self.db {
                             db.execute(
                                  "INSERT OR IGNORE INTO servers (host, user, key_path) VALUES (?1, ?2, ?3)",
-                                 &[&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
+                                 [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
                              ).expect("Could not insert server");
                         }
                         // Mark that we should refresh projects after this block
@@ -656,18 +635,10 @@ impl eframe::App for DesktopApp {
                                                     // Project path - smaller, muted color
                                                     ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
 
-                                                    // Language badge if present
-                                                    if let Some(language) = &project.language {
+                                                    // Description if present
+                                                    if let Some(description) = &project.description {
                                                         ui.add_space(6.0);
-                                                        ui.horizontal(|ui| {
-                                                            egui::Frame::NONE
-                                                                .fill(ui.style().visuals.selection.bg_fill)
-                                                                .corner_radius(4.0)
-                                                                .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                .show(ui, |ui| {
-                                                                    ui.label(egui::RichText::new(language).size(11.0));
-                                                                });
-                                                        });
+                                                        ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
                                                     }
                                                 });
                                             });
@@ -1079,11 +1050,10 @@ impl eframe::App for DesktopApp {
                     ui.text_edit_singleline(&mut self.new_work_model);
 
                     ui.horizontal(|ui| {
-                        if ui.button("Create").clicked() {
-                            if !self.new_work_title.trim().is_empty() {
+                        if ui.button("Create").clicked()
+                            && !self.new_work_title.trim().is_empty() {
                                 self.create_work();
                             }
-                        }
                         if ui.button("Cancel").clicked() {
                             self.show_new_work_dialog = false;
                             self.new_work_title.clear();

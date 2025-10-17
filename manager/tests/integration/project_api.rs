@@ -68,8 +68,8 @@ async fn test_create_project_with_template() {
     let create_request = CreateProjectRequest {
         name: "template-test-project".to_string(),
         path: Some(project_temp_dir.to_string_lossy().to_string()),
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: Some("rust-web-api".to_string()),
     };
 
@@ -103,7 +103,7 @@ async fn test_create_project_default_path() {
         name: "default-path-project".to_string(),
         path: None, // Should use default path logic
         language: Some("javascript".to_string()),
-        framework: None,
+        parent_id: None,
         template: None,
     };
 
@@ -135,7 +135,7 @@ async fn test_create_project_invalid_name() {
         name: "   ".to_string(), // Invalid: whitespace only
         path: Some("/tmp/test".to_string()),
         language: Some("rust".to_string()),
-        framework: None,
+        parent_id: None,
         template: None,
     };
 
@@ -166,7 +166,7 @@ async fn test_create_project_duplicate_path() {
         name: "duplicate-path-project-1".to_string(),
         path: Some(project_path.to_string_lossy().to_string()),
         language: Some("rust".to_string()),
-        framework: None,
+        parent_id: None,
         template: None,
     };
 
@@ -183,7 +183,7 @@ async fn test_create_project_duplicate_path() {
         name: "duplicate-path-project-2".to_string(),
         path: Some(project_path.to_string_lossy().to_string()),
         language: Some("rust".to_string()),
-        framework: None,
+        parent_id: None,
         template: None,
     };
 
@@ -288,8 +288,8 @@ async fn test_project_technology_detection() {
     let create_request = CreateProjectRequest {
         name: "tech-detection-test".to_string(),
         path: Some(project_temp_dir.to_string_lossy().to_string()),
-        language: None,
-        framework: None,
+        description: None,
+        parent_id: None,
         template: None,
     };
 
