@@ -114,10 +114,7 @@ impl TestDataGenerator {
     }
 
     /// Create a test AI session result
-    pub fn create_ai_session_result(
-        session_id: i64,
-        response_message_id: i64,
-    ) -> AiSessionResult {
+    pub fn create_ai_session_result(session_id: i64, response_message_id: i64) -> AiSessionResult {
         AiSessionResult {
             id: get_unique_id("ai-result"),
             session_id,

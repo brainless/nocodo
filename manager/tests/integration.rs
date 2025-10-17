@@ -127,8 +127,6 @@ async fn test_create_project() {
         );
         panic!("Request failed with status: {status}");
     }
-    
-    
 
     assert!(status.is_success());
     assert_eq!(status, 201); // Created

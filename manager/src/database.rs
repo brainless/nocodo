@@ -68,7 +68,10 @@ impl Database {
 
         // Migration: Add new columns if they don't exist (for existing databases)
         let _ = conn.execute("ALTER TABLE projects ADD COLUMN description TEXT", []);
-        let _ = conn.execute("ALTER TABLE projects ADD COLUMN parent_id INTEGER REFERENCES projects(id)", []);
+        let _ = conn.execute(
+            "ALTER TABLE projects ADD COLUMN parent_id INTEGER REFERENCES projects(id)",
+            [],
+        );
 
         // Migration: Drop old columns if they exist (SQLite doesn't support DROP COLUMN before 3.35.0)
         // We'll handle this by creating a new table and migrating data
@@ -811,7 +814,7 @@ impl Database {
                 session_id: row.get(1)?,
                 content: row.get(2)?,
                 created_at: row.get(3)?,
-                role: None, // Old outputs don't have role information
+                role: None,  // Old outputs don't have role information
                 model: None, // Old outputs don't have model information
             })
         })?;

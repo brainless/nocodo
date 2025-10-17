@@ -98,10 +98,11 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let outputs_response: manager_models::AiSessionOutputListResponse = response
-            .json()
-            .await
-            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+        let outputs_response: manager_models::AiSessionOutputListResponse =
+            response
+                .json()
+                .await
+                .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(outputs_response.outputs)
     }

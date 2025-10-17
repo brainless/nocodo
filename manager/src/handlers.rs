@@ -240,9 +240,7 @@ A new project created with nocodo.
         project.path
     );
 
-    let response = ProjectResponse {
-        project,
-    };
+    let response = ProjectResponse { project };
     Ok(HttpResponse::Created().json(response))
 }
 
@@ -489,9 +487,7 @@ pub async fn add_existing_project(
         project.path
     );
 
-    let response = ProjectResponse {
-        project,
-    };
+    let response = ProjectResponse { project };
     Ok(HttpResponse::Created().json(response))
 }
 

@@ -403,7 +403,7 @@ impl eframe::App for DesktopApp {
                         if let Some(ref db) = self.db {
                             db.execute(
                                  "INSERT OR IGNORE INTO servers (host, user, key_path) VALUES (?1, ?2, ?3)",
-                                 &[&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
+                                 [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
                              ).expect("Could not insert server");
                         }
                         // Mark that we should refresh projects after this block
@@ -1050,11 +1050,10 @@ impl eframe::App for DesktopApp {
                     ui.text_edit_singleline(&mut self.new_work_model);
 
                     ui.horizontal(|ui| {
-                        if ui.button("Create").clicked() {
-                            if !self.new_work_title.trim().is_empty() {
+                        if ui.button("Create").clicked()
+                            && !self.new_work_title.trim().is_empty() {
                                 self.create_work();
                             }
-                        }
                         if ui.button("Cancel").clicked() {
                             self.show_new_work_dialog = false;
                             self.new_work_title.clear();

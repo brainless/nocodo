@@ -245,7 +245,7 @@ impl SocketServer {
                                 message: format!("Session not found: {session_id}"),
                             }
                         }
-                    }
+                    },
                     Err(_) => SocketResponse::Error {
                         message: format!("Invalid session ID: {session_id}"),
                     },
@@ -281,7 +281,7 @@ impl SocketServer {
                                 message: format!("Session not found: {session_id}"),
                             }
                         }
-                    }
+                    },
                     Err(_) => SocketResponse::Error {
                         message: format!("Invalid session ID: {session_id}"),
                     },
@@ -299,18 +299,20 @@ impl SocketServer {
                     Ok(session_id_int) => {
                         // Ensure session exists
                         match database.get_ai_session_by_id(session_id_int) {
-                            Ok(_session) => match database.create_ai_session_output(session_id_int, &output) {
-                                Ok(()) => {
-                                    let data = serde_json::json!({ "ok": true, "session_id": session_id });
-                                    SocketResponse::Success { data }
-                                }
-                                Err(e) => {
-                                    error!("Failed to record AI output: {}", e);
-                                    SocketResponse::Error {
-                                        message: format!("Failed to record output: {e}"),
+                            Ok(_session) => {
+                                match database.create_ai_session_output(session_id_int, &output) {
+                                    Ok(()) => {
+                                        let data = serde_json::json!({ "ok": true, "session_id": session_id });
+                                        SocketResponse::Success { data }
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to record AI output: {}", e);
+                                        SocketResponse::Error {
+                                            message: format!("Failed to record output: {e}"),
+                                        }
                                     }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 error!("AI session not found for recording output: {}", e);
                                 SocketResponse::Error {

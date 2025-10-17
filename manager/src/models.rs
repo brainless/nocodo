@@ -241,9 +241,9 @@ pub struct FileListRequest {
 pub struct FileListResponse {
     pub files: Vec<FileInfo>, // List of files and directories
     pub current_path: String, // Current directory being listed
-    pub total_files: u32, // Total number of files found
+    pub total_files: u32,     // Total number of files found
     pub truncated: bool,      // Whether results were limited to 100
-    pub limit: u32, // Maximum files returned (100)
+    pub limit: u32,           // Maximum files returned (100)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
