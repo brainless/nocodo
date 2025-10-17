@@ -769,33 +769,43 @@ impl eframe::App for DesktopApp {
                             } else {
                                  egui::ScrollArea::vertical().show(ui, |ui| {
                                      ui.add_space(8.0);
-                                     for project in &self.projects {
-                                         // Project card that uses full available width
-                                         ui.allocate_ui(ui.available_size(), |ui| {
-                                             egui::Frame::NONE
-                                                 .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                                 .corner_radius(8.0)
-                                                 .inner_margin(egui::Margin::same(12))
-                                                 .show(ui, |ui| {
-                                                     ui.vertical(|ui| {
-                                                         // Project name - larger and bold
-                                                         ui.label(egui::RichText::new(&project.name).size(16.0).strong());
 
-                                                         ui.add_space(4.0);
+                                     let card_width = 300.0;
+                                     let card_height = 100.0;
+                                     let card_spacing = 10.0;
 
-                                                         // Project path - smaller, muted color
-                                                         ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
+                                     // Set spacing between items
+                                     ui.spacing_mut().item_spacing = egui::Vec2::new(card_spacing, card_spacing);
 
-                                                         // Description if present
-                                                         if let Some(description) = &project.description {
-                                                             ui.add_space(6.0);
-                                                             ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
-                                                         }
+                                     // Use horizontal_wrapped to create a responsive grid
+                                     ui.horizontal_wrapped(|ui| {
+                                         for project in &self.projects {
+                                             // Use allocate_ui with fixed size to enable proper wrapping
+                                             ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
+                                                 egui::Frame::NONE
+                                                     .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                                     .corner_radius(8.0)
+                                                     .inner_margin(egui::Margin::same(12))
+                                                     .show(ui, |ui| {
+                                                         ui.vertical(|ui| {
+                                                             // Project name - larger and bold
+                                                             ui.label(egui::RichText::new(&project.name).size(16.0).strong());
+
+                                                             ui.add_space(4.0);
+
+                                                             // Project path - smaller, muted color
+                                                             ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
+
+                                                             // Description if present
+                                                             if let Some(description) = &project.description {
+                                                                 ui.add_space(6.0);
+                                                                 ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
+                                                             }
+                                                         });
                                                      });
-                                                 });
-                                         });
-                                         ui.add_space(8.0);
-                                     }
+                                             });
+                                         }
+                                     });
                                  });
                             }
                         }
