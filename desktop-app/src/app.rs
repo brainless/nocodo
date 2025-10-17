@@ -26,6 +26,7 @@ pub struct DesktopApp {
     work_messages: Vec<manager_models::WorkMessage>,
     ai_session_outputs: Vec<manager_models::AiSessionOutput>,
     servers: Vec<Server>,
+    settings: Option<manager_models::SettingsResponse>,
     current_page: Page,
 
     // Runtime state (not serialized)
@@ -50,6 +51,9 @@ pub struct DesktopApp {
     ai_session_outputs_result:
         Arc<std::sync::Mutex<Option<Result<Vec<manager_models::AiSessionOutput>, String>>>>,
     #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    settings_result: Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
+    #[serde(skip)]
     loading_projects: bool,
     #[serde(skip)]
     loading_works: bool,
@@ -57,6 +61,8 @@ pub struct DesktopApp {
     loading_work_messages: bool,
     #[serde(skip)]
     loading_ai_session_outputs: bool,
+    #[serde(skip)]
+    loading_settings: bool,
     #[serde(skip)]
     creating_work: bool,
     #[serde(skip)]
@@ -107,6 +113,7 @@ impl Default for DesktopApp {
             work_messages: Vec::new(),
             ai_session_outputs: Vec::new(),
             servers: Vec::new(),
+            settings: None,
             current_page: Page::Projects,
             tunnel: None,
             api_client: None,
@@ -115,10 +122,12 @@ impl Default for DesktopApp {
             works_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
+            settings_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
             loading_works: false,
             loading_work_messages: false,
             loading_ai_session_outputs: false,
+            loading_settings: false,
             creating_work: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
@@ -265,6 +274,24 @@ impl DesktopApp {
                     let result = api_client.list_works().await;
                     let mut works_result = result_clone.lock().unwrap();
                     *works_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
+    fn refresh_settings(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.loading_settings = true;
+                self.settings_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.settings_result);
+
+                tokio::spawn(async move {
+                    let result = api_client.get_settings().await;
+                    let mut settings_result = result_clone.lock().unwrap();
+                    *settings_result = Some(result.map_err(|e| e.to_string()));
                 });
             }
         }
@@ -470,21 +497,37 @@ impl eframe::App for DesktopApp {
             }
         }
 
-        // Check for AI session outputs results
-        if let Ok(mut result) = self.ai_session_outputs_result.try_lock() {
-            if let Some(ai_session_outputs_result) = result.take() {
-                self.loading_ai_session_outputs = false;
-                match ai_session_outputs_result {
-                    Ok(outputs) => {
-                        tracing::info!("Loaded {} AI session outputs", outputs.len());
-                        self.ai_session_outputs = outputs;
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to load AI session outputs: {}", e);
-                        self.connection_error =
-                            Some(format!("Failed to load AI session outputs: {}", e));
-                    }
-                }
+         // Check for AI session outputs results
+         if let Ok(mut result) = self.ai_session_outputs_result.try_lock() {
+             if let Some(ai_session_outputs_result) = result.take() {
+                 self.loading_ai_session_outputs = false;
+                 match ai_session_outputs_result {
+                     Ok(outputs) => {
+                         tracing::info!("Loaded {} AI session outputs", outputs.len());
+                         self.ai_session_outputs = outputs;
+                     }
+                     Err(e) => {
+                         tracing::error!("Failed to load AI session outputs: {}", e);
+                         self.connection_error = Some(format!("Failed to load AI session outputs: {}", e));
+                               }
+                           }
+                       }
+                 }
+
+         // Check for settings results
+         if let Ok(mut result) = self.settings_result.try_lock() {
+             if let Some(settings_result) = result.take() {
+                 self.loading_settings = false;
+                  match settings_result {
+                      Ok(settings) => {
+                          tracing::info!("Loaded settings");
+                          self.settings = Some(settings);
+                      }
+                      Err(e) => {
+                          tracing::error!("Failed to load settings: {}", e);
+                          self.connection_error = Some(format!("Failed to load settings: {}", e));
+                      }
+                  }
             }
         }
 
@@ -511,11 +554,12 @@ impl eframe::App for DesktopApp {
             }
         }
 
-        // Auto-refresh projects and works after connection
-        if should_refresh_projects {
-            self.refresh_projects();
-            self.refresh_works();
-        }
+         // Auto-refresh projects, works, and settings after connection
+         if should_refresh_projects {
+             self.refresh_projects();
+             self.refresh_works();
+             self.refresh_settings();
+         }
 
         // Connection status bar
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
@@ -984,10 +1028,62 @@ impl eframe::App for DesktopApp {
                         });
                     }
                 }
-                Page::Settings => {
-                    ui.heading("Settings");
-                    ui.label("Dummy Settings page");
-                }
+                 Page::Settings => {
+                     ui.heading("Settings");
+
+                     match &self.connection_state {
+                         ConnectionState::Disconnected => {
+                             ui.vertical_centered(|ui| {
+                                 ui.label("Not connected to server");
+                                 if ui.button("Connect").clicked() {
+                                     self.show_connection_dialog = true;
+                                 }
+                             });
+                         }
+                         ConnectionState::Connecting => {
+                             ui.vertical_centered(|ui| {
+                                 ui.label("Connecting...");
+                                 ui.add(egui::Spinner::new());
+                             });
+                         }
+                         ConnectionState::Connected => {
+                             if self.loading_settings {
+                                 ui.vertical_centered(|ui| {
+                                     ui.label("Loading settings...");
+                                     ui.add(egui::Spinner::new());
+                                 });
+                             } else if let Some(settings) = &self.settings {
+                                 ui.heading("API Keys");
+
+                                 egui::ScrollArea::vertical().show(ui, |ui| {
+                                     for api_key in &settings.api_keys {
+                                         ui.horizontal(|ui| {
+                                             ui.label(&api_key.name);
+                                             ui.add(
+                                                 egui::TextEdit::singleline(&mut api_key.key.as_ref().unwrap_or(&String::new()).clone())
+                                                     .desired_width(300.0)
+                                                     .interactive(false)
+                                             );
+                                             ui.label(if api_key.is_configured { "✓" } else { "✗" });
+                                         });
+                                         ui.separator();
+                                     }
+                                 });
+
+                                 if ui.button("Refresh Settings").clicked() {
+                                     self.refresh_settings();
+                                 }
+                              } else {
+                                  ui.vertical_centered(|ui| {
+                                      ui.label("No settings loaded");
+                                      if ui.button("Refresh").clicked() {
+                                          self.refresh_settings();
+                                      }
+                                  });
+                              }
+                          }
+                      }
+                 }
             }
         });
 

@@ -1,6 +1,9 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
+// Re-export shared models from manager-models
+pub use manager_models::{ApiKeyConfig, SettingsResponse, SupportedModel, SupportedModelsResponse, LlmAgentToolCall};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
     pub id: i64,
@@ -707,91 +710,4 @@ pub struct LlmAgentMessage {
     pub created_at: i64,
 }
 
-/// API key configuration for the settings page
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiKeyConfig {
-    pub name: String,
-    pub key: Option<String>, // Will be masked for security
-    pub is_configured: bool,
-}
 
-/// Settings response containing API keys and configuration info
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SettingsResponse {
-    pub config_file_path: String,
-    pub api_keys: Vec<ApiKeyConfig>,
-}
-
-/// Supported model information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SupportedModel {
-    pub provider: String,
-    pub model_id: String,
-    pub name: String,
-    pub context_length: u32,
-    pub supports_streaming: bool,
-    pub supports_tool_calling: bool,
-    pub supports_vision: bool,
-    pub supports_reasoning: bool,
-    pub input_cost_per_token: Option<f64>,
-    pub output_cost_per_token: Option<f64>,
-    pub default_temperature: Option<f32>,
-    pub default_max_tokens: Option<u32>,
-}
-
-/// Response containing list of supported models
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SupportedModelsResponse {
-    pub models: Vec<SupportedModel>,
-}
-
-/// LLM agent tool call
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmAgentToolCall {
-    pub id: i64,
-    pub session_id: i64,
-    pub message_id: Option<i64>,
-    pub tool_name: String,
-    pub request: serde_json::Value,
-    pub response: Option<serde_json::Value>,
-    pub status: String, // "pending" | "executing" | "completed" | "failed"
-    pub created_at: i64,
-    pub completed_at: Option<i64>,
-    pub execution_time_ms: Option<i64>,
-    pub progress_updates: Option<String>, // JSON array of progress updates
-    pub error_details: Option<String>,
-}
-
-impl LlmAgentToolCall {
-    pub fn new(session_id: i64, tool_name: String, request: serde_json::Value) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: now, // Simple ID based on timestamp
-            session_id,
-            message_id: None,
-            tool_name,
-            request,
-            response: None,
-            status: "pending".to_string(),
-            created_at: now,
-            completed_at: None,
-            execution_time_ms: None,
-            progress_updates: None,
-            error_details: None,
-        }
-    }
-
-    pub fn complete(&mut self, response: serde_json::Value) {
-        self.response = Some(response);
-        self.status = "completed".to_string();
-        self.completed_at = Some(Utc::now().timestamp());
-    }
-
-    pub fn fail(&mut self, error: String) {
-        self.response = Some(serde_json::json!({
-            "error": error
-        }));
-        self.status = "failed".to_string();
-        self.completed_at = Some(Utc::now().timestamp());
-    }
-}

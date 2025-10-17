@@ -1,5 +1,5 @@
 use manager_models::{
-    CreateWorkRequest, Project, ProjectListResponse, Work, WorkListResponse, WorkResponse,
+    CreateWorkRequest, Project, ProjectListResponse, SettingsResponse, Work, WorkListResponse, WorkResponse,
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -127,6 +127,27 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(work_response.work)
+    }
+
+    pub async fn get_settings(&self) -> Result<SettingsResponse, ApiError> {
+        let url = format!("{}/settings", self.base_url);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let settings_response: SettingsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(settings_response)
     }
 }
 
