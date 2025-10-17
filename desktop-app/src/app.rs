@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use serde_json::Value;
 use std::sync::Arc;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -29,6 +30,10 @@ pub struct DesktopApp {
     settings: Option<manager_models::SettingsResponse>,
     current_page: Page,
 
+    // Projects default path state
+    projects_default_path: String,
+    projects_default_path_modified: bool,
+
     // Runtime state (not serialized)
     #[serde(skip)]
     tunnel: Option<crate::ssh::SshTunnel>,
@@ -53,6 +58,10 @@ pub struct DesktopApp {
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     settings_result: Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
+    #[allow(clippy::type_complexity)]
+    update_projects_path_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    #[allow(clippy::type_complexity)]
+    scan_projects_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
     loading_projects: bool,
     #[serde(skip)]
@@ -61,10 +70,10 @@ pub struct DesktopApp {
     loading_work_messages: bool,
     #[serde(skip)]
     loading_ai_session_outputs: bool,
-    #[serde(skip)]
     loading_settings: bool,
-    #[serde(skip)]
     creating_work: bool,
+    updating_projects_path: bool,
+    scanning_projects: bool,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
@@ -115,6 +124,8 @@ impl Default for DesktopApp {
             servers: Vec::new(),
             settings: None,
             current_page: Page::Projects,
+            projects_default_path: String::new(),
+            projects_default_path_modified: false,
             tunnel: None,
             api_client: None,
             connection_result: Arc::new(std::sync::Mutex::new(None)),
@@ -130,6 +141,10 @@ impl Default for DesktopApp {
             loading_settings: false,
             creating_work: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
+            updating_projects_path: false,
+            scanning_projects: false,
+            update_projects_path_result: Arc::new(std::sync::Mutex::new(None)),
+            scan_projects_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
         }
     }
@@ -359,6 +374,43 @@ impl DesktopApp {
         }
     }
 
+    fn update_projects_default_path(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.updating_projects_path = true;
+                self.update_projects_path_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.update_projects_path_result);
+                let path = self.projects_default_path.clone();
+
+                tokio::spawn(async move {
+                    let result = api_client.set_projects_default_path(path).await;
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
+    fn scan_projects(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.scanning_projects = true;
+                self.scan_projects_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.scan_projects_result);
+
+                tokio::spawn(async move {
+                    let result = api_client.scan_projects().await;
+                    let mut scan_result = result_clone.lock().unwrap();
+                    *scan_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
     /// Helper function to create a sidebar link with proper styling
     fn sidebar_link(
         &self,
@@ -518,41 +570,95 @@ impl eframe::App for DesktopApp {
          if let Ok(mut result) = self.settings_result.try_lock() {
              if let Some(settings_result) = result.take() {
                  self.loading_settings = false;
-                  match settings_result {
-                      Ok(settings) => {
-                          tracing::info!("Loaded settings");
-                          self.settings = Some(settings);
-                      }
-                      Err(e) => {
-                          tracing::error!("Failed to load settings: {}", e);
-                          self.connection_error = Some(format!("Failed to load settings: {}", e));
-                      }
-                  }
+                   match settings_result {
+                       Ok(settings) => {
+                           tracing::info!("Loaded settings");
+                           self.settings = Some(settings.clone());
+                           // Update projects default path from settings
+                           if let Some(path) = &settings.projects_default_path {
+                               self.projects_default_path = path.clone();
+                               self.projects_default_path_modified = false;
+                           }
+                       }
+                       Err(e) => {
+                           tracing::error!("Failed to load settings: {}", e);
+                           self.connection_error = Some(format!("Failed to load settings: {}", e));
+                       }
+                   }
             }
         }
 
-        // Check for create work results
-        if let Ok(mut result) = self.create_work_result.try_lock() {
-            if let Some(create_work_result) = result.take() {
-                self.creating_work = false;
-                match create_work_result {
-                    Ok(work) => {
-                        tracing::info!("Created work: {} ({})", work.title, work.id);
-                        // Add the new work to the list
-                        self.works.push(work);
-                        // Close the dialog and clear the form
-                        self.show_new_work_dialog = false;
-                        self.new_work_title.clear();
-                        self.new_work_project_id = None;
-                        self.new_work_model.clear();
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to create work: {}", e);
-                        self.connection_error = Some(format!("Failed to create work: {}", e));
-                    }
-                }
-            }
-        }
+         // Check for create work results
+         if let Ok(mut result) = self.create_work_result.try_lock() {
+             if let Some(create_work_result) = result.take() {
+                 self.creating_work = false;
+                 match create_work_result {
+                     Ok(work) => {
+                         tracing::info!("Created work: {} ({})", work.title, work.id);
+                         // Add the new work to the list
+                         self.works.push(work);
+                         // Close the dialog and clear the form
+                         self.show_new_work_dialog = false;
+                         self.new_work_title.clear();
+                         self.new_work_project_id = None;
+                         self.new_work_model.clear();
+                     }
+                     Err(e) => {
+                         tracing::error!("Failed to create work: {}", e);
+                         self.connection_error = Some(format!("Failed to create work: {}", e));
+                     }
+                 }
+             }
+         }
+
+          // Check for update projects path results
+          let mut should_refresh_settings = false;
+          if let Ok(mut result) = self.update_projects_path_result.try_lock() {
+              if let Some(update_result) = result.take() {
+                  self.updating_projects_path = false;
+                  match update_result {
+                      Ok(value) => {
+                          tracing::info!("Updated projects default path");
+                          // Update the local path with the expanded path from the API response
+                          if let Some(path) = value.get("path").and_then(|p| p.as_str()) {
+                              self.projects_default_path = path.to_string();
+                          }
+                          self.projects_default_path_modified = false;
+                          should_refresh_settings = true;
+                      }
+                      Err(e) => {
+                          tracing::error!("Failed to update projects path: {}", e);
+                          self.connection_error = Some(format!("Failed to update projects path: {}", e));
+                      }
+                  }
+              }
+          }
+
+         // Check for scan projects results
+         let mut should_refresh_projects = false;
+         if let Ok(mut result) = self.scan_projects_result.try_lock() {
+             if let Some(scan_result) = result.take() {
+                 self.scanning_projects = false;
+                 match scan_result {
+                     Ok(_) => {
+                         tracing::info!("Scanned projects successfully");
+                         should_refresh_projects = true;
+                     }
+                     Err(e) => {
+                         tracing::error!("Failed to scan projects: {}", e);
+                         self.connection_error = Some(format!("Failed to scan projects: {}", e));
+                     }
+                 }
+             }
+         }
+
+         // Refresh data after operations complete
+         if should_refresh_settings {
+             self.refresh_settings();
+         }
+         if should_refresh_projects {
+             self.refresh_projects();
+         }
 
          // Auto-refresh projects, works, and settings after connection
          if should_refresh_projects {
@@ -661,34 +767,36 @@ impl eframe::App for DesktopApp {
                                     }
                                 });
                             } else {
-                                egui::ScrollArea::vertical().show(ui, |ui| {
-                                    ui.add_space(8.0);
-                                    for project in &self.projects {
-                                        // Card frame with padding and rounded corners
-                                        egui::Frame::NONE
-                                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                            .corner_radius(8.0)
-                                            .inner_margin(egui::Margin::same(12))
-                                            .show(ui, |ui| {
-                                                ui.vertical(|ui| {
-                                                    // Project name - larger and bold
-                                                    ui.label(egui::RichText::new(&project.name).size(16.0).strong());
+                                 egui::ScrollArea::vertical().show(ui, |ui| {
+                                     ui.add_space(8.0);
+                                     for project in &self.projects {
+                                         // Project card that uses full available width
+                                         ui.allocate_ui(ui.available_size(), |ui| {
+                                             egui::Frame::NONE
+                                                 .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                                 .corner_radius(8.0)
+                                                 .inner_margin(egui::Margin::same(12))
+                                                 .show(ui, |ui| {
+                                                     ui.vertical(|ui| {
+                                                         // Project name - larger and bold
+                                                         ui.label(egui::RichText::new(&project.name).size(16.0).strong());
 
-                                                    ui.add_space(4.0);
+                                                         ui.add_space(4.0);
 
-                                                    // Project path - smaller, muted color
-                                                    ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
+                                                         // Project path - smaller, muted color
+                                                         ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
 
-                                                    // Description if present
-                                                    if let Some(description) = &project.description {
-                                                        ui.add_space(6.0);
-                                                        ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
-                                                    }
-                                                });
-                                            });
-                                        ui.add_space(8.0);
-                                    }
-                                });
+                                                         // Description if present
+                                                         if let Some(description) = &project.description {
+                                                             ui.add_space(6.0);
+                                                             ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
+                                                         }
+                                                     });
+                                                 });
+                                         });
+                                         ui.add_space(8.0);
+                                     }
+                                 });
                             }
                         }
                     }
@@ -1072,17 +1180,58 @@ impl eframe::App for DesktopApp {
                                      }
                                  });
 
-                                 if ui.button("Refresh Settings").clicked() {
-                                     self.refresh_settings();
-                                 }
-                              } else {
-                                  ui.vertical_centered(|ui| {
-                                      ui.label("No settings loaded");
-                                      if ui.button("Refresh").clicked() {
-                                          self.refresh_settings();
+                                  ui.add_space(20.0);
+                                  ui.heading("Projects Default Path");
+
+                                  ui.horizontal(|ui| {
+                                      ui.label("Path:");
+                                      let response = ui.text_edit_singleline(&mut self.projects_default_path);
+                                      if response.changed() {
+                                          self.projects_default_path_modified = true;
                                       }
                                   });
-                              }
+
+                                  ui.horizontal(|ui| {
+                                      let update_button = ui.add_enabled(
+                                          self.projects_default_path_modified && !self.updating_projects_path,
+                                          egui::Button::new("Update path")
+                                      );
+
+                                      if update_button.clicked() {
+                                          self.update_projects_default_path();
+                                      }
+
+                                      if self.updating_projects_path {
+                                          ui.add(egui::Spinner::new());
+                                      }
+
+                                      ui.add_space(10.0);
+
+                                      let scan_button = ui.add_enabled(
+                                          !self.scanning_projects,
+                                          egui::Button::new("Scan and load projects")
+                                      );
+
+                                      if scan_button.clicked() {
+                                          self.scan_projects();
+                                      }
+
+                                      if self.scanning_projects {
+                                          ui.add(egui::Spinner::new());
+                                      }
+                                  });
+
+                                  if ui.button("Refresh Settings").clicked() {
+                                      self.refresh_settings();
+                                  }
+                               } else {
+                                   ui.vertical_centered(|ui| {
+                                       ui.label("No settings loaded");
+                                       if ui.button("Refresh").clicked() {
+                                           self.refresh_settings();
+                                       }
+                                   });
+                               }
                           }
                       }
                  }

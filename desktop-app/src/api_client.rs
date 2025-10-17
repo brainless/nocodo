@@ -1,6 +1,7 @@
 use manager_models::{
     CreateWorkRequest, Project, ProjectListResponse, SettingsResponse, Work, WorkListResponse, WorkResponse,
 };
+use serde_json::Value;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiClient {
@@ -148,6 +149,54 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(settings_response)
+    }
+
+    pub async fn set_projects_default_path(&self, path: String) -> Result<Value, ApiError> {
+        let url = format!("{}/api/settings/projects-path", self.base_url);
+        let payload = serde_json::json!({
+            "path": path
+        });
+
+        let response = self
+            .client()
+            .post(&url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    pub async fn scan_projects(&self) -> Result<Value, ApiError> {
+        let url = format!("{}/api/projects/scan", self.base_url);
+
+        let response = self
+            .client()
+            .post(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
     }
 }
 

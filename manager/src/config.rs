@@ -1,8 +1,8 @@
 use config::{Config, ConfigError, File};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
@@ -10,25 +10,26 @@ pub struct AppConfig {
     pub api_keys: Option<ApiKeysConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ApiKeysConfig {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
+    pub projects_default_path: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DatabaseConfig {
     pub path: PathBuf,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SocketConfig {
     pub path: String,
 }
@@ -75,10 +76,11 @@ path = "~/.local/share/nocodo/manager.db"
 [socket]
 path = "/tmp/nocodo-manager.sock"
 
-[api_keys]
-# xai_api_key = "your-xai-key"
-# openai_api_key = "your-openai-key"
-# anthropic_api_key = "your-anthropic-key"
+ [api_keys]
+ # xai_api_key = "your-xai-key"
+ # openai_api_key = "your-openai-key"
+ # anthropic_api_key = "your-anthropic-key"
+ # projects_default_path = "~/projects"
 "#;
             std::fs::write(&config_path, default_config).map_err(|e| {
                 ConfigError::Message(format!("Failed to write default config: {e}"))

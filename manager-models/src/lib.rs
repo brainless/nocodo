@@ -800,6 +800,7 @@ pub struct ApiKeyConfig {
 pub struct SettingsResponse {
     pub config_file_path: String,
     pub api_keys: Vec<ApiKeyConfig>,
+    pub projects_default_path: Option<String>,
 }
 
 /// Supported model information

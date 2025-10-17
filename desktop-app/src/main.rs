@@ -29,7 +29,7 @@ fn main() -> eframe::Result {
         };
 
         eframe::run_native(
-            "nocodo Desktop App",
+            "nocodo",
             native_options,
             Box::new(|cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::new(cc)))),
         )

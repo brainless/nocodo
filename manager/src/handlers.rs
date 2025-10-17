@@ -1398,8 +1398,10 @@ pub async fn get_command_executions(
 }
 
 /// Get settings information including API key configuration
-pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let config = &data.config;
+pub async fn get_settings(_data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    // Reload config from file to get latest settings
+    let config = AppConfig::load()
+        .map_err(|e| AppError::Internal(format!("Failed to reload config: {}", e)))?;
 
     // Get config file path - similar to how it's determined in config.rs
     let config_file_path = if let Some(home) = home::home_dir() {
@@ -1482,9 +1484,198 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
     let response = SettingsResponse {
         config_file_path,
         api_keys,
+        projects_default_path: config.api_keys.as_ref().and_then(|keys| keys.projects_default_path.clone()),
     };
 
     Ok(HttpResponse::Ok().json(response))
+}
+
+/// Set projects default path
+pub async fn set_projects_default_path(
+    data: web::Data<AppState>,
+    request: web::Json<serde_json::Value>,
+) -> Result<HttpResponse, AppError> {
+    let path = request
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::InvalidRequest("path field is required".to_string()))?;
+
+    // Expand ~ to home directory if present
+    let expanded_path = if path.starts_with("~/") {
+        if let Some(home) = home::home_dir() {
+            path.replacen("~", &home.to_string_lossy(), 1)
+        } else {
+            return Err(AppError::InvalidRequest(
+                "Cannot expand ~: home directory not found".to_string(),
+            ));
+        }
+    } else {
+        path.to_string()
+    };
+
+    // Validate path exists and is a directory
+    let path_obj = std::path::Path::new(&expanded_path);
+    if !path_obj.exists() {
+        return Err(AppError::InvalidRequest(format!(
+            "Path does not exist: {} (expanded from: {})",
+            expanded_path, path
+        )));
+    }
+
+    if !path_obj.is_dir() {
+        return Err(AppError::InvalidRequest(format!(
+            "Path is not a directory: {} (expanded from: {})",
+            expanded_path, path
+        )));
+    }
+
+    // Update config
+    let mut config = data.config.as_ref().clone();
+    if let Some(ref mut api_keys) = config.api_keys {
+        api_keys.projects_default_path = Some(expanded_path.clone());
+    } else {
+        config.api_keys = Some(crate::config::ApiKeysConfig {
+            xai_api_key: None,
+            openai_api_key: None,
+            anthropic_api_key: None,
+            projects_default_path: Some(expanded_path.clone()),
+        });
+    }
+
+    // Save config to file
+    let config_path = if let Some(home) = home::home_dir() {
+        home.join(".config/nocodo/manager.toml")
+    } else {
+        std::path::PathBuf::from("manager.toml")
+    };
+
+    let toml_string = toml::to_string(&config)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize config: {}", e)))?;
+
+    std::fs::write(&config_path, toml_string)
+        .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
+
+    tracing::info!("Updated projects default path to: {}", expanded_path);
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "path": expanded_path
+    })))
+}
+
+/// Scan projects default path and save as Project entities
+pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    tracing::info!("scan_projects endpoint called");
+
+    // Reload config from file to get latest projects_default_path
+    let config = AppConfig::load()
+        .map_err(|e| {
+            tracing::error!("Failed to reload config: {}", e);
+            AppError::Internal(format!("Failed to reload config: {}", e))
+        })?;
+
+    tracing::info!("Reloaded config api_keys: {:?}", config.api_keys);
+
+    let projects_path = if let Some(api_keys) = &config.api_keys {
+        if let Some(path) = &api_keys.projects_default_path {
+            path.clone()
+        } else {
+            tracing::error!("Projects default path not configured in reloaded config");
+            return Err(AppError::InvalidRequest(
+                "Projects default path not configured. Please set it in Settings first.".to_string(),
+            ));
+        }
+    } else {
+        tracing::error!("API keys configuration not found in reloaded config");
+        return Err(AppError::InvalidRequest(
+            "API keys configuration not found. Please configure API keys in Settings.".to_string(),
+        ));
+    };
+
+    tracing::info!("Scanning projects directory: {}", projects_path);
+    let projects_dir = std::path::Path::new(&projects_path);
+
+    if !projects_dir.exists() {
+        return Err(AppError::InvalidRequest(format!(
+            "Projects directory does not exist: {}",
+            projects_path
+        )));
+    }
+
+    if !projects_dir.is_dir() {
+        return Err(AppError::InvalidRequest(format!(
+            "Projects path is not a directory: {}",
+            projects_path
+        )));
+    }
+
+    // Read directory contents
+    let entries = std::fs::read_dir(projects_dir)
+        .map_err(|e| AppError::Internal(format!("Failed to read projects directory: {}", e)))?;
+
+    let mut created_projects = Vec::new();
+    let mut entry_count = 0;
+
+    for entry in entries {
+        entry_count += 1;
+        let entry = entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {}", e)))?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            let project_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("<invalid>")
+                .to_string();
+
+            let project_path = path.to_string_lossy().to_string();
+
+            // Check if project already exists in database
+            if let Ok(_existing) = data.database.get_project_by_path(&project_path) {
+                tracing::info!("Project already exists: {}", project_name);
+                continue;
+            }
+
+            // Create new project
+            let mut project = Project::new(project_name.clone(), project_path.clone());
+
+            // Try to detect project type from common files
+            if path.join("package.json").exists() {
+                project.description = Some("Node.js project".to_string());
+            } else if path.join("Cargo.toml").exists() {
+                project.description = Some("Rust project".to_string());
+            } else if path.join("pyproject.toml").exists() || path.join("requirements.txt").exists() {
+                project.description = Some("Python project".to_string());
+            } else if path.join("go.mod").exists() {
+                project.description = Some("Go project".to_string());
+            } else {
+                project.description = Some("Project".to_string());
+            }
+
+            // Save to database
+            let project_id = data.database.create_project(&project)?;
+            project.id = project_id;
+
+            created_projects.push(project.clone());
+
+            tracing::info!(
+                "Created project: {} at {}",
+                project.name,
+                project.path
+            );
+        }
+    }
+
+    tracing::info!(
+        "Successfully scanned projects directory: {} (found {} entries, created {} projects)",
+        projects_path, entry_count, created_projects.len()
+    );
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "created_projects": created_projects.len(),
+        "projects": created_projects
+    })))
 }
 
 /// Get list of supported and enabled models
