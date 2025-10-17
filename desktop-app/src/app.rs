@@ -714,6 +714,10 @@ impl eframe::App for DesktopApp {
                     }
                     if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
                         self.current_page = Page::Work;
+                        // Refresh works when navigating to Work page
+                        if self.connection_state == ConnectionState::Connected && self.works.is_empty() && !self.loading_works {
+                            self.refresh_works();
+                        }
                     }
                     if self.sidebar_link(ui, "Mentions", sidebar_bg, button_bg) {
                         self.current_page = Page::Mentions;
