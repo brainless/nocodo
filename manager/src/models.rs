@@ -191,18 +191,9 @@ pub struct AiSessionOutputListResponse {
     pub outputs: Vec<AiSessionOutput>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct RecordAiOutputRequest {
-    pub content: String,
-}
 
-/// Send interactive input to a running AI session (Phase 1 streaming)
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct AiSessionInputRequest {
-    pub content: String,
-}
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
@@ -704,12 +695,7 @@ pub struct CreateLlmAgentSessionRequest {
     pub system_prompt: Option<String>,
 }
 
-/// LLM agent session response
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct LlmAgentSessionResponse {
-    pub session: LlmAgentSession,
-}
+
 
 /// LLM agent message
 #[derive(Debug, Clone, Serialize, Deserialize)]
