@@ -100,6 +100,12 @@ pub struct ProjectListResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectDetailsResponse {
+    pub project: Project,
+    pub components: Vec<ProjectComponent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ServerStatus {
     pub status: String,
     pub version: String,

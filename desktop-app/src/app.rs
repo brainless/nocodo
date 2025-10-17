@@ -26,6 +26,7 @@ pub struct DesktopApp {
     works: Vec<manager_models::Work>,
     work_messages: Vec<manager_models::WorkMessage>,
     ai_session_outputs: Vec<manager_models::AiSessionOutput>,
+    project_details: Option<manager_models::ProjectDetailsResponse>,
     servers: Vec<Server>,
     settings: Option<manager_models::SettingsResponse>,
     current_page: Page,
@@ -34,13 +35,21 @@ pub struct DesktopApp {
     projects_default_path: String,
     projects_default_path_modified: bool,
 
-    // Runtime state (not serialized)
-    #[serde(skip)]
-    tunnel: Option<crate::ssh::SshTunnel>,
-    #[serde(skip)]
-    api_client: Option<crate::api_client::ApiClient>,
+     // Runtime state (not serialized)
+     #[serde(skip)]
+     tunnel: Option<crate::ssh::SshTunnel>,
+     #[serde(skip)]
+     api_client: Option<crate::api_client::ApiClient>,
+     #[serde(skip)]
+     pending_project_details_refresh: Option<i64>,
     #[serde(skip)]
     connection_result: Arc<std::sync::Mutex<Option<Result<crate::ssh::SshTunnel, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    settings_result: Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    project_details_result: Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     projects_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
@@ -57,20 +66,17 @@ pub struct DesktopApp {
         Arc<std::sync::Mutex<Option<Result<Vec<manager_models::AiSessionOutput>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    settings_result: Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
-    #[allow(clippy::type_complexity)]
     update_projects_path_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    #[serde(skip)]
     #[allow(clippy::type_complexity)]
     scan_projects_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
     loading_projects: bool,
-    #[serde(skip)]
     loading_works: bool,
-    #[serde(skip)]
     loading_work_messages: bool,
-    #[serde(skip)]
     loading_ai_session_outputs: bool,
     loading_settings: bool,
+    loading_project_details: bool,
     creating_work: bool,
     updating_projects_path: bool,
     scanning_projects: bool,
@@ -93,6 +99,7 @@ enum Page {
     Projects,
     Work,
     WorkDetail(i64), // Work ID
+    ProjectDetail(i64), // Project ID
     Mentions,
     Servers,
     Settings,
@@ -121,24 +128,28 @@ impl Default for DesktopApp {
             works: Vec::new(),
             work_messages: Vec::new(),
             ai_session_outputs: Vec::new(),
+            project_details: None,
             servers: Vec::new(),
             settings: None,
             current_page: Page::Projects,
             projects_default_path: String::new(),
             projects_default_path_modified: false,
-            tunnel: None,
-            api_client: None,
-            connection_result: Arc::new(std::sync::Mutex::new(None)),
+             tunnel: None,
+             api_client: None,
+             pending_project_details_refresh: None,
+             connection_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
-            settings_result: Arc::new(std::sync::Mutex::new(None)),
+             settings_result: Arc::new(std::sync::Mutex::new(None)),
+             project_details_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
             loading_works: false,
             loading_work_messages: false,
             loading_ai_session_outputs: false,
             loading_settings: false,
+            loading_project_details: false,
             creating_work: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
             updating_projects_path: false,
@@ -211,10 +222,12 @@ impl DesktopApp {
         app.connection_state = ConnectionState::Disconnected;
         app.tunnel = None;
         app.api_client = None;
+        app.pending_project_details_refresh = None;
         app.projects.clear();
         app.works.clear();
         app.work_messages.clear();
         app.ai_session_outputs.clear();
+        app.project_details = None;
         app.connection_error = None;
         app.loading_projects = false;
         app.loading_works = false;
@@ -307,6 +320,24 @@ impl DesktopApp {
                     let result = api_client.get_settings().await;
                     let mut settings_result = result_clone.lock().unwrap();
                     *settings_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
+    fn refresh_project_details(&mut self, project_id: i64) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.loading_project_details = true;
+                self.project_details_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.project_details_result);
+
+                tokio::spawn(async move {
+                    let result = api_client.get_project_details(project_id).await;
+                    let mut project_details_result = result_clone.lock().unwrap();
+                    *project_details_result = Some(result.map_err(|e| e.to_string()));
                 });
             }
         }
@@ -458,9 +489,14 @@ impl eframe::App for DesktopApp {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-    /// Called each time the UI needs repainting, which may be many times per second.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut should_refresh_projects = false;
+     /// Called each time the UI needs repainting, which may be many times per second.
+     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+         // Handle pending project details refresh
+         if let Some(project_id) = self.pending_project_details_refresh.take() {
+             self.refresh_project_details(project_id);
+         }
+
+         let mut should_refresh_projects = false;
 
         // Check for connection results
         if let Ok(mut result) = self.connection_result.try_lock() {
@@ -566,27 +602,44 @@ impl eframe::App for DesktopApp {
                        }
                  }
 
-         // Check for settings results
-         if let Ok(mut result) = self.settings_result.try_lock() {
-             if let Some(settings_result) = result.take() {
-                 self.loading_settings = false;
-                   match settings_result {
-                       Ok(settings) => {
-                           tracing::info!("Loaded settings");
-                           self.settings = Some(settings.clone());
-                           // Update projects default path from settings
-                           if let Some(path) = &settings.projects_default_path {
-                               self.projects_default_path = path.clone();
-                               self.projects_default_path_modified = false;
-                           }
-                       }
-                       Err(e) => {
-                           tracing::error!("Failed to load settings: {}", e);
-                           self.connection_error = Some(format!("Failed to load settings: {}", e));
-                       }
-                   }
-            }
-        }
+          // Check for settings results
+          if let Ok(mut result) = self.settings_result.try_lock() {
+              if let Some(settings_result) = result.take() {
+                  self.loading_settings = false;
+                    match settings_result {
+                        Ok(settings) => {
+                            tracing::info!("Loaded settings");
+                            self.settings = Some(settings.clone());
+                            // Update projects default path from settings
+                            if let Some(path) = &settings.projects_default_path {
+                                self.projects_default_path = path.clone();
+                                self.projects_default_path_modified = false;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to load settings: {}", e);
+                            self.connection_error = Some(format!("Failed to load settings: {}", e));
+                        }
+                    }
+             }
+         }
+
+          // Check for project details results
+          if let Ok(mut result) = self.project_details_result.try_lock() {
+              if let Some(project_details_result) = result.take() {
+                  self.loading_project_details = false;
+                  match project_details_result {
+                      Ok(details) => {
+                          tracing::info!("Loaded project details for project {}", details.project.id);
+                          self.project_details = Some(details);
+                      }
+                      Err(e) => {
+                          tracing::error!("Failed to load project details: {}", e);
+                          self.connection_error = Some(format!("Failed to load project details: {}", e));
+                      }
+                  }
+              }
+          }
 
          // Check for create work results
          if let Ok(mut result) = self.create_work_result.try_lock() {
@@ -770,48 +823,63 @@ impl eframe::App for DesktopApp {
                                         self.refresh_projects();
                                     }
                                 });
-                            } else {
-                                 egui::ScrollArea::vertical().show(ui, |ui| {
-                                     ui.add_space(8.0);
+                             } else {
+                                  egui::ScrollArea::vertical().show(ui, |ui| {
+                                      ui.add_space(8.0);
 
-                                     let card_width = 300.0;
-                                     let card_height = 100.0;
-                                     let card_spacing = 10.0;
+                                      let card_width = 300.0;
+                                      let card_height = 100.0;
+                                      let card_spacing = 10.0;
 
-                                     // Set spacing between items
-                                     ui.spacing_mut().item_spacing = egui::Vec2::new(card_spacing, card_spacing);
+                                      // Set spacing between items
+                                      ui.spacing_mut().item_spacing = egui::Vec2::new(card_spacing, card_spacing);
 
-                                     // Use horizontal_wrapped to create a responsive grid
-                                     ui.horizontal_wrapped(|ui| {
-                                         for project in &self.projects {
-                                             // Use allocate_ui with fixed size to enable proper wrapping
-                                             ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
-                                                 egui::Frame::NONE
-                                                     .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                                     .corner_radius(8.0)
-                                                     .inner_margin(egui::Margin::same(12))
-                                                     .show(ui, |ui| {
-                                                         ui.vertical(|ui| {
-                                                             // Project name - larger and bold
-                                                             ui.label(egui::RichText::new(&project.name).size(16.0).strong());
+                                      // Collect project IDs to avoid borrowing issues
+                                      let project_ids: Vec<i64> = self.projects.iter().map(|p| p.id).collect();
 
-                                                             ui.add_space(4.0);
+                                      // Use horizontal_wrapped to create a responsive grid
+                                      ui.horizontal_wrapped(|ui| {
+                                          for (i, project) in self.projects.iter().enumerate() {
+                                              let project_id = project_ids[i];
+                                              // Use allocate_ui with fixed size to enable proper wrapping
+                                              let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
+                                                  egui::Frame::NONE
+                                                      .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                                      .corner_radius(8.0)
+                                                      .inner_margin(egui::Margin::same(12))
+                                                      .show(ui, |ui| {
+                                                          ui.vertical(|ui| {
+                                                              // Project name - larger and bold
+                                                              ui.label(egui::RichText::new(&project.name).size(16.0).strong());
 
-                                                             // Project path - smaller, muted color
-                                                             ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
+                                                              ui.add_space(4.0);
 
-                                                             // Description if present
-                                                             if let Some(description) = &project.description {
-                                                                 ui.add_space(6.0);
-                                                                 ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
-                                                             }
-                                                         });
-                                                     });
-                                             });
-                                         }
-                                     });
-                                 });
-                            }
+                                                              // Project path - smaller, muted color
+                                                              ui.label(egui::RichText::new(&project.path).size(12.0).color(ui.style().visuals.weak_text_color()));
+
+                                                              // Description if present
+                                                              if let Some(description) = &project.description {
+                                                                  ui.add_space(6.0);
+                                                                  ui.label(egui::RichText::new(description).size(11.0).color(ui.style().visuals.weak_text_color()));
+                                                              }
+                                                          });
+                                                      });
+                                              });
+
+                                              // Make the entire card clickable
+                                              if response.response.interact(egui::Sense::click()).clicked() {
+                                                  self.current_page = Page::ProjectDetail(project_id);
+                                                  self.pending_project_details_refresh = Some(project_id);
+                                              }
+
+                                              // Change cursor to pointer on hover
+                                              if response.response.hovered() {
+                                                  ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                              }
+                                          }
+                                      });
+                                  });
+                             }
                         }
                     }
                 }
@@ -945,179 +1013,267 @@ impl eframe::App for DesktopApp {
                         }
                     }
                 }
-                Page::WorkDetail(work_id) => {
-                    // Find the work
-                    let work = self.works.iter().find(|w| w.id == work_id).cloned();
+                 Page::WorkDetail(work_id) => {
+                     // Find the work
+                     let work = self.works.iter().find(|w| w.id == work_id).cloned();
 
-                    if let Some(work) = work {
-                        // Header with back button
-                        ui.horizontal(|ui| {
-                            if ui.button("← Back to Work List").clicked() {
-                                self.current_page = Page::Work;
-                            }
-                        });
+                     if let Some(work) = work {
+                         // Header with back button
+                         ui.horizontal(|ui| {
+                             if ui.button("← Back to Work List").clicked() {
+                                 self.current_page = Page::Work;
+                             }
+                         });
 
-                        ui.add_space(8.0);
+                         ui.add_space(8.0);
 
-                        // Work title
-                        ui.heading(&work.title);
+                         // Work title
+                         ui.heading(&work.title);
 
-                        ui.add_space(4.0);
+                         ui.add_space(4.0);
 
-                        // Work metadata
-                        ui.horizontal(|ui| {
-                            ui.label("Status:");
-                            ui.label(&work.status);
+                         // Work metadata
+                         ui.horizontal(|ui| {
+                             ui.label("Status:");
+                             ui.label(&work.status);
 
-                            if let Some(tool_name) = &work.tool_name {
-                                ui.separator();
-                                ui.label("Tool:");
-                                ui.label(tool_name);
-                            }
+                             if let Some(tool_name) = &work.tool_name {
+                                 ui.separator();
+                                 ui.label("Tool:");
+                                 ui.label(tool_name);
+                             }
 
-                            if let Some(model) = &work.model {
-                                ui.separator();
-                                ui.label("Model:");
-                                ui.label(model);
-                            }
+                             if let Some(model) = &work.model {
+                                 ui.separator();
+                                 ui.label("Model:");
+                                 ui.label(model);
+                             }
 
-                            if let Some(project_id) = work.project_id {
-                                if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
-                                    ui.separator();
-                                    ui.label("Project:");
-                                    ui.label(&project.name);
-                                }
-                            }
-                        });
+                             if let Some(project_id) = work.project_id {
+                                 if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                     ui.separator();
+                                     ui.label("Project:");
+                                     ui.label(&project.name);
+                                 }
+                             }
+                         });
 
-                        ui.separator();
+                         ui.separator();
 
-                        // Message history
-                        ui.heading("Message History");
+                         // Message history
+                         ui.heading("Message History");
 
-                        match &self.connection_state {
-                            ConnectionState::Disconnected => {
-                                ui.vertical_centered(|ui| {
-                                    ui.label("Not connected to server");
-                                });
-                            }
-                            ConnectionState::Connecting => {
-                                ui.vertical_centered(|ui| {
-                                    ui.label("Connecting...");
-                                    ui.add(egui::Spinner::new());
-                                });
-                            }
-                            ConnectionState::Connected => {
-                                if self.loading_work_messages || self.loading_ai_session_outputs {
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Loading messages...");
-                                        ui.add(egui::Spinner::new());
-                                    });
-                                } else if self.work_messages.is_empty() && self.ai_session_outputs.is_empty() {
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("No messages found");
-                                        if ui.button("Refresh").clicked() {
-                                            self.refresh_work_messages(work_id);
-                                        }
-                                    });
-                                } else {
-                                    egui::ScrollArea::vertical().show(ui, |ui| {
-                                        ui.add_space(8.0);
+                         match &self.connection_state {
+                             ConnectionState::Disconnected => {
+                                 ui.vertical_centered(|ui| {
+                                     ui.label("Not connected to server");
+                                 });
+                             }
+                             ConnectionState::Connecting => {
+                                 ui.vertical_centered(|ui| {
+                                     ui.label("Connecting...");
+                                     ui.add(egui::Spinner::new());
+                                 });
+                             }
+                             ConnectionState::Connected => {
+                                 if self.loading_work_messages || self.loading_ai_session_outputs {
+                                     ui.vertical_centered(|ui| {
+                                         ui.label("Loading messages...");
+                                         ui.add(egui::Spinner::new());
+                                     });
+                                 } else if self.work_messages.is_empty() && self.ai_session_outputs.is_empty() {
+                                     ui.vertical_centered(|ui| {
+                                         ui.label("No messages found");
+                                         if ui.button("Refresh").clicked() {
+                                             self.refresh_work_messages(work_id);
+                                         }
+                                     });
+                                 } else {
+                                     egui::ScrollArea::vertical().show(ui, |ui| {
+                                         ui.add_space(8.0);
 
-                                        // Combine and sort all messages by timestamp
-                                        #[derive(Clone)]
-                                        enum DisplayMessage {
-                                            WorkMessage(manager_models::WorkMessage),
-                                            AiOutput(manager_models::AiSessionOutput),
-                                        }
+                                         // Combine and sort all messages by timestamp
+                                         #[derive(Clone)]
+                                         enum DisplayMessage {
+                                             WorkMessage(manager_models::WorkMessage),
+                                             AiOutput(manager_models::AiSessionOutput),
+                                         }
 
-                                        let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
+                                         let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
 
-                                        // Add work messages (user input)
-                                        for msg in &self.work_messages {
-                                            all_messages.push((msg.created_at, DisplayMessage::WorkMessage(msg.clone())));
-                                        }
+                                         // Add work messages (user input)
+                                         for msg in &self.work_messages {
+                                             all_messages.push((msg.created_at, DisplayMessage::WorkMessage(msg.clone())));
+                                         }
 
-                                        // Add AI session outputs (AI responses)
-                                        for output in &self.ai_session_outputs {
-                                            all_messages.push((output.created_at, DisplayMessage::AiOutput(output.clone())));
-                                        }
+                                         // Add AI session outputs (AI responses)
+                                         for output in &self.ai_session_outputs {
+                                             all_messages.push((output.created_at, DisplayMessage::AiOutput(output.clone())));
+                                         }
 
-                                        // Sort by timestamp
-                                        all_messages.sort_by_key(|(timestamp, _)| *timestamp);
+                                         // Sort by timestamp
+                                         all_messages.sort_by_key(|(timestamp, _)| *timestamp);
 
-                                        for (_timestamp, message) in &all_messages {
-                                            match message {
-                                                DisplayMessage::WorkMessage(msg) => {
-                                                    // User message
-                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+                                         for (_timestamp, message) in &all_messages {
+                                             match message {
+                                                 DisplayMessage::WorkMessage(msg) => {
+                                                     // User message
+                                                     let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
 
-                                                    egui::Frame::NONE
-                                                        .fill(bg_color)
-                                                        .corner_radius(8.0)
-                                                        .inner_margin(egui::Margin::same(12))
-                                                        .show(ui, |ui| {
-                                                            ui.vertical(|ui| {
-                                                                ui.horizontal(|ui| {
-                                                                    ui.label(egui::RichText::new("User").size(12.0).strong());
-                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                        let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
-                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                            .unwrap_or_else(|| "Unknown".to_string());
-                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                    });
-                                                                });
-                                                                ui.add_space(4.0);
-                                                                ui.label(&msg.content);
-                                                            });
-                                                        });
-                                                }
-                                                DisplayMessage::AiOutput(output) => {
-                                                    // AI response message
-                                                    let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
+                                                     egui::Frame::NONE
+                                                         .fill(bg_color)
+                                                         .corner_radius(8.0)
+                                                         .inner_margin(egui::Margin::same(12))
+                                                         .show(ui, |ui| {
+                                                             ui.vertical(|ui| {
+                                                                 ui.horizontal(|ui| {
+                                                                     ui.label(egui::RichText::new("User").size(12.0).strong());
+                                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                         let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
+                                                                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                             .unwrap_or_else(|| "Unknown".to_string());
+                                                                         ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                     });
+                                                                 });
+                                                                 ui.add_space(4.0);
+                                                                 ui.label(&msg.content);
+                                                             });
+                                                         });
+                                                 }
+                                                 DisplayMessage::AiOutput(output) => {
+                                                     // AI response message
+                                                     let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 
-                                                    egui::Frame::NONE
-                                                        .fill(bg_color)
-                                                        .corner_radius(8.0)
-                                                        .inner_margin(egui::Margin::same(12))
-                                                        .show(ui, |ui| {
-                                                            ui.vertical(|ui| {
-                                                                ui.horizontal(|ui| {
-                                                                    // Determine label based on role and model
-                                                                    let label = match (output.role.as_deref(), output.model.as_deref()) {
-                                                                        (Some("tool"), _) => "nocodo".to_string(),
-                                                                        (Some("assistant"), Some(model)) => format!("AI - {}", model),
-                                                                        _ => "AI".to_string(),
-                                                                    };
-                                                                    ui.label(egui::RichText::new(label).size(12.0).strong());
-                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                        let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
-                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                            .unwrap_or_else(|| "Unknown".to_string());
-                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                    });
-                                                                });
-                                                                ui.add_space(4.0);
-                                                                ui.label(&output.content);
-                                                            });
-                                                        });
-                                                }
-                                            }
-                                            ui.add_space(8.0);
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                    } else {
-                        ui.vertical_centered(|ui| {
-                            ui.label("Work not found");
-                            if ui.button("Back to Work List").clicked() {
-                                self.current_page = Page::Work;
-                            }
-                        });
-                    }
-                }
+                                                     egui::Frame::NONE
+                                                         .fill(bg_color)
+                                                         .corner_radius(8.0)
+                                                         .inner_margin(egui::Margin::same(12))
+                                                         .show(ui, |ui| {
+                                                             ui.vertical(|ui| {
+                                                                 ui.horizontal(|ui| {
+                                                                     // Determine label based on role and model
+                                                                     let label = match (output.role.as_deref(), output.model.as_deref()) {
+                                                                         (Some("tool"), _) => "nocodo".to_string(),
+                                                                         (Some("assistant"), Some(model)) => format!("AI - {}", model),
+                                                                         _ => "AI".to_string(),
+                                                                     };
+                                                                     ui.label(egui::RichText::new(label).size(12.0).strong());
+                                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                         let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
+                                                                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                             .unwrap_or_else(|| "Unknown".to_string());
+                                                                         ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                     });
+                                                                 });
+                                                                 ui.add_space(4.0);
+                                                                 ui.label(&output.content);
+                                                             });
+                                                         });
+                                                 }
+                                             }
+                                             ui.add_space(8.0);
+                                         }
+                                     });
+                                 }
+                             }
+                         }
+                     } else {
+                         ui.vertical_centered(|ui| {
+                             ui.label("Work not found");
+                             if ui.button("Back to Work List").clicked() {
+                                 self.current_page = Page::Work;
+                             }
+                         });
+                     }
+                 }
+                 Page::ProjectDetail(project_id) => {
+                     // Header with back button
+                     ui.horizontal(|ui| {
+                         if ui.button("← Back to Projects").clicked() {
+                             self.current_page = Page::Projects;
+                         }
+                     });
+
+                     ui.add_space(8.0);
+
+                     match &self.connection_state {
+                         ConnectionState::Disconnected => {
+                             ui.vertical_centered(|ui| {
+                                 ui.label("Not connected to server");
+                             });
+                         }
+                         ConnectionState::Connecting => {
+                             ui.vertical_centered(|ui| {
+                                 ui.label("Connecting...");
+                                 ui.add(egui::Spinner::new());
+                             });
+                         }
+                         ConnectionState::Connected => {
+                             if self.loading_project_details {
+                                 ui.vertical_centered(|ui| {
+                                     ui.label("Loading project details...");
+                                     ui.add(egui::Spinner::new());
+                                 });
+                             } else if let Some(details) = &self.project_details {
+                                 // Project title
+                                 ui.heading(&details.project.name);
+
+                                 ui.add_space(4.0);
+
+                                 // Project metadata
+                                 ui.horizontal(|ui| {
+                                     ui.label("Path:");
+                                     ui.label(&details.project.path);
+
+                                     if let Some(description) = &details.project.description {
+                                         ui.separator();
+                                         ui.label("Description:");
+                                         ui.label(description);
+                                     }
+                                 });
+
+                                 ui.separator();
+
+                                 // Project components
+                                 ui.heading("Project Components");
+
+                                 if details.components.is_empty() {
+                                     ui.label("No components found");
+                                 } else {
+                                     egui::ScrollArea::vertical().show(ui, |ui| {
+                                         for component in &details.components {
+                                             ui.horizontal(|ui| {
+                                                 ui.label(&component.name);
+                                                 ui.separator();
+                                                 ui.label(&component.path);
+                                                 ui.separator();
+                                                 ui.label(&component.language);
+                                                 if let Some(framework) = &component.framework {
+                                                     ui.separator();
+                                                     ui.label(framework);
+                                                 }
+                                             });
+                                             ui.separator();
+                                         }
+                                     });
+                                 }
+
+                                 ui.add_space(8.0);
+
+                                 if ui.button("Refresh").clicked() {
+                                     self.refresh_project_details(project_id);
+                                 }
+                             } else {
+                                 ui.vertical_centered(|ui| {
+                                     ui.label("Project not found");
+                                     if ui.button("Back to Projects").clicked() {
+                                         self.current_page = Page::Projects;
+                                     }
+                                 });
+                             }
+                         }
+                     }
+                 }
                 Page::Mentions => {
                     ui.heading("Mentions");
                     ui.label("Dummy Mentions page");

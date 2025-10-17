@@ -3,11 +3,16 @@ use manager_models::Project;
 
 pub struct ProjectsView {
     projects: Vec<Project>,
+    on_project_click: Option<Box<dyn Fn(i64) + Send + Sync>>,
 }
 
 impl ProjectsView {
     pub fn new(projects: Vec<Project>) -> Self {
-        Self { projects }
+        Self { projects, on_project_click: None }
+    }
+
+    pub fn set_on_project_click<F: Fn(i64) + Send + Sync + 'static>(&mut self, callback: F) {
+        self.on_project_click = Some(Box::new(callback));
     }
 
     pub fn render(&mut self, _ctx: &Context, ui: &mut Ui) {
@@ -30,17 +35,27 @@ impl ProjectsView {
             ui.horizontal_wrapped(|ui| {
                 for project in &self.projects {
                     // Use allocate_ui with fixed size to enable proper wrapping
-                    ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
-                        ui.group(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label(egui::RichText::new(&project.name).strong());
-                                ui.label(egui::RichText::new(&project.path).small());
-                                if let Some(description) = &project.description {
-                                    ui.label(egui::RichText::new(description).italics().small());
-                                }
-                            });
-                        });
-                    });
+                     let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
+                         ui.group(|ui| {
+                             ui.vertical(|ui| {
+                                 ui.label(egui::RichText::new(&project.name).strong());
+                                 ui.label(egui::RichText::new(&project.path).small());
+                                 if let Some(description) = &project.description {
+                                     ui.label(egui::RichText::new(description).italics().small());
+                                 }
+                             });
+                         });
+                     });
+
+                     if response.response.clicked() {
+                         if let Some(ref callback) = self.on_project_click {
+                             callback(project.id);
+                         }
+                     }
+
+                     if response.response.hovered() {
+                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                     }
                 }
             });
         });
