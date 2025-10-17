@@ -130,7 +130,7 @@ impl ApiClient {
     }
 
     pub async fn get_settings(&self) -> Result<SettingsResponse, ApiError> {
-        let url = format!("{}/settings", self.base_url);
+        let url = format!("{}/api/settings", self.base_url);
         let response = self
             .client()
             .get(&url)

@@ -180,8 +180,8 @@ async fn main() -> AppResult<()> {
                             web::get().to(handlers::get_command_executions),
                         )
                         // Settings endpoint
-                        .route("/settings", web::get().to(handlers::get_settings))
-                        .route("/models", web::get().to(handlers::get_supported_models)),
+                        .route("/api/settings", web::get().to(handlers::get_settings))
+                        .route("/api/models", web::get().to(handlers::get_supported_models)),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
