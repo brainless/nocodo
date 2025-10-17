@@ -1057,14 +1057,16 @@ impl eframe::App for DesktopApp {
 
                                  egui::ScrollArea::vertical().show(ui, |ui| {
                                      for api_key in &settings.api_keys {
-                                         ui.horizontal(|ui| {
+                                         ui.vertical(|ui| {
                                              ui.label(&api_key.name);
                                              ui.add(
                                                  egui::TextEdit::singleline(&mut api_key.key.as_ref().unwrap_or(&String::new()).clone())
                                                      .desired_width(300.0)
                                                      .interactive(false)
                                              );
-                                             ui.label(if api_key.is_configured { "✓" } else { "✗" });
+                                             ui.horizontal(|ui| {
+                                                 ui.label(if api_key.is_configured { "✓ Configured" } else { "✗ Not configured" });
+                                             });
                                          });
                                          ui.separator();
                                      }
