@@ -104,7 +104,7 @@ fn run_test_mode(
         };
 
         let tunnel =
-            match ssh::SshTunnel::connect(&config.ssh.server, &config.ssh.username, key_path).await
+            match ssh::SshTunnel::connect(&config.ssh.server, &config.ssh.username, key_path, config.ssh.remote_port).await
             {
                 Ok(tunnel) => {
                     println!("   ✓ SSH tunnel established successfully!");

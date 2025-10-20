@@ -38,6 +38,7 @@ impl SshTunnel {
         server: &str,
         username: &str,
         key_path: Option<&str>,
+        remote_port: u16,
     ) -> Result<Self, SshError> {
         tracing::info!("Attempting SSH connection to {}@{}", username, server);
 
@@ -134,7 +135,7 @@ impl SshTunnel {
         // Start port forwarding task
         let task_handle = tokio::spawn(async move {
             if let Err(e) =
-                run_port_forward_loop(local_port, session_clone, 8081, shutdown_clone).await
+                run_port_forward_loop(local_port, session_clone, remote_port, shutdown_clone).await
             {
                 tracing::error!("Port forwarding error: {}", e);
             }
@@ -144,13 +145,13 @@ impl SshTunnel {
             "Port forwarding active: localhost:{} -> {}:{}",
             local_port,
             server,
-            8081
+            remote_port
         );
 
         Ok(Self {
             local_port,
             server: server_clone,
-            remote_port: 8081,
+            remote_port,
             session,
             shutdown,
             _task_handle: Some(task_handle),
