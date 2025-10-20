@@ -1264,19 +1264,9 @@ Page::ProjectDetail(project_id) => {
                           // Star button
                           let is_favorite = self.is_project_favorite(project_id);
                           let star_text = if is_favorite { "⭐ Star" } else { "☆ Star" };
-                          let star_color = if is_favorite { 
-                              egui::Color32::YELLOW 
-                          } else { 
-                              ui.style().visuals.text_color() 
-                          };
                           
-                          if ui.colored_label(star_color, star_text).clicked() {
+                          if ui.button(star_text).clicked() {
                               self.toggle_project_favorite(project_id);
-                          }
-                          
-                          // Change cursor to pointer on hover
-                          if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
-                              ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                           }
                       });
 
