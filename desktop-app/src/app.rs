@@ -31,6 +31,13 @@ pub struct DesktopApp {
     settings: Option<manager_models::SettingsResponse>,
     current_page: Page,
     
+    // Local server detection
+    local_server_running: bool,
+    #[serde(skip)]
+    checking_local_server: bool,
+    #[serde(skip)]
+    local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
+    
     // Favorite state
     favorite_projects: std::collections::HashSet<i64>,
 
@@ -135,6 +142,9 @@ impl Default for DesktopApp {
             servers: Vec::new(),
             settings: None,
             current_page: Page::Projects,
+            local_server_running: false,
+            checking_local_server: false,
+            local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
             favorite_projects: std::collections::HashSet::new(),
             projects_default_path: String::new(),
             projects_default_path_modified: false,
@@ -547,6 +557,28 @@ impl DesktopApp {
     fn is_project_favorite(&self, project_id: i64) -> bool {
         self.favorite_projects.contains(&project_id)
     }
+
+    /// Check if local nocodo manager is running
+    fn check_local_server(&mut self) {
+        self.checking_local_server = true;
+        self.local_server_check_result = Arc::new(std::sync::Mutex::new(None));
+        
+        let result_clone = Arc::clone(&self.local_server_check_result);
+        
+        tokio::spawn(async move {
+            // Try to connect to the local manager on default port 8081
+            let result = reqwest::Client::new()
+                .get("http://localhost:8081/api/health")
+                .timeout(std::time::Duration::from_secs(2))
+                .send()
+                .await;
+            
+            let is_running = result.is_ok() && result.unwrap().status().is_success();
+            
+            let mut check_result = result_clone.lock().unwrap();
+            *check_result = Some(is_running);
+        });
+    }
 }
 
 impl eframe::App for DesktopApp {
@@ -753,23 +785,32 @@ impl eframe::App for DesktopApp {
               }
           }
 
-         // Check for scan projects results
-         let mut should_refresh_projects = false;
-         if let Ok(mut result) = self.scan_projects_result.try_lock() {
-             if let Some(scan_result) = result.take() {
-                 self.scanning_projects = false;
-                 match scan_result {
-                     Ok(_) => {
-                         tracing::info!("Scanned projects successfully");
-                         should_refresh_projects = true;
-                     }
-                     Err(e) => {
-                         tracing::error!("Failed to scan projects: {}", e);
-                         self.connection_error = Some(format!("Failed to scan projects: {}", e));
-                     }
-                 }
-             }
-         }
+// Check for scan projects results
+          let mut should_refresh_projects = false;
+          if let Ok(mut result) = self.scan_projects_result.try_lock() {
+              if let Some(scan_result) = result.take() {
+                  self.scanning_projects = false;
+                  match scan_result {
+                      Ok(_) => {
+                          tracing::info!("Scanned projects successfully");
+                          should_refresh_projects = true;
+                      }
+                      Err(e) => {
+                          tracing::error!("Failed to scan projects: {}", e);
+                          self.connection_error = Some(format!("Failed to scan projects: {}", e));
+                      }
+                  }
+              }
+          }
+
+          // Check for local server check results
+          if let Ok(mut result) = self.local_server_check_result.try_lock() {
+              if let Some(check_result) = result.take() {
+                  self.checking_local_server = false;
+                  self.local_server_running = check_result;
+                  tracing::info!("Local server running: {}", self.local_server_running);
+              }
+          }
 
          // Refresh data after operations complete
          if should_refresh_settings {
@@ -848,6 +889,10 @@ impl eframe::App for DesktopApp {
                     // Bottom navigation
                     if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg) {
                         self.current_page = Page::Servers;
+                        // Check local server when navigating to Servers page
+                        if !self.checking_local_server {
+                            self.check_local_server();
+                        }
                     }
                     if self.sidebar_link(ui, "Settings", sidebar_bg, button_bg) {
                         self.current_page = Page::Settings;
@@ -1361,6 +1406,13 @@ Page::ProjectDetail(project_id) => {
                 }
                 Page::Servers => {
                     ui.heading("Servers");
+                    
+                    // Check local server status when page is shown
+                    if ui.button("Refresh Local Server Status").clicked() {
+                        self.check_local_server();
+                    }
+                    
+                    // Saved servers section
                     if self.servers.is_empty() {
                         ui.label("No servers saved");
                     } else {
@@ -1385,6 +1437,63 @@ Page::ProjectDetail(project_id) => {
                                 ui.separator();
                             }
                         });
+                    }
+                    
+                    ui.add_space(20.0);
+                    
+                    // Local server section
+                    ui.heading("Local server:");
+                    
+                    if self.checking_local_server {
+                        ui.horizontal(|ui| {
+                            ui.label("Checking local server...");
+                            ui.add(egui::Spinner::new());
+                        });
+                    } else if self.local_server_running {
+                        // Show grid with localhost entry
+                        ui.label("Local nocodo manager is running:");
+                        
+                        let card_width = 300.0;
+                        let card_height = 60.0;
+                        let card_spacing = 10.0;
+                        
+                        ui.horizontal_wrapped(|ui| {
+                            let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
+                                egui::Frame::NONE
+                                    .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                    .corner_radius(8.0)
+                                    .inner_margin(egui::Margin::same(12))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.vertical(|ui| {
+                                                ui.label(egui::RichText::new("localhost").size(14.0).strong());
+                                                ui.label(egui::RichText::new("No key required").size(12.0).color(ui.style().visuals.weak_text_color()));
+                                            });
+                                        });
+                                    });
+                            });
+                            
+                            // Make the card clickable
+                            if response.response.interact(egui::Sense::click()).clicked() {
+                                // Connect directly to local server without SSH
+                                self.api_client = Some(crate::api_client::ApiClient::new("http://localhost:8081".to_string()));
+                                self.connection_state = ConnectionState::Connected;
+                                self.connected_host = Some("localhost".to_string());
+                                self.tunnel = None; // No SSH tunnel for local connection
+                                // Refresh data after connecting
+                                self.refresh_projects();
+                                self.refresh_works();
+                                self.refresh_settings();
+                            }
+                            
+                            // Change cursor to pointer on hover
+                            if response.response.hovered() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+                        });
+                    } else {
+                        ui.label("You can run nocodo manager locally on this computer and connect to it");
+                        ui.label("Start the manager with: nocodo-manager --config ~/.config/nocodo/manager.toml");
                     }
                 }
                  Page::Settings => {

@@ -366,7 +366,7 @@ impl Database {
                  environment TEXT, -- JSON string
                  file_path TEXT NOT NULL,
                  project_id INTEGER NOT NULL,
-                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                 created_at INTEGER DEFAULT (strftime('%s','now')),
                  FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
              )
              "#,
@@ -382,8 +382,8 @@ impl Database {
                  stdout TEXT NOT NULL,
                  stderr TEXT NOT NULL,
                  duration_ms INTEGER NOT NULL,
-                 executed_at DATETIME NOT NULL,
-                 success BOOLEAN NOT NULL,
+                 executed_at INTEGER NOT NULL,
+                 success INTEGER NOT NULL,
                  FOREIGN KEY (command_id) REFERENCES workflow_commands (id) ON DELETE CASCADE
              )
              "#,
@@ -400,6 +400,118 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_command_executions_command_id ON command_executions(command_id)",
             [],
         )?;
+
+        // Migration: Fix DATETIME and BOOLEAN types in workflow tables
+        let has_datetime_columns: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('workflow_commands') WHERE name = 'created_at' AND type LIKE '%DATETIME%'",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        if has_datetime_columns {
+            tracing::info!("Migrating DATETIME columns to INTEGER in workflow tables");
+            
+            // Migrate workflow_commands table
+            conn.execute(
+                "CREATE TABLE workflow_commands_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    workflow_name TEXT NOT NULL,
+                    job_name TEXT NOT NULL,
+                    step_name TEXT,
+                    command TEXT NOT NULL,
+                    shell TEXT,
+                    working_directory TEXT,
+                    environment TEXT,
+                    file_path TEXT NOT NULL,
+                    project_id INTEGER NOT NULL,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+                )",
+                [],
+            )?;
+
+            conn.execute(
+                "INSERT INTO workflow_commands_new 
+                 SELECT id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path, project_id, 
+                        CASE 
+                            WHEN created_at IS NULL THEN strftime('%s','now')
+                            WHEN typeof(created_at) = 'integer' THEN created_at
+                            ELSE strftime('%s', created_at)
+                        END
+                 FROM workflow_commands",
+                [],
+            )?;
+
+            conn.execute("DROP TABLE workflow_commands", [])?;
+            conn.execute("ALTER TABLE workflow_commands_new RENAME TO workflow_commands", [])?;
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_workflow_commands_project_id ON workflow_commands(project_id)",
+                [],
+            )?;
+        }
+
+        // Migration: Fix BOOLEAN to INTEGER for success column in command_executions
+        let has_boolean_success: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('command_executions') WHERE name = 'success' AND type LIKE '%BOOLEAN%'",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        let has_datetime_executed_at: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('command_executions') WHERE name = 'executed_at' AND type LIKE '%DATETIME%'",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        if has_boolean_success || has_datetime_executed_at {
+            tracing::info!("Migrating command_executions table schema");
+            // SQLite doesn't support ALTER COLUMN directly, so we need to recreate the table
+            conn.execute(
+                "CREATE TABLE command_executions_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    command_id INTEGER NOT NULL,
+                    exit_code INTEGER,
+                    stdout TEXT NOT NULL,
+                    stderr TEXT NOT NULL,
+                    duration_ms INTEGER NOT NULL,
+                    executed_at INTEGER NOT NULL,
+                    success INTEGER NOT NULL,
+                    FOREIGN KEY (command_id) REFERENCES workflow_commands (id) ON DELETE CASCADE
+                )",
+                [],
+            )?;
+
+            // Copy data, converting types as needed
+            conn.execute(
+                "INSERT INTO command_executions_new 
+                 SELECT id, command_id, exit_code, stdout, stderr, duration_ms, 
+                        CASE 
+                            WHEN typeof(executed_at) = 'integer' THEN executed_at
+                            ELSE strftime('%s', executed_at)
+                        END,
+                        CASE WHEN success THEN 1 ELSE 0 END 
+                 FROM command_executions",
+                [],
+            )?;
+
+            // Drop old table and rename new one
+            conn.execute("DROP TABLE command_executions", [])?;
+            conn.execute("ALTER TABLE command_executions_new RENAME TO command_executions", [])?;
+
+            // Recreate index
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_command_executions_command_id ON command_executions(command_id)",
+                [],
+            )?;
+
+            tracing::info!("Successfully migrated command_executions table schema");
+        }
 
         tracing::info!("Database migrations completed");
         Ok(())
@@ -1607,7 +1719,7 @@ impl Database {
                 execution.stderr,
                 execution.duration_ms as i64,
                 execution.executed_at.timestamp(),
-                execution.success
+                if execution.success { 1i64 } else { 0i64 }
             ],
         )?;
 
@@ -1641,7 +1753,7 @@ impl Database {
                 duration_ms: row.get::<_, i64>("duration_ms")? as u64,
                 executed_at: chrono::DateTime::from_timestamp(row.get::<_, i64>("executed_at")?, 0)
                     .unwrap_or_else(chrono::Utc::now),
-                success: row.get("success")?,
+                success: row.get::<_, i64>("success")? != 0,
             })
         })?;
 
