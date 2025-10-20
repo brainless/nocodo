@@ -30,6 +30,9 @@ pub struct DesktopApp {
     servers: Vec<Server>,
     settings: Option<manager_models::SettingsResponse>,
     current_page: Page,
+    
+    // Favorite state
+    favorite_projects: std::collections::HashSet<i64>,
 
     // Projects default path state
     projects_default_path: String,
@@ -132,6 +135,7 @@ impl Default for DesktopApp {
             servers: Vec::new(),
             settings: None,
             current_page: Page::Projects,
+            favorite_projects: std::collections::HashSet::new(),
             projects_default_path: String::new(),
             projects_default_path_modified: false,
              tunnel: None,
@@ -199,6 +203,22 @@ impl DesktopApp {
             [],
         ).expect("Could not create unique index");
 
+        // Create favorites table for storing favorite entities
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS favorites (
+                id INTEGER PRIMARY KEY,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                UNIQUE(entity_type, entity_id)
+            )",
+            [],
+        ).expect("Could not create favorites table");
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id)",
+            [],
+        ).expect("Could not create favorites index");
+
         // Load existing servers
         {
             let mut stmt = db
@@ -217,6 +237,9 @@ impl DesktopApp {
         }
 
         app.db = Some(db);
+
+        // Load favorite projects
+        app.load_favorite_projects();
 
         // Always start disconnected - never restore connection state
         app.connection_state = ConnectionState::Disconnected;
@@ -261,11 +284,12 @@ impl DesktopApp {
             Some(expanded_path)
         };
         let result_clone = Arc::clone(&self.connection_result);
+        let remote_port = self.config.ssh.remote_port;
 
         // Spawn async task for SSH connection
         tokio::spawn(async move {
             let result =
-                crate::ssh::SshTunnel::connect(&server, &username, key_path.as_deref()).await;
+                crate::ssh::SshTunnel::connect(&server, &username, key_path.as_deref(), remote_port).await;
             let mut connection_result = result_clone.lock().unwrap();
             *connection_result = Some(result.map_err(|e| e.to_string()));
         });
@@ -480,6 +504,48 @@ impl DesktopApp {
         );
 
         response.clicked()
+    }
+
+    /// Load favorite projects from database
+    fn load_favorite_projects(&mut self) {
+        if let Some(ref db) = self.db {
+            let mut stmt = db
+                .prepare("SELECT entity_id FROM favorites WHERE entity_type = 'project'")
+                .expect("Could not prepare statement for loading favorites");
+            let favorite_iter = stmt
+                .query_map([], |row| {
+                    Ok(row.get::<_, i64>(0)?)
+                })
+                .expect("Could not query favorites");
+            self.favorite_projects = favorite_iter.filter_map(|f| f.ok()).collect();
+        }
+    }
+
+    /// Toggle favorite status for a project
+    fn toggle_project_favorite(&mut self, project_id: i64) {
+        if let Some(ref db) = self.db {
+            if self.favorite_projects.contains(&project_id) {
+                // Remove from favorites
+                db.execute(
+                    "DELETE FROM favorites WHERE entity_type = 'project' AND entity_id = ?1",
+                    [&project_id],
+                ).expect("Could not delete favorite");
+                self.favorite_projects.remove(&project_id);
+            } else {
+                // Add to favorites
+                let now = chrono::Utc::now().timestamp();
+                db.execute(
+                    "INSERT OR IGNORE INTO favorites (entity_type, entity_id, created_at) VALUES ('project', ?1, ?2)",
+                    [&project_id, &now],
+                ).expect("Could not insert favorite");
+                self.favorite_projects.insert(project_id);
+            }
+        }
+    }
+
+    /// Check if a project is favorited
+    fn is_project_favorite(&self, project_id: i64) -> bool {
+        self.favorite_projects.contains(&project_id)
     }
 }
 
@@ -1186,13 +1252,33 @@ impl eframe::App for DesktopApp {
                          });
                      }
                  }
-                 Page::ProjectDetail(project_id) => {
-                     // Header with back button
-                     ui.horizontal(|ui| {
-                         if ui.button("← Back to Projects").clicked() {
-                             self.current_page = Page::Projects;
-                         }
-                     });
+Page::ProjectDetail(project_id) => {
+                      // Header with back button and star button
+                      ui.horizontal(|ui| {
+                          if ui.button("← Back to Projects").clicked() {
+                              self.current_page = Page::Projects;
+                          }
+                          
+                          ui.add_space(10.0);
+                          
+                          // Star button
+                          let is_favorite = self.is_project_favorite(project_id);
+                          let star_text = if is_favorite { "⭐ Star" } else { "☆ Star" };
+                          let star_color = if is_favorite { 
+                              egui::Color32::YELLOW 
+                          } else { 
+                              ui.style().visuals.text_color() 
+                          };
+                          
+                          if ui.colored_label(star_color, star_text).clicked() {
+                              self.toggle_project_favorite(project_id);
+                          }
+                          
+                          // Change cursor to pointer on hover
+                          if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
+                              ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                          }
+                      });
 
                      ui.add_space(8.0);
 
