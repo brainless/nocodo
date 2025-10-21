@@ -17,7 +17,7 @@ pub struct DesktopApp {
     show_new_work_dialog: bool,
     new_work_title: String,
     new_work_project_id: Option<i64>,
-    new_work_model: String,
+    new_work_model: Option<String>,
     connection_error: Option<String>,
     connected_host: Option<String>,
 
@@ -29,6 +29,7 @@ pub struct DesktopApp {
     project_details: Option<manager_models::ProjectDetailsResponse>,
     servers: Vec<Server>,
     settings: Option<manager_models::SettingsResponse>,
+    supported_models: Vec<manager_models::SupportedModel>,
     current_page: Page,
 
     // Local server detection
@@ -83,12 +84,16 @@ pub struct DesktopApp {
     #[allow(clippy::type_complexity)]
     scan_projects_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    supported_models_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::SupportedModel>, String>>>>,
+    #[serde(skip)]
     loading_projects: bool,
     loading_works: bool,
     loading_work_messages: bool,
     loading_ai_session_outputs: bool,
     loading_settings: bool,
     loading_project_details: bool,
+    loading_supported_models: bool,
     creating_work: bool,
     updating_projects_path: bool,
     scanning_projects: bool,
@@ -139,7 +144,7 @@ impl Default for DesktopApp {
             show_new_work_dialog: false,
             new_work_title: String::new(),
             new_work_project_id: None,
-            new_work_model: String::new(),
+            new_work_model: None,
             connection_error: None,
             connected_host: None,
             projects: Vec::new(),
@@ -149,6 +154,7 @@ impl Default for DesktopApp {
             project_details: None,
             servers: Vec::new(),
             settings: None,
+            supported_models: Vec::new(),
             current_page: Page::Servers,
             local_server_running: false,
             checking_local_server: false,
@@ -166,12 +172,14 @@ impl Default for DesktopApp {
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             settings_result: Arc::new(std::sync::Mutex::new(None)),
             project_details_result: Arc::new(std::sync::Mutex::new(None)),
+            supported_models_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
             loading_works: false,
             loading_work_messages: false,
             loading_ai_session_outputs: false,
             loading_settings: false,
             loading_project_details: false,
+            loading_supported_models: false,
             creating_work: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
             updating_projects_path: false,
@@ -389,6 +397,24 @@ impl DesktopApp {
         }
     }
 
+    fn refresh_supported_models(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.loading_supported_models = true;
+                self.supported_models_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.supported_models_result);
+
+                tokio::spawn(async move {
+                    let result = api_client.get_supported_models().await;
+                    let mut supported_models_result = result_clone.lock().unwrap();
+                    *supported_models_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
     fn refresh_project_details(&mut self, project_id: i64) {
         if self.connection_state == ConnectionState::Connected {
             if let Some(ref api_client) = self.api_client {
@@ -449,11 +475,7 @@ impl DesktopApp {
 
                 let title = self.new_work_title.clone();
                 let project_id = self.new_work_project_id;
-                let model = if self.new_work_model.is_empty() {
-                    None
-                } else {
-                    Some(self.new_work_model.clone())
-                };
+                let model = self.new_work_model.clone();
 
                 tokio::spawn(async move {
                     let request = manager_models::CreateWorkRequest {
@@ -754,6 +776,23 @@ impl eframe::App for DesktopApp {
             }
         }
 
+        // Check for supported models results
+        if let Ok(mut result) = self.supported_models_result.try_lock() {
+            if let Some(models_result) = result.take() {
+                self.loading_supported_models = false;
+                match models_result {
+                    Ok(models) => {
+                        tracing::info!("Loaded {} supported models", models.len());
+                        self.supported_models = models;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load supported models: {}", e);
+                        self.connection_error = Some(format!("Failed to load supported models: {}", e));
+                    }
+                }
+            }
+        }
+
         // Check for project details results
         if let Ok(mut result) = self.project_details_result.try_lock() {
             if let Some(project_details_result) = result.take() {
@@ -781,11 +820,10 @@ impl eframe::App for DesktopApp {
                         tracing::info!("Created work: {} ({})", work.title, work.id);
                         // Add the new work to the list
                         self.works.push(work);
-                        // Close the dialog and clear the form
-                        self.show_new_work_dialog = false;
+                        // Clear the form
                         self.new_work_title.clear();
                         self.new_work_project_id = None;
-                        self.new_work_model.clear();
+                        self.new_work_model = None;
                     }
                     Err(e) => {
                         tracing::error!("Failed to create work: {}", e);
@@ -854,11 +892,12 @@ impl eframe::App for DesktopApp {
             self.refresh_projects();
         }
 
-        // Auto-refresh projects, works, and settings after connection
+        // Auto-refresh projects, works, settings, and models after connection
         if should_refresh_projects {
             self.refresh_projects();
             self.refresh_works();
             self.refresh_settings();
+            self.refresh_supported_models();
         }
 
         // Connection status bar
@@ -1079,14 +1118,102 @@ let card_spacing = 10.0;
                     }
                 }
                 Page::Work => {
-                    ui.horizontal(|ui| {
-                        ui.heading("Work");
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button("+ New Work").clicked() {
-                                self.show_new_work_dialog = true;
-                            }
-                        });
-                    });
+                    ui.heading("Work");
+
+                    // Add the new work form directly on the page
+                    if matches!(self.connection_state, ConnectionState::Connected) {
+                        // Load models if not already loaded
+                        if self.supported_models.is_empty() && !self.loading_supported_models {
+                            self.refresh_supported_models();
+                        }
+                        // Create form with same styling as work items
+                        egui::Frame::NONE
+                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                            .corner_radius(8.0)
+                            .inner_margin(egui::Margin::same(12))
+                            .show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    // Title/Question field as textarea
+                                    ui.label("What do you want to do?");
+                                    ui.add_sized(
+                                        egui::vec2(ui.available_width(), 60.0),
+                                        egui::TextEdit::multiline(&mut self.new_work_title)
+                                    );
+
+                                    ui.add_space(8.0);
+
+                                    // Project and Model fields side by side
+                                    ui.horizontal(|ui| {
+                                        // Project field
+                                        ui.vertical(|ui| {
+                                            ui.label("Project:");
+                                            egui::ComboBox::from_id_salt("work_project_combo")
+                                                .selected_text(
+                                                    self.new_work_project_id
+                                                        .and_then(|id| self.projects.iter().find(|p| p.id == id))
+                                                        .map(|p| p.name.clone())
+                                                        .unwrap_or_else(|| "None".to_string()),
+                                                )
+                                                .show_ui(ui, |ui| {
+                                                    ui.selectable_value(&mut self.new_work_project_id, None, "None");
+                                                    for project in &self.projects {
+                                                        ui.selectable_value(
+                                                            &mut self.new_work_project_id,
+                                                            Some(project.id),
+                                                            &project.name,
+                                                        );
+                                                    }
+                                                });
+                                        });
+
+                                        ui.add_space(16.0);
+
+                                        // Model field
+                                        ui.vertical(|ui| {
+                                            ui.label("Model:");
+                                            if self.loading_supported_models {
+                                                ui.add(egui::Spinner::new());
+                                            } else {
+                                                egui::ComboBox::from_id_salt("work_model_combo")
+                                                    .selected_text(
+                                                        self.new_work_model
+                                                            .as_ref()
+                                                            .and_then(|model_id| self.supported_models.iter()
+                                                                .find(|m| m.model_id == *model_id))
+                                                            .map(|m| m.name.clone())
+                                                            .unwrap_or_else(|| "None".to_string()),
+                                                    )
+                                                    .show_ui(ui, |ui| {
+                                                        ui.selectable_value(&mut self.new_work_model, None, "None");
+                                                        for model in &self.supported_models {
+                                                            ui.selectable_value(
+                                                                &mut self.new_work_model,
+                                                                Some(model.model_id.clone()),
+                                                                &model.name,
+                                                            );
+                                                        }
+                                                    });
+                                            }
+                                        });
+                                    });
+
+                                    ui.add_space(8.0);
+
+                                    // Create button
+                                    ui.horizontal(|ui| {
+                                        if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
+                                            self.create_work();
+                                        }
+                                        
+                                        if self.creating_work {
+                                            ui.add(egui::Spinner::new());
+                                        }
+                                    });
+                                });
+                            });
+
+                        ui.add_space(16.0);
+                    }
 
                     match &self.connection_state {
                         ConnectionState::Disconnected => {
@@ -1741,53 +1868,6 @@ ui.heading("Saved servers:");
                 });
         }
 
-        // New Work dialog
-        if self.show_new_work_dialog {
-            egui::Window::new("Create New Work")
-                .collapsible(false)
-                .resizable(false)
-                .show(ctx, |ui| {
-                    ui.label("Title:");
-                    ui.text_edit_singleline(&mut self.new_work_title);
-
-                    ui.label("Project (optional):");
-                    egui::ComboBox::from_label("")
-                        .selected_text(
-                            self.new_work_project_id
-                                .and_then(|id| self.projects.iter().find(|p| p.id == id))
-                                .map(|p| p.name.clone())
-                                .unwrap_or_else(|| "None".to_string()),
-                        )
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.new_work_project_id, None, "None");
-                            for project in &self.projects {
-                                ui.selectable_value(
-                                    &mut self.new_work_project_id,
-                                    Some(project.id),
-                                    &project.name,
-                                );
-                            }
-                        });
-
-                    ui.label("Model (optional):");
-                    ui.text_edit_singleline(&mut self.new_work_model);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
-                            self.create_work();
-                        }
-                        if ui.button("Cancel").clicked() {
-                            self.show_new_work_dialog = false;
-                            self.new_work_title.clear();
-                            self.new_work_project_id = None;
-                            self.new_work_model.clear();
-                        }
-                    });
-
-                    if self.creating_work {
-                        ui.add(egui::Spinner::new());
-                    }
-                });
-        }
+        
     }
 }

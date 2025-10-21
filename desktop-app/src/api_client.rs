@@ -1,5 +1,6 @@
 use manager_models::{
-    CreateWorkRequest, Project, ProjectDetailsResponse, ProjectListResponse, SettingsResponse, Work, WorkListResponse, WorkResponse,
+    CreateWorkRequest, Project, ProjectDetailsResponse, ProjectListResponse, SettingsResponse,
+    SupportedModelsResponse, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -38,7 +39,10 @@ impl ApiClient {
         Ok(project_response.projects)
     }
 
-    pub async fn get_project_details(&self, project_id: i64) -> Result<ProjectDetailsResponse, ApiError> {
+    pub async fn get_project_details(
+        &self,
+        project_id: i64,
+    ) -> Result<ProjectDetailsResponse, ApiError> {
         let url = format!("{}/api/projects/{}/details", self.base_url, project_id);
         let response = self
             .client()
@@ -149,6 +153,27 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(work_response.work)
+    }
+
+    pub async fn get_supported_models(&self) -> Result<Vec<manager_models::SupportedModel>, ApiError> {
+        let url = format!("{}/api/models", self.base_url);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let models_response: SupportedModelsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(models_response.models)
     }
 
     pub async fn get_settings(&self) -> Result<SettingsResponse, ApiError> {
