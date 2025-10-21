@@ -149,7 +149,7 @@ impl Default for DesktopApp {
             project_details: None,
             servers: Vec::new(),
             settings: None,
-            current_page: Page::Projects,
+            current_page: Page::Servers,
             local_server_running: false,
             checking_local_server: false,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
@@ -286,6 +286,9 @@ impl DesktopApp {
         app.loading_works = false;
         app.loading_work_messages = false;
         app.loading_ai_session_outputs = false;
+        
+        // Always start on Servers page
+        app.current_page = Page::Servers;
 
         app
     }
@@ -645,6 +648,8 @@ impl eframe::App for DesktopApp {
                                  [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path, &self.config.ssh.port.to_string()],
                              ).expect("Could not insert server");
                         }
+                        // Navigate to Projects page after successful connection
+                        self.current_page = Page::Projects;
                         // Mark that we should refresh projects after this block
                         should_refresh_projects = true;
                     }
@@ -901,6 +906,53 @@ impl eframe::App for DesktopApp {
                     if self.sidebar_link(ui, "Projects", sidebar_bg, button_bg) {
                         self.current_page = Page::Projects;
                     }
+
+                    // Favorite projects section
+                    if !self.favorite_projects.is_empty() && self.connection_state == ConnectionState::Connected {
+                        ui.add_space(4.0);
+                        
+                        // Show favorite projects
+                        for project in &self.projects {
+                            if self.favorite_projects.contains(&project.id) {
+                                let available_width = ui.available_width();
+                                let (rect, response) = 
+                                    ui.allocate_exact_size(egui::vec2(available_width, 24.0), egui::Sense::click());
+                                
+                                // Change cursor to pointer on hover
+                                if response.hovered() {
+                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
+                                
+                                // Determine background color based on hover state (same as sidebar_link)
+                                let bg_color = if response.hovered() {
+                                    button_bg
+                                } else {
+                                    sidebar_bg
+                                };
+                                
+                                // Draw background with same border radius as sidebar_link (0.0)
+                                ui.painter().rect_filled(rect, 0.0, bg_color);
+                                
+                                // Draw text with same styling as sidebar_link but with 12px left padding (8px + 4px extra)
+                                let text_pos = rect.min + egui::vec2(12.0, 4.0); // Same y position (4.0) as sidebar_link
+                                ui.painter().text(
+                                    text_pos,
+                                    egui::Align2::LEFT_TOP, // Same alignment as sidebar_link
+                                    &project.name,
+                                    egui::FontId::default(), // Same font as sidebar_link
+                                    ui.style().visuals.text_color() // Same text color as sidebar_link
+                                );
+                                
+                                // Handle click
+                                if response.clicked() {
+                                    self.current_page = Page::ProjectDetail(project.id);
+                                    self.pending_project_details_refresh = Some(project.id);
+                                }
+                            }
+                        }
+                        ui.add_space(4.0);
+                    }
+
                     if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
                         self.current_page = Page::Work;
                         // Refresh works when navigating to Work page
