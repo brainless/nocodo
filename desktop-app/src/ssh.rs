@@ -38,6 +38,7 @@ impl SshTunnel {
         server: &str,
         username: &str,
         key_path: Option<&str>,
+        port: u16,
         remote_port: u16,
     ) -> Result<Self, SshError> {
         tracing::info!("Attempting SSH connection to {}@{}", username, server);
@@ -93,8 +94,8 @@ impl SshTunnel {
         let handler = ClientHandler;
 
         // Connect to SSH server
-        tracing::info!("Connecting to SSH server {}:22", server);
-        let mut session = client::connect(config, (server, 22), handler)
+        tracing::info!("Connecting to SSH server {}:{}", server, port);
+        let mut session = client::connect(config, (server, port), handler)
             .await
             .map_err(|e| SshError::ConnectionFailed(format!("Connection failed: {}", e)))?;
 

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 # UI Framework
 egui = "0.33.0"
+egui_extras = "0.33.0"
 eframe = { version = "0.33.0", default-features = false, features = [
     "default_fonts",
     "glow",
@@ -46,3 +47,5 @@ rusqlite = "0.32"
 
 # Date/Time formatting
 chrono = "0.4"
+
+

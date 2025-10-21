@@ -81,6 +81,7 @@ fn run_test_mode(
         println!("\n   Final configuration:");
         println!("     - Server: {}", config.ssh.server);
         println!("     - Username: {}", config.ssh.username);
+        println!("     - Port: {}", config.ssh.port);
         println!("     - SSH Key: {}", config.ssh.ssh_key_path);
         println!("     - Remote Port: {}\n", config.ssh.remote_port);
 
@@ -103,23 +104,29 @@ fn run_test_mode(
             Some(config.ssh.ssh_key_path.as_str())
         };
 
-        let tunnel =
-            match ssh::SshTunnel::connect(&config.ssh.server, &config.ssh.username, key_path, config.ssh.remote_port).await
-            {
-                Ok(tunnel) => {
-                    println!("   ✓ SSH tunnel established successfully!");
-                    println!("     - Local port: {}", tunnel.local_port());
-                    println!(
-                        "     - Forwarding to: {}:{}\n",
-                        config.ssh.server, tunnel.remote_port
-                    );
-                    Some(tunnel)
-                }
-                Err(e) => {
-                    println!("   ✗ SSH connection failed: {}\n", e);
-                    None
-                }
-            };
+        let tunnel = match ssh::SshTunnel::connect(
+            &config.ssh.server,
+            &config.ssh.username,
+            key_path,
+            config.ssh.port,
+            config.ssh.remote_port,
+        )
+        .await
+        {
+            Ok(tunnel) => {
+                println!("   ✓ SSH tunnel established successfully!");
+                println!("     - Local port: {}", tunnel.local_port());
+                println!(
+                    "     - Forwarding to: {}:{}\n",
+                    config.ssh.server, tunnel.remote_port
+                );
+                Some(tunnel)
+            }
+            Err(e) => {
+                println!("   ✗ SSH connection failed: {}\n", e);
+                None
+            }
+        };
 
         if let Some(tunnel) = tunnel {
             // Test API connection

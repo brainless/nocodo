@@ -30,14 +30,14 @@ pub struct DesktopApp {
     servers: Vec<Server>,
     settings: Option<manager_models::SettingsResponse>,
     current_page: Page,
-    
+
     // Local server detection
     local_server_running: bool,
     #[serde(skip)]
     checking_local_server: bool,
     #[serde(skip)]
     local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
-    
+
     // Favorite state
     favorite_projects: std::collections::HashSet<i64>,
 
@@ -45,21 +45,23 @@ pub struct DesktopApp {
     projects_default_path: String,
     projects_default_path_modified: bool,
 
-     // Runtime state (not serialized)
-     #[serde(skip)]
-     tunnel: Option<crate::ssh::SshTunnel>,
-     #[serde(skip)]
-     api_client: Option<crate::api_client::ApiClient>,
-     #[serde(skip)]
-     pending_project_details_refresh: Option<i64>,
+    // Runtime state (not serialized)
+    #[serde(skip)]
+    tunnel: Option<crate::ssh::SshTunnel>,
+    #[serde(skip)]
+    api_client: Option<crate::api_client::ApiClient>,
+    #[serde(skip)]
+    pending_project_details_refresh: Option<i64>,
     #[serde(skip)]
     connection_result: Arc<std::sync::Mutex<Option<Result<crate::ssh::SshTunnel, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    settings_result: Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
+    settings_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    project_details_result: Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
+    project_details_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     projects_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
@@ -108,7 +110,7 @@ enum ConnectionState {
 enum Page {
     Projects,
     Work,
-    WorkDetail(i64), // Work ID
+    WorkDetail(i64),    // Work ID
     ProjectDetail(i64), // Project ID
     Mentions,
     Servers,
@@ -120,6 +122,12 @@ struct Server {
     host: String,
     user: String,
     key_path: Option<String>,
+    #[serde(default = "default_ssh_port")]
+    port: u16,
+}
+
+fn default_ssh_port() -> u16 {
+    22
 }
 
 impl Default for DesktopApp {
@@ -148,16 +156,16 @@ impl Default for DesktopApp {
             favorite_projects: std::collections::HashSet::new(),
             projects_default_path: String::new(),
             projects_default_path_modified: false,
-             tunnel: None,
-             api_client: None,
-             pending_project_details_refresh: None,
-             connection_result: Arc::new(std::sync::Mutex::new(None)),
+            tunnel: None,
+            api_client: None,
+            pending_project_details_refresh: None,
+            connection_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
-             settings_result: Arc::new(std::sync::Mutex::new(None)),
-             project_details_result: Arc::new(std::sync::Mutex::new(None)),
+            settings_result: Arc::new(std::sync::Mutex::new(None)),
+            project_details_result: Arc::new(std::sync::Mutex::new(None)),
             loading_projects: false,
             loading_works: false,
             loading_work_messages: false,
@@ -203,15 +211,24 @@ impl DesktopApp {
                 id INTEGER PRIMARY KEY,
                 host TEXT NOT NULL,
                 user TEXT NOT NULL,
-                key_path TEXT
+                key_path TEXT,
+                port INTEGER NOT NULL DEFAULT 22
             )",
             [],
         )
         .expect("Could not create servers table");
         db.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_unique ON servers (host, user, key_path)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_unique ON servers (host, user, key_path, port)",
             [],
         ).expect("Could not create unique index");
+
+        // Add port column if it doesn't exist (for backward compatibility)
+        if let Err(_) = db.execute(
+            "ALTER TABLE servers ADD COLUMN port INTEGER NOT NULL DEFAULT 22",
+            [],
+        ) {
+            // Ignore error if column already exists
+        }
 
         // Create favorites table for storing favorite entities
         db.execute(
@@ -223,16 +240,18 @@ impl DesktopApp {
                 UNIQUE(entity_type, entity_id)
             )",
             [],
-        ).expect("Could not create favorites table");
+        )
+        .expect("Could not create favorites table");
         db.execute(
             "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id)",
             [],
-        ).expect("Could not create favorites index");
+        )
+        .expect("Could not create favorites index");
 
         // Load existing servers
         {
             let mut stmt = db
-                .prepare("SELECT host, user, key_path FROM servers")
+                .prepare("SELECT host, user, key_path, COALESCE(port, 22) FROM servers")
                 .expect("Could not prepare statement");
             let server_iter = stmt
                 .query_map([], |row| {
@@ -240,6 +259,7 @@ impl DesktopApp {
                         host: row.get(0)?,
                         user: row.get(1)?,
                         key_path: row.get(2)?,
+                        port: row.get(3)?,
                     })
                 })
                 .expect("Could not query servers");
@@ -295,11 +315,18 @@ impl DesktopApp {
         };
         let result_clone = Arc::clone(&self.connection_result);
         let remote_port = self.config.ssh.remote_port;
+        let port = self.config.ssh.port;
 
         // Spawn async task for SSH connection
         tokio::spawn(async move {
-            let result =
-                crate::ssh::SshTunnel::connect(&server, &username, key_path.as_deref(), remote_port).await;
+            let result = crate::ssh::SshTunnel::connect(
+                &server,
+                &username,
+                key_path.as_deref(),
+                port,
+                remote_port,
+            )
+            .await;
             let mut connection_result = result_clone.lock().unwrap();
             *connection_result = Some(result.map_err(|e| e.to_string()));
         });
@@ -523,9 +550,7 @@ impl DesktopApp {
                 .prepare("SELECT entity_id FROM favorites WHERE entity_type = 'project'")
                 .expect("Could not prepare statement for loading favorites");
             let favorite_iter = stmt
-                .query_map([], |row| {
-                    Ok(row.get::<_, i64>(0)?)
-                })
+                .query_map([], |row| Ok(row.get::<_, i64>(0)?))
                 .expect("Could not query favorites");
             self.favorite_projects = favorite_iter.filter_map(|f| f.ok()).collect();
         }
@@ -539,7 +564,8 @@ impl DesktopApp {
                 db.execute(
                     "DELETE FROM favorites WHERE entity_type = 'project' AND entity_id = ?1",
                     [&project_id],
-                ).expect("Could not delete favorite");
+                )
+                .expect("Could not delete favorite");
                 self.favorite_projects.remove(&project_id);
             } else {
                 // Add to favorites
@@ -562,9 +588,9 @@ impl DesktopApp {
     fn check_local_server(&mut self) {
         self.checking_local_server = true;
         self.local_server_check_result = Arc::new(std::sync::Mutex::new(None));
-        
+
         let result_clone = Arc::clone(&self.local_server_check_result);
-        
+
         tokio::spawn(async move {
             // Try to connect to the local manager on default port 8081
             let result = reqwest::Client::new()
@@ -572,9 +598,9 @@ impl DesktopApp {
                 .timeout(std::time::Duration::from_secs(2))
                 .send()
                 .await;
-            
+
             let is_running = result.is_ok() && result.unwrap().status().is_success();
-            
+
             let mut check_result = result_clone.lock().unwrap();
             *check_result = Some(is_running);
         });
@@ -587,14 +613,14 @@ impl eframe::App for DesktopApp {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-     /// Called each time the UI needs repainting, which may be many times per second.
-     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-         // Handle pending project details refresh
-         if let Some(project_id) = self.pending_project_details_refresh.take() {
-             self.refresh_project_details(project_id);
-         }
+    /// Called each time the UI needs repainting, which may be many times per second.
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Handle pending project details refresh
+        if let Some(project_id) = self.pending_project_details_refresh.take() {
+            self.refresh_project_details(project_id);
+        }
 
-         let mut should_refresh_projects = false;
+        let mut should_refresh_projects = false;
 
         // Check for connection results
         if let Ok(mut result) = self.connection_result.try_lock() {
@@ -615,8 +641,8 @@ impl eframe::App for DesktopApp {
                         // Store server in local DB
                         if let Some(ref db) = self.db {
                             db.execute(
-                                 "INSERT OR IGNORE INTO servers (host, user, key_path) VALUES (?1, ?2, ?3)",
-                                 [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path],
+                                 "INSERT OR IGNORE INTO servers (host, user, key_path, port) VALUES (?1, ?2, ?3, ?4)",
+                                 [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path, &self.config.ssh.port.to_string()],
                              ).expect("Could not insert server");
                         }
                         // Mark that we should refresh projects after this block
@@ -683,149 +709,152 @@ impl eframe::App for DesktopApp {
             }
         }
 
-         // Check for AI session outputs results
-         if let Ok(mut result) = self.ai_session_outputs_result.try_lock() {
-             if let Some(ai_session_outputs_result) = result.take() {
-                 self.loading_ai_session_outputs = false;
-                 match ai_session_outputs_result {
-                     Ok(outputs) => {
-                         tracing::info!("Loaded {} AI session outputs", outputs.len());
-                         self.ai_session_outputs = outputs;
-                     }
-                     Err(e) => {
-                         tracing::error!("Failed to load AI session outputs: {}", e);
-                         self.connection_error = Some(format!("Failed to load AI session outputs: {}", e));
-                               }
-                           }
-                       }
-                 }
+        // Check for AI session outputs results
+        if let Ok(mut result) = self.ai_session_outputs_result.try_lock() {
+            if let Some(ai_session_outputs_result) = result.take() {
+                self.loading_ai_session_outputs = false;
+                match ai_session_outputs_result {
+                    Ok(outputs) => {
+                        tracing::info!("Loaded {} AI session outputs", outputs.len());
+                        self.ai_session_outputs = outputs;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load AI session outputs: {}", e);
+                        self.connection_error =
+                            Some(format!("Failed to load AI session outputs: {}", e));
+                    }
+                }
+            }
+        }
 
-          // Check for settings results
-          if let Ok(mut result) = self.settings_result.try_lock() {
-              if let Some(settings_result) = result.take() {
-                  self.loading_settings = false;
-                    match settings_result {
-                        Ok(settings) => {
-                            tracing::info!("Loaded settings");
-                            self.settings = Some(settings.clone());
-                            // Update projects default path from settings
-                            if let Some(path) = &settings.projects_default_path {
-                                self.projects_default_path = path.clone();
-                                self.projects_default_path_modified = false;
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to load settings: {}", e);
-                            self.connection_error = Some(format!("Failed to load settings: {}", e));
+        // Check for settings results
+        if let Ok(mut result) = self.settings_result.try_lock() {
+            if let Some(settings_result) = result.take() {
+                self.loading_settings = false;
+                match settings_result {
+                    Ok(settings) => {
+                        tracing::info!("Loaded settings");
+                        self.settings = Some(settings.clone());
+                        // Update projects default path from settings
+                        if let Some(path) = &settings.projects_default_path {
+                            self.projects_default_path = path.clone();
+                            self.projects_default_path_modified = false;
                         }
                     }
-             }
-         }
+                    Err(e) => {
+                        tracing::error!("Failed to load settings: {}", e);
+                        self.connection_error = Some(format!("Failed to load settings: {}", e));
+                    }
+                }
+            }
+        }
 
-          // Check for project details results
-          if let Ok(mut result) = self.project_details_result.try_lock() {
-              if let Some(project_details_result) = result.take() {
-                  self.loading_project_details = false;
-                  match project_details_result {
-                      Ok(details) => {
-                          tracing::info!("Loaded project details for project {}", details.project.id);
-                          self.project_details = Some(details);
-                      }
-                      Err(e) => {
-                          tracing::error!("Failed to load project details: {}", e);
-                          self.connection_error = Some(format!("Failed to load project details: {}", e));
-                      }
-                  }
-              }
-          }
+        // Check for project details results
+        if let Ok(mut result) = self.project_details_result.try_lock() {
+            if let Some(project_details_result) = result.take() {
+                self.loading_project_details = false;
+                match project_details_result {
+                    Ok(details) => {
+                        tracing::info!("Loaded project details for project {}", details.project.id);
+                        self.project_details = Some(details);
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to load project details: {}", e);
+                        self.connection_error =
+                            Some(format!("Failed to load project details: {}", e));
+                    }
+                }
+            }
+        }
 
-         // Check for create work results
-         if let Ok(mut result) = self.create_work_result.try_lock() {
-             if let Some(create_work_result) = result.take() {
-                 self.creating_work = false;
-                 match create_work_result {
-                     Ok(work) => {
-                         tracing::info!("Created work: {} ({})", work.title, work.id);
-                         // Add the new work to the list
-                         self.works.push(work);
-                         // Close the dialog and clear the form
-                         self.show_new_work_dialog = false;
-                         self.new_work_title.clear();
-                         self.new_work_project_id = None;
-                         self.new_work_model.clear();
-                     }
-                     Err(e) => {
-                         tracing::error!("Failed to create work: {}", e);
-                         self.connection_error = Some(format!("Failed to create work: {}", e));
-                     }
-                 }
-             }
-         }
+        // Check for create work results
+        if let Ok(mut result) = self.create_work_result.try_lock() {
+            if let Some(create_work_result) = result.take() {
+                self.creating_work = false;
+                match create_work_result {
+                    Ok(work) => {
+                        tracing::info!("Created work: {} ({})", work.title, work.id);
+                        // Add the new work to the list
+                        self.works.push(work);
+                        // Close the dialog and clear the form
+                        self.show_new_work_dialog = false;
+                        self.new_work_title.clear();
+                        self.new_work_project_id = None;
+                        self.new_work_model.clear();
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to create work: {}", e);
+                        self.connection_error = Some(format!("Failed to create work: {}", e));
+                    }
+                }
+            }
+        }
 
-          // Check for update projects path results
-          let mut should_refresh_settings = false;
-          if let Ok(mut result) = self.update_projects_path_result.try_lock() {
-              if let Some(update_result) = result.take() {
-                  self.updating_projects_path = false;
-                  match update_result {
-                      Ok(value) => {
-                          tracing::info!("Updated projects default path");
-                          // Update the local path with the expanded path from the API response
-                          if let Some(path) = value.get("path").and_then(|p| p.as_str()) {
-                              self.projects_default_path = path.to_string();
-                          }
-                          self.projects_default_path_modified = false;
-                          should_refresh_settings = true;
-                      }
-                      Err(e) => {
-                          tracing::error!("Failed to update projects path: {}", e);
-                          self.connection_error = Some(format!("Failed to update projects path: {}", e));
-                      }
-                  }
-              }
-          }
+        // Check for update projects path results
+        let mut should_refresh_settings = false;
+        if let Ok(mut result) = self.update_projects_path_result.try_lock() {
+            if let Some(update_result) = result.take() {
+                self.updating_projects_path = false;
+                match update_result {
+                    Ok(value) => {
+                        tracing::info!("Updated projects default path");
+                        // Update the local path with the expanded path from the API response
+                        if let Some(path) = value.get("path").and_then(|p| p.as_str()) {
+                            self.projects_default_path = path.to_string();
+                        }
+                        self.projects_default_path_modified = false;
+                        should_refresh_settings = true;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to update projects path: {}", e);
+                        self.connection_error =
+                            Some(format!("Failed to update projects path: {}", e));
+                    }
+                }
+            }
+        }
 
-// Check for scan projects results
-          let mut should_refresh_projects = false;
-          if let Ok(mut result) = self.scan_projects_result.try_lock() {
-              if let Some(scan_result) = result.take() {
-                  self.scanning_projects = false;
-                  match scan_result {
-                      Ok(_) => {
-                          tracing::info!("Scanned projects successfully");
-                          should_refresh_projects = true;
-                      }
-                      Err(e) => {
-                          tracing::error!("Failed to scan projects: {}", e);
-                          self.connection_error = Some(format!("Failed to scan projects: {}", e));
-                      }
-                  }
-              }
-          }
+        // Check for scan projects results
+        let mut _should_refresh_projects = false;
+        if let Ok(mut result) = self.scan_projects_result.try_lock() {
+            if let Some(scan_result) = result.take() {
+                self.scanning_projects = false;
+                match scan_result {
+                    Ok(_) => {
+                        tracing::info!("Scanned projects successfully");
+                        _should_refresh_projects = true;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to scan projects: {}", e);
+                        self.connection_error = Some(format!("Failed to scan projects: {}", e));
+                    }
+                }
+            }
+        }
 
-          // Check for local server check results
-          if let Ok(mut result) = self.local_server_check_result.try_lock() {
-              if let Some(check_result) = result.take() {
-                  self.checking_local_server = false;
-                  self.local_server_running = check_result;
-                  tracing::info!("Local server running: {}", self.local_server_running);
-              }
-          }
+        // Check for local server check results
+        if let Ok(mut result) = self.local_server_check_result.try_lock() {
+            if let Some(check_result) = result.take() {
+                self.checking_local_server = false;
+                self.local_server_running = check_result;
+                tracing::info!("Local server running: {}", self.local_server_running);
+            }
+        }
 
-         // Refresh data after operations complete
-         if should_refresh_settings {
-             self.refresh_settings();
-         }
-         if should_refresh_projects {
-             self.refresh_projects();
-         }
+        // Refresh data after operations complete
+        if should_refresh_settings {
+            self.refresh_settings();
+        }
+        if should_refresh_projects {
+            self.refresh_projects();
+        }
 
-         // Auto-refresh projects, works, and settings after connection
-         if should_refresh_projects {
-             self.refresh_projects();
-             self.refresh_works();
-             self.refresh_settings();
-         }
+        // Auto-refresh projects, works, and settings after connection
+        if should_refresh_projects {
+            self.refresh_projects();
+            self.refresh_works();
+            self.refresh_settings();
+        }
 
         // Connection status bar
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
@@ -875,7 +904,10 @@ impl eframe::App for DesktopApp {
                     if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
                         self.current_page = Page::Work;
                         // Refresh works when navigating to Work page
-                        if self.connection_state == ConnectionState::Connected && self.works.is_empty() && !self.loading_works {
+                        if self.connection_state == ConnectionState::Connected
+                            && self.works.is_empty()
+                            && !self.loading_works
+                        {
                             self.refresh_works();
                         }
                     }
@@ -940,7 +972,7 @@ impl eframe::App for DesktopApp {
 
                                       let card_width = 300.0;
                                       let card_height = 100.0;
-                                      let card_spacing = 10.0;
+let card_spacing = 10.0;
 
                                       // Set spacing between items
                                       ui.spacing_mut().item_spacing = egui::Vec2::new(card_spacing, card_spacing);
@@ -1302,20 +1334,20 @@ Page::ProjectDetail(project_id) => {
                       ui.horizontal(|ui| {
                           if ui.button("← Back to Projects").clicked() {
                               self.current_page = Page::Projects;
-                          }
-                          
-                          ui.add_space(10.0);
-                          
-                          // Star button
+}
+
+                           ui.add_space(10.0);
+
+                           // Star button
                           let is_favorite = self.is_project_favorite(project_id);
                           let star_text = if is_favorite { "⭐ Star" } else { "☆ Star" };
-                          let star_color = if is_favorite { 
-                              egui::Color32::YELLOW 
-                          } else { 
-                              ui.style().visuals.text_color() 
-                          };
-                          
-                          if ui.button(egui::RichText::new(star_text).color(star_color)).clicked() {
+let star_color = if is_favorite {
+                               egui::Color32::YELLOW
+                           } else {
+                               ui.style().visuals.text_color()
+                           };
+
+                           if ui.button(egui::RichText::new(star_text).color(star_color)).clicked() {
                               self.toggle_project_favorite(project_id);
                           }
                       });
@@ -1404,60 +1436,30 @@ Page::ProjectDetail(project_id) => {
                     ui.heading("Mentions");
                     ui.label("Dummy Mentions page");
                 }
-                Page::Servers => {
+Page::Servers => {
                     ui.heading("Servers");
-                    
-                    // Check local server status when page is shown
-                    if ui.button("Refresh Local Server Status").clicked() {
+
+                    // Local server section
+ui.heading("Local server:");
+
+                     if ui.button("Refresh Local Server Status").clicked() {
                         self.check_local_server();
                     }
-                    
-                    // Saved servers section
-                    if self.servers.is_empty() {
-                        ui.label("No servers saved");
-                    } else {
-                        ui.label("Saved servers:");
-                        egui::ScrollArea::vertical().show(ui, |ui| {
-                            for server in &self.servers {
-                                ui.horizontal(|ui| {
-                                    ui.label(format!("{}@{}", server.user, server.host));
-                                    if let Some(key_path) = &server.key_path {
-                                        ui.separator();
-                                        ui.label(format!("Key: {}", key_path));
-                                    }
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        if ui.button("Connect").clicked() {
-                                            self.config.ssh.server = server.host.clone();
-                                            self.config.ssh.username = server.user.clone();
-                                            self.config.ssh.ssh_key_path = server.key_path.clone().unwrap_or_default();
-                                            self.show_connection_dialog = true;
-                                        }
-                                    });
-                                });
-                                ui.separator();
-                            }
-                        });
-                    }
-                    
-                    ui.add_space(20.0);
-                    
-                    // Local server section
-                    ui.heading("Local server:");
-                    
-                    if self.checking_local_server {
+
+                     if self.checking_local_server {
                         ui.horizontal(|ui| {
                             ui.label("Checking local server...");
                             ui.add(egui::Spinner::new());
                         });
                     } else if self.local_server_running {
                         // Show grid with localhost entry
-                        ui.label("Local nocodo manager is running:");
-                        
-                        let card_width = 300.0;
-                        let card_height = 60.0;
-                        let card_spacing = 10.0;
-                        
-                        ui.horizontal_wrapped(|ui| {
+ui.label("Local nocodo manager is running:");
+
+                         let card_width = 300.0;
+                         let card_height = 60.0;
+                         let _card_spacing = 10.0;
+
+                         ui.horizontal_wrapped(|ui| {
                             let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
                                 egui::Frame::NONE
                                     .fill(ui.style().visuals.widgets.inactive.bg_fill)
@@ -1471,9 +1473,9 @@ Page::ProjectDetail(project_id) => {
                                             });
                                         });
                                     });
-                            });
-                            
-                            // Make the card clickable
+});
+
+                             // Make the card clickable
                             if response.response.interact(egui::Sense::click()).clicked() {
                                 // Connect directly to local server without SSH
                                 self.api_client = Some(crate::api_client::ApiClient::new("http://localhost:8081".to_string()));
@@ -1483,10 +1485,10 @@ Page::ProjectDetail(project_id) => {
                                 // Refresh data after connecting
                                 self.refresh_projects();
                                 self.refresh_works();
-                                self.refresh_settings();
-                            }
-                            
-                            // Change cursor to pointer on hover
+self.refresh_settings();
+                             }
+
+                             // Change cursor to pointer on hover
                             if response.response.hovered() {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                             }
@@ -1494,6 +1496,65 @@ Page::ProjectDetail(project_id) => {
                     } else {
                         ui.label("You can run nocodo manager locally on this computer and connect to it");
                         ui.label("Start the manager with: nocodo-manager --config ~/.config/nocodo/manager.toml");
+                    }
+
+                    ui.add_space(20.0);
+
+                    // Saved servers section
+ui.heading("Saved servers:");
+
+                     if self.servers.is_empty() {
+                        ui.label("No servers saved");
+                    } else {
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            egui_extras::TableBuilder::new(ui)
+                                .column(egui_extras::Column::remainder().at_least(200.0)) // Server column
+                                .column(egui_extras::Column::auto()) // Port column  
+                                .column(egui_extras::Column::remainder().at_least(250.0)) // Key column
+                                .column(egui_extras::Column::auto()) // Connect button column
+                                .header(20.0, |mut header| {
+                                    header.col(|ui| {
+                                        ui.strong("Server");
+                                    });
+                                    header.col(|ui| {
+                                        ui.strong("Port");
+                                    });
+                                    header.col(|ui| {
+                                        ui.strong("SSH Key");
+                                    });
+                                    header.col(|ui| {
+                                        ui.strong("");
+                                    });
+                                })
+                                .body(|mut body| {
+                                    for server in &self.servers {
+                                        body.row(18.0, |mut row| {
+                                            row.col(|ui| {
+                                                ui.label(format!("{}@{}", server.user, server.host));
+                                            });
+                                            row.col(|ui| {
+                                                ui.label(format!("{}", server.port));
+                                            });
+                                            row.col(|ui| {
+                                                if let Some(key_path) = &server.key_path {
+                                                    ui.label(key_path);
+                                                } else {
+                                                    ui.label(egui::RichText::new("Default").color(ui.style().visuals.weak_text_color()));
+                                                }
+                                            });
+                                            row.col(|ui| {
+                                                if ui.button("Connect").clicked() {
+                                                    self.config.ssh.server = server.host.clone();
+                                                    self.config.ssh.username = server.user.clone();
+                                                    self.config.ssh.port = server.port;
+                                                    self.config.ssh.ssh_key_path = server.key_path.clone().unwrap_or_default();
+                                                    self.show_connection_dialog = true;
+                                                }
+                                            });
+                                        });
+                                    }
+                                });
+                        });
                     }
                 }
                  Page::Settings => {
@@ -1610,6 +1671,9 @@ Page::ProjectDetail(project_id) => {
                     ui.label("Username:");
                     ui.text_edit_singleline(&mut self.config.ssh.username);
 
+                    ui.label("Port:");
+                    ui.add(egui::DragValue::new(&mut self.config.ssh.port).range(1..=65535));
+
                     ui.label("SSH Key Path:");
                     ui.text_edit_singleline(&mut self.config.ssh.ssh_key_path);
 
@@ -1657,10 +1721,9 @@ Page::ProjectDetail(project_id) => {
                     ui.text_edit_singleline(&mut self.new_work_model);
 
                     ui.horizontal(|ui| {
-                        if ui.button("Create").clicked()
-                            && !self.new_work_title.trim().is_empty() {
-                                self.create_work();
-                            }
+                        if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
+                            self.create_work();
+                        }
                         if ui.button("Cancel").clicked() {
                             self.show_new_work_dialog = false;
                             self.new_work_title.clear();
