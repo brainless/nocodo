@@ -26,11 +26,11 @@ impl AnthropicProvider {
     }
 
     fn initialize_models(&mut self) {
-        // Initialize common Anthropic models
+        // Initialize latest Claude models
         let models: Vec<Arc<dyn LlmModel>> = vec![
-            Arc::new(ClaudeSonnet4Model::new()),
-            Arc::new(Claude3SonnetModel::new()),
-            Arc::new(Claude3HaikuModel::new()),
+            Arc::new(ClaudeOpus41Model::new()),
+            Arc::new(ClaudeSonnet45Model::new()),
+            Arc::new(ClaudeHaiku45Model::new()),
         ];
 
         for model in models {
@@ -97,44 +97,44 @@ impl LlmProvider for AnthropicProvider {
     }
 }
 
-/// Claude Sonnet 4 model implementation
-pub struct ClaudeSonnet4Model {
+/// Claude Opus 4.1 model implementation
+pub struct ClaudeOpus41Model {
     capabilities: ModelCapabilities,
     pricing: Option<ModelPricing>,
 }
 
-impl ClaudeSonnet4Model {
+impl ClaudeOpus41Model {
     pub fn new() -> Self {
         Self {
             capabilities: ModelCapabilities {
                 supports_streaming: true,
                 supports_tool_calling: true,
                 supports_vision: true,
-                supports_reasoning: true, // Claude Sonnet 4 supports extended thinking
+                supports_reasoning: true,
                 supports_json_mode: true,
             },
             pricing: Some(ModelPricing {
-                input_cost_per_million_tokens: 3.0,
-                output_cost_per_million_tokens: 15.0,
+                input_cost_per_million_tokens: 15.0,
+                output_cost_per_million_tokens: 75.0,
                 reasoning_cost_per_million_tokens: None,
             }),
         }
     }
 }
 
-impl Default for ClaudeSonnet4Model {
+impl Default for ClaudeOpus41Model {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LlmModel for ClaudeSonnet4Model {
+impl LlmModel for ClaudeOpus41Model {
     fn id(&self) -> &str {
-        "claude-sonnet-4-20250514"
+        "claude-opus-4-1-20250805"
     }
 
     fn name(&self) -> &str {
-        "Claude Sonnet 4"
+        "Claude Opus 4.1"
     }
 
     fn provider_id(&self) -> &str {
@@ -142,11 +142,11 @@ impl LlmModel for ClaudeSonnet4Model {
     }
 
     fn context_length(&self) -> u32 {
-        200000 // 200K tokens, with 1M beta available
+        200000 // 200K tokens
     }
 
     fn max_output_tokens(&self) -> Option<u32> {
-        Some(64000) // 64K max output tokens according to the docs
+        Some(32000) // 32K max output tokens
     }
 
     fn supports_streaming(&self) -> bool {
@@ -190,20 +190,20 @@ impl LlmModel for ClaudeSonnet4Model {
     }
 }
 
-/// Claude 3 Sonnet model implementation
-pub struct Claude3SonnetModel {
+/// Claude Sonnet 4.5 model implementation
+pub struct ClaudeSonnet45Model {
     capabilities: ModelCapabilities,
     pricing: Option<ModelPricing>,
 }
 
-impl Claude3SonnetModel {
+impl ClaudeSonnet45Model {
     pub fn new() -> Self {
         Self {
             capabilities: ModelCapabilities {
                 supports_streaming: true,
                 supports_tool_calling: true,
                 supports_vision: true,
-                supports_reasoning: false,
+                supports_reasoning: true, // Claude Sonnet 4.5 supports extended thinking
                 supports_json_mode: true,
             },
             pricing: Some(ModelPricing {
@@ -215,19 +215,19 @@ impl Claude3SonnetModel {
     }
 }
 
-impl Default for Claude3SonnetModel {
+impl Default for ClaudeSonnet45Model {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LlmModel for Claude3SonnetModel {
+impl LlmModel for ClaudeSonnet45Model {
     fn id(&self) -> &str {
-        "claude-3-sonnet-20240229"
+        "claude-sonnet-4-5-20250929"
     }
 
     fn name(&self) -> &str {
-        "Claude 3 Sonnet"
+        "Claude Sonnet 4.5"
     }
 
     fn provider_id(&self) -> &str {
@@ -235,11 +235,11 @@ impl LlmModel for Claude3SonnetModel {
     }
 
     fn context_length(&self) -> u32 {
-        200000
+        200000 // 200K tokens, with 1M beta available
     }
 
     fn max_output_tokens(&self) -> Option<u32> {
-        Some(4096)
+        Some(64000) // 64K max output tokens
     }
 
     fn supports_streaming(&self) -> bool {
@@ -275,7 +275,7 @@ impl LlmModel for Claude3SonnetModel {
     }
 
     fn default_max_tokens(&self) -> Option<u32> {
-        Some(1000)
+        Some(4000)
     }
 
     fn estimate_tokens(&self, text: &str) -> u32 {
@@ -283,44 +283,44 @@ impl LlmModel for Claude3SonnetModel {
     }
 }
 
-/// Claude 3 Haiku model implementation
-pub struct Claude3HaikuModel {
+/// Claude Haiku 4.5 model implementation
+pub struct ClaudeHaiku45Model {
     capabilities: ModelCapabilities,
     pricing: Option<ModelPricing>,
 }
 
-impl Claude3HaikuModel {
+impl ClaudeHaiku45Model {
     pub fn new() -> Self {
         Self {
             capabilities: ModelCapabilities {
                 supports_streaming: true,
                 supports_tool_calling: true,
                 supports_vision: true,
-                supports_reasoning: false,
+                supports_reasoning: true,
                 supports_json_mode: true,
             },
             pricing: Some(ModelPricing {
-                input_cost_per_million_tokens: 0.25,
-                output_cost_per_million_tokens: 1.25,
+                input_cost_per_million_tokens: 1.0,
+                output_cost_per_million_tokens: 5.0,
                 reasoning_cost_per_million_tokens: None,
             }),
         }
     }
 }
 
-impl Default for Claude3HaikuModel {
+impl Default for ClaudeHaiku45Model {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LlmModel for Claude3HaikuModel {
+impl LlmModel for ClaudeHaiku45Model {
     fn id(&self) -> &str {
-        "claude-3-haiku-20240307"
+        "claude-haiku-4-5-20251001"
     }
 
     fn name(&self) -> &str {
-        "Claude 3 Haiku"
+        "Claude Haiku 4.5"
     }
 
     fn provider_id(&self) -> &str {
@@ -328,11 +328,11 @@ impl LlmModel for Claude3HaikuModel {
     }
 
     fn context_length(&self) -> u32 {
-        200000
+        200000 // 200K tokens
     }
 
     fn max_output_tokens(&self) -> Option<u32> {
-        Some(4096)
+        Some(64000) // 64K max output tokens
     }
 
     fn supports_streaming(&self) -> bool {
@@ -368,7 +368,7 @@ impl LlmModel for Claude3HaikuModel {
     }
 
     fn default_max_tokens(&self) -> Option<u32> {
-        Some(1000)
+        Some(4000)
     }
 
     fn estimate_tokens(&self, text: &str) -> u32 {
