@@ -107,6 +107,9 @@ pub struct DesktopApp {
     create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
+    create_ai_session_result: Arc<std::sync::Mutex<Option<Result<manager_models::AiSession, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
     update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
     db: Option<Connection>,
@@ -193,6 +196,7 @@ impl Default for DesktopApp {
             models_fetch_attempted: false,
             creating_work: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
+            create_ai_session_result: Arc::new(std::sync::Mutex::new(None)),
             updating_projects_path: false,
             scanning_projects: false,
             updating_api_keys: false,
@@ -614,6 +618,49 @@ impl DesktopApp {
         }
     }
 
+    fn create_work_message_and_ai_session(&mut self, work: manager_models::Work) {
+        if self.connection_state == ConnectionState::Connected {
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let work_id = work.id;
+            let work_title = work.title.clone();
+            let work_model = work.model.clone();
+            
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    // Step 1: Create work message with the work title as content
+                    match api_client.add_message_to_work(work_id, work_title.clone()).await {
+                        Ok(message) => {
+                            tracing::info!("Created work message {} for work {}", message.id, work_id);
+                            
+                            // Step 2: Create AI session with the message
+                            let tool_name = "llm-agent".to_string();
+                            let message_id_str = message.id.to_string();
+                            
+                            match api_client.create_ai_session(work_id, message_id_str, tool_name).await {
+                                Ok(session) => {
+                                    tracing::info!("Created AI session {} for work {}", session.id, work_id);
+                                    
+                                    // Log the model being used
+                                    if let Some(model) = work_model {
+                                        tracing::info!("AI session will use model: {}", model);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to create AI session for work {}: {}", work_id, e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to create work message for work {}: {}", work_id, e);
+                        }
+                    }
+                } else {
+                    tracing::error!("Not connected to API client");
+                }
+            });
+        }
+    }
+
     /// Helper function to create a sidebar link with proper styling
     fn sidebar_link(
         &self,
@@ -911,22 +958,50 @@ impl eframe::App for DesktopApp {
         }
 
         // Check for create work results
-        if let Ok(mut result) = self.create_work_result.try_lock() {
+        let work_to_process = if let Ok(mut result) = self.create_work_result.try_lock() {
             if let Some(create_work_result) = result.take() {
                 self.creating_work = false;
                 match create_work_result {
                     Ok(work) => {
                         tracing::info!("Created work: {} ({})", work.title, work.id);
                         // Add the new work to the list
-                        self.works.push(work);
+                        self.works.push(work.clone());
+                        
                         // Clear the form
                         self.new_work_title.clear();
                         self.new_work_project_id = None;
                         self.new_work_model = None;
+                        
+                        Some(work)
                     }
                     Err(e) => {
                         tracing::error!("Failed to create work: {}", e);
                         self.connection_error = Some(format!("Failed to create work: {}", e));
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Create work message and AI session for successfully created work
+        if let Some(work) = work_to_process {
+            self.create_work_message_and_ai_session(work);
+        }
+
+        // Check for create AI session results
+        if let Ok(mut result) = self.create_ai_session_result.try_lock() {
+            if let Some(create_ai_session_result) = result.take() {
+                match create_ai_session_result {
+                    Ok(session) => {
+                        tracing::info!("Successfully created AI session: {} for work {}", session.id, session.work_id);
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to create AI session: {}", e);
+                        // Don't show connection error for AI session failure as it's a background operation
                     }
                 }
             }
