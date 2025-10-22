@@ -94,6 +94,7 @@ pub struct DesktopApp {
     loading_settings: bool,
     loading_project_details: bool,
     loading_supported_models: bool,
+    models_fetch_attempted: bool,
     creating_work: bool,
     updating_projects_path: bool,
     scanning_projects: bool,
@@ -180,6 +181,7 @@ impl Default for DesktopApp {
             loading_settings: false,
             loading_project_details: false,
             loading_supported_models: false,
+            models_fetch_attempted: false,
             creating_work: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
             updating_projects_path: false,
@@ -401,6 +403,7 @@ impl DesktopApp {
         if self.connection_state == ConnectionState::Connected {
             if let Some(ref api_client) = self.api_client {
                 self.loading_supported_models = true;
+                self.models_fetch_attempted = true;
                 self.supported_models_result = Arc::new(std::sync::Mutex::new(None));
 
                 let api_client = api_client.clone();
@@ -663,6 +666,7 @@ impl eframe::App for DesktopApp {
                         )));
                         self.connection_state = ConnectionState::Connected;
                         self.connected_host = Some(self.config.ssh.server.clone());
+                        self.models_fetch_attempted = false; // Reset to allow fetching models on new connection
                         // Store server in local DB
                         if let Some(ref db) = self.db {
                             db.execute(
@@ -1122,8 +1126,8 @@ let card_spacing = 10.0;
 
                     // Add the new work form directly on the page
                     if matches!(self.connection_state, ConnectionState::Connected) {
-                        // Load models if not already loaded
-                        if self.supported_models.is_empty() && !self.loading_supported_models {
+                        // Load models only once when form is opened
+                        if !self.models_fetch_attempted && !self.loading_supported_models {
                             self.refresh_supported_models();
                         }
                         // Create form with same styling as work items
@@ -1199,12 +1203,24 @@ let card_spacing = 10.0;
 
                                     ui.add_space(8.0);
 
+                                    // Show error if no models are configured
+                                    if !self.loading_supported_models && self.supported_models.is_empty() {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
+                                            ui.label(
+                                                egui::RichText::new("No models configured. Please set API keys in Settings page")
+                                                    .color(egui::Color32::from_rgb(255, 165, 0))
+                                            );
+                                        });
+                                        ui.add_space(8.0);
+                                    }
+
                                     // Create button
                                     ui.horizontal(|ui| {
                                         if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
                                             self.create_work();
                                         }
-                                        
+
                                         if self.creating_work {
                                             ui.add(egui::Spinner::new());
                                         }
@@ -1661,6 +1677,7 @@ ui.label("Local nocodo manager is running:");
                                 self.connection_state = ConnectionState::Connected;
                                 self.connected_host = Some("localhost".to_string());
                                 self.tunnel = None; // No SSH tunnel for local connection
+                                self.models_fetch_attempted = false; // Reset to allow fetching models on new connection
                                 // Refresh data after connecting
                                 self.refresh_projects();
                                 self.refresh_works();
