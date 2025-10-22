@@ -84,9 +84,11 @@ impl SshTunnel {
         let key_pair = key_pair
             .ok_or_else(|| SshError::AuthenticationFailed("No valid SSH keys found".to_string()))?;
 
-        // Create SSH client configuration
+        // Create SSH client configuration with keepalive
         let config = client::Config {
-            inactivity_timeout: Some(std::time::Duration::from_secs(300)),
+            inactivity_timeout: Some(std::time::Duration::from_secs(600)), // 10 minutes (increased from 5)
+            keepalive_interval: Some(std::time::Duration::from_secs(30)), // Send keepalive every 30 seconds
+            keepalive_max: 3, // Allow 3 missed keepalives before closing connection
             ..Default::default()
         };
 

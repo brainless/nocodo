@@ -54,13 +54,9 @@ pub struct DesktopApp {
 
     // Runtime state (not serialized)
     #[serde(skip)]
-    tunnel: Option<crate::ssh::SshTunnel>,
-    #[serde(skip)]
-    api_client: Option<crate::api_client::ApiClient>,
+    connection_manager: Arc<crate::connection_manager::ConnectionManager>,
     #[serde(skip)]
     pending_project_details_refresh: Option<i64>,
-    #[serde(skip)]
-    connection_result: Arc<std::sync::Mutex<Option<Result<crate::ssh::SshTunnel, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     settings_result:
@@ -178,10 +174,8 @@ impl Default for DesktopApp {
             openai_api_key_input: String::new(),
             anthropic_api_key_input: String::new(),
             api_keys_modified: false,
-            tunnel: None,
-            api_client: None,
+            connection_manager: Arc::new(crate::connection_manager::ConnectionManager::new()),
             pending_project_details_refresh: None,
-            connection_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
@@ -303,8 +297,6 @@ impl DesktopApp {
 
         // Always start disconnected - never restore connection state
         app.connection_state = ConnectionState::Disconnected;
-        app.tunnel = None;
-        app.api_client = None;
         app.pending_project_details_refresh = None;
         app.projects.clear();
         app.works.clear();
@@ -326,7 +318,6 @@ impl DesktopApp {
     fn connect(&mut self) {
         self.connection_state = ConnectionState::Connecting;
         self.connection_error = None;
-        self.connection_result = Arc::new(std::sync::Mutex::new(None));
 
         let server = self.config.ssh.server.clone();
         let username = self.config.ssh.username.clone();
@@ -346,161 +337,185 @@ impl DesktopApp {
             self.config.ssh.ssh_key_path = expanded_path.clone();
             Some(expanded_path)
         };
-        let result_clone = Arc::clone(&self.connection_result);
         let remote_port = self.config.ssh.remote_port;
         let port = self.config.ssh.port;
+        let connection_manager = Arc::clone(&self.connection_manager);
 
-        // Spawn async task for SSH connection
+        // Spawn async task for SSH connection via connection manager
         tokio::spawn(async move {
-            let result = crate::ssh::SshTunnel::connect(
-                &server,
-                &username,
-                key_path.as_deref(),
-                port,
-                remote_port,
-            )
-            .await;
-            let mut connection_result = result_clone.lock().unwrap();
-            *connection_result = Some(result.map_err(|e| e.to_string()));
+            match connection_manager
+                .connect_ssh(&server, &username, key_path.as_deref(), port, remote_port)
+                .await
+            {
+                Ok(_) => {
+                    tracing::info!("Connected successfully via connection manager");
+                }
+                Err(e) => {
+                    tracing::error!("Connection failed: {}", e);
+                }
+            }
         });
     }
 
     fn refresh_projects(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.loading_projects = true;
-                self.projects_result = Arc::new(std::sync::Mutex::new(None));
+            self.loading_projects = true;
+            self.projects_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.projects_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.projects_result);
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.list_projects().await;
                     let mut projects_result = result_clone.lock().unwrap();
                     *projects_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut projects_result = result_clone.lock().unwrap();
+                    *projects_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn refresh_works(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.loading_works = true;
-                self.works_result = Arc::new(std::sync::Mutex::new(None));
+            self.loading_works = true;
+            self.works_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.works_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.works_result);
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.list_works().await;
                     let mut works_result = result_clone.lock().unwrap();
                     *works_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut works_result = result_clone.lock().unwrap();
+                    *works_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn refresh_settings(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.loading_settings = true;
-                self.settings_result = Arc::new(std::sync::Mutex::new(None));
+            self.loading_settings = true;
+            self.settings_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.settings_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.settings_result);
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.get_settings().await;
                     let mut settings_result = result_clone.lock().unwrap();
                     *settings_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut settings_result = result_clone.lock().unwrap();
+                    *settings_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn refresh_supported_models(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.loading_supported_models = true;
-                self.models_fetch_attempted = true;
-                self.supported_models_result = Arc::new(std::sync::Mutex::new(None));
+            self.loading_supported_models = true;
+            self.models_fetch_attempted = true;
+            self.supported_models_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.supported_models_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.supported_models_result);
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.get_supported_models().await;
                     let mut supported_models_result = result_clone.lock().unwrap();
                     *supported_models_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut supported_models_result = result_clone.lock().unwrap();
+                    *supported_models_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn refresh_project_details(&mut self, project_id: i64) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.loading_project_details = true;
-                self.project_details_result = Arc::new(std::sync::Mutex::new(None));
+            self.loading_project_details = true;
+            self.project_details_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.project_details_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.project_details_result);
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.get_project_details(project_id).await;
                     let mut project_details_result = result_clone.lock().unwrap();
                     *project_details_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut project_details_result = result_clone.lock().unwrap();
+                    *project_details_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn refresh_work_messages(&mut self, work_id: i64) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                // Fetch both work messages and AI session outputs
-                self.loading_work_messages = true;
-                self.loading_ai_session_outputs = true;
-                self.work_messages_result = Arc::new(std::sync::Mutex::new(None));
-                self.ai_session_outputs_result = Arc::new(std::sync::Mutex::new(None));
+            // Fetch both work messages and AI session outputs
+            self.loading_work_messages = true;
+            self.loading_ai_session_outputs = true;
+            self.work_messages_result = Arc::new(std::sync::Mutex::new(None));
+            self.ai_session_outputs_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client_clone1 = api_client.clone();
-                let api_client_clone2 = api_client.clone();
-                let messages_result_clone = Arc::clone(&self.work_messages_result);
-                let outputs_result_clone = Arc::clone(&self.ai_session_outputs_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let connection_manager2 = Arc::clone(&self.connection_manager);
+            let messages_result_clone = Arc::clone(&self.work_messages_result);
+            let outputs_result_clone = Arc::clone(&self.ai_session_outputs_result);
 
-                // Fetch work messages (user input)
-                tokio::spawn(async move {
-                    let result = api_client_clone1.get_work_messages(work_id).await;
+            // Fetch work messages (user input)
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let result = api_client.get_work_messages(work_id).await;
                     let mut work_messages_result = messages_result_clone.lock().unwrap();
                     *work_messages_result = Some(result.map_err(|e| e.to_string()));
-                });
+                } else {
+                    let mut work_messages_result = messages_result_clone.lock().unwrap();
+                    *work_messages_result = Some(Err("Not connected".to_string()));
+                }
+            });
 
-                // Fetch AI session outputs (AI responses and tool results)
-                tokio::spawn(async move {
-                    let result = api_client_clone2.get_ai_session_outputs(work_id).await;
+            // Fetch AI session outputs (AI responses and tool results)
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager2.get_api_client().await {
+                    let result = api_client.get_ai_session_outputs(work_id).await;
                     let mut ai_session_outputs_result = outputs_result_clone.lock().unwrap();
                     *ai_session_outputs_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut ai_session_outputs_result = outputs_result_clone.lock().unwrap();
+                    *ai_session_outputs_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn create_work(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.creating_work = true;
-                self.create_work_result = Arc::new(std::sync::Mutex::new(None));
+            self.creating_work = true;
+            self.create_work_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.create_work_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.create_work_result);
 
-                let title = self.new_work_title.clone();
-                let project_id = self.new_work_project_id;
-                let model = self.new_work_model.clone();
+            let title = self.new_work_title.clone();
+            let project_id = self.new_work_project_id;
+            let model = self.new_work_model.clone();
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let request = manager_models::CreateWorkRequest {
                         title,
                         project_id,
@@ -509,81 +524,93 @@ impl DesktopApp {
                     let result = api_client.create_work(request).await;
                     let mut create_work_result = result_clone.lock().unwrap();
                     *create_work_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut create_work_result = result_clone.lock().unwrap();
+                    *create_work_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn update_projects_default_path(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.updating_projects_path = true;
-                self.update_projects_path_result = Arc::new(std::sync::Mutex::new(None));
+            self.updating_projects_path = true;
+            self.update_projects_path_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.update_projects_path_result);
-                let path = self.projects_default_path.clone();
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.update_projects_path_result);
+            let path = self.projects_default_path.clone();
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.set_projects_default_path(path).await;
                     let mut update_result = result_clone.lock().unwrap();
                     *update_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn scan_projects(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.scanning_projects = true;
-                self.scan_projects_result = Arc::new(std::sync::Mutex::new(None));
+            self.scanning_projects = true;
+            self.scan_projects_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.scan_projects_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.scan_projects_result);
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.scan_projects().await;
                     let mut scan_result = result_clone.lock().unwrap();
                     *scan_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut scan_result = result_clone.lock().unwrap();
+                    *scan_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
     fn update_api_keys(&mut self) {
         if self.connection_state == ConnectionState::Connected {
-            if let Some(ref api_client) = self.api_client {
-                self.updating_api_keys = true;
-                self.update_api_keys_result = Arc::new(std::sync::Mutex::new(None));
+            self.updating_api_keys = true;
+            self.update_api_keys_result = Arc::new(std::sync::Mutex::new(None));
 
-                let api_client = api_client.clone();
-                let result_clone = Arc::clone(&self.update_api_keys_result);
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let result_clone = Arc::clone(&self.update_api_keys_result);
 
-                let request = manager_models::UpdateApiKeysRequest {
-                    xai_api_key: if self.xai_api_key_input.is_empty() {
-                        None
-                    } else {
-                        Some(self.xai_api_key_input.clone())
-                    },
-                    openai_api_key: if self.openai_api_key_input.is_empty() {
-                        None
-                    } else {
-                        Some(self.openai_api_key_input.clone())
-                    },
-                    anthropic_api_key: if self.anthropic_api_key_input.is_empty() {
-                        None
-                    } else {
-                        Some(self.anthropic_api_key_input.clone())
-                    },
-                };
+            let request = manager_models::UpdateApiKeysRequest {
+                xai_api_key: if self.xai_api_key_input.is_empty() {
+                    None
+                } else {
+                    Some(self.xai_api_key_input.clone())
+                },
+                openai_api_key: if self.openai_api_key_input.is_empty() {
+                    None
+                } else {
+                    Some(self.openai_api_key_input.clone())
+                },
+                anthropic_api_key: if self.anthropic_api_key_input.is_empty() {
+                    None
+                } else {
+                    Some(self.anthropic_api_key_input.clone())
+                },
+            };
 
-                tokio::spawn(async move {
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.update_api_keys(request).await;
                     let mut update_result = result_clone.lock().unwrap();
                     *update_result = Some(result.map_err(|e| e.to_string()));
-                });
-            }
+                } else {
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(Err("Not connected".to_string()));
+                }
+            });
         }
     }
 
@@ -706,41 +733,43 @@ impl eframe::App for DesktopApp {
 
         let mut should_refresh_projects = false;
 
-        // Check for connection results
-        if let Ok(mut result) = self.connection_result.try_lock() {
-            if let Some(connection_result) = result.take() {
-                match connection_result {
-                    Ok(tunnel) => {
-                        tracing::info!(
-                            "SSH tunnel established successfully on port {}",
-                            tunnel.local_port()
-                        );
-                        self.tunnel = Some(tunnel);
-                        self.api_client = Some(crate::api_client::ApiClient::new(format!(
-                            "http://localhost:{}",
-                            self.tunnel.as_ref().unwrap().local_port()
-                        )));
-                        self.connection_state = ConnectionState::Connected;
-                        self.connected_host = Some(self.config.ssh.server.clone());
-                        self.models_fetch_attempted = false; // Reset to allow fetching models on new connection
-                                                             // Store server in local DB
-                        if let Some(ref db) = self.db {
-                            db.execute(
-                                 "INSERT OR IGNORE INTO servers (host, user, key_path, port) VALUES (?1, ?2, ?3, ?4)",
-                                 [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path, &self.config.ssh.port.to_string()],
-                             ).expect("Could not insert server");
-                        }
-                        // Navigate to Projects page after successful connection
-                        self.current_page = Page::Projects;
-                        // Mark that we should refresh projects after this block
-                        should_refresh_projects = true;
-                    }
-                    Err(e) => {
-                        tracing::error!("SSH connection failed: {}", e);
-                        self.connection_error = Some(e);
-                        self.connection_state = ConnectionState::Disconnected;
-                    }
+        // Check connection manager status
+        if self.connection_state == ConnectionState::Connecting {
+            let connection_manager = Arc::clone(&self.connection_manager);
+            let ctx_clone = ctx.clone();
+
+            tokio::spawn(async move {
+                // Poll to see if connected
+                if connection_manager.is_connected().await {
+                    ctx_clone.request_repaint();
                 }
+            });
+
+            // Check if connection is now established
+            let connection_manager_sync = Arc::clone(&self.connection_manager);
+            let is_connected = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async { connection_manager_sync.is_connected().await })
+            });
+
+            if is_connected {
+                tracing::info!("Connection established via connection manager");
+                self.connection_state = ConnectionState::Connected;
+                self.connected_host = Some(self.config.ssh.server.clone());
+                self.models_fetch_attempted = false; // Reset to allow fetching models on new connection
+
+                // Store server in local DB
+                if let Some(ref db) = self.db {
+                    db.execute(
+                        "INSERT OR IGNORE INTO servers (host, user, key_path, port) VALUES (?1, ?2, ?3, ?4)",
+                        [&self.config.ssh.server, &self.config.ssh.username, &self.config.ssh.ssh_key_path, &self.config.ssh.port.to_string()],
+                    ).expect("Could not insert server");
+                }
+
+                // Navigate to Projects page after successful connection
+                self.current_page = Page::Projects;
+                // Mark that we should refresh projects after this block
+                should_refresh_projects = true;
             }
         }
 
@@ -1769,11 +1798,17 @@ ui.label("Local nocodo manager is running:");
 
                              // Make the card clickable
                             if response.response.interact(egui::Sense::click()).clicked() {
-                                // Connect directly to local server without SSH
-                                self.api_client = Some(crate::api_client::ApiClient::new("http://localhost:8081".to_string()));
+                                // Connect directly to local server without SSH via connection manager
+                                let connection_manager = Arc::clone(&self.connection_manager);
+                                tokio::spawn(async move {
+                                    match connection_manager.connect_local(8081).await {
+                                        Ok(_) => tracing::info!("Connected to local manager"),
+                                        Err(e) => tracing::error!("Failed to connect to local manager: {}", e),
+                                    }
+                                });
+
                                 self.connection_state = ConnectionState::Connected;
                                 self.connected_host = Some("localhost".to_string());
-                                self.tunnel = None; // No SSH tunnel for local connection
                                 self.models_fetch_attempted = false; // Reset to allow fetching models on new connection
                                 // Refresh data after connecting
                                 self.refresh_projects();
