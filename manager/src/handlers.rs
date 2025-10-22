@@ -9,8 +9,8 @@ use crate::models::{
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
     CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
     FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
-    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
-    WorkMessageResponse, WorkResponse,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, UpdateApiKeysRequest,
+    WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -1484,10 +1484,88 @@ pub async fn get_settings(_data: web::Data<AppState>) -> Result<HttpResponse, Ap
     let response = SettingsResponse {
         config_file_path,
         api_keys,
-        projects_default_path: config.projects.as_ref().and_then(|projects| projects.default_path.clone()),
+        projects_default_path: config
+            .projects
+            .as_ref()
+            .and_then(|projects| projects.default_path.clone()),
     };
 
     Ok(HttpResponse::Ok().json(response))
+}
+
+/// Update API keys
+pub async fn update_api_keys(
+    data: web::Data<AppState>,
+    request: web::Json<UpdateApiKeysRequest>,
+) -> Result<HttpResponse, AppError> {
+    let req = request.into_inner();
+
+    tracing::info!("Updating API keys");
+
+    // Load current config
+    let mut config = data.config.as_ref().clone();
+
+    // Initialize api_keys section if it doesn't exist
+    if config.api_keys.is_none() {
+        config.api_keys = Some(crate::config::ApiKeysConfig {
+            xai_api_key: None,
+            openai_api_key: None,
+            anthropic_api_key: None,
+        });
+    }
+
+    // Update the API keys (only update if provided in request)
+    if let Some(ref mut api_keys) = config.api_keys {
+        if let Some(xai_key) = req.xai_api_key {
+            if !xai_key.is_empty() {
+                api_keys.xai_api_key = Some(xai_key);
+                tracing::info!("Updated xAI API key");
+            } else {
+                api_keys.xai_api_key = None;
+                tracing::info!("Cleared xAI API key");
+            }
+        }
+
+        if let Some(openai_key) = req.openai_api_key {
+            if !openai_key.is_empty() {
+                api_keys.openai_api_key = Some(openai_key);
+                tracing::info!("Updated OpenAI API key");
+            } else {
+                api_keys.openai_api_key = None;
+                tracing::info!("Cleared OpenAI API key");
+            }
+        }
+
+        if let Some(anthropic_key) = req.anthropic_api_key {
+            if !anthropic_key.is_empty() {
+                api_keys.anthropic_api_key = Some(anthropic_key);
+                tracing::info!("Updated Anthropic API key");
+            } else {
+                api_keys.anthropic_api_key = None;
+                tracing::info!("Cleared Anthropic API key");
+            }
+        }
+    }
+
+    // Save config to file
+    let config_path = if let Some(home) = home::home_dir() {
+        home.join(".config/nocodo/manager.toml")
+    } else {
+        std::path::PathBuf::from("manager.toml")
+    };
+
+    let toml_string = toml::to_string(&config)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize config: {}", e)))?;
+
+    std::fs::write(&config_path, toml_string)
+        .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
+
+    tracing::info!("API keys updated successfully");
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "API keys updated successfully"
+    })))
 }
 
 /// Set projects default path
@@ -1565,11 +1643,10 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
     tracing::info!("scan_projects endpoint called");
 
     // Reload config from file to get latest projects_default_path
-    let config = AppConfig::load()
-        .map_err(|e| {
-            tracing::error!("Failed to reload config: {}", e);
-            AppError::Internal(format!("Failed to reload config: {}", e))
-        })?;
+    let config = AppConfig::load().map_err(|e| {
+        tracing::error!("Failed to reload config: {}", e);
+        AppError::Internal(format!("Failed to reload config: {}", e))
+    })?;
 
     tracing::info!("Reloaded config api_keys: {:?}", config.api_keys);
 
@@ -1579,13 +1656,15 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
         } else {
             tracing::error!("Projects default path not configured in reloaded config");
             return Err(AppError::InvalidRequest(
-                "Projects default path not configured. Please set it in Settings first.".to_string(),
+                "Projects default path not configured. Please set it in Settings first."
+                    .to_string(),
             ));
         }
     } else {
         tracing::error!("Projects configuration not found in reloaded config");
         return Err(AppError::InvalidRequest(
-            "Projects configuration not found. Please set the projects path in Settings.".to_string(),
+            "Projects configuration not found. Please set the projects path in Settings."
+                .to_string(),
         ));
     };
 
@@ -1615,7 +1694,8 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
 
     for entry in entries {
         entry_count += 1;
-        let entry = entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {}", e)))?;
+        let entry =
+            entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {}", e)))?;
         let path = entry.path();
 
         if path.is_dir() {
@@ -1641,7 +1721,8 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
                 project.description = Some("Node.js project".to_string());
             } else if path.join("Cargo.toml").exists() {
                 project.description = Some("Rust project".to_string());
-            } else if path.join("pyproject.toml").exists() || path.join("requirements.txt").exists() {
+            } else if path.join("pyproject.toml").exists() || path.join("requirements.txt").exists()
+            {
                 project.description = Some("Python project".to_string());
             } else if path.join("go.mod").exists() {
                 project.description = Some("Go project".to_string());
@@ -1655,17 +1736,15 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
 
             created_projects.push(project.clone());
 
-            tracing::info!(
-                "Created project: {} at {}",
-                project.name,
-                project.path
-            );
+            tracing::info!("Created project: {} at {}", project.name, project.path);
         }
     }
 
     tracing::info!(
         "Successfully scanned projects directory: {} (found {} entries, created {} projects)",
-        projects_path, entry_count, created_projects.len()
+        projects_path,
+        entry_count,
+        created_projects.len()
     );
 
     Ok(HttpResponse::Ok().json(serde_json::json!({

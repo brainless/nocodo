@@ -1,6 +1,6 @@
 use manager_models::{
     CreateWorkRequest, Project, ProjectDetailsResponse, ProjectListResponse, SettingsResponse,
-    SupportedModelsResponse, Work, WorkListResponse, WorkResponse,
+    SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -155,7 +155,9 @@ impl ApiClient {
         Ok(work_response.work)
     }
 
-    pub async fn get_supported_models(&self) -> Result<Vec<manager_models::SupportedModel>, ApiError> {
+    pub async fn get_supported_models(
+        &self,
+    ) -> Result<Vec<manager_models::SupportedModel>, ApiError> {
         let url = format!("{}/api/models", self.base_url);
         let response = self
             .client()
@@ -229,6 +231,29 @@ impl ApiClient {
         let response = self
             .client()
             .post(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    pub async fn update_api_keys(&self, request: UpdateApiKeysRequest) -> Result<Value, ApiError> {
+        let url = format!("{}/api/settings/api-keys", self.base_url);
+
+        let response = self
+            .client()
+            .post(&url)
+            .json(&request)
             .send()
             .await
             .map_err(|e| ApiError::RequestFailed(e.to_string()))?;

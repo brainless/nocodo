@@ -54,6 +54,7 @@ impl TestConfig {
                 openai_api_key: Some("test-openai-key".to_string()),
                 anthropic_api_key: Some("test-anthropic-key".to_string()),
             }),
+            projects: None,
         };
 
         Self {

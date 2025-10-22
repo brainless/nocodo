@@ -46,6 +46,12 @@ pub struct DesktopApp {
     projects_default_path: String,
     projects_default_path_modified: bool,
 
+    // API keys state
+    xai_api_key_input: String,
+    openai_api_key_input: String,
+    anthropic_api_key_input: String,
+    api_keys_modified: bool,
+
     // Runtime state (not serialized)
     #[serde(skip)]
     tunnel: Option<crate::ssh::SshTunnel>,
@@ -85,7 +91,8 @@ pub struct DesktopApp {
     scan_projects_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    supported_models_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::SupportedModel>, String>>>>,
+    supported_models_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::SupportedModel>, String>>>>,
     #[serde(skip)]
     loading_projects: bool,
     loading_works: bool,
@@ -98,9 +105,13 @@ pub struct DesktopApp {
     creating_work: bool,
     updating_projects_path: bool,
     scanning_projects: bool,
+    updating_api_keys: bool,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
     db: Option<Connection>,
 }
@@ -163,6 +174,10 @@ impl Default for DesktopApp {
             favorite_projects: std::collections::HashSet::new(),
             projects_default_path: String::new(),
             projects_default_path_modified: false,
+            xai_api_key_input: String::new(),
+            openai_api_key_input: String::new(),
+            anthropic_api_key_input: String::new(),
+            api_keys_modified: false,
             tunnel: None,
             api_client: None,
             pending_project_details_refresh: None,
@@ -186,8 +201,10 @@ impl Default for DesktopApp {
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
             updating_projects_path: false,
             scanning_projects: false,
+            updating_api_keys: false,
             update_projects_path_result: Arc::new(std::sync::Mutex::new(None)),
             scan_projects_result: Arc::new(std::sync::Mutex::new(None)),
+            update_api_keys_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
         }
     }
@@ -233,10 +250,10 @@ impl DesktopApp {
         ).expect("Could not create unique index");
 
         // Add port column if it doesn't exist (for backward compatibility)
-        if let Err(_) = db.execute(
+        if db.execute(
             "ALTER TABLE servers ADD COLUMN port INTEGER NOT NULL DEFAULT 22",
             [],
-        ) {
+        ).is_err() {
             // Ignore error if column already exists
         }
 
@@ -296,7 +313,7 @@ impl DesktopApp {
         app.loading_works = false;
         app.loading_work_messages = false;
         app.loading_ai_session_outputs = false;
-        
+
         // Always start on Servers page
         app.current_page = Page::Servers;
 
@@ -531,6 +548,42 @@ impl DesktopApp {
         }
     }
 
+    fn update_api_keys(&mut self) {
+        if self.connection_state == ConnectionState::Connected {
+            if let Some(ref api_client) = self.api_client {
+                self.updating_api_keys = true;
+                self.update_api_keys_result = Arc::new(std::sync::Mutex::new(None));
+
+                let api_client = api_client.clone();
+                let result_clone = Arc::clone(&self.update_api_keys_result);
+
+                let request = manager_models::UpdateApiKeysRequest {
+                    xai_api_key: if self.xai_api_key_input.is_empty() {
+                        None
+                    } else {
+                        Some(self.xai_api_key_input.clone())
+                    },
+                    openai_api_key: if self.openai_api_key_input.is_empty() {
+                        None
+                    } else {
+                        Some(self.openai_api_key_input.clone())
+                    },
+                    anthropic_api_key: if self.anthropic_api_key_input.is_empty() {
+                        None
+                    } else {
+                        Some(self.anthropic_api_key_input.clone())
+                    },
+                };
+
+                tokio::spawn(async move {
+                    let result = api_client.update_api_keys(request).await;
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(result.map_err(|e| e.to_string()));
+                });
+            }
+        }
+    }
+
     /// Helper function to create a sidebar link with proper styling
     fn sidebar_link(
         &self,
@@ -578,7 +631,7 @@ impl DesktopApp {
                 .prepare("SELECT entity_id FROM favorites WHERE entity_type = 'project'")
                 .expect("Could not prepare statement for loading favorites");
             let favorite_iter = stmt
-                .query_map([], |row| Ok(row.get::<_, i64>(0)?))
+                .query_map([], |row| row.get::<_, i64>(0))
                 .expect("Could not query favorites");
             self.favorite_projects = favorite_iter.filter_map(|f| f.ok()).collect();
         }
@@ -667,7 +720,7 @@ impl eframe::App for DesktopApp {
                         self.connection_state = ConnectionState::Connected;
                         self.connected_host = Some(self.config.ssh.server.clone());
                         self.models_fetch_attempted = false; // Reset to allow fetching models on new connection
-                        // Store server in local DB
+                                                             // Store server in local DB
                         if let Some(ref db) = self.db {
                             db.execute(
                                  "INSERT OR IGNORE INTO servers (host, user, key_path, port) VALUES (?1, ?2, ?3, ?4)",
@@ -771,6 +824,15 @@ impl eframe::App for DesktopApp {
                             self.projects_default_path = path.clone();
                             self.projects_default_path_modified = false;
                         }
+                        // Initialize API key input fields from loaded settings (unmask them)
+                        // Note: We'll keep them empty initially for security, user needs to enter them
+                        if self.xai_api_key_input.is_empty()
+                            && self.openai_api_key_input.is_empty()
+                            && self.anthropic_api_key_input.is_empty()
+                        {
+                            // Keep fields empty for security - don't populate from masked values
+                            self.api_keys_modified = false;
+                        }
                     }
                     Err(e) => {
                         tracing::error!("Failed to load settings: {}", e);
@@ -791,7 +853,8 @@ impl eframe::App for DesktopApp {
                     }
                     Err(e) => {
                         tracing::error!("Failed to load supported models: {}", e);
-                        self.connection_error = Some(format!("Failed to load supported models: {}", e));
+                        self.connection_error =
+                            Some(format!("Failed to load supported models: {}", e));
                     }
                 }
             }
@@ -879,6 +942,29 @@ impl eframe::App for DesktopApp {
             }
         }
 
+        // Check for update API keys results
+        let mut should_refresh_api_keys = false;
+        if let Ok(mut result) = self.update_api_keys_result.try_lock() {
+            if let Some(update_result) = result.take() {
+                self.updating_api_keys = false;
+                match update_result {
+                    Ok(_) => {
+                        tracing::info!("API keys updated successfully");
+                        self.api_keys_modified = false;
+                        // Clear input fields after successful update
+                        self.xai_api_key_input.clear();
+                        self.openai_api_key_input.clear();
+                        self.anthropic_api_key_input.clear();
+                        should_refresh_api_keys = true;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to update API keys: {}", e);
+                        self.connection_error = Some(format!("Failed to update API keys: {}", e));
+                    }
+                }
+            }
+        }
+
         // Check for local server check results
         if let Ok(mut result) = self.local_server_check_result.try_lock() {
             if let Some(check_result) = result.take() {
@@ -894,6 +980,10 @@ impl eframe::App for DesktopApp {
         }
         if should_refresh_projects {
             self.refresh_projects();
+        }
+        if should_refresh_api_keys {
+            self.refresh_settings();
+            self.refresh_supported_models();
         }
 
         // Auto-refresh projects, works, settings, and models after connection
@@ -951,31 +1041,35 @@ impl eframe::App for DesktopApp {
                     }
 
                     // Favorite projects section
-                    if !self.favorite_projects.is_empty() && self.connection_state == ConnectionState::Connected {
+                    if !self.favorite_projects.is_empty()
+                        && self.connection_state == ConnectionState::Connected
+                    {
                         ui.add_space(4.0);
-                        
+
                         // Show favorite projects
                         for project in &self.projects {
                             if self.favorite_projects.contains(&project.id) {
                                 let available_width = ui.available_width();
-                                let (rect, response) = 
-                                    ui.allocate_exact_size(egui::vec2(available_width, 24.0), egui::Sense::click());
-                                
+                                let (rect, response) = ui.allocate_exact_size(
+                                    egui::vec2(available_width, 24.0),
+                                    egui::Sense::click(),
+                                );
+
                                 // Change cursor to pointer on hover
                                 if response.hovered() {
                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                 }
-                                
+
                                 // Determine background color based on hover state (same as sidebar_link)
                                 let bg_color = if response.hovered() {
                                     button_bg
                                 } else {
                                     sidebar_bg
                                 };
-                                
+
                                 // Draw background with same border radius as sidebar_link (0.0)
                                 ui.painter().rect_filled(rect, 0.0, bg_color);
-                                
+
                                 // Draw text with same styling as sidebar_link but with 12px left padding (8px + 4px extra)
                                 let text_pos = rect.min + egui::vec2(12.0, 4.0); // Same y position (4.0) as sidebar_link
                                 ui.painter().text(
@@ -983,9 +1077,9 @@ impl eframe::App for DesktopApp {
                                     egui::Align2::LEFT_TOP, // Same alignment as sidebar_link
                                     &project.name,
                                     egui::FontId::default(), // Same font as sidebar_link
-                                    ui.style().visuals.text_color() // Same text color as sidebar_link
+                                    ui.style().visuals.text_color(), // Same text color as sidebar_link
                                 );
-                                
+
                                 // Handle click
                                 if response.clicked() {
                                     self.current_page = Page::ProjectDetail(project.id);
@@ -1780,21 +1874,91 @@ ui.heading("Saved servers:");
                              } else if let Some(settings) = &self.settings {
                                  ui.heading("API Keys");
 
+                                 // Clone settings to avoid borrowing issues
+                                 let settings_clone = settings.clone();
+
                                  egui::ScrollArea::vertical().show(ui, |ui| {
-                                     for api_key in &settings.api_keys {
-                                         ui.vertical(|ui| {
-                                             ui.label(&api_key.name);
-                                             ui.add(
-                                                 egui::TextEdit::singleline(&mut api_key.key.as_ref().unwrap_or(&String::new()).clone())
-                                                     .desired_width(300.0)
-                                                     .interactive(false)
-                                             );
-                                             ui.horizontal(|ui| {
-                                                 ui.label(if api_key.is_configured { "✓ Configured" } else { "✗ Not configured" });
-                                             });
+                                     // Grok/xAI API Key
+                                     ui.vertical(|ui| {
+                                         ui.label("Grok API Key");
+                                         let response = ui.add(
+                                             egui::TextEdit::singleline(&mut self.xai_api_key_input)
+                                                 .password(true)
+                                                 .hint_text("Enter xAI API key")
+                                                 .desired_width(400.0)
+                                         );
+                                         if response.changed() {
+                                             self.api_keys_modified = true;
+                                         }
+                                         ui.horizontal(|ui| {
+                                             let configured = settings_clone.api_keys.iter()
+                                                 .find(|k| k.name == "Grok API Key")
+                                                 .map(|k| k.is_configured)
+                                                 .unwrap_or(false);
+                                             ui.label(if configured { "✓ Configured" } else { "✗ Not configured" });
                                          });
-                                         ui.separator();
-                                     }
+                                     });
+                                     ui.separator();
+
+                                     // OpenAI API Key
+                                     ui.vertical(|ui| {
+                                         ui.label("OpenAI API Key");
+                                         let response = ui.add(
+                                             egui::TextEdit::singleline(&mut self.openai_api_key_input)
+                                                 .password(true)
+                                                 .hint_text("Enter OpenAI API key")
+                                                 .desired_width(400.0)
+                                         );
+                                         if response.changed() {
+                                             self.api_keys_modified = true;
+                                         }
+                                         ui.horizontal(|ui| {
+                                             let configured = settings_clone.api_keys.iter()
+                                                 .find(|k| k.name == "OpenAI API Key")
+                                                 .map(|k| k.is_configured)
+                                                 .unwrap_or(false);
+                                             ui.label(if configured { "✓ Configured" } else { "✗ Not configured" });
+                                         });
+                                     });
+                                     ui.separator();
+
+                                     // Anthropic API Key
+                                     ui.vertical(|ui| {
+                                         ui.label("Anthropic API Key");
+                                         let response = ui.add(
+                                             egui::TextEdit::singleline(&mut self.anthropic_api_key_input)
+                                                 .password(true)
+                                                 .hint_text("Enter Anthropic API key")
+                                                 .desired_width(400.0)
+                                         );
+                                         if response.changed() {
+                                             self.api_keys_modified = true;
+                                         }
+                                         ui.horizontal(|ui| {
+                                             let configured = settings_clone.api_keys.iter()
+                                                 .find(|k| k.name == "Anthropic API Key")
+                                                 .map(|k| k.is_configured)
+                                                 .unwrap_or(false);
+                                             ui.label(if configured { "✓ Configured" } else { "✗ Not configured" });
+                                         });
+                                     });
+                                     ui.separator();
+
+                                     // Update Keys button
+                                     ui.horizontal(|ui| {
+                                         let update_button = ui.add_enabled(
+                                             self.api_keys_modified && !self.updating_api_keys,
+                                             egui::Button::new("Update API Keys")
+                                         );
+
+                                         if update_button.clicked() {
+                                             self.update_api_keys();
+                                         }
+
+                                         if self.updating_api_keys {
+                                             ui.add(egui::Spinner::new());
+                                         }
+                                     });
                                  });
 
                                   ui.add_space(20.0);
@@ -1884,7 +2048,5 @@ ui.heading("Saved servers:");
                     });
                 });
         }
-
-        
     }
 }

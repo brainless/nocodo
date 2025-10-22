@@ -179,11 +179,18 @@ async fn main() -> AppResult<()> {
                             "/projects/{project_id}/workflows/commands/{command_id}/executions",
                             web::get().to(handlers::get_command_executions),
                         )
-                         // Settings endpoints
-                         .route("/settings", web::get().to(handlers::get_settings))
-                         .route("/settings/projects-path", web::post().to(handlers::set_projects_default_path))
-                         .route("/projects/scan", web::post().to(handlers::scan_projects))
-                         .route("/models", web::get().to(handlers::get_supported_models)),
+                        // Settings endpoints
+                        .route("/settings", web::get().to(handlers::get_settings))
+                        .route(
+                            "/settings/api-keys",
+                            web::post().to(handlers::update_api_keys),
+                        )
+                        .route(
+                            "/settings/projects-path",
+                            web::post().to(handlers::set_projects_default_path),
+                        )
+                        .route("/projects/scan", web::post().to(handlers::scan_projects))
+                        .route("/models", web::get().to(handlers::get_supported_models)),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))
