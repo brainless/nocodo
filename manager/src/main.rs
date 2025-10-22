@@ -98,7 +98,7 @@ async fn main() -> AppResult<()> {
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
         llm_agent,
-        config: Arc::new(config.clone()),
+        config: Arc::new(std::sync::RwLock::new(config.clone())),
     });
 
     // Start HTTP server

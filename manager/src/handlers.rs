@@ -30,7 +30,7 @@ pub struct AppState {
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
     pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
-    pub config: Arc<AppConfig>,
+    pub config: Arc<std::sync::RwLock<AppConfig>>,
 }
 
 /// Helper function to infer the provider from a model ID
@@ -55,9 +55,14 @@ fn infer_provider_from_model(model_id: &str) -> &str {
 }
 
 /// Helper function to get a user-friendly display name from a model ID by looking it up in the provider
-async fn get_model_display_name(model_id: &str, provider: &str, config: &AppConfig) -> String {
+async fn get_model_display_name(model_id: &str, provider: &str, config: &std::sync::RwLock<AppConfig>) -> String {
     // Try to get the model name from the provider
-    if let Some(api_key_config) = &config.api_keys {
+    let config_read = match config.read() {
+        Ok(guard) => guard,
+        Err(_) => return model_id.to_string(), // Return model_id if we can't get the lock
+    };
+    
+    if let Some(api_key_config) = &config_read.api_keys {
         let model_name = match provider {
             "anthropic" => {
                 if let Some(api_key) = &api_key_config.anthropic_api_key {
@@ -1398,10 +1403,9 @@ pub async fn get_command_executions(
 }
 
 /// Get settings information including API key configuration
-pub async fn get_settings(_data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    // Reload config from file to get latest settings
-    let config = AppConfig::load()
-        .map_err(|e| AppError::Internal(format!("Failed to reload config: {}", e)))?;
+pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    // Use the in-memory config to get latest settings
+    let config = data.config.read().map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
 
     // Get config file path - similar to how it's determined in config.rs
     let config_file_path = if let Some(home) = home::home_dir() {
@@ -1503,7 +1507,10 @@ pub async fn update_api_keys(
     tracing::info!("Updating API keys");
 
     // Load current config
-    let mut config = data.config.as_ref().clone();
+    let mut config = {
+        let config_read = data.config.read().map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
+        config_read.clone()
+    };
 
     // Initialize api_keys section if it doesn't exist
     if config.api_keys.is_none() {
@@ -1560,6 +1567,12 @@ pub async fn update_api_keys(
     std::fs::write(&config_path, toml_string)
         .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
 
+    // Update the in-memory config as well
+    {
+        let mut config_write = data.config.write().map_err(|e| AppError::Internal(format!("Failed to acquire config write lock: {}", e)))?;
+        *config_write = config;
+    }
+
     tracing::info!("API keys updated successfully");
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -1608,7 +1621,10 @@ pub async fn set_projects_default_path(
     }
 
     // Update config
-    let mut config = data.config.as_ref().clone();
+    let mut config = {
+        let config_read = data.config.read().map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
+        config_read.clone()
+    };
     if let Some(ref mut projects) = config.projects {
         projects.default_path = Some(expanded_path.clone());
     } else {
@@ -1629,6 +1645,12 @@ pub async fn set_projects_default_path(
 
     std::fs::write(&config_path, toml_string)
         .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
+
+    // Update the in-memory config as well
+    {
+        let mut config_write = data.config.write().map_err(|e| AppError::Internal(format!("Failed to acquire config write lock: {}", e)))?;
+        *config_write = config;
+    }
 
     tracing::info!("Updated projects default path to: {}", expanded_path);
 
@@ -1757,7 +1779,7 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
 /// Get list of supported and enabled models
 pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     tracing::info!("get_supported_models endpoint called");
-    let config = &data.config;
+    let config = data.config.read().map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
     let mut models = Vec::new();
 
     tracing::info!("Checking for configured API keys in get_supported_models");
