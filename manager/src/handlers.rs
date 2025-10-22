@@ -1484,7 +1484,7 @@ pub async fn get_settings(_data: web::Data<AppState>) -> Result<HttpResponse, Ap
     let response = SettingsResponse {
         config_file_path,
         api_keys,
-        projects_default_path: config.api_keys.as_ref().and_then(|keys| keys.projects_default_path.clone()),
+        projects_default_path: config.projects.as_ref().and_then(|projects| projects.default_path.clone()),
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -1531,14 +1531,11 @@ pub async fn set_projects_default_path(
 
     // Update config
     let mut config = data.config.as_ref().clone();
-    if let Some(ref mut api_keys) = config.api_keys {
-        api_keys.projects_default_path = Some(expanded_path.clone());
+    if let Some(ref mut projects) = config.projects {
+        projects.default_path = Some(expanded_path.clone());
     } else {
-        config.api_keys = Some(crate::config::ApiKeysConfig {
-            xai_api_key: None,
-            openai_api_key: None,
-            anthropic_api_key: None,
-            projects_default_path: Some(expanded_path.clone()),
+        config.projects = Some(crate::config::ProjectsConfig {
+            default_path: Some(expanded_path.clone()),
         });
     }
 
@@ -1576,8 +1573,8 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
 
     tracing::info!("Reloaded config api_keys: {:?}", config.api_keys);
 
-    let projects_path = if let Some(api_keys) = &config.api_keys {
-        if let Some(path) = &api_keys.projects_default_path {
+    let projects_path = if let Some(projects) = &config.projects {
+        if let Some(path) = &projects.default_path {
             path.clone()
         } else {
             tracing::error!("Projects default path not configured in reloaded config");
@@ -1586,9 +1583,9 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
             ));
         }
     } else {
-        tracing::error!("API keys configuration not found in reloaded config");
+        tracing::error!("Projects configuration not found in reloaded config");
         return Err(AppError::InvalidRequest(
-            "API keys configuration not found. Please configure API keys in Settings.".to_string(),
+            "Projects configuration not found. Please set the projects path in Settings.".to_string(),
         ));
     };
 
@@ -1840,54 +1837,6 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
         } else {
             tracing::info!("xAI API key not configured");
         }
-    }
-
-    // If no models were found but we have API keys configured, try to return default models
-    if models.is_empty() && config.api_keys.is_some() {
-        tracing::info!("No models found from providers, adding default models");
-        // Add some default models for development/testing
-        models.push(crate::models::SupportedModel {
-            provider: "openai".to_string(),
-            model_id: "gpt-5".to_string(),
-            name: "GPT-5".to_string(),
-            context_length: 262144,
-            supports_streaming: true,
-            supports_tool_calling: true,
-            supports_vision: true,
-            supports_reasoning: true,
-            input_cost_per_token: Some(0.002),
-            output_cost_per_token: Some(0.008),
-            default_temperature: Some(0.7),
-            default_max_tokens: Some(2000),
-        });
-        models.push(crate::models::SupportedModel {
-            provider: "anthropic".to_string(),
-            model_id: "claude-3-sonnet-20240229".to_string(),
-            name: "Claude 3 Sonnet".to_string(),
-            context_length: 200000,
-            supports_streaming: true,
-            supports_tool_calling: true,
-            supports_vision: true,
-            supports_reasoning: false,
-            input_cost_per_token: Some(0.003),
-            output_cost_per_token: Some(0.015),
-            default_temperature: Some(0.7),
-            default_max_tokens: Some(1000),
-        });
-        models.push(crate::models::SupportedModel {
-            provider: "xai".to_string(),
-            model_id: "grok-code-fast-1".to_string(),
-            name: "Grok Code Fast 1".to_string(),
-            context_length: 131072,
-            supports_streaming: true,
-            supports_tool_calling: true,
-            supports_vision: false,
-            supports_reasoning: true,
-            input_cost_per_token: Some(0.002),
-            output_cost_per_token: Some(0.01),
-            default_temperature: Some(0.7),
-            default_max_tokens: Some(2000),
-        });
     }
 
     tracing::info!("Returning {} supported models", models.len());
