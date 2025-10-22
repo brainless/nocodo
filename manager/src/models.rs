@@ -2,7 +2,10 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 // Re-export shared models from manager-models
-pub use manager_models::{ApiKeyConfig, SettingsResponse, SupportedModel, SupportedModelsResponse, LlmAgentToolCall};
+pub use manager_models::{
+    ApiKeyConfig, LlmAgentToolCall, SettingsResponse, SupportedModel, SupportedModelsResponse,
+    UpdateApiKeysRequest,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -193,10 +196,6 @@ impl AiSessionResult {
 pub struct AiSessionOutputListResponse {
     pub outputs: Vec<AiSessionOutput>,
 }
-
-
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
@@ -698,8 +697,6 @@ pub struct CreateLlmAgentSessionRequest {
     pub system_prompt: Option<String>,
 }
 
-
-
 /// LLM agent message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAgentMessage {
@@ -709,5 +706,3 @@ pub struct LlmAgentMessage {
     pub content: String,
     pub created_at: i64,
 }
-
-

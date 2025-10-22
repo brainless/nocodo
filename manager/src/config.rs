@@ -8,6 +8,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub socket: SocketConfig,
     pub api_keys: Option<ApiKeysConfig>,
+    pub projects: Option<ProjectsConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -15,7 +16,11 @@ pub struct ApiKeysConfig {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
-    pub projects_default_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProjectsConfig {
+    pub default_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -48,6 +53,7 @@ impl Default for AppConfig {
                 path: "/tmp/nocodo-manager.sock".to_string(),
             },
             api_keys: None,
+            projects: None,
         }
     }
 }
@@ -76,11 +82,13 @@ path = "~/.local/share/nocodo/manager.db"
 [socket]
 path = "/tmp/nocodo-manager.sock"
 
- [api_keys]
- # xai_api_key = "your-xai-key"
- # openai_api_key = "your-openai-key"
- # anthropic_api_key = "your-anthropic-key"
- # projects_default_path = "~/projects"
+[api_keys]
+# xai_api_key = "your-xai-key"
+# openai_api_key = "your-openai-key"
+# anthropic_api_key = "your-anthropic-key"
+
+[projects]
+# default_path = "~/projects"
 "#;
             std::fs::write(&config_path, default_config).map_err(|e| {
                 ConfigError::Message(format!("Failed to write default config: {e}"))

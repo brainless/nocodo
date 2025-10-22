@@ -68,8 +68,6 @@ impl ProjectComponent {
     }
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDetectionResult {
     pub primary_language: String,
@@ -77,8 +75,6 @@ pub struct ProjectDetectionResult {
     pub package_managers: Vec<String>,
     pub deployment_configs: Vec<String>,
 }
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateProjectRequest {
@@ -225,10 +221,6 @@ impl AiSessionResult {
 pub struct AiSessionOutputListResponse {
     pub outputs: Vec<AiSessionOutput>,
 }
-
-
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
@@ -730,8 +722,6 @@ pub struct CreateLlmAgentSessionRequest {
     pub system_prompt: Option<String>,
 }
 
-
-
 /// LLM agent message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAgentMessage {
@@ -830,4 +820,12 @@ pub struct SupportedModel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupportedModelsResponse {
     pub models: Vec<SupportedModel>,
+}
+
+/// Request for updating API keys
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateApiKeysRequest {
+    pub xai_api_key: Option<String>,
+    pub openai_api_key: Option<String>,
+    pub anthropic_api_key: Option<String>,
 }

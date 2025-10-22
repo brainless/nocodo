@@ -412,7 +412,7 @@ impl Database {
 
         if has_datetime_columns {
             tracing::info!("Migrating DATETIME columns to INTEGER in workflow tables");
-            
+
             // Migrate workflow_commands table
             conn.execute(
                 "CREATE TABLE workflow_commands_new (
@@ -445,7 +445,10 @@ impl Database {
             )?;
 
             conn.execute("DROP TABLE workflow_commands", [])?;
-            conn.execute("ALTER TABLE workflow_commands_new RENAME TO workflow_commands", [])?;
+            conn.execute(
+                "ALTER TABLE workflow_commands_new RENAME TO workflow_commands",
+                [],
+            )?;
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_workflow_commands_project_id ON workflow_commands(project_id)",
                 [],
@@ -502,7 +505,10 @@ impl Database {
 
             // Drop old table and rename new one
             conn.execute("DROP TABLE command_executions", [])?;
-            conn.execute("ALTER TABLE command_executions_new RENAME TO command_executions", [])?;
+            conn.execute(
+                "ALTER TABLE command_executions_new RENAME TO command_executions",
+                [],
+            )?;
 
             // Recreate index
             conn.execute(
