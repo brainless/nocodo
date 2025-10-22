@@ -250,10 +250,13 @@ impl DesktopApp {
         ).expect("Could not create unique index");
 
         // Add port column if it doesn't exist (for backward compatibility)
-        if db.execute(
-            "ALTER TABLE servers ADD COLUMN port INTEGER NOT NULL DEFAULT 22",
-            [],
-        ).is_err() {
+        if db
+            .execute(
+                "ALTER TABLE servers ADD COLUMN port INTEGER NOT NULL DEFAULT 22",
+                [],
+            )
+            .is_err()
+        {
             // Ignore error if column already exists
         }
 
@@ -1895,7 +1898,11 @@ ui.heading("Saved servers:");
                                                  .find(|k| k.name == "Grok API Key")
                                                  .map(|k| k.is_configured)
                                                  .unwrap_or(false);
-                                             ui.label(if configured { "✓ Configured" } else { "✗ Not configured" });
+                                             if configured {
+                                                 ui.colored_label(egui::Color32::GREEN, "✅ Configured");
+                                             } else {
+                                                 ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "❌ Not configured");
+                                             }
                                          });
                                      });
                                      ui.separator();
@@ -1917,7 +1924,11 @@ ui.heading("Saved servers:");
                                                  .find(|k| k.name == "OpenAI API Key")
                                                  .map(|k| k.is_configured)
                                                  .unwrap_or(false);
-                                             ui.label(if configured { "✓ Configured" } else { "✗ Not configured" });
+                                             if configured {
+                                                 ui.colored_label(egui::Color32::GREEN, "✅ Configured");
+                                             } else {
+                                                 ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "❌ Not configured");
+                                             }
                                          });
                                      });
                                      ui.separator();
@@ -1939,7 +1950,11 @@ ui.heading("Saved servers:");
                                                  .find(|k| k.name == "Anthropic API Key")
                                                  .map(|k| k.is_configured)
                                                  .unwrap_or(false);
-                                             ui.label(if configured { "✓ Configured" } else { "✗ Not configured" });
+                                             if configured {
+                                                 ui.colored_label(egui::Color32::GREEN, "✅ Configured");
+                                             } else {
+                                                 ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "❌ Not configured");
+                                             }
                                          });
                                      });
                                      ui.separator();
