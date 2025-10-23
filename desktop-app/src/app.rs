@@ -1228,7 +1228,7 @@ impl eframe::App for DesktopApp {
                         ui.add_space(4.0);
                     }
 
-                    if self.sidebar_link(ui, "Work", sidebar_bg, button_bg) {
+                    if self.sidebar_link(ui, "Board", sidebar_bg, button_bg) {
                         self.current_page = Page::Work;
                         // Refresh works when navigating to Work page
                         if self.connection_state == ConnectionState::Connected
@@ -1390,9 +1390,10 @@ let card_spacing = 10.0;
                                                     ui.vertical(|ui| {
                                                         // Title/Question field as textarea
                                                         ui.label("What do you want to do?");
-                                                        ui.add_sized(
-                                                            egui::vec2(ui.available_width(), 60.0),
+                                                        ui.add(
                                                             egui::TextEdit::multiline(&mut self.new_work_title)
+                                                                .desired_width(ui.available_width())
+                                                                .desired_rows(3)
                                                         );
 
                                                 ui.add_space(8.0);
