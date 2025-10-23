@@ -31,6 +31,7 @@ pub struct DesktopApp {
     settings: Option<manager_models::SettingsResponse>,
     supported_models: Vec<manager_models::SupportedModel>,
     current_page: Page,
+    selected_work_id: Option<i64>,
 
     // Local server detection
     local_server_running: bool,
@@ -126,7 +127,6 @@ enum ConnectionState {
 enum Page {
     Projects,
     Work,
-    WorkDetail(i64),    // Work ID
     ProjectDetail(i64), // Project ID
     Mentions,
     Servers,
@@ -167,6 +167,7 @@ impl Default for DesktopApp {
             settings: None,
             supported_models: Vec::new(),
             current_page: Page::Servers,
+            selected_work_id: None,
             local_server_running: false,
             checking_local_server: false,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
@@ -1130,7 +1131,7 @@ impl eframe::App for DesktopApp {
 
         // Left sidebar
         egui::SidePanel::left("sidebar")
-            .exact_width(300.0)
+            .exact_width(200.0)
             .show(ctx, |ui| {
                 ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
                 ui.vertical(|ui| {
@@ -1323,408 +1324,433 @@ let card_spacing = 10.0;
                     }
                 }
                 Page::Work => {
-                    ui.heading("Work");
+                    // Two-column layout: left column for form and list, right column for details
+                    // Capture full available size BEFORE starting horizontal layout
+                    let available_size = ui.available_size_before_wrap();
+                    ui.horizontal(|ui| {
+                        // Left column (400px wide) - Create work form and work list
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(400.0, available_size.y),
+                            egui::Layout::top_down(egui::Align::LEFT),
+                            |ui| {
+                                // Create work form
+                                if matches!(self.connection_state, ConnectionState::Connected) {
+                                    // Load models only once when form is opened
+                                    if !self.models_fetch_attempted && !self.loading_supported_models {
+                                        self.refresh_supported_models();
+                                    }
+                                    
+                                    // Create form with same styling as work items
+                                    egui::Frame::NONE
+                                        .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                        .corner_radius(8.0)
+                                        .inner_margin(egui::Margin::same(12))
+                                        .show(ui, |ui| {
+                                            ui.vertical(|ui| {
+                                                // Title/Question field as textarea
+                                                ui.label("What do you want to do?");
+                                                ui.add_sized(
+                                                    egui::vec2(ui.available_width(), 60.0),
+                                                    egui::TextEdit::multiline(&mut self.new_work_title)
+                                                );
 
-                    // Add the new work form directly on the page
-                    if matches!(self.connection_state, ConnectionState::Connected) {
-                        // Load models only once when form is opened
-                        if !self.models_fetch_attempted && !self.loading_supported_models {
-                            self.refresh_supported_models();
-                        }
-                        // Create form with same styling as work items
-                        egui::Frame::NONE
-                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                            .corner_radius(8.0)
-                            .inner_margin(egui::Margin::same(12))
-                            .show(ui, |ui| {
-                                ui.vertical(|ui| {
-                                    // Title/Question field as textarea
-                                    ui.label("What do you want to do?");
-                                    ui.add_sized(
-                                        egui::vec2(ui.available_width(), 60.0),
-                                        egui::TextEdit::multiline(&mut self.new_work_title)
-                                    );
+                                                ui.add_space(8.0);
 
-                                    ui.add_space(8.0);
+                                                // Project and Model fields side by side
+                                                ui.horizontal(|ui| {
+                                                    // Project field
+                                                    ui.vertical(|ui| {
+                                                        ui.label("Project:");
+                                                        egui::ComboBox::from_id_salt("work_project_combo")
+                                                            .selected_text(
+                                                                self.new_work_project_id
+                                                                    .and_then(|id| self.projects.iter().find(|p| p.id == id))
+                                                                    .map(|p| p.name.clone())
+                                                                    .unwrap_or_else(|| "None".to_string()),
+                                                            )
+                                                            .show_ui(ui, |ui| {
+                                                                ui.selectable_value(&mut self.new_work_project_id, None, "None");
+                                                                for project in &self.projects {
+                                                                    ui.selectable_value(
+                                                                        &mut self.new_work_project_id,
+                                                                        Some(project.id),
+                                                                        &project.name,
+                                                                    );
+                                                                }
+                                                            });
+                                                    });
 
-                                    // Project and Model fields side by side
-                                    ui.horizontal(|ui| {
-                                        // Project field
-                                        ui.vertical(|ui| {
-                                            ui.label("Project:");
-                                            egui::ComboBox::from_id_salt("work_project_combo")
-                                                .selected_text(
-                                                    self.new_work_project_id
-                                                        .and_then(|id| self.projects.iter().find(|p| p.id == id))
-                                                        .map(|p| p.name.clone())
-                                                        .unwrap_or_else(|| "None".to_string()),
-                                                )
-                                                .show_ui(ui, |ui| {
-                                                    ui.selectable_value(&mut self.new_work_project_id, None, "None");
-                                                    for project in &self.projects {
-                                                        ui.selectable_value(
-                                                            &mut self.new_work_project_id,
-                                                            Some(project.id),
-                                                            &project.name,
-                                                        );
-                                                    }
-                                                });
-                                        });
+                                                    ui.add_space(16.0);
 
-                                        ui.add_space(16.0);
-
-                                        // Model field
-                                        ui.vertical(|ui| {
-                                            ui.label("Model:");
-                                            if self.loading_supported_models {
-                                                ui.add(egui::Spinner::new());
-                                            } else {
-                                                egui::ComboBox::from_id_salt("work_model_combo")
-                                                    .selected_text(
-                                                        self.new_work_model
-                                                            .as_ref()
-                                                            .and_then(|model_id| self.supported_models.iter()
-                                                                .find(|m| m.model_id == *model_id))
-                                                            .map(|m| m.name.clone())
-                                                            .unwrap_or_else(|| "None".to_string()),
-                                                    )
-                                                    .show_ui(ui, |ui| {
-                                                        ui.selectable_value(&mut self.new_work_model, None, "None");
-                                                        for model in &self.supported_models {
-                                                            ui.selectable_value(
-                                                                &mut self.new_work_model,
-                                                                Some(model.model_id.clone()),
-                                                                &model.name,
-                                                            );
+                                                    // Model field
+                                                    ui.vertical(|ui| {
+                                                        ui.label("Model:");
+                                                        if self.loading_supported_models {
+                                                            ui.add(egui::Spinner::new());
+                                                        } else {
+                                                            egui::ComboBox::from_id_salt("work_model_combo")
+                                                                .selected_text(
+                                                                    self.new_work_model
+                                                                        .as_ref()
+                                                                        .and_then(|model_id| self.supported_models.iter()
+                                                                            .find(|m| m.model_id == *model_id))
+                                                                        .map(|m| m.name.clone())
+                                                                        .unwrap_or_else(|| "None".to_string()),
+                                                                )
+                                                                .show_ui(ui, |ui| {
+                                                                    ui.selectable_value(&mut self.new_work_model, None, "None");
+                                                                    for model in &self.supported_models {
+                                                                        ui.selectable_value(
+                                                                            &mut self.new_work_model,
+                                                                            Some(model.model_id.clone()),
+                                                                            &model.name,
+                                                                        );
+                                                                    }
+                                                                });
                                                         }
                                                     });
+                                                });
+
+                                                ui.add_space(8.0);
+
+                                                // Show error if no models are configured
+                                                if !self.loading_supported_models && self.supported_models.is_empty() {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
+                                                        ui.label(
+                                                            egui::RichText::new("No models configured. Please set API keys in Settings page")
+                                                                .color(egui::Color32::from_rgb(255, 165, 0))
+                                                        );
+                                                    });
+                                                    ui.add_space(8.0);
+                                                }
+
+                                                // Create button
+                                                ui.horizontal(|ui| {
+                                                    if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
+                                                        self.create_work();
+                                                    }
+
+                                                    if self.creating_work {
+                                                        ui.add(egui::Spinner::new());
+                                                    }
+                                                });
+                                            });
+                                        });
+
+                                    ui.add_space(16.0);
+                                }
+
+                                // Work list
+                                match &self.connection_state {
+                                    ConnectionState::Disconnected => {
+                                        ui.vertical_centered(|ui| {
+                                            ui.label("Not connected to server");
+                                            if ui.button("Connect").clicked() {
+                                                self.show_connection_dialog = true;
                                             }
                                         });
-                                    });
-
-                                    ui.add_space(8.0);
-
-                                    // Show error if no models are configured
-                                    if !self.loading_supported_models && self.supported_models.is_empty() {
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
-                                            ui.label(
-                                                egui::RichText::new("No models configured. Please set API keys in Settings page")
-                                                    .color(egui::Color32::from_rgb(255, 165, 0))
-                                            );
-                                        });
-                                        ui.add_space(8.0);
                                     }
-
-                                    // Create button
-                                    ui.horizontal(|ui| {
-                                        if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
-                                            self.create_work();
-                                        }
-
-                                        if self.creating_work {
+                                    ConnectionState::Connecting => {
+                                        ui.vertical_centered(|ui| {
+                                            ui.label("Connecting...");
                                             ui.add(egui::Spinner::new());
-                                        }
-                                    });
-                                });
-                            });
-
-                        ui.add_space(16.0);
-                    }
-
-                    match &self.connection_state {
-                        ConnectionState::Disconnected => {
-                            ui.vertical_centered(|ui| {
-                                ui.label("Not connected to server");
-                                if ui.button("Connect").clicked() {
-                                    self.show_connection_dialog = true;
-                                }
-                            });
-                        }
-                        ConnectionState::Connecting => {
-                            ui.vertical_centered(|ui| {
-                                ui.label("Connecting...");
-                                ui.add(egui::Spinner::new());
-                            });
-                        }
-                        ConnectionState::Connected => {
-                            if self.loading_works {
-                                ui.vertical_centered(|ui| {
-                                    ui.label("Loading work...");
-                                    ui.add(egui::Spinner::new());
-                                });
-                            } else if self.works.is_empty() {
-                                ui.vertical_centered(|ui| {
-                                    ui.label("No work found");
-                                    if ui.button("Refresh").clicked() {
-                                        self.refresh_works();
+                                        });
                                     }
-                                });
-                            } else {
-                                egui::ScrollArea::vertical().show(ui, |ui| {
-                                    ui.add_space(8.0);
+                                    ConnectionState::Connected => {
+                                        if self.loading_works {
+                                            ui.vertical_centered(|ui| {
+                                                ui.label("Loading work...");
+                                                ui.add(egui::Spinner::new());
+                                            });
+                                        } else if self.works.is_empty() {
+                                            ui.vertical_centered(|ui| {
+                                                ui.label("No work found");
+                                                if ui.button("Refresh").clicked() {
+                                                    self.refresh_works();
+                                                }
+                                            });
+                                        } else {
+                                            // Use remaining space in this column for scrolling
+                                            egui::ScrollArea::vertical()
+                                                .auto_shrink(false)
+                                                .show(ui, |ui| {
+                                                ui.add_space(8.0);
 
-                                    // Sort works by created_at (most recent first)
-                                    let mut sorted_works = self.works.clone();
-                                    sorted_works.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                                                // Sort works by created_at (most recent first)
+                                                let mut sorted_works = self.works.clone();
+                                                sorted_works.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
-                                    for work in &sorted_works {
-                                        let work_id = work.id;
+                                                for work in &sorted_works {
+                                                    let work_id = work.id;
+                                                    let is_selected = self.selected_work_id == Some(work_id);
 
-                                        // Full-width card frame with padding and rounded corners
-                                        let response = egui::Frame::NONE
-                                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                            .corner_radius(8.0)
-                                            .inner_margin(egui::Margin::same(12))
-                                            .show(ui, |ui| {
-                                                ui.horizontal(|ui| {
-                                                    ui.vertical(|ui| {
-                                                        // Work title - larger and bold
-                                                        ui.label(egui::RichText::new(&work.title).size(16.0).strong());
+                                                    // Card frame with different styling for selected item
+                                                    let frame_fill = if is_selected {
+                                                        ui.style().visuals.selection.bg_fill
+                                                    } else {
+                                                        ui.style().visuals.widgets.inactive.bg_fill
+                                                    };
 
-                                                        ui.add_space(4.0);
+                                                    let response = egui::Frame::NONE
+                                                        .fill(frame_fill)
+                                                        .corner_radius(8.0)
+                                                        .inner_margin(egui::Margin::same(12))
+                                                        .show(ui, |ui| {
+                                                            ui.vertical(|ui| {
+                                                                // Work title - larger and bold
+                                                                ui.label(egui::RichText::new(&work.title).size(16.0).strong());
 
-                                                        // Metadata row
-                                                        ui.horizontal(|ui| {
-                                                            // Status badge
-                                                            egui::Frame::NONE
-                                                                .fill(ui.style().visuals.selection.bg_fill)
-                                                                .corner_radius(4.0)
-                                                                .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                .show(ui, |ui| {
-                                                                    ui.label(egui::RichText::new(&work.status).size(11.0));
-                                                                });
+                                                                ui.add_space(4.0);
 
-                                                            // Tool name if present
-                                                            if let Some(tool_name) = &work.tool_name {
-                                                                egui::Frame::NONE
-                                                                    .fill(ui.style().visuals.selection.bg_fill)
-                                                                    .corner_radius(4.0)
-                                                                    .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                    .show(ui, |ui| {
-                                                                        ui.label(egui::RichText::new(tool_name).size(11.0));
-                                                                    });
-                                                            }
-
-                                                            // Model if present
-                                                            if let Some(model) = &work.model {
-                                                                egui::Frame::NONE
-                                                                    .fill(ui.style().visuals.selection.bg_fill)
-                                                                    .corner_radius(4.0)
-                                                                    .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                    .show(ui, |ui| {
-                                                                        ui.label(egui::RichText::new(model).size(11.0));
-                                                                    });
-                                                            }
-
-                                                            // Project if linked
-                                                            if let Some(project_id) = work.project_id {
-                                                                if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                                                // Metadata row
+                                                                ui.horizontal(|ui| {
+                                                                    // Status badge
                                                                     egui::Frame::NONE
                                                                         .fill(ui.style().visuals.selection.bg_fill)
                                                                         .corner_radius(4.0)
                                                                         .inner_margin(egui::Margin::symmetric(8, 4))
                                                                         .show(ui, |ui| {
-                                                                            ui.label(egui::RichText::new(&project.name).size(11.0));
+                                                                            ui.label(egui::RichText::new(&work.status).size(11.0));
+                                                                        });
+
+                                                                    // Tool name if present
+                                                                    if let Some(tool_name) = &work.tool_name {
+                                                                        egui::Frame::NONE
+                                                                            .fill(ui.style().visuals.selection.bg_fill)
+                                                                            .corner_radius(4.0)
+                                                                            .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                            .show(ui, |ui| {
+                                                                                ui.label(egui::RichText::new(tool_name).size(11.0));
+                                                                            });
+                                                                    }
+
+                                                                    // Model if present
+                                                                    if let Some(model) = &work.model {
+                                                                        egui::Frame::NONE
+                                                                            .fill(ui.style().visuals.selection.bg_fill)
+                                                                            .corner_radius(4.0)
+                                                                            .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                            .show(ui, |ui| {
+                                                                                ui.label(egui::RichText::new(model).size(11.0));
+                                                                            });
+                                                                    }
+
+                                                                    // Project if linked
+                                                                    if let Some(project_id) = work.project_id {
+                                                                        if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                                                            egui::Frame::NONE
+                                                                                .fill(ui.style().visuals.selection.bg_fill)
+                                                                                .corner_radius(4.0)
+                                                                                .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                                .show(ui, |ui| {
+                                                                                    ui.label(egui::RichText::new(&project.name).size(11.0));
+                                                                                });
+                                                                        }
+                                                                    }
+                                                                });
+                                                            });
+                                                        });
+
+                                                    // Make the entire card clickable
+                                                    if response.response.interact(egui::Sense::click()).clicked() {
+                                                        self.selected_work_id = Some(work_id);
+                                                        self.refresh_work_messages(work_id);
+                                                    }
+
+                                                    // Change cursor to pointer on hover
+                                                    if response.response.hovered() {
+                                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                    }
+
+                                                    ui.add_space(8.0);
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        );
+
+                        // Separator
+                        ui.separator();
+
+                        // Right column (fills remaining width) - Work details
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(available_size.x - 400.0, available_size.y),
+                            egui::Layout::top_down(egui::Align::LEFT),
+                            |ui| {
+                                if let Some(selected_work_id) = self.selected_work_id {
+                                    // Find the selected work
+                                    if let Some(work) = self.works.iter().find(|w| w.id == selected_work_id) {
+                                        // Work details
+                                        ui.heading(&work.title);
+
+                                        ui.add_space(4.0);
+
+                                        // Work metadata
+                                        ui.horizontal(|ui| {
+                                            ui.label("Status:");
+                                            ui.label(&work.status);
+
+                                            if let Some(tool_name) = &work.tool_name {
+                                                ui.separator();
+                                                ui.label("Tool:");
+                                                ui.label(tool_name);
+                                            }
+
+                                            if let Some(model) = &work.model {
+                                                ui.separator();
+                                                ui.label("Model:");
+                                                ui.label(model);
+                                            }
+
+                                            if let Some(project_id) = work.project_id {
+                                                if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                                    ui.separator();
+                                                    ui.label("Project:");
+                                                    ui.label(&project.name);
+                                                }
+                                            }
+                                        });
+
+                                        ui.separator();
+
+                                        // Message history
+                                        ui.heading("Message History");
+
+                                        match &self.connection_state {
+                                            ConnectionState::Disconnected => {
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Not connected to server");
+                                                });
+                                            }
+                                            ConnectionState::Connecting => {
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Connecting...");
+                                                    ui.add(egui::Spinner::new());
+                                                });
+                                            }
+                                            ConnectionState::Connected => {
+                                                if self.loading_work_messages || self.loading_ai_session_outputs {
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label("Loading messages...");
+                                                        ui.add(egui::Spinner::new());
+                                                    });
+                                                } else if self.work_messages.is_empty() && self.ai_session_outputs.is_empty() {
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label("No messages found");
+                                                        if ui.button("Refresh").clicked() {
+                                                            self.refresh_work_messages(selected_work_id);
+                                                        }
+                                                    });
+                                                } else {
+                                                    // Use remaining space in this column for scrolling
+                                                    egui::ScrollArea::vertical()
+                                                        .auto_shrink(false)
+                                                        .show(ui, |ui| {
+                                                        ui.add_space(8.0);
+
+                                                        // Combine and sort all messages by timestamp
+                                                        #[derive(Clone)]
+                                                        enum DisplayMessage {
+                                                            WorkMessage(manager_models::WorkMessage),
+                                                            AiOutput(manager_models::AiSessionOutput),
+                                                        }
+
+                                                        let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
+
+                                                        // Add work messages (user input)
+                                                        for msg in &self.work_messages {
+                                                            all_messages.push((msg.created_at, DisplayMessage::WorkMessage(msg.clone())));
+                                                        }
+
+                                                        // Add AI session outputs (AI responses)
+                                                        for output in &self.ai_session_outputs {
+                                                            all_messages.push((output.created_at, DisplayMessage::AiOutput(output.clone())));
+                                                        }
+
+                                                        // Sort by timestamp
+                                                        all_messages.sort_by_key(|(timestamp, _)| *timestamp);
+
+                                                        for (_timestamp, message) in &all_messages {
+                                                            match message {
+                                                                DisplayMessage::WorkMessage(msg) => {
+                                                                    // User message
+                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                    egui::Frame::NONE
+                                                                        .fill(bg_color)
+                                                                        .corner_radius(8.0)
+                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .show(ui, |ui| {
+                                                                            ui.vertical(|ui| {
+                                                                                ui.horizontal(|ui| {
+                                                                                    ui.label(egui::RichText::new("User").size(12.0).strong());
+                                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                                        let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
+                                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                                            .unwrap_or_else(|| "Unknown".to_string());
+                                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                                    });
+                                                                                });
+                                                                                ui.add_space(4.0);
+                                                                                ui.label(&msg.content);
+                                                                            });
+                                                                        });
+                                                                }
+                                                                DisplayMessage::AiOutput(output) => {
+                                                                    // AI response message
+                                                                    let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
+
+                                                                    egui::Frame::NONE
+                                                                        .fill(bg_color)
+                                                                        .corner_radius(8.0)
+                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .show(ui, |ui| {
+                                                                            ui.vertical(|ui| {
+                                                                                ui.horizontal(|ui| {
+                                                                                    // Determine label based on role and model
+                                                                                    let label = match (output.role.as_deref(), output.model.as_deref()) {
+                                                                                        (Some("tool"), _) => "nocodo".to_string(),
+                                                                                        (Some("assistant"), Some(model)) => format!("AI - {}", model),
+                                                                                        _ => "AI".to_string(),
+                                                                                    };
+                                                                                    ui.label(egui::RichText::new(label).size(12.0).strong());
+                                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                                        let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
+                                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                                            .unwrap_or_else(|| "Unknown".to_string());
+                                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                                    });
+                                                                                });
+                                                                                ui.add_space(4.0);
+                                                                                ui.label(&output.content);
+                                                                            });
                                                                         });
                                                                 }
                                                             }
-                                                        });
+                                                            ui.add_space(8.0);
+                                                        }
                                                     });
-                                                });
-                                            });
-
-                                        // Make the entire card clickable
-                                        if response.response.interact(egui::Sense::click()).clicked() {
-                                            self.current_page = Page::WorkDetail(work_id);
-                                            self.refresh_work_messages(work_id);
+                                                }
+                                            }
                                         }
-
-                                        // Change cursor to pointer on hover
-                                        if response.response.hovered() {
-                                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                        }
-
-                                        ui.add_space(8.0);
+                                    } else {
+                                        ui.vertical_centered(|ui| {
+                                            ui.label("Work not found");
+                                        });
                                     }
-                                });
+                                } else {
+                                    ui.vertical_centered(|ui| {
+                                        ui.label("Select a work item to view details");
+                                    });
+                                }
                             }
-                        }
-                    }
+                        );
+                    });
                 }
-                 Page::WorkDetail(work_id) => {
-                     // Find the work
-                     let work = self.works.iter().find(|w| w.id == work_id).cloned();
 
-                     if let Some(work) = work {
-                         // Header with back button
-                         ui.horizontal(|ui| {
-                             if ui.button("← Back to Work List").clicked() {
-                                 self.current_page = Page::Work;
-                             }
-                         });
-
-                         ui.add_space(8.0);
-
-                         // Work title
-                         ui.heading(&work.title);
-
-                         ui.add_space(4.0);
-
-                         // Work metadata
-                         ui.horizontal(|ui| {
-                             ui.label("Status:");
-                             ui.label(&work.status);
-
-                             if let Some(tool_name) = &work.tool_name {
-                                 ui.separator();
-                                 ui.label("Tool:");
-                                 ui.label(tool_name);
-                             }
-
-                             if let Some(model) = &work.model {
-                                 ui.separator();
-                                 ui.label("Model:");
-                                 ui.label(model);
-                             }
-
-                             if let Some(project_id) = work.project_id {
-                                 if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
-                                     ui.separator();
-                                     ui.label("Project:");
-                                     ui.label(&project.name);
-                                 }
-                             }
-                         });
-
-                         ui.separator();
-
-                         // Message history
-                         ui.heading("Message History");
-
-                         match &self.connection_state {
-                             ConnectionState::Disconnected => {
-                                 ui.vertical_centered(|ui| {
-                                     ui.label("Not connected to server");
-                                 });
-                             }
-                             ConnectionState::Connecting => {
-                                 ui.vertical_centered(|ui| {
-                                     ui.label("Connecting...");
-                                     ui.add(egui::Spinner::new());
-                                 });
-                             }
-                             ConnectionState::Connected => {
-                                 if self.loading_work_messages || self.loading_ai_session_outputs {
-                                     ui.vertical_centered(|ui| {
-                                         ui.label("Loading messages...");
-                                         ui.add(egui::Spinner::new());
-                                     });
-                                 } else if self.work_messages.is_empty() && self.ai_session_outputs.is_empty() {
-                                     ui.vertical_centered(|ui| {
-                                         ui.label("No messages found");
-                                         if ui.button("Refresh").clicked() {
-                                             self.refresh_work_messages(work_id);
-                                         }
-                                     });
-                                 } else {
-                                     egui::ScrollArea::vertical().show(ui, |ui| {
-                                         ui.add_space(8.0);
-
-                                         // Combine and sort all messages by timestamp
-                                         #[derive(Clone)]
-                                         enum DisplayMessage {
-                                             WorkMessage(manager_models::WorkMessage),
-                                             AiOutput(manager_models::AiSessionOutput),
-                                         }
-
-                                         let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
-
-                                         // Add work messages (user input)
-                                         for msg in &self.work_messages {
-                                             all_messages.push((msg.created_at, DisplayMessage::WorkMessage(msg.clone())));
-                                         }
-
-                                         // Add AI session outputs (AI responses)
-                                         for output in &self.ai_session_outputs {
-                                             all_messages.push((output.created_at, DisplayMessage::AiOutput(output.clone())));
-                                         }
-
-                                         // Sort by timestamp
-                                         all_messages.sort_by_key(|(timestamp, _)| *timestamp);
-
-                                         for (_timestamp, message) in &all_messages {
-                                             match message {
-                                                 DisplayMessage::WorkMessage(msg) => {
-                                                     // User message
-                                                     let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
-
-                                                     egui::Frame::NONE
-                                                         .fill(bg_color)
-                                                         .corner_radius(8.0)
-                                                         .inner_margin(egui::Margin::same(12))
-                                                         .show(ui, |ui| {
-                                                             ui.vertical(|ui| {
-                                                                 ui.horizontal(|ui| {
-                                                                     ui.label(egui::RichText::new("User").size(12.0).strong());
-                                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                         let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
-                                                                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                             .unwrap_or_else(|| "Unknown".to_string());
-                                                                         ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                     });
-                                                                 });
-                                                                 ui.add_space(4.0);
-                                                                 ui.label(&msg.content);
-                                                             });
-                                                         });
-                                                 }
-                                                 DisplayMessage::AiOutput(output) => {
-                                                     // AI response message
-                                                     let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
-
-                                                     egui::Frame::NONE
-                                                         .fill(bg_color)
-                                                         .corner_radius(8.0)
-                                                         .inner_margin(egui::Margin::same(12))
-                                                         .show(ui, |ui| {
-                                                             ui.vertical(|ui| {
-                                                                 ui.horizontal(|ui| {
-                                                                     // Determine label based on role and model
-                                                                     let label = match (output.role.as_deref(), output.model.as_deref()) {
-                                                                         (Some("tool"), _) => "nocodo".to_string(),
-                                                                         (Some("assistant"), Some(model)) => format!("AI - {}", model),
-                                                                         _ => "AI".to_string(),
-                                                                     };
-                                                                     ui.label(egui::RichText::new(label).size(12.0).strong());
-                                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                         let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
-                                                                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                             .unwrap_or_else(|| "Unknown".to_string());
-                                                                         ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                     });
-                                                                 });
-                                                                 ui.add_space(4.0);
-                                                                 ui.label(&output.content);
-                                                             });
-                                                         });
-                                                 }
-                                             }
-                                             ui.add_space(8.0);
-                                         }
-                                     });
-                                 }
-                             }
-                         }
-                     } else {
-                         ui.vertical_centered(|ui| {
-                             ui.label("Work not found");
-                             if ui.button("Back to Work List").clicked() {
-                                 self.current_page = Page::Work;
-                             }
-                         });
-                     }
-                 }
 Page::ProjectDetail(project_id) => {
                       // Header with back button and star button
                       ui.horizontal(|ui| {
