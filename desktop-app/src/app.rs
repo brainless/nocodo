@@ -32,6 +32,8 @@ pub struct DesktopApp {
     supported_models: Vec<manager_models::SupportedModel>,
     current_page: Page,
     selected_work_id: Option<i64>,
+    #[serde(skip)]
+    reset_work_details_scroll: bool,
 
     // Local server detection
     local_server_running: bool,
@@ -108,7 +110,8 @@ pub struct DesktopApp {
     create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    create_ai_session_result: Arc<std::sync::Mutex<Option<Result<manager_models::AiSession, String>>>>,
+    create_ai_session_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::AiSession, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
@@ -168,6 +171,7 @@ impl Default for DesktopApp {
             supported_models: Vec::new(),
             current_page: Page::Servers,
             selected_work_id: None,
+            reset_work_details_scroll: false,
             local_server_running: false,
             checking_local_server: false,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
@@ -625,34 +629,56 @@ impl DesktopApp {
             let work_id = work.id;
             let work_title = work.title.clone();
             let work_model = work.model.clone();
-            
+
             tokio::spawn(async move {
                 if let Some(api_client) = connection_manager.get_api_client().await {
                     // Step 1: Create work message with the work title as content
-                    match api_client.add_message_to_work(work_id, work_title.clone()).await {
+                    match api_client
+                        .add_message_to_work(work_id, work_title.clone())
+                        .await
+                    {
                         Ok(message) => {
-                            tracing::info!("Created work message {} for work {}", message.id, work_id);
-                            
+                            tracing::info!(
+                                "Created work message {} for work {}",
+                                message.id,
+                                work_id
+                            );
+
                             // Step 2: Create AI session with the message
                             let tool_name = "llm-agent".to_string();
                             let message_id_str = message.id.to_string();
-                            
-                            match api_client.create_ai_session(work_id, message_id_str, tool_name).await {
+
+                            match api_client
+                                .create_ai_session(work_id, message_id_str, tool_name)
+                                .await
+                            {
                                 Ok(session) => {
-                                    tracing::info!("Created AI session {} for work {}", session.id, work_id);
-                                    
+                                    tracing::info!(
+                                        "Created AI session {} for work {}",
+                                        session.id,
+                                        work_id
+                                    );
+
                                     // Log the model being used
                                     if let Some(model) = work_model {
                                         tracing::info!("AI session will use model: {}", model);
                                     }
                                 }
                                 Err(e) => {
-                                    tracing::error!("Failed to create AI session for work {}: {}", work_id, e);
+                                    tracing::error!(
+                                        "Failed to create AI session for work {}: {}",
+                                        work_id,
+                                        e
+                                    );
                                 }
                             }
                         }
                         Err(e) => {
-                            tracing::error!("Failed to create work message for work {}: {}", work_id, e);
+                            tracing::error!(
+                                "Failed to create work message for work {}: {}",
+                                work_id,
+                                e
+                            );
                         }
                     }
                 } else {
@@ -967,12 +993,12 @@ impl eframe::App for DesktopApp {
                         tracing::info!("Created work: {} ({})", work.title, work.id);
                         // Add the new work to the list
                         self.works.push(work.clone());
-                        
+
                         // Clear the form
                         self.new_work_title.clear();
                         self.new_work_project_id = None;
                         self.new_work_model = None;
-                        
+
                         Some(work)
                     }
                     Err(e) => {
@@ -998,7 +1024,11 @@ impl eframe::App for DesktopApp {
             if let Some(create_ai_session_result) = result.take() {
                 match create_ai_session_result {
                     Ok(session) => {
-                        tracing::info!("Successfully created AI session: {} for work {}", session.id, session.work_id);
+                        tracing::info!(
+                            "Successfully created AI session: {} for work {}",
+                            session.id,
+                            session.work_id
+                        );
                     }
                     Err(e) => {
                         tracing::error!("Failed to create AI session: {}", e);
@@ -1325,12 +1355,18 @@ let card_spacing = 10.0;
                 }
                 Page::Work => {
                     // Two-column layout: left column for form and list, right column for details
+                    let show_second_column = true;
                     // Capture full available size BEFORE starting horizontal layout
                     let available_size = ui.available_size_before_wrap();
+
+                    // Calculate column widths accounting for spacing
+                    let left_column_width = 400.0;
+                    let spacing = ui.spacing().item_spacing.x;
+
                     ui.horizontal(|ui| {
                         // Left column (400px wide) - Create work form and work list
                         ui.allocate_ui_with_layout(
-                            egui::vec2(400.0, available_size.y),
+                            egui::vec2(left_column_width, available_size.y),
                             egui::Layout::top_down(egui::Align::LEFT),
                             |ui| {
                                 // Create work form
@@ -1339,7 +1375,7 @@ let card_spacing = 10.0;
                                     if !self.models_fetch_attempted && !self.loading_supported_models {
                                         self.refresh_supported_models();
                                     }
-                                    
+
                                     // Create form with same styling as work items
                                     egui::Frame::NONE
                                         .fill(ui.style().visuals.widgets.inactive.bg_fill)
@@ -1473,6 +1509,7 @@ let card_spacing = 10.0;
                                         } else {
                                             // Use remaining space in this column for scrolling
                                             egui::ScrollArea::vertical()
+                                                .id_salt("work_list_scroll")
                                                 .auto_shrink(false)
                                                 .show(ui, |ui| {
                                                 ui.add_space(8.0);
@@ -1554,6 +1591,10 @@ let card_spacing = 10.0;
 
                                                     // Make the entire card clickable
                                                     if response.response.interact(egui::Sense::click()).clicked() {
+                                                        // Reset scroll if selecting a different work item
+                                                        if self.selected_work_id != Some(work_id) {
+                                                            self.reset_work_details_scroll = true;
+                                                        }
                                                         self.selected_work_id = Some(work_id);
                                                         self.refresh_work_messages(work_id);
                                                     }
@@ -1572,12 +1613,15 @@ let card_spacing = 10.0;
                             }
                         );
 
-                        // Separator
-                        ui.separator();
+                        if show_second_column {
+                            // Separator
+                            ui.separator();
 
-                        // Right column (fills remaining width) - Work details
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(available_size.x - 400.0, available_size.y),
+                            // Right column (fills remaining width) - Work details
+                            // Account for: left column width + spacing after left column + separator width + spacing after separator
+                            let right_column_width = available_size.x - left_column_width - (spacing * 3.0);
+                            ui.allocate_ui_with_layout(
+                            egui::vec2(right_column_width, available_size.y),
                             egui::Layout::top_down(egui::Align::LEFT),
                             |ui| {
                                 if let Some(selected_work_id) = self.selected_work_id {
@@ -1646,9 +1690,19 @@ let card_spacing = 10.0;
                                                     });
                                                 } else {
                                                     // Use remaining space in this column for scrolling
-                                                    egui::ScrollArea::vertical()
+                                                    let available_width = ui.available_width();
+                                                    let mut scroll_area = egui::ScrollArea::vertical()
+                                                        .id_salt("work_messages_scroll")
                                                         .auto_shrink(false)
-                                                        .show(ui, |ui| {
+                                                        .max_width(available_width);
+
+                                                    // Reset scroll to top if a new work item was selected
+                                                    if self.reset_work_details_scroll {
+                                                        scroll_area = scroll_area.vertical_scroll_offset(0.0);
+                                                        self.reset_work_details_scroll = false;
+                                                    }
+
+                                                    scroll_area.show(ui, |ui| {
                                                         ui.add_space(8.0);
 
                                                         // Combine and sort all messages by timestamp
@@ -1748,6 +1802,7 @@ let card_spacing = 10.0;
                                 }
                             }
                         );
+                        }
                     });
                 }
 

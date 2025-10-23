@@ -1,7 +1,8 @@
 use manager_models::{
-    AddMessageRequest, CreateAiSessionRequest, CreateWorkRequest, MessageContentType, MessageAuthorType,
-    Project, ProjectDetailsResponse, ProjectListResponse, SettingsResponse,
-    SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkResponse, AiSessionResponse,
+    AddMessageRequest, AiSessionResponse, CreateAiSessionRequest, CreateWorkRequest,
+    MessageAuthorType, MessageContentType, Project, ProjectDetailsResponse, ProjectListResponse,
+    SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse,
+    WorkResponse,
 };
 use serde_json::Value;
 
@@ -168,7 +169,7 @@ impl ApiClient {
             author_type: MessageAuthorType::User,
             author_id: None,
         };
-        
+
         let response = self
             .client()
             .post(&url)
@@ -200,7 +201,7 @@ impl ApiClient {
             message_id,
             tool_name,
         };
-        
+
         let response = self
             .client()
             .post(&url)
