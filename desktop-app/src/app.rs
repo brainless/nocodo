@@ -1376,19 +1376,24 @@ let card_spacing = 10.0;
                                         self.refresh_supported_models();
                                     }
 
-                                    // Create form with same styling as work items
-                                    egui::Frame::NONE
-                                        .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                        .corner_radius(8.0)
-                                        .inner_margin(egui::Margin::same(12))
-                                        .show(ui, |ui| {
-                                            ui.vertical(|ui| {
-                                                // Title/Question field as textarea
-                                                ui.label("What do you want to do?");
-                                                ui.add_sized(
-                                                    egui::vec2(ui.available_width(), 60.0),
-                                                    egui::TextEdit::multiline(&mut self.new_work_title)
-                                                );
+                                    // Create form with same styling as work items - full width of column
+                                    let _form_response = ui.allocate_ui_with_layout(
+                                        egui::vec2(ui.available_width(), 0.0),
+                                        egui::Layout::top_down(egui::Align::LEFT),
+                                        |ui| {
+                                            egui::Frame::NONE
+                                                .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                                .corner_radius(8.0)
+                                                .inner_margin(egui::Margin::same(12))
+                                                .show(ui, |ui| {
+                                                    ui.set_width(ui.available_width());
+                                                    ui.vertical(|ui| {
+                                                        // Title/Question field as textarea
+                                                        ui.label("What do you want to do?");
+                                                        ui.add_sized(
+                                                            egui::vec2(ui.available_width(), 60.0),
+                                                            egui::TextEdit::multiline(&mut self.new_work_title)
+                                                        );
 
                                                 ui.add_space(8.0);
 
@@ -1461,18 +1466,20 @@ let card_spacing = 10.0;
                                                     ui.add_space(8.0);
                                                 }
 
-                                                // Create button
-                                                ui.horizontal(|ui| {
-                                                    if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
-                                                        self.create_work();
-                                                    }
+                                                        // Create button
+                                                        ui.horizontal(|ui| {
+                                                            if ui.button("Create").clicked() && !self.new_work_title.trim().is_empty() {
+                                                                self.create_work();
+                                                            }
 
-                                                    if self.creating_work {
-                                                        ui.add(egui::Spinner::new());
-                                                    }
+                                                            if self.creating_work {
+                                                                ui.add(egui::Spinner::new());
+                                                            }
+                                                        });
+                                                    });
                                                 });
-                                            });
-                                        });
+                                        }
+                                    );
 
                                     ui.add_space(16.0);
                                 }
@@ -1522,21 +1529,27 @@ let card_spacing = 10.0;
                                                     let work_id = work.id;
                                                     let is_selected = self.selected_work_id == Some(work_id);
 
-                                                    // Card frame with different styling for selected item
+                                                    // Card frame with different styling for selected item - full width
                                                     let frame_fill = if is_selected {
                                                         ui.style().visuals.selection.bg_fill
                                                     } else {
                                                         ui.style().visuals.widgets.inactive.bg_fill
                                                     };
 
-                                                    let response = egui::Frame::NONE
-                                                        .fill(frame_fill)
-                                                        .corner_radius(8.0)
-                                                        .inner_margin(egui::Margin::same(12))
-                                                        .show(ui, |ui| {
-                                                            ui.vertical(|ui| {
-                                                                // Work title - larger and bold
-                                                                ui.label(egui::RichText::new(&work.title).size(16.0).strong());
+                                                    // Allocate full width for the work item
+                                                    let item_response = ui.allocate_ui_with_layout(
+                                                        egui::vec2(ui.available_width(), 0.0),
+                                                        egui::Layout::top_down(egui::Align::LEFT),
+                                                        |ui| {
+                                                            egui::Frame::NONE
+                                                                .fill(frame_fill)
+                                                                .corner_radius(8.0)
+                                                                .inner_margin(egui::Margin::same(12))
+                                                                .show(ui, |ui| {
+                                                                    ui.set_width(ui.available_width());
+                                                                    ui.vertical(|ui| {
+                                                                        // Work title - larger and bold
+                                                                        ui.label(egui::RichText::new(&work.title).size(16.0).strong());
 
                                                                 ui.add_space(4.0);
 
@@ -1573,24 +1586,26 @@ let card_spacing = 10.0;
                                                                             });
                                                                     }
 
-                                                                    // Project if linked
-                                                                    if let Some(project_id) = work.project_id {
-                                                                        if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
-                                                                            egui::Frame::NONE
-                                                                                .fill(ui.style().visuals.selection.bg_fill)
-                                                                                .corner_radius(4.0)
-                                                                                .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                                .show(ui, |ui| {
-                                                                                    ui.label(egui::RichText::new(&project.name).size(11.0));
-                                                                                });
+                                                                        // Project if linked
+                                                                        if let Some(project_id) = work.project_id {
+                                                                            if let Some(project) = self.projects.iter().find(|p| p.id == project_id) {
+                                                                                egui::Frame::NONE
+                                                                                    .fill(ui.style().visuals.selection.bg_fill)
+                                                                                    .corner_radius(4.0)
+                                                                                    .inner_margin(egui::Margin::symmetric(8, 4))
+                                                                                    .show(ui, |ui| {
+                                                                                        ui.label(egui::RichText::new(&project.name).size(11.0));
+                                                                                    });
+                                                                            }
                                                                         }
-                                                                    }
+                                                                    });
                                                                 });
-                                                            });
-                                                        });
+                                                            })
+                                                        }
+                                                    );
 
                                                     // Make the entire card clickable
-                                                    if response.response.interact(egui::Sense::click()).clicked() {
+                                                    if item_response.response.interact(egui::Sense::click()).clicked() {
                                                         // Reset scroll if selecting a different work item
                                                         if self.selected_work_id != Some(work_id) {
                                                             self.reset_work_details_scroll = true;
@@ -1600,7 +1615,7 @@ let card_spacing = 10.0;
                                                     }
 
                                                     // Change cursor to pointer on hover
-                                                    if response.response.hovered() {
+                                                    if item_response.response.hovered() {
                                                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                     }
 
