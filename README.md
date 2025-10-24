@@ -118,7 +118,6 @@ The manager runs on any Linux machine and handles the complete development envir
 
 **nocodo Cloud**
 - Managed cloud infrastructure for teams who prefer not to manage their own servers
-- nocodo's own LLM integration for simplified setup
 - One-click deployment and scaling
 
 ## Technical Architecture
