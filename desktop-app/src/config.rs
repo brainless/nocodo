@@ -11,6 +11,7 @@ pub struct SshConfig {
     pub server: String,
     pub username: String,
     pub ssh_key_path: String,
+    pub port: u16,
     pub remote_port: u16,
 }
 
@@ -21,6 +22,7 @@ impl Default for DesktopConfig {
                 server: "dev-server.example.com".to_string(),
                 username: "nocodo".to_string(),
                 ssh_key_path: "~/.ssh/id_ed25519".to_string(),
+                port: 22,
                 remote_port: 8081,
             },
         }

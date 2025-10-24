@@ -9,8 +9,8 @@ use crate::models::{
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
     CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
     FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
-    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, WorkListResponse,
-    WorkMessageResponse, WorkResponse,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, UpdateApiKeysRequest,
+    WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -30,7 +30,7 @@ pub struct AppState {
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<WebSocketBroadcaster>,
     pub llm_agent: Option<Arc<LlmAgent>>, // LLM agent for direct LLM integration
-    pub config: Arc<AppConfig>,
+    pub config: Arc<std::sync::RwLock<AppConfig>>,
 }
 
 /// Helper function to infer the provider from a model ID
@@ -55,9 +55,18 @@ fn infer_provider_from_model(model_id: &str) -> &str {
 }
 
 /// Helper function to get a user-friendly display name from a model ID by looking it up in the provider
-async fn get_model_display_name(model_id: &str, provider: &str, config: &AppConfig) -> String {
+async fn get_model_display_name(
+    model_id: &str,
+    provider: &str,
+    config: &std::sync::RwLock<AppConfig>,
+) -> String {
     // Try to get the model name from the provider
-    if let Some(api_key_config) = &config.api_keys {
+    let config_read = match config.read() {
+        Ok(guard) => guard,
+        Err(_) => return model_id.to_string(), // Return model_id if we can't get the lock
+    };
+
+    if let Some(api_key_config) = &config_read.api_keys {
         let model_name = match provider {
             "anthropic" => {
                 if let Some(api_key) = &api_key_config.anthropic_api_key {
@@ -1399,7 +1408,11 @@ pub async fn get_command_executions(
 
 /// Get settings information including API key configuration
 pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let config = &data.config;
+    // Use the in-memory config to get latest settings
+    let config = data
+        .config
+        .read()
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
 
     // Get config file path - similar to how it's determined in config.rs
     let config_file_path = if let Some(home) = home::home_dir() {
@@ -1482,15 +1495,309 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
     let response = SettingsResponse {
         config_file_path,
         api_keys,
+        projects_default_path: config
+            .projects
+            .as_ref()
+            .and_then(|projects| projects.default_path.clone()),
     };
 
     Ok(HttpResponse::Ok().json(response))
 }
 
+/// Update API keys
+pub async fn update_api_keys(
+    data: web::Data<AppState>,
+    request: web::Json<UpdateApiKeysRequest>,
+) -> Result<HttpResponse, AppError> {
+    let req = request.into_inner();
+
+    tracing::info!("Updating API keys");
+
+    // Load current config
+    let mut config = {
+        let config_read = data.config.read().map_err(|e| {
+            AppError::Internal(format!("Failed to acquire config read lock: {}", e))
+        })?;
+        config_read.clone()
+    };
+
+    // Initialize api_keys section if it doesn't exist
+    if config.api_keys.is_none() {
+        config.api_keys = Some(crate::config::ApiKeysConfig {
+            xai_api_key: None,
+            openai_api_key: None,
+            anthropic_api_key: None,
+        });
+    }
+
+    // Update the API keys (only update if provided in request)
+    if let Some(ref mut api_keys) = config.api_keys {
+        if let Some(xai_key) = req.xai_api_key {
+            if !xai_key.is_empty() {
+                api_keys.xai_api_key = Some(xai_key);
+                tracing::info!("Updated xAI API key");
+            } else {
+                api_keys.xai_api_key = None;
+                tracing::info!("Cleared xAI API key");
+            }
+        }
+
+        if let Some(openai_key) = req.openai_api_key {
+            if !openai_key.is_empty() {
+                api_keys.openai_api_key = Some(openai_key);
+                tracing::info!("Updated OpenAI API key");
+            } else {
+                api_keys.openai_api_key = None;
+                tracing::info!("Cleared OpenAI API key");
+            }
+        }
+
+        if let Some(anthropic_key) = req.anthropic_api_key {
+            if !anthropic_key.is_empty() {
+                api_keys.anthropic_api_key = Some(anthropic_key);
+                tracing::info!("Updated Anthropic API key");
+            } else {
+                api_keys.anthropic_api_key = None;
+                tracing::info!("Cleared Anthropic API key");
+            }
+        }
+    }
+
+    // Save config to file
+    let config_path = if let Some(home) = home::home_dir() {
+        home.join(".config/nocodo/manager.toml")
+    } else {
+        std::path::PathBuf::from("manager.toml")
+    };
+
+    let toml_string = toml::to_string(&config)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize config: {}", e)))?;
+
+    std::fs::write(&config_path, toml_string)
+        .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
+
+    // Update the in-memory config as well
+    {
+        let mut config_write = data.config.write().map_err(|e| {
+            AppError::Internal(format!("Failed to acquire config write lock: {}", e))
+        })?;
+        *config_write = config;
+    }
+
+    tracing::info!("API keys updated successfully");
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "API keys updated successfully"
+    })))
+}
+
+/// Set projects default path
+pub async fn set_projects_default_path(
+    data: web::Data<AppState>,
+    request: web::Json<serde_json::Value>,
+) -> Result<HttpResponse, AppError> {
+    let path = request
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::InvalidRequest("path field is required".to_string()))?;
+
+    // Expand ~ to home directory if present
+    let expanded_path = if path.starts_with("~/") {
+        if let Some(home) = home::home_dir() {
+            path.replacen("~", &home.to_string_lossy(), 1)
+        } else {
+            return Err(AppError::InvalidRequest(
+                "Cannot expand ~: home directory not found".to_string(),
+            ));
+        }
+    } else {
+        path.to_string()
+    };
+
+    // Validate path exists and is a directory
+    let path_obj = std::path::Path::new(&expanded_path);
+    if !path_obj.exists() {
+        return Err(AppError::InvalidRequest(format!(
+            "Path does not exist: {} (expanded from: {})",
+            expanded_path, path
+        )));
+    }
+
+    if !path_obj.is_dir() {
+        return Err(AppError::InvalidRequest(format!(
+            "Path is not a directory: {} (expanded from: {})",
+            expanded_path, path
+        )));
+    }
+
+    // Update config
+    let mut config = {
+        let config_read = data.config.read().map_err(|e| {
+            AppError::Internal(format!("Failed to acquire config read lock: {}", e))
+        })?;
+        config_read.clone()
+    };
+    if let Some(ref mut projects) = config.projects {
+        projects.default_path = Some(expanded_path.clone());
+    } else {
+        config.projects = Some(crate::config::ProjectsConfig {
+            default_path: Some(expanded_path.clone()),
+        });
+    }
+
+    // Save config to file
+    let config_path = if let Some(home) = home::home_dir() {
+        home.join(".config/nocodo/manager.toml")
+    } else {
+        std::path::PathBuf::from("manager.toml")
+    };
+
+    let toml_string = toml::to_string(&config)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize config: {}", e)))?;
+
+    std::fs::write(&config_path, toml_string)
+        .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
+
+    // Update the in-memory config as well
+    {
+        let mut config_write = data.config.write().map_err(|e| {
+            AppError::Internal(format!("Failed to acquire config write lock: {}", e))
+        })?;
+        *config_write = config;
+    }
+
+    tracing::info!("Updated projects default path to: {}", expanded_path);
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "path": expanded_path
+    })))
+}
+
+/// Scan projects default path and save as Project entities
+pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    tracing::info!("scan_projects endpoint called");
+
+    // Reload config from file to get latest projects_default_path
+    let config = AppConfig::load().map_err(|e| {
+        tracing::error!("Failed to reload config: {}", e);
+        AppError::Internal(format!("Failed to reload config: {}", e))
+    })?;
+
+    tracing::info!("Reloaded config api_keys: {:?}", config.api_keys);
+
+    let projects_path = if let Some(projects) = &config.projects {
+        if let Some(path) = &projects.default_path {
+            path.clone()
+        } else {
+            tracing::error!("Projects default path not configured in reloaded config");
+            return Err(AppError::InvalidRequest(
+                "Projects default path not configured. Please set it in Settings first."
+                    .to_string(),
+            ));
+        }
+    } else {
+        tracing::error!("Projects configuration not found in reloaded config");
+        return Err(AppError::InvalidRequest(
+            "Projects configuration not found. Please set the projects path in Settings."
+                .to_string(),
+        ));
+    };
+
+    tracing::info!("Scanning projects directory: {}", projects_path);
+    let projects_dir = std::path::Path::new(&projects_path);
+
+    if !projects_dir.exists() {
+        return Err(AppError::InvalidRequest(format!(
+            "Projects directory does not exist: {}",
+            projects_path
+        )));
+    }
+
+    if !projects_dir.is_dir() {
+        return Err(AppError::InvalidRequest(format!(
+            "Projects path is not a directory: {}",
+            projects_path
+        )));
+    }
+
+    // Read directory contents
+    let entries = std::fs::read_dir(projects_dir)
+        .map_err(|e| AppError::Internal(format!("Failed to read projects directory: {}", e)))?;
+
+    let mut created_projects = Vec::new();
+    let mut entry_count = 0;
+
+    for entry in entries {
+        entry_count += 1;
+        let entry =
+            entry.map_err(|e| AppError::Internal(format!("Failed to read entry: {}", e)))?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            let project_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("<invalid>")
+                .to_string();
+
+            let project_path = path.to_string_lossy().to_string();
+
+            // Check if project already exists in database
+            if let Ok(_existing) = data.database.get_project_by_path(&project_path) {
+                tracing::info!("Project already exists: {}", project_name);
+                continue;
+            }
+
+            // Create new project
+            let mut project = Project::new(project_name.clone(), project_path.clone());
+
+            // Try to detect project type from common files
+            if path.join("package.json").exists() {
+                project.description = Some("Node.js project".to_string());
+            } else if path.join("Cargo.toml").exists() {
+                project.description = Some("Rust project".to_string());
+            } else if path.join("pyproject.toml").exists() || path.join("requirements.txt").exists()
+            {
+                project.description = Some("Python project".to_string());
+            } else if path.join("go.mod").exists() {
+                project.description = Some("Go project".to_string());
+            } else {
+                project.description = Some("Project".to_string());
+            }
+
+            // Save to database
+            let project_id = data.database.create_project(&project)?;
+            project.id = project_id;
+
+            created_projects.push(project.clone());
+
+            tracing::info!("Created project: {} at {}", project.name, project.path);
+        }
+    }
+
+    tracing::info!(
+        "Successfully scanned projects directory: {} (found {} entries, created {} projects)",
+        projects_path,
+        entry_count,
+        created_projects.len()
+    );
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "created_projects": created_projects.len(),
+        "projects": created_projects
+    })))
+}
+
 /// Get list of supported and enabled models
 pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     tracing::info!("get_supported_models endpoint called");
-    let config = &data.config;
+    let config = data
+        .config
+        .read()
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
     let mut models = Vec::new();
 
     tracing::info!("Checking for configured API keys in get_supported_models");
@@ -1649,54 +1956,6 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
         } else {
             tracing::info!("xAI API key not configured");
         }
-    }
-
-    // If no models were found but we have API keys configured, try to return default models
-    if models.is_empty() && config.api_keys.is_some() {
-        tracing::info!("No models found from providers, adding default models");
-        // Add some default models for development/testing
-        models.push(crate::models::SupportedModel {
-            provider: "openai".to_string(),
-            model_id: "gpt-5".to_string(),
-            name: "GPT-5".to_string(),
-            context_length: 262144,
-            supports_streaming: true,
-            supports_tool_calling: true,
-            supports_vision: true,
-            supports_reasoning: true,
-            input_cost_per_token: Some(0.002),
-            output_cost_per_token: Some(0.008),
-            default_temperature: Some(0.7),
-            default_max_tokens: Some(2000),
-        });
-        models.push(crate::models::SupportedModel {
-            provider: "anthropic".to_string(),
-            model_id: "claude-3-sonnet-20240229".to_string(),
-            name: "Claude 3 Sonnet".to_string(),
-            context_length: 200000,
-            supports_streaming: true,
-            supports_tool_calling: true,
-            supports_vision: true,
-            supports_reasoning: false,
-            input_cost_per_token: Some(0.003),
-            output_cost_per_token: Some(0.015),
-            default_temperature: Some(0.7),
-            default_max_tokens: Some(1000),
-        });
-        models.push(crate::models::SupportedModel {
-            provider: "xai".to_string(),
-            model_id: "grok-code-fast-1".to_string(),
-            name: "Grok Code Fast 1".to_string(),
-            context_length: 131072,
-            supports_streaming: true,
-            supports_tool_calling: true,
-            supports_vision: false,
-            supports_reasoning: true,
-            input_cost_per_token: Some(0.002),
-            output_cost_per_token: Some(0.01),
-            default_temperature: Some(0.7),
-            default_max_tokens: Some(2000),
-        });
     }
 
     tracing::info!("Returning {} supported models", models.len());

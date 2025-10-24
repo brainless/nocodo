@@ -1,6 +1,10 @@
 use manager_models::{
-    CreateWorkRequest, Project, ProjectListResponse, Work, WorkListResponse, WorkResponse,
+    AddMessageRequest, AiSessionResponse, CreateAiSessionRequest, CreateWorkRequest,
+    MessageAuthorType, MessageContentType, Project, ProjectDetailsResponse, ProjectListResponse,
+    SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse,
+    WorkResponse,
 };
+use serde_json::Value;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiClient {
@@ -35,6 +39,30 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(project_response.projects)
+    }
+
+    pub async fn get_project_details(
+        &self,
+        project_id: i64,
+    ) -> Result<ProjectDetailsResponse, ApiError> {
+        let url = format!("{}/api/projects/{}/details", self.base_url, project_id);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let project_details_response: ProjectDetailsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(project_details_response)
     }
 
     pub async fn list_works(&self) -> Result<Vec<Work>, ApiError> {
@@ -127,6 +155,186 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(work_response.work)
+    }
+
+    pub async fn add_message_to_work(
+        &self,
+        work_id: i64,
+        content: String,
+    ) -> Result<manager_models::WorkMessage, ApiError> {
+        let url = format!("{}/api/work/{}/messages", self.base_url, work_id);
+        let request = AddMessageRequest {
+            content,
+            content_type: MessageContentType::Text,
+            author_type: MessageAuthorType::User,
+            author_id: None,
+        };
+
+        let response = self
+            .client()
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let message_response: manager_models::WorkMessageResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(message_response.message)
+    }
+
+    pub async fn create_ai_session(
+        &self,
+        work_id: i64,
+        message_id: String,
+        tool_name: String,
+    ) -> Result<manager_models::AiSession, ApiError> {
+        let url = format!("{}/api/work/{}/sessions", self.base_url, work_id);
+        let request = CreateAiSessionRequest {
+            message_id,
+            tool_name,
+        };
+
+        let response = self
+            .client()
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let session_response: AiSessionResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(session_response.session)
+    }
+
+    pub async fn get_supported_models(
+        &self,
+    ) -> Result<Vec<manager_models::SupportedModel>, ApiError> {
+        let url = format!("{}/api/models", self.base_url);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let models_response: SupportedModelsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(models_response.models)
+    }
+
+    pub async fn get_settings(&self) -> Result<SettingsResponse, ApiError> {
+        let url = format!("{}/api/settings", self.base_url);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let settings_response: SettingsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(settings_response)
+    }
+
+    pub async fn set_projects_default_path(&self, path: String) -> Result<Value, ApiError> {
+        let url = format!("{}/api/settings/projects-path", self.base_url);
+        let payload = serde_json::json!({
+            "path": path
+        });
+
+        let response = self
+            .client()
+            .post(&url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    pub async fn scan_projects(&self) -> Result<Value, ApiError> {
+        let url = format!("{}/api/projects/scan", self.base_url);
+
+        let response = self
+            .client()
+            .post(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    pub async fn update_api_keys(&self, request: UpdateApiKeysRequest) -> Result<Value, ApiError> {
+        let url = format!("{}/api/settings/api-keys", self.base_url);
+
+        let response = self
+            .client()
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
     }
 }
 

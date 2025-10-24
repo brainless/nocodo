@@ -301,6 +301,7 @@ impl LlmProviderTestConfig {
                     None
                 },
             }),
+            projects: None,
         }
     }
 }

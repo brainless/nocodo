@@ -38,6 +38,8 @@ impl SshTunnel {
         server: &str,
         username: &str,
         key_path: Option<&str>,
+        port: u16,
+        remote_port: u16,
     ) -> Result<Self, SshError> {
         tracing::info!("Attempting SSH connection to {}@{}", username, server);
 
@@ -82,9 +84,11 @@ impl SshTunnel {
         let key_pair = key_pair
             .ok_or_else(|| SshError::AuthenticationFailed("No valid SSH keys found".to_string()))?;
 
-        // Create SSH client configuration
+        // Create SSH client configuration with keepalive
         let config = client::Config {
-            inactivity_timeout: Some(std::time::Duration::from_secs(300)),
+            inactivity_timeout: Some(std::time::Duration::from_secs(600)), // 10 minutes (increased from 5)
+            keepalive_interval: Some(std::time::Duration::from_secs(30)), // Send keepalive every 30 seconds
+            keepalive_max: 3, // Allow 3 missed keepalives before closing connection
             ..Default::default()
         };
 
@@ -92,8 +96,8 @@ impl SshTunnel {
         let handler = ClientHandler;
 
         // Connect to SSH server
-        tracing::info!("Connecting to SSH server {}:22", server);
-        let mut session = client::connect(config, (server, 22), handler)
+        tracing::info!("Connecting to SSH server {}:{}", server, port);
+        let mut session = client::connect(config, (server, port), handler)
             .await
             .map_err(|e| SshError::ConnectionFailed(format!("Connection failed: {}", e)))?;
 
@@ -134,7 +138,7 @@ impl SshTunnel {
         // Start port forwarding task
         let task_handle = tokio::spawn(async move {
             if let Err(e) =
-                run_port_forward_loop(local_port, session_clone, 8081, shutdown_clone).await
+                run_port_forward_loop(local_port, session_clone, remote_port, shutdown_clone).await
             {
                 tracing::error!("Port forwarding error: {}", e);
             }
@@ -144,13 +148,13 @@ impl SshTunnel {
             "Port forwarding active: localhost:{} -> {}:{}",
             local_port,
             server,
-            8081
+            remote_port
         );
 
         Ok(Self {
             local_port,
             server: server_clone,
-            remote_port: 8081,
+            remote_port,
             session,
             shutdown,
             _task_handle: Some(task_handle),
