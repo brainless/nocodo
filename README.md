@@ -4,11 +4,14 @@
 
 🚀 [**nocodo.com →**](https://nocodo.com)
 
-> ⚠️ **Under Active Development** - This product is actively being developed. Please ⭐ star and 👀 watch this repository for updates!
+> ⚠️ **Under Active Development** - nocodo is actively developed. If you ⭐ star and 👀 watch this repository, it would mean a lot to me.
 
 Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help teams of all sizes collaborate on software development with AI assistance - whether you're working solo, in a small startup, or part of a large organization.
 
-![User prompt and choice of LL Model](./website/src/assets/nocodo_tech_stack_work_model_dropdown_open.png)
+
+![nocodo Desktop app connected over SSH, showing past prompts](./website/src/assets/nocodo_Board_Writing_a_Prompt_Existing_Prompt_List_Work_Details.png "Desktop app showing past prompts, current prompt, on connected manager instance")
+
+> ⚠️ **Under Active Development** - the desktop app shows tool call outputs as raw JSON, a better UI will come soon.
 
 ## What is nocodo?
 
@@ -35,6 +38,26 @@ nocodo is a collaborative development platform where coding agents, project mana
 
 nocodo consists of two main components that work together:
 
+### nocodo Desktop App (Client)
+
+![nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH](./website/src/assets/nocodo_Connection_Screen_Local_Remote_SSH_Options.png "Connect to nocodo manager running locally or remote over SSH")
+
+![nocodo Desktop app, connecting to my other computer in LAN over SSH](./website/src/assets/nocodo_Connect_Remote_Within_LAN.png "Connecting to my other computer in LAN over SSH")
+
+The desktop app provides secure, native access to your development environment:
+
+**Easy Access**
+- Connect to manager via SSH tunnel
+- Access development setup and coding agents
+- Share ideas, create tasks, manage projects
+- View and test deployed demos
+
+**Team Collaboration**
+- Join multiple teams with secure authentication
+- Contribute to projects across different organizations
+- Integrated UI for all project management needs
+- Mobile apps coming soon
+
 ### nocodo Manager (Backend)
 
 The manager runs on any Linux machine and handles the complete development environment:
@@ -51,22 +74,6 @@ The manager runs on any Linux machine and handles the complete development envir
 - Automatic environment setup and configuration
 - Git worktree management (coming soon - one worktree per task)
 - Intelligent task dependency resolution and parallel execution
-
-### nocodo Desktop App (Client)
-
-The desktop app provides secure, native access to your development environment:
-
-**Easy Access**
-- Connect to manager via SSH tunnel
-- Access development setup and coding agents
-- Share ideas, create tasks, manage projects
-- View and test deployed demos
-
-**Team Collaboration**
-- Join multiple teams with secure authentication
-- Contribute to projects across different organizations
-- Integrated UI for all project management needs
-- Mobile apps coming soon
 
 ## Getting Started
 
