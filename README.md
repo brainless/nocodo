@@ -171,4 +171,4 @@ cargo build --release --bin nocodo-desktop-app
 
 **🚀 Ready to transform how your team builds software?** [**Get Started →**](https://nocodo.com)
 
-Built with Rust • Privacy-focused • Works for teams of all sizes
+Privacy-focused • No vendor lock-in • Works for teams of all sizes
