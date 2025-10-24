@@ -1,3 +1,4 @@
+use manager_models::{ListFilesRequest, ToolRequest};
 use rusqlite::Connection;
 use serde_json::Value;
 use std::sync::Arc;
@@ -1345,8 +1346,10 @@ let card_spacing = 10.0;
                                               // Change cursor to pointer on hover
                                               if response.response.hovered() {
                                                   ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                              }
-                                          }
+}
+}
+
+
                                       });
                                   });
                              }
@@ -1770,34 +1773,149 @@ let card_spacing = 10.0;
                                                                         });
                                                                 }
                                                                 DisplayMessage::AiOutput(output) => {
-                                                                    // AI response message
-                                                                    let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
+                                                                    // Check if this is a list_files tool request using proper Rust types
+                                                                    let list_files_requests = if output.role.as_deref() == Some("assistant") {
+                                                                        // Try multiple parsing approaches for robustness
 
-                                                                    egui::Frame::NONE
-                                                                        .fill(bg_color)
-                                                                        .corner_radius(8.0)
-                                                                        .inner_margin(egui::Margin::same(12))
-                                                                        .show(ui, |ui| {
-                                                                            ui.vertical(|ui| {
-                                                                                ui.horizontal(|ui| {
-                                                                                    // Determine label based on role and model
-                                                                                    let label = match (output.role.as_deref(), output.model.as_deref()) {
-                                                                                        (Some("tool"), _) => "nocodo".to_string(),
-                                                                                        (Some("assistant"), Some(model)) => format!("AI - {}", model),
-                                                                                        _ => "AI".to_string(),
-                                                                                    };
-                                                                                    ui.label(egui::RichText::new(label).size(12.0).strong());
-                                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                                        let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
-                                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                                            .unwrap_or_else(|| "Unknown".to_string());
-                                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                        // Debug: Log the content we're trying to parse
+                                                                        tracing::debug!(
+                                                                            content_preview = %output.content.chars().take(200).collect::<String>(),
+                                                                            content_length = %output.content.len(),
+                                                                            "Attempting to parse AI output for tool calls"
+                                                                        );
+
+                                                                        // 1. Try to parse as structured JSON with tool_calls (standard format)
+                                                                        let mut requests = Vec::new();
+
+                                                                        if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                            tracing::debug!("Successfully parsed as structured JSON");
+                                                                            // Look for tool_calls array in the structured response
+                                                                            if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
+                                                                                tracing::debug!(tool_calls_count = %tool_calls.len(), "Found tool_calls array");
+                                                                                for tool_call in tool_calls {
+                                                                                    if let Some(function) = tool_call.get("function") {
+                                                                                        if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
+                                                                                            tracing::debug!(tool_name = %name, "Found tool call");
+                                                                                            if name == "list_files" {
+                                                                                                if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
+                                                                                                    // Use proper Rust type for parsing ListFilesRequest
+                                                                                                    match serde_json::from_str::<ListFilesRequest>(args) {
+                                                                                                        Ok(list_files_req) => {
+                                                                                                            tracing::debug!(path = %list_files_req.path, "Successfully parsed ListFilesRequest");
+                                                                                                            requests.push(list_files_req);
+                                                                                                        }
+                                                                                                        Err(e) => {
+                                                                                                            tracing::warn!(error = %e, arguments = %args, "Failed to parse ListFilesRequest");
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            } else {
+                                                                                tracing::debug!("No tool_calls array found in structured JSON");
+                                                                            }
+                                                                        } else {
+                                                                            tracing::debug!("Failed to parse as structured JSON");
+                                                                        }
+
+                                                                        // 2. Try to parse as direct ToolRequest (fallback format)
+                                                                        if requests.is_empty() {
+                                                                            tracing::debug!("Trying to parse as direct ToolRequest");
+                                                                            match serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                                Ok(tool_request) => {
+                                                                                    tracing::debug!("Successfully parsed as direct ToolRequest");
+                                                                                    if let ToolRequest::ListFiles(list_files_req) = tool_request {
+                                                                                        tracing::debug!(path = %list_files_req.path, "Found ListFiles in direct ToolRequest");
+                                                                                        requests.push(list_files_req);
+                                                                                    }
+                                                                                }
+                                                                                Err(e) => {
+                                                                                    tracing::debug!(error = %e, "Failed to parse as direct ToolRequest");
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        if !requests.is_empty() {
+                                                                            tracing::debug!(requests_count = %requests.len(), "Successfully extracted list_files requests");
+                                                                            Some(requests)
+                                                                        } else {
+                                                                            tracing::debug!("No list_files requests found");
+                                                                            None
+                                                                        }
+                                                                    } else {
+                                                                        None
+                                                                    };
+
+                                                                    if let Some(requests) = list_files_requests {
+                                                                        // Display each list_files tool request in a rounded box with enhanced info
+                                                                        for req in requests {
+                                                                            let mut description = format!("List files: {}", req.path);
+
+                                                                            // Add optional parameters to the description
+                                                                            let mut options = Vec::new();
+                                                                            if req.recursive.unwrap_or(false) {
+                                                                                options.push("recursive".to_string());
+                                                                            }
+                                                                            if req.include_hidden.unwrap_or(false) {
+                                                                                options.push("include hidden".to_string());
+                                                                            }
+                                                                            if let Some(max_files) = req.max_files {
+                                                                                options.push(format!("max: {}", max_files));
+                                                                            }
+
+                                                                            if !options.is_empty() {
+                                                                                description.push_str(&format!(" ({})", options.join(", ")));
+                                                                            }
+
+                                                                            // Use the same styling as User box
+                                                                            let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                            egui::Frame::NONE
+                                                                                .fill(bg_color)
+                                                                                .corner_radius(8.0)
+                                                                                .inner_margin(egui::Margin::same(12))
+                                                                                .show(ui, |ui| {
+                                                                                    ui.vertical(|ui| {
+                                                                                        ui.horizontal(|ui| {
+                                                                                            ui.label(egui::RichText::new("📁").size(16.0));
+                                                                                            ui.label(egui::RichText::new(description).size(12.0).strong());
+                                                                                        });
                                                                                     });
                                                                                 });
-                                                                                ui.add_space(4.0);
-                                                                                ui.label(&output.content);
+                                                                            ui.add_space(4.0);
+                                                                        }
+                                                                    } else {
+                                                                        // Regular AI response message
+                                                                        let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
+
+                                                                        egui::Frame::NONE
+                                                                            .fill(bg_color)
+                                                                            .corner_radius(8.0)
+                                                                            .inner_margin(egui::Margin::same(12))
+                                                                            .show(ui, |ui| {
+                                                                                ui.vertical(|ui| {
+                                                                                    ui.horizontal(|ui| {
+                                                                                        // Determine label based on role and model
+                                                                                        let label = match (output.role.as_deref(), output.model.as_deref()) {
+                                                                                            (Some("tool"), _) => "nocodo".to_string(),
+                                                                                            (Some("assistant"), Some(model)) => format!("AI - {}", model),
+                                                                                            _ => "AI".to_string(),
+                                                                                        };
+                                                                                        ui.label(egui::RichText::new(label).size(12.0).strong());
+                                                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                                            let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
+                                                                                                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                                                .unwrap_or_else(|| "Unknown".to_string());
+                                                                                            ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                                        });
+                                                                                    });
+                                                                                    ui.add_space(4.0);
+                                                                                    ui.label(&output.content);
+                                                                                });
                                                                             });
-                                                                        });
+                                                                    }
                                                                 }
                                                             }
                                                             ui.add_space(8.0);
