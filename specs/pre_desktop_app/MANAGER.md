@@ -398,7 +398,7 @@ impl HealthMonitor {
         components.insert("database".to_string(), self.check_database().await);
         components.insert("filesystem".to_string(), self.check_filesystem().await);
         components.insert("ai_tools".to_string(), self.check_ai_tools().await);
-        components.insert("services".to_string(), self.check_services().await);
+        
         
         let overall = self.calculate_overall_status(&components);
         
