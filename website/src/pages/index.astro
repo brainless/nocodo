@@ -1,5 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import heroScreenshot from '../assets/nocodo_Board_Writing_a_Prompt_Existing_Prompt_List_Work_Details.png';
+import connectionScreenshot from '../assets/nocodo_Connection_Screen_Local_Remote_SSH_Options.png';
+import lanConnectScreenshot from '../assets/nocodo_Connect_Remote_Within_LAN.png';
 ---
 
 <Layout
@@ -53,6 +56,25 @@ import Layout from '../layouts/Layout.astro';
 
         <p class="text-sm text-slate-500 mt-8">
           Under active development • Star and watch for updates
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hero Screenshot -->
+  <section class="py-12 bg-slate-950">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="relative">
+        <img
+          src={heroScreenshot.src}
+          alt="nocodo Desktop app connected over SSH, showing past prompts"
+          title="Desktop app showing past prompts, current prompt, on connected manager instance"
+          class="w-full rounded-lg shadow-2xl border border-slate-700"
+        />
+      </div>
+      <div class="mt-4 text-center">
+        <p class="text-sm text-slate-500">
+          ⚠️ Under active development - the desktop app shows tool call outputs as raw JSON, a better UI will come soon
         </p>
       </div>
     </div>
@@ -172,6 +194,26 @@ import Layout from '../layouts/Layout.astro';
               <span>Review generated code and demos</span>
             </li>
           </ul>
+        </div>
+      </div>
+
+      <!-- Connection Screenshots -->
+      <div class="mt-12 space-y-8">
+        <div class="relative">
+          <img
+            src={connectionScreenshot.src}
+            alt="nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH"
+            title="Connect to nocodo manager running locally or remote over SSH"
+            class="w-full rounded-lg border border-slate-700 shadow-2xl"
+          />
+        </div>
+        <div class="relative">
+          <img
+            src={lanConnectScreenshot.src}
+            alt="nocodo Desktop app, connecting to my other computer in LAN over SSH"
+            title="Connecting to my other computer in LAN over SSH"
+            class="w-full rounded-lg border border-slate-700 shadow-2xl"
+          />
         </div>
       </div>
 
@@ -412,7 +454,7 @@ import Layout from '../layouts/Layout.astro';
       <div class="mt-12 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-2xl p-8 border border-emerald-500/20">
         <div class="text-center">
           <h3 class="text-2xl font-bold text-slate-100 mb-4">
-            Collaboration Features
+            Pricing
           </h3>
           <p class="text-slate-300 mb-4">
             Team collaboration will be a paid feature:
