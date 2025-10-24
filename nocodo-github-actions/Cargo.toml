@@ -21,7 +21,7 @@ chrono = { workspace = true }
 ts-rs = { workspace = true }
 
 # Optional dependencies for nocodo integration
-rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+rusqlite = { version = "0.37", features = ["bundled"], optional = true }
 actix-web = { workspace = true, optional = true }
 
 # Optional CLI dependency
