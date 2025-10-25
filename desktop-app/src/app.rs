@@ -5,8 +5,9 @@ use crate::pages::{
 };
 use crate::services::{ApiService, BackgroundTasks};
 use crate::state::ui_state::Page as UiPage;
-use crate::state::AppState;
+use crate::state::{AppState, Server};
 use eframe;
+use rusqlite::Connection;
 use std::sync::Arc;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -106,6 +107,112 @@ impl eframe::App for DesktopApp {
 }
 
 impl DesktopApp {
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Load previous app state (if any).
+        let mut app: DesktopApp = if let Some(storage) = cc.storage {
+            eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
+        } else {
+            Default::default()
+        };
+
+        // Load configuration
+        app.state.config = crate::config::DesktopConfig::load().unwrap_or_default();
+
+        // Initialize local database
+        let config_dir = dirs::config_dir().expect("Could not find config dir");
+        let nocodo_dir = config_dir.join("nocodo");
+        std::fs::create_dir_all(&nocodo_dir).expect("Could not create nocodo config dir");
+        let db_path = nocodo_dir.join("local.sqlite3");
+        let db = Connection::open(&db_path).expect("Could not open DB");
+
+        // Create tables
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS servers (
+                id INTEGER PRIMARY KEY,
+                host TEXT NOT NULL,
+                user TEXT NOT NULL,
+                key_path TEXT,
+                port INTEGER NOT NULL DEFAULT 22
+            )",
+            [],
+        )
+        .expect("Could not create servers table");
+        db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_unique ON servers (host, user, key_path, port)",
+            [],
+        )
+        .expect("Could not create unique index");
+
+        // Add port column if it doesn't exist (for backward compatibility)
+        let _ = db.execute(
+            "ALTER TABLE servers ADD COLUMN port INTEGER NOT NULL DEFAULT 22",
+            [],
+        );
+
+        // Create favorites table
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS favorites (
+                id INTEGER PRIMARY KEY,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                UNIQUE(entity_type, entity_id)
+            )",
+            [],
+        )
+        .expect("Could not create favorites table");
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id)",
+            [],
+        )
+        .expect("Could not create favorites index");
+
+        // Load servers from database
+        {
+            let mut stmt = db
+                .prepare("SELECT host, user, key_path, COALESCE(port, 22) FROM servers")
+                .expect("Could not prepare statement");
+            let server_iter = stmt
+                .query_map([], |row| {
+                    Ok(Server {
+                        host: row.get(0)?,
+                        user: row.get(1)?,
+                        key_path: row.get(2)?,
+                        port: row.get(3)?,
+                    })
+                })
+                .expect("Could not query servers");
+            app.state.servers = server_iter.filter_map(|s| s.ok()).collect();
+        }
+
+        // Load favorites
+        {
+            let mut stmt = db
+                .prepare("SELECT entity_type, entity_id FROM favorites")
+                .expect("Could not prepare favorites statement");
+            let favorites_iter = stmt
+                .query_map([], |row| {
+                    let entity_type: String = row.get(0)?;
+                    let entity_id: i64 = row.get(1)?;
+                    Ok((entity_type, entity_id))
+                })
+                .expect("Could not query favorites");
+
+            for result in favorites_iter {
+                if let Ok((entity_type, entity_id)) = result {
+                    if entity_type == "project" {
+                        app.state.favorite_projects.insert(entity_id);
+                    }
+                }
+            }
+        }
+
+        app.state.db = Some(db);
+
+        app
+    }
+
     fn navigate_to(&mut self, page: UiPage) {
         // Call on_navigate_from for current page
         if let Some(current_page) = self.pages.get_mut(&self.state.ui_state.current_page) {

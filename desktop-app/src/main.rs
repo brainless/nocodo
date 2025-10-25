@@ -31,7 +31,7 @@ fn main() -> eframe::Result {
         eframe::run_native(
             "nocodo",
             native_options,
-            Box::new(|_cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::default()))),
+            Box::new(|cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::new(cc)))),
         )
     })
 }
@@ -196,7 +196,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|_cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::default()))),
+                Box::new(|cc| Ok(Box::new(nocodo_desktop_app::DesktopApp::new(cc)))),
             )
             .await;
 
