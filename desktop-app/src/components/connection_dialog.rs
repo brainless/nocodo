@@ -57,6 +57,7 @@ impl ConnectionDialog {
     fn connect(&self, state: &mut AppState) {
         state.connection_state = ConnectionState::Connecting;
         state.ui_state.connection_error = None;
+        state.connection_result = Arc::new(std::sync::Mutex::new(None));
 
         let server = state.config.ssh.server.clone();
         let username = state.config.ssh.username.clone();
@@ -79,18 +80,59 @@ impl ConnectionDialog {
         let remote_port = state.config.ssh.remote_port;
         let port = state.config.ssh.port;
         let connection_manager = Arc::clone(&state.connection_manager);
+        let result_arc = Arc::clone(&state.connection_result);
+
+        tracing::info!(
+            "Initiating SSH connection to {}@{}:{}",
+            username,
+            server,
+            port
+        );
 
         // Spawn async task for SSH connection via connection manager
         tokio::spawn(async move {
+            tracing::info!("Starting SSH tunnel connection...");
             match connection_manager
                 .connect_ssh(&server, &username, key_path.as_deref(), port, remote_port)
                 .await
             {
                 Ok(_) => {
-                    tracing::info!("Connected successfully via connection manager");
+                    tracing::info!("SSH tunnel established successfully");
+
+                    // Wait a moment for the tunnel to be fully ready
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    // Verify we can reach the API through the tunnel
+                    if let Some(api_client) = connection_manager.get_api_client().await {
+                        tracing::info!("API client created, testing connection...");
+                        match api_client.get_settings().await {
+                            Ok(_) => {
+                                tracing::info!(
+                                    "Successfully connected to nocodo manager at {}@{}",
+                                    username,
+                                    server
+                                );
+                                let mut result = result_arc.lock().unwrap();
+                                *result = Some(Ok(server.clone()));
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to reach API through tunnel: {}", e);
+                                let mut result = result_arc.lock().unwrap();
+                                *result = Some(Err(format!("SSH tunnel OK but cannot reach nocodo manager: {}. Is nocodo-manager running on the server?", e)));
+                            }
+                        }
+                    } else {
+                        tracing::error!("Failed to get API client after SSH tunnel");
+                        let mut result = result_arc.lock().unwrap();
+                        *result = Some(Err(
+                            "SSH tunnel established but API client not available".to_string()
+                        ));
+                    }
                 }
                 Err(e) => {
-                    tracing::error!("Connection failed: {}", e);
+                    tracing::error!("SSH connection failed: {}", e);
+                    let mut result = result_arc.lock().unwrap();
+                    *result = Some(Err(format!("SSH connection failed: {}", e)));
                 }
             }
         });

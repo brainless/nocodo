@@ -156,6 +156,8 @@ pub struct AppState {
     pub db: Option<Connection>,
     #[serde(skip)]
     pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
+    #[serde(skip)]
+    pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
 }
 
 impl Default for AppState {
@@ -210,6 +212,7 @@ impl Default for AppState {
             update_api_keys_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
+            connection_result: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 }

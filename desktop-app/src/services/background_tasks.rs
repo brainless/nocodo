@@ -13,6 +13,9 @@ impl BackgroundTasks {
 
 impl BackgroundTasks {
     pub fn handle_background_updates(&self, state: &mut AppState) {
+        // Monitor connection state
+        self.check_connection_state(state);
+
         // Handle async task results
         self.check_projects_result(state);
         self.check_works_result(state);
@@ -27,6 +30,40 @@ impl BackgroundTasks {
         self.check_update_projects_path_result(state);
         self.check_scan_projects_result(state);
         self.check_local_server_result(state);
+    }
+
+    fn check_connection_state(&self, state: &mut AppState) {
+        use crate::state::ConnectionState;
+
+        // Check if connection result is available
+        let result_opt = {
+            let mut result = state.connection_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
+            match res {
+                Ok(server) => {
+                    tracing::info!("Connection successful to {}", server);
+                    state.connection_state = ConnectionState::Connected;
+                    state.ui_state.connected_host = Some(server);
+                    state.ui_state.connection_error = None;
+                    state.models_fetch_attempted = false; // Reset to allow fetching models
+
+                    // Refresh data after connecting
+                    let api_service = crate::services::ApiService::new();
+                    api_service.refresh_projects(state);
+                    api_service.refresh_works(state);
+                    api_service.refresh_supported_models(state);
+                }
+                Err(error) => {
+                    tracing::error!("Connection failed: {}", error);
+                    state.connection_state = ConnectionState::Error(error.clone());
+                    state.ui_state.connection_error = Some(error);
+                    state.ui_state.connected_host = None;
+                }
+            }
+        }
     }
 
     fn check_projects_result(&self, state: &mut AppState) {
