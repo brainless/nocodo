@@ -48,4 +48,7 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 # Date/Time formatting
 chrono = "0.4"
 
+# Random data generation
+rand = "0.8"
+
 
