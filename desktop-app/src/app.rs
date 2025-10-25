@@ -56,6 +56,12 @@ pub struct DesktopApp {
     anthropic_api_key_input: String,
     api_keys_modified: bool,
 
+    // UI Reference state
+    ui_reference_card_titles: Vec<String>,
+    ui_reference_form_text: String,
+    ui_reference_form_dropdown: Option<String>,
+    ui_reference_readme_content: String,
+
     // Runtime state (not serialized)
     #[serde(skip)]
     connection_manager: Arc<crate::connection_manager::ConnectionManager>,
@@ -135,6 +141,8 @@ enum Page {
     Mentions,
     Servers,
     Settings,
+    UiReference,
+    UiTwoColumnMainContent,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -183,6 +191,10 @@ impl Default for DesktopApp {
             openai_api_key_input: String::new(),
             anthropic_api_key_input: String::new(),
             api_keys_modified: false,
+            ui_reference_card_titles: Vec::new(),
+            ui_reference_form_text: String::new(),
+            ui_reference_form_dropdown: None,
+            ui_reference_readme_content: String::new(),
             connection_manager: Arc::new(crate::connection_manager::ConnectionManager::new()),
             pending_project_details_refresh: None,
             projects_result: Arc::new(std::sync::Mutex::new(None)),
@@ -321,6 +333,25 @@ impl DesktopApp {
 
         // Always start on Servers page
         app.current_page = Page::Servers;
+
+        // Initialize UI reference card titles with random data
+        app.ui_reference_card_titles = vec![
+            "Dashboard Overview".to_string(),
+            "User Profile Settings".to_string(),
+            "Analytics & Reports".to_string(),
+            "Project Management".to_string(),
+            "Task List View".to_string(),
+            "Calendar Integration".to_string(),
+            "Notification Center".to_string(),
+            "Search & Filter".to_string(),
+            "Data Visualization".to_string(),
+            "Export Options".to_string(),
+        ];
+
+        // Load README content
+        if let Ok(content) = std::fs::read_to_string("/home/brainless/Projects/nocodo/README.md") {
+            app.ui_reference_readme_content = content;
+        }
 
         app
     }
@@ -769,6 +800,8 @@ impl DesktopApp {
     fn is_project_favorite(&self, project_id: i64) -> bool {
         self.favorite_projects.contains(&project_id)
     }
+
+    /// Render markdown content with custom styling (Option 2)
 
     /// Check if local nocodo manager is running
     fn check_local_server(&mut self) {
@@ -2127,7 +2160,7 @@ ui.heading("Saved servers:");
                         egui::ScrollArea::vertical().show(ui, |ui| {
                             egui_extras::TableBuilder::new(ui)
                                 .column(egui_extras::Column::remainder().at_least(200.0)) // Server column
-                                .column(egui_extras::Column::auto()) // Port column  
+                                .column(egui_extras::Column::auto()) // Port column
                                 .column(egui_extras::Column::remainder().at_least(250.0)) // Key column
                                 .column(egui_extras::Column::auto()) // Connect button column
                                 .header(20.0, |mut header| {
@@ -2342,10 +2375,17 @@ ui.heading("Saved servers:");
                                       }
                                   });
 
-                                  if ui.button("Refresh Settings").clicked() {
-                                      self.refresh_settings();
-                                  }
-                               } else {
+if ui.button("Refresh Settings").clicked() {
+                                       self.refresh_settings();
+                                   }
+
+                                   ui.add_space(30.0);
+                                   ui.heading("UI Reference");
+
+                                   if ui.button("2 column main content").clicked() {
+                                       self.current_page = Page::UiTwoColumnMainContent;
+                                   }
+                                } else {
                                    ui.vertical_centered(|ui| {
                                        ui.label("No settings loaded");
                                        if ui.button("Refresh").clicked() {
@@ -2354,11 +2394,145 @@ ui.heading("Saved servers:");
                                    });
                                }
                           }
-                      }
+                     }
+                  }
+                 Page::UiReference => {
+                     ui.heading("UI Reference");
+
+                     ui.vertical_centered(|ui| {
+                         ui.label("UI Widget Gallery and Reference");
+                         ui.add_space(20.0);
+
+                         if ui.button("← Back to Settings").clicked() {
+                             self.current_page = Page::Settings;
+                         }
+
+                         ui.add_space(20.0);
+
+                         if ui.button("2 column main content").clicked() {
+                             self.current_page = Page::UiTwoColumnMainContent;
+                         }
+                     });
+                 }
+                 Page::UiTwoColumnMainContent => {
+                     // Header with back button
+                     ui.horizontal(|ui| {
+                         if ui.button("← Back to UI Reference").clicked() {
+                             self.current_page = Page::UiReference;
+                         }
+
+                         ui.add_space(10.0);
+                         ui.heading("2 Column Main Content");
+                     });
+
+                     ui.add_space(10.0);
+
+                     // Two-column layout with independent scroll
+                     let available_size = ui.available_size_before_wrap();
+                     let left_column_width = 400.0;
+
+                     ui.horizontal(|ui| {
+                         // First column (400px wide) with independent scroll
+                         ui.allocate_ui_with_layout(
+                             egui::vec2(left_column_width, available_size.y),
+                             egui::Layout::top_down(egui::Align::LEFT),
+                             |ui| {
+                                 ui.heading("First Column");
+
+                                 egui::ScrollArea::vertical()
+                                     .id_salt("first_column_scroll")
+                                     .auto_shrink(false)
+                                     .show(ui, |ui| {
+                                         ui.add_space(8.0);
+
+                                         // Form above the cards
+                                         egui::Frame::NONE
+                                             .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                             .corner_radius(4.0)
+                                             .inner_margin(egui::Margin::same(12))
+                                             .show(ui, |ui| {
+                                                 ui.set_width(ui.available_width());
+                                                 ui.vertical(|ui| {
+                                                     // Textarea (full-width, 3 rows)
+                                                     ui.label("Text Input:");
+                                                     ui.add(
+                                                         egui::TextEdit::multiline(&mut self.ui_reference_form_text)
+                                                             .desired_width(ui.available_width())
+                                                             .desired_rows(3)
+                                                             .hint_text("Enter your text here...")
+                                                     );
+
+                                                     ui.add_space(8.0);
+
+                                                     // Dropdown
+                                                     ui.label("Select Option:");
+                                                     let dropdown_options = vec!["Option 1", "Option 2", "Option 3", "Option 4"];
+                                                     egui::ComboBox::from_id_salt("ui_reference_dropdown")
+                                                         .selected_text(
+                                                             self.ui_reference_form_dropdown
+                                                                 .as_ref()
+                                                                 .unwrap_or(&"Select an option".to_string())
+                                                         )
+                                                         .show_ui(ui, |ui| {
+                                                             for option in dropdown_options {
+                                                                 ui.selectable_value(
+                                                                     &mut self.ui_reference_form_dropdown,
+                                                                     Some(option.to_string()),
+                                                                     option,
+                                                                 );
+                                                             }
+                                                         });
+
+                                                     ui.add_space(8.0);
+
+                                                     // Submit button
+                                                     ui.horizontal(|ui| {
+                                                         if ui.button("Submit").clicked() {
+                                                             // Form does not do anything
+                                                         }
+                                                     });
+                                                 });
+                                             });
+
+                                         ui.add_space(16.0);
+
+                                         // Display Card items with random titles
+                                         for (i, title) in self.ui_reference_card_titles.iter().enumerate() {
+                                             let card_height = 80.0;
+
+                                             ui.allocate_ui_with_layout(
+                                                 egui::vec2(ui.available_width(), card_height),
+                                                 egui::Layout::top_down(egui::Align::LEFT),
+                                                 |ui| {
+                                                     egui::Frame::NONE
+                                                         .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                                         .corner_radius(4.0)
+                                                         .inner_margin(egui::Margin::same(12))
+                                                         .show(ui, |ui| {
+                                                             ui.set_width(ui.available_width());
+                                                             ui.vertical(|ui| {
+                                                                 ui.label(egui::RichText::new(title).size(16.0).strong());
+                                                                 ui.add_space(4.0);
+                                                                 ui.label(egui::RichText::new(format!("Card item {}", i + 1))
+                                                                     .size(12.0)
+                                                                     .color(ui.style().visuals.weak_text_color()));
+                                                                 ui.add_space(2.0);
+                                                                 ui.label(egui::RichText::new("This is a sample card with some description text.")
+                                                                     .size(11.0)
+                                                                     .color(ui.style().visuals.weak_text_color()));
+                                                             });
+                                                         });
+                                                 });
+
+                                             ui.add_space(8.0);
+                                         }
+                                     });
+                             }
+                         );
+                     });
+
                  }
             }
-        });
-
         // Connection dialog
         if self.show_connection_dialog {
             egui::Window::new("Connect to Server")
@@ -2388,5 +2562,6 @@ ui.heading("Saved servers:");
                     });
                 });
         }
+        });
     }
 }
