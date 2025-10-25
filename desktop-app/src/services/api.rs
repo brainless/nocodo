@@ -195,6 +195,10 @@ impl ApiService {
 
     pub fn refresh_project_details(&self, project_id: i64, state: &mut AppState) {
         if state.connection_state == crate::state::ConnectionState::Connected {
+            tracing::info!(
+                "refresh_project_details called for project_id={}",
+                project_id
+            );
             state.loading_project_details = true;
             state.project_details_result = Arc::new(std::sync::Mutex::new(None));
 
@@ -202,15 +206,26 @@ impl ApiService {
             let result_clone = Arc::clone(&state.project_details_result);
 
             tokio::spawn(async move {
+                tracing::info!("Fetching project details for project_id={}", project_id);
                 if let Some(api_client) = connection_manager.get_api_client().await {
                     let result = api_client.get_project_details(project_id).await;
+                    match &result {
+                        Ok(details) => tracing::info!(
+                            "Project details loaded: {} components",
+                            details.components.len()
+                        ),
+                        Err(e) => tracing::error!("Failed to load project details: {}", e),
+                    }
                     let mut project_details_result = result_clone.lock().unwrap();
                     *project_details_result = Some(result.map_err(|e| e.to_string()));
                 } else {
+                    tracing::error!("No API client available for project details");
                     let mut project_details_result = result_clone.lock().unwrap();
                     *project_details_result = Some(Err("Not connected".to_string()));
                 }
             });
+        } else {
+            tracing::warn!("refresh_project_details called but not connected");
         }
     }
 

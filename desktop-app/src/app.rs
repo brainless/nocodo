@@ -75,6 +75,10 @@ impl eframe::App for DesktopApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Handle pending project details refresh
         if let Some(project_id) = self.state.pending_project_details_refresh.take() {
+            tracing::info!(
+                "Processing pending_project_details_refresh for project_id={}",
+                project_id
+            );
             self.api_service
                 .refresh_project_details(project_id, &mut self.state);
         }
@@ -96,12 +100,11 @@ impl eframe::App for DesktopApp {
             let current_page = self.state.ui_state.current_page.clone();
 
             // Handle ProjectDetail page specially since it needs the project_id
+            // We don't store it in the HashMap since each instance needs a different project_id
             if let UiPage::ProjectDetail(project_id) = current_page {
-                if let Some(page) = self.pages.get_mut(&UiPage::ProjectDetail(0)) {
-                    // Create a temporary ProjectDetailPage with the correct ID
-                    let mut detail_page = ProjectDetailPage::new(project_id);
-                    detail_page.ui(ctx, ui, &mut self.state);
-                }
+                tracing::info!("Rendering ProjectDetail page for project_id={}", project_id);
+                let mut detail_page = ProjectDetailPage::new(project_id);
+                detail_page.ui(ctx, ui, &mut self.state);
             } else if let Some(page) = self.pages.get_mut(&current_page) {
                 page.ui(ctx, ui, &mut self.state);
             }

@@ -121,8 +121,16 @@ impl crate::pages::Page for ProjectsPage {
 
                                 // Make the entire card clickable
                                 if response.response.interact(egui::Sense::click()).clicked() {
+                                    tracing::info!(
+                                        "Project card clicked: project_id={}",
+                                        project_id
+                                    );
                                     state.ui_state.current_page = UiPage::ProjectDetail(project_id);
                                     state.pending_project_details_refresh = Some(project_id);
+                                    tracing::info!(
+                                        "Set pending_project_details_refresh to {}",
+                                        project_id
+                                    );
                                 }
 
                                 // Change cursor to pointer on hover

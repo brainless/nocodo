@@ -163,12 +163,19 @@ impl BackgroundTasks {
     fn check_project_details_result(&self, state: &mut AppState) {
         let mut result = state.project_details_result.lock().unwrap();
         if let Some(res) = result.take() {
+            tracing::info!("check_project_details_result: received result");
             state.loading_project_details = false;
             match res {
                 Ok(details) => {
+                    tracing::info!(
+                        "Project details loaded successfully: project={}, {} components",
+                        details.project.name,
+                        details.components.len()
+                    );
                     state.project_details = Some(details);
                 }
                 Err(e) => {
+                    tracing::error!("Failed to load project details: {}", e);
                     state.ui_state.connection_error =
                         Some(format!("Failed to load project details: {}", e));
                 }

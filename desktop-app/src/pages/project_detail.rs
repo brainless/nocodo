@@ -20,6 +20,13 @@ impl crate::pages::Page for ProjectDetailPage {
     }
 
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        tracing::info!(
+            "ProjectDetailPage::ui() called for project_id={}, loading={}, has_details={}",
+            self.project_id,
+            state.loading_project_details,
+            state.project_details.is_some()
+        );
+
         // Header with back button and star button
         ui.horizontal(|ui| {
             if ui.button("← Back to Projects").clicked() {
