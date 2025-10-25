@@ -73,6 +73,12 @@ impl Default for DesktopApp {
 
 impl eframe::App for DesktopApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Handle pending project details refresh
+        if let Some(project_id) = self.state.pending_project_details_refresh.take() {
+            self.api_service
+                .refresh_project_details(project_id, &mut self.state);
+        }
+
         // Handle background tasks
         self.background_tasks
             .handle_background_updates(&mut self.state);

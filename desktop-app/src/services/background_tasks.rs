@@ -52,6 +52,7 @@ impl BackgroundTasks {
 
                     // Refresh data after connecting
                     let api_service = crate::services::ApiService::new();
+                    api_service.refresh_settings(state);
                     api_service.refresh_projects(state);
                     api_service.refresh_works(state);
                     api_service.refresh_supported_models(state);

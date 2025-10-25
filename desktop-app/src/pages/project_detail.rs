@@ -149,8 +149,7 @@ impl ProjectDetailPage {
     }
 
     fn refresh_project_details(&self, state: &mut AppState) {
-        state.loading_project_details = true;
-        state.pending_project_details_refresh = Some(self.project_id);
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_project_details(self.project_id, state);
     }
 }

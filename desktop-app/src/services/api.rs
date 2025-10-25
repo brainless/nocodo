@@ -81,6 +81,27 @@ impl ApiService {
         }
     }
 
+    pub fn refresh_settings(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_settings = true;
+            state.settings_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.settings_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let result = api_client.get_settings().await;
+                    let mut settings_result = result_clone.lock().unwrap();
+                    *settings_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut settings_result = result_clone.lock().unwrap();
+                    *settings_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
     pub fn refresh_supported_models(&self, state: &mut AppState) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.loading_supported_models = true;
@@ -172,15 +193,25 @@ impl ApiService {
         }
     }
 
-    pub async fn refresh_project_details(
-        &self,
-        project_id: i64,
-        state: &mut AppState,
-    ) -> Result<(), String> {
-        state.loading_project_details = true;
-        state.pending_project_details_refresh = Some(project_id);
-        // This will be implemented with actual API calls
-        Ok(())
+    pub fn refresh_project_details(&self, project_id: i64, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_project_details = true;
+            state.project_details_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.project_details_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let result = api_client.get_project_details(project_id).await;
+                    let mut project_details_result = result_clone.lock().unwrap();
+                    *project_details_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut project_details_result = result_clone.lock().unwrap();
+                    *project_details_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
     }
 
     // Local server methods
