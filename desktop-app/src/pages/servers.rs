@@ -165,21 +165,22 @@ impl crate::pages::Page for ServersPage {
 impl ServersPage {
     fn check_local_server(&self, state: &mut AppState) {
         state.ui_state.checking_local_server = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.check_local_server(state);
     }
 
     fn refresh_projects(&self, state: &mut AppState) {
-        state.loading_projects = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_projects(state);
     }
 
     fn refresh_works(&self, state: &mut AppState) {
-        state.loading_works = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_works(state);
     }
 
     fn refresh_settings(&self, state: &mut AppState) {
-        state.loading_settings = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_supported_models(state);
     }
 }

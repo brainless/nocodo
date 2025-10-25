@@ -1,5 +1,6 @@
-use crate::state::AppState;
+use crate::state::{AppState, ConnectionState};
 use egui::Context;
+use std::sync::Arc;
 
 pub struct ConnectionDialog;
 
@@ -54,8 +55,44 @@ impl ConnectionDialog {
     }
 
     fn connect(&self, state: &mut AppState) {
-        // This will be implemented when we extract the API methods
-        // For now, just set the connection state to connecting
-        state.connection_state = crate::state::ConnectionState::Connecting;
+        state.connection_state = ConnectionState::Connecting;
+        state.ui_state.connection_error = None;
+
+        let server = state.config.ssh.server.clone();
+        let username = state.config.ssh.username.clone();
+
+        // Expand tilde in SSH key path
+        let key_path = if state.config.ssh.ssh_key_path.is_empty() {
+            None
+        } else {
+            let expanded_path = if state.config.ssh.ssh_key_path.starts_with("~/") {
+                let home = std::env::var("HOME").unwrap_or_default();
+                state.config.ssh.ssh_key_path.replacen("~", &home, 1)
+            } else {
+                state.config.ssh.ssh_key_path.clone()
+            };
+            tracing::info!("Using SSH key: {}", expanded_path);
+            // Update config with expanded path
+            state.config.ssh.ssh_key_path = expanded_path.clone();
+            Some(expanded_path)
+        };
+        let remote_port = state.config.ssh.remote_port;
+        let port = state.config.ssh.port;
+        let connection_manager = Arc::clone(&state.connection_manager);
+
+        // Spawn async task for SSH connection via connection manager
+        tokio::spawn(async move {
+            match connection_manager
+                .connect_ssh(&server, &username, key_path.as_deref(), port, remote_port)
+                .await
+            {
+                Ok(_) => {
+                    tracing::info!("Connected successfully via connection manager");
+                }
+                Err(e) => {
+                    tracing::error!("Connection failed: {}", e);
+                }
+            }
+        });
     }
 }
