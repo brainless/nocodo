@@ -460,6 +460,23 @@ impl LlmAgent {
                         }
                     }
                 }
+                "apply_patch" => {
+                    match serde_json::from_str::<crate::models::ApplyPatchRequest>(
+                        &tool_call.function.arguments,
+                    ) {
+                        Ok(request) => crate::models::ToolRequest::ApplyPatch(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse apply_patch arguments"
+                            );
+                            continue;
+                        }
+                    }
+                }
                 unknown_function => {
                     tracing::error!(
                         session_id = %session_id,
@@ -484,6 +501,7 @@ impl LlmAgent {
                 crate::models::ToolRequest::ReadFile(_) => "read_file",
                 crate::models::ToolRequest::WriteFile(_) => "write_file",
                 crate::models::ToolRequest::Grep(_) => "grep",
+                crate::models::ToolRequest::ApplyPatch(_) => "apply_patch",
             };
 
             tracing::debug!(
@@ -970,7 +988,9 @@ impl LlmAgent {
 
     /// Create native tool definitions for supported providers
     fn create_native_tool_definitions(&self) -> Vec<crate::llm_client::ToolDefinition> {
-        use crate::models::{GrepRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest};
+        use crate::models::{
+            ApplyPatchRequest, GrepRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest,
+        };
 
         vec![
             crate::llm_client::ToolDefinition {
@@ -1006,6 +1026,15 @@ impl LlmAgent {
                     name: "grep".to_string(),
                     description: "Search for patterns in files using grep".to_string(),
                     parameters: serde_json::to_value(GrepRequest::example_schema())
+                        .unwrap_or_default(),
+                },
+            },
+            crate::llm_client::ToolDefinition {
+                r#type: "function".to_string(),
+                function: crate::llm_client::FunctionDefinition {
+                    name: "apply_patch".to_string(),
+                    description: "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format".to_string(),
+                    parameters: serde_json::to_value(ApplyPatchRequest::example_schema())
                         .unwrap_or_default(),
                 },
             },

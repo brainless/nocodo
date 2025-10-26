@@ -366,6 +366,8 @@ pub enum ToolRequest {
     WriteFile(WriteFileRequest),
     #[serde(rename = "grep")]
     Grep(GrepRequest),
+    #[serde(rename = "apply_patch")]
+    ApplyPatch(ApplyPatchRequest),
 }
 
 /// List files tool request
@@ -567,6 +569,28 @@ impl GrepRequest {
     }
 }
 
+/// Apply patch tool request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchRequest {
+    pub patch: String,
+}
+
+impl ApplyPatchRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "patch": {
+                    "type": "string",
+                    "description": "The patch content in the format:\n*** Begin Patch\n*** Add File: path/to/new.txt\n+line content\n*** Update File: path/to/existing.txt\n@@ optional context\n-old line\n+new line\n*** Delete File: path/to/remove.txt\n*** End Patch\n\nSupports:\n- Add File: Create new files with + prefixed lines\n- Update File: Modify files with diff hunks (- for removed, + for added)\n- Delete File: Remove files\n- Move to: Rename files (after Update File header)\n- @@ context headers for targeting specific code blocks\n\nAll file paths must be relative to the project root."
+                }
+            },
+            "required": ["patch"]
+        })
+    }
+}
+
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -579,6 +603,8 @@ pub enum ToolResponse {
     WriteFile(WriteFileResponse),
     #[serde(rename = "grep")]
     Grep(GrepResponse),
+    #[serde(rename = "apply_patch")]
+    ApplyPatch(ApplyPatchResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
@@ -632,6 +658,27 @@ pub struct GrepResponse {
     pub total_matches: u32,
     pub files_searched: u32,
     pub truncated: bool,
+}
+
+/// Apply patch file change
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchFileChange {
+    pub path: String,
+    pub operation: String, // "add", "update", "delete", "move"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_path: Option<String>, // For move operations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unified_diff: Option<String>, // For update operations
+}
+
+/// Apply patch tool response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchResponse {
+    pub success: bool,
+    pub files_changed: Vec<ApplyPatchFileChange>,
+    pub total_additions: usize,
+    pub total_deletions: usize,
+    pub message: String,
 }
 
 /// Tool error response
