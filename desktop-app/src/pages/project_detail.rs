@@ -2,6 +2,7 @@ use crate::pages::Page;
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
+use crate::ui_text::{ContentText, WidgetText};
 use egui::{Context, Ui};
 
 pub struct ProjectDetailPage {
@@ -29,13 +30,17 @@ impl crate::pages::Page for ProjectDetailPage {
 
         // Header with back button and star button
         ui.horizontal(|ui| {
-            if ui.button("← Back to Projects").clicked() {
+            // Back button - Ubuntu SemiBold
+            if ui
+                .button(WidgetText::button("← Back to Projects"))
+                .clicked()
+            {
                 state.ui_state.current_page = UiPage::Projects;
             }
 
             ui.add_space(10.0);
 
-            // Star button
+            // Star button - Ubuntu SemiBold with color
             let is_favorite = self.is_project_favorite(state);
             let star_text = if is_favorite { "⭐ Star" } else { "☆ Star" };
             let star_color = if is_favorite {
@@ -45,7 +50,11 @@ impl crate::pages::Page for ProjectDetailPage {
             };
 
             if ui
-                .button(egui::RichText::new(star_text).color(star_color))
+                .button(
+                    egui::RichText::new(star_text)
+                        .color(star_color)
+                        .family(egui::FontFamily::Name("ui_semibold".into())),
+                )
                 .clicked()
             {
                 self.toggle_project_favorite(state);
@@ -57,58 +66,67 @@ impl crate::pages::Page for ProjectDetailPage {
         match &state.connection_state {
             ConnectionState::Disconnected => {
                 ui.vertical_centered(|ui| {
-                    ui.label("Not connected to server");
+                    // Status - Ubuntu Light
+                    ui.label(WidgetText::status("Not connected to server"));
                 });
             }
             ConnectionState::Connecting => {
                 ui.vertical_centered(|ui| {
-                    ui.label("Connecting...");
+                    // Status - Ubuntu Light
+                    ui.label(WidgetText::status("Connecting..."));
                     ui.add(egui::Spinner::new());
                 });
             }
             ConnectionState::Connected => {
                 if state.loading_project_details {
                     ui.vertical_centered(|ui| {
-                        ui.label("Loading project details...");
+                        // Status - Ubuntu Light
+                        ui.label(WidgetText::status("Loading project details..."));
                         ui.add(egui::Spinner::new());
                     });
                 } else if let Some(details) = &state.project_details {
-                    // Project title
-                    ui.heading(&details.project.name);
+                    // Project title - User content (Inter)
+                    ui.label(ContentText::title(&details.project.name));
 
                     ui.add_space(4.0);
 
                     // Project metadata
                     ui.horizontal(|ui| {
-                        ui.label("Path:");
-                        ui.label(&details.project.path);
+                        // Labels - Ubuntu Light
+                        ui.label(WidgetText::label("Path:"));
+                        // User content - Inter
+                        ui.label(ContentText::text(&details.project.path));
 
                         if let Some(description) = &details.project.description {
                             ui.separator();
-                            ui.label("Description:");
-                            ui.label(description);
+                            // Label - Ubuntu Light
+                            ui.label(WidgetText::label("Description:"));
+                            // User content - Inter
+                            ui.label(ContentText::text(description));
                         }
                     });
 
                     ui.separator();
 
-                    // Project components
-                    ui.heading("Project Components");
+                    // Section heading - Ubuntu SemiBold
+                    ui.heading(WidgetText::section_heading("Project Components"));
 
                     if details.components.is_empty() {
-                        ui.label("No components found");
+                        // Status - Ubuntu Light
+                        ui.label(WidgetText::status("No components found"));
                     } else {
                         egui::ScrollArea::vertical().show(ui, |ui| {
                             for component in &details.components {
                                 ui.horizontal(|ui| {
-                                    ui.label(&component.name);
+                                    // Component data - User content (Inter)
+                                    ui.label(ContentText::text(&component.name));
                                     ui.separator();
-                                    ui.label(&component.path);
+                                    ui.label(ContentText::text(&component.path));
                                     ui.separator();
-                                    ui.label(&component.language);
+                                    ui.label(ContentText::text(&component.language));
                                     if let Some(framework) = &component.framework {
                                         ui.separator();
-                                        ui.label(framework);
+                                        ui.label(ContentText::text(framework));
                                     }
                                 });
                                 ui.separator();
@@ -118,13 +136,16 @@ impl crate::pages::Page for ProjectDetailPage {
 
                     ui.add_space(8.0);
 
-                    if ui.button("Refresh").clicked() {
+                    // Button - Ubuntu SemiBold
+                    if ui.button(WidgetText::button("Refresh")).clicked() {
                         self.refresh_project_details(state);
                     }
                 } else {
                     ui.vertical_centered(|ui| {
-                        ui.label("Project not found");
-                        if ui.button("Back to Projects").clicked() {
+                        // Status - Ubuntu Light
+                        ui.label(WidgetText::status("Project not found"));
+                        // Button - Ubuntu SemiBold
+                        if ui.button(WidgetText::button("Back to Projects")).clicked() {
                             state.ui_state.current_page = UiPage::Projects;
                         }
                     });
@@ -132,8 +153,10 @@ impl crate::pages::Page for ProjectDetailPage {
             }
             ConnectionState::Error(error) => {
                 ui.vertical_centered(|ui| {
-                    ui.colored_label(egui::Color32::RED, format!("Error: {}", error));
-                    if ui.button("Back to Projects").clicked() {
+                    // Error - Ubuntu Light
+                    ui.label(WidgetText::error(format!("Error: {}", error)));
+                    // Button - Ubuntu SemiBold
+                    if ui.button(WidgetText::button("Back to Projects")).clicked() {
                         state.ui_state.current_page = UiPage::Projects;
                     }
                 });

@@ -1,6 +1,7 @@
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
+use crate::ui_text::{ContentText, WidgetText};
 use egui::{Color32, Context};
 
 pub struct Sidebar;
@@ -29,9 +30,14 @@ impl Sidebar {
                     let sidebar_bg = ui.style().visuals.panel_fill;
                     let button_bg = ui.style().visuals.widgets.inactive.bg_fill;
 
-                    // Branding
+                    // Branding - Ubuntu Light with white color
                     ui.add_space(8.0);
-                    ui.label(egui::RichText::new("nocodo").size(20.0).strong());
+                    ui.label(
+                        egui::RichText::new("nocodo")
+                            .size(20.0)
+                            .family(egui::FontFamily::Name("ui_light".into()))
+                            .color(Color32::WHITE),
+                    );
                     ui.add_space(20.0);
 
                     // Top navigation
@@ -69,14 +75,18 @@ impl Sidebar {
                                 // Draw background with same border radius as sidebar_link (0.0)
                                 ui.painter().rect_filled(rect, 0.0, bg_color);
 
-                                // Draw text with same styling as sidebar_link but with 12px left padding (8px + 4px extra)
-                                let text_pos = rect.min + egui::vec2(12.0, 4.0); // Same y position (4.0) as sidebar_link
+                                // Draw text - project names are user content, use Inter (Proportional)
+                                let text_pos = rect.min + egui::vec2(12.0, 4.0);
+                                let font_id = egui::FontId::new(
+                                    14.0,
+                                    egui::FontFamily::Proportional, // Inter for user content
+                                );
                                 ui.painter().text(
                                     text_pos,
-                                    egui::Align2::LEFT_TOP, // Same alignment as sidebar_link
+                                    egui::Align2::LEFT_TOP,
                                     &project.name,
-                                    egui::FontId::default(), // Same font as sidebar_link
-                                    ui.style().visuals.text_color(), // Same text color as sidebar_link
+                                    font_id,
+                                    ui.style().visuals.text_color(),
                                 );
 
                                 // Handle click
@@ -149,13 +159,17 @@ impl Sidebar {
         // Draw background
         ui.painter().rect_filled(rect, 0.0, bg_color);
 
-        // Draw text (non-selectable)
+        // Draw text (non-selectable) using Ubuntu Light
         let text_pos = rect.min + egui::vec2(8.0, 4.0);
+        let font_id = egui::FontId::new(
+            14.0,
+            egui::FontFamily::Name("ui_light".into()), // Ubuntu Light
+        );
         ui.painter().text(
             text_pos,
             egui::Align2::LEFT_TOP,
             text,
-            egui::FontId::default(),
+            font_id,
             ui.style().visuals.text_color(),
         );
 

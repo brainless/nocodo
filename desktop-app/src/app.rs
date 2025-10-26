@@ -118,6 +118,9 @@ impl eframe::App for DesktopApp {
 impl DesktopApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Configure custom fonts
+        Self::setup_fonts(&cc.egui_ctx);
+
         // Load previous app state (if any).
         let mut app: DesktopApp = if let Some(storage) = cc.storage {
             eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
@@ -220,6 +223,73 @@ impl DesktopApp {
         app.state.db = Some(db);
 
         app
+    }
+
+    /// Configure custom fonts for the entire application
+    ///
+    /// Font families:
+    /// - "ui_light" - Ubuntu Light for regular UI widgets (labels, navigation)
+    /// - "ui_semibold" - Ubuntu SemiBold for emphasis (buttons, headings)
+    /// - Proportional - Inter Regular for user content (project names, descriptions)
+    /// - Monospace - Inter Medium for code blocks
+    fn setup_fonts(ctx: &egui::Context) {
+        // Load font files at compile time
+        const UBUNTU_LIGHT: &[u8] = include_bytes!("../fonts/UbuntuSans-Light.ttf");
+        const UBUNTU_SEMIBOLD: &[u8] = include_bytes!("../fonts/UbuntuSans-SemiBold.ttf");
+        const INTER_REGULAR: &[u8] = include_bytes!("../fonts/Inter-Regular.ttf");
+        const INTER_MEDIUM: &[u8] = include_bytes!("../fonts/Inter-Medium.ttf");
+
+        let mut fonts = egui::FontDefinitions::default();
+
+        // Install Ubuntu fonts for UI widgets
+        fonts.font_data.insert(
+            "ubuntu_light".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_static(UBUNTU_LIGHT)),
+        );
+        fonts.font_data.insert(
+            "ubuntu_semibold".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_static(UBUNTU_SEMIBOLD)),
+        );
+
+        // Install Inter fonts for user content
+        fonts.font_data.insert(
+            "inter_regular".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_static(INTER_REGULAR)),
+        );
+        fonts.font_data.insert(
+            "inter_medium".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_static(INTER_MEDIUM)),
+        );
+
+        // Create custom font family for light UI widgets (labels, navigation, status)
+        fonts.families.insert(
+            egui::FontFamily::Name("ui_light".into()),
+            vec!["ubuntu_light".to_owned()],
+        );
+
+        // Create custom font family for emphasized UI widgets (buttons, headings, CTAs)
+        fonts.families.insert(
+            egui::FontFamily::Name("ui_semibold".into()),
+            vec!["ubuntu_semibold".to_owned()],
+        );
+
+        // Set Inter as the default font for user content (Proportional family)
+        // This is used for project names, descriptions, file contents, etc.
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .insert(0, "inter_regular".to_owned());
+
+        // Set Inter Medium for code/monospace text
+        fonts
+            .families
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .insert(0, "inter_medium".to_owned());
+
+        // Apply fonts to the context
+        ctx.set_fonts(fonts);
     }
 
     fn navigate_to(&mut self, page: UiPage) {
