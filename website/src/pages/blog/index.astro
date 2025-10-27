@@ -14,86 +14,10 @@ const blogPosts = blogEntries.map(entry => ({
 }));
 ---
 
-<Layout 
-  title="nocodo Blog" 
+<Layout
+  title="nocodo Blog"
   description="Articles, insights, and deep dives into vibe coding, AI-assisted development, and nocodo methodology"
 >
-  <!-- Hero Section -->
-  <section class="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-10">
-      <svg class="absolute inset-0 h-full w-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="blog-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M0 32V0h32" fill="none" stroke="currentColor" stroke-width="1"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#blog-grid)"/>
-      </svg>
-    </div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
-      <div class="text-center">
-        <!-- Header -->
-        <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-2xl mb-6">
-          <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
-          </svg>
-        </div>
-        
-        <h1 class="text-5xl sm:text-6xl font-bold text-gray-900 mb-6">
-          <span class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            nocodo Blog
-          </span>
-        </h1>
-        
-        <p class="text-xl sm:text-2xl text-gray-600 max-w-4xl mx-auto mb-8 leading-relaxed">
-          Insights, methodologies, and real-world experiences from the world of 
-          <strong class="text-gray-900">AI-assisted development</strong> and <strong class="text-gray-900">vibe coding</strong>
-        </p>
-        
-        <!-- Key Points -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
-          <div class="text-center">
-            <div class="text-2xl mb-2">✍️</div>
-            <div class="text-sm font-medium text-gray-900">Deep Insights</div>
-            <div class="text-xs text-gray-600">Real experiences shared</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl mb-2">🛠️</div>
-            <div class="text-sm font-medium text-gray-900">Practical Examples</div>
-            <div class="text-xs text-gray-600">Working implementations</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl mb-2">🌟</div>
-            <div class="text-sm font-medium text-gray-900">Latest Techniques</div>
-            <div class="text-xs text-gray-600">Cutting-edge approaches</div>
-          </div>
-        </div>
-        
-        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button 
-            href="/playbook"
-            variant="primary"
-            size="lg"
-          >
-            Read the Playbook
-            <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-          </Button>
-          <Button 
-            href="/"
-            variant="outline"
-            size="lg"
-          >
-            Back to Home
-          </Button>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Blog Posts -->
   <section class="py-24 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
