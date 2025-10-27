@@ -240,25 +240,19 @@ impl crate::pages::Page for WorkPage {
                                                                             ui.label(egui::RichText::new(&work.status).size(11.0));
                                                                         });
 
-                                                                    // Tool name if present
-                                                                    if let Some(tool_name) = &work.tool_name {
-                                                                        egui::Frame::NONE
-                                                                            .fill(ui.style().visuals.selection.bg_fill)
-                                                                            .corner_radius(4.0)
-                                                                            .inner_margin(egui::Margin::symmetric(8, 4))
-                                                                            .show(ui, |ui| {
-                                                                                ui.label(egui::RichText::new(tool_name).size(11.0));
-                                                                            });
-                                                                    }
+                                                                    // Model display name if present
+                                                                    if let Some(model_id) = &work.model {
+                                                                        let model_display_name = state.supported_models.iter()
+                                                                            .find(|m| m.model_id == *model_id)
+                                                                            .map(|m| m.name.clone())
+                                                                            .unwrap_or_else(|| model_id.clone());
 
-                                                                    // Model if present
-                                                                    if let Some(model) = &work.model {
                                                                         egui::Frame::NONE
                                                                             .fill(ui.style().visuals.selection.bg_fill)
                                                                             .corner_radius(4.0)
                                                                             .inner_margin(egui::Margin::symmetric(8, 4))
                                                                             .show(ui, |ui| {
-                                                                                ui.label(egui::RichText::new(model).size(11.0));
+                                                                                ui.label(egui::RichText::new(&model_display_name).size(11.0));
                                                                             });
                                                                     }
 
@@ -334,16 +328,15 @@ impl crate::pages::Page for WorkPage {
                                     ui.label("Status:");
                                     ui.label(&work.status);
 
-                                    if let Some(tool_name) = &work.tool_name {
-                                        ui.separator();
-                                        ui.label("Tool:");
-                                        ui.label(tool_name);
-                                    }
+                                    if let Some(model_id) = &work.model {
+                                        let model_display_name = state.supported_models.iter()
+                                            .find(|m| m.model_id == *model_id)
+                                            .map(|m| m.name.clone())
+                                            .unwrap_or_else(|| model_id.clone());
 
-                                    if let Some(model) = &work.model {
                                         ui.separator();
                                         ui.label("Model:");
-                                        ui.label(model);
+                                        ui.label(&model_display_name);
                                     }
 
                                     if let Some(project_id) = work.project_id {

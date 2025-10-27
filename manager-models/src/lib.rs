@@ -328,7 +328,6 @@ pub struct Work {
     pub id: i64,
     pub title: String,
     pub project_id: Option<i64>,
-    pub tool_name: Option<String>,
     pub model: Option<String>, // Model ID for the work
     pub status: String,
     pub created_at: i64,

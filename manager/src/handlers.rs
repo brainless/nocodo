@@ -55,95 +55,6 @@ fn infer_provider_from_model(model_id: &str) -> &str {
 }
 
 /// Helper function to get a user-friendly display name from a model ID by looking it up in the provider
-async fn get_model_display_name(
-    model_id: &str,
-    provider: &str,
-    config: &std::sync::RwLock<AppConfig>,
-) -> String {
-    // Try to get the model name from the provider
-    let config_read = match config.read() {
-        Ok(guard) => guard,
-        Err(_) => return model_id.to_string(), // Return model_id if we can't get the lock
-    };
-
-    if let Some(api_key_config) = &config_read.api_keys {
-        let model_name = match provider {
-            "anthropic" => {
-                if let Some(api_key) = &api_key_config.anthropic_api_key {
-                    if !api_key.is_empty() {
-                        let anthropic_config = LlmProviderConfig {
-                            provider: "anthropic".to_string(),
-                            model: model_id.to_string(),
-                            api_key: api_key.clone(),
-                            base_url: None,
-                            max_tokens: Some(1000),
-                            temperature: Some(0.7),
-                        };
-                        if let Ok(provider) =
-                            crate::llm_providers::AnthropicProvider::new(anthropic_config)
-                        {
-                            if let Some(model) = provider.get_model(model_id) {
-                                return model.name().to_string();
-                            }
-                        }
-                    }
-                }
-                None
-            }
-            "openai" => {
-                if let Some(api_key) = &api_key_config.openai_api_key {
-                    if !api_key.is_empty() {
-                        let openai_config = LlmProviderConfig {
-                            provider: "openai".to_string(),
-                            model: model_id.to_string(),
-                            api_key: api_key.clone(),
-                            base_url: None,
-                            max_tokens: Some(1000),
-                            temperature: Some(0.7),
-                        };
-                        if let Ok(provider) =
-                            crate::llm_providers::OpenAiProvider::new(openai_config)
-                        {
-                            if let Some(model) = provider.get_model(model_id) {
-                                return model.name().to_string();
-                            }
-                        }
-                    }
-                }
-                None
-            }
-            "xai" => {
-                if let Some(api_key) = &api_key_config.xai_api_key {
-                    if !api_key.is_empty() {
-                        let xai_config = LlmProviderConfig {
-                            provider: "xai".to_string(),
-                            model: model_id.to_string(),
-                            api_key: api_key.clone(),
-                            base_url: Some("https://api.x.ai".to_string()),
-                            max_tokens: Some(1000),
-                            temperature: Some(0.7),
-                        };
-                        if let Ok(provider) = crate::llm_providers::XaiProvider::new(xai_config) {
-                            if let Some(model) = provider.get_model(model_id) {
-                                return model.name().to_string();
-                            }
-                        }
-                    }
-                }
-                None
-            }
-            _ => None,
-        };
-
-        if let Some(model) = model_name {
-            return model;
-        }
-    }
-
-    // Fall back to the model ID itself if we can't look it up
-    model_id.to_string()
-}
-
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let projects = data.database.get_all_projects()?;
     let response = ProjectListResponse { projects };
@@ -1006,14 +917,6 @@ pub async fn create_ai_session(
                 (provider, model)
             };
 
-            // Get the model name for display from the provider's model definition
-            let model_display_name = get_model_display_name(&model, &provider, &data.config).await;
-
-            // Update work with tool_name and model info
-            let mut updated_work = work.clone();
-            updated_work.tool_name = Some(format!("LLM Agent ({})", model_display_name));
-            data.database.update_work(&updated_work)?;
-
             // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
                 .create_session(work_id, provider, model, session.project_context.clone())
@@ -1178,7 +1081,6 @@ pub async fn create_work(
         id: 0, // Will be set by database AUTOINCREMENT
         title: req.title.clone(),
         project_id: req.project_id,
-        tool_name: None,
         model: req.model.clone(),
         status: "active".to_string(),
         created_at: now,
@@ -1251,14 +1153,6 @@ pub async fn create_work(
                         .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
                     (provider, model)
                 };
-
-                // Get the model name for display from the provider's model definition
-                let model_display_name = get_model_display_name(&model, &provider, &data.config).await;
-
-                // Update work with tool_name and model info
-                let mut updated_work = work.clone();
-                updated_work.tool_name = Some(format!("LLM Agent ({})", model_display_name));
-                data.database.update_work(&updated_work)?;
 
                 // Create LLM agent session
                 let llm_session = llm_agent

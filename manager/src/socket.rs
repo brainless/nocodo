@@ -342,7 +342,6 @@ impl SocketServer {
                     id: 0, // Will be set by database AUTOINCREMENT
                     title: req.title,
                     project_id: req.project_id,
-                    tool_name: None,
                     model: req.model,
                     status: "active".to_string(),
                     created_at: now,
