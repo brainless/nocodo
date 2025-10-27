@@ -10,35 +10,35 @@ const { title, description } = Astro.props;
 ---
 
 <Layout title={title} description={description}>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12">
+  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-12">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="text-center mb-12">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">
+        <h1 class="text-4xl font-bold text-slate-100 mb-4">
           {title}
         </h1>
-        <p class="text-lg text-gray-600">
+        <p class="text-lg text-slate-300">
           nocodo - Local AI-assisted development environment
         </p>
       </div>
 
       <!-- Content -->
-      <div class="bg-white rounded-lg shadow-md p-8 mb-12">
-        <div class="prose prose-lg max-w-none">
+      <div class="bg-slate-800 rounded-lg shadow-md border border-slate-700 p-8 mb-12">
+        <div class="prose prose-lg prose-invert max-w-none">
           <slot />
         </div>
       </div>
 
       <!-- Company Info -->
-      <div class="bg-white rounded-lg shadow-md p-6">
+      <div class="bg-slate-800 rounded-lg shadow-md border border-slate-700 p-6">
         <div class="text-center">
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">nocodo</h3>
-          <p class="text-gray-600 mb-2">A product of Pixlie Web Solutions Private Limited</p>
-          <p class="text-sm text-gray-500">
+          <h3 class="text-lg font-semibold text-slate-100 mb-2">nocodo</h3>
+          <p class="text-slate-300 mb-2">A product of Pixlie Web Solutions Private Limited</p>
+          <p class="text-sm text-slate-400">
             103 Kamalapur East, Dum Dum Kolkata WEST BENGAL 700028
           </p>
-          <p class="text-sm text-gray-500">
-            Email: <a href="mailto:nocodo@pixlie.com" class="text-blue-600 hover:text-blue-800">nocodo@pixlie.com</a>
+          <p class="text-sm text-slate-400">
+            Email: <a href="mailto:nocodo@pixlie.com" class="text-emerald-400 hover:text-emerald-300">nocodo@pixlie.com</a>
           </p>
         </div>
       </div>

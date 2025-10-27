@@ -1,0 +1,38 @@
+---
+/**
+ * Card - Reusable card component with variants
+ * Theme-aware component that adapts to light/dark mode automatically
+ *
+ * Variants:
+ * - default: Simple card with border
+ * - gradient: Card with gradient background
+ * - hover-accent: Card with accent border on hover
+ */
+export interface Props {
+  variant?: 'default' | 'gradient' | 'hover-accent';
+  accentColor?: 'emerald' | 'cyan';
+  class?: string;
+}
+
+const {
+  variant = 'default',
+  accentColor = 'emerald',
+  class: className
+} = Astro.props;
+
+const baseClasses = "rounded-lg shadow-md p-6 border";
+
+const variantClasses = {
+  default: "bg-bg-tertiary border-border-primary",
+  gradient: "bg-gradient-to-br from-bg-tertiary to-bg-secondary border-border-primary",
+  'hover-accent': `bg-bg-tertiary border-border-primary hover:border-accent-${accentColor}/50 transition-all duration-300`
+};
+---
+
+<div class:list={[
+  baseClasses,
+  variantClasses[variant],
+  className
+]}>
+  <slot />
+</div>

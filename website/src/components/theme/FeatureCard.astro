@@ -1,0 +1,49 @@
+---
+/**
+ * FeatureCard - Card with icon, title, and description
+ * Theme-aware component that adapts to light/dark mode automatically
+ */
+export interface Props {
+  title: string;
+  description: string;
+  iconColor?: 'emerald' | 'cyan';
+  variant?: 'default' | 'gradient';
+  class?: string;
+}
+
+const {
+  title,
+  description,
+  iconColor = 'emerald',
+  variant = 'default',
+  class: className
+} = Astro.props;
+
+const bgClasses = variant === 'gradient'
+  ? 'bg-gradient-to-br from-bg-tertiary to-bg-secondary'
+  : 'bg-bg-tertiary';
+---
+
+<div class:list={[
+  bgClasses,
+  "rounded-lg p-6 border border-border-primary",
+  className
+]}>
+  <div class:list={[
+    "w-12 h-12",
+    `bg-accent-${iconColor}/10`,
+    "rounded-lg flex items-center justify-center mb-4"
+  ]}>
+    <slot name="icon">
+      <svg class:list={["w-6 h-6", `text-accent-${iconColor}`]} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+      </svg>
+    </slot>
+  </div>
+  <h3 class="text-xl font-semibold text-text-primary mb-3">
+    {title}
+  </h3>
+  <p class="text-text-secondary">
+    {description}
+  </p>
+</div>
