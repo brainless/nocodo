@@ -328,7 +328,6 @@ pub struct Work {
     pub id: i64,
     pub title: String,
     pub project_id: Option<i64>,
-    pub tool_name: Option<String>,
     pub model: Option<String>, // Model ID for the work
     pub status: String,
     pub created_at: i64,
@@ -355,6 +354,13 @@ pub struct CreateWorkRequest {
     pub title: String,
     pub project_id: Option<i64>,
     pub model: Option<String>, // Model ID for the work (e.g., "gpt-4", "claude-3-opus-20240229")
+    #[serde(default = "default_auto_start")]
+    pub auto_start: bool, // Whether to automatically start LLM agent session (default: true)
+    pub tool_name: Option<String>, // Tool to use for auto-started session (default: "llm-agent")
+}
+
+fn default_auto_start() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize)]

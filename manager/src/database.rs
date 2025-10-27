@@ -213,7 +213,6 @@ impl Database {
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  title TEXT NOT NULL,
                  project_id INTEGER,
-                 tool_name TEXT,
                  model TEXT,
                  status TEXT NOT NULL DEFAULT 'active',
                  created_at INTEGER NOT NULL,
@@ -222,17 +221,6 @@ impl Database {
              )",
             [],
         )?;
-
-        // Add tool_name column if it doesn't exist (migration for existing databases)
-        conn.execute("ALTER TABLE works ADD COLUMN tool_name TEXT", [])
-            .or_else(|e| {
-                // Ignore error if column already exists
-                if e.to_string().contains("duplicate column name") {
-                    Ok(0)
-                } else {
-                    Err(e)
-                }
-            })?;
 
         // Create work messages with content types and history
         conn.execute(
@@ -960,13 +948,12 @@ impl Database {
         let id_param = if work.id == 0 { None } else { Some(work.id) };
 
         conn.execute(
-            "INSERT INTO works (id, title, project_id, tool_name, model, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO works (id, title, project_id, model, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             params![
                 id_param,
                 work.title,
                 work.project_id,
-                work.tool_name,
                 work.model,
                 work.status,
                 work.created_at,
@@ -986,7 +973,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, tool_name, model, status, created_at, updated_at
+            "SELECT id, title, project_id, model, status, created_at, updated_at
              FROM works WHERE id = ?",
         )?;
 
@@ -996,11 +983,10 @@ impl Database {
                     id: row.get(0)?,
                     title: row.get(1)?,
                     project_id: row.get(2)?,
-                    tool_name: row.get(3)?,
-                    model: row.get(4)?,
-                    status: row.get(5)?,
-                    created_at: row.get(6)?,
-                    updated_at: row.get(7)?,
+                    model: row.get(3)?,
+                    status: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
                 })
             })
             .map_err(|e| match e {
@@ -1020,7 +1006,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, tool_name, model, status, created_at, updated_at
+            "SELECT id, title, project_id, model, status, created_at, updated_at
              FROM works ORDER BY created_at DESC",
         )?;
 
@@ -1029,11 +1015,10 @@ impl Database {
                 id: row.get(0)?,
                 title: row.get(1)?,
                 project_id: row.get(2)?,
-                tool_name: row.get(3)?,
-                model: row.get(4)?,
-                status: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                model: row.get(3)?,
+                status: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         })?;
 
@@ -1052,11 +1037,10 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")));
 
         let rows_affected = conn?.execute(
-            "UPDATE works SET title = ?, project_id = ?, tool_name = ?, status = ?, updated_at = ? WHERE id = ?",
+            "UPDATE works SET title = ?, project_id = ?, status = ?, updated_at = ? WHERE id = ?",
             params![
                 work.title,
                 work.project_id,
-                work.tool_name,
                 work.status,
                 work.updated_at,
                 work.id
@@ -1088,6 +1072,62 @@ impl Database {
     }
 
     // Work message management methods
+    /// Create work with initial message in a single transaction
+    pub fn create_work_with_message(
+        &self,
+        work: &crate::models::Work,
+        message_content: String,
+    ) -> AppResult<(i64, i64)> {
+        let mut conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // Begin transaction
+        let tx = conn.transaction()?;
+
+        // Create work
+        let id_param = if work.id == 0 { None } else { Some(work.id) };
+
+        tx.execute(
+            "INSERT INTO works (id, title, project_id, model, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                work.title,
+                work.project_id,
+                work.model,
+                work.status,
+                work.created_at,
+                work.updated_at
+            ],
+        )?;
+
+        let work_id = tx.last_insert_rowid();
+
+        // Create initial message with the work title as content
+        let now = chrono::Utc::now().timestamp();
+        tx.execute(
+            "INSERT INTO work_messages (work_id, content, content_type, author_type, author_id, sequence_order, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![work_id, message_content, "text", "user", Option::<String>::None, 0, now],
+        )?;
+
+        let message_id = tx.last_insert_rowid();
+
+        // Commit transaction
+        tx.commit()?;
+
+        tracing::info!(
+            "Created work '{}' ({}) with initial message ({})",
+            work.title,
+            work_id,
+            message_id
+        );
+
+        Ok((work_id, message_id))
+    }
+
     pub fn create_work_message(&self, message: &crate::models::WorkMessage) -> AppResult<i64> {
         let conn = self
             .connection

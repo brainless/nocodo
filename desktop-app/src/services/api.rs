@@ -142,6 +142,8 @@ impl ApiService {
                         title,
                         project_id,
                         model,
+                        auto_start: true, // Automatically start LLM agent session
+                        tool_name: Some("llm-agent".to_string()),
                     };
                     let result = api_client.create_work(request).await;
                     let mut create_work_result = result_clone.lock().unwrap();

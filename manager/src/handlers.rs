@@ -55,95 +55,6 @@ fn infer_provider_from_model(model_id: &str) -> &str {
 }
 
 /// Helper function to get a user-friendly display name from a model ID by looking it up in the provider
-async fn get_model_display_name(
-    model_id: &str,
-    provider: &str,
-    config: &std::sync::RwLock<AppConfig>,
-) -> String {
-    // Try to get the model name from the provider
-    let config_read = match config.read() {
-        Ok(guard) => guard,
-        Err(_) => return model_id.to_string(), // Return model_id if we can't get the lock
-    };
-
-    if let Some(api_key_config) = &config_read.api_keys {
-        let model_name = match provider {
-            "anthropic" => {
-                if let Some(api_key) = &api_key_config.anthropic_api_key {
-                    if !api_key.is_empty() {
-                        let anthropic_config = LlmProviderConfig {
-                            provider: "anthropic".to_string(),
-                            model: model_id.to_string(),
-                            api_key: api_key.clone(),
-                            base_url: None,
-                            max_tokens: Some(1000),
-                            temperature: Some(0.7),
-                        };
-                        if let Ok(provider) =
-                            crate::llm_providers::AnthropicProvider::new(anthropic_config)
-                        {
-                            if let Some(model) = provider.get_model(model_id) {
-                                return model.name().to_string();
-                            }
-                        }
-                    }
-                }
-                None
-            }
-            "openai" => {
-                if let Some(api_key) = &api_key_config.openai_api_key {
-                    if !api_key.is_empty() {
-                        let openai_config = LlmProviderConfig {
-                            provider: "openai".to_string(),
-                            model: model_id.to_string(),
-                            api_key: api_key.clone(),
-                            base_url: None,
-                            max_tokens: Some(1000),
-                            temperature: Some(0.7),
-                        };
-                        if let Ok(provider) =
-                            crate::llm_providers::OpenAiProvider::new(openai_config)
-                        {
-                            if let Some(model) = provider.get_model(model_id) {
-                                return model.name().to_string();
-                            }
-                        }
-                    }
-                }
-                None
-            }
-            "xai" => {
-                if let Some(api_key) = &api_key_config.xai_api_key {
-                    if !api_key.is_empty() {
-                        let xai_config = LlmProviderConfig {
-                            provider: "xai".to_string(),
-                            model: model_id.to_string(),
-                            api_key: api_key.clone(),
-                            base_url: Some("https://api.x.ai".to_string()),
-                            max_tokens: Some(1000),
-                            temperature: Some(0.7),
-                        };
-                        if let Ok(provider) = crate::llm_providers::XaiProvider::new(xai_config) {
-                            if let Some(model) = provider.get_model(model_id) {
-                                return model.name().to_string();
-                            }
-                        }
-                    }
-                }
-                None
-            }
-            _ => None,
-        };
-
-        if let Some(model) = model_name {
-            return model;
-        }
-    }
-
-    // Fall back to the model ID itself if we can't look it up
-    model_id.to_string()
-}
-
 pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let projects = data.database.get_all_projects()?;
     let response = ProjectListResponse { projects };
@@ -1006,14 +917,6 @@ pub async fn create_ai_session(
                 (provider, model)
             };
 
-            // Get the model name for display from the provider's model definition
-            let model_display_name = get_model_display_name(&model, &provider, &data.config).await;
-
-            // Update work with tool_name and model info
-            let mut updated_work = work.clone();
-            updated_work.tool_name = Some(format!("LLM Agent ({})", model_display_name));
-            data.database.update_work(&updated_work)?;
-
             // Create LLM agent session with provider/model from environment
             let llm_session = llm_agent
                 .create_session(work_id, provider, model, session.project_context.clone())
@@ -1176,17 +1079,16 @@ pub async fn create_work(
 
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
-        title: req.title,
+        title: req.title.clone(),
         project_id: req.project_id,
-        tool_name: None,
-        model: req.model,
+        model: req.model.clone(),
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
     };
 
-    // Save to database
-    let work_id = data.database.create_work(&work)?;
+    // Create work with initial message in a single transaction
+    let (work_id, message_id) = data.database.create_work_with_message(&work, req.title.clone())?;
     let mut work = work;
     work.id = work_id;
 
@@ -1202,10 +1104,90 @@ pub async fn create_work(
     });
 
     tracing::info!(
-        "Successfully created work '{}' with ID {}",
+        "Successfully created work '{}' with ID {} and message ID {}",
         work.title,
-        work.id
+        work.id,
+        message_id
     );
+
+    // Auto-start LLM agent session if requested (default: true)
+    if req.auto_start {
+        let tool_name = req.tool_name.unwrap_or_else(|| "llm-agent".to_string());
+
+        // Generate project context if work is associated with a project
+        let project_context = if let Some(project_id) = work.project_id {
+            let project = data.database.get_project_by_id(project_id)?;
+            Some(format!("Project: {}\nPath: {}", project.name, project.path))
+        } else {
+            None
+        };
+
+        // Create AI session record
+        let session = crate::models::AiSession::new(
+            work_id,
+            message_id,
+            tool_name.clone(),
+            project_context.clone(),
+        );
+        let session_id = data.database.create_ai_session(&session)?;
+
+        tracing::info!(
+            "Auto-starting {} session {} for work {}",
+            tool_name,
+            session_id,
+            work_id
+        );
+
+        // Handle LLM agent specially
+        if tool_name == "llm-agent" {
+            if let Some(ref llm_agent) = data.llm_agent {
+                // Determine provider and model from work.model or fall back to environment/defaults
+                let (provider, model) = if let Some(ref model_id) = work.model {
+                    let provider = infer_provider_from_model(model_id);
+                    (provider.to_string(), model_id.clone())
+                } else {
+                    // Fall back to environment variables or defaults
+                    let provider =
+                        std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+                    let model = std::env::var("MODEL")
+                        .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                    (provider, model)
+                };
+
+                // Create LLM agent session
+                let llm_session = llm_agent
+                    .create_session(work_id, provider, model, project_context)
+                    .await?;
+
+                // Process the message in background task to avoid blocking HTTP response
+                let llm_agent_clone = llm_agent.clone();
+                let session_id = llm_session.id;
+                let message_content = req.title.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = llm_agent_clone
+                        .process_message(session_id, message_content)
+                        .await
+                    {
+                        tracing::error!(
+                            "Failed to process LLM message for session {}: {}",
+                            session_id,
+                            e
+                        );
+                    } else {
+                        tracing::info!(
+                            "Successfully completed LLM agent processing for session {}",
+                            session_id
+                        );
+                    }
+                });
+            } else {
+                tracing::warn!(
+                    "LLM agent not available - work {} will not have auto-started session",
+                    work_id
+                );
+            }
+        }
+    }
 
     let response = WorkResponse { work };
     Ok(HttpResponse::Created().json(response))

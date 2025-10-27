@@ -3,8 +3,12 @@ use serde::{Deserialize, Serialize};
 
 // Re-export shared models from manager-models
 pub use manager_models::{
-    ApiKeyConfig, LlmAgentToolCall, SettingsResponse, SupportedModel, SupportedModelsResponse,
-    UpdateApiKeysRequest,
+    AddMessageRequest, AiSession, AiSessionListResponse, AiSessionOutput,
+    AiSessionOutputListResponse, AiSessionResponse, AiSessionResult, ApiKeyConfig,
+    CreateAiSessionRequest, CreateWorkRequest, LlmAgentToolCall, MessageAuthorType,
+    MessageContentType, SettingsResponse, SupportedModel, SupportedModelsResponse,
+    UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage, WorkMessageListResponse,
+    WorkMessageResponse, WorkResponse, WorkWithHistory,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,119 +87,9 @@ pub struct ServerStatus {
     pub uptime: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiSession {
-    pub id: i64,
-    pub work_id: i64,
-    pub message_id: i64,
-    pub tool_name: String,
-    pub status: String,
-    pub project_context: Option<String>,
-    pub started_at: i64,
-    pub ended_at: Option<i64>,
-}
-
-impl AiSession {
-    pub fn new(
-        work_id: i64,
-        message_id: i64,
-        tool_name: String,
-        project_context: Option<String>,
-    ) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: 0, // Will be set by database AUTOINCREMENT
-            work_id,
-            message_id,
-            tool_name,
-            status: "started".to_string(),
-            project_context,
-            started_at: now,
-            ended_at: None,
-        }
-    }
-
-    pub fn complete(&mut self) {
-        self.status = "completed".to_string();
-        self.ended_at = Some(Utc::now().timestamp());
-    }
-
-    pub fn fail(&mut self) {
-        self.status = "failed".to_string();
-        self.ended_at = Some(Utc::now().timestamp());
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateAiSessionRequest {
-    pub message_id: String,
-    pub tool_name: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AiSessionResponse {
-    pub session: AiSession,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AiSessionListResponse {
-    pub sessions: Vec<AiSession>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiSessionOutput {
-    pub id: i64,
-    pub session_id: i64,
-    pub content: String,
-    pub created_at: i64,
-    /// Role of the message author: "assistant" for LLM responses, "tool" for tool responses
-    pub role: Option<String>,
-    /// Model name/ID used for this message (only for assistant messages)
-    pub model: Option<String>,
-}
-
-/// Represents an AI session result that stores the response in a WorkMessage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiSessionResult {
-    pub id: i64,
-    pub session_id: i64,
-    pub response_message_id: i64,
-    pub status: String,
-    pub created_at: i64,
-    pub completed_at: Option<i64>,
-}
-
-impl AiSessionResult {
-    #[allow(dead_code)]
-    pub fn new(session_id: i64, response_message_id: i64) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: 0, // Will be set by database AUTOINCREMENT
-            session_id,
-            response_message_id,
-            status: "processing".to_string(),
-            created_at: now,
-            completed_at: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn complete(&mut self) {
-        self.status = "completed".to_string();
-        self.completed_at = Some(Utc::now().timestamp());
-    }
-
-    #[allow(dead_code)]
-    pub fn fail(&mut self) {
-        self.status = "failed".to_string();
-        self.completed_at = Some(Utc::now().timestamp());
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AiSessionOutputListResponse {
-    pub outputs: Vec<AiSessionOutput>,
-}
+// AiSession, CreateAiSessionRequest, AiSessionResponse, AiSessionListResponse,
+// AiSessionOutput, AiSessionResult, AiSessionOutputListResponse
+// are now re-exported from manager-models (see top of file)
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
@@ -265,92 +159,9 @@ pub struct FileResponse {
     pub file: FileInfo,
 }
 
-// Work history models
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MessageContentType {
-    #[serde(rename = "text")]
-    Text,
-    #[serde(rename = "markdown")]
-    Markdown,
-    #[serde(rename = "json")]
-    Json,
-    #[serde(rename = "code")]
-    Code { language: String },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MessageAuthorType {
-    #[serde(rename = "user")]
-    User,
-    #[serde(rename = "ai")]
-    Ai,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkMessage {
-    pub id: i64,
-    pub work_id: i64,
-    pub content: String,
-    pub content_type: MessageContentType,
-    pub author_type: MessageAuthorType,
-    pub author_id: Option<String>,
-    pub sequence_order: i32,
-    pub created_at: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Work {
-    pub id: i64,
-    pub title: String,
-    pub project_id: Option<i64>,
-    pub tool_name: Option<String>,
-    pub model: Option<String>, // Model ID for the work
-    pub status: String,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WorkWithHistory {
-    pub work: Work,
-    pub messages: Vec<WorkMessage>,
-    pub total_messages: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AddMessageRequest {
-    pub content: String,
-    pub content_type: MessageContentType,
-    pub author_type: MessageAuthorType,
-    pub author_id: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateWorkRequest {
-    pub title: String,
-    pub project_id: Option<i64>,
-    pub model: Option<String>, // Model ID for the work (e.g., "gpt-4", "claude-3-opus-20240229")
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WorkResponse {
-    pub work: Work,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WorkListResponse {
-    pub works: Vec<Work>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WorkMessageResponse {
-    pub message: WorkMessage,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WorkMessageListResponse {
-    pub messages: Vec<WorkMessage>,
-}
+// Work history models (MessageContentType, MessageAuthorType, WorkMessage, Work,
+// WorkWithHistory, AddMessageRequest, CreateWorkRequest, WorkResponse, WorkListResponse,
+// WorkMessageResponse, WorkMessageListResponse) are now re-exported from manager-models
 
 // LLM Agent Types for Issue 99
 
@@ -366,6 +177,8 @@ pub enum ToolRequest {
     WriteFile(WriteFileRequest),
     #[serde(rename = "grep")]
     Grep(GrepRequest),
+    #[serde(rename = "apply_patch")]
+    ApplyPatch(ApplyPatchRequest),
 }
 
 /// List files tool request
@@ -567,6 +380,28 @@ impl GrepRequest {
     }
 }
 
+/// Apply patch tool request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchRequest {
+    pub patch: String,
+}
+
+impl ApplyPatchRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "patch": {
+                    "type": "string",
+                    "description": "The patch content in the format:\n*** Begin Patch\n*** Add File: path/to/new.txt\n+line content\n*** Update File: path/to/existing.txt\n@@ optional context\n-old line\n+new line\n*** Delete File: path/to/remove.txt\n*** End Patch\n\nSupports:\n- Add File: Create new files with + prefixed lines\n- Update File: Modify files with diff hunks (- for removed, + for added)\n- Delete File: Remove files\n- Move to: Rename files (after Update File header)\n- @@ context headers for targeting specific code blocks\n\nAll file paths must be relative to the project root."
+                }
+            },
+            "required": ["patch"]
+        })
+    }
+}
+
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -579,6 +414,8 @@ pub enum ToolResponse {
     WriteFile(WriteFileResponse),
     #[serde(rename = "grep")]
     Grep(GrepResponse),
+    #[serde(rename = "apply_patch")]
+    ApplyPatch(ApplyPatchResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
@@ -632,6 +469,27 @@ pub struct GrepResponse {
     pub total_matches: u32,
     pub files_searched: u32,
     pub truncated: bool,
+}
+
+/// Apply patch file change
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchFileChange {
+    pub path: String,
+    pub operation: String, // "add", "update", "delete", "move"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_path: Option<String>, // For move operations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unified_diff: Option<String>, // For update operations
+}
+
+/// Apply patch tool response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchResponse {
+    pub success: bool,
+    pub files_changed: Vec<ApplyPatchFileChange>,
+    pub total_additions: usize,
+    pub total_deletions: usize,
+    pub message: String,
 }
 
 /// Tool error response
