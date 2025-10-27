@@ -1,299 +1,255 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/theme/PageHeader.astro';
+import ContentBox from '../components/theme/ContentBox.astro';
+import SectionHeader from '../components/theme/SectionHeader.astro';
+import FeatureCard from '../components/theme/FeatureCard.astro';
+import IconBadge from '../components/theme/IconBadge.astro';
 ---
 
 <Layout>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12">
+  <div class="min-h-screen bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-primary py-12">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
-      <div class="text-center mb-16">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">
-          About nocodo
-        </h1>
-        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          A structured approach to software engineering that emphasizes understanding fundamentals 
-          before leveraging AI coding agents for maximum productivity and code quality.
-        </p>
-      </div>
+      <PageHeader
+        title="About nocodo"
+        subtitle="A structured approach to software engineering that emphasizes understanding fundamentals before leveraging AI coding agents for maximum productivity and code quality."
+      />
 
       <!-- Philosophy Section -->
-      <section class="bg-white rounded-lg shadow-md p-8 mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-6">The nocodo Philosophy</h2>
-        <div class="prose prose-lg max-w-none">
-          <p class="text-gray-600 mb-6">
-            In the rapidly evolving landscape of software development, AI coding agents have emerged as powerful tools 
-            that can significantly accelerate development processes. However, the true power of these tools can only 
-            be unlocked when developers have a solid foundation in software engineering fundamentals.
-          </p>
-          
-          <p class="text-gray-600 mb-6">
-            <strong>nocodo</strong> is our philosophy that bridges the gap between traditional software engineering 
-            practices and modern AI-assisted development. It's about finding the right rhythm—the "vibe"—between 
-            human expertise and artificial intelligence to create high-quality software efficiently.
-          </p>
-        </div>
-      </section>
+      <ContentBox>
+        <h2 class="text-3xl font-bold text-text-primary mb-6">The nocodo Philosophy</h2>
+        <p class="text-text-secondary mb-6">
+          In the rapidly evolving landscape of software development, AI coding agents have emerged as powerful tools
+          that can significantly accelerate development processes. However, the true power of these tools can only
+          be unlocked when developers have a solid foundation in software engineering fundamentals.
+        </p>
+
+        <p class="text-text-secondary mb-6">
+          <strong>nocodo</strong> is our philosophy that bridges the gap between traditional software engineering
+          practices and modern AI-assisted development. It's about finding the right rhythm—the "vibe"—between
+          human expertise and artificial intelligence to create high-quality software efficiently.
+        </p>
+      </ContentBox>
 
       <!-- Core Principles -->
       <section class="mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-8">Core Principles</h2>
+        <SectionHeader title="Core Principles" centered={false} />
         <div class="grid md:grid-cols-2 gap-8">
-          <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-3">Fundamentals First</h3>
-            <p class="text-gray-600">
-              Master version control, testing, CI/CD, and code quality practices before diving into AI-assisted development. 
-              These foundations enable you to effectively guide and evaluate AI-generated code.
-            </p>
-          </div>
+          <FeatureCard
+            title="Fundamentals First"
+            description="Master version control, testing, CI/CD, and code quality practices before diving into AI-assisted development. These foundations enable you to effectively guide and evaluate AI-generated code."
+            iconColor="emerald"
+          >
+            <svg slot="icon" class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+          </FeatureCard>
 
-          <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-3">AI as an Amplifier</h3>
-            <p class="text-gray-600">
-              Use AI coding agents to amplify your existing skills, not replace them. AI excels at routine tasks, 
-              pattern recognition, and boilerplate generation, while humans excel at architecture, creativity, and judgment.
-            </p>
-          </div>
+          <FeatureCard
+            title="AI as an Amplifier"
+            description="Use AI coding agents to amplify your existing skills, not replace them. AI excels at routine tasks, pattern recognition, and boilerplate generation, while humans excel at architecture, creativity, and judgment."
+            iconColor="emerald"
+          >
+            <svg slot="icon" class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+          </FeatureCard>
 
-          <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-3">Quality Over Speed</h3>
-            <p class="text-gray-600">
-              While AI can significantly speed up development, maintaining code quality should never be compromised. 
-              Always review, test, and validate AI-generated code before deployment.
-            </p>
-          </div>
+          <FeatureCard
+            title="Quality Over Speed"
+            description="While AI can significantly speed up development, maintaining code quality should never be compromised. Always review, test, and validate AI-generated code before deployment."
+            iconColor="cyan"
+          >
+            <svg slot="icon" class="w-6 h-6 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </FeatureCard>
 
-          <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-3">Continuous Learning</h3>
-            <p class="text-gray-600">
-              Stay curious and adaptable. The AI landscape evolves rapidly, and successful developers continuously 
-              learn new tools, techniques, and best practices for human-AI collaboration.
-            </p>
-          </div>
+          <FeatureCard
+            title="Continuous Learning"
+            description="Stay curious and adaptable. The AI landscape evolves rapidly, and successful developers continuously learn new tools, techniques, and best practices for human-AI collaboration."
+            iconColor="emerald"
+          >
+            <svg slot="icon" class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+          </FeatureCard>
         </div>
       </section>
 
       <!-- Fundamentals -->
-      <section class="bg-white rounded-lg shadow-md p-8 mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-6">The nocodo Fundamentals</h2>
+      <ContentBox>
+        <h2 class="text-3xl font-bold text-text-primary mb-6">The nocodo Fundamentals</h2>
         <div class="space-y-6">
           <div class="flex items-start">
-            <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-              <span class="text-blue-600 font-semibold">1</span>
-            </div>
+            <IconBadge number="1" shape="circle" size="sm" class="mr-4" />
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Build Your Foundation</h3>
-              <p class="text-gray-600">
-                Start with software engineering fundamentals. Learn Git, testing, CI/CD, and code quality practices. 
+              <h3 class="text-lg font-semibold text-text-primary mt-0 mb-2">Build Your Foundation</h3>
+              <p class="text-text-secondary">
+                Start with software engineering fundamentals. Learn Git, testing, CI/CD, and code quality practices.
                 These skills are essential for working effectively with AI coding agents.
               </p>
             </div>
           </div>
-          
+
           <div class="flex items-start">
-            <div class="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
-              <span class="text-green-600 font-semibold">2</span>
-            </div>
+            <IconBadge number="2" shape="circle" size="sm" class="mr-4" />
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Explore AI-Assisted Development</h3>
-              <p class="text-gray-600">
-                Learn how AI can enhance your development workflow. Understand different AI tools, their capabilities, 
+              <h3 class="text-lg font-semibold text-text-primary mt-0 mb-2">Explore AI-Assisted Development</h3>
+              <p class="text-text-secondary">
+                Learn how AI can enhance your development workflow. Understand different AI tools, their capabilities,
                 and how to integrate them into your existing processes.
               </p>
             </div>
           </div>
-          
+
           <div class="flex items-start">
-            <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-              <span class="text-purple-600 font-semibold">3</span>
-            </div>
+            <IconBadge number="3" shape="circle" size="sm" class="mr-4" />
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Master AI Coding Agents</h3>
-              <p class="text-gray-600">
-                Dive deep into specific AI coding tools like Claude Code, GitHub Copilot, and Cursor AI. 
+              <h3 class="text-lg font-semibold text-text-primary mt-0 mb-2">Master AI Coding Agents</h3>
+              <p class="text-text-secondary">
+                Dive deep into specific AI coding tools like Claude Code, GitHub Copilot, and Cursor AI.
                 Learn optimization techniques and develop efficient human-AI collaboration patterns.
               </p>
             </div>
           </div>
         </div>
-      </section>
+      </ContentBox>
 
       <!-- Methodology -->
-      <section class="bg-white rounded-lg shadow-md p-8 mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-6">Learning Methodology</h2>
+      <ContentBox>
+        <h2 class="text-3xl font-bold text-text-primary mb-6">Learning Methodology</h2>
         <div class="grid md:grid-cols-3 gap-8">
           <div class="text-center">
-            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <IconBadge shape="circle" size="lg" class="mx-auto mb-4">
+              <svg class="w-8 h-8 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
               </svg>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Theory & Practice</h3>
-            <p class="text-gray-600">
+            </IconBadge>
+            <h3 class="text-lg font-semibold text-text-primary mb-2">Theory & Practice</h3>
+            <p class="text-text-secondary">
               Each module combines theoretical knowledge with practical, hands-on exercises to reinforce learning.
             </p>
           </div>
-          
+
           <div class="text-center">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <IconBadge shape="circle" size="lg" color="cyan" class="mx-auto mb-4">
+              <svg class="w-8 h-8 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Progressive Complexity</h3>
-            <p class="text-gray-600">
+            </IconBadge>
+            <h3 class="text-lg font-semibold text-text-primary mb-2">Progressive Complexity</h3>
+            <p class="text-text-secondary">
               Start with basic concepts and gradually build up to advanced AI collaboration techniques.
             </p>
           </div>
-          
+
           <div class="text-center">
-            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <IconBadge shape="circle" size="lg" class="mx-auto mb-4">
+              <svg class="w-8 h-8 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
               </svg>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Community Focus</h3>
-            <p class="text-gray-600">
+            </IconBadge>
+            <h3 class="text-lg font-semibold text-text-primary mb-2">Community Focus</h3>
+            <p class="text-text-secondary">
               Learn alongside others and contribute to a growing community of vibe coding practitioners.
             </p>
           </div>
         </div>
-      </section>
+      </ContentBox>
 
       <!-- Community Guidelines -->
-      <section class="bg-white rounded-lg shadow-md p-8 mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-6">Community Guidelines</h2>
-        <div class="prose prose-lg max-w-none">
-          <ul class="space-y-3 text-gray-600">
-            <li class="flex items-start">
-              <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-              </svg>
-              <span><strong>Share Knowledge:</strong> Help others learn by sharing your experiences, tips, and discoveries.</span>
-            </li>
-            <li class="flex items-start">
-              <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-              </svg>
-              <span><strong>Question Everything:</strong> Ask questions, challenge assumptions, and seek to understand the "why" behind practices.</span>
-            </li>
-            <li class="flex items-start">
-              <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-              </svg>
-              <span><strong>Embrace Experimentation:</strong> Try new tools and techniques, then share your results with the community.</span>
-            </li>
-            <li class="flex items-start">
-              <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-              </svg>
-              <span><strong>Maintain Quality:</strong> Always prioritize code quality and best practices, even when using AI assistance.</span>
-            </li>
-            <li class="flex items-start">
-              <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-              </svg>
-              <span><strong>Be Inclusive:</strong> Welcome developers of all skill levels and backgrounds to the vibe coding community.</span>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <ContentBox>
+        <h2 class="text-3xl font-bold text-text-primary mb-6">Community Guidelines</h2>
+        <ul class="space-y-3 text-text-secondary">
+          <li class="flex items-start">
+            <svg class="w-5 h-5 text-accent-emerald mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span><strong>Share Knowledge:</strong> Help others learn by sharing your experiences, tips, and discoveries.</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="w-5 h-5 text-accent-emerald mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span><strong>Question Everything:</strong> Ask questions, challenge assumptions, and seek to understand the "why" behind practices.</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="w-5 h-5 text-accent-emerald mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span><strong>Embrace Experimentation:</strong> Try new tools and techniques, then share your results with the community.</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="w-5 h-5 text-accent-emerald mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span><strong>Maintain Quality:</strong> Always prioritize code quality and best practices, even when using AI assistance.</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="w-5 h-5 text-accent-emerald mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span><strong>Be Inclusive:</strong> Welcome developers of all skill levels and backgrounds to the vibe coding community.</span>
+          </li>
+        </ul>
+      </ContentBox>
 
       <!-- Company Policies -->
-      <section class="bg-white rounded-lg shadow-md p-8 mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-6">Company Policies</h2>
-        <p class="text-gray-600 mb-6">
+      <ContentBox>
+        <h2 class="text-3xl font-bold text-text-primary mb-6">Company Policies</h2>
+        <p class="text-text-secondary mb-6">
           Learn about our policies and how we handle your data and services.
         </p>
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <a 
-            href="/privacy-policy" 
-            class="flex items-center px-4 py-3 border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50 hover:border-blue-300 transition-colors"
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 not-prose">
+          <a
+            href="/privacy-policy"
+            class="flex items-center px-4 py-3 border border-border-secondary rounded-md text-text-secondary hover:bg-surface-hover hover:border-accent-emerald/50 transition-colors no-underline"
           >
-            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-text-tertiary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
             </svg>
             Privacy Policy
           </a>
-          <a 
-            href="/terms-and-conditions" 
-            class="flex items-center px-4 py-3 border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50 hover:border-blue-300 transition-colors"
+          <a
+            href="/terms-and-conditions"
+            class="flex items-center px-4 py-3 border border-border-secondary rounded-md text-text-secondary hover:bg-surface-hover hover:border-accent-emerald/50 transition-colors no-underline"
           >
-            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-text-tertiary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
             Terms and Conditions
           </a>
-          <a 
-            href="/cancellation-and-refund" 
-            class="flex items-center px-4 py-3 border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50 hover:border-blue-300 transition-colors"
+          <a
+            href="/cancellation-and-refund"
+            class="flex items-center px-4 py-3 border border-border-secondary rounded-md text-text-secondary hover:bg-surface-hover hover:border-accent-emerald/50 transition-colors no-underline"
           >
-            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-text-tertiary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path>
             </svg>
             Cancellation & Refund
           </a>
-          <a 
-            href="/shipping-and-delivery" 
-            class="flex items-center px-4 py-3 border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50 hover:border-blue-300 transition-colors"
+          <a
+            href="/shipping-and-delivery"
+            class="flex items-center px-4 py-3 border border-border-secondary rounded-md text-text-secondary hover:bg-surface-hover hover:border-accent-emerald/50 transition-colors no-underline"
           >
-            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-text-tertiary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
             </svg>
             Shipping & Delivery
           </a>
-          <a 
-            href="/contact-us" 
-            class="flex items-center px-4 py-3 border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50 hover:border-blue-300 transition-colors"
+          <a
+            href="/contact-us"
+            class="flex items-center px-4 py-3 border border-border-secondary rounded-md text-text-secondary hover:bg-surface-hover hover:border-accent-emerald/50 transition-colors no-underline"
           >
-            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-text-tertiary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
             </svg>
             Contact Us
           </a>
         </div>
-      </section>
-
-      <!-- Call to Action -->
-      <div class="text-center">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Ready to Start Your nocodo Journey?</h2>
-        <p class="text-gray-600 mb-6">
-          Join thousands of developers who are transforming their workflow with AI while maintaining the highest standards of software craftsmanship.
-        </p>
-        <div class="space-x-4">
-          <a 
-            href="/fundamentals" 
-            class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-          >
-            Begin Learning
-          </a>
-          <a 
-            href="/resources" 
-            class="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-          >
-            Explore Resources
-          </a>
-        </div>
-      </div>
+      </ContentBox>
     </div>
   </div>
 </Layout>

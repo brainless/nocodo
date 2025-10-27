@@ -1,7 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import Button from '../../components/UI/Button.astro';
-import Card from '../../components/UI/Card.astro';
+import Section from '../../components/theme/Section.astro';
+import SectionHeader from '../../components/theme/SectionHeader.astro';
+import Card from '../../components/theme/Card.astro';
 import { getCollection } from 'astro:content';
 
 const blogEntries = await getCollection('blog');
@@ -14,152 +15,71 @@ const blogPosts = blogEntries.map(entry => ({
 }));
 ---
 
-<Layout 
-  title="nocodo Blog" 
+<Layout
+  title="nocodo Blog"
   description="Articles, insights, and deep dives into vibe coding, AI-assisted development, and nocodo methodology"
 >
-  <!-- Hero Section -->
-  <section class="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-10">
-      <svg class="absolute inset-0 h-full w-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="blog-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M0 32V0h32" fill="none" stroke="currentColor" stroke-width="1"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#blog-grid)"/>
-      </svg>
+  <!-- Blog Posts -->
+  <Section background="primary">
+    <SectionHeader
+      title="Latest Articles"
+      subtitle="Deep dives into vibe coding methodology, AI development practices, and real-world case studies"
+    />
+
+    <!-- Posts Grid -->
+    <div class="grid lg:grid-cols-1 gap-8 max-w-4xl mx-auto">
+      {blogPosts.map((post) => (
+        <Card class="p-8 border-l-4 border-accent-emerald">
+          <!-- Tags -->
+          {post.tags.length > 0 && (
+            <div class="flex flex-wrap gap-2 mb-4">
+              {post.tags.map((tag) => (
+                <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <!-- Icon -->
+          <div class="text-4xl mb-4">📝</div>
+
+          <!-- Title -->
+          <h3 class="text-2xl font-bold text-text-primary mb-3">{post.title}</h3>
+
+          <!-- Description -->
+          {post.description && (
+            <p class="text-text-secondary mb-6">{post.description}</p>
+          )}
+
+          <!-- Read Button -->
+          <a
+            href={`/blog/${post.slug}`}
+            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold rounded-lg transition-all duration-200"
+          >
+            Read Article
+            <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </a>
+        </Card>
+      ))}
     </div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+
+    {blogPosts.length === 0 && (
       <div class="text-center">
-        <!-- Header -->
-        <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-2xl mb-6">
-          <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
+        <div class="inline-flex items-center justify-center w-12 h-12 bg-bg-tertiary rounded-full mb-4">
+          <svg class="w-6 h-6 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.286a1 1 0 00-.293-.707l-5.657-5.657A1 1 0 0015.343 1H5a2 2 0 00-2 2v16a2 2 0 002 2z"></path>
           </svg>
         </div>
-        
-        <h1 class="text-5xl sm:text-6xl font-bold text-gray-900 mb-6">
-          <span class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            nocodo Blog
-          </span>
-        </h1>
-        
-        <p class="text-xl sm:text-2xl text-gray-600 max-w-4xl mx-auto mb-8 leading-relaxed">
-          Insights, methodologies, and real-world experiences from the world of 
-          <strong class="text-gray-900">AI-assisted development</strong> and <strong class="text-gray-900">vibe coding</strong>
-        </p>
-        
-        <!-- Key Points -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
-          <div class="text-center">
-            <div class="text-2xl mb-2">✍️</div>
-            <div class="text-sm font-medium text-gray-900">Deep Insights</div>
-            <div class="text-xs text-gray-600">Real experiences shared</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl mb-2">🛠️</div>
-            <div class="text-sm font-medium text-gray-900">Practical Examples</div>
-            <div class="text-xs text-gray-600">Working implementations</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl mb-2">🌟</div>
-            <div class="text-sm font-medium text-gray-900">Latest Techniques</div>
-            <div class="text-xs text-gray-600">Cutting-edge approaches</div>
-          </div>
-        </div>
-        
-        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button 
-            href="/playbook"
-            variant="primary"
-            size="lg"
-          >
-            Read the Playbook
-            <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-          </Button>
-          <Button 
-            href="/"
-            variant="outline"
-            size="lg"
-          >
-            Back to Home
-          </Button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Blog Posts -->
-  <section class="py-24 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold text-gray-900 mb-4">
-          Latest Articles
-        </h2>
-        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-          Deep dives into vibe coding methodology, AI development practices, and real-world case studies
+        <h3 class="text-xl font-semibold text-text-primary mb-2">More Articles Coming Soon</h3>
+        <p class="text-text-secondary max-w-2xl mx-auto">
+          We're working on more in-depth articles covering advanced vibe coding techniques,
+          case studies, and implementation guides. Stay tuned!
         </p>
       </div>
-      
-      <!-- Posts Grid -->
-      <div class="grid lg:grid-cols-1 gap-8 max-w-4xl mx-auto">
-        {blogPosts.map((post) => (
-          <Card 
-            title={post.title}
-            description={post.description}
-            hover={true}
-            class="border-l-4 border-blue-500"
-          >
-            <!-- Tags -->
-            {post.tags.length > 0 && (
-              <div class="flex flex-wrap gap-2 mb-4">
-                {post.tags.map((tag) => (
-                  <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            
-            <!-- Icon -->
-            <div class="text-4xl mb-4">📝</div>
-            
-            <div slot="footer">
-              <Button 
-                href={`/blog/${post.slug}`}
-                variant="primary"
-                class="w-full"
-              >
-                Read Article
-                <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-      
-      {blogPosts.length === 0 && (
-        <div class="text-center">
-          <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-full mb-4">
-            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.286a1 1 0 00-.293-.707l-5.657-5.657A1 1 0 0015.343 1H5a2 2 0 00-2 2v16a2 2 0 002 2z"></path>
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">More Articles Coming Soon</h3>
-          <p class="text-gray-600 max-w-2xl mx-auto">
-            We're working on more in-depth articles covering advanced vibe coding techniques, 
-            case studies, and implementation guides. Stay tuned!
-          </p>
-        </div>
-      )}
-    </div>
-  </section>
+    )}
+  </Section>
 
 </Layout>

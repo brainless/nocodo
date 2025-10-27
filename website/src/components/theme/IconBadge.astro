@@ -1,0 +1,62 @@
+---
+/**
+ * IconBadge - Icon container with optional number badge
+ * Theme-aware component that adapts to light/dark mode automatically
+ *
+ * Size variants: sm (w-10 h-10), md (w-12 h-12), lg (w-16 h-16)
+ * Shape variants: square (rounded-lg), circle (rounded-full)
+ * Color variants: emerald, cyan
+ */
+export interface Props {
+  size?: 'sm' | 'md' | 'lg';
+  shape?: 'square' | 'circle';
+  color?: 'emerald' | 'cyan';
+  number?: string | number;
+  class?: string;
+}
+
+const {
+  size = 'md',
+  shape = 'square',
+  color = 'emerald',
+  number,
+  class: className
+} = Astro.props;
+
+const sizeClasses = {
+  sm: 'w-10 h-10',
+  md: 'w-12 h-12',
+  lg: 'w-16 h-16'
+};
+
+const shapeClasses = {
+  square: 'rounded-lg',
+  circle: 'rounded-full'
+};
+
+const colorBgClasses = {
+  emerald: 'bg-accent-emerald/10 border-accent-emerald/20',
+  cyan: 'bg-accent-cyan/10 border-accent-cyan/20'
+};
+
+const colorTextClasses = {
+  emerald: 'text-accent-emerald',
+  cyan: 'text-accent-cyan'
+};
+---
+
+<div class:list={[
+  sizeClasses[size],
+  shapeClasses[shape],
+  colorBgClasses[color],
+  "border flex items-center justify-center flex-shrink-0",
+  className
+]}>
+  {number ? (
+    <span class:list={[colorTextClasses[color], "font-semibold"]}>
+      {number}
+    </span>
+  ) : (
+    <slot />
+  )}
+</div>
