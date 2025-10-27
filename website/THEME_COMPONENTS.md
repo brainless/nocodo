@@ -25,7 +25,48 @@ import Card from '../components/theme/Card.astro';
 
 ## Available Components
 
-### 1. PageHeader
+### 1. Button
+Theme-aware button component with multiple variants and sizes.
+
+**Props:**
+- `variant` ('primary' | 'secondary' | 'accent-emerald' | 'accent-cyan' | 'outline' | 'ghost', default: 'primary')
+- `size` ('sm' | 'md' | 'lg', default: 'md')
+- `disabled` (boolean, default: false)
+- `href` (string, optional): For link-style buttons
+- `type` ('button' | 'submit' | 'reset', default: 'button')
+- `class` (string, optional): Additional CSS classes
+
+**Example:**
+```astro
+<Button
+  href="/events"
+  variant="accent-emerald"
+  size="sm"
+>
+  Join Event
+</Button>
+```
+
+---
+
+### 2. NavLink
+Theme-aware navigation link with active state detection.
+
+**Props:**
+- `href` (string, required): Link destination
+- `active` (boolean, optional): Manually set active state
+- `class` (string, optional): Additional CSS classes
+
+**Example:**
+```astro
+<NavLink href="/about">
+  About
+</NavLink>
+```
+
+---
+
+### 3. PageHeader
 Main page title and subtitle.
 
 **Props:**
@@ -43,7 +84,7 @@ Main page title and subtitle.
 
 ---
 
-### 2. SectionHeader
+### 4. SectionHeader
 Section heading with optional subtitle.
 
 **Props:**
@@ -61,7 +102,7 @@ Section heading with optional subtitle.
 
 ---
 
-### 3. ContentBox
+### 5. ContentBox
 Container for main content with prose styling. Ideal for markdown/rich text.
 
 **Props:**
@@ -77,7 +118,7 @@ Container for main content with prose styling. Ideal for markdown/rich text.
 
 ---
 
-### 4. Card
+### 6. Card
 Reusable card component with three variants.
 
 **Props:**
@@ -100,7 +141,7 @@ Reusable card component with three variants.
 
 ---
 
-### 5. FeatureCard
+### 7. FeatureCard
 Card with icon, title, and description.
 
 **Props:**
@@ -128,7 +169,7 @@ Card with icon, title, and description.
 
 ---
 
-### 6. IconBadge
+### 8. IconBadge
 Icon container with optional number badge.
 
 **Props:**
@@ -151,7 +192,7 @@ Icon container with optional number badge.
 
 ---
 
-### 7. Section
+### 9. Section
 Full-width section wrapper with background variants.
 
 **Props:**

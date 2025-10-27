@@ -1,65 +1,51 @@
 ---
-// Footer component with comprehensive navigation links
-import Button from './UI/Button.astro';
+/**
+ * Footer Component
+ *
+ * Site-wide footer with navigation links and copyright.
+ * Uses theme-aware components for consistent dark theme styling.
+ */
+import Button from './theme/Button.astro';
 ---
 
-<footer class="bg-gray-50 border-t border-gray-200">
+<footer class="bg-bg-secondary border-t border-border-primary">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="grid grid-cols-1 md:grid-cols-1 gap-8">
-
-      <!-- Navigation Links -->
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900 tracking-wider uppercase mb-4">
-          Navigation
-        </h3>
-        <ul class="space-y-3">
-          <li>
-            <a href="/" class="text-gray-600 hover:text-gray-900 transition-colors">
-              Home
-            </a>
-          </li>
-          <li>
-            <a href="/about" class="text-gray-600 hover:text-gray-900 transition-colors">
-              About
-            </a>
-          </li>
-          <li>
-            <a href="/playbook" class="text-gray-600 hover:text-gray-900 transition-colors">
-              Playbook
-            </a>
-          </li>
-          <li>
-            <a href="/blog" class="text-gray-600 hover:text-gray-900 transition-colors">
-              Blog
-            </a>
-          </li>
-          <li class="mt-4">
-            <Button
-              href="/events"
-              variant="primary"
-              size="sm"
-              class="!bg-green-800 hover:!bg-green-900 !bg-none"
-            >
-              🚀 Join my next session
-            </Button>
-          </li>
-        </ul>
-      </div>
-    </div>
+    <!-- Navigation Links in a single row -->
+    <nav class="flex flex-wrap justify-center items-center gap-6 mb-8">
+      <a href="/" class="text-text-secondary hover:text-accent-emerald transition-colors">
+        Home
+      </a>
+      <a href="/about" class="text-text-secondary hover:text-accent-emerald transition-colors">
+        About
+      </a>
+      <a href="/playbook" class="text-text-secondary hover:text-accent-emerald transition-colors">
+        Playbook
+      </a>
+      <a href="/blog" class="text-text-secondary hover:text-accent-emerald transition-colors">
+        Blog
+      </a>
+      <Button
+        href="/events"
+        variant="accent-emerald"
+        size="sm"
+      >
+        🚀 Join my next session
+      </Button>
+    </nav>
 
     <!-- Bottom section with copyright -->
-    <div class="mt-12 pt-8 border-t border-gray-300">
-      <div class="flex flex-col md:flex-row justify-between items-center">
-        <div class="flex items-center space-x-4">
-          <a href="/" class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
+    <div class="pt-8 border-t border-border-primary">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex flex-col md:flex-row items-center md:space-x-4 gap-2 md:gap-0">
+          <a href="/" class="text-xl font-bold text-text-primary hover:text-accent-emerald transition-colors">
             nocodo
           </a>
-          <span class="text-gray-500 text-sm">
+          <span class="text-text-tertiary text-sm text-center md:text-left">
             Learn software engineering fundamentals with AI coding agents
           </span>
         </div>
-        
-        <div class="mt-4 md:mt-0 text-sm text-gray-500">
+
+        <div class="text-sm text-text-muted">
           © {new Date().getFullYear()} nocodo. All rights reserved.
         </div>
       </div>

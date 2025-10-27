@@ -1,0 +1,44 @@
+---
+/**
+ * Theme-aware Navigation Link Component
+ *
+ * A reusable navigation link that works with the dark theme system.
+ * Automatically highlights the active page.
+ */
+
+export interface Props {
+  href: string;
+  class?: string;
+  active?: boolean;
+}
+
+const {
+  href,
+  class: className = '',
+  active = false,
+  ...rest
+} = Astro.props;
+
+// Check if this link is for the current page
+const currentPath = Astro.url.pathname;
+const isActive = active || currentPath === href || (href !== '/' && currentPath.startsWith(href));
+
+// Base styles for navigation links
+const baseStyles = 'px-3 py-2 rounded-md text-sm font-medium transition-colors';
+
+// Active/inactive styles using theme tokens
+const stateStyles = isActive
+  ? 'text-accent-emerald bg-bg-tertiary'
+  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary';
+
+const linkStyles = [baseStyles, stateStyles, className].join(' ');
+---
+
+<a
+  href={href}
+  class={linkStyles}
+  aria-current={isActive ? 'page' : undefined}
+  {...rest}
+>
+  <slot />
+</a>

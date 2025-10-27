@@ -11,7 +11,9 @@
   - Uses Tailwind CSS v4's `@theme` directive
 
 #### 2. Reusable Components (`src/components/theme/`)
-Created 7 theme-aware components:
+Created 9 theme-aware components:
+- `Button.astro` - Buttons with multiple variants (primary, secondary, accent-emerald, accent-cyan, outline, ghost)
+- `NavLink.astro` - Navigation links with active state detection
 - `PageHeader.astro` - Page titles and subtitles
 - `SectionHeader.astro` - Section headings
 - `ContentBox.astro` - Content containers with prose styling
@@ -108,12 +110,48 @@ Created 7 theme-aware components:
 
 ---
 
+---
+
+**✅ Header Component (`src/components/Header.astro`)** - 100% Complete
+- Converted from light theme to dark theme
+- Uses theme-aware components: `Button`, `NavLink`
+- All hard-coded colors → Semantic tokens
+- Desktop and mobile navigation fully themed
+- Sticky header with backdrop blur effect
+
+**Components Used:**
+- `Button` (with accent-emerald variant)
+- `NavLink` (with active state detection)
+
+**Color Tokens Used:**
+- `bg-bg-secondary`, `border-border-primary`
+- `text-text-primary`, `text-text-secondary`
+- `text-accent-emerald`
+
+---
+
+**✅ Footer Component (`src/components/Footer.astro`)** - 100% Complete
+- Converted from light theme to dark theme
+- Uses theme-aware `Button` component
+- Navigation links in single horizontal row
+- All hard-coded colors → Semantic tokens
+- Responsive layout for mobile/desktop
+
+**Components Used:**
+- `Button` (with accent-emerald variant)
+
+**Color Tokens Used:**
+- `bg-bg-secondary`, `border-border-primary`
+- `text-text-primary`, `text-text-secondary`, `text-text-tertiary`, `text-text-muted`
+- `text-accent-emerald`
+
+---
+
 ## 🔲 Not Yet Refactored
 
 ### Pages Still Using Hard-Coded Colors:
 
-1. **Main Layout** (`src/layouts/Layout.astro`)
-   - Check if it uses any hard-coded colors
+None - all major pages and components have been refactored!
 
 ---
 
