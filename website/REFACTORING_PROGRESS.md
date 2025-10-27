@@ -45,26 +45,74 @@ Created 7 theme-aware components:
 
 ---
 
+**✅ Homepage (`src/pages/index.astro`)** - 100% Complete
+- Hero section → Semantic color tokens
+- Hero screenshot → `Section` component with semantic tokens
+- Problem Statement section → `Section`, `SectionHeader`, `Card` components
+- Solution section → `Section`, `SectionHeader`, `Card` components with gradient variant
+- How It Works section → `Section`, `SectionHeader`, `Card` components with numbered steps
+- What's Included section → `Section`, `SectionHeader`, `Card` components in grid
+- Future Plans section → `Section`, `SectionHeader`, `Card` components with roadmap and pricing
+- Privacy & Control section → `Section`, `SectionHeader`, `Card` components
+- Built with Agents section → `Section`, `SectionHeader`, `Card` components
+- CTA section → Semantic color tokens
+- Footer section → Semantic color tokens
+
+**Components Used:**
+- `Section` (for full-width section wrappers)
+- `SectionHeader` (for section titles and subtitles)
+- `Card` (with default and gradient variants)
+
+**Color Tokens Used:**
+- `bg-bg-primary`, `bg-bg-secondary`
+- `text-text-primary`, `text-text-secondary`, `text-text-tertiary`, `text-text-muted`
+- `text-accent-emerald`, `text-accent-cyan`
+- `border-border-primary`, `border-border-secondary`
+- `bg-accent-emerald/10`, `bg-accent-cyan/10`
+
+**✅ Policy Pages Layout (`src/layouts/PolicyLayout.astro`)** - 100% Complete
+- Page header → `PageHeader` component
+- Content section → `ContentBox` component
+- Company info → `Card` component
+- All hard-coded colors → Semantic tokens
+
+**Components Used:**
+- `PageHeader` (for page title and subtitle)
+- `ContentBox` (for prose content with automatic styling)
+- `Card` (for company info box)
+
+**Color Tokens Used:**
+- `bg-bg-primary`, `bg-bg-secondary` (gradient background)
+- `text-text-primary`, `text-text-secondary`, `text-text-tertiary`
+- `text-accent-emerald`
+
+**✅ Individual Policy Pages** - 100% Complete (Automatically refactored via PolicyLayout)
+- ✅ `src/pages/privacy-policy.astro`
+- ✅ `src/pages/terms-and-conditions.astro`
+- ✅ `src/pages/cancellation-and-refund.astro`
+- ✅ `src/pages/shipping-and-delivery.astro`
+- ✅ `src/pages/contact-us.astro`
+
+**Note:** All 5 policy pages use PolicyLayout, so refactoring the layout automatically updated all of them!
+
+---
+
+**⚪ Playbook Page (`src/pages/playbook.astro`)** - Intentional Light Theme Design
+- Uses a **light theme** design (bg-gray-50, text-gray-900) which is different from the rest of the dark-themed site
+- This is an intentional design choice to make the playbook/documentation content more readable
+- Uses custom UI components: Button, Terminal, Prompt, WorkflowList (all with light-appropriate colors)
+- Has custom prose styles for content formatting
+- **Decision:** Keep as-is until we implement a full light theme system across the site
+
+**Note:** When light theme support is added globally, this page will be easier to adapt since it already uses light colors.
+
+---
+
 ## 🔲 Not Yet Refactored
 
 ### Pages Still Using Hard-Coded Colors:
 
-1. **Homepage** (`src/pages/index.astro`)
-   - Uses: `bg-slate-950`, `text-slate-100`, etc.
-   - Sections: Hero, Features, How It Works, What's Included, etc.
-
-2. **Policy Pages Layout** (`src/layouts/PolicyLayout.astro`)
-   - Currently uses: `bg-slate-800`, `text-slate-100`, etc.
-   - Affects all policy pages when refactored
-
-3. **Individual Policy Pages:**
-   - `src/pages/privacy-policy.astro`
-   - `src/pages/terms-and-conditions.astro`
-   - `src/pages/cancellation-and-refund.astro`
-   - `src/pages/shipping-and-delivery.astro`
-   - `src/pages/contact-us.astro`
-
-4. **Main Layout** (`src/layouts/Layout.astro`)
+1. **Main Layout** (`src/layouts/Layout.astro`)
    - Check if it uses any hard-coded colors
 
 ---
