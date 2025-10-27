@@ -2,6 +2,7 @@ use crate::pages::Page;
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
+use crate::ui_text::{ContentText, WidgetText};
 use egui::{Context, Ui};
 
 pub struct ProjectsPage;
@@ -24,33 +25,40 @@ impl crate::pages::Page for ProjectsPage {
     }
 
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
-        ui.heading("Projects");
+        // Page heading - Ubuntu SemiBold
+        ui.heading(WidgetText::page_heading("Projects"));
 
         match &state.connection_state {
             ConnectionState::Disconnected => {
                 ui.vertical_centered(|ui| {
-                    ui.label("Not connected to server");
-                    if ui.button("Connect").clicked() {
+                    // Status message - Ubuntu Light
+                    ui.label(WidgetText::status("Not connected to server"));
+                    // Button - Ubuntu SemiBold
+                    if ui.button(WidgetText::button("Connect")).clicked() {
                         state.ui_state.show_connection_dialog = true;
                     }
                 });
             }
             ConnectionState::Connecting => {
                 ui.vertical_centered(|ui| {
-                    ui.label("Connecting...");
+                    // Status message - Ubuntu Light
+                    ui.label(WidgetText::status("Connecting..."));
                     ui.add(egui::Spinner::new());
                 });
             }
             ConnectionState::Connected => {
                 if state.loading_projects {
                     ui.vertical_centered(|ui| {
-                        ui.label("Loading projects...");
+                        // Status message - Ubuntu Light
+                        ui.label(WidgetText::status("Loading projects..."));
                         ui.add(egui::Spinner::new());
                     });
                 } else if state.projects.is_empty() {
                     ui.vertical_centered(|ui| {
-                        ui.label("No projects found");
-                        if ui.button("Refresh").clicked() {
+                        // Status message - Ubuntu Light
+                        ui.label(WidgetText::status("No projects found"));
+                        // Button - Ubuntu SemiBold
+                        if ui.button(WidgetText::button("Refresh")).clicked() {
                             self.refresh_projects(state);
                         }
                     });
@@ -81,39 +89,25 @@ impl crate::pages::Page for ProjectsPage {
                                             .inner_margin(egui::Margin::same(12))
                                             .show(ui, |ui| {
                                                 ui.vertical(|ui| {
-                                                    // Project name - larger and bold
-                                                    ui.label(
-                                                        egui::RichText::new(&project.name)
-                                                            .size(16.0)
-                                                            .strong(),
-                                                    );
+                                                    // Project name - User content (Inter)
+                                                    ui.label(ContentText::title(&project.name));
 
                                                     ui.add_space(4.0);
 
-                                                    // Project path - smaller, muted color
-                                                    ui.label(
-                                                        egui::RichText::new(&project.path)
-                                                            .size(12.0)
-                                                            .color(
-                                                                ui.style()
-                                                                    .visuals
-                                                                    .weak_text_color(),
-                                                            ),
-                                                    );
+                                                    // Project path - User content (Inter)
+                                                    ui.label(ContentText::subtitle(
+                                                        ui,
+                                                        &project.path,
+                                                    ));
 
-                                                    // Description if present
+                                                    // Description if present - User content (Inter)
                                                     if let Some(description) = &project.description
                                                     {
                                                         ui.add_space(6.0);
-                                                        ui.label(
-                                                            egui::RichText::new(description)
-                                                                .size(11.0)
-                                                                .color(
-                                                                    ui.style()
-                                                                        .visuals
-                                                                        .weak_text_color(),
-                                                                ),
-                                                        );
+                                                        ui.label(ContentText::description(
+                                                            ui,
+                                                            description,
+                                                        ));
                                                     }
                                                 });
                                             });
@@ -144,8 +138,10 @@ impl crate::pages::Page for ProjectsPage {
             }
             ConnectionState::Error(error) => {
                 ui.vertical_centered(|ui| {
-                    ui.colored_label(egui::Color32::RED, format!("Error: {}", error));
-                    if ui.button("Retry").clicked() {
+                    // Error message - Ubuntu Light
+                    ui.label(WidgetText::error(format!("Error: {}", error)));
+                    // Button - Ubuntu SemiBold
+                    if ui.button(WidgetText::button("Retry")).clicked() {
                         state.ui_state.show_connection_dialog = true;
                     }
                 });

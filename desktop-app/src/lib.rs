@@ -4,6 +4,7 @@ pub mod config;
 pub mod connection_manager;
 pub mod ssh;
 pub mod ui;
+pub mod ui_text;
 
 // New modular architecture
 pub mod components;
