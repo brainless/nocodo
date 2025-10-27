@@ -200,8 +200,12 @@ impl BackgroundTasks {
     }
 
     fn check_create_work_result(&self, state: &mut AppState) {
-        let mut result = state.create_work_result.lock().unwrap();
-        if let Some(res) = result.take() {
+        let result_opt = {
+            let mut result = state.create_work_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
             state.creating_work = false;
             match res {
                 Ok(_work) => {
@@ -209,8 +213,8 @@ impl BackgroundTasks {
                     state.ui_state.new_work_title.clear();
                     state.ui_state.new_work_project_id = None;
                     state.ui_state.new_work_model = None;
-                    // Refresh works list
-                    // Note: This is a placeholder - proper async handling will be implemented later
+                    // Refresh works list to show the newly created work
+                    self.api_service.refresh_works(state);
                 }
                 Err(e) => {
                     state.ui_state.connection_error = Some(format!("Failed to create work: {}", e));
