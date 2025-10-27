@@ -141,19 +141,13 @@ async fn main() -> AppResult<()> {
                         .route("/work/{id}", web::get().to(handlers::get_work))
                         .route("/work/{id}", web::delete().to(handlers::delete_work))
                         // Work message endpoints
-                        .route(
-                            "/work/{id}/messages",
-                            web::post().to(handlers::add_message_to_work),
-                        )
+                        // Note: POST /work/{id}/messages removed - messages are now created with work
                         .route(
                             "/work/{id}/messages",
                             web::get().to(handlers::get_work_messages),
                         )
                         // AI session endpoints
-                        .route(
-                            "/work/{id}/sessions",
-                            web::post().to(handlers::create_ai_session),
-                        )
+                        // Note: POST /work/{id}/sessions removed - sessions are now auto-started with work
                         .route(
                             "/work/{id}/sessions",
                             web::get().to(handlers::list_ai_sessions),

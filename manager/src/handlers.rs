@@ -1176,17 +1176,17 @@ pub async fn create_work(
 
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
-        title: req.title,
+        title: req.title.clone(),
         project_id: req.project_id,
         tool_name: None,
-        model: req.model,
+        model: req.model.clone(),
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
     };
 
-    // Save to database
-    let work_id = data.database.create_work(&work)?;
+    // Create work with initial message in a single transaction
+    let (work_id, message_id) = data.database.create_work_with_message(&work, req.title.clone())?;
     let mut work = work;
     work.id = work_id;
 
@@ -1202,10 +1202,98 @@ pub async fn create_work(
     });
 
     tracing::info!(
-        "Successfully created work '{}' with ID {}",
+        "Successfully created work '{}' with ID {} and message ID {}",
         work.title,
-        work.id
+        work.id,
+        message_id
     );
+
+    // Auto-start LLM agent session if requested (default: true)
+    if req.auto_start {
+        let tool_name = req.tool_name.unwrap_or_else(|| "llm-agent".to_string());
+
+        // Generate project context if work is associated with a project
+        let project_context = if let Some(project_id) = work.project_id {
+            let project = data.database.get_project_by_id(project_id)?;
+            Some(format!("Project: {}\nPath: {}", project.name, project.path))
+        } else {
+            None
+        };
+
+        // Create AI session record
+        let session = crate::models::AiSession::new(
+            work_id,
+            message_id,
+            tool_name.clone(),
+            project_context.clone(),
+        );
+        let session_id = data.database.create_ai_session(&session)?;
+
+        tracing::info!(
+            "Auto-starting {} session {} for work {}",
+            tool_name,
+            session_id,
+            work_id
+        );
+
+        // Handle LLM agent specially
+        if tool_name == "llm-agent" {
+            if let Some(ref llm_agent) = data.llm_agent {
+                // Determine provider and model from work.model or fall back to environment/defaults
+                let (provider, model) = if let Some(ref model_id) = work.model {
+                    let provider = infer_provider_from_model(model_id);
+                    (provider.to_string(), model_id.clone())
+                } else {
+                    // Fall back to environment variables or defaults
+                    let provider =
+                        std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+                    let model = std::env::var("MODEL")
+                        .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                    (provider, model)
+                };
+
+                // Get the model name for display from the provider's model definition
+                let model_display_name = get_model_display_name(&model, &provider, &data.config).await;
+
+                // Update work with tool_name and model info
+                let mut updated_work = work.clone();
+                updated_work.tool_name = Some(format!("LLM Agent ({})", model_display_name));
+                data.database.update_work(&updated_work)?;
+
+                // Create LLM agent session
+                let llm_session = llm_agent
+                    .create_session(work_id, provider, model, project_context)
+                    .await?;
+
+                // Process the message in background task to avoid blocking HTTP response
+                let llm_agent_clone = llm_agent.clone();
+                let session_id = llm_session.id;
+                let message_content = req.title.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = llm_agent_clone
+                        .process_message(session_id, message_content)
+                        .await
+                    {
+                        tracing::error!(
+                            "Failed to process LLM message for session {}: {}",
+                            session_id,
+                            e
+                        );
+                    } else {
+                        tracing::info!(
+                            "Successfully completed LLM agent processing for session {}",
+                            session_id
+                        );
+                    }
+                });
+            } else {
+                tracing::warn!(
+                    "LLM agent not available - work {} will not have auto-started session",
+                    work_id
+                );
+            }
+        }
+    }
 
     let response = WorkResponse { work };
     Ok(HttpResponse::Created().json(response))

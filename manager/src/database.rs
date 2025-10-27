@@ -1088,6 +1088,63 @@ impl Database {
     }
 
     // Work message management methods
+    /// Create work with initial message in a single transaction
+    pub fn create_work_with_message(
+        &self,
+        work: &crate::models::Work,
+        message_content: String,
+    ) -> AppResult<(i64, i64)> {
+        let mut conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // Begin transaction
+        let tx = conn.transaction()?;
+
+        // Create work
+        let id_param = if work.id == 0 { None } else { Some(work.id) };
+
+        tx.execute(
+            "INSERT INTO works (id, title, project_id, tool_name, model, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                work.title,
+                work.project_id,
+                work.tool_name,
+                work.model,
+                work.status,
+                work.created_at,
+                work.updated_at
+            ],
+        )?;
+
+        let work_id = tx.last_insert_rowid();
+
+        // Create initial message with the work title as content
+        let now = chrono::Utc::now().timestamp();
+        tx.execute(
+            "INSERT INTO work_messages (work_id, content, content_type, author_type, author_id, sequence_order, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![work_id, message_content, "text", "user", Option::<String>::None, 0, now],
+        )?;
+
+        let message_id = tx.last_insert_rowid();
+
+        // Commit transaction
+        tx.commit()?;
+
+        tracing::info!(
+            "Created work '{}' ({}) with initial message ({})",
+            work.title,
+            work_id,
+            message_id
+        );
+
+        Ok((work_id, message_id))
+    }
+
     pub fn create_work_message(&self, message: &crate::models::WorkMessage) -> AppResult<i64> {
         let conn = self
             .connection

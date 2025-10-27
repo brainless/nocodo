@@ -1,8 +1,6 @@
 use manager_models::{
-    AddMessageRequest, AiSessionResponse, CreateAiSessionRequest, CreateWorkRequest,
-    MessageAuthorType, MessageContentType, Project, ProjectDetailsResponse, ProjectListResponse,
-    SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse,
-    WorkResponse,
+    CreateWorkRequest, Project, ProjectDetailsResponse, ProjectListResponse, SettingsResponse,
+    SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -157,70 +155,8 @@ impl ApiClient {
         Ok(work_response.work)
     }
 
-    pub async fn add_message_to_work(
-        &self,
-        work_id: i64,
-        content: String,
-    ) -> Result<manager_models::WorkMessage, ApiError> {
-        let url = format!("{}/api/work/{}/messages", self.base_url, work_id);
-        let request = AddMessageRequest {
-            content,
-            content_type: MessageContentType::Text,
-            author_type: MessageAuthorType::User,
-            author_id: None,
-        };
-
-        let response = self
-            .client()
-            .post(&url)
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
-
-        if !response.status().is_success() {
-            return Err(ApiError::HttpStatus(response.status()));
-        }
-
-        let message_response: manager_models::WorkMessageResponse = response
-            .json()
-            .await
-            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
-
-        Ok(message_response.message)
-    }
-
-    pub async fn create_ai_session(
-        &self,
-        work_id: i64,
-        message_id: String,
-        tool_name: String,
-    ) -> Result<manager_models::AiSession, ApiError> {
-        let url = format!("{}/api/work/{}/sessions", self.base_url, work_id);
-        let request = CreateAiSessionRequest {
-            message_id,
-            tool_name,
-        };
-
-        let response = self
-            .client()
-            .post(&url)
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
-
-        if !response.status().is_success() {
-            return Err(ApiError::HttpStatus(response.status()));
-        }
-
-        let session_response: AiSessionResponse = response
-            .json()
-            .await
-            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
-
-        Ok(session_response.session)
-    }
+    // Note: add_message_to_work and create_ai_session methods removed
+    // Messages and sessions are now automatically created when creating a Work item
 
     pub async fn get_supported_models(
         &self,
