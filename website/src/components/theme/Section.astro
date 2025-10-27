@@ -1,0 +1,60 @@
+---
+/**
+ * Section - Full-width section wrapper with background variants
+ * Theme-aware component that adapts to light/dark mode automatically
+ *
+ * Background variants:
+ * - primary: slate-950
+ * - secondary: slate-900
+ * - gradient: gradient from slate-950 via slate-900 to slate-950
+ */
+export interface Props {
+  background?: 'primary' | 'secondary' | 'gradient';
+  containerWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | '5xl' | '6xl';
+  paddingY?: 'sm' | 'md' | 'lg';
+  class?: string;
+}
+
+const {
+  background = 'primary',
+  containerWidth = '6xl',
+  paddingY = 'lg',
+  class: className
+} = Astro.props;
+
+const bgClasses = {
+  primary: 'bg-bg-primary',
+  secondary: 'bg-bg-secondary',
+  gradient: 'bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-primary'
+};
+
+const widthClasses = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '4xl': 'max-w-4xl',
+  '5xl': 'max-w-5xl',
+  '6xl': 'max-w-6xl'
+};
+
+const paddingClasses = {
+  sm: 'py-12',
+  md: 'py-16',
+  lg: 'py-20'
+};
+---
+
+<section class:list={[
+  bgClasses[background],
+  paddingClasses[paddingY],
+  className
+]}>
+  <div class:list={[
+    widthClasses[containerWidth],
+    "mx-auto px-4 sm:px-6 lg:px-8"
+  ]}>
+    <slot />
+  </div>
+</section>

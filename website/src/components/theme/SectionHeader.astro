@@ -1,0 +1,24 @@
+---
+/**
+ * SectionHeader - Section heading with optional subtitle
+ * Theme-aware component that adapts to light/dark mode automatically
+ */
+export interface Props {
+  title: string;
+  subtitle?: string;
+  centered?: boolean;
+}
+
+const { title, subtitle, centered = true } = Astro.props;
+---
+
+<div class:list={["mb-12 md:mb-16", { "text-center": centered }]}>
+  <h2 class="text-3xl sm:text-4xl font-bold mb-6 text-text-primary">
+    {title}
+  </h2>
+  {subtitle && (
+    <p class:list={["text-xl text-text-secondary", { "max-w-3xl mx-auto": centered }]}>
+      {subtitle}
+    </p>
+  )}
+</div>

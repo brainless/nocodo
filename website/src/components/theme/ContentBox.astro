@@ -1,0 +1,21 @@
+---
+/**
+ * ContentBox - Container for main content with prose styling
+ * Theme-aware component that adapts to light/dark mode automatically
+ * Ideal for markdown/rich text content
+ */
+export interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={[
+  "bg-bg-tertiary rounded-lg shadow-md border border-border-primary p-8 mb-12",
+  className
+]}>
+  <div class="prose prose-lg prose-invert max-w-none">
+    <slot />
+  </div>
+</div>

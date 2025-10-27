@@ -1,0 +1,24 @@
+---
+/**
+ * PageHeader - Main page title and subtitle
+ * Theme-aware component that adapts to light/dark mode automatically
+ */
+export interface Props {
+  title: string;
+  subtitle?: string;
+  centered?: boolean;
+}
+
+const { title, subtitle, centered = true } = Astro.props;
+---
+
+<div class:list={["mb-12 md:mb-16", { "text-center": centered }]}>
+  <h1 class="text-4xl font-bold text-text-primary mb-4">
+    {title}
+  </h1>
+  {subtitle && (
+    <p class:list={["text-xl text-text-secondary", { "max-w-3xl mx-auto": centered }]}>
+      {subtitle}
+    </p>
+  )}
+</div>

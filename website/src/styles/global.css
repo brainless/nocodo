@@ -1,2 +1,34 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+
+/* nocodo Design System - Theme Variables */
+/* Currently: Dark theme only. Light theme can be added to :root later without changing components. */
+
+@theme {
+  /* Background Colors */
+  --color-bg-primary: rgb(2 6 23); /* slate-950 */
+  --color-bg-secondary: rgb(15 23 42); /* slate-900 */
+  --color-bg-tertiary: rgb(30 41 59); /* slate-800 */
+
+  /* Text Colors */
+  --color-text-primary: rgb(241 245 249); /* slate-100 */
+  --color-text-secondary: rgb(203 213 225); /* slate-300 */
+  --color-text-tertiary: rgb(148 163 184); /* slate-400 */
+  --color-text-muted: rgb(100 116 139); /* slate-500 */
+
+  /* Accent Colors */
+  --color-accent-emerald: rgb(52 211 153); /* emerald-400 */
+  --color-accent-emerald-dark: rgb(16 185 129); /* emerald-500 */
+  --color-accent-emerald-darker: rgb(5 150 105); /* emerald-600 */
+  --color-accent-cyan: rgb(34 211 238); /* cyan-400 */
+  --color-accent-cyan-dark: rgb(6 182 212); /* cyan-500 */
+  --color-accent-cyan-darker: rgb(8 145 178); /* cyan-600 */
+
+  /* Border Colors */
+  --color-border-primary: rgb(51 65 85); /* slate-700 */
+  --color-border-secondary: rgb(71 85 105); /* slate-600 */
+
+  /* Surface Colors (for cards, boxes) */
+  --color-surface: rgb(30 41 59); /* slate-800 */
+  --color-surface-hover: rgb(51 65 85); /* slate-700 */
+}

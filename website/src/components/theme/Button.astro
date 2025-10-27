@@ -1,0 +1,70 @@
+---
+/**
+ * Theme-aware Button Component
+ *
+ * A reusable button component that works with the dark theme system.
+ * Supports multiple variants and sizes.
+ */
+
+export interface Props {
+  variant?: 'primary' | 'secondary' | 'accent-emerald' | 'accent-cyan' | 'outline' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  href?: string; // For link-style buttons
+  type?: 'button' | 'submit' | 'reset';
+  class?: string;
+}
+
+const {
+  variant = 'primary',
+  size = 'md',
+  disabled = false,
+  href,
+  type = 'button',
+  class: className = '',
+  ...rest
+} = Astro.props;
+
+// Base styles that apply to all buttons
+const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed';
+
+// Size variants
+const sizeStyles = {
+  sm: 'px-3 py-2 text-sm',
+  md: 'px-4 py-2.5 text-base',
+  lg: 'px-6 py-3 text-lg'
+};
+
+// Variant styles using theme tokens
+const variantStyles = {
+  primary: 'text-text-primary bg-bg-tertiary hover:bg-surface-hover border border-border-primary hover:border-border-secondary focus:ring-accent-emerald',
+  secondary: 'text-text-primary bg-bg-secondary hover:bg-bg-tertiary border border-border-primary focus:ring-accent-cyan',
+  'accent-emerald': 'text-white bg-gradient-to-r from-accent-emerald-dark to-accent-emerald hover:from-accent-emerald-darker hover:to-accent-emerald-dark focus:ring-accent-emerald shadow-lg hover:shadow-xl transform hover:scale-105',
+  'accent-cyan': 'text-white bg-gradient-to-r from-accent-cyan-dark to-accent-cyan hover:from-accent-cyan-darker hover:to-accent-cyan-dark focus:ring-accent-cyan shadow-lg hover:shadow-xl transform hover:scale-105',
+  outline: 'text-text-primary bg-transparent border-2 border-border-primary hover:border-accent-emerald hover:bg-bg-tertiary/50 focus:ring-accent-emerald',
+  ghost: 'text-text-secondary bg-transparent hover:bg-bg-tertiary hover:text-text-primary focus:ring-accent-emerald'
+};
+
+// Combine all styles
+const buttonStyles = [
+  baseStyles,
+  sizeStyles[size],
+  variantStyles[variant],
+  className
+].join(' ');
+
+// Determine if we should render as a link or button
+const Tag = href ? 'a' : 'button';
+const additionalProps = href
+  ? { href }
+  : { type, disabled };
+---
+
+<Tag
+  class={buttonStyles}
+  aria-disabled={disabled}
+  {...additionalProps}
+  {...rest}
+>
+  <slot />
+</Tag>

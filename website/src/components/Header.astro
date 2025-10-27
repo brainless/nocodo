@@ -1,49 +1,39 @@
 ---
-// Header component with navigation links
-import Button from './UI/Button.astro';
+/**
+ * Header Component
+ *
+ * Main navigation header with dark theme support.
+ * Uses theme-aware components for consistent styling.
+ */
+import Button from './theme/Button.astro';
+import NavLink from './theme/NavLink.astro';
 ---
 
-<header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+<header class="bg-bg-secondary border-b border-border-primary sticky top-0 z-50 backdrop-blur-sm bg-bg-secondary/95">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between items-center h-16">
       <!-- Logo/Brand -->
       <div class="flex-shrink-0">
-        <a href="/" class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
+        <a href="/" class="text-xl font-bold text-text-primary hover:text-accent-emerald transition-colors">
           nocodo
         </a>
       </div>
 
       <!-- Navigation Links -->
-      <nav class="hidden md:flex items-center space-x-8">
-        <a 
-          href="/" 
-          class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        >
+      <nav class="hidden md:flex items-center space-x-2">
+        <NavLink href="/">
           Home
-        </a>
-        <a 
-          href="/fundamentals" 
-          class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        >
-          Fundamentals
-        </a>
-        <a 
-          href="/playbook" 
-          class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        >
+        </NavLink>
+        <NavLink href="/playbook">
           Playbook
-        </a>
-        <a 
-          href="/blog" 
-          class="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        >
+        </NavLink>
+        <NavLink href="/blog">
           Blog
-        </a>
+        </NavLink>
         <Button
           href="/events"
-          variant="primary"
+          variant="accent-emerald"
           size="sm"
-          class="!bg-green-800 hover:!bg-green-900 !bg-none"
         >
           Events
         </Button>
@@ -51,9 +41,9 @@ import Button from './UI/Button.astro';
 
       <!-- Mobile menu button -->
       <div class="md:hidden">
-        <button 
-          type="button" 
-          class="text-gray-500 hover:text-gray-900 focus:outline-none focus:text-gray-900 transition-colors"
+        <button
+          type="button"
+          class="text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-emerald rounded-md p-2 transition-colors"
           id="mobile-menu-button"
           aria-expanded="false"
           aria-controls="mobile-menu"
@@ -69,37 +59,22 @@ import Button from './UI/Button.astro';
 
     <!-- Mobile menu (hidden by default) -->
     <div class="md:hidden hidden" id="mobile-menu">
-      <div class="px-2 pt-2 pb-3 space-y-1 border-t border-gray-200">
-        <a 
-          href="/" 
-          class="block text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-base font-medium transition-colors"
-        >
+      <div class="px-2 pt-2 pb-3 space-y-1 border-t border-border-primary">
+        <NavLink href="/" class="block">
           Home
-        </a>
-        <a 
-          href="/fundamentals" 
-          class="block text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-base font-medium transition-colors"
-        >
-          Fundamentals
-        </a>
-        <a 
-          href="/playbook" 
-          class="block text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-base font-medium transition-colors"
-        >
+        </NavLink>
+        <NavLink href="/playbook" class="block">
           Playbook
-        </a>
-        <a 
-          href="/blog" 
-          class="block text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-base font-medium transition-colors"
-        >
+        </NavLink>
+        <NavLink href="/blog" class="block">
           Blog
-        </a>
+        </NavLink>
         <div class="px-3 py-2">
           <Button
             href="/events"
-            variant="primary"
+            variant="accent-emerald"
             size="sm"
-            class="w-full !bg-green-800 hover:!bg-green-900 !bg-none"
+            class="w-full"
           >
             Events
           </Button>
