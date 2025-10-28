@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{ListFilesRequest, ToolRequest};
+use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest};
 
 pub struct WorkPage;
 
@@ -459,8 +459,8 @@ impl crate::pages::Page for WorkPage {
                                                                 None
                                                             };
 
-                                                            if let Some(requests) = list_files_requests {
-                                                                // Display each list_files tool request in a rounded box with enhanced info
+                                                            if let Some(ref requests) = list_files_requests {
+                                                                // Display each list_files tool request in full width box with no rounded corners
                                                                 for req in requests {
                                                                     let mut description = format!("List files: {}", req.path);
 
@@ -480,16 +480,18 @@ impl crate::pages::Page for WorkPage {
                                                                         description.push_str(&format!(" ({})", options.join(", ")));
                                                                     }
 
-                                                                    // Use the same styling as User box
+                                                                    // Use the same styling as User box but full width with no rounded corners
                                                                     let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
 
                                                                     egui::Frame::NONE
                                                                         .fill(bg_color)
-                                                                        .corner_radius(8.0)
+                                                                        .corner_radius(0.0)
                                                                         .inner_margin(egui::Margin::same(12))
                                                                         .show(ui, |ui| {
+                                                                            ui.set_width(ui.available_width());
                                                                             ui.vertical(|ui| {
                                                                                 ui.horizontal(|ui| {
+                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
                                                                                     ui.label(egui::RichText::new("📁").size(16.0));
                                                                                     ui.label(egui::RichText::new(description).size(12.0).strong());
                                                                                 });
@@ -497,7 +499,96 @@ impl crate::pages::Page for WorkPage {
                                                                         });
                                                                     ui.add_space(4.0);
                                                                 }
+                                                            }
+
+                                                            // Check if this is a read_file tool request using proper Rust types
+                                                            let read_file_requests = if output.role.as_deref() == Some("assistant") {
+                                                                // Try multiple parsing approaches for robustness
+                                                                let mut requests = Vec::new();
+
+                                                                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    // Look for tool_calls array in the structured response
+                                                                    if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
+                                                                        for tool_call in tool_calls {
+                                                                            if let Some(function) = tool_call.get("function") {
+                                                                                if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
+                                                                                    if name == "read_file" {
+                                                                                        if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
+                                                                                            // Use proper Rust type for parsing ReadFileRequest
+                                                                                            match serde_json::from_str::<ReadFileRequest>(args) {
+                                                                                                Ok(read_file_req) => {
+                                                                                                    tracing::debug!(path = %read_file_req.path, "Successfully parsed ReadFileRequest");
+                                                                                                    requests.push(read_file_req);
+                                                                                                }
+                                                                                                Err(e) => {
+                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse ReadFileRequest");
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                // Try to parse as direct ToolRequest (fallback format)
+                                                                if requests.is_empty() {
+                                                                    match serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        Ok(tool_request) => {
+                                                                            if let ToolRequest::ReadFile(read_file_req) = tool_request {
+                                                                                tracing::debug!(path = %read_file_req.path, "Found ReadFile in direct ToolRequest");
+                                                                                requests.push(read_file_req);
+                                                                            }
+                                                                        }
+                                                                        Err(_e) => {
+                                                                            // Silent error for read_file
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                if !requests.is_empty() {
+                                                                    Some(requests)
+                                                                } else {
+                                                                    None
+                                                                }
                                                             } else {
+                                                                None
+                                                            };
+
+                                                            if let Some(ref requests) = read_file_requests {
+                                                                // Display each read_file tool request in full width box with no rounded corners
+                                                                for req in requests {
+                                                                    let mut description = format!("Read file: {}", req.path);
+
+                                                                    // Add optional parameters to the description
+                                                                    if let Some(max_size) = req.max_size {
+                                                                        description.push_str(&format!(" (max size: {} bytes)", max_size));
+                                                                    }
+
+                                                                    // Use the same styling as list_files box but full width with no rounded corners
+                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                    egui::Frame::NONE
+                                                                        .fill(bg_color)
+                                                                        .corner_radius(0.0)
+                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .show(ui, |ui| {
+                                                                            ui.set_width(ui.available_width());
+                                                                            ui.vertical(|ui| {
+                                                                                ui.horizontal(|ui| {
+                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
+                                                                                    ui.label(egui::RichText::new("📄").size(16.0));
+                                                                                    ui.label(egui::RichText::new(description).size(12.0).strong());
+                                                                                });
+                                                                            });
+                                                                        });
+                                                                    ui.add_space(4.0);
+                                                                }
+                                                            }
+
+                                                            // Show regular AI response if neither list_files nor read_file
+                                                            if list_files_requests.is_none() && read_file_requests.is_none() {
                                                                 // Regular AI response message
                                                                 let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 
