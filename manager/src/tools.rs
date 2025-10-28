@@ -329,6 +329,56 @@ impl ToolExecutor {
         }))
     }
 
+    /// Convert glob pattern to regex pattern
+    /// Examples:
+    /// - *.rs -> .*\.rs$
+    /// - *.py -> .*\.py$
+    /// - test*.txt -> ^test.*\.txt$
+    /// - **/*.rs -> .*/.*\.rs$ (for nested paths)
+    fn glob_to_regex(glob: &str) -> String {
+        let mut regex = String::new();
+        let mut chars = glob.chars().peekable();
+
+        // Add start anchor unless pattern starts with ** or *
+        if !glob.starts_with("**") && !glob.starts_with('*') {
+            regex.push('^');
+        }
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                '*' => {
+                    // Check for ** pattern (match any directory depth)
+                    if chars.peek() == Some(&'*') {
+                        chars.next(); // consume second *
+                        regex.push_str(".*");
+                    } else {
+                        // Single * matches any characters except path separator
+                        regex.push_str("[^/]*");
+                    }
+                }
+                '?' => {
+                    // ? matches any single character except path separator
+                    regex.push_str("[^/]");
+                }
+                '.' | '+' | '^' | '$' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '\\' => {
+                    // Escape regex special characters
+                    regex.push('\\');
+                    regex.push(ch);
+                }
+                _ => {
+                    regex.push(ch);
+                }
+            }
+        }
+
+        // Add end anchor if pattern doesn't contain directory separators or wildcards at the end
+        if !regex.ends_with(".*") {
+            regex.push('$');
+        }
+
+        regex
+    }
+
     /// Search files using grep
     async fn grep_search(&self, request: GrepRequest) -> Result<ToolResponse> {
         use regex::RegexBuilder;
@@ -356,10 +406,11 @@ impl ToolExecutor {
             .build()
             .map_err(|e| ToolError::InvalidPath(format!("Invalid regex pattern: {}", e)))?;
 
-        // Compile include/exclude patterns
+        // Compile include/exclude patterns (convert from glob to regex)
         let include_regex =
             if let Some(pattern) = &request.include_pattern {
-                Some(RegexBuilder::new(pattern).build().map_err(|e| {
+                let regex_pattern = Self::glob_to_regex(pattern);
+                Some(RegexBuilder::new(&regex_pattern).build().map_err(|e| {
                     ToolError::InvalidPath(format!("Invalid include pattern: {}", e))
                 })?)
             } else {
@@ -368,7 +419,8 @@ impl ToolExecutor {
 
         let exclude_regex =
             if let Some(pattern) = &request.exclude_pattern {
-                Some(RegexBuilder::new(pattern).build().map_err(|e| {
+                let regex_pattern = Self::glob_to_regex(pattern);
+                Some(RegexBuilder::new(&regex_pattern).build().map_err(|e| {
                     ToolError::InvalidPath(format!("Invalid exclude pattern: {}", e))
                 })?)
             } else {
@@ -938,6 +990,71 @@ impl ToolExecutor {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_glob_to_regex() {
+        // Test simple wildcard patterns (no start anchor for patterns starting with *)
+        assert_eq!(ToolExecutor::glob_to_regex("*.rs"), r"[^/]*\.rs$");
+        assert_eq!(ToolExecutor::glob_to_regex("*.py"), r"[^/]*\.py$");
+        assert_eq!(ToolExecutor::glob_to_regex("*.txt"), r"[^/]*\.txt$");
+
+        // Test patterns with prefix (start anchor for patterns not starting with *)
+        assert_eq!(ToolExecutor::glob_to_regex("test*.rs"), r"^test[^/]*\.rs$");
+        assert_eq!(ToolExecutor::glob_to_regex("mod*.py"), r"^mod[^/]*\.py$");
+
+        // Test double wildcard for directory depth
+        assert_eq!(ToolExecutor::glob_to_regex("**/*.rs"), r".*/[^/]*\.rs$");
+        assert_eq!(ToolExecutor::glob_to_regex("src/**/*.rs"), r"^src/.*/[^/]*\.rs$");
+
+        // Test question mark (single character)
+        assert_eq!(ToolExecutor::glob_to_regex("test?.rs"), r"^test[^/]\.rs$");
+
+        // Test escaping of regex special characters
+        assert_eq!(ToolExecutor::glob_to_regex("test+file.rs"), r"^test\+file\.rs$");
+        assert_eq!(ToolExecutor::glob_to_regex("test[1].rs"), r"^test\[1\]\.rs$");
+
+        // Test patterns without wildcards
+        assert_eq!(ToolExecutor::glob_to_regex("test.rs"), r"^test\.rs$");
+    }
+
+    #[test]
+    fn test_glob_to_regex_matching() {
+        use regex::Regex;
+
+        // Test *.rs matches - should match filenames ending in .rs
+        // Note: The pattern is applied to relative file paths, so src/main.rs will match
+        let pattern = ToolExecutor::glob_to_regex("*.rs");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("main.rs"));
+        assert!(regex.is_match("lib.rs"));
+        assert!(!regex.is_match("main.py"));
+
+        // In grep_search, this is matched against relative_path which includes directories
+        // For file-only matching, the grep tool filters by filename, not full path
+        // So *.rs pattern will be matched against just "main.rs" not "src/main.rs"
+
+        // Test *.py matches
+        let pattern = ToolExecutor::glob_to_regex("*.py");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("test.py"));
+        assert!(regex.is_match("module.py"));
+        assert!(!regex.is_match("test.rs"));
+
+        // Test **/*.rs matches (nested paths) - this should match full paths
+        let pattern = ToolExecutor::glob_to_regex("**/*.rs");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("src/main.rs"));
+        assert!(regex.is_match("src/lib/mod.rs"));
+        assert!(regex.is_match("tests/integration.rs"));
+        assert!(!regex.is_match("main.py"));
+
+        // Test that patterns are properly anchored
+        let pattern = ToolExecutor::glob_to_regex("test.rs");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("test.rs"));
+        assert!(!regex.is_match("test.rs.bak"));
+        assert!(!regex.is_match("my_test.rs"));
+    }
 
     #[tokio::test]
     async fn test_tool_executor_list_files() {
