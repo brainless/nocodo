@@ -559,105 +559,186 @@ impl crate::pages::Page for WorkPage {
                                     egui::vec2(ui.available_width(), 0.0),
                                     egui::Layout::top_down(egui::Align::LEFT),
                                     |ui| {
-                                        egui::Frame::NONE
-                                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                            .corner_radius(8.0)
-                                            .inner_margin(egui::Margin::same(12))
-                                            .show(ui, |ui| {
-                                                ui.set_width(ui.available_width());
-                                                ui.vertical(|ui| {
-                                                    // Title/Question field as textarea
-                                                    ui.label("What do you want to do?");
+                                        // No background frame - removed gray background
+                                        ui.set_width(ui.available_width());
+                                        ui.vertical(|ui| {
+                                            // Title/Question field as textarea
+                                            ui.label("What do you want to do?");
+
+                                            // Custom frame for text area with 4px padding
+                                            egui::Frame::NONE
+                                                .fill(ui.style().visuals.extreme_bg_color)
+                                                .stroke(egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color))
+                                                .corner_radius(4.0)
+                                                .inner_margin(egui::Margin::same(4))
+                                                .show(ui, |ui| {
+                                                    // Set larger font size for the text area
+                                                    ui.style_mut().text_styles.insert(
+                                                        egui::TextStyle::Body,
+                                                        egui::FontId::new(15.0, egui::FontFamily::Proportional),
+                                                    );
+
                                                     ui.add(
                                                         egui::TextEdit::multiline(&mut state.ui_state.new_work_title)
                                                             .desired_width(ui.available_width())
-                                                            .desired_rows(3)
+                                                            .desired_rows(15)
                                                     );
+                                                });
 
-                                                    ui.add_space(8.0);
+                                            ui.add_space(12.0);
 
-                                                    // Project and Model fields side by side
-                                                    ui.horizontal(|ui| {
-                                                        // Project field
-                                                        ui.vertical(|ui| {
-                                                            ui.label("Project:");
-                                                            egui::ComboBox::from_id_salt("work_project_combo")
-                                                                .selected_text(
-                                                                    state.ui_state.new_work_project_id
-                                                                        .and_then(|id| state.projects.iter().find(|p| p.id == id))
-                                                                        .map(|p| p.name.clone())
-                                                                        .unwrap_or_else(|| "None".to_string()),
-                                                                )
-                                                                .show_ui(ui, |ui| {
-                                                                    ui.selectable_value(&mut state.ui_state.new_work_project_id, None, "None");
-                                                                    for project in &state.projects {
-                                                                        ui.selectable_value(
-                                                                            &mut state.ui_state.new_work_project_id,
-                                                                            Some(project.id),
-                                                                            &project.name,
-                                                                        );
-                                                                    }
-                                                                });
-                                                        });
+                                            // Project and Model fields side by side
+                                            ui.horizontal(|ui| {
+                                                // Project field
+                                                ui.vertical(|ui| {
+                                                    ui.label("Project:");
+                                                    // Set button padding for the dropdown widget itself
+                                                    ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
-                                                        ui.add_space(16.0);
+                                                    egui::ComboBox::from_id_salt("work_project_combo")
+                                                        .width(200.0)
+                                                        .selected_text(
+                                                            state.ui_state.new_work_project_id
+                                                                .and_then(|id| state.projects.iter().find(|p| p.id == id))
+                                                                .map(|p| p.name.clone())
+                                                                .unwrap_or_else(|| "None".to_string()),
+                                                        )
+                                                        .show_ui(ui, |ui| {
+                                                            // Add padding to dropdown items
+                                                            ui.style_mut().spacing.item_spacing = egui::vec2(8.0, 4.0);
+                                                            ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
-                                                        // Model field
-                                                        ui.vertical(|ui| {
-                                                            ui.label("Model:");
-                                                            if state.loading_supported_models {
-                                                                ui.add(egui::Spinner::new());
-                                                            } else {
-                                                                egui::ComboBox::from_id_salt("work_model_combo")
-                                                                    .selected_text(
-                                                                        state.ui_state.new_work_model
-                                                                            .as_ref()
-                                                                            .and_then(|model_id| state.supported_models.iter()
-                                                                                .find(|m| m.model_id == *model_id))
-                                                                            .map(|m| m.name.clone())
-                                                                            .unwrap_or_else(|| "None".to_string()),
-                                                                    )
-                                                                    .show_ui(ui, |ui| {
-                                                                        ui.selectable_value(&mut state.ui_state.new_work_model, None, "None");
-                                                                        for model in &state.supported_models {
-                                                                            ui.selectable_value(
-                                                                                &mut state.ui_state.new_work_model,
-                                                                                Some(model.model_id.clone()),
-                                                                                &model.name,
-                                                                            );
-                                                                        }
-                                                                    });
+                                                            let none_response = ui.selectable_value(&mut state.ui_state.new_work_project_id, None, "None");
+                                                            if none_response.hovered() {
+                                                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                            }
+
+                                                            for project in &state.projects {
+                                                                let project_response = ui.selectable_value(
+                                                                    &mut state.ui_state.new_work_project_id,
+                                                                    Some(project.id),
+                                                                    &project.name,
+                                                                );
+                                                                if project_response.hovered() {
+                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                }
                                                             }
                                                         });
-                                                    });
+                                                });
 
-                                                    ui.add_space(8.0);
+                                                ui.add_space(16.0);
 
-                                                    // Show error if no models are configured
-                                                    if !state.loading_supported_models && state.supported_models.is_empty() {
-                                                        ui.horizontal(|ui| {
-                                                            ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
-                                                            ui.label(
-                                                                egui::RichText::new("No models configured. Please set API keys in Settings page")
-                                                                    .color(egui::Color32::from_rgb(255, 165, 0))
-                                                            );
-                                                        });
-                                                        ui.add_space(8.0);
+                                                // Model field
+                                                ui.vertical(|ui| {
+                                                    ui.label("Model:");
+                                                    if state.loading_supported_models {
+                                                        ui.add(egui::Spinner::new());
+                                                    } else {
+                                                        // Set button padding for the dropdown widget itself
+                                                        ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+
+                                                        egui::ComboBox::from_id_salt("work_model_combo")
+                                                            .width(200.0)
+                                                            .selected_text(
+                                                                state.ui_state.new_work_model
+                                                                    .as_ref()
+                                                                    .and_then(|model_id| state.supported_models.iter()
+                                                                        .find(|m| m.model_id == *model_id))
+                                                                    .map(|m| m.name.clone())
+                                                                    .unwrap_or_else(|| "None".to_string()),
+                                                            )
+                                                            .show_ui(ui, |ui| {
+                                                                // Add padding to dropdown items
+                                                                ui.style_mut().spacing.item_spacing = egui::vec2(8.0, 4.0);
+                                                                ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+
+                                                                let none_response = ui.selectable_value(&mut state.ui_state.new_work_model, None, "None");
+                                                                if none_response.hovered() {
+                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                }
+
+                                                                for model in &state.supported_models {
+                                                                    let model_response = ui.selectable_value(
+                                                                        &mut state.ui_state.new_work_model,
+                                                                        Some(model.model_id.clone()),
+                                                                        &model.name,
+                                                                    );
+                                                                    if model_response.hovered() {
+                                                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                    }
+                                                                }
+                                                            });
                                                     }
-
-                                                    // Create button
-                                                    ui.horizontal(|ui| {
-                                                        if ui.button("Create").clicked() && !state.ui_state.new_work_title.trim().is_empty() {
-                                                            let api_service = crate::services::ApiService::new();
-                                                            api_service.create_work(state);
-                                                        }
-
-                                                        if state.creating_work {
-                                                            ui.add(egui::Spinner::new());
-                                                        }
-                                                    });
                                                 });
                                             });
+
+                                            ui.add_space(12.0);
+
+                                            // Show error if no models are configured
+                                            if !state.loading_supported_models && state.supported_models.is_empty() {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
+                                                    ui.label(
+                                                        egui::RichText::new("No models configured. Please set API keys in Settings page")
+                                                            .color(egui::Color32::from_rgb(255, 165, 0))
+                                                    );
+                                                });
+                                                ui.add_space(8.0);
+                                            }
+
+                                            // Create button with same styling as CTA
+                                            ui.horizontal(|ui| {
+                                                let button_response = ui
+                                                    .allocate_ui_with_layout(
+                                                        egui::vec2(0.0, 0.0),
+                                                        egui::Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            // Same pastel green colors as CTA button
+                                                            let (bg_color, border_color) = if ui.rect_contains_pointer(ui.max_rect()) {
+                                                                (
+                                                                    egui::Color32::from_rgb(152, 251, 152), // Lighter green on hover
+                                                                    egui::Color32::from_rgb(144, 238, 144), // Medium green border on hover
+                                                                )
+                                                            } else {
+                                                                (
+                                                                    egui::Color32::from_rgb(144, 238, 144), // Darker pastel green
+                                                                    egui::Color32::from_rgb(120, 200, 120), // Darker green border
+                                                                )
+                                                            };
+                                                            let text_color = egui::Color32::from_rgb(40, 80, 40); // Dark green text
+
+                                                            egui::Frame::NONE
+                                                                .fill(bg_color)
+                                                                .stroke(egui::Stroke::new(1.0, border_color))
+                                                                .corner_radius(8.0)
+                                                                .inner_margin(egui::Margin::symmetric(16, 8))
+                                                                .show(ui, |ui| {
+                                                                    ui.label(
+                                                                        egui::RichText::new("Create")
+                                                                            .color(text_color)
+                                                                            .family(egui::FontFamily::Name("ui_semibold".into())),
+                                                                    );
+                                                                })
+                                                                .response
+                                                        },
+                                                    )
+                                                    .inner;
+
+                                                // Change cursor to pointer on hover
+                                                if button_response.hovered() {
+                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                }
+
+                                                if button_response.interact(egui::Sense::click()).clicked() && !state.ui_state.new_work_title.trim().is_empty() {
+                                                    let api_service = crate::services::ApiService::new();
+                                                    api_service.create_work(state);
+                                                }
+
+                                                if state.creating_work {
+                                                    ui.add(egui::Spinner::new());
+                                                }
+                                            });
+                                        });
                                     }
                                 );
                             }
