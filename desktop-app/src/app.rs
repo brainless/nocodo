@@ -262,31 +262,53 @@ impl DesktopApp {
         );
 
         // Create custom font family for light UI widgets (labels, navigation, status)
+        // Add emoji support by including default emoji font as fallback
         fonts.families.insert(
             egui::FontFamily::Name("ui_light".into()),
-            vec!["ubuntu_light".to_owned()],
+            vec![
+                "ubuntu_light".to_owned(),
+                "NotoEmoji-Regular".to_owned(), // Fallback for emojis
+            ],
         );
 
         // Create custom font family for emphasized UI widgets (buttons, headings, CTAs)
+        // Add emoji support by including default emoji font as fallback
         fonts.families.insert(
             egui::FontFamily::Name("ui_semibold".into()),
-            vec!["ubuntu_semibold".to_owned()],
+            vec![
+                "ubuntu_semibold".to_owned(),
+                "NotoEmoji-Regular".to_owned(), // Fallback for emojis
+            ],
         );
 
         // Set Inter as the default font for user content (Proportional family)
         // This is used for project names, descriptions, file contents, etc.
+        // Add emoji support by keeping the default emoji font as fallback
         fonts
             .families
             .entry(egui::FontFamily::Proportional)
             .or_default()
             .insert(0, "inter_regular".to_owned());
+        // Ensure emoji font is present (should be there by default)
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .push("NotoEmoji-Regular".to_owned());
 
         // Set Inter Medium for code/monospace text
+        // Add emoji support by keeping the default emoji font as fallback
         fonts
             .families
             .entry(egui::FontFamily::Monospace)
             .or_default()
             .insert(0, "inter_medium".to_owned());
+        // Ensure emoji font is present (should be there by default)
+        fonts
+            .families
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .push("NotoEmoji-Regular".to_owned());
 
         // Apply fonts to the context
         ctx.set_fonts(fonts);

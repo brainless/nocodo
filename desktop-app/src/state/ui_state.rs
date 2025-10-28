@@ -37,6 +37,9 @@ pub struct UiState {
     pub ui_reference_form_text: String,
     pub ui_reference_form_dropdown: Option<String>,
     pub ui_reference_readme_content: String,
+    /// Set of expanded tool call IDs (for collapsible tool response widgets)
+    #[serde(skip)]
+    pub expanded_tool_calls: std::collections::HashSet<i64>,
 }
 
 impl Default for UiState {
@@ -59,6 +62,7 @@ impl Default for UiState {
             ui_reference_form_text: String::new(),
             ui_reference_form_dropdown: None,
             ui_reference_readme_content: String::new(),
+            expanded_tool_calls: std::collections::HashSet::new(),
         }
     }
 }

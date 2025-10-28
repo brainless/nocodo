@@ -495,13 +495,11 @@ impl ToolExecutor {
         };
 
         // Change to base directory before applying patch
-        let original_dir = std::env::current_dir().map_err(|e| {
-            anyhow::anyhow!("Failed to get current directory: {}", e)
-        })?;
+        let original_dir = std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
 
-        std::env::set_current_dir(&self.base_path).map_err(|e| {
-            anyhow::anyhow!("Failed to change to base directory: {}", e)
-        })?;
+        std::env::set_current_dir(&self.base_path)
+            .map_err(|e| anyhow::anyhow!("Failed to change to base directory: {}", e))?;
 
         let mut files_changed = Vec::new();
         let mut total_additions = 0;

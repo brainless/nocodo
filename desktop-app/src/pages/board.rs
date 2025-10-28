@@ -1,7 +1,9 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest};
+use manager_models::{
+    ListFilesRequest, ListFilesResponse, ReadFileRequest, ToolRequest, ToolResponse,
+};
 
 pub struct WorkPage;
 
@@ -305,12 +307,12 @@ impl crate::pages::Page for WorkPage {
                                         });
                                     }
                                     ConnectionState::Connected => {
-                                        if state.loading_work_messages || state.loading_ai_session_outputs {
+                                        if state.loading_work_messages || state.loading_ai_session_outputs || state.loading_ai_tool_calls {
                                             ui.vertical_centered(|ui| {
                                                 ui.label("Loading messages...");
                                                 ui.add(egui::Spinner::new());
                                             });
-                                        } else if state.work_messages.is_empty() && state.ai_session_outputs.is_empty() {
+                                        } else if state.work_messages.is_empty() && state.ai_session_outputs.is_empty() && state.ai_tool_calls.is_empty() {
                                             ui.vertical_centered(|ui| {
                                                 ui.label("No messages found");
                                                 if ui.button("Refresh").clicked() {
@@ -486,7 +488,7 @@ impl crate::pages::Page for WorkPage {
                                                                     egui::Frame::NONE
                                                                         .fill(bg_color)
                                                                         .corner_radius(0.0)
-                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
                                                                         .show(ui, |ui| {
                                                                             ui.set_width(ui.available_width());
                                                                             ui.vertical(|ui| {
@@ -572,7 +574,7 @@ impl crate::pages::Page for WorkPage {
                                                                     egui::Frame::NONE
                                                                         .fill(bg_color)
                                                                         .corner_radius(0.0)
-                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
                                                                         .show(ui, |ui| {
                                                                             ui.set_width(ui.available_width());
                                                                             ui.vertical(|ui| {
@@ -587,8 +589,95 @@ impl crate::pages::Page for WorkPage {
                                                                 }
                                                             }
 
-                                                            // Show regular AI response if neither list_files nor read_file
-                                                            if list_files_requests.is_none() && read_file_requests.is_none() {
+                                                            // Show tool responses (from ai_session_outputs with role='tool')
+                                                            // Check if this output is a tool response
+                                                            if output.role.as_deref() == Some("tool") {
+                                                                // Parse the tool response - it's wrapped in {"content": <ToolResponse>, "tool_use_id": "..."}
+                                                                if let Ok(wrapped_response) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    if let Some(content) = wrapped_response.get("content") {
+                                                                        // Try to parse the content as ToolResponse
+                                                                        if let Ok(tool_response) = serde_json::from_value::<ToolResponse>(content.clone()) {
+                                                                        match tool_response {
+                                                                            ToolResponse::ListFiles(list_files_response) => {
+                                                                                // Check if this tool response is expanded (use output.id)
+                                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
+
+                                                                                // Use the same styling as tool request box
+                                                                                let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                                let response = egui::Frame::NONE
+                                                                                    .fill(bg_color)
+                                                                                    .corner_radius(0.0)
+                                                                                    .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                                    .show(ui, |ui| {
+                                                                                        ui.set_width(ui.available_width());
+                                                                                        ui.vertical(|ui| {
+                                                                                            // Header row - clickable
+                                                                                            ui.horizontal(|ui| {
+                                                                                                ui.label(egui::RichText::new("🤖").size(16.0));
+                                                                                                ui.label(egui::RichText::new("📁").size(16.0));
+                                                                                                let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                                ui.label(egui::RichText::new(arrow).size(12.0));
+                                                                                                ui.label(egui::RichText::new(format!(
+                                                                                                    "Listed {} files in {}",
+                                                                                                    list_files_response.total_files,
+                                                                                                    list_files_response.current_path
+                                                                                                )).size(12.0).strong());
+                                                                                            });
+
+                                                                                            // Show file list if expanded
+                                                                                            if is_expanded {
+                                                                                                ui.add_space(8.0);
+                                                                                                ui.separator();
+                                                                                                ui.add_space(4.0);
+
+                                                                                                // Display the file tree
+                                                                                                ui.label(&list_files_response.files);
+
+                                                                                                // Show truncation warning if needed
+                                                                                                if list_files_response.truncated {
+                                                                                                    ui.add_space(4.0);
+                                                                                                    ui.label(
+                                                                                                        egui::RichText::new(format!(
+                                                                                                            "⚠ Truncated at {} files",
+                                                                                                            list_files_response.limit
+                                                                                                        ))
+                                                                                                        .size(11.0)
+                                                                                                        .color(egui::Color32::from_rgb(255, 165, 0))
+                                                                                                    );
+                                                                                                }
+                                                                                            }
+                                                                                        });
+                                                                                    })
+                                                                                    .response;
+
+                                                                                // Make the widget clickable to toggle expansion
+                                                                                if response.interact(egui::Sense::click()).clicked() {
+                                                                                    if is_expanded {
+                                                                                        state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                                    } else {
+                                                                                        state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                                    }
+                                                                                }
+
+                                                                                // Change cursor to pointer on hover
+                                                                                if response.hovered() {
+                                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                                }
+
+                                                                                ui.add_space(4.0);
+                                                                            }
+                                                                            _ => {
+                                                                                // Other tool responses - skip for now
+                                                                            }
+                                                                        }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // Show regular AI response if not a tool request or tool response
+                                                            if list_files_requests.is_none() && read_file_requests.is_none() && output.role.as_deref() != Some("tool") {
                                                                 // Regular AI response message
                                                                 let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 

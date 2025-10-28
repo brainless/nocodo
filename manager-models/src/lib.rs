@@ -223,6 +223,11 @@ pub struct AiSessionOutputListResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct LlmAgentToolCallListResponse {
+    pub tool_calls: Vec<LlmAgentToolCall>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
     pub name: String,
     pub path: String, // Required - must be existing directory

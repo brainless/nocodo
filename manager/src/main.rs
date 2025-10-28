@@ -156,6 +156,10 @@ async fn main() -> AppResult<()> {
                             "/work/{id}/outputs",
                             web::get().to(handlers::list_ai_session_outputs),
                         )
+                        .route(
+                            "/work/{id}/tool-calls",
+                            web::get().to(handlers::list_ai_tool_calls),
+                        )
                         // Workflow endpoints
                         .route(
                             "/projects/{id}/workflows/scan",

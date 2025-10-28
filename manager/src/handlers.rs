@@ -8,9 +8,9 @@ use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
     CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
-    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
-    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, UpdateApiKeysRequest,
-    WorkListResponse, WorkMessageResponse, WorkResponse,
+    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest,
+    LlmAgentToolCallListResponse, Project, ProjectListResponse, ProjectResponse, ServerStatus,
+    SettingsResponse, UpdateApiKeysRequest, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -1023,6 +1023,47 @@ pub async fn list_ai_session_outputs(
     Ok(HttpResponse::Ok().json(response))
 }
 
+pub async fn list_ai_tool_calls(
+    path: web::Path<i64>,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+
+    // First, get the AI session for this work
+    let sessions = data.database.get_ai_sessions_by_work_id(work_id)?;
+
+    if sessions.is_empty() {
+        // No AI session found for this work, return empty tool calls
+        let response = LlmAgentToolCallListResponse { tool_calls: vec![] };
+        return Ok(HttpResponse::Ok().json(response));
+    }
+
+    // Get the most recent AI session (in case there are multiple)
+    let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
+
+    // Only fetch tool calls if this is an LLM agent session
+    let tool_calls = if session.tool_name == "llm-agent" {
+        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
+            data.database
+                .get_llm_agent_tool_calls(llm_agent_session.id)
+                .unwrap_or_default()
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
+    let response = LlmAgentToolCallListResponse { tool_calls };
+
+    tracing::debug!(
+        "Retrieved {} tool calls for work {}",
+        response.tool_calls.len(),
+        work_id
+    );
+    Ok(HttpResponse::Ok().json(response))
+}
+
 pub async fn check_project_path_conflicts(
     database: &Database,
     requested_path: &std::path::Path,
@@ -1088,7 +1129,9 @@ pub async fn create_work(
     };
 
     // Create work with initial message in a single transaction
-    let (work_id, message_id) = data.database.create_work_with_message(&work, req.title.clone())?;
+    let (work_id, message_id) = data
+        .database
+        .create_work_with_message(&work, req.title.clone())?;
     let mut work = work;
     work.id = work_id;
 

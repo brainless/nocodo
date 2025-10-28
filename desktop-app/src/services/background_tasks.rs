@@ -21,6 +21,7 @@ impl BackgroundTasks {
         self.check_works_result(state);
         self.check_work_messages_result(state);
         self.check_ai_session_outputs_result(state);
+        self.check_ai_tool_calls_result(state);
         self.check_settings_result(state);
         self.check_project_details_result(state);
         self.check_supported_models_result(state);
@@ -125,6 +126,22 @@ impl BackgroundTasks {
                 Err(e) => {
                     state.ui_state.connection_error =
                         Some(format!("Failed to load AI outputs: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_ai_tool_calls_result(&self, state: &mut AppState) {
+        let mut result = state.ai_tool_calls_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_ai_tool_calls = false;
+            match res {
+                Ok(tool_calls) => {
+                    state.ai_tool_calls = tool_calls;
+                }
+                Err(e) => {
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to load AI tool calls: {}", e));
                 }
             }
         }
