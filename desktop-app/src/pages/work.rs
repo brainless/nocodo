@@ -1,4 +1,3 @@
-use crate::pages::Page;
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
@@ -20,11 +19,11 @@ impl Default for WorkPage {
 
 impl crate::pages::Page for WorkPage {
     fn name(&self) -> &'static str {
-        "Work"
+        "Board"
     }
 
-    fn ui(&mut self, ctx: &Context, ui: &mut Ui, state: &mut AppState) {
-        ui.heading("Work");
+    fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        ui.heading("Board");
 
         // Two-column layout: left column for form and list, right column for details
         let show_second_column = true;
@@ -36,125 +35,65 @@ impl crate::pages::Page for WorkPage {
         let spacing = ui.spacing().item_spacing.x;
 
         ui.horizontal(|ui| {
-            // Left column (400px wide) - Create work form and work list
+            // Left column (400px wide) - CTA button and work list
             ui.allocate_ui_with_layout(
                 egui::vec2(left_column_width, available_size.y),
                 egui::Layout::top_down(egui::Align::LEFT),
                 |ui| {
-                    // Create work form
+                    // CTA button to show create work form (only show when connected)
                     if matches!(state.connection_state, ConnectionState::Connected) {
-                        // Load models only once when form is opened
-                        if !state.models_fetch_attempted && !state.loading_supported_models {
-                            let api_service = crate::services::ApiService::new();
-                            api_service.refresh_supported_models(state);
+                        // Full-width button with centered text
+                        let response = ui
+                            .allocate_ui_with_layout(
+                                egui::vec2(ui.available_width(), 0.0),
+                                egui::Layout::top_down(egui::Align::LEFT),
+                                |ui| {
+                                    // Pastel green colors for primary CTA - darker shade for normal, lighter on hover
+                                    let (bg_color, border_color) = if ui.rect_contains_pointer(ui.max_rect()) {
+                                        (
+                                            egui::Color32::from_rgb(152, 251, 152), // Lighter green on hover
+                                            egui::Color32::from_rgb(144, 238, 144), // Medium green border on hover
+                                        )
+                                    } else {
+                                        (
+                                            egui::Color32::from_rgb(144, 238, 144), // Darker pastel green
+                                            egui::Color32::from_rgb(120, 200, 120), // Darker green border
+                                        )
+                                    };
+                                    let text_color = egui::Color32::from_rgb(40, 80, 40); // Dark green text
+
+                                    egui::Frame::NONE
+                                        .fill(bg_color)
+                                        .stroke(egui::Stroke::new(1.0, border_color))
+                                        .corner_radius(8.0)
+                                        .inner_margin(egui::Margin::same(12))
+                                        .show(ui, |ui| {
+                                            ui.set_width(ui.available_width());
+                                            ui.vertical_centered(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new("What do you want to create?")
+                                                        .size(16.0)
+                                                        .family(egui::FontFamily::Name(
+                                                            "ui_semibold".into(),
+                                                        ))
+                                                        .color(text_color),
+                                                );
+                                            });
+                                        })
+                                        .response
+                                },
+                            )
+                            .inner;
+
+                        // Change cursor to pointer on hover
+                        if response.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
 
-                        // Create form with same styling as work items - full width of column
-                        let _form_response = ui.allocate_ui_with_layout(
-                            egui::vec2(ui.available_width(), 0.0),
-                            egui::Layout::top_down(egui::Align::LEFT),
-                            |ui| {
-                                egui::Frame::NONE
-                                    .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                                    .corner_radius(8.0)
-                                    .inner_margin(egui::Margin::same(12))
-                                    .show(ui, |ui| {
-                                        ui.set_width(ui.available_width());
-                                        ui.vertical(|ui| {
-                                            // Title/Question field as textarea
-                                            ui.label("What do you want to do?");
-                                            ui.add(
-                                                egui::TextEdit::multiline(&mut state.ui_state.new_work_title)
-                                                    .desired_width(ui.available_width())
-                                                    .desired_rows(3)
-                                            );
-
-                                            ui.add_space(8.0);
-
-                                            // Project and Model fields side by side
-                                            ui.horizontal(|ui| {
-                                                // Project field
-                                                ui.vertical(|ui| {
-                                                    ui.label("Project:");
-                                                    egui::ComboBox::from_id_salt("work_project_combo")
-                                                        .selected_text(
-                                                            state.ui_state.new_work_project_id
-                                                                .and_then(|id| state.projects.iter().find(|p| p.id == id))
-                                                                .map(|p| p.name.clone())
-                                                                .unwrap_or_else(|| "None".to_string()),
-                                                        )
-                                                        .show_ui(ui, |ui| {
-                                                            ui.selectable_value(&mut state.ui_state.new_work_project_id, None, "None");
-                                                            for project in &state.projects {
-                                                                ui.selectable_value(
-                                                                    &mut state.ui_state.new_work_project_id,
-                                                                    Some(project.id),
-                                                                    &project.name,
-                                                                );
-                                                            }
-                                                        });
-                                                });
-
-                                                ui.add_space(16.0);
-
-                                                // Model field
-                                                ui.vertical(|ui| {
-                                                    ui.label("Model:");
-                                                    if state.loading_supported_models {
-                                                        ui.add(egui::Spinner::new());
-                                                    } else {
-                                                        egui::ComboBox::from_id_salt("work_model_combo")
-                                                            .selected_text(
-                                                                state.ui_state.new_work_model
-                                                                    .as_ref()
-                                                                    .and_then(|model_id| state.supported_models.iter()
-                                                                        .find(|m| m.model_id == *model_id))
-                                                                    .map(|m| m.name.clone())
-                                                                    .unwrap_or_else(|| "None".to_string()),
-                                                            )
-                                                            .show_ui(ui, |ui| {
-                                                                ui.selectable_value(&mut state.ui_state.new_work_model, None, "None");
-                                                                for model in &state.supported_models {
-                                                                    ui.selectable_value(
-                                                                        &mut state.ui_state.new_work_model,
-                                                                        Some(model.model_id.clone()),
-                                                                        &model.name,
-                                                                    );
-                                                                }
-                                                            });
-                                                    }
-                                                });
-                                            });
-
-                                            ui.add_space(8.0);
-
-                                            // Show error if no models are configured
-                                            if !state.loading_supported_models && state.supported_models.is_empty() {
-                                                ui.horizontal(|ui| {
-                                                    ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
-                                                    ui.label(
-                                                        egui::RichText::new("No models configured. Please set API keys in Settings page")
-                                                            .color(egui::Color32::from_rgb(255, 165, 0))
-                                                    );
-                                                });
-                                                ui.add_space(8.0);
-                                            }
-
-                                            // Create button
-                                            ui.horizontal(|ui| {
-                                                if ui.button("Create").clicked() && !state.ui_state.new_work_title.trim().is_empty() {
-                                                    let api_service = crate::services::ApiService::new();
-                                                    api_service.create_work(state);
-                                                }
-
-                                                if state.creating_work {
-                                                    ui.add(egui::Spinner::new());
-                                                }
-                                            });
-                                        });
-                                    });
-                            }
-                        );
+                        if response.interact(egui::Sense::click()).clicked() {
+                            // Clear selection to show form in second column
+                            state.ui_state.selected_work_id = None;
+                        }
 
                         ui.add_space(16.0);
                     }
@@ -607,9 +546,121 @@ impl crate::pages::Page for WorkPage {
                                 });
                             }
                         } else {
-                            ui.vertical_centered(|ui| {
-                                ui.label("Select a work item to view details");
-                            });
+                            // No work selected - show create work form
+                            if matches!(state.connection_state, ConnectionState::Connected) {
+                                // Load models only once when form is opened
+                                if !state.models_fetch_attempted && !state.loading_supported_models {
+                                    let api_service = crate::services::ApiService::new();
+                                    api_service.refresh_supported_models(state);
+                                }
+
+                                // Create form - full width of second column
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(ui.available_width(), 0.0),
+                                    egui::Layout::top_down(egui::Align::LEFT),
+                                    |ui| {
+                                        egui::Frame::NONE
+                                            .fill(ui.style().visuals.widgets.inactive.bg_fill)
+                                            .corner_radius(8.0)
+                                            .inner_margin(egui::Margin::same(12))
+                                            .show(ui, |ui| {
+                                                ui.set_width(ui.available_width());
+                                                ui.vertical(|ui| {
+                                                    // Title/Question field as textarea
+                                                    ui.label("What do you want to do?");
+                                                    ui.add(
+                                                        egui::TextEdit::multiline(&mut state.ui_state.new_work_title)
+                                                            .desired_width(ui.available_width())
+                                                            .desired_rows(3)
+                                                    );
+
+                                                    ui.add_space(8.0);
+
+                                                    // Project and Model fields side by side
+                                                    ui.horizontal(|ui| {
+                                                        // Project field
+                                                        ui.vertical(|ui| {
+                                                            ui.label("Project:");
+                                                            egui::ComboBox::from_id_salt("work_project_combo")
+                                                                .selected_text(
+                                                                    state.ui_state.new_work_project_id
+                                                                        .and_then(|id| state.projects.iter().find(|p| p.id == id))
+                                                                        .map(|p| p.name.clone())
+                                                                        .unwrap_or_else(|| "None".to_string()),
+                                                                )
+                                                                .show_ui(ui, |ui| {
+                                                                    ui.selectable_value(&mut state.ui_state.new_work_project_id, None, "None");
+                                                                    for project in &state.projects {
+                                                                        ui.selectable_value(
+                                                                            &mut state.ui_state.new_work_project_id,
+                                                                            Some(project.id),
+                                                                            &project.name,
+                                                                        );
+                                                                    }
+                                                                });
+                                                        });
+
+                                                        ui.add_space(16.0);
+
+                                                        // Model field
+                                                        ui.vertical(|ui| {
+                                                            ui.label("Model:");
+                                                            if state.loading_supported_models {
+                                                                ui.add(egui::Spinner::new());
+                                                            } else {
+                                                                egui::ComboBox::from_id_salt("work_model_combo")
+                                                                    .selected_text(
+                                                                        state.ui_state.new_work_model
+                                                                            .as_ref()
+                                                                            .and_then(|model_id| state.supported_models.iter()
+                                                                                .find(|m| m.model_id == *model_id))
+                                                                            .map(|m| m.name.clone())
+                                                                            .unwrap_or_else(|| "None".to_string()),
+                                                                    )
+                                                                    .show_ui(ui, |ui| {
+                                                                        ui.selectable_value(&mut state.ui_state.new_work_model, None, "None");
+                                                                        for model in &state.supported_models {
+                                                                            ui.selectable_value(
+                                                                                &mut state.ui_state.new_work_model,
+                                                                                Some(model.model_id.clone()),
+                                                                                &model.name,
+                                                                            );
+                                                                        }
+                                                                    });
+                                                            }
+                                                        });
+                                                    });
+
+                                                    ui.add_space(8.0);
+
+                                                    // Show error if no models are configured
+                                                    if !state.loading_supported_models && state.supported_models.is_empty() {
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(egui::RichText::new("⚠").size(16.0).color(egui::Color32::from_rgb(255, 165, 0)));
+                                                            ui.label(
+                                                                egui::RichText::new("No models configured. Please set API keys in Settings page")
+                                                                    .color(egui::Color32::from_rgb(255, 165, 0))
+                                                            );
+                                                        });
+                                                        ui.add_space(8.0);
+                                                    }
+
+                                                    // Create button
+                                                    ui.horizontal(|ui| {
+                                                        if ui.button("Create").clicked() && !state.ui_state.new_work_title.trim().is_empty() {
+                                                            let api_service = crate::services::ApiService::new();
+                                                            api_service.create_work(state);
+                                                        }
+
+                                                        if state.creating_work {
+                                                            ui.add(egui::Spinner::new());
+                                                        }
+                                                    });
+                                                });
+                                            });
+                                    }
+                                );
+                            }
                         }
                     }
                 );
