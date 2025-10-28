@@ -231,6 +231,91 @@ impl ApiService {
         }
     }
 
+    pub fn update_projects_default_path(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.updating_projects_path = true;
+            state.update_projects_path_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.update_projects_path_result);
+            let path = state.ui_state.projects_default_path.clone();
+
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let result = api_client.set_projects_default_path(path).await;
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn scan_projects(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.scanning_projects = true;
+            state.scan_projects_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.scan_projects_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let result = api_client.scan_projects().await;
+                    let mut scan_result = result_clone.lock().unwrap();
+                    *scan_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut scan_result = result_clone.lock().unwrap();
+                    *scan_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn update_api_keys(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.updating_api_keys = true;
+            state.update_api_keys_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.update_api_keys_result);
+
+            let xai_key = if !state.xai_api_key_input.is_empty() {
+                Some(state.xai_api_key_input.clone())
+            } else {
+                None
+            };
+            let openai_key = if !state.openai_api_key_input.is_empty() {
+                Some(state.openai_api_key_input.clone())
+            } else {
+                None
+            };
+            let anthropic_key = if !state.anthropic_api_key_input.is_empty() {
+                Some(state.anthropic_api_key_input.clone())
+            } else {
+                None
+            };
+
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let request = manager_models::UpdateApiKeysRequest {
+                        xai_api_key: xai_key,
+                        openai_api_key: openai_key,
+                        anthropic_api_key: anthropic_key,
+                    };
+                    let result = api_client.update_api_keys(request).await;
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
     // Local server methods
     pub async fn check_local_server(&self, state: &mut AppState) -> Result<(), String> {
         state.ui_state.checking_local_server = true;
