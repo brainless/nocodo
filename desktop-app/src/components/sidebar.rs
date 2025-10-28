@@ -177,8 +177,8 @@ impl Sidebar {
     }
 
     fn refresh_works(&self, state: &mut AppState) {
-        state.loading_works = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_works(state);
     }
 
     fn check_local_server(&self, state: &mut AppState) {

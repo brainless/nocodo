@@ -8,18 +8,18 @@ pub trait Page {
     fn on_navigate_from(&mut self) {}
 }
 
+pub mod board;
 pub mod mentions;
 pub mod project_detail;
 pub mod projects;
 pub mod servers;
 pub mod settings;
 pub mod ui_reference;
-pub mod work;
 
+pub use board::*;
 pub use mentions::*;
 pub use project_detail::*;
 pub use projects::*;
 pub use servers::*;
 pub use settings::*;
 pub use ui_reference::*;
-pub use work::*;

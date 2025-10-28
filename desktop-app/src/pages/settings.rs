@@ -239,22 +239,22 @@ impl crate::pages::Page for SettingsPage {
 
 impl SettingsPage {
     fn update_api_keys(&self, state: &mut AppState) {
-        state.updating_api_keys = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.update_api_keys(state);
     }
 
     fn update_projects_default_path(&self, state: &mut AppState) {
-        state.updating_projects_path = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.update_projects_default_path(state);
     }
 
     fn scan_projects(&self, state: &mut AppState) {
-        state.scanning_projects = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.scan_projects(state);
     }
 
     fn refresh_settings(&self, state: &mut AppState) {
-        state.loading_settings = true;
-        // This will be implemented when we extract the API methods
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_settings(state);
     }
 }

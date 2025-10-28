@@ -200,8 +200,12 @@ impl BackgroundTasks {
     }
 
     fn check_create_work_result(&self, state: &mut AppState) {
-        let mut result = state.create_work_result.lock().unwrap();
-        if let Some(res) = result.take() {
+        let result_opt = {
+            let mut result = state.create_work_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
             state.creating_work = false;
             match res {
                 Ok(_work) => {
@@ -209,8 +213,8 @@ impl BackgroundTasks {
                     state.ui_state.new_work_title.clear();
                     state.ui_state.new_work_project_id = None;
                     state.ui_state.new_work_model = None;
-                    // Refresh works list
-                    // Note: This is a placeholder - proper async handling will be implemented later
+                    // Refresh works list to show the newly created work
+                    self.api_service.refresh_works(state);
                 }
                 Err(e) => {
                     state.ui_state.connection_error = Some(format!("Failed to create work: {}", e));
@@ -235,14 +239,18 @@ impl BackgroundTasks {
     }
 
     fn check_update_api_keys_result(&self, state: &mut AppState) {
-        let mut result = state.update_api_keys_result.lock().unwrap();
-        if let Some(res) = result.take() {
+        let result_opt = {
+            let mut result = state.update_api_keys_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
             state.updating_api_keys = false;
             match res {
                 Ok(_) => {
                     state.api_keys_modified = false;
                     // Refresh settings to get updated API key status
-                    // Note: This is a placeholder - proper async handling will be implemented later
+                    self.api_service.refresh_settings(state);
                 }
                 Err(e) => {
                     state.ui_state.connection_error =
@@ -253,14 +261,18 @@ impl BackgroundTasks {
     }
 
     fn check_update_projects_path_result(&self, state: &mut AppState) {
-        let mut result = state.update_projects_path_result.lock().unwrap();
-        if let Some(res) = result.take() {
+        let result_opt = {
+            let mut result = state.update_projects_path_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
             state.updating_projects_path = false;
             match res {
                 Ok(_) => {
                     state.projects_default_path_modified = false;
                     // Refresh settings to get updated path
-                    // Note: This is a placeholder - proper async handling will be implemented later
+                    self.api_service.refresh_settings(state);
                 }
                 Err(e) => {
                     state.ui_state.connection_error =
@@ -271,13 +283,17 @@ impl BackgroundTasks {
     }
 
     fn check_scan_projects_result(&self, state: &mut AppState) {
-        let mut result = state.scan_projects_result.lock().unwrap();
-        if let Some(res) = result.take() {
+        let result_opt = {
+            let mut result = state.scan_projects_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
             state.scanning_projects = false;
             match res {
                 Ok(_) => {
-                    // Refresh projects list
-                    // Note: This is a placeholder - proper async handling will be implemented later
+                    // Refresh projects list after successful scan
+                    self.api_service.refresh_projects(state);
                 }
                 Err(e) => {
                     state.ui_state.connection_error =
