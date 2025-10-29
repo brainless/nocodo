@@ -340,6 +340,56 @@ impl Database {
             [],
         ); // Ignore error if index already exists
 
+        // User authentication tables
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 username TEXT NOT NULL UNIQUE,
+                 email TEXT NOT NULL UNIQUE,
+                 password_hash TEXT NOT NULL,
+                 is_active INTEGER NOT NULL DEFAULT 1,
+                 created_at INTEGER NOT NULL,
+                 updated_at INTEGER NOT NULL
+             )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS user_ssh_keys (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 user_id INTEGER NOT NULL,
+                 key_type TEXT NOT NULL,
+                 fingerprint TEXT NOT NULL UNIQUE,
+                 public_key_data TEXT NOT NULL,
+                 label TEXT,
+                 is_active INTEGER NOT NULL DEFAULT 1,
+                 created_at INTEGER NOT NULL,
+                 last_used_at INTEGER,
+                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+             )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_ssh_keys_user_id ON user_ssh_keys(user_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_ssh_keys_fingerprint ON user_ssh_keys(fingerprint)",
+            [],
+        )?;
+
         // GitHub Actions workflow tables
         conn.execute(
             r#"
@@ -1809,5 +1859,248 @@ impl Database {
         }
 
         Ok(executions)
+    }
+
+    // User authentication methods
+
+    pub fn create_user(&self, user: &crate::models::User) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let id_param = if user.id == 0 { None } else { Some(user.id) };
+
+        conn.execute(
+            "INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                user.username,
+                user.email,
+                user.password_hash,
+                if user.is_active { 1 } else { 0 },
+                user.created_at,
+                user.updated_at,
+            ],
+        )?;
+
+        let user_id = conn.last_insert_rowid();
+        tracing::info!("Created user: {} ({})", user.username, user_id);
+        Ok(user_id)
+    }
+
+    pub fn get_user_by_id(&self, id: i64) -> AppResult<crate::models::User> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let user = conn
+            .query_row(
+                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                 FROM users WHERE id = ?",
+                [id],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        username: row.get(1)?,
+                        email: row.get(2)?,
+                        password_hash: row.get(3)?,
+                        is_active: row.get::<_, i64>(4)? != 0,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", id))),
+        }
+    }
+
+    pub fn get_user_by_username(&self, username: &str) -> AppResult<crate::models::User> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let user = conn
+            .query_row(
+                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                 FROM users WHERE username = ?",
+                [username],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        username: row.get(1)?,
+                        email: row.get(2)?,
+                        password_hash: row.get(3)?,
+                        is_active: row.get::<_, i64>(4)? != 0,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", username))),
+        }
+    }
+
+    pub fn get_user_by_email(&self, email: &str) -> AppResult<crate::models::User> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let user = conn
+            .query_row(
+                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                 FROM users WHERE email = ?",
+                [email],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        username: row.get(1)?,
+                        email: row.get(2)?,
+                        password_hash: row.get(3)?,
+                        is_active: row.get::<_, i64>(4)? != 0,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", email))),
+        }
+    }
+
+    // SSH key methods
+
+    pub fn create_ssh_key(&self, key: &crate::models::UserSshKey) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let id_param = if key.id == 0 { None } else { Some(key.id) };
+
+        conn.execute(
+            "INSERT INTO user_ssh_keys (id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                key.user_id,
+                key.key_type,
+                key.fingerprint,
+                key.public_key_data,
+                key.label,
+                if key.is_active { 1 } else { 0 },
+                key.created_at,
+                key.last_used_at,
+            ],
+        )?;
+
+        let key_id = conn.last_insert_rowid();
+        tracing::info!(
+            "Created SSH key for user {}: {} ({})",
+            key.user_id,
+            key.fingerprint,
+            key_id
+        );
+        Ok(key_id)
+    }
+
+    pub fn get_ssh_key_by_fingerprint(
+        &self,
+        fingerprint: &str,
+    ) -> AppResult<crate::models::UserSshKey> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let key = conn
+            .query_row(
+                "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
+                 FROM user_ssh_keys WHERE fingerprint = ? AND is_active = 1",
+                [fingerprint],
+                |row| {
+                    Ok(crate::models::UserSshKey {
+                        id: row.get(0)?,
+                        user_id: row.get(1)?,
+                        key_type: row.get(2)?,
+                        fingerprint: row.get(3)?,
+                        public_key_data: row.get(4)?,
+                        label: row.get(5)?,
+                        is_active: row.get::<_, i64>(6)? != 0,
+                        created_at: row.get(7)?,
+                        last_used_at: row.get(8)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match key {
+            Some(key) => Ok(key),
+            None => Err(AppError::NotFound(format!(
+                "SSH key not found or inactive: {}",
+                fingerprint
+            ))),
+        }
+    }
+
+    pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
+             FROM user_ssh_keys WHERE user_id = ? ORDER BY created_at DESC",
+        )?;
+
+        let key_iter = stmt.query_map([user_id], |row| {
+            Ok(crate::models::UserSshKey {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                key_type: row.get(2)?,
+                fingerprint: row.get(3)?,
+                public_key_data: row.get(4)?,
+                label: row.get(5)?,
+                is_active: row.get::<_, i64>(6)? != 0,
+                created_at: row.get(7)?,
+                last_used_at: row.get(8)?,
+            })
+        })?;
+
+        let keys: Result<Vec<_>, _> = key_iter.collect();
+        keys.map_err(AppError::from)
+    }
+
+    pub fn update_ssh_key_last_used(&self, key_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        conn.execute(
+            "UPDATE user_ssh_keys SET last_used_at = ? WHERE id = ?",
+            params![now, key_id],
+        )?;
+
+        tracing::debug!("Updated SSH key last_used_at: {}", key_id);
+        Ok(())
     }
 }

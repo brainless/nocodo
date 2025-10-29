@@ -11,6 +11,100 @@ pub use manager_models::{
     WorkMessageListResponse, WorkMessageResponse, WorkResponse, WorkWithHistory,
 };
 
+// User and SSH key authentication models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    pub password_hash: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl User {
+    pub fn new(username: String, email: String, password_hash: String) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            username,
+            email,
+            password_hash,
+            is_active: true,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn update_timestamp(&mut self) {
+        self.updated_at = Utc::now().timestamp();
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSshKey {
+    pub id: i64,
+    pub user_id: i64,
+    pub key_type: String, // "ssh-rsa", "ssh-ed25519", "ecdsa-sha2-nistp256", etc.
+    pub fingerprint: String, // SHA256:base64hash
+    pub public_key_data: String, // Full public key for verification
+    pub label: Option<String>, // User-friendly name like "Work Laptop"
+    pub is_active: bool,
+    pub created_at: i64,
+    pub last_used_at: Option<i64>,
+}
+
+impl UserSshKey {
+    pub fn new(
+        user_id: i64,
+        key_type: String,
+        fingerprint: String,
+        public_key_data: String,
+        label: Option<String>,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            user_id,
+            key_type,
+            fingerprint,
+            public_key_data,
+            label,
+            is_active: true,
+            created_at: now,
+            last_used_at: None,
+        }
+    }
+
+    pub fn mark_used(&mut self) {
+        self.last_used_at = Some(Utc::now().timestamp());
+    }
+}
+
+// Login request and response models
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+    pub ssh_fingerprint: String, // SHA256 fingerprint from client
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub user: UserInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserInfo {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
     pub id: i64,

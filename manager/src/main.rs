@@ -1,3 +1,4 @@
+mod auth;
 mod config;
 mod database;
 mod error;
@@ -188,7 +189,9 @@ async fn main() -> AppResult<()> {
                             web::post().to(handlers::set_projects_default_path),
                         )
                         .route("/projects/scan", web::post().to(handlers::scan_projects))
-                        .route("/models", web::get().to(handlers::get_supported_models)),
+                        .route("/models", web::get().to(handlers::get_supported_models))
+                        // Authentication routes
+                        .route("/auth/login", web::post().to(handlers::login)),
                 )
                 // WebSocket endpoints
                 .route("/ws", web::get().to(websocket::websocket_handler))

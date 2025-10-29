@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub socket: SocketConfig,
     pub api_keys: Option<ApiKeysConfig>,
     pub projects: Option<ProjectsConfig>,
+    pub jwt_secret: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -54,6 +55,7 @@ impl Default for AppConfig {
             },
             api_keys: None,
             projects: None,
+            jwt_secret: None,
         }
     }
 }
@@ -81,6 +83,9 @@ path = "~/.local/share/nocodo/manager.db"
 
 [socket]
 path = "/tmp/nocodo-manager.sock"
+
+# JWT secret for authentication tokens (IMPORTANT: Change this in production!)
+# jwt_secret = "change-this-to-a-secure-random-string-in-production"
 
 [api_keys]
 # xai_api_key = "your-xai-key"

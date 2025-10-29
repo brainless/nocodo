@@ -1,3 +1,4 @@
+use crate::auth;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
@@ -1985,5 +1986,102 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
 
     tracing::info!("Returning {} supported models", models.len());
     let response = crate::models::SupportedModelsResponse { models };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+// Authentication handlers
+
+/// Login handler - authenticates user with password and SSH key fingerprint
+pub async fn login(
+    data: web::Data<AppState>,
+    login_req: web::Json<crate::models::LoginRequest>,
+) -> Result<HttpResponse> {
+    tracing::info!("Login attempt for user: {}", login_req.username);
+
+    // 1. Get user by username
+    let user = data
+        .database
+        .get_user_by_username(&login_req.username)
+        .map_err(|_| AppError::AuthenticationFailed("Invalid username or password".to_string()))?;
+
+    // 2. Check if user is active
+    if !user.is_active {
+        tracing::warn!("Login attempt for inactive user: {}", user.username);
+        return Err(AppError::AuthenticationFailed("User account is inactive".to_string()).into());
+    }
+
+    // 3. Verify password
+    let password_valid =
+        auth::verify_password(&login_req.password, &user.password_hash).map_err(|e| {
+            tracing::error!("Password verification error: {}", e);
+            AppError::Internal("Authentication system error".to_string())
+        })?;
+
+    if !password_valid {
+        tracing::warn!("Invalid password for user: {}", user.username);
+        return Err(
+            AppError::AuthenticationFailed("Invalid username or password".to_string()).into(),
+        );
+    }
+
+    // 4. Verify SSH key fingerprint
+    let ssh_key = data
+        .database
+        .get_ssh_key_by_fingerprint(&login_req.ssh_fingerprint)
+        .map_err(|_| {
+            tracing::warn!(
+                "SSH key not found for user {}: {}",
+                user.username,
+                login_req.ssh_fingerprint
+            );
+            AppError::AuthenticationFailed("Invalid SSH key".to_string())
+        })?;
+
+    // 5. Verify SSH key belongs to this user
+    if ssh_key.user_id != user.id {
+        tracing::warn!(
+            "SSH key {} does not belong to user {}",
+            login_req.ssh_fingerprint,
+            user.username
+        );
+        return Err(AppError::AuthenticationFailed("Invalid SSH key".to_string()).into());
+    }
+
+    // 6. Update SSH key last_used_at
+    if let Err(e) = data.database.update_ssh_key_last_used(ssh_key.id) {
+        tracing::error!("Failed to update SSH key last_used_at: {}", e);
+        // Non-fatal error, continue with login
+    }
+
+    // 7. Generate JWT token
+    let config = data.config.read().unwrap();
+    let jwt_secret = config
+        .jwt_secret
+        .as_ref()
+        .ok_or_else(|| AppError::Internal("JWT secret not configured".to_string()))?;
+
+    let claims = auth::Claims::new(
+        user.id,
+        user.username.clone(),
+        Some(login_req.ssh_fingerprint.clone()),
+    );
+
+    let token = auth::generate_token(&claims, jwt_secret).map_err(|e| {
+        tracing::error!("Failed to generate token: {}", e);
+        AppError::Internal("Failed to generate authentication token".to_string())
+    })?;
+
+    tracing::info!("Successful login for user: {}", user.username);
+
+    // 8. Return success response
+    let response = crate::models::LoginResponse {
+        token,
+        user: crate::models::UserInfo {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+        },
+    };
+
     Ok(HttpResponse::Ok().json(response))
 }

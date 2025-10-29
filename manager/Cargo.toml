@@ -49,6 +49,11 @@ codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-
 nocodo-github-actions = { path = "../nocodo-github-actions", features = ["nocodo-integration"] }
 manager-models = { path = "../manager-models" }
 
+# Authentication and security
+argon2 = { version = "0.5", features = ["std"] }
+jsonwebtoken = "9"
+sha2 = "0.10"
+
 [dev-dependencies]
 actix-rt = "2.9"
 rand = "0.9"
