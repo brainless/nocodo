@@ -6,6 +6,7 @@ mod handlers;
 mod llm_agent;
 mod llm_client;
 mod llm_providers;
+mod middleware;
 mod models;
 mod permissions;
 mod socket;
@@ -21,6 +22,7 @@ use database::Database;
 use error::AppResult;
 use handlers::AppState;
 use llm_agent::LlmAgent;
+use middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement};
 use socket::SocketServer;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -112,92 +114,298 @@ async fn main() -> AppResult<()> {
                 .app_data(app_state.clone())
                 .app_data(ws_server_data.clone())
                 .wrap(Logger::default())
+                .wrap(AuthenticationMiddleware)
                 .service(
                     web::scope("/api")
+                        // Public endpoints (no auth required)
                         .route("/health", web::get().to(handlers::health_check))
-                        .route("/projects", web::get().to(handlers::get_projects))
-                        .route("/projects", web::post().to(handlers::create_project))
-                        .route(
-                            "/projects/add-existing",
-                            web::post().to(handlers::add_existing_project),
+                        .route("/auth/login", web::post().to(handlers::login))
+                        // Protected endpoints with permission checks
+                        .service(
+                            web::scope("/projects")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "project", "read",
+                                )))
+                                .route("", web::get().to(handlers::get_projects))
+                                .service(
+                                    web::resource("")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::create_project)),
+                                )
+                                .service(
+                                    web::resource("/add-existing")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::add_existing_project)),
+                                )
+                                .service(
+                                    web::scope("/{id}")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "read")
+                                                .with_resource_id("id"),
+                                        ))
+                                        .route("", web::get().to(handlers::get_project))
+                                        .route(
+                                            "/details",
+                                            web::get().to(handlers::get_project_details),
+                                        )
+                                        .service(
+                                            web::resource("")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("project", "delete")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route(web::delete().to(handlers::delete_project)),
+                                        ),
+                                ),
                         )
-                        .route("/projects/{id}", web::get().to(handlers::get_project))
-                        .route("/projects/{id}", web::delete().to(handlers::delete_project))
-                        .route(
-                            "/projects/{id}/details",
-                            web::get().to(handlers::get_project_details),
+                        .service(
+                            web::scope("/templates")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "project", "read",
+                                )))
+                                .route("", web::get().to(handlers::get_templates)),
                         )
-                        .route("/templates", web::get().to(handlers::get_templates))
                         // File operation endpoints
-                        .route("/files", web::get().to(handlers::list_files))
-                        .route("/files", web::post().to(handlers::create_file))
-                        .route(
-                            "/files/{path:.*}",
-                            web::get().to(handlers::get_file_content),
+                        .service(
+                            web::scope("/files")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "project", "read",
+                                )))
+                                .route("", web::get().to(handlers::list_files))
+                                .service(
+                                    web::resource("")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::create_file)),
+                                )
+                                .service(
+                                    web::scope("/{path:.*}")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "read"),
+                                        ))
+                                        .route("", web::get().to(handlers::get_file_content))
+                                        .service(
+                                            web::resource("")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("project", "write"),
+                                                ))
+                                                .route(web::put().to(handlers::update_file))
+                                                .route(web::delete().to(handlers::delete_file)),
+                                        ),
+                                ),
                         )
-                        .route("/files/{path:.*}", web::put().to(handlers::update_file))
-                        .route("/files/{path:.*}", web::delete().to(handlers::delete_file))
                         // Work management endpoints
-                        .route("/work", web::post().to(handlers::create_work))
-                        .route("/work", web::get().to(handlers::list_works))
-                        .route("/work/{id}", web::get().to(handlers::get_work))
-                        .route("/work/{id}", web::delete().to(handlers::delete_work))
-                        // Work message endpoints
-                        .route(
-                            "/work/{id}/messages",
-                            web::get().to(handlers::get_work_messages),
-                        )
-                        .route(
-                            "/work/{id}/messages",
-                            web::post().to(handlers::add_message_to_work),
-                        )
-                        // AI session endpoints
-                        // Note: POST /work/{id}/sessions removed - sessions are now auto-started with work
-                        .route(
-                            "/work/{id}/sessions",
-                            web::get().to(handlers::list_ai_sessions),
-                        )
-                        .route(
-                            "/work/{id}/outputs",
-                            web::get().to(handlers::list_ai_session_outputs),
-                        )
-                        .route(
-                            "/work/{id}/tool-calls",
-                            web::get().to(handlers::list_ai_tool_calls),
+                        .service(
+                            web::scope("/work")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "work", "read",
+                                )))
+                                .route("", web::get().to(handlers::list_works))
+                                .service(
+                                    web::resource("")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("work", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::create_work)),
+                                )
+                                .service(
+                                    web::scope("/{id}")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("work", "read")
+                                                .with_resource_id("id"),
+                                        ))
+                                        .route("", web::get().to(handlers::get_work))
+                                        .route(
+                                            "/messages",
+                                            web::get().to(handlers::get_work_messages),
+                                        )
+                                        .route(
+                                            "/sessions",
+                                            web::get().to(handlers::list_ai_sessions),
+                                        )
+                                        .route(
+                                            "/outputs",
+                                            web::get().to(handlers::list_ai_session_outputs),
+                                        )
+                                        .route(
+                                            "/tool-calls",
+                                            web::get().to(handlers::list_ai_tool_calls),
+                                        )
+                                        .service(
+                                            web::resource("")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("work", "delete")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route(web::delete().to(handlers::delete_work)),
+                                        )
+                                        .service(
+                                            web::resource("/messages")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("work", "write")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route(
+                                                    web::post().to(handlers::add_message_to_work),
+                                                ),
+                                        ),
+                                ),
                         )
                         // Workflow endpoints
-                        .route(
-                            "/projects/{id}/workflows/scan",
-                            web::post().to(handlers::scan_workflows),
-                        )
-                        .route(
-                            "/projects/{id}/workflows/commands",
-                            web::get().to(handlers::get_workflow_commands),
-                        )
-                        .route(
-                            "/projects/{project_id}/workflows/commands/{command_id}/execute",
-                            web::post().to(handlers::execute_workflow_command),
-                        )
-                        .route(
-                            "/projects/{project_id}/workflows/commands/{command_id}/executions",
-                            web::get().to(handlers::get_command_executions),
+                        .service(
+                            web::scope("/projects/{id}/workflows")
+                                .wrap(PermissionMiddleware::new(
+                                    PermissionRequirement::new("project", "read")
+                                        .with_resource_id("id"),
+                                ))
+                                .route("/scan", web::post().to(handlers::scan_workflows))
+                                .route("/commands", web::get().to(handlers::get_workflow_commands))
+                                .service(
+                                    web::scope("/commands/{command_id}")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "write")
+                                                .with_resource_id("id"),
+                                        ))
+                                        .route(
+                                            "/execute",
+                                            web::post().to(handlers::execute_workflow_command),
+                                        )
+                                        .route(
+                                            "/executions",
+                                            web::get().to(handlers::get_command_executions),
+                                        ),
+                                ),
                         )
                         // Settings endpoints
-                        .route("/settings", web::get().to(handlers::get_settings))
-                        .route(
-                            "/settings/api-keys",
-                            web::post().to(handlers::update_api_keys),
+                        .service(
+                            web::scope("/settings")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "settings", "read",
+                                )))
+                                .route("", web::get().to(handlers::get_settings))
+                                .service(
+                                    web::resource("/api-keys")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("settings", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::update_api_keys)),
+                                )
+                                .service(
+                                    web::resource("/projects-path")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("settings", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::set_projects_default_path)),
+                                ),
                         )
-                        .route(
-                            "/settings/projects-path",
-                            web::post().to(handlers::set_projects_default_path),
+                        .service(
+                            web::resource("/projects/scan")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "project", "write",
+                                )))
+                                .route(web::post().to(handlers::scan_projects)),
                         )
-                        .route("/projects/scan", web::post().to(handlers::scan_projects))
-                        .route("/models", web::get().to(handlers::get_supported_models))
-                        // Authentication routes
-                        .route("/auth/login", web::post().to(handlers::login)),
+                        .service(
+                            web::resource("/models")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "settings", "read",
+                                )))
+                                .route(web::get().to(handlers::get_supported_models)),
+                        )
+                        // User management endpoints (admin only)
+                        .service(
+                            web::scope("/users")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "user", "admin",
+                                )))
+                                .route("", web::get().to(handlers::list_users))
+                                .route("", web::post().to(handlers::create_user))
+                                .route("/{id}", web::get().to(handlers::get_user))
+                                .route("/{id}", web::put().to(handlers::update_user))
+                                .route("/{id}", web::delete().to(handlers::delete_user)),
+                        )
+                        // Team management endpoints
+                        .service(
+                            web::scope("/teams")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "team", "read",
+                                )))
+                                .route("", web::get().to(handlers::list_teams))
+                                .service(
+                                    web::resource("")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("team", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::create_team)),
+                                )
+                                .service(
+                                    web::scope("/{id}")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("team", "read")
+                                                .with_resource_id("id"),
+                                        ))
+                                        .route("", web::get().to(handlers::get_team))
+                                        .route(
+                                            "/members",
+                                            web::get().to(handlers::get_team_members),
+                                        )
+                                        .route(
+                                            "/permissions",
+                                            web::get().to(handlers::get_team_permissions),
+                                        )
+                                        .service(
+                                            web::resource("")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("team", "write")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route(web::put().to(handlers::update_team))
+                                                .route(web::delete().to(handlers::delete_team)),
+                                        )
+                                        .service(
+                                            web::resource("/members")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("team", "write")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route(web::post().to(handlers::add_team_member)),
+                                        )
+                                        .service(
+                                            web::scope("/members/{user_id}")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("team", "write")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route(
+                                                    "",
+                                                    web::delete().to(handlers::remove_team_member),
+                                                ),
+                                        ),
+                                ),
+                        )
+                        // Permission management endpoints
+                        .service(
+                            web::scope("/permissions")
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "team", "admin",
+                                )))
+                                .route("", web::get().to(handlers::list_permissions))
+                                .route("", web::post().to(handlers::create_permission))
+                                .service(
+                                    web::scope("/{id}")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("team", "admin"),
+                                        ))
+                                        .route("", web::delete().to(handlers::delete_permission)),
+                                ),
+                        ),
                 )
-                // WebSocket endpoints
+                // WebSocket endpoints (they handle auth internally)
                 .route("/ws", web::get().to(websocket::websocket_handler))
                 .route(
                     "/ws/work/{id}",

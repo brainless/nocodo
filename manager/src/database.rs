@@ -2202,6 +2202,112 @@ impl Database {
         Ok(())
     }
 
+    // User management methods
+
+    pub fn get_all_users(&self) -> AppResult<Vec<crate::models::User>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+             FROM users ORDER BY username",
+        )?;
+
+        let user_iter = stmt.query_map([], |row| {
+            Ok(crate::models::User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                email: row.get(2)?,
+                password_hash: row.get(3)?,
+                is_active: row.get::<_, i64>(4)? != 0,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?;
+
+        let users: Result<Vec<_>, _> = user_iter.collect();
+        users.map_err(AppError::from)
+    }
+
+    pub fn update_user(
+        &self,
+        user_id: i64,
+        update: &crate::models::UpdateUserRequest,
+    ) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        if let Some(username) = &update.username {
+            conn.execute(
+                "UPDATE users SET username = ?, updated_at = ? WHERE id = ?",
+                params![username, now, user_id],
+            )?;
+        }
+
+        if let Some(email) = &update.email {
+            conn.execute(
+                "UPDATE users SET email = ?, updated_at = ? WHERE id = ?",
+                params![email, now, user_id],
+            )?;
+        }
+
+        if let Some(is_active) = update.is_active {
+            conn.execute(
+                "UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?",
+                params![is_active, now, user_id],
+            )?;
+        }
+
+        tracing::info!("Updated user {}", user_id);
+        Ok(())
+    }
+
+    pub fn delete_user(&self, user_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute("DELETE FROM users WHERE id = ?", params![user_id])?;
+        tracing::info!("Deleted user {}", user_id);
+        Ok(())
+    }
+
+    // Permission management methods
+
+    pub fn get_all_permissions(&self) -> AppResult<Vec<crate::models::Permission>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, team_id, resource_type, resource_id, action, granted_by, granted_at
+             FROM permissions ORDER BY granted_at DESC",
+        )?;
+
+        let permission_iter = stmt.query_map([], |row| {
+            Ok(crate::models::Permission {
+                id: row.get(0)?,
+                team_id: row.get(1)?,
+                resource_type: row.get(2)?,
+                resource_id: row.get(3)?,
+                action: row.get(4)?,
+                granted_by: row.get(5)?,
+                granted_at: row.get(6)?,
+            })
+        })?;
+
+        let permissions: Result<Vec<_>, _> = permission_iter.collect();
+        permissions.map_err(AppError::from)
+    }
+
     // Permission system methods (Phase 2: Permission Checking)
 
     /// Get all teams that a user belongs to
@@ -2392,18 +2498,33 @@ impl Database {
     }
 
     /// Update a team
-    pub fn update_team(&self, team: &crate::models::Team) -> AppResult<()> {
+    pub fn update_team(
+        &self,
+        team_id: i64,
+        update: &crate::models::UpdateTeamRequest,
+    ) -> AppResult<()> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        conn.execute(
-            "UPDATE teams SET name = ?, description = ?, updated_at = ? WHERE id = ?",
-            params![team.name, team.description, team.updated_at, team.id],
-        )?;
+        let now = chrono::Utc::now().timestamp();
 
-        tracing::debug!("Updated team: {} (id={})", team.name, team.id);
+        if let Some(name) = &update.name {
+            conn.execute(
+                "UPDATE teams SET name = ?, updated_at = ? WHERE id = ?",
+                params![name, now, team_id],
+            )?;
+        }
+
+        if let Some(description) = &update.description {
+            conn.execute(
+                "UPDATE teams SET description = ?, updated_at = ? WHERE id = ?",
+                params![description, now, team_id],
+            )?;
+        }
+
+        tracing::info!("Updated team {}", team_id);
         Ok(())
     }
 
@@ -2423,31 +2544,28 @@ impl Database {
     // Team member methods
 
     /// Add a user to a team
-    pub fn add_team_member(&self, member: &crate::models::TeamMember) -> AppResult<i64> {
+    pub fn add_team_member(
+        &self,
+        team_id: i64,
+        user_id: i64,
+        added_by: Option<i64>,
+    ) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let now = chrono::Utc::now().timestamp();
+
         conn.execute(
             "INSERT INTO team_members (team_id, user_id, added_by, added_at)
              VALUES (?, ?, ?, ?)",
-            params![
-                member.team_id,
-                member.user_id,
-                member.added_by,
-                member.added_at
-            ],
+            params![team_id, user_id, added_by, &now],
         )?;
 
-        let id = conn.last_insert_rowid();
-        tracing::debug!(
-            "Added user {} to team {} (member_id={})",
-            member.user_id,
-            member.team_id,
-            id
-        );
-        Ok(id)
+        let member_id = conn.last_insert_rowid();
+        tracing::debug!("Added user {} to team {}", user_id, team_id);
+        Ok(member_id)
     }
 
     /// Remove a user from a team

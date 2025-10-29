@@ -8,14 +8,16 @@ use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
-    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest,
-    LlmAgentToolCallListResponse, Project, ProjectListResponse, ProjectResponse, ServerStatus,
-    SettingsResponse, UpdateApiKeysRequest, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateTeamRequest, CreateWorkRequest, FileContentResponse,
+    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
+    FileUpdateRequest, LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse,
+    ProjectResponse, ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest, UpdateTeamRequest,
+    UpdateUserRequest, User, UserListResponse, UserResponse, WorkListResponse, WorkMessageResponse,
+    WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{web, HttpMessage, HttpResponse, Result};
 use handlebars::Handlebars;
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
@@ -66,6 +68,7 @@ pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, App
 pub async fn create_project(
     data: web::Data<AppState>,
     request: web::Json<CreateProjectRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     let req = request.into_inner();
 
@@ -152,6 +155,17 @@ A new project created with nocodo.
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
 
+    // Get user ID from request and record ownership
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    let ownership =
+        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+    data.database.create_ownership(&ownership)?;
+
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
         .broadcast_project_created(project.clone());
@@ -188,9 +202,290 @@ pub async fn get_project_details(
         project,
         components,
     };
+
     Ok(HttpResponse::Ok().json(response))
 }
 
+// User management handlers
+
+pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let users = data.database.get_all_users()?;
+    let response = UserListResponse { users };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn create_user(
+    data: web::Data<AppState>,
+    request: web::Json<crate::models::CreateUserRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let create_req = request.into_inner();
+
+    // Validate username
+    if create_req.username.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Username cannot be empty".to_string(),
+        ));
+    }
+
+    // Check if user already exists
+    if data.database.get_user_by_username(&create_req.username).is_ok() {
+        return Err(AppError::InvalidRequest(
+            "Username already exists".to_string(),
+        ));
+    }
+
+    // Hash password
+    let password_hash = auth::hash_password(&create_req.password)?;
+
+    // Get current user ID for created_by field (currently not used, but reserved for future audit logging)
+    let _created_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Create user
+    let user = User {
+        id: 0, // Will be set by database
+        username: create_req.username,
+        email: create_req.email.unwrap_or_default(),
+        password_hash,
+        is_active: true,
+        created_at: std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+        updated_at: std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+    };
+
+    let user_id = data.database.create_user(&user)?;
+    let mut user = user;
+    user.id = user_id;
+
+    let response = UserResponse { user };
+    Ok(HttpResponse::Created().json(response))
+}
+
+pub async fn get_user(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    let user = data.database.get_user_by_id(user_id)?;
+    let response = UserResponse { user };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn update_user(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    request: web::Json<UpdateUserRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    let update_req = request.into_inner();
+
+    // Get current user for updated_by field (currently not used, but reserved for future audit logging)
+    let _updated_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Update user
+    data.database.update_user(user_id, &update_req)?;
+
+    let user = data.database.get_user_by_id(user_id)?;
+    let response = UserResponse { user };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn delete_user(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    data.database.delete_user(user_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// Team management handlers
+
+pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let teams = data.database.get_all_teams()?;
+    Ok(HttpResponse::Ok().json(teams))
+}
+
+pub async fn create_team(
+    data: web::Data<AppState>,
+    request: web::Json<CreateTeamRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let create_req = request.into_inner();
+
+    // Validate team name
+    if create_req.name.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Team name cannot be empty".to_string(),
+        ));
+    }
+
+    // Get current user ID for created_by field
+    let created_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Create team
+    let team = Team::new(create_req.name, create_req.description, created_by);
+    let team_id = data.database.create_team(&team)?;
+    let mut team = team;
+    team.id = team_id;
+
+    Ok(HttpResponse::Created().json(team))
+}
+
+pub async fn get_team(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let team = data.database.get_team_by_id(team_id)?;
+    Ok(HttpResponse::Ok().json(team))
+}
+
+pub async fn update_team(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    request: web::Json<UpdateTeamRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let update_req = request.into_inner();
+
+    // Get current user ID for updated_by field (currently not used, but reserved for future audit logging)
+    let _updated_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Update team
+    data.database.update_team(team_id, &update_req)?;
+
+    let team = data.database.get_team_by_id(team_id)?;
+    Ok(HttpResponse::Ok().json(team))
+}
+
+pub async fn delete_team(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    data.database.delete_team(team_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn get_team_members(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let members = data.database.get_team_members(team_id)?;
+    Ok(HttpResponse::Ok().json(members))
+}
+
+pub async fn add_team_member(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    request: web::Json<crate::models::AddTeamMemberRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let add_req = request.into_inner();
+
+    // Get current user ID for added_by field
+    let added_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Add team member
+    data.database
+        .add_team_member(team_id, add_req.user_id, Some(added_by))?;
+
+    Ok(HttpResponse::Created().finish())
+}
+
+pub async fn remove_team_member(
+    data: web::Data<AppState>,
+    path: web::Path<(i64, i64)>,
+) -> Result<HttpResponse, AppError> {
+    let (team_id, user_id) = path.into_inner();
+    data.database.remove_team_member(team_id, user_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn get_team_permissions(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let permissions = data.database.get_team_permissions(team_id)?;
+    Ok(HttpResponse::Ok().json(permissions))
+}
+
+// Permission management handlers
+
+pub async fn list_permissions(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let permissions = data.database.get_all_permissions()?;
+    Ok(HttpResponse::Ok().json(permissions))
+}
+
+pub async fn create_permission(
+    data: web::Data<AppState>,
+    request: web::Json<crate::models::CreatePermissionRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let create_req = request.into_inner();
+
+    // Get current user ID for granted_by field
+    let granted_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Create permission
+    let permission = Permission::new(
+        create_req.team_id,
+        create_req.resource_type,
+        create_req.resource_id,
+        create_req.action,
+        Some(granted_by),
+    );
+
+    let permission_id = data.database.create_permission(&permission)?;
+    let mut permission = permission;
+    permission.id = permission_id;
+
+    Ok(HttpResponse::Created().json(permission))
+}
+
+pub async fn delete_permission(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let permission_id = path.into_inner();
+    data.database.delete_permission(permission_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
 pub async fn delete_project(
     data: web::Data<AppState>,
     path: web::Path<i64>,
@@ -332,24 +627,25 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
 pub async fn add_existing_project(
     data: web::Data<AppState>,
     request: web::Json<AddExistingProjectRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
-    let req = request.into_inner();
+    let project_req = request.into_inner();
 
     // Validate project name
-    if req.name.trim().is_empty() {
+    if project_req.name.trim().is_empty() {
         return Err(AppError::InvalidRequest(
             "Project name cannot be empty".to_string(),
         ));
     }
 
     // Validate path is provided
-    if req.path.trim().is_empty() {
+    if project_req.path.trim().is_empty() {
         return Err(AppError::InvalidRequest(
             "Project path cannot be empty".to_string(),
         ));
     }
 
-    let project_path = Path::new(&req.path);
+    let project_path = Path::new(&project_req.path);
 
     // Validate directory exists and is accessible
     if !project_path.exists() {
@@ -390,18 +686,35 @@ pub async fn add_existing_project(
         return Err(AppError::InvalidRequest(err_msg));
     }
 
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
     // Create the project object
-    let mut project = Project::new(req.name.clone(), absolute_path_str);
-    project.description = req.description;
-    project.parent_id = req.parent_id;
+    let mut project = Project::new(project_req.name.clone(), absolute_path_str);
+    project.description = project_req.description;
+    project.parent_id = project_req.parent_id;
 
     // Save to database
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
 
+    // Record ownership
+    let ownership =
+        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+    data.database.create_ownership(&ownership)?;
+
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
         .broadcast_project_created(project.clone());
+
+    // Record ownership
+    let ownership =
+        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+    data.database.create_ownership(&ownership)?;
 
     tracing::info!(
         "Successfully registered existing project '{}' at {}",
@@ -835,22 +1148,23 @@ pub async fn create_ai_session(
     data: web::Data<AppState>,
     path: web::Path<i64>,
     request: web::Json<CreateAiSessionRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    let req = request.into_inner();
+    let session_req = request.into_inner();
 
     // Validate required fields
-    if req.tool_name.trim().is_empty() {
+    if session_req.tool_name.trim().is_empty() {
         return Err(AppError::InvalidRequest("tool_name is required".into()));
     }
-    if req.message_id.trim().is_empty() {
+    if session_req.message_id.trim().is_empty() {
         return Err(AppError::InvalidRequest("message_id is required".into()));
     }
 
     // Validate that work and message exist
     let work = data.database.get_work_by_id(work_id)?;
     let messages = data.database.get_work_messages(work_id)?;
-    let message_id_i64 = req
+    let message_id_i64 = session_req
         .message_id
         .parse::<i64>()
         .map_err(|_| AppError::InvalidRequest("Invalid message_id".to_string()))?;
@@ -871,13 +1185,25 @@ pub async fn create_ai_session(
     let mut session = crate::models::AiSession::new(
         work_id,
         message_id_i64,
-        req.tool_name.clone(),
+        session_req.tool_name.clone(),
         project_context,
     );
+
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
 
     // Persist
     let session_id = data.database.create_ai_session(&session)?;
     session.id = session_id;
+
+    // Record ownership for the AI session
+    let ownership =
+        crate::models::ResourceOwnership::new("ai_session".to_string(), session_id, user_id);
+    data.database.create_ownership(&ownership)?;
 
     // Broadcast AI session creation via WebSocket
     data.ws_broadcaster
@@ -889,7 +1215,7 @@ pub async fn create_ai_session(
     };
 
     // Handle LLM agent specially
-    if req.tool_name == "llm-agent" {
+    if session_req.tool_name == "llm-agent" {
         if let Some(ref llm_agent) = data.llm_agent {
             tracing::info!(
                 "LLM agent is available, starting LLM agent session for session {}",
@@ -1110,11 +1436,12 @@ pub async fn check_project_path_conflicts(
 pub async fn create_work(
     data: web::Data<AppState>,
     request: web::Json<CreateWorkRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
-    let req = request.into_inner();
+    let work_req = request.into_inner();
 
     // Validate work title
-    if req.title.trim().is_empty() {
+    if work_req.title.trim().is_empty() {
         return Err(AppError::InvalidRequest(
             "Work title cannot be empty".to_string(),
         ));
@@ -1128,20 +1455,31 @@ pub async fn create_work(
 
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
-        title: req.title.clone(),
-        project_id: req.project_id,
-        model: req.model.clone(),
+        title: work_req.title.clone(),
+        project_id: work_req.project_id,
+        model: work_req.model.clone(),
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
     };
 
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
     // Create work with initial message in a single transaction
     let (work_id, message_id) = data
         .database
-        .create_work_with_message(&work, req.title.clone())?;
+        .create_work_with_message(&work, work_req.title.clone())?;
     let mut work = work;
     work.id = work_id;
+
+    // Record ownership
+    let ownership = crate::models::ResourceOwnership::new("work".to_string(), work_id, user_id);
+    data.database.create_ownership(&ownership)?;
 
     // Broadcast work creation via WebSocket
     data.ws_broadcaster.broadcast_project_created(Project {
@@ -1162,8 +1500,10 @@ pub async fn create_work(
     );
 
     // Auto-start LLM agent session if requested (default: true)
-    if req.auto_start {
-        let tool_name = req.tool_name.unwrap_or_else(|| "llm-agent".to_string());
+    if work_req.auto_start {
+        let tool_name = work_req
+            .tool_name
+            .unwrap_or_else(|| "llm-agent".to_string());
 
         // Generate project context if work is associated with a project
         let project_context = if let Some(project_id) = work.project_id {
@@ -1213,7 +1553,7 @@ pub async fn create_work(
                 // Process the message in background task to avoid blocking HTTP response
                 let llm_agent_clone = llm_agent.clone();
                 let session_id = llm_session.id;
-                let message_content = req.title.clone();
+                let message_content = work_req.title.clone();
                 tokio::spawn(async move {
                     if let Err(e) = llm_agent_clone
                         .process_message(session_id, message_content)
@@ -1279,15 +1619,23 @@ pub async fn add_message_to_work(
     data: web::Data<AppState>,
     path: web::Path<i64>,
     request: web::Json<AddMessageRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    let req = request.into_inner();
+    let msg_req = request.into_inner();
 
     // Verify work exists
     let _work = data.database.get_work_by_id(work_id)?;
 
     // Get next sequence number
     let sequence_order = data.database.get_next_message_sequence(work_id)?;
+
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
 
     // Create the message object
     let now = SystemTime::now()
@@ -1298,10 +1646,10 @@ pub async fn add_message_to_work(
     let mut message = crate::models::WorkMessage {
         id: 0, // Will be set by database AUTOINCREMENT
         work_id,
-        content: req.content,
-        content_type: req.content_type,
-        author_type: req.author_type,
-        author_id: req.author_id,
+        content: msg_req.content,
+        content_type: msg_req.content_type,
+        author_type: msg_req.author_type,
+        author_id: Some(user_id.to_string()), // Use authenticated user ID
         sequence_order,
         created_at: now,
     };
@@ -1901,9 +2249,8 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
                 project.description = Some("Project".to_string());
             }
 
-            // Save to database
-            let project_id = data.database.create_project(&project)?;
-            project.id = project_id;
+            // This function only scans the filesystem, it doesn't create projects in the database
+            // The ownership recording code was misplaced here
 
             created_projects.push(project.clone());
 

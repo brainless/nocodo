@@ -98,7 +98,7 @@ pub struct LoginResponse {
     pub user: UserInfo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
     pub id: i64,
     pub username: String,
@@ -767,4 +767,59 @@ impl ResourceOwnership {
             created_at: now,
         }
     }
+}
+
+// Additional request/response models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserListResponse {
+    pub users: Vec<User>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserResponse {
+    pub user: User,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub email: Option<String>,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateUserRequest {
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+// Team management models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateTeamRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTeamRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddTeamMemberRequest {
+    pub user_id: i64,
+}
+
+// Permission management models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePermissionRequest {
+    pub team_id: i64,
+    pub resource_type: String,
+    pub resource_id: Option<i64>,
+    pub action: String,
 }
