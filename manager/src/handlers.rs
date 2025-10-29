@@ -25,6 +25,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+use urlencoding;
 
 pub struct AppState {
     pub database: Arc<Database>,
@@ -651,7 +652,9 @@ pub async fn get_file_content(
     path_param: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
-    let file_path = path_param.into_inner();
+    let file_path = urlencoding::decode(&path_param.into_inner())
+        .map_err(|_| AppError::InvalidRequest("Invalid URL encoding in path".to_string()))?
+        .to_string();
     let project_id_str = query
         .get("project_id")
         .ok_or_else(|| AppError::InvalidRequest("project_id is required".to_string()))?;
@@ -711,7 +714,9 @@ pub async fn update_file(
     path_param: web::Path<String>,
     request: web::Json<FileUpdateRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let file_path = path_param.into_inner();
+    let file_path = urlencoding::decode(&path_param.into_inner())
+        .map_err(|_| AppError::InvalidRequest("Invalid URL encoding in path".to_string()))?
+        .to_string();
     let req = request.into_inner();
 
     // Get the project to determine the base path
@@ -768,7 +773,9 @@ pub async fn delete_file(
     path_param: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
-    let file_path = path_param.into_inner();
+    let file_path = urlencoding::decode(&path_param.into_inner())
+        .map_err(|_| AppError::InvalidRequest("Invalid URL encoding in path".to_string()))?
+        .to_string();
     let project_id_str = query
         .get("project_id")
         .ok_or_else(|| AppError::InvalidRequest("project_id is required".to_string()))?;
