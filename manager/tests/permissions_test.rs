@@ -10,7 +10,7 @@
 //! - Permission denial when no access
 
 use nocodo_manager::database::Database;
-use nocodo_manager::models::{Permission, ResourceOwnership, Team, TeamMember, User};
+use nocodo_manager::models::{Permission, ResourceOwnership, Team, User};
 use nocodo_manager::permissions::{check_permission, Action, ResourceType};
 use tempfile::TempDir;
 
@@ -100,8 +100,7 @@ async fn test_team_member_inherits_permission() {
     );
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant permission to team
     let permission = Permission::new(
@@ -149,8 +148,7 @@ async fn test_entity_level_permission() {
     );
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant entity-level permission (resource_id = NULL)
     let permission = Permission::new(
@@ -190,8 +188,7 @@ async fn test_action_hierarchy() {
     let team = Team::new("Team".to_string(), None, user_id);
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant ADMIN permission
     let permission = Permission::new(
@@ -278,11 +275,8 @@ async fn test_multiple_team_memberships() {
     let team2_id = db.create_team(&team2).unwrap();
 
     // Add user to both teams
-    let member1 = TeamMember::new(team1_id, user_id, Some(user_id));
-    db.add_team_member(&member1).unwrap();
-
-    let member2 = TeamMember::new(team2_id, user_id, Some(user_id));
-    db.add_team_member(&member2).unwrap();
+    db.add_team_member(team1_id, user_id, Some(user_id)).unwrap();
+    db.add_team_member(team2_id, user_id, Some(user_id)).unwrap();
 
     // Grant different permissions to each team
     let permission1 = Permission::new(
@@ -335,8 +329,7 @@ async fn test_write_implies_read() {
     let team = Team::new("Writers".to_string(), None, user_id);
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant WRITE permission
     let permission = Permission::new(
@@ -399,8 +392,7 @@ async fn test_delete_implies_read() {
     let team = Team::new("Deleters".to_string(), None, user_id);
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant DELETE permission
     let permission = Permission::new(
@@ -463,8 +455,7 @@ async fn test_resource_specific_vs_entity_level() {
     let team = Team::new("Team".to_string(), None, user_id);
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant entity-level read permission
     let permission1 = Permission::new(
@@ -544,8 +535,7 @@ async fn test_team_deletion_cascades_permissions() {
     let team = Team::new("Temp Team".to_string(), None, user_id);
     let team_id = db.create_team(&team).unwrap();
 
-    let member = TeamMember::new(team_id, user_id, Some(user_id));
-    db.add_team_member(&member).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
 
     // Grant permission
     let permission = Permission::new(
@@ -581,4 +571,127 @@ async fn test_team_deletion_cascades_permissions() {
     )
     .await
     .unwrap());
+}
+
+#[tokio::test]
+async fn test_hierarchical_project_permission_inheritance() {
+    let (db, _temp) = setup_test_db();
+
+    let user_id = create_test_user(&db, "kevin", "kevin@example.com");
+    let parent_project_id = 5;
+    let child_project_id = 10;
+
+    // Create parent project
+    let parent_project = nocodo_manager::models::Project {
+        id: parent_project_id,
+        name: "Parent Project".to_string(),
+        path: "/tmp/test/parent".to_string(),
+        description: Some("Parent project".to_string()),
+        parent_id: None,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+    db.create_project(&parent_project).unwrap();
+
+    // Create child project with parent_id = 5
+    let child_project = nocodo_manager::models::Project {
+        id: child_project_id,
+        name: "Child Project".to_string(),
+        path: "/tmp/test/child".to_string(),
+        description: Some("Child project".to_string()),
+        parent_id: Some(parent_project_id),
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+    db.create_project(&child_project).unwrap();
+
+    // Create team and add user
+    let team = Team::new("Team".to_string(), None, user_id);
+    let team_id = db.create_team(&team).unwrap();
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
+
+    // Grant permission on PARENT project only
+    let permission = Permission::new(
+        team_id,
+        "project".to_string(),
+        Some(parent_project_id),
+        "write".to_string(),
+        Some(user_id),
+    );
+    db.create_permission(&permission).unwrap();
+
+    // User should have access to PARENT project
+    assert!(check_permission(
+        &db,
+        user_id,
+        ResourceType::Project,
+        Some(parent_project_id),
+        Action::Write
+    )
+    .await
+    .unwrap());
+
+    // User should have access to CHILD project (inheritance)
+    assert!(check_permission(
+        &db,
+        user_id,
+        ResourceType::Project,
+        Some(child_project_id),
+        Action::Write
+    )
+    .await
+    .unwrap());
+
+    // Both should imply read
+    assert!(check_permission(
+        &db,
+        user_id,
+        ResourceType::Project,
+        Some(parent_project_id),
+        Action::Read
+    )
+    .await
+    .unwrap());
+    assert!(check_permission(
+        &db,
+        user_id,
+        ResourceType::Project,
+        Some(child_project_id),
+        Action::Read
+    )
+    .await
+    .unwrap());
+}
+
+#[tokio::test]
+async fn test_ownership_deleted_with_resource() {
+    let (db, _temp) = setup_test_db();
+
+    let user_id = create_test_user(&db, "lisa", "lisa@example.com");
+    let project_id = 15;
+
+    // Create project
+    let project = nocodo_manager::models::Project {
+        id: project_id,
+        name: "Test Project".to_string(),
+        path: "/tmp/test/project15".to_string(),
+        description: None,
+        parent_id: None,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+    db.create_project(&project).unwrap();
+
+    // Create ownership record
+    let ownership = ResourceOwnership::new("project".to_string(), project_id, user_id);
+    db.create_ownership(&ownership).unwrap();
+
+    // Verify ownership exists
+    assert!(db.is_owner(user_id, "project", project_id).unwrap());
+
+    // Delete the project
+    db.delete_project(project_id).unwrap();
+
+    // Verify ownership record is gone (is_owner should return false)
+    assert!(!db.is_owner(user_id, "project", project_id).unwrap());
 }

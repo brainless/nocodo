@@ -65,6 +65,7 @@ pub enum ResourceType {
     Settings,
     User,
     Team,
+    AiSession,
 }
 
 impl ResourceType {
@@ -76,6 +77,7 @@ impl ResourceType {
             ResourceType::Settings => "settings",
             ResourceType::User => "user",
             ResourceType::Team => "team",
+            ResourceType::AiSession => "ai_session",
         }
     }
 
@@ -87,6 +89,7 @@ impl ResourceType {
             "settings" => Some(ResourceType::Settings),
             "user" => Some(ResourceType::User),
             "team" => Some(ResourceType::Team),
+            "ai_session" => Some(ResourceType::AiSession),
             _ => None,
         }
     }
@@ -242,6 +245,10 @@ mod tests {
         );
         assert_eq!(ResourceType::from_str("user"), Some(ResourceType::User));
         assert_eq!(ResourceType::from_str("team"), Some(ResourceType::Team));
+        assert_eq!(
+            ResourceType::from_str("ai_session"),
+            Some(ResourceType::AiSession)
+        );
         assert_eq!(
             ResourceType::from_str("PROJECT"),
             Some(ResourceType::Project)

@@ -610,7 +610,7 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id INTEGER NOT NULL,
-                resource_type TEXT NOT NULL CHECK (resource_type IN ('project', 'work', 'settings', 'user', 'team')),
+                resource_type TEXT NOT NULL CHECK (resource_type IN ('project', 'work', 'settings', 'user', 'team', 'ai_session')),
                 resource_id INTEGER,
                 action TEXT NOT NULL CHECK (action IN ('read', 'write', 'delete', 'admin')),
                 granted_by INTEGER,
@@ -635,7 +635,7 @@ impl Database {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS resource_ownership (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                resource_type TEXT NOT NULL CHECK (resource_type IN ('project', 'work', 'settings', 'user', 'team')),
+                resource_type TEXT NOT NULL CHECK (resource_type IN ('project', 'work', 'settings', 'user', 'team', 'ai_session')),
                 resource_id INTEGER NOT NULL,
                 owner_id INTEGER NOT NULL,
                 created_at INTEGER NOT NULL,
@@ -820,6 +820,12 @@ impl Database {
 
         // First delete components
         conn.execute("DELETE FROM project_components WHERE project_id = ?", [id])?;
+
+        // Clean up ownership records for this project
+        conn.execute("DELETE FROM resource_ownership WHERE resource_type = 'project' AND resource_id = ?", [id])?;
+
+        // Clean up permissions referencing this specific project
+        conn.execute("DELETE FROM permissions WHERE resource_type = 'project' AND resource_id = ?", [id])?;
 
         let rows_affected = conn.execute("DELETE FROM projects WHERE id = ?", [id])?;
 
@@ -1208,6 +1214,12 @@ impl Database {
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // Clean up ownership records for this work
+        conn.execute("DELETE FROM resource_ownership WHERE resource_type = 'work' AND resource_id = ?", [id])?;
+
+        // Clean up permissions referencing this specific work
+        conn.execute("DELETE FROM permissions WHERE resource_type = 'work' AND resource_id = ?", [id])?;
 
         let rows_affected = conn.execute("DELETE FROM works WHERE id = ?", [id])?;
 

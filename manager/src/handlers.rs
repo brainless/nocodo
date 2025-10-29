@@ -711,11 +711,6 @@ pub async fn add_existing_project(
     data.ws_broadcaster
         .broadcast_project_created(project.clone());
 
-    // Record ownership
-    let ownership =
-        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
-    data.database.create_ownership(&ownership)?;
-
     tracing::info!(
         "Successfully registered existing project '{}' at {}",
         project.name,
