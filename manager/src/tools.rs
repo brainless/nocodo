@@ -661,15 +661,69 @@ impl ToolExecutor {
                         original_lines.pop();
                     }
 
-                    // Count additions/deletions from chunks
+                    // Apply each chunk to the file
+                    let mut modified_content = original_content.clone();
+
                     for chunk in chunks {
                         total_deletions += chunk.old_lines.len();
                         total_additions += chunk.new_lines.len();
+
+                        // Find and replace the old_lines with new_lines
+                        let old_text = chunk.old_lines.join("\n");
+                        let new_text = chunk.new_lines.join("\n");
+
+                        // Try to find the exact match first
+                        if let Some(pos) = modified_content.find(&old_text) {
+                            // Replace the found text
+                            modified_content.replace_range(pos..pos + old_text.len(), &new_text);
+                        } else {
+                            // If exact match fails, try with context
+                            if let Some(ref context) = chunk.change_context {
+                                // Find the context line first
+                                if let Some(context_pos) = modified_content.find(context) {
+                                    // Search for old_lines after the context
+                                    let search_start = context_pos + context.len();
+                                    if let Some(relative_pos) =
+                                        modified_content[search_start..].find(&old_text)
+                                    {
+                                        let absolute_pos = search_start + relative_pos;
+                                        modified_content.replace_range(
+                                            absolute_pos..absolute_pos + old_text.len(),
+                                            &new_text,
+                                        );
+                                    } else {
+                                        errors.push(format!(
+                                            "Could not find old lines in '{}' after context '{}'",
+                                            path_str, context
+                                        ));
+                                        continue;
+                                    }
+                                } else {
+                                    errors.push(format!(
+                                        "Could not find context '{}' in '{}'",
+                                        context, path_str
+                                    ));
+                                    continue;
+                                }
+                            } else {
+                                errors.push(format!(
+                                    "Could not find old lines in '{}' and no context provided",
+                                    path_str
+                                ));
+                                continue;
+                            }
+                        }
                     }
 
-                    // For simplicity, we'll let codex-apply-patch handle the actual application
-                    // by writing a temporary single-hunk patch and using its apply logic
-                    // For now, we'll just track the operation
+                    // Write the modified content back to the file
+                    if let Err(e) = fs::write(path, modified_content) {
+                        errors.push(format!(
+                            "Failed to write modified file '{}': {}",
+                            path_str, e
+                        ));
+                        continue;
+                    }
+
                     let operation = if move_path.is_some() {
                         "move"
                     } else {
