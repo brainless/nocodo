@@ -449,10 +449,21 @@ impl ToolExecutor {
 
             // Check include/exclude patterns
             let file_path = entry.path();
-            let relative_path = file_path
-                .strip_prefix(&search_path)
-                .unwrap_or(file_path)
-                .to_string_lossy();
+
+            // Calculate relative path for display
+            // When searching a single file, use the file name instead of empty string
+            let relative_path = if search_path.is_file() {
+                file_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| file_path.to_string_lossy().to_string())
+            } else {
+                file_path
+                    .strip_prefix(&search_path)
+                    .unwrap_or(file_path)
+                    .to_string_lossy()
+                    .to_string()
+            };
 
             // Apply include filter
             if let Some(ref include_re) = include_regex {
@@ -497,7 +508,7 @@ impl ToolExecutor {
                     let matched_text = mat.as_str().to_string();
 
                     let grep_match = GrepMatch {
-                        file_path: relative_path.to_string(),
+                        file_path: relative_path.clone(),
                         line_number: if request.include_line_numbers.unwrap_or(true) {
                             Some((line_num + 1) as u32)
                         } else {
