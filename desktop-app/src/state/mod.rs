@@ -156,8 +156,14 @@ pub struct AppState {
     #[serde(skip)]
     pub current_file_browser_project_id: Option<i64>,
     #[serde(skip)]
+    pub sending_message: bool,
+    #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub send_message_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::WorkMessage, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub create_ai_session_result:
@@ -234,7 +240,9 @@ impl Default for AppState {
             loading_file_list: false,
             loading_file_content: false,
             current_file_browser_project_id: None,
+            sending_message: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
+            send_message_result: Arc::new(std::sync::Mutex::new(None)),
             create_ai_session_result: Arc::new(std::sync::Mutex::new(None)),
             update_api_keys_result: Arc::new(std::sync::Mutex::new(None)),
             file_list_result: Arc::new(std::sync::Mutex::new(None)),

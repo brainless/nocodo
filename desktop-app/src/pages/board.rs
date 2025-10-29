@@ -712,6 +712,42 @@ impl crate::pages::Page for WorkPage {
                                                     ui.add_space(8.0);
                                                 }
                                             });
+
+                                            // Message continuation input (outside scroll area)
+                                            ui.separator();
+                                            ui.add_space(8.0);
+
+                                            ui.horizontal(|ui| {
+                                                ui.label("Continue conversation:");
+                                            });
+
+                                            ui.add_space(4.0);
+
+                                            let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
+                                                .desired_width(ui.available_width())
+                                                .desired_rows(3)
+                                                .hint_text("Type your message here...");
+
+                                            ui.add(text_edit);
+
+                                            ui.add_space(8.0);
+
+                                            ui.horizontal(|ui| {
+                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                    let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
+                                                        && !state.sending_message;
+
+                                                    if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
+                                                        let api_service = crate::services::ApiService::new();
+                                                        api_service.send_message_to_work(selected_work_id, state);
+                                                    }
+
+                                                    if state.sending_message {
+                                                        ui.add(egui::Spinner::new());
+                                                        ui.label("Sending...");
+                                                    }
+                                                });
+                                            });
                                         }
                                     }
                                     ConnectionState::Error(error) => {

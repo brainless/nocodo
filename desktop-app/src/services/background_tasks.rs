@@ -33,6 +33,7 @@ impl BackgroundTasks {
         self.check_local_server_result(state);
         self.check_file_list_result(state);
         self.check_file_content_result(state);
+        self.check_send_message_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -341,6 +342,31 @@ impl BackgroundTasks {
         let result = state.file_content_result.lock().unwrap();
         if result.is_some() {
             state.loading_file_content = false;
+        }
+    }
+
+    fn check_send_message_result(&self, state: &mut AppState) {
+        let result_opt = {
+            let mut result = state.send_message_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
+            state.sending_message = false;
+            match res {
+                Ok(_message) => {
+                    // Clear the input
+                    state.ui_state.continue_message_input.clear();
+                    // Refresh messages to show the new message and AI response
+                    if let Some(work_id) = state.ui_state.selected_work_id {
+                        self.api_service.refresh_work_messages(work_id, state);
+                    }
+                }
+                Err(e) => {
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to send message: {}", e));
+                }
+            }
         }
     }
 }

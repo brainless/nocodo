@@ -58,6 +58,8 @@ pub struct UiState {
     /// File management state for project detail page
     pub selected_file_path: Option<String>,
     pub expanded_folders: std::collections::HashSet<String>,
+    /// Message continuation input for work detail
+    pub continue_message_input: String,
 }
 
 impl Default for UiState {
@@ -84,6 +86,7 @@ impl Default for UiState {
             project_detail_tab: ProjectDetailTab::default(),
             selected_file_path: None,
             expanded_folders: std::collections::HashSet::new(),
+            continue_message_input: String::new(),
         }
     }
 }

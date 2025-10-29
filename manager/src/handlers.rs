@@ -1309,6 +1309,107 @@ pub async fn add_message_to_work(
         work_id
     );
 
+    // Auto-start AI session to continue the conversation
+    let work = data.database.get_work_by_id(work_id)?;
+    let tool_name = "llm-agent".to_string();
+
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(project_id) = work.project_id {
+        let project = data.database.get_project_by_id(project_id)?;
+        Some(format!("Project: {}\nPath: {}", project.name, project.path))
+    } else {
+        None
+    };
+
+    // Create AI session record
+    let session = crate::models::AiSession::new(
+        work_id,
+        message_id,
+        tool_name.clone(),
+        project_context.clone(),
+    );
+    let session_id = data.database.create_ai_session(&session)?;
+
+    tracing::info!(
+        "Auto-starting {} session {} for work {} (message continuation)",
+        tool_name,
+        session_id,
+        work_id
+    );
+
+    // Handle LLM agent
+    if let Some(ref llm_agent) = data.llm_agent {
+        // Get existing LLM agent session for this work
+        if let Ok(llm_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
+            // Use existing session - just process the new message
+            let session_id = llm_session.id;
+            let message_content = message.content.clone();
+            let llm_agent_clone = llm_agent.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) = llm_agent_clone
+                    .process_message(session_id, message_content)
+                    .await
+                {
+                    tracing::error!(
+                        "Failed to process LLM message for session {}: {}",
+                        session_id,
+                        e
+                    );
+                } else {
+                    tracing::info!(
+                        "Successfully completed LLM agent processing for session {}",
+                        session_id
+                    );
+                }
+            });
+        } else {
+            // No existing session - create a new one
+            let (provider, model) = if let Some(ref model_id) = work.model {
+                let provider = infer_provider_from_model(model_id);
+                (provider.to_string(), model_id.clone())
+            } else {
+                let provider =
+                    std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+                let model = std::env::var("MODEL")
+                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                (provider, model)
+            };
+
+            let llm_session = llm_agent
+                .create_session(work_id, provider, model, project_context)
+                .await?;
+
+            let llm_agent_clone = llm_agent.clone();
+            let session_id = llm_session.id;
+            let message_content = message.content.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) = llm_agent_clone
+                    .process_message(session_id, message_content)
+                    .await
+                {
+                    tracing::error!(
+                        "Failed to process LLM message for session {}: {}",
+                        session_id,
+                        e
+                    );
+                } else {
+                    tracing::info!(
+                        "Successfully completed LLM agent processing for session {}",
+                        session_id
+                    );
+                }
+            });
+        }
+    } else {
+        tracing::warn!(
+            "LLM agent not available - work {} message {} will not be processed",
+            work_id,
+            message_id
+        );
+    }
+
     let response = WorkMessageResponse { message };
     Ok(HttpResponse::Created().json(response))
 }

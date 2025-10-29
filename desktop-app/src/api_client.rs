@@ -180,8 +180,31 @@ impl ApiClient {
         Ok(work_response.work)
     }
 
-    // Note: add_message_to_work and create_ai_session methods removed
-    // Messages and sessions are now automatically created when creating a Work item
+    pub async fn add_message_to_work(
+        &self,
+        work_id: i64,
+        request: manager_models::AddMessageRequest,
+    ) -> Result<manager_models::WorkMessage, ApiError> {
+        let url = format!("{}/api/work/{}/messages", self.base_url, work_id);
+        let response = self
+            .client()
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let message_response: manager_models::WorkMessageResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(message_response.message)
+    }
 
     pub async fn get_supported_models(
         &self,

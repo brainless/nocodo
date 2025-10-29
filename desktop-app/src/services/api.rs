@@ -156,6 +156,35 @@ impl ApiService {
         }
     }
 
+    pub fn send_message_to_work(&self, work_id: i64, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.sending_message = true;
+            state.send_message_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.send_message_result);
+
+            let message_content = state.ui_state.continue_message_input.clone();
+
+            tokio::spawn(async move {
+                if let Some(api_client) = connection_manager.get_api_client().await {
+                    let request = manager_models::AddMessageRequest {
+                        content: message_content,
+                        content_type: manager_models::MessageContentType::Text,
+                        author_type: manager_models::MessageAuthorType::User,
+                        author_id: None,
+                    };
+                    let result = api_client.add_message_to_work(work_id, request).await;
+                    let mut send_message_result = result_clone.lock().unwrap();
+                    *send_message_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut send_message_result = result_clone.lock().unwrap();
+                    *send_message_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
     pub fn refresh_work_messages(&self, work_id: i64, state: &mut AppState) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             // Fetch work messages, AI session outputs, and tool calls
