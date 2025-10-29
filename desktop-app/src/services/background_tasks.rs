@@ -31,6 +31,8 @@ impl BackgroundTasks {
         self.check_update_projects_path_result(state);
         self.check_scan_projects_result(state);
         self.check_local_server_result(state);
+        self.check_file_list_result(state);
+        self.check_file_content_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -325,6 +327,20 @@ impl BackgroundTasks {
         if let Some(res) = result.take() {
             state.ui_state.checking_local_server = false;
             state.ui_state.local_server_running = res;
+        }
+    }
+
+    fn check_file_list_result(&self, state: &mut AppState) {
+        let result = state.file_list_result.lock().unwrap();
+        if result.is_some() {
+            state.loading_file_list = false;
+        }
+    }
+
+    fn check_file_content_result(&self, state: &mut AppState) {
+        let result = state.file_content_result.lock().unwrap();
+        if result.is_some() {
+            state.loading_file_content = false;
         }
     }
 }

@@ -108,8 +108,10 @@ impl crate::pages::Page for ProjectDetailPage {
 
                     ui.separator();
 
-                    // Tab navigation
+                    // Tab navigation - styled to look like tabs
                     ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 0.0; // Remove spacing between tabs
+
                         let tabs = [
                             (ProjectDetailTab::Dashboard, "Dashboard"),
                             (ProjectDetailTab::Files, "Files"),
@@ -118,17 +120,40 @@ impl crate::pages::Page for ProjectDetailPage {
 
                         for (tab, label) in tabs {
                             let is_selected = state.ui_state.project_detail_tab == tab;
-                            let button_text = if is_selected {
-                                WidgetText::section_heading(label)
-                            } else {
-                                WidgetText::button(label)
-                            };
 
-                            if ui.button(button_text).clicked() {
+                            // Create a styled button that looks like a tab
+                            let mut button = egui::Button::new(
+                                egui::RichText::new(label)
+                                    .family(egui::FontFamily::Name("ui_semibold".into())),
+                            )
+                            .selected(is_selected);
+
+                            // Remove frame when not selected to create tab-like appearance
+                            if !is_selected {
+                                button = button.frame(false);
+                            }
+
+                            // Add padding to make tabs more spacious
+                            button = button.min_size(egui::vec2(100.0, 32.0));
+
+                            let response = ui.add(button);
+
+                            if response.clicked() {
                                 state.ui_state.project_detail_tab = tab;
                             }
 
-                            ui.add_space(8.0);
+                            // Draw underline for selected tab
+                            if is_selected {
+                                let rect = response.rect;
+                                let stroke = egui::Stroke::new(2.0, ui.visuals().selection.bg_fill);
+                                ui.painter().line_segment(
+                                    [
+                                        egui::pos2(rect.left(), rect.bottom()),
+                                        egui::pos2(rect.right(), rect.bottom()),
+                                    ],
+                                    stroke,
+                                );
+                            }
                         }
                     });
 
