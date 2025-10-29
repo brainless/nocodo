@@ -321,11 +321,15 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Use remaining space in this column for scrolling
+                                            // Reserve space for reply form at bottom (approximately 120px)
+                                            let reply_form_height = 120.0;
+                                            let available_height = ui.available_height() - reply_form_height;
                                             let available_width = ui.available_width();
+
                                             let mut scroll_area = egui::ScrollArea::vertical()
                                                 .id_salt("work_messages_scroll")
                                                 .auto_shrink(false)
+                                                .max_height(available_height)
                                                 .max_width(available_width);
 
                                             // Reset scroll to top if a new work item was selected
