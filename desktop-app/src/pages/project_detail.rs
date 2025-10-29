@@ -404,7 +404,7 @@ impl ProjectDetailPage {
         ui: &mut Ui,
         state: &mut AppState,
         files: &[manager_models::FileInfo],
-        prefix: &str,
+        _prefix: &str,
     ) {
         let mut directories = Vec::new();
         let mut regular_files = Vec::new();
@@ -423,11 +423,8 @@ impl ProjectDetailPage {
 
         // Render directories first
         for directory in directories {
-            let full_path = if prefix.is_empty() {
-                directory.name.clone()
-            } else {
-                format!("{}/{}", prefix, directory.name)
-            };
+            // Use the path directly from the API response, which is already relative to project root
+            let full_path = directory.path.clone();
 
             let is_expanded = state.ui_state.expanded_folders.contains(&full_path);
 
@@ -460,11 +457,8 @@ impl ProjectDetailPage {
 
         // Render files
         for file in regular_files {
-            let full_path = if prefix.is_empty() {
-                file.name.clone()
-            } else {
-                format!("{}/{}", prefix, file.name)
-            };
+            // Use the path directly from the API response, which is already relative to project root
+            let full_path = file.path.clone();
 
             ui.horizontal(|ui| {
                 // Add 2 spaces for hierarchy
