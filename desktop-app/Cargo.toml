@@ -51,4 +51,7 @@ chrono = "0.4"
 # Random data generation
 rand = "0.8"
 
+# URL encoding
+urlencoding = "2.1"
+
 

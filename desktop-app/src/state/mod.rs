@@ -150,6 +150,10 @@ pub struct AppState {
     #[serde(skip)]
     pub updating_api_keys: bool,
     #[serde(skip)]
+    pub loading_file_list: bool,
+    #[serde(skip)]
+    pub loading_file_content: bool,
+    #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
     #[serde(skip)]
@@ -159,6 +163,14 @@ pub struct AppState {
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub file_list_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::FileInfo>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub file_content_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::FileContentResponse, String>>>>,
     #[serde(skip)]
     pub db: Option<Connection>,
     #[serde(skip)]
@@ -217,9 +229,13 @@ impl Default for AppState {
             updating_projects_path: false,
             scanning_projects: false,
             updating_api_keys: false,
+            loading_file_list: false,
+            loading_file_content: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
             create_ai_session_result: Arc::new(std::sync::Mutex::new(None)),
             update_api_keys_result: Arc::new(std::sync::Mutex::new(None)),
+            file_list_result: Arc::new(std::sync::Mutex::new(None)),
+            file_content_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
             connection_result: Arc::new(std::sync::Mutex::new(None)),

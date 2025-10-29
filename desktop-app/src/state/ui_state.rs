@@ -12,6 +12,19 @@ pub enum Page {
     UiTwoColumnMainContent,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProjectDetailTab {
+    Dashboard,
+    Files,
+    Components,
+}
+
+impl Default for ProjectDetailTab {
+    fn default() -> Self {
+        ProjectDetailTab::Dashboard
+    }
+}
+
 impl Default for Page {
     fn default() -> Self {
         Page::Servers
@@ -40,6 +53,11 @@ pub struct UiState {
     /// Set of expanded tool call IDs (for collapsible tool response widgets)
     #[serde(skip)]
     pub expanded_tool_calls: std::collections::HashSet<i64>,
+    /// Current selected tab in project detail page
+    pub project_detail_tab: ProjectDetailTab,
+    /// File management state for project detail page
+    pub selected_file_path: Option<String>,
+    pub expanded_folders: std::collections::HashSet<String>,
 }
 
 impl Default for UiState {
@@ -63,6 +81,9 @@ impl Default for UiState {
             ui_reference_form_dropdown: None,
             ui_reference_readme_content: String::new(),
             expanded_tool_calls: std::collections::HashSet::new(),
+            project_detail_tab: ProjectDetailTab::default(),
+            selected_file_path: None,
+            expanded_folders: std::collections::HashSet::new(),
         }
     }
 }

@@ -1,6 +1,7 @@
 use manager_models::{
-    CreateWorkRequest, Project, ProjectDetailsResponse, ProjectListResponse, SettingsResponse,
-    SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkResponse,
+    CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
+    ProjectListResponse, SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work,
+    WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -295,6 +296,66 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(result)
+    }
+
+    pub async fn list_files(
+        &self,
+        project_id: i64,
+        path: Option<&str>,
+    ) -> Result<Vec<FileInfo>, ApiError> {
+        let mut url = format!("{}/api/files?project_id={}", self.base_url, project_id);
+        if let Some(path) = path {
+            url.push_str(&format!("&path={}", urlencoding::encode(path)));
+        }
+
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let file_list_response: manager_models::FileListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(file_list_response.files)
+    }
+
+    pub async fn get_file_content(
+        &self,
+        project_id: i64,
+        path: &str,
+    ) -> Result<FileContentResponse, ApiError> {
+        let url = format!(
+            "{}/api/files/{}?project_id={}",
+            self.base_url,
+            urlencoding::encode(path),
+            project_id
+        );
+
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let file_content_response: FileContentResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(file_content_response)
     }
 }
 
