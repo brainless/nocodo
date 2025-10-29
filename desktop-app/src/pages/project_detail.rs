@@ -91,24 +91,6 @@ impl crate::pages::Page for ProjectDetailPage {
 
                     ui.add_space(4.0);
 
-                    // Project metadata
-                    ui.horizontal(|ui| {
-                        // Labels - Ubuntu Light
-                        ui.label(WidgetText::label("Path:"));
-                        // User content - Inter
-                        ui.label(ContentText::text(&details.project.path));
-
-                        if let Some(description) = &details.project.description {
-                            ui.separator();
-                            // Label - Ubuntu Light
-                            ui.label(WidgetText::label("Description:"));
-                            // User content - Inter
-                            ui.label(ContentText::text(description));
-                        }
-                    });
-
-                    ui.separator();
-
                     // Tab navigation - styled to look like tabs
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 0.0; // Remove spacing between tabs
@@ -155,6 +137,31 @@ impl crate::pages::Page for ProjectDetailPage {
                                     stroke,
                                 );
                             }
+                        }
+                    });
+
+                    ui.separator();
+
+                    // Project metadata - always visible
+                    ui.horizontal(|ui| {
+                        // ID - Ubuntu Light
+                        ui.label(WidgetText::label("ID:"));
+                        // User content - Inter
+                        ui.label(ContentText::text(&self.project_id.to_string()));
+
+                        ui.separator();
+
+                        // Labels - Ubuntu Light
+                        ui.label(WidgetText::label("Path:"));
+                        // User content - Inter
+                        ui.label(ContentText::text(&details.project.path));
+
+                        if let Some(description) = &details.project.description {
+                            ui.separator();
+                            // Label - Ubuntu Light
+                            ui.label(WidgetText::label("Description:"));
+                            // User content - Inter
+                            ui.label(ContentText::text(description));
                         }
                     });
 
