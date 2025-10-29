@@ -1,3 +1,4 @@
+use crate::content_renderer::MarkdownRenderer;
 use crate::state::ui_state::{Page as UiPage, ProjectDetailTab};
 use crate::state::AppState;
 use crate::state::ConnectionState;
@@ -344,7 +345,7 @@ impl ProjectDetailPage {
                         .show(ui, |ui| {
                             ui.add_space(8.0);
 
-                            if let Some(_path) = &state.ui_state.selected_file_path {
+                            if let Some(path) = &state.ui_state.selected_file_path {
                                 if state.loading_file_content {
                                     ui.vertical_centered(|ui| {
                                         ui.label(WidgetText::status("Loading file content..."));
@@ -356,17 +357,27 @@ impl ProjectDetailPage {
                                     if let Some(result) = file_content_result.as_ref() {
                                         match result {
                                             Ok(content_response) => {
-                                                // Show file content in a monospace font
                                                 let content = content_response.content.clone();
-                                                ui.add(
-                                                    egui::TextEdit::multiline(
-                                                        &mut content.as_str(),
-                                                    )
-                                                    .desired_width(ui.available_width())
-                                                    .desired_rows(30)
-                                                    .font(egui::TextStyle::Monospace)
-                                                    .interactive(false),
-                                                );
+                                                drop(file_content_result);
+
+                                                // Check if this is a markdown file
+                                                let is_markdown = path.ends_with(".md");
+
+                                                if is_markdown {
+                                                    // Render markdown with styling
+                                                    MarkdownRenderer::render(ui, &content);
+                                                } else {
+                                                    // Show other files in a monospace font
+                                                    ui.add(
+                                                        egui::TextEdit::multiline(
+                                                            &mut content.as_str(),
+                                                        )
+                                                        .desired_width(ui.available_width())
+                                                        .desired_rows(30)
+                                                        .font(egui::TextStyle::Monospace)
+                                                        .interactive(false),
+                                                    );
+                                                }
                                             }
                                             Err(e) => {
                                                 ui.label(WidgetText::error(format!(

@@ -2,6 +2,7 @@ pub mod api_client;
 pub mod app;
 pub mod config;
 pub mod connection_manager;
+pub mod content_renderer;
 pub mod ssh;
 pub mod ui;
 pub mod ui_text;
