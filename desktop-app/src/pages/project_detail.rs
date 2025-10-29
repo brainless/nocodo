@@ -244,6 +244,24 @@ impl ProjectDetailPage {
     }
 
     fn show_files_tab(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Check if we've switched to a different project and need to clear state
+        if state.current_file_browser_project_id != Some(self.project_id) {
+            // Clear file browser state when switching projects
+            state.current_file_browser_project_id = Some(self.project_id);
+            {
+                let mut file_list_result = state.file_list_result.lock().unwrap();
+                *file_list_result = None;
+            }
+            {
+                let mut file_content_result = state.file_content_result.lock().unwrap();
+                *file_content_result = None;
+            }
+            state.ui_state.selected_file_path = None;
+            state.ui_state.expanded_folders.clear();
+            state.loading_file_list = false;
+            state.loading_file_content = false;
+        }
+
         // Load file list if not already loaded
         {
             let file_list_result = state.file_list_result.lock().unwrap();
