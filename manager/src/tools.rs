@@ -1004,14 +1004,23 @@ mod tests {
 
         // Test double wildcard for directory depth
         assert_eq!(ToolExecutor::glob_to_regex("**/*.rs"), r".*/[^/]*\.rs$");
-        assert_eq!(ToolExecutor::glob_to_regex("src/**/*.rs"), r"^src/.*/[^/]*\.rs$");
+        assert_eq!(
+            ToolExecutor::glob_to_regex("src/**/*.rs"),
+            r"^src/.*/[^/]*\.rs$"
+        );
 
         // Test question mark (single character)
         assert_eq!(ToolExecutor::glob_to_regex("test?.rs"), r"^test[^/]\.rs$");
 
         // Test escaping of regex special characters
-        assert_eq!(ToolExecutor::glob_to_regex("test+file.rs"), r"^test\+file\.rs$");
-        assert_eq!(ToolExecutor::glob_to_regex("test[1].rs"), r"^test\[1\]\.rs$");
+        assert_eq!(
+            ToolExecutor::glob_to_regex("test+file.rs"),
+            r"^test\+file\.rs$"
+        );
+        assert_eq!(
+            ToolExecutor::glob_to_regex("test[1].rs"),
+            r"^test\[1\]\.rs$"
+        );
 
         // Test patterns without wildcards
         assert_eq!(ToolExecutor::glob_to_regex("test.rs"), r"^test\.rs$");
