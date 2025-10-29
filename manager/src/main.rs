@@ -7,6 +7,7 @@ mod llm_agent;
 mod llm_client;
 mod llm_providers;
 mod models;
+mod permissions;
 mod socket;
 mod templates;
 mod tools;

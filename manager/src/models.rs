@@ -658,3 +658,113 @@ pub struct LlmAgentMessage {
     pub content: String,
     pub created_at: i64,
 }
+
+// Permission system models (Phase 1: DB & Models)
+
+/// Team - groups of users that share permissions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Team {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_by: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl Team {
+    pub fn new(name: String, description: Option<String>, created_by: i64) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            name,
+            description,
+            created_by,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn update_timestamp(&mut self) {
+        self.updated_at = Utc::now().timestamp();
+    }
+}
+
+/// Team member - links users to teams
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamMember {
+    pub id: i64,
+    pub team_id: i64,
+    pub user_id: i64,
+    pub added_by: Option<i64>,
+    pub added_at: i64,
+}
+
+impl TeamMember {
+    pub fn new(team_id: i64, user_id: i64, added_by: Option<i64>) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            team_id,
+            user_id,
+            added_by,
+            added_at: now,
+        }
+    }
+}
+
+/// Permission - access rules assigned to teams
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Permission {
+    pub id: i64,
+    pub team_id: i64,
+    pub resource_type: String, // "project", "work", "settings", "user", "team"
+    pub resource_id: Option<i64>, // NULL = entity-level permission (all resources of this type)
+    pub action: String,        // "read", "write", "delete", "admin"
+    pub granted_by: Option<i64>,
+    pub granted_at: i64,
+}
+
+impl Permission {
+    pub fn new(
+        team_id: i64,
+        resource_type: String,
+        resource_id: Option<i64>,
+        action: String,
+        granted_by: Option<i64>,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            team_id,
+            resource_type,
+            resource_id,
+            action,
+            granted_by,
+            granted_at: now,
+        }
+    }
+}
+
+/// Resource ownership - tracks who created/owns resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceOwnership {
+    pub id: i64,
+    pub resource_type: String, // "project", "work", "settings", "user", "team"
+    pub resource_id: i64,
+    pub owner_id: i64,
+    pub created_at: i64,
+}
+
+impl ResourceOwnership {
+    pub fn new(resource_type: String, resource_id: i64, owner_id: i64) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            resource_type,
+            resource_id,
+            owner_id,
+            created_at: now,
+        }
+    }
+}
