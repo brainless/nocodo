@@ -2441,6 +2441,95 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
 
 // Authentication handlers
 
+/// Registration handler - allows self-registration, with bootstrap logic for first user
+pub async fn register(
+    data: web::Data<AppState>,
+    register_req: web::Json<crate::models::CreateUserRequest>,
+) -> Result<HttpResponse, AppError> {
+    let create_req = register_req.into_inner();
+
+    // Validate username
+    if create_req.username.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Username cannot be empty".to_string(),
+        ));
+    }
+
+    // Check if user already exists
+    if data.database.get_user_by_username(&create_req.username).is_ok() {
+        return Err(AppError::InvalidRequest(
+            "Username already exists".to_string(),
+        ));
+    }
+
+    // Hash password
+    let password_hash = auth::hash_password(&create_req.password)?;
+
+    // Create user
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+
+    let user = User {
+        id: 0, // Will be set by database
+        username: create_req.username.clone(),
+        email: create_req.email.unwrap_or_default(),
+        password_hash,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let user_id = data.database.create_user(&user)?;
+    let mut user = user;
+    user.id = user_id;
+
+    // Check if this is the first user (bootstrap logic)
+    let user_count = data.database.get_all_users()?.len();
+    if user_count == 1 {
+        // This is the first user - create Super Admins team and grant admin permissions
+        tracing::info!("First user registered: {} - creating Super Admins team", user.username);
+
+        // Create "Super Admins" team
+        let super_admin_team = Team {
+            id: 0,
+            name: "Super Admins".to_string(),
+            description: Some("System administrators with full access".to_string()),
+            created_by: user_id,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let team_id = data.database.create_team(&super_admin_team)?;
+
+        // Add first user to the team
+        data.database.add_team_member(team_id, user_id, Some(user_id))?;
+
+        // Grant entity-level admin permissions on all resource types
+        let resource_types = ["project", "work", "settings", "user", "team", "ai_session"];
+        for resource_type in &resource_types {
+            let permission = Permission {
+                id: 0,
+                team_id,
+                resource_type: resource_type.to_string(),
+                resource_id: None, // Entity-level (all resources of this type)
+                action: "admin".to_string(),
+                granted_by: Some(user_id),
+                granted_at: now,
+            };
+            data.database.create_permission(&permission)?;
+        }
+
+        tracing::info!("Bootstrap complete: Super Admins team created with full admin permissions");
+    } else {
+        tracing::info!("User registered: {} (not first user, no auto-permissions)", user.username);
+    }
+
+    let response = UserResponse { user };
+    Ok(HttpResponse::Created().json(response))
+}
+
 /// Login handler - authenticates user with password and SSH key fingerprint
 pub async fn login(
     data: web::Data<AppState>,

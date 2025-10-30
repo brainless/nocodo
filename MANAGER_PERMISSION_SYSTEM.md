@@ -423,13 +423,13 @@ db.create_permission(Permission {
   - Cascade delete ownership records
   - Clean up permissions referencing deleted resources
 
-### Phase 5: Bootstrap & Registration
-- [ ] **Task 5.1**: First user registration logic
+### Phase 5: Bootstrap & Registration ✅ COMPLETED
+- [x] **Task 5.1**: First user registration logic
   - Check if user count == 0
   - Create "Super Admins" team
   - Add user to team
   - Grant entity-level admin permissions
-- [ ] **Task 5.2**: User registration endpoint
+- [x] **Task 5.2**: User registration endpoint
   - Create user account
   - Do NOT auto-assign permissions (admin must add to team)
   - Optional: require admin approval
@@ -667,7 +667,7 @@ DELETE /api/users/{id}                - Delete user (admin)
 
 ### Registration
 ```
-POST   /api/auth/register             - Self-registration (pending approval)
+POST   /api/auth/register             - Self-registration (with bootstrap for first user)
 POST   /api/auth/login                - Login (already implemented)
 ```
 

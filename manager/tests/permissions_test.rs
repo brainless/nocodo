@@ -695,3 +695,71 @@ async fn test_ownership_deleted_with_resource() {
     // Verify ownership record is gone (is_owner should return false)
     assert!(!db.is_owner(user_id, "project", project_id).unwrap());
 }
+
+#[test]
+fn test_bootstrap_first_user_creates_super_admin_team() {
+    let (db, _temp) = setup_test_db();
+
+    // Verify no users exist initially
+    assert_eq!(db.get_all_users().unwrap().len(), 0);
+
+    // Create first user (simulating registration)
+    let first_user = User {
+        id: 0,
+        username: "admin".to_string(),
+        email: "admin@example.com".to_string(),
+        password_hash: "hashed_password".to_string(),
+        is_active: true,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+
+    let user_id = db.create_user(&first_user).unwrap();
+
+    // Simulate bootstrap logic (normally done in register handler)
+    let user_count = db.get_all_users().unwrap().len();
+    assert_eq!(user_count, 1); // Should be 1 now
+
+    // Create "Super Admins" team
+    let super_admin_team = Team {
+        id: 0,
+        name: "Super Admins".to_string(),
+        description: Some("System administrators with full access".to_string()),
+        created_by: user_id,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+
+    let team_id = db.create_team(&super_admin_team).unwrap();
+
+    // Add first user to the team
+    db.add_team_member(team_id, user_id, Some(user_id)).unwrap();
+
+    // Grant entity-level admin permissions on all resource types
+    let resource_types = ["project", "work", "settings", "user", "team", "ai_session"];
+    for resource_type in &resource_types {
+        let permission = Permission {
+            id: 0,
+            team_id,
+            resource_type: resource_type.to_string(),
+            resource_id: None, // Entity-level (all resources of this type)
+            action: "admin".to_string(),
+            granted_by: Some(user_id),
+            granted_at: chrono::Utc::now().timestamp(),
+        };
+        db.create_permission(&permission).unwrap();
+    }
+
+    // Verify the bootstrap worked
+    let teams = db.get_user_teams(user_id).unwrap();
+    assert_eq!(teams.len(), 1);
+    assert_eq!(teams[0].name, "Super Admins");
+
+    let team_permissions = db.get_team_permissions(team_id).unwrap();
+    assert_eq!(team_permissions.len(), 6); // One permission per resource type
+
+    // Verify admin permissions work
+    assert!(db.team_has_permission(team_id, "project", None, "admin").unwrap());
+    assert!(db.team_has_permission(team_id, "user", None, "admin").unwrap());
+    assert!(db.team_has_permission(team_id, "settings", None, "admin").unwrap());
+}

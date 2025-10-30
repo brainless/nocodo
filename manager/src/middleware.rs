@@ -50,9 +50,9 @@ where
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let config = req.app_data::<web::Data<Arc<AppConfig>>>().cloned();
 
-        // Skip authentication for health check and login endpoints
+        // Skip authentication for health check, login, and register endpoints
         let path = req.path().to_string();
-        if path == "/api/health" || path == "/api/auth/login" {
+        if path == "/api/health" || path == "/api/auth/login" || path == "/api/auth/register" {
             let fut = self.service.call(req);
             return Box::pin(async move { fut.await });
         }

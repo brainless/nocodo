@@ -120,6 +120,7 @@ async fn main() -> AppResult<()> {
                         // Public endpoints (no auth required)
                         .route("/health", web::get().to(handlers::health_check))
                         .route("/auth/login", web::post().to(handlers::login))
+                        .route("/auth/register", web::post().to(handlers::register))
                         // Protected endpoints with permission checks
                         .service(
                             web::scope("/projects")
