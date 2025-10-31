@@ -46,6 +46,9 @@ pub struct AppState {
     // Connection state
     pub connection_state: ConnectionState,
 
+    // Authentication state
+    pub auth_state: AuthState,
+
     // Configuration
     pub config: crate::config::DesktopConfig,
 
@@ -185,12 +188,15 @@ pub struct AppState {
     pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
     #[serde(skip)]
     pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
+    #[serde(skip)]
+    pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
             connection_state: ConnectionState::default(),
+            auth_state: AuthState::default(),
             config: crate::config::DesktopConfig::default(),
             ui_state: UiState::default(),
             projects: Vec::new(),
@@ -250,6 +256,7 @@ impl Default for AppState {
             db: None,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
             connection_result: Arc::new(std::sync::Mutex::new(None)),
+            auth_required: Arc::new(std::sync::Mutex::new(false)),
         }
     }
 }

@@ -1,4 +1,4 @@
-use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key};
+use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key, PublicKeyBase64};
 use russh::*;
 use std::net::TcpListener;
 use std::path::Path;
@@ -6,6 +6,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio::sync::Mutex;
+use sha2::{Sha256, Digest};
+use base64::{Engine as _, engine::general_purpose};
 
 pub struct SshTunnel {
     local_port: u16,
@@ -305,6 +307,55 @@ async fn handle_tunnel_connection(
 
     tracing::debug!("Tunnel connection closed");
     Ok(())
+}
+
+/// Calculate SSH key fingerprint in SHA256 format
+/// Returns a string like "SHA256:base64hash"
+pub fn calculate_ssh_fingerprint(key_path: Option<&str>) -> Result<String, SshError> {
+    // Find key path (same logic as connect)
+    let key_paths: Vec<String> = if let Some(key_path) = key_path {
+        vec![key_path.to_string()]
+    } else {
+        // Try default key locations
+        let home = std::env::var("HOME").unwrap_or_default();
+        vec![
+            format!("{}/.ssh/id_rsa", home),
+            format!("{}/.ssh/id_ed25519", home),
+            format!("{}/.ssh/id_ecdsa", home),
+        ]
+    };
+
+    // Load SSH key
+    let mut key_pair = None;
+    for key_path in &key_paths {
+        if Path::new(key_path).exists() {
+            match load_secret_key(key_path, None) {
+                Ok(key) => {
+                    key_pair = Some(key);
+                    break;
+                }
+                Err(_) => continue,
+            }
+        }
+    }
+
+    let key_pair = key_pair
+        .ok_or_else(|| SshError::AuthenticationFailed("No valid SSH keys found".to_string()))?;
+
+    // Get public key bytes
+    let public_key = key_pair.public_key();
+    let public_key_bytes = public_key.public_key_bytes();
+
+    // Calculate SHA256 hash
+    let mut hasher = Sha256::new();
+    hasher.update(public_key_bytes);
+    let hash = hasher.finalize();
+
+    // Encode to base64
+    let base64_hash = general_purpose::STANDARD.encode(&hash);
+
+    // Format as "SHA256:base64hash"
+    Ok(format!("SHA256:{}", base64_hash))
 }
 
 #[derive(Debug, thiserror::Error)]

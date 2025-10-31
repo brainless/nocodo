@@ -3317,6 +3317,7 @@ dependencies = [
 name = "nocodo-desktop-app"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "dirs",
  "eframe",
@@ -3329,6 +3330,7 @@ dependencies = [
  "russh",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.17",
  "tokio",
  "toml 0.9.8",

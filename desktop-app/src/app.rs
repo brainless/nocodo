@@ -1,4 +1,4 @@
-use crate::components::{ConnectionDialog, Sidebar, StatusBar};
+use crate::components::{AuthDialog, ConnectionDialog, Sidebar, StatusBar};
 use crate::pages::{
     MentionsPage, Page, ProjectDetailPage, ProjectsPage, ServersPage, SettingsPage,
     UiReferencePage, UiTwoColumnMainContentPage, WorkPage,
@@ -29,6 +29,8 @@ pub struct DesktopApp {
     status_bar: StatusBar,
     #[serde(skip)]
     connection_dialog: ConnectionDialog,
+    #[serde(skip)]
+    auth_dialog: AuthDialog,
 
     // Services
     #[serde(skip)]
@@ -45,6 +47,7 @@ impl Default for DesktopApp {
             sidebar: Sidebar::default(),
             status_bar: StatusBar::default(),
             connection_dialog: ConnectionDialog::default(),
+            auth_dialog: AuthDialog::default(),
             api_service: Arc::new(ApiService::default()),
             background_tasks: BackgroundTasks::new(Arc::new(ApiService::default())),
         };
@@ -73,6 +76,16 @@ impl Default for DesktopApp {
 
 impl eframe::App for DesktopApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Check if authentication is required (401 detected)
+        let auth_required_flag = self.state.connection_manager.get_auth_required_flag();
+        if let Ok(mut auth_required) = auth_required_flag.lock() {
+            if *auth_required {
+                tracing::info!("Authentication required - showing auth dialog");
+                self.state.ui_state.show_auth_dialog = true;
+                *auth_required = false; // Reset flag
+            }
+        }
+
         // Handle pending project details refresh
         if let Some(project_id) = self.state.pending_project_details_refresh.take() {
             tracing::info!(
@@ -112,6 +125,9 @@ impl eframe::App for DesktopApp {
 
         // Connection dialog
         self.connection_dialog.ui(ctx, &mut self.state);
+
+        // Auth dialog
+        self.auth_dialog.ui(ctx, &mut self.state);
     }
 }
 

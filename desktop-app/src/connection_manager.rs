@@ -27,6 +27,7 @@ pub struct ConnectionManager {
     connected: Arc<RwLock<bool>>,
     keepalive_shutdown: Arc<tokio::sync::Notify>,
     health_check_shutdown: Arc<tokio::sync::Notify>,
+    auth_required: Arc<std::sync::Mutex<bool>>, // Shared flag for 401 detection
 }
 
 impl ConnectionManager {
@@ -38,7 +39,13 @@ impl ConnectionManager {
             connected: Arc::new(RwLock::new(false)),
             keepalive_shutdown: Arc::new(tokio::sync::Notify::new()),
             health_check_shutdown: Arc::new(tokio::sync::Notify::new()),
+            auth_required: Arc::new(std::sync::Mutex::new(false)),
         }
+    }
+
+    /// Get the auth_required flag (for checking in AppState)
+    pub fn get_auth_required_flag(&self) -> Arc<std::sync::Mutex<bool>> {
+        Arc::clone(&self.auth_required)
     }
 
     /// Connect using SSH tunnel
@@ -241,6 +248,7 @@ impl ConnectionManager {
             connected: Arc::clone(&self.connected),
             keepalive_shutdown: Arc::clone(&self.keepalive_shutdown),
             health_check_shutdown: Arc::clone(&self.health_check_shutdown),
+            auth_required: Arc::clone(&self.auth_required),
         };
 
         tokio::spawn(async move {
@@ -262,6 +270,17 @@ impl ConnectionManager {
                                         consecutive_failures = 0;
                                     }
                                     Ok(Err(e)) => {
+                                        // Check if this is a 401 Unauthorized error
+                                        if e.is_unauthorized() {
+                                            tracing::warn!("Health check returned 401 Unauthorized - authentication required");
+                                            if let Ok(mut auth_required) = connection_manager.auth_required.lock() {
+                                                *auth_required = true;
+                                            }
+                                            // Don't try to reconnect on 401, just wait for user to authenticate
+                                            consecutive_failures = 0;
+                                            continue;
+                                        }
+
                                         consecutive_failures += 1;
                                         tracing::warn!(
                                             "Health check failed (attempt {}): {}",
@@ -364,6 +383,47 @@ impl ConnectionManager {
             ConnectionType::Local { .. } => Some("localhost".to_string()),
         }
     }
+
+    /// Login with username, password, and SSH fingerprint
+    pub async fn login(
+        &self,
+        username: &str,
+        password: &str,
+        ssh_fingerprint: &str,
+    ) -> Result<manager_models::LoginResponse, ConnectionError> {
+        let api_client = self.api_client.read().await;
+        let client = api_client
+            .as_ref()
+            .ok_or(ConnectionError::NoConnectionInfo)?;
+
+        let response = client.login(username, password, ssh_fingerprint).await?;
+
+        // Store JWT token in the API client
+        drop(api_client); // Release read lock
+        let mut api_client = self.api_client.write().await;
+        if let Some(client) = api_client.as_mut() {
+            client.set_jwt_token(Some(response.token.clone()));
+        }
+
+        Ok(response)
+    }
+
+    /// Register a new user
+    pub async fn register(
+        &self,
+        username: &str,
+        password: &str,
+        email: Option<&str>,
+    ) -> Result<manager_models::UserResponse, ConnectionError> {
+        let api_client = self.api_client.read().await;
+        let client = api_client
+            .as_ref()
+            .ok_or(ConnectionError::NoConnectionInfo)?;
+
+        let response = client.register(username, password, email).await?;
+
+        Ok(response)
+    }
 }
 
 /// A handle to the connection manager for use in background tasks
@@ -376,6 +436,7 @@ struct ConnectionManagerHandle {
     #[allow(dead_code)]
     keepalive_shutdown: Arc<tokio::sync::Notify>,
     health_check_shutdown: Arc<tokio::sync::Notify>,
+    auth_required: Arc<std::sync::Mutex<bool>>,
 }
 
 #[derive(Debug, thiserror::Error)]

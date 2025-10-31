@@ -34,6 +34,7 @@ impl Default for Page {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiState {
     pub show_connection_dialog: bool,
+    pub show_auth_dialog: bool,
     pub show_new_work_dialog: bool,
     pub new_work_title: String,
     pub new_work_project_id: Option<i64>,
@@ -66,6 +67,7 @@ impl Default for UiState {
     fn default() -> Self {
         Self {
             show_connection_dialog: false,
+            show_auth_dialog: false,
             show_new_work_dialog: false,
             new_work_title: String::new(),
             new_work_project_id: None,
