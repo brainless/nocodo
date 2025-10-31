@@ -1,4 +1,3 @@
-use crate::pages::Page;
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
@@ -166,7 +165,7 @@ impl ServersPage {
     fn check_local_server(&self, state: &mut AppState) {
         state.ui_state.checking_local_server = true;
         let api_service = crate::services::ApiService::new();
-        api_service.check_local_server(state);
+        let _ = api_service.check_local_server(state);
     }
 
     fn refresh_projects(&self, state: &mut AppState) {

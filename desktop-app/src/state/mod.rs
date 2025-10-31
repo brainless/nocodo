@@ -8,22 +8,17 @@ pub mod ui_state;
 pub use connection::*;
 pub use ui_state::*;
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, Default)]
 pub enum Page {
     Projects,
     Work,
     ProjectDetail(i64), // Project ID
     Mentions,
+    #[default]
     Servers,
     Settings,
     UiReference,
     UiTwoColumnMainContent,
-}
-
-impl Default for Page {
-    fn default() -> Self {
-        Page::Servers
-    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

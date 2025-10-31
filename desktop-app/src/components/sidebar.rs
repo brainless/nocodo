@@ -1,7 +1,6 @@
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
-use crate::ui_text::{ContentText, WidgetText};
 use egui::{Color32, Context};
 
 pub struct Sidebar;

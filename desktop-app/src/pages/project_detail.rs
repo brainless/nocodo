@@ -147,7 +147,7 @@ impl crate::pages::Page for ProjectDetailPage {
                         // ID - Ubuntu Light
                         ui.label(WidgetText::label("ID:"));
                         // User content - Inter
-                        ui.label(ContentText::text(&self.project_id.to_string()));
+                        ui.label(ContentText::text(self.project_id.to_string()));
 
                         ui.separator();
 
@@ -475,7 +475,7 @@ impl ProjectDetailPage {
                 let icon = self.get_file_icon(&file.name);
                 let _is_selected = state.ui_state.selected_file_path.as_ref() == Some(&full_path);
 
-                let button_text = WidgetText::button(&format!("{} {}", icon, file.name));
+                let button_text = WidgetText::button(format!("{} {}", icon, file.name));
 
                 if ui.button(button_text).clicked() {
                     state.ui_state.selected_file_path = Some(full_path.clone());

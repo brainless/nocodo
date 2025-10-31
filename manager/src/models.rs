@@ -25,6 +25,7 @@ pub struct User {
 }
 
 impl User {
+    #[allow(dead_code)]
     pub fn new(username: String, email: String, password_hash: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
@@ -38,6 +39,7 @@ impl User {
         }
     }
 
+    #[allow(dead_code)]
     pub fn update_timestamp(&mut self) {
         self.updated_at = Utc::now().timestamp();
     }
@@ -57,6 +59,7 @@ pub struct UserSshKey {
 }
 
 impl UserSshKey {
+    #[allow(dead_code)]
     pub fn new(
         user_id: i64,
         key_type: String,
@@ -78,6 +81,7 @@ impl UserSshKey {
         }
     }
 
+    #[allow(dead_code)]
     pub fn mark_used(&mut self) {
         self.last_used_at = Some(Utc::now().timestamp());
     }
@@ -130,6 +134,7 @@ impl Project {
         }
     }
 
+    #[allow(dead_code)]
     #[allow(dead_code)]
     pub fn update_timestamp(&mut self) {
         self.updated_at = Utc::now().timestamp();
@@ -685,6 +690,7 @@ impl Team {
         }
     }
 
+    #[allow(dead_code)]
     pub fn update_timestamp(&mut self) {
         self.updated_at = Utc::now().timestamp();
     }
@@ -701,6 +707,7 @@ pub struct TeamMember {
 }
 
 impl TeamMember {
+    #[allow(dead_code)]
     pub fn new(team_id: i64, user_id: i64, added_by: Option<i64>) -> Self {
         let now = Utc::now().timestamp();
         Self {

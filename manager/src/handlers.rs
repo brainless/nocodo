@@ -27,7 +27,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
-use urlencoding;
+
 
 pub struct AppState {
     pub database: Arc<Database>,
@@ -1139,6 +1139,7 @@ pub async fn delete_file(
 }
 
 // AI session HTTP handlers
+#[allow(dead_code)]
 pub async fn create_ai_session(
     data: web::Data<AppState>,
     path: web::Path<i64>,
@@ -2270,16 +2271,18 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
 /// Get list of supported and enabled models
 pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     tracing::info!("get_supported_models endpoint called");
-    let config = data
+    let api_key_config = data
         .config
         .read()
-        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?
+        .api_keys
+        .clone();
     let mut models = Vec::new();
 
     tracing::info!("Checking for configured API keys in get_supported_models");
 
     // Check if API keys are configured and add enabled models
-    if let Some(api_key_config) = &config.api_keys {
+    if let Some(api_key_config) = api_key_config {
         tracing::info!("API keys config found, checking individual keys");
         // OpenAI models
         if api_key_config.openai_api_key.is_some()
@@ -2447,6 +2450,7 @@ pub async fn register(
     register_req: web::Json<crate::models::CreateUserRequest>,
 ) -> Result<HttpResponse, AppError> {
     let create_req = register_req.into_inner();
+    tracing::info!("Registration attempt for user: {}", create_req.username);
 
     // Validate username
     if create_req.username.trim().is_empty() {
@@ -2484,6 +2488,7 @@ pub async fn register(
     let user_id = data.database.create_user(&user)?;
     let mut user = user;
     user.id = user_id;
+    tracing::info!("User created with ID: {}", user_id);
 
     // Check if this is the first user (bootstrap logic)
     let user_count = data.database.get_all_users()?.len();
@@ -2507,7 +2512,7 @@ pub async fn register(
         data.database.add_team_member(team_id, user_id, Some(user_id))?;
 
         // Grant entity-level admin permissions on all resource types
-        let resource_types = ["project", "work", "settings", "user", "team", "ai_session"];
+        let resource_types = ["project", "work", "settings", "user", "team"];
         for resource_type in &resource_types {
             let permission = Permission {
                 id: 0,
@@ -2526,6 +2531,7 @@ pub async fn register(
         tracing::info!("User registered: {} (not first user, no auto-permissions)", user.username);
     }
 
+    tracing::info!("Registration successful for user: {}", user.username);
     let response = UserResponse { user };
     Ok(HttpResponse::Created().json(response))
 }
@@ -2535,7 +2541,7 @@ pub async fn login(
     data: web::Data<AppState>,
     login_req: web::Json<crate::models::LoginRequest>,
 ) -> Result<HttpResponse> {
-    tracing::info!("Login attempt for user: {}", login_req.username);
+    tracing::info!("Login attempt for user: {} with SSH fingerprint: {}", login_req.username, login_req.ssh_fingerprint);
 
     // 1. Get user by username
     let user = data
@@ -2613,14 +2619,15 @@ pub async fn login(
     tracing::info!("Successful login for user: {}", user.username);
 
     // 8. Return success response
+    let user_info = crate::models::UserInfo {
+        id: user.id,
+        username: user.username.clone(),
+        email: user.email.clone(),
+    };
     let response = crate::models::LoginResponse {
         token,
-        user: crate::models::UserInfo {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-        },
+        user: user_info,
     };
-
+    tracing::info!("Login response sent for user: {}", user.username);
     Ok(HttpResponse::Ok().json(response))
 }

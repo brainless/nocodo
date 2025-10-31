@@ -1184,6 +1184,7 @@ impl Database {
         Ok(works)
     }
 
+    #[allow(dead_code)]
     pub fn update_work(&self, work: &crate::models::Work) -> AppResult<()> {
         let conn = self
             .connection
@@ -2062,6 +2063,7 @@ impl Database {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_user_by_email(&self, email: &str) -> AppResult<crate::models::User> {
         let conn = self
             .connection
@@ -2095,6 +2097,7 @@ impl Database {
 
     // SSH key methods
 
+    #[allow(dead_code)]
     pub fn create_ssh_key(&self, key: &crate::models::UserSshKey) -> AppResult<i64> {
         let conn = self
             .connection
@@ -2168,6 +2171,7 @@ impl Database {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
         let conn = self
             .connection
@@ -2366,7 +2370,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         // Parse the requested action
-        let requested_action = Action::from_str(action)
+        let requested_action = Action::parse(action)
             .ok_or_else(|| AppError::InvalidRequest(format!("Invalid action: {}", action)))?;
 
         // Query all permissions for this team on this resource
@@ -2385,7 +2389,7 @@ impl Database {
         // Check if any permission implies the requested action
         for action_result in action_iter {
             let action_str = action_result?;
-            if let Some(granted_action) = Action::from_str(&action_str) {
+            if let Some(granted_action) = Action::parse(&action_str) {
                 if granted_action.implies(&requested_action) {
                     return Ok(true);
                 }
@@ -2729,6 +2733,7 @@ impl Database {
     }
 
     /// Get the owner of a resource
+    #[allow(dead_code)]
     pub fn get_resource_owner(
         &self,
         resource_type: &str,
@@ -2752,6 +2757,7 @@ impl Database {
     }
 
     /// Delete a resource ownership record
+    #[allow(dead_code)]
     pub fn delete_ownership(&self, resource_type: &str, resource_id: i64) -> AppResult<()> {
         let conn = self
             .connection

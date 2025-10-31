@@ -1,37 +1,27 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Page {
     Projects,
     Work,
     ProjectDetail(i64), // Project ID
     Mentions,
+    #[default]
     Servers,
     Settings,
     UiReference,
     UiTwoColumnMainContent,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ProjectDetailTab {
+    #[default]
     Dashboard,
     Files,
     Components,
 }
 
-impl Default for ProjectDetailTab {
-    fn default() -> Self {
-        ProjectDetailTab::Dashboard
-    }
-}
-
-impl Default for Page {
-    fn default() -> Self {
-        Page::Servers
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UiState {
     pub show_connection_dialog: bool,
     pub show_auth_dialog: bool,
@@ -61,34 +51,4 @@ pub struct UiState {
     pub expanded_folders: std::collections::HashSet<String>,
     /// Message continuation input for work detail
     pub continue_message_input: String,
-}
-
-impl Default for UiState {
-    fn default() -> Self {
-        Self {
-            show_connection_dialog: false,
-            show_auth_dialog: false,
-            show_new_work_dialog: false,
-            new_work_title: String::new(),
-            new_work_project_id: None,
-            new_work_model: None,
-            connection_error: None,
-            connected_host: None,
-            current_page: Page::default(),
-            selected_work_id: None,
-            reset_work_details_scroll: false,
-            local_server_running: false,
-            checking_local_server: false,
-            projects_default_path: String::new(),
-            ui_reference_card_titles: Vec::new(),
-            ui_reference_form_text: String::new(),
-            ui_reference_form_dropdown: None,
-            ui_reference_readme_content: String::new(),
-            expanded_tool_calls: std::collections::HashSet::new(),
-            project_detail_tab: ProjectDetailTab::default(),
-            selected_file_path: None,
-            expanded_folders: std::collections::HashSet::new(),
-            continue_message_input: String::new(),
-        }
-    }
 }

@@ -2,7 +2,7 @@ use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
 use manager_models::{
-    ListFilesRequest, ListFilesResponse, ReadFileRequest, ToolRequest, ToolResponse,
+    ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse,
 };
 
 pub struct WorkPage;
@@ -600,9 +600,7 @@ impl crate::pages::Page for WorkPage {
                                                                 if let Ok(wrapped_response) = serde_json::from_str::<serde_json::Value>(&output.content) {
                                                                     if let Some(content) = wrapped_response.get("content") {
                                                                         // Try to parse the content as ToolResponse
-                                                                        if let Ok(tool_response) = serde_json::from_value::<ToolResponse>(content.clone()) {
-                                                                        match tool_response {
-                                                                            ToolResponse::ListFiles(list_files_response) => {
+                                                                        if let Ok(ToolResponse::ListFiles(list_files_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
                                                                                 // Check if this tool response is expanded (use output.id)
                                                                                 let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
 
@@ -670,11 +668,6 @@ impl crate::pages::Page for WorkPage {
                                                                                 }
 
                                                                                 ui.add_space(4.0);
-                                                                            }
-                                                                            _ => {
-                                                                                // Other tool responses - skip for now
-                                                                            }
-                                                                        }
                                                                         }
                                                                     }
                                                                 }

@@ -362,7 +362,7 @@ impl ApiService {
     }
 
     // Local server methods
-    pub async fn check_local_server(&self, state: &mut AppState) -> Result<(), String> {
+    pub fn check_local_server(&self, state: &mut AppState) -> Result<(), String> {
         state.ui_state.checking_local_server = true;
         // This will be implemented with actual API calls
         Ok(())

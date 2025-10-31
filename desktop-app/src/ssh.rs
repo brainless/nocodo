@@ -352,7 +352,7 @@ pub fn calculate_ssh_fingerprint(key_path: Option<&str>) -> Result<String, SshEr
     let hash = hasher.finalize();
 
     // Encode to base64
-    let base64_hash = general_purpose::STANDARD.encode(&hash);
+    let base64_hash = general_purpose::STANDARD.encode(hash);
 
     // Format as "SHA256:base64hash"
     Ok(format!("SHA256:{}", base64_hash))

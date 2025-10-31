@@ -9,6 +9,7 @@
 use crate::database::Database;
 use crate::error::AppResult;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Actions that can be performed on resources
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +19,20 @@ pub enum Action {
     Write,
     Delete,
     Admin,
+}
+
+impl FromStr for Action {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "read" => Ok(Action::Read),
+            "write" => Ok(Action::Write),
+            "delete" => Ok(Action::Delete),
+            "admin" => Ok(Action::Admin),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Action {
@@ -32,14 +47,8 @@ impl Action {
     }
 
     /// Parse action from string
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "read" => Some(Action::Read),
-            "write" => Some(Action::Write),
-            "delete" => Some(Action::Delete),
-            "admin" => Some(Action::Admin),
-            _ => None,
-        }
+    pub fn parse(s: &str) -> Option<Self> {
+        s.parse().ok()
     }
 
     /// Check if this action implies another action
@@ -68,6 +77,22 @@ pub enum ResourceType {
     AiSession,
 }
 
+impl FromStr for ResourceType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "project" => Ok(ResourceType::Project),
+            "work" => Ok(ResourceType::Work),
+            "settings" => Ok(ResourceType::Settings),
+            "user" => Ok(ResourceType::User),
+            "team" => Ok(ResourceType::Team),
+            "ai_session" => Ok(ResourceType::AiSession),
+            _ => Err(()),
+        }
+    }
+}
+
 impl ResourceType {
     /// Convert resource type to string for database storage
     pub fn as_str(&self) -> &'static str {
@@ -82,16 +107,8 @@ impl ResourceType {
     }
 
     /// Parse resource type from string
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "project" => Some(ResourceType::Project),
-            "work" => Some(ResourceType::Work),
-            "settings" => Some(ResourceType::Settings),
-            "user" => Some(ResourceType::User),
-            "team" => Some(ResourceType::Team),
-            "ai_session" => Some(ResourceType::AiSession),
-            _ => None,
-        }
+    pub fn parse(s: &str) -> Option<Self> {
+        s.parse().ok()
     }
 }
 
@@ -223,36 +240,36 @@ mod tests {
     }
 
     #[test]
-    fn test_action_from_str() {
-        assert_eq!(Action::from_str("read"), Some(Action::Read));
-        assert_eq!(Action::from_str("write"), Some(Action::Write));
-        assert_eq!(Action::from_str("delete"), Some(Action::Delete));
-        assert_eq!(Action::from_str("admin"), Some(Action::Admin));
-        assert_eq!(Action::from_str("READ"), Some(Action::Read)); // Case insensitive
-        assert_eq!(Action::from_str("invalid"), None);
+    fn test_action_parse() {
+        assert_eq!(Action::parse("read"), Some(Action::Read));
+        assert_eq!(Action::parse("write"), Some(Action::Write));
+        assert_eq!(Action::parse("delete"), Some(Action::Delete));
+        assert_eq!(Action::parse("admin"), Some(Action::Admin));
+        assert_eq!(Action::parse("READ"), Some(Action::Read)); // Case insensitive
+        assert_eq!(Action::parse("invalid"), None);
     }
 
     #[test]
-    fn test_resource_type_from_str() {
+    fn test_resource_type_parse() {
         assert_eq!(
-            ResourceType::from_str("project"),
+            ResourceType::parse("project"),
             Some(ResourceType::Project)
         );
-        assert_eq!(ResourceType::from_str("work"), Some(ResourceType::Work));
+        assert_eq!(ResourceType::parse("work"), Some(ResourceType::Work));
         assert_eq!(
-            ResourceType::from_str("settings"),
+            ResourceType::parse("settings"),
             Some(ResourceType::Settings)
         );
-        assert_eq!(ResourceType::from_str("user"), Some(ResourceType::User));
-        assert_eq!(ResourceType::from_str("team"), Some(ResourceType::Team));
+        assert_eq!(ResourceType::parse("user"), Some(ResourceType::User));
+        assert_eq!(ResourceType::parse("team"), Some(ResourceType::Team));
         assert_eq!(
-            ResourceType::from_str("ai_session"),
+            ResourceType::parse("ai_session"),
             Some(ResourceType::AiSession)
         );
         assert_eq!(
-            ResourceType::from_str("PROJECT"),
+            ResourceType::parse("PROJECT"),
             Some(ResourceType::Project)
         ); // Case insensitive
-        assert_eq!(ResourceType::from_str("invalid"), None);
+        assert_eq!(ResourceType::parse("invalid"), None);
     }
 }

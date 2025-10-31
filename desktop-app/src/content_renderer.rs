@@ -141,19 +141,19 @@ impl MarkdownRenderer {
             }
 
             // Headings
-            if line.starts_with("# ") {
-                ui.label(TextStyles::heading_1(ui, &line[2..]));
+            if let Some(stripped) = line.strip_prefix("# ") {
+                ui.label(TextStyles::heading_1(ui, stripped));
                 ui.add_space(8.0);
-            } else if line.starts_with("## ") {
-                ui.label(TextStyles::heading_2(ui, &line[3..]));
+            } else if let Some(stripped) = line.strip_prefix("## ") {
+                ui.label(TextStyles::heading_2(ui, stripped));
                 ui.add_space(6.0);
-            } else if line.starts_with("### ") {
-                ui.label(TextStyles::heading_3(ui, &line[4..]));
+            } else if let Some(stripped) = line.strip_prefix("### ") {
+                ui.label(TextStyles::heading_3(ui, stripped));
                 ui.add_space(4.0);
             }
             // Blockquotes
-            else if line.starts_with("> ") {
-                ui.label(TextStyles::quote(ui, &line[2..]));
+            else if let Some(stripped) = line.strip_prefix("> ") {
+                ui.label(TextStyles::quote(ui, stripped));
             }
             // Bullet points
             else if line.trim_start().starts_with("- ") {

@@ -44,25 +44,25 @@ impl Default for DesktopApp {
         let mut app = Self {
             state: AppState::default(),
             pages: std::collections::HashMap::new(),
-            sidebar: Sidebar::default(),
-            status_bar: StatusBar::default(),
-            connection_dialog: ConnectionDialog::default(),
+            sidebar: Sidebar,
+            status_bar: StatusBar,
+            connection_dialog: ConnectionDialog,
             auth_dialog: AuthDialog::default(),
-            api_service: Arc::new(ApiService::default()),
-            background_tasks: BackgroundTasks::new(Arc::new(ApiService::default())),
+            api_service: Arc::new(ApiService),
+            background_tasks: BackgroundTasks::new(Arc::new(ApiService)),
         };
 
         // Initialize pages
         app.pages
-            .insert(UiPage::Mentions, Box::new(MentionsPage::default()));
+            .insert(UiPage::Mentions, Box::new(MentionsPage));
         app.pages
-            .insert(UiPage::Projects, Box::new(ProjectsPage::default()));
+            .insert(UiPage::Projects, Box::new(ProjectsPage));
         app.pages
-            .insert(UiPage::Work, Box::new(WorkPage::default()));
+            .insert(UiPage::Work, Box::new(WorkPage));
         app.pages
-            .insert(UiPage::Servers, Box::new(ServersPage::default()));
+            .insert(UiPage::Servers, Box::new(ServersPage));
         app.pages
-            .insert(UiPage::Settings, Box::new(SettingsPage::default()));
+            .insert(UiPage::Settings, Box::new(SettingsPage));
         app.pages
             .insert(UiPage::UiReference, Box::new(UiReferencePage::default()));
         app.pages.insert(
@@ -227,11 +227,9 @@ impl DesktopApp {
                 })
                 .expect("Could not query favorites");
 
-            for result in favorites_iter {
-                if let Ok((entity_type, entity_id)) = result {
-                    if entity_type == "project" {
-                        app.state.favorite_projects.insert(entity_id);
-                    }
+            for (entity_type, entity_id) in favorites_iter.flatten() {
+                if entity_type == "project" {
+                    app.state.favorite_projects.insert(entity_id);
                 }
             }
         }
