@@ -793,6 +793,10 @@ pub struct CreateUserRequest {
     pub username: String,
     pub email: Option<String>,
     pub password: String,
+    #[serde(default)]
+    pub ssh_public_key: Option<String>,
+    #[serde(default)]
+    pub ssh_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

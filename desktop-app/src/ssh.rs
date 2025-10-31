@@ -309,6 +309,39 @@ async fn handle_tunnel_connection(
     Ok(())
 }
 
+/// Read SSH public key from .pub file
+/// Returns the full public key content
+pub fn read_ssh_public_key(key_path: Option<&str>) -> Result<String, SshError> {
+    // Find key path (same logic as connect)
+    let key_paths: Vec<String> = if let Some(key_path) = key_path {
+        vec![key_path.to_string()]
+    } else {
+        // Try default key locations
+        let home = std::env::var("HOME").unwrap_or_default();
+        vec![
+            format!("{}/.ssh/id_rsa", home),
+            format!("{}/.ssh/id_ed25519", home),
+            format!("{}/.ssh/id_ecdsa", home),
+        ]
+    };
+
+    // Try to find the corresponding .pub file
+    for key_path in &key_paths {
+        let pub_key_path = format!("{}.pub", key_path);
+        if Path::new(&pub_key_path).exists() {
+            match std::fs::read_to_string(&pub_key_path) {
+                Ok(content) => {
+                    // Trim whitespace and return
+                    return Ok(content.trim().to_string());
+                }
+                Err(_) => continue,
+            }
+        }
+    }
+
+    Err(SshError::AuthenticationFailed("No SSH public key found".to_string()))
+}
+
 /// Calculate SSH key fingerprint in SHA256 format
 /// Returns a string like "SHA256:base64hash"
 pub fn calculate_ssh_fingerprint(key_path: Option<&str>) -> Result<String, SshError> {

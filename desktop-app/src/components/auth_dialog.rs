@@ -156,6 +156,35 @@ impl AuthDialog {
             return;
         }
 
+        // Calculate SSH fingerprint and read public key
+        let ssh_fingerprint = match crate::ssh::calculate_ssh_fingerprint(
+            if state.config.ssh.ssh_key_path.is_empty() {
+                None
+            } else {
+                Some(&state.config.ssh.ssh_key_path)
+            },
+        ) {
+            Ok(fingerprint) => fingerprint,
+            Err(e) => {
+                self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
+                return;
+            }
+        };
+
+        let ssh_public_key = match crate::ssh::read_ssh_public_key(
+            if state.config.ssh.ssh_key_path.is_empty() {
+                None
+            } else {
+                Some(&state.config.ssh.ssh_key_path)
+            },
+        ) {
+            Ok(public_key) => public_key,
+            Err(e) => {
+                self.error_message = Some(format!("Failed to read SSH public key: {}", e));
+                return;
+            }
+        };
+
         let username = self.username.clone();
         let password = self.password.clone();
         let email = if self.email.trim().is_empty() {
@@ -167,7 +196,7 @@ impl AuthDialog {
 
         // Spawn async task for registration
         tokio::spawn(async move {
-            match connection_manager.register(&username, &password, email.as_deref()).await {
+            match connection_manager.register(&username, &password, email.as_deref(), &ssh_public_key, &ssh_fingerprint).await {
                 Ok(user_response) => {
                     tracing::info!("Registration successful for user: {}", user_response.user.username);
                     // After registration, automatically log in

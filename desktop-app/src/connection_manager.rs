@@ -419,13 +419,15 @@ impl ConnectionManager {
         username: &str,
         password: &str,
         email: Option<&str>,
+        ssh_public_key: &str,
+        ssh_fingerprint: &str,
     ) -> Result<manager_models::UserResponse, ConnectionError> {
         let api_client = self.api_client.read().await;
         let client = api_client
             .as_ref()
             .ok_or(ConnectionError::NoConnectionInfo)?;
 
-        let response = client.register(username, password, email).await?;
+        let response = client.register(username, password, email, ssh_public_key, ssh_fingerprint).await?;
 
         // Reset auth required flag since registration might provide auth
         if let Ok(mut auth_required) = self.auth_required.lock() {

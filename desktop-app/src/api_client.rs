@@ -422,12 +422,16 @@ impl ApiClient {
         username: &str,
         password: &str,
         email: Option<&str>,
+        ssh_public_key: &str,
+        ssh_fingerprint: &str,
     ) -> Result<manager_models::UserResponse, ApiError> {
         let url = format!("{}/api/auth/register", self.base_url);
         let payload = manager_models::CreateUserRequest {
             username: username.to_string(),
             email: email.map(|s| s.to_string()),
             password: password.to_string(),
+            ssh_public_key: ssh_public_key.to_string(),
+            ssh_fingerprint: ssh_fingerprint.to_string(),
         };
 
         let response = self

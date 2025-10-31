@@ -2490,6 +2490,26 @@ pub async fn register(
     user.id = user_id;
     tracing::info!("User created with ID: {}", user_id);
 
+    // Create SSH key record for the user if SSH key data is provided
+    if let (Some(ssh_public_key), Some(ssh_fingerprint)) = (&create_req.ssh_public_key, &create_req.ssh_fingerprint) {
+        let ssh_key = crate::models::UserSshKey {
+            id: 0, // Will be set by database
+            user_id,
+            key_type: "ssh-ed25519".to_string(), // Default assumption, could be improved
+            fingerprint: ssh_fingerprint.clone(),
+            public_key_data: ssh_public_key.clone(),
+            label: Some("Registration Key".to_string()),
+            is_active: true,
+            created_at: now,
+            last_used_at: None,
+        };
+
+        let ssh_key_id = data.database.create_ssh_key(&ssh_key)?;
+        tracing::info!("SSH key created with ID: {} for user: {}", ssh_key_id, user.username);
+    } else {
+        tracing::info!("No SSH key provided during registration for user: {}", user.username);
+    }
+
     // Check if this is the first user (bootstrap logic)
     let user_count = data.database.get_all_users()?.len();
     if user_count == 1 {
