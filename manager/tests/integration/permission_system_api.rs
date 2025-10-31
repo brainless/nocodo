@@ -8,21 +8,18 @@
 //! - Bootstrap logic for first user
 
 use actix_web::{test, web, App};
-use serde_json::json;
 
 use nocodo_manager::models::{
     CreateTeamRequest, UpdateTeamRequest, AddTeamMemberRequest, CreatePermissionRequest,
-    CreateUserRequest, User
+    CreateUserRequest
 };
-use nocodo_manager::permissions::{Action, ResourceType};
 
-use crate::common::{TestApp, TestDataGenerator};
+use crate::common::TestApp;
 
-/// Helper to create a test service with all routes
-async fn create_test_service(test_app: &TestApp) -> test::Service {
-    test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
+/// Macro to create app routes for permission tests
+macro_rules! create_test_routes {
+    ($app:expr) => {
+        $app
             // Health check
             .route("/api/health", web::get().to(nocodo_manager::handlers::health_check))
             // Auth endpoints
@@ -88,15 +85,16 @@ async fn create_test_service(test_app: &TestApp) -> test::Service {
                             .route("", web::get().to(nocodo_manager::handlers::get_project))
                             .route("", web::delete().to(nocodo_manager::handlers::delete_project)),
                     ),
-            ),
-    )
-    .await
+            )
+    };
 }
 
 #[actix_rt::test]
 async fn test_complete_team_management_workflow() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     // 1. Register first user (should create Super Admins team)
     let register_req = CreateUserRequest {
@@ -253,7 +251,9 @@ async fn test_complete_team_management_workflow() {
 #[actix_rt::test]
 async fn test_permission_revocation() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     // Create first user (Super Admin)
     let register_req = CreateUserRequest {
@@ -346,7 +346,9 @@ async fn test_permission_revocation() {
 #[actix_rt::test]
 async fn test_team_member_removal() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     // Create first user (Super Admin)
     let register_req = CreateUserRequest {
@@ -449,7 +451,9 @@ async fn test_team_member_removal() {
 #[actix_rt::test]
 async fn test_super_admin_permissions() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     // Register first user (should get Super Admin permissions)
     let register_req = CreateUserRequest {
@@ -514,7 +518,9 @@ async fn test_super_admin_permissions() {
 #[actix_rt::test]
 async fn test_list_all_permissions_admin_only() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     // Register first user (Super Admin)
     let register_req = CreateUserRequest {
@@ -544,7 +550,9 @@ async fn test_list_all_permissions_admin_only() {
 #[actix_rt::test]
 async fn test_team_deletion_cascades() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     // Create first user (Super Admin)
     let register_req = CreateUserRequest {

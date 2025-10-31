@@ -61,7 +61,6 @@ impl TestDataGenerator {
             id: get_unique_id("work"),
             title,
             project_id,
-            tool_name: Some("test-tool".to_string()),
             model: Some("gpt-5".to_string()),
             status: "active".to_string(),
             created_at: chrono::Utc::now().timestamp(),
@@ -299,7 +298,7 @@ mod tests {
 
         assert_eq!(work.title, "My Work");
         assert_eq!(work.status, "active");
-        assert_eq!(work.tool_name, Some("test-tool".to_string()));
+        assert_eq!(work.model, Some("gpt-5".to_string()));
         assert!(work.id > 0);
     }
 

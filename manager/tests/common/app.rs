@@ -38,7 +38,7 @@ impl TestApp {
             start_time: SystemTime::now(),
             ws_broadcaster,
             llm_agent: None, // Not needed for basic API tests
-            config: Arc::new(config.config.clone()),
+            config: Arc::new(std::sync::RwLock::new(config.config.clone())),
         });
 
         // Create the test service with all routes
@@ -182,7 +182,7 @@ impl TestApp {
             start_time: SystemTime::now(),
             ws_broadcaster,
             llm_agent, // Real LLM agent, not None!
-            config: Arc::new(config.config.clone()),
+            config: Arc::new(std::sync::RwLock::new(config.config.clone())),
         });
 
         // Create the test service with all routes

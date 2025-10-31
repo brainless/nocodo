@@ -302,6 +302,7 @@ impl LlmProviderTestConfig {
                 },
             }),
             projects: None,
+            jwt_secret: Some("test-jwt-secret-for-llm-tests".to_string()),
         }
     }
 }

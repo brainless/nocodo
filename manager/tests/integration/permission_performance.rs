@@ -9,15 +9,13 @@ use actix_web::{test, web, App};
 use std::time::Instant;
 
 use nocodo_manager::models::{CreateTeamRequest, AddTeamMemberRequest, CreatePermissionRequest, CreateUserRequest};
-use nocodo_manager::permissions::{Action, ResourceType};
 
 use crate::common::{TestApp, TestDataGenerator};
 
-/// Helper to create a test service with permission-related routes
-async fn create_test_service(test_app: &TestApp) -> test::Service {
-    test::init_service(
-        App::new()
-            .app_data(test_app.app_state.clone())
+/// Macro to create app routes for performance tests
+macro_rules! create_perf_test_routes {
+    ($app:expr) => {
+        $app
             // Auth endpoints
             .route("/api/auth/register", web::post().to(nocodo_manager::handlers::register))
             // Team management endpoints
@@ -43,15 +41,16 @@ async fn create_test_service(test_app: &TestApp) -> test::Service {
             .service(
                 web::scope("/api/permissions")
                     .route("", web::post().to(nocodo_manager::handlers::create_permission))
-            ),
-    )
-    .await
+            )
+    };
 }
 
 #[actix_rt::test]
 async fn test_performance_many_teams_and_permissions() {
     let test_app = TestApp::new().await;
-    let service = create_test_service(&test_app).await;
+    let service = test::init_service(
+        create_perf_test_routes!(App::new().app_data(test_app.app_state.clone()))
+    ).await;
 
     let start_time = Instant::now();
 
