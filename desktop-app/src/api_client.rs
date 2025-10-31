@@ -1,6 +1,6 @@
 use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
-    ProjectListResponse, SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work,
+    ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work,
     WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
@@ -245,6 +245,27 @@ impl ApiClient {
         Ok(models_response.models)
     }
 
+    pub async fn health_check(&self) -> Result<ServerStatus, ApiError> {
+        let url = format!("{}/api/health", self.base_url);
+        let response = self
+            .client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let status: ServerStatus = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(status)
+    }
+
     pub async fn get_settings(&self) -> Result<SettingsResponse, ApiError> {
         let url = format!("{}/api/settings", self.base_url);
         let request = self.client().get(&url);
@@ -402,7 +423,7 @@ impl ApiClient {
         password: &str,
         email: Option<&str>,
     ) -> Result<manager_models::UserResponse, ApiError> {
-        let url = format!("{}/auth/register", self.base_url);
+        let url = format!("{}/api/auth/register", self.base_url);
         let payload = manager_models::CreateUserRequest {
             username: username.to_string(),
             email: email.map(|s| s.to_string()),
@@ -436,7 +457,7 @@ impl ApiClient {
         password: &str,
         ssh_fingerprint: &str,
     ) -> Result<manager_models::LoginResponse, ApiError> {
-        let url = format!("{}/auth/login", self.base_url);
+        let url = format!("{}/api/auth/login", self.base_url);
         let payload = manager_models::LoginRequest {
             username: username.to_string(),
             password: password.to_string(),

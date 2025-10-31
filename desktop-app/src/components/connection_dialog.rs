@@ -105,7 +105,7 @@ impl ConnectionDialog {
                     // Verify we can reach the API through the tunnel
                     if let Some(api_client) = connection_manager.get_api_client().await {
                         tracing::info!("API client created, testing connection...");
-                        match api_client.get_settings().await {
+                        match api_client.health_check().await {
                             Ok(_) => {
                                 tracing::info!(
                                     "Successfully connected to nocodo manager at {}@{}",

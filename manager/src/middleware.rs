@@ -47,21 +47,25 @@ where
 
     forward_ready!(service);
 
+    #[allow(unused_mut)]
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let config = req.app_data::<web::Data<Arc<AppConfig>>>().cloned();
 
-        // Skip authentication for health check, login, and register endpoints
         let path = req.path().to_string();
+        let method = req.method().to_string();
+        tracing::info!("Incoming request: {} {} (auth required: {})", method, path, !matches!(path.as_str(), "/api/health" | "/api/auth/login" | "/api/auth/register"));
+
+        // Skip authentication for health check, login, and register endpoints
         if path == "/api/health" || path == "/api/auth/login" || path == "/api/auth/register" {
             let fut = self.service.call(req);
-            return Box::pin(async move { fut.await });
+            return Box::pin(fut);
         }
 
         let config = match config {
             Some(cfg) => cfg,
             None => {
                 return Box::pin(async {
-                    Err(ErrorUnauthorized("Server configuration error").into())
+                    Err(ErrorUnauthorized("Server configuration error"))
                 });
             }
         };
@@ -76,8 +80,9 @@ where
         let auth_header = match auth_header {
             Some(h) => h,
             None => {
+                tracing::warn!("Auth failed: missing Authorization header");
                 return Box::pin(async {
-                    Err(ErrorUnauthorized("Missing Authorization header").into())
+                    Err(ErrorUnauthorized("Missing Authorization header"))
                 });
             }
         };
@@ -85,11 +90,11 @@ where
         let token = match auth_header.strip_prefix("Bearer ") {
             Some(t) => t.to_string(),
             None => {
+                tracing::warn!("Auth failed: invalid Authorization header format");
                 return Box::pin(async {
                     Err(ErrorUnauthorized(
                         "Invalid Authorization header format. Expected 'Bearer <token>'",
-                    )
-                    .into())
+                    ))
                 });
             }
         };
@@ -99,7 +104,7 @@ where
             Some(secret) => secret.clone(),
             None => {
                 return Box::pin(async {
-                    Err(ErrorUnauthorized("JWT secret not configured").into())
+                    Err(ErrorUnauthorized("JWT secret not configured"))
                 });
             }
         };
@@ -107,6 +112,7 @@ where
         match validate_token(&token, &jwt_secret) {
             Ok(claims) => {
                 // Attach user info to request extensions
+                let username = claims.username.clone();
                 let user_info = UserInfo {
                     id: claims.sub.parse().unwrap_or(0),
                     username: claims.username,
@@ -114,11 +120,15 @@ where
                 };
 
                 req.extensions_mut().insert(user_info);
+                tracing::info!("Auth successful for user: {}", username);
 
                 let fut = self.service.call(req);
-                Box::pin(async move { fut.await })
+                Box::pin(fut)
             }
-            Err(_) => Box::pin(async { Err(ErrorUnauthorized("Invalid or expired token").into()) }),
+            Err(_) => {
+                tracing::warn!("Auth failed: invalid or expired token");
+                Box::pin(async { Err(ErrorUnauthorized("Invalid or expired token")) })
+            },
         }
     }
 }
@@ -217,7 +227,7 @@ where
             Some(state) => state.database.clone(),
             None => {
                 return Box::pin(async {
-                    Err(actix_web::error::ErrorInternalServerError("Database not available").into())
+                    Err(actix_web::error::ErrorInternalServerError("Database not available"))
                 });
             }
         };
@@ -227,7 +237,7 @@ where
             Ok(id) => id,
             Err(_) => {
                 return Box::pin(async {
-                    Err(ErrorUnauthorized("Authentication required").into())
+                    Err(ErrorUnauthorized("Authentication required"))
                 });
             }
         };
@@ -243,28 +253,26 @@ where
 
         // Parse resource type and action
         let resource_type =
-            match crate::permissions::ResourceType::from_str(&requirement.resource_type) {
+            match crate::permissions::ResourceType::parse(&requirement.resource_type) {
                 Some(rt) => rt,
                 None => {
-                    return Box::pin(async move {
-                        Err(actix_web::error::ErrorInternalServerError(format!(
-                            "Invalid resource type: {}",
-                            requirement.resource_type
-                        ))
-                        .into())
-                    });
+                return Box::pin(async move {
+                    Err(actix_web::error::ErrorInternalServerError(format!(
+                        "Invalid resource type: {}",
+                        requirement.resource_type
+                    )))
+                });
                 }
             };
 
-        let action = match crate::permissions::Action::from_str(&requirement.action) {
+        let action = match crate::permissions::Action::parse(&requirement.action) {
             Some(a) => a,
             None => {
                 return Box::pin(async move {
                     Err(actix_web::error::ErrorInternalServerError(format!(
                         "Invalid action: {}",
                         requirement.action
-                    ))
-                    .into())
+                    )))
                 });
             }
         };
@@ -287,14 +295,13 @@ where
                 }
                 Ok(false) => {
                     // Permission denied
-                    Err(actix_web::error::ErrorForbidden("Insufficient permissions").into())
+                    Err(actix_web::error::ErrorForbidden("Insufficient permissions"))
                 }
                 Err(e) => {
                     // Error checking permission
                     tracing::error!("Permission check error: {}", e);
                     Err(
-                        actix_web::error::ErrorInternalServerError("Permission check failed")
-                            .into(),
+                        actix_web::error::ErrorInternalServerError("Permission check failed"),
                     )
                 }
             }

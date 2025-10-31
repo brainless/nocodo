@@ -103,7 +103,7 @@ impl ConnectionManager {
         let api_client = ApiClient::new(format!("http://localhost:{}", port));
 
         // Test connection
-        match api_client.get_settings().await {
+        match api_client.health_check().await {
             Ok(_) => {
                 *self.api_client.write().await = Some(api_client);
                 *self.connected.write().await = true;
@@ -161,7 +161,7 @@ impl ConnectionManager {
 
         if let Some(client) = self.api_client.read().await.as_ref() {
             // Try a lightweight API call to verify connection
-            match tokio::time::timeout(Duration::from_secs(5), client.get_settings()).await {
+            match tokio::time::timeout(Duration::from_secs(5), client.health_check()).await {
                 Ok(Ok(_)) => true,
                 Ok(Err(e)) => {
                     tracing::warn!("Health check failed: {}", e);
@@ -263,7 +263,7 @@ impl ConnectionManager {
                             if let Some(client) = connection_manager.api_client.read().await.as_ref() {
                                 match tokio::time::timeout(
                                     Duration::from_secs(5),
-                                    client.get_settings()
+                                    client.health_check()
                                 ).await {
                                     Ok(Ok(_)) => {
                                         tracing::trace!("Health check passed");
@@ -340,7 +340,7 @@ impl ConnectionManager {
                                                         // For local connections, just recreate the client
                                                         let api_client = ApiClient::new(format!("http://localhost:{}", port));
 
-                                                        if api_client.get_settings().await.is_ok() {
+                                                        if api_client.health_check().await.is_ok() {
                                                             *connection_manager.api_client.write().await = Some(api_client);
                                                             *connection_manager.connected.write().await = true;
                                                             consecutive_failures = 0;
