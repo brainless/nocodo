@@ -405,6 +405,11 @@ impl ConnectionManager {
             client.set_jwt_token(Some(response.token.clone()));
         }
 
+        // Reset auth required flag since we now have authentication
+        if let Ok(mut auth_required) = self.auth_required.lock() {
+            *auth_required = false;
+        }
+
         Ok(response)
     }
 
@@ -421,6 +426,11 @@ impl ConnectionManager {
             .ok_or(ConnectionError::NoConnectionInfo)?;
 
         let response = client.register(username, password, email).await?;
+
+        // Reset auth required flag since registration might provide auth
+        if let Ok(mut auth_required) = self.auth_required.lock() {
+            *auth_required = false;
+        }
 
         Ok(response)
     }

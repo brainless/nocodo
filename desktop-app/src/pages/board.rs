@@ -758,14 +758,14 @@ impl crate::pages::Page for WorkPage {
                                     ui.label("Work not found");
                                 });
                             }
-                        } else {
-                            // No work selected - show create work form
-                            if matches!(state.connection_state, ConnectionState::Connected) {
-                                // Load models only once when form is opened
-                                if !state.models_fetch_attempted && !state.loading_supported_models {
-                                    let api_service = crate::services::ApiService::new();
-                                    api_service.refresh_supported_models(state);
-                                }
+                             } else {
+                                 // No work selected - show create work form
+                                 if matches!(state.connection_state, ConnectionState::Connected) {
+                                     // Load models only once when form is opened
+                                     if !state.models_fetch_attempted && !state.loading_supported_models {
+                                         let api_service = crate::services::ApiService::new();
+                                         api_service.refresh_supported_models(state);
+                                     }
 
                                 // Create form - full width of second column
                                 ui.allocate_ui_with_layout(
