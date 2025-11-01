@@ -872,6 +872,8 @@ pub struct CreateUserRequest {
     pub username: String,
     pub email: Option<String>,
     pub password: String,
+    pub ssh_public_key: String,
+    pub ssh_fingerprint: String,
 }
 
 /// Response after user creation/registration
