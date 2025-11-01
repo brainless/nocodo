@@ -51,4 +51,11 @@ chrono = "0.4"
 # Random data generation
 rand = "0.8"
 
+# URL encoding
+urlencoding = "2.1"
+
+# Cryptography for SSH fingerprint
+sha2 = "0.10"
+base64 = "0.22"
+
 

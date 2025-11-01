@@ -8,22 +8,17 @@ pub mod ui_state;
 pub use connection::*;
 pub use ui_state::*;
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, Default)]
 pub enum Page {
     Projects,
     Work,
     ProjectDetail(i64), // Project ID
     Mentions,
+    #[default]
     Servers,
     Settings,
     UiReference,
     UiTwoColumnMainContent,
-}
-
-impl Default for Page {
-    fn default() -> Self {
-        Page::Servers
-    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -46,6 +41,9 @@ pub struct AppState {
     // Connection state
     pub connection_state: ConnectionState,
 
+    // Authentication state
+    pub auth_state: AuthState,
+
     // Configuration
     pub config: crate::config::DesktopConfig,
 
@@ -57,6 +55,7 @@ pub struct AppState {
     pub works: Vec<manager_models::Work>,
     pub work_messages: Vec<manager_models::WorkMessage>,
     pub ai_session_outputs: Vec<manager_models::AiSessionOutput>,
+    pub ai_tool_calls: Vec<manager_models::LlmAgentToolCall>,
     pub project_details: Option<manager_models::ProjectDetailsResponse>,
     pub servers: Vec<Server>,
     pub settings: Option<manager_models::SettingsResponse>,
@@ -110,6 +109,10 @@ pub struct AppState {
         Arc<std::sync::Mutex<Option<Result<Vec<manager_models::AiSessionOutput>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
+    pub ai_tool_calls_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::LlmAgentToolCall>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
     pub update_projects_path_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
@@ -127,6 +130,8 @@ pub struct AppState {
     #[serde(skip)]
     pub loading_ai_session_outputs: bool,
     #[serde(skip)]
+    pub loading_ai_tool_calls: bool,
+    #[serde(skip)]
     pub loading_settings: bool,
     #[serde(skip)]
     pub loading_project_details: bool,
@@ -143,8 +148,20 @@ pub struct AppState {
     #[serde(skip)]
     pub updating_api_keys: bool,
     #[serde(skip)]
+    pub loading_file_list: bool,
+    #[serde(skip)]
+    pub loading_file_content: bool,
+    #[serde(skip)]
+    pub current_file_browser_project_id: Option<i64>,
+    #[serde(skip)]
+    pub sending_message: bool,
+    #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub send_message_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::WorkMessage, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub create_ai_session_result:
@@ -153,23 +170,35 @@ pub struct AppState {
     #[allow(clippy::type_complexity)]
     pub update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
     #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub file_list_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::FileInfo>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub file_content_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::FileContentResponse, String>>>>,
+    #[serde(skip)]
     pub db: Option<Connection>,
     #[serde(skip)]
     pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
     #[serde(skip)]
     pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
+    #[serde(skip)]
+    pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
             connection_state: ConnectionState::default(),
+            auth_state: AuthState::default(),
             config: crate::config::DesktopConfig::default(),
             ui_state: UiState::default(),
             projects: Vec::new(),
             works: Vec::new(),
             work_messages: Vec::new(),
             ai_session_outputs: Vec::new(),
+            ai_tool_calls: Vec::new(),
             project_details: None,
             servers: Vec::new(),
             settings: None,
@@ -192,6 +221,7 @@ impl Default for AppState {
             works_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
+            ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
             update_projects_path_result: Arc::new(std::sync::Mutex::new(None)),
             scan_projects_result: Arc::new(std::sync::Mutex::new(None)),
             supported_models_result: Arc::new(std::sync::Mutex::new(None)),
@@ -199,6 +229,7 @@ impl Default for AppState {
             loading_works: false,
             loading_work_messages: false,
             loading_ai_session_outputs: false,
+            loading_ai_tool_calls: false,
             loading_settings: false,
             loading_project_details: false,
             loading_supported_models: false,
@@ -207,12 +238,20 @@ impl Default for AppState {
             updating_projects_path: false,
             scanning_projects: false,
             updating_api_keys: false,
+            loading_file_list: false,
+            loading_file_content: false,
+            current_file_browser_project_id: None,
+            sending_message: false,
             create_work_result: Arc::new(std::sync::Mutex::new(None)),
+            send_message_result: Arc::new(std::sync::Mutex::new(None)),
             create_ai_session_result: Arc::new(std::sync::Mutex::new(None)),
             update_api_keys_result: Arc::new(std::sync::Mutex::new(None)),
+            file_list_result: Arc::new(std::sync::Mutex::new(None)),
+            file_content_result: Arc::new(std::sync::Mutex::new(None)),
             db: None,
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
             connection_result: Arc::new(std::sync::Mutex::new(None)),
+            auth_required: Arc::new(std::sync::Mutex::new(false)),
         }
     }
 }

@@ -1,9 +1,10 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use nocodo_manager::database::Database;
 use nocodo_manager::models::{
     AiSession, AiSessionOutput, AiSessionResult, LlmAgentMessage, LlmAgentSession,
-    LlmAgentToolCall, MessageAuthorType, MessageContentType, Project, ProjectComponent, Work,
-    WorkMessage,
+    LlmAgentToolCall, MessageAuthorType, MessageContentType, Permission, Project, ProjectComponent,
+    Team, User, Work, WorkMessage,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -60,7 +61,6 @@ impl TestDataGenerator {
             id: get_unique_id("work"),
             title,
             project_id,
-            tool_name: Some("test-tool".to_string()),
             model: Some("gpt-5".to_string()),
             status: "active".to_string(),
             created_at: chrono::Utc::now().timestamp(),
@@ -232,6 +232,38 @@ impl TestDataGenerator {
 
         (project, work, messages)
     }
+
+    /// Create a test user in the database
+    pub async fn create_test_user(db: &Database) -> i64 {
+        let user = User::new(
+            format!("testuser{}", get_unique_id("user")),
+            format!("testuser{}@example.com", get_unique_id("email")),
+            "hashed_password".to_string(),
+        );
+        db.create_user(&user).unwrap()
+    }
+
+    /// Create a test team in the database
+    pub async fn create_test_team(db: &Database, created_by: i64) -> i64 {
+        let team = Team::new(
+            "Test Team".to_string(),
+            Some("A test team".to_string()),
+            created_by,
+        );
+        db.create_team(&team).unwrap()
+    }
+
+    /// Create a test permission in the database
+    pub async fn create_test_permission(db: &Database, team_id: i64, granted_by: i64) -> i64 {
+        let permission = Permission::new(
+            team_id,
+            "project".to_string(),
+            Some(1),
+            "write".to_string(),
+            Some(granted_by),
+        );
+        db.create_permission(&permission).unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -266,7 +298,7 @@ mod tests {
 
         assert_eq!(work.title, "My Work");
         assert_eq!(work.status, "active");
-        assert_eq!(work.tool_name, Some("test-tool".to_string()));
+        assert_eq!(work.model, Some("gpt-5".to_string()));
         assert!(work.id > 0);
     }
 

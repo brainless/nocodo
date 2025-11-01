@@ -5,11 +5,109 @@ use serde::{Deserialize, Serialize};
 pub use manager_models::{
     AddMessageRequest, AiSession, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, AiSessionResult, ApiKeyConfig,
-    CreateAiSessionRequest, CreateWorkRequest, LlmAgentToolCall, MessageAuthorType,
-    MessageContentType, SettingsResponse, SupportedModel, SupportedModelsResponse,
-    UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage, WorkMessageListResponse,
-    WorkMessageResponse, WorkResponse, WorkWithHistory,
+    CreateAiSessionRequest, CreateWorkRequest, LlmAgentToolCall, LlmAgentToolCallListResponse,
+    MessageAuthorType, MessageContentType, SettingsResponse, SupportedModel,
+    SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage,
+    WorkMessageListResponse, WorkMessageResponse, WorkResponse, WorkWithHistory,
 };
+
+// User and SSH key authentication models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    pub password_hash: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl User {
+    #[allow(dead_code)]
+    pub fn new(username: String, email: String, password_hash: String) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            username,
+            email,
+            password_hash,
+            is_active: true,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn update_timestamp(&mut self) {
+        self.updated_at = Utc::now().timestamp();
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSshKey {
+    pub id: i64,
+    pub user_id: i64,
+    pub key_type: String, // "ssh-rsa", "ssh-ed25519", "ecdsa-sha2-nistp256", etc.
+    pub fingerprint: String, // SHA256:base64hash
+    pub public_key_data: String, // Full public key for verification
+    pub label: Option<String>, // User-friendly name like "Work Laptop"
+    pub is_active: bool,
+    pub created_at: i64,
+    pub last_used_at: Option<i64>,
+}
+
+impl UserSshKey {
+    #[allow(dead_code)]
+    pub fn new(
+        user_id: i64,
+        key_type: String,
+        fingerprint: String,
+        public_key_data: String,
+        label: Option<String>,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            user_id,
+            key_type,
+            fingerprint,
+            public_key_data,
+            label,
+            is_active: true,
+            created_at: now,
+            last_used_at: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn mark_used(&mut self) {
+        self.last_used_at = Some(Utc::now().timestamp());
+    }
+}
+
+// Login request and response models
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+    pub ssh_fingerprint: String, // SHA256 fingerprint from client
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub user: UserInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserInfo {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -36,6 +134,7 @@ impl Project {
         }
     }
 
+    #[allow(dead_code)]
     #[allow(dead_code)]
     pub fn update_timestamp(&mut self) {
         self.updated_at = Utc::now().timestamp();
@@ -563,4 +662,175 @@ pub struct LlmAgentMessage {
     pub role: String, // "user" | "assistant" | "system"
     pub content: String,
     pub created_at: i64,
+}
+
+// Permission system models (Phase 1: DB & Models)
+
+/// Team - groups of users that share permissions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Team {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_by: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl Team {
+    pub fn new(name: String, description: Option<String>, created_by: i64) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            name,
+            description,
+            created_by,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn update_timestamp(&mut self) {
+        self.updated_at = Utc::now().timestamp();
+    }
+}
+
+/// Team member - links users to teams
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamMember {
+    pub id: i64,
+    pub team_id: i64,
+    pub user_id: i64,
+    pub added_by: Option<i64>,
+    pub added_at: i64,
+}
+
+impl TeamMember {
+    #[allow(dead_code)]
+    pub fn new(team_id: i64, user_id: i64, added_by: Option<i64>) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            team_id,
+            user_id,
+            added_by,
+            added_at: now,
+        }
+    }
+}
+
+/// Permission - access rules assigned to teams
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Permission {
+    pub id: i64,
+    pub team_id: i64,
+    pub resource_type: String, // "project", "work", "settings", "user", "team"
+    pub resource_id: Option<i64>, // NULL = entity-level permission (all resources of this type)
+    pub action: String,        // "read", "write", "delete", "admin"
+    pub granted_by: Option<i64>,
+    pub granted_at: i64,
+}
+
+impl Permission {
+    pub fn new(
+        team_id: i64,
+        resource_type: String,
+        resource_id: Option<i64>,
+        action: String,
+        granted_by: Option<i64>,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            team_id,
+            resource_type,
+            resource_id,
+            action,
+            granted_by,
+            granted_at: now,
+        }
+    }
+}
+
+/// Resource ownership - tracks who created/owns resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceOwnership {
+    pub id: i64,
+    pub resource_type: String, // "project", "work", "settings", "user", "team"
+    pub resource_id: i64,
+    pub owner_id: i64,
+    pub created_at: i64,
+}
+
+impl ResourceOwnership {
+    pub fn new(resource_type: String, resource_id: i64, owner_id: i64) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            resource_type,
+            resource_id,
+            owner_id,
+            created_at: now,
+        }
+    }
+}
+
+// Additional request/response models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserListResponse {
+    pub users: Vec<User>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserResponse {
+    pub user: User,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub email: Option<String>,
+    pub password: String,
+    #[serde(default)]
+    pub ssh_public_key: Option<String>,
+    #[serde(default)]
+    pub ssh_fingerprint: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateUserRequest {
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+// Team management models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateTeamRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTeamRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddTeamMemberRequest {
+    pub user_id: i64,
+}
+
+// Permission management models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePermissionRequest {
+    pub team_id: i64,
+    pub resource_type: String,
+    pub resource_id: Option<i64>,
+    pub action: String,
 }

@@ -48,9 +48,22 @@ impl ApiService {
             let result_clone = Arc::clone(&state.projects_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.list_projects().await;
                     let mut projects_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *projects_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut projects_result = result_clone.lock().unwrap();
@@ -69,9 +82,22 @@ impl ApiService {
             let result_clone = Arc::clone(&state.works_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.list_works().await;
                     let mut works_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *works_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut works_result = result_clone.lock().unwrap();
@@ -90,9 +116,22 @@ impl ApiService {
             let result_clone = Arc::clone(&state.settings_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_settings().await;
                     let mut settings_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *settings_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut settings_result = result_clone.lock().unwrap();
@@ -112,10 +151,35 @@ impl ApiService {
             let result_clone = Arc::clone(&state.supported_models_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
-                    let result = api_client.get_supported_models().await;
-                    let mut supported_models_result = result_clone.lock().unwrap();
-                    *supported_models_result = Some(result.map_err(|e| e.to_string()));
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    // Check if we have a JWT token before making the API call
+                    if api_client.get_jwt_token().is_some() {
+                        let result = api_client.get_supported_models().await;
+                        let mut supported_models_result = result_clone.lock().unwrap();
+
+                        // Check for 401 Unauthorized and set auth required flag
+                        if let Err(ref e) = result {
+                            if e.is_unauthorized() {
+                                if let Ok(mut auth_required) =
+                                    connection_manager.get_auth_required_flag().lock()
+                                {
+                                    *auth_required = true;
+                                }
+                            }
+                        }
+
+                        *supported_models_result = Some(result.map_err(|e| e.to_string()));
+                    } else {
+                        // No token, set auth required
+                        if let Ok(mut auth_required) =
+                            connection_manager.get_auth_required_flag().lock()
+                        {
+                            *auth_required = true;
+                        }
+                        let mut supported_models_result = result_clone.lock().unwrap();
+                        *supported_models_result = Some(Err("Authentication required".to_string()));
+                    }
                 } else {
                     let mut supported_models_result = result_clone.lock().unwrap();
                     *supported_models_result = Some(Err("Not connected".to_string()));
@@ -137,7 +201,8 @@ impl ApiService {
             let model = state.ui_state.new_work_model.clone();
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let request = manager_models::CreateWorkRequest {
                         title,
                         project_id,
@@ -147,6 +212,18 @@ impl ApiService {
                     };
                     let result = api_client.create_work(request).await;
                     let mut create_work_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *create_work_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut create_work_result = result_clone.lock().unwrap();
@@ -156,24 +233,83 @@ impl ApiService {
         }
     }
 
+    pub fn send_message_to_work(&self, work_id: i64, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.sending_message = true;
+            state.send_message_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.send_message_result);
+
+            let message_content = state.ui_state.continue_message_input.clone();
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let request = manager_models::AddMessageRequest {
+                        content: message_content,
+                        content_type: manager_models::MessageContentType::Text,
+                        author_type: manager_models::MessageAuthorType::User,
+                        author_id: None,
+                    };
+                    let result = api_client.add_message_to_work(work_id, request).await;
+                    let mut send_message_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *send_message_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut send_message_result = result_clone.lock().unwrap();
+                    *send_message_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
     pub fn refresh_work_messages(&self, work_id: i64, state: &mut AppState) {
         if state.connection_state == crate::state::ConnectionState::Connected {
-            // Fetch both work messages and AI session outputs
+            // Fetch work messages, AI session outputs, and tool calls
             state.loading_work_messages = true;
             state.loading_ai_session_outputs = true;
+            state.loading_ai_tool_calls = true;
             state.work_messages_result = Arc::new(std::sync::Mutex::new(None));
             state.ai_session_outputs_result = Arc::new(std::sync::Mutex::new(None));
+            state.ai_tool_calls_result = Arc::new(std::sync::Mutex::new(None));
 
             let connection_manager = Arc::clone(&state.connection_manager);
             let connection_manager2 = Arc::clone(&state.connection_manager);
+            let connection_manager3 = Arc::clone(&state.connection_manager);
             let messages_result_clone = Arc::clone(&state.work_messages_result);
             let outputs_result_clone = Arc::clone(&state.ai_session_outputs_result);
+            let tool_calls_result_clone = Arc::clone(&state.ai_tool_calls_result);
 
             // Fetch work messages (user input)
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_work_messages(work_id).await;
                     let mut work_messages_result = messages_result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *work_messages_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut work_messages_result = messages_result_clone.lock().unwrap();
@@ -183,13 +319,51 @@ impl ApiService {
 
             // Fetch AI session outputs (AI responses and tool results)
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager2.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager2.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_ai_session_outputs(work_id).await;
                     let mut ai_session_outputs_result = outputs_result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager2.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *ai_session_outputs_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut ai_session_outputs_result = outputs_result_clone.lock().unwrap();
                     *ai_session_outputs_result = Some(Err("Not connected".to_string()));
+                }
+            });
+
+            // Fetch AI tool calls (tool requests and responses)
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager3.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.get_ai_tool_calls(work_id).await;
+                    let mut ai_tool_calls_result = tool_calls_result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager3.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *ai_tool_calls_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut ai_tool_calls_result = tool_calls_result_clone.lock().unwrap();
+                    *ai_tool_calls_result = Some(Err("Not connected".to_string()));
                 }
             });
         }
@@ -209,14 +383,25 @@ impl ApiService {
 
             tokio::spawn(async move {
                 tracing::info!("Fetching project details for project_id={}", project_id);
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_project_details(project_id).await;
                     match &result {
                         Ok(details) => tracing::info!(
                             "Project details loaded: {} components",
                             details.components.len()
                         ),
-                        Err(e) => tracing::error!("Failed to load project details: {}", e),
+                        Err(e) => {
+                            tracing::error!("Failed to load project details: {}", e);
+                            // Check for 401 Unauthorized and set auth required flag
+                            if e.is_unauthorized() {
+                                if let Ok(mut auth_required) =
+                                    connection_manager.get_auth_required_flag().lock()
+                                {
+                                    *auth_required = true;
+                                }
+                            }
+                        }
                     }
                     let mut project_details_result = result_clone.lock().unwrap();
                     *project_details_result = Some(result.map_err(|e| e.to_string()));
@@ -241,9 +426,22 @@ impl ApiService {
             let path = state.ui_state.projects_default_path.clone();
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.set_projects_default_path(path).await;
                     let mut update_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *update_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut update_result = result_clone.lock().unwrap();
@@ -262,9 +460,22 @@ impl ApiService {
             let result_clone = Arc::clone(&state.scan_projects_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.scan_projects().await;
                     let mut scan_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *scan_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut scan_result = result_clone.lock().unwrap();
@@ -299,7 +510,8 @@ impl ApiService {
             };
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let request = manager_models::UpdateApiKeysRequest {
                         xai_api_key: xai_key,
                         openai_api_key: openai_key,
@@ -307,6 +519,18 @@ impl ApiService {
                     };
                     let result = api_client.update_api_keys(request).await;
                     let mut update_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
                     *update_result = Some(result.map_err(|e| e.to_string()));
                 } else {
                     let mut update_result = result_clone.lock().unwrap();
@@ -317,7 +541,7 @@ impl ApiService {
     }
 
     // Local server methods
-    pub async fn check_local_server(&self, state: &mut AppState) -> Result<(), String> {
+    pub fn check_local_server(&self, state: &mut AppState) -> Result<(), String> {
         state.ui_state.checking_local_server = true;
         // This will be implemented with actual API calls
         Ok(())

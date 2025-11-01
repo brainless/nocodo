@@ -1,5 +1,7 @@
-use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key};
+use base64::{engine::general_purpose, Engine as _};
+use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key, PublicKeyBase64};
 use russh::*;
+use sha2::{Digest, Sha256};
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::Arc;
@@ -305,6 +307,90 @@ async fn handle_tunnel_connection(
 
     tracing::debug!("Tunnel connection closed");
     Ok(())
+}
+
+/// Read SSH public key from .pub file
+/// Returns the full public key content
+pub fn read_ssh_public_key(key_path: Option<&str>) -> Result<String, SshError> {
+    // Find key path (same logic as connect)
+    let key_paths: Vec<String> = if let Some(key_path) = key_path {
+        vec![key_path.to_string()]
+    } else {
+        // Try default key locations
+        let home = std::env::var("HOME").unwrap_or_default();
+        vec![
+            format!("{}/.ssh/id_rsa", home),
+            format!("{}/.ssh/id_ed25519", home),
+            format!("{}/.ssh/id_ecdsa", home),
+        ]
+    };
+
+    // Try to find the corresponding .pub file
+    for key_path in &key_paths {
+        let pub_key_path = format!("{}.pub", key_path);
+        if Path::new(&pub_key_path).exists() {
+            match std::fs::read_to_string(&pub_key_path) {
+                Ok(content) => {
+                    // Trim whitespace and return
+                    return Ok(content.trim().to_string());
+                }
+                Err(_) => continue,
+            }
+        }
+    }
+
+    Err(SshError::AuthenticationFailed(
+        "No SSH public key found".to_string(),
+    ))
+}
+
+/// Calculate SSH key fingerprint in SHA256 format
+/// Returns a string like "SHA256:base64hash"
+pub fn calculate_ssh_fingerprint(key_path: Option<&str>) -> Result<String, SshError> {
+    // Find key path (same logic as connect)
+    let key_paths: Vec<String> = if let Some(key_path) = key_path {
+        vec![key_path.to_string()]
+    } else {
+        // Try default key locations
+        let home = std::env::var("HOME").unwrap_or_default();
+        vec![
+            format!("{}/.ssh/id_rsa", home),
+            format!("{}/.ssh/id_ed25519", home),
+            format!("{}/.ssh/id_ecdsa", home),
+        ]
+    };
+
+    // Load SSH key
+    let mut key_pair = None;
+    for key_path in &key_paths {
+        if Path::new(key_path).exists() {
+            match load_secret_key(key_path, None) {
+                Ok(key) => {
+                    key_pair = Some(key);
+                    break;
+                }
+                Err(_) => continue,
+            }
+        }
+    }
+
+    let key_pair = key_pair
+        .ok_or_else(|| SshError::AuthenticationFailed("No valid SSH keys found".to_string()))?;
+
+    // Get public key bytes
+    let public_key = key_pair.public_key();
+    let public_key_bytes = public_key.public_key_bytes();
+
+    // Calculate SHA256 hash
+    let mut hasher = Sha256::new();
+    hasher.update(public_key_bytes);
+    let hash = hasher.finalize();
+
+    // Encode to base64
+    let base64_hash = general_purpose::STANDARD.encode(hash);
+
+    // Format as "SHA256:base64hash"
+    Ok(format!("SHA256:{}", base64_hash))
 }
 
 #[derive(Debug, thiserror::Error)]

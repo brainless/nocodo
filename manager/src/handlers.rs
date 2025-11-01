@@ -1,3 +1,4 @@
+use crate::auth;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
@@ -7,14 +8,16 @@ use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateWorkRequest, FileContentResponse, FileCreateRequest, FileInfo,
-    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest, Project,
-    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, UpdateApiKeysRequest,
-    WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateTeamRequest, CreateWorkRequest, FileContentResponse,
+    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
+    FileUpdateRequest, LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse,
+    ProjectResponse, ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest, UpdateTeamRequest,
+    UpdateUserRequest, User, UserListResponse, UserResponse, WorkListResponse, WorkMessageResponse,
+    WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{web, HttpMessage, HttpResponse, Result};
 use handlebars::Handlebars;
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
@@ -24,6 +27,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+
 
 pub struct AppState {
     pub database: Arc<Database>,
@@ -64,6 +68,7 @@ pub async fn get_projects(data: web::Data<AppState>) -> Result<HttpResponse, App
 pub async fn create_project(
     data: web::Data<AppState>,
     request: web::Json<CreateProjectRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     let req = request.into_inner();
 
@@ -150,6 +155,17 @@ A new project created with nocodo.
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
 
+    // Get user ID from request and record ownership
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    let ownership =
+        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+    data.database.create_ownership(&ownership)?;
+
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
         .broadcast_project_created(project.clone());
@@ -186,9 +202,290 @@ pub async fn get_project_details(
         project,
         components,
     };
+
     Ok(HttpResponse::Ok().json(response))
 }
 
+// User management handlers
+
+pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let users = data.database.get_all_users()?;
+    let response = UserListResponse { users };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn create_user(
+    data: web::Data<AppState>,
+    request: web::Json<crate::models::CreateUserRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let create_req = request.into_inner();
+
+    // Validate username
+    if create_req.username.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Username cannot be empty".to_string(),
+        ));
+    }
+
+    // Check if user already exists
+    if data.database.get_user_by_username(&create_req.username).is_ok() {
+        return Err(AppError::InvalidRequest(
+            "Username already exists".to_string(),
+        ));
+    }
+
+    // Hash password
+    let password_hash = auth::hash_password(&create_req.password)?;
+
+    // Get current user ID for created_by field (currently not used, but reserved for future audit logging)
+    let _created_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Create user
+    let user = User {
+        id: 0, // Will be set by database
+        username: create_req.username,
+        email: create_req.email.unwrap_or_default(),
+        password_hash,
+        is_active: true,
+        created_at: std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+        updated_at: std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+    };
+
+    let user_id = data.database.create_user(&user)?;
+    let mut user = user;
+    user.id = user_id;
+
+    let response = UserResponse { user };
+    Ok(HttpResponse::Created().json(response))
+}
+
+pub async fn get_user(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    let user = data.database.get_user_by_id(user_id)?;
+    let response = UserResponse { user };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn update_user(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    request: web::Json<UpdateUserRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    let update_req = request.into_inner();
+
+    // Get current user for updated_by field (currently not used, but reserved for future audit logging)
+    let _updated_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Update user
+    data.database.update_user(user_id, &update_req)?;
+
+    let user = data.database.get_user_by_id(user_id)?;
+    let response = UserResponse { user };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn delete_user(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    data.database.delete_user(user_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// Team management handlers
+
+pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let teams = data.database.get_all_teams()?;
+    Ok(HttpResponse::Ok().json(teams))
+}
+
+pub async fn create_team(
+    data: web::Data<AppState>,
+    request: web::Json<CreateTeamRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let create_req = request.into_inner();
+
+    // Validate team name
+    if create_req.name.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Team name cannot be empty".to_string(),
+        ));
+    }
+
+    // Get current user ID for created_by field
+    let created_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Create team
+    let team = Team::new(create_req.name, create_req.description, created_by);
+    let team_id = data.database.create_team(&team)?;
+    let mut team = team;
+    team.id = team_id;
+
+    Ok(HttpResponse::Created().json(team))
+}
+
+pub async fn get_team(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let team = data.database.get_team_by_id(team_id)?;
+    Ok(HttpResponse::Ok().json(team))
+}
+
+pub async fn update_team(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    request: web::Json<UpdateTeamRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let update_req = request.into_inner();
+
+    // Get current user ID for updated_by field (currently not used, but reserved for future audit logging)
+    let _updated_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Update team
+    data.database.update_team(team_id, &update_req)?;
+
+    let team = data.database.get_team_by_id(team_id)?;
+    Ok(HttpResponse::Ok().json(team))
+}
+
+pub async fn delete_team(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    data.database.delete_team(team_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn get_team_members(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let members = data.database.get_team_members(team_id)?;
+    Ok(HttpResponse::Ok().json(members))
+}
+
+pub async fn add_team_member(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    request: web::Json<crate::models::AddTeamMemberRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let add_req = request.into_inner();
+
+    // Get current user ID for added_by field
+    let added_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Add team member
+    data.database
+        .add_team_member(team_id, add_req.user_id, Some(added_by))?;
+
+    Ok(HttpResponse::Created().finish())
+}
+
+pub async fn remove_team_member(
+    data: web::Data<AppState>,
+    path: web::Path<(i64, i64)>,
+) -> Result<HttpResponse, AppError> {
+    let (team_id, user_id) = path.into_inner();
+    data.database.remove_team_member(team_id, user_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn get_team_permissions(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let team_id = path.into_inner();
+    let permissions = data.database.get_team_permissions(team_id)?;
+    Ok(HttpResponse::Ok().json(permissions))
+}
+
+// Permission management handlers
+
+pub async fn list_permissions(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    let permissions = data.database.get_all_permissions()?;
+    Ok(HttpResponse::Ok().json(permissions))
+}
+
+pub async fn create_permission(
+    data: web::Data<AppState>,
+    request: web::Json<crate::models::CreatePermissionRequest>,
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let create_req = request.into_inner();
+
+    // Get current user ID for granted_by field
+    let granted_by = req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Create permission
+    let permission = Permission::new(
+        create_req.team_id,
+        create_req.resource_type,
+        create_req.resource_id,
+        create_req.action,
+        Some(granted_by),
+    );
+
+    let permission_id = data.database.create_permission(&permission)?;
+    let mut permission = permission;
+    permission.id = permission_id;
+
+    Ok(HttpResponse::Created().json(permission))
+}
+
+pub async fn delete_permission(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let permission_id = path.into_inner();
+    data.database.delete_permission(permission_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
 pub async fn delete_project(
     data: web::Data<AppState>,
     path: web::Path<i64>,
@@ -330,24 +627,25 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
 pub async fn add_existing_project(
     data: web::Data<AppState>,
     request: web::Json<AddExistingProjectRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
-    let req = request.into_inner();
+    let project_req = request.into_inner();
 
     // Validate project name
-    if req.name.trim().is_empty() {
+    if project_req.name.trim().is_empty() {
         return Err(AppError::InvalidRequest(
             "Project name cannot be empty".to_string(),
         ));
     }
 
     // Validate path is provided
-    if req.path.trim().is_empty() {
+    if project_req.path.trim().is_empty() {
         return Err(AppError::InvalidRequest(
             "Project path cannot be empty".to_string(),
         ));
     }
 
-    let project_path = Path::new(&req.path);
+    let project_path = Path::new(&project_req.path);
 
     // Validate directory exists and is accessible
     if !project_path.exists() {
@@ -388,14 +686,26 @@ pub async fn add_existing_project(
         return Err(AppError::InvalidRequest(err_msg));
     }
 
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
     // Create the project object
-    let mut project = Project::new(req.name.clone(), absolute_path_str);
-    project.description = req.description;
-    project.parent_id = req.parent_id;
+    let mut project = Project::new(project_req.name.clone(), absolute_path_str);
+    project.description = project_req.description;
+    project.parent_id = project_req.parent_id;
 
     // Save to database
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
+
+    // Record ownership
+    let ownership =
+        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+    data.database.create_ownership(&ownership)?;
 
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
@@ -650,7 +960,9 @@ pub async fn get_file_content(
     path_param: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
-    let file_path = path_param.into_inner();
+    let file_path = urlencoding::decode(&path_param.into_inner())
+        .map_err(|_| AppError::InvalidRequest("Invalid URL encoding in path".to_string()))?
+        .to_string();
     let project_id_str = query
         .get("project_id")
         .ok_or_else(|| AppError::InvalidRequest("project_id is required".to_string()))?;
@@ -710,7 +1022,9 @@ pub async fn update_file(
     path_param: web::Path<String>,
     request: web::Json<FileUpdateRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let file_path = path_param.into_inner();
+    let file_path = urlencoding::decode(&path_param.into_inner())
+        .map_err(|_| AppError::InvalidRequest("Invalid URL encoding in path".to_string()))?
+        .to_string();
     let req = request.into_inner();
 
     // Get the project to determine the base path
@@ -767,7 +1081,9 @@ pub async fn delete_file(
     path_param: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
-    let file_path = path_param.into_inner();
+    let file_path = urlencoding::decode(&path_param.into_inner())
+        .map_err(|_| AppError::InvalidRequest("Invalid URL encoding in path".to_string()))?
+        .to_string();
     let project_id_str = query
         .get("project_id")
         .ok_or_else(|| AppError::InvalidRequest("project_id is required".to_string()))?;
@@ -823,26 +1139,28 @@ pub async fn delete_file(
 }
 
 // AI session HTTP handlers
+#[allow(dead_code)]
 pub async fn create_ai_session(
     data: web::Data<AppState>,
     path: web::Path<i64>,
     request: web::Json<CreateAiSessionRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    let req = request.into_inner();
+    let session_req = request.into_inner();
 
     // Validate required fields
-    if req.tool_name.trim().is_empty() {
+    if session_req.tool_name.trim().is_empty() {
         return Err(AppError::InvalidRequest("tool_name is required".into()));
     }
-    if req.message_id.trim().is_empty() {
+    if session_req.message_id.trim().is_empty() {
         return Err(AppError::InvalidRequest("message_id is required".into()));
     }
 
     // Validate that work and message exist
     let work = data.database.get_work_by_id(work_id)?;
     let messages = data.database.get_work_messages(work_id)?;
-    let message_id_i64 = req
+    let message_id_i64 = session_req
         .message_id
         .parse::<i64>()
         .map_err(|_| AppError::InvalidRequest("Invalid message_id".to_string()))?;
@@ -863,13 +1181,25 @@ pub async fn create_ai_session(
     let mut session = crate::models::AiSession::new(
         work_id,
         message_id_i64,
-        req.tool_name.clone(),
+        session_req.tool_name.clone(),
         project_context,
     );
+
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
 
     // Persist
     let session_id = data.database.create_ai_session(&session)?;
     session.id = session_id;
+
+    // Record ownership for the AI session
+    let ownership =
+        crate::models::ResourceOwnership::new("ai_session".to_string(), session_id, user_id);
+    data.database.create_ownership(&ownership)?;
 
     // Broadcast AI session creation via WebSocket
     data.ws_broadcaster
@@ -881,7 +1211,7 @@ pub async fn create_ai_session(
     };
 
     // Handle LLM agent specially
-    if req.tool_name == "llm-agent" {
+    if session_req.tool_name == "llm-agent" {
         if let Some(ref llm_agent) = data.llm_agent {
             tracing::info!(
                 "LLM agent is available, starting LLM agent session for session {}",
@@ -1023,6 +1353,47 @@ pub async fn list_ai_session_outputs(
     Ok(HttpResponse::Ok().json(response))
 }
 
+pub async fn list_ai_tool_calls(
+    path: web::Path<i64>,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+
+    // First, get the AI session for this work
+    let sessions = data.database.get_ai_sessions_by_work_id(work_id)?;
+
+    if sessions.is_empty() {
+        // No AI session found for this work, return empty tool calls
+        let response = LlmAgentToolCallListResponse { tool_calls: vec![] };
+        return Ok(HttpResponse::Ok().json(response));
+    }
+
+    // Get the most recent AI session (in case there are multiple)
+    let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
+
+    // Only fetch tool calls if this is an LLM agent session
+    let tool_calls = if session.tool_name == "llm-agent" {
+        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
+            data.database
+                .get_llm_agent_tool_calls(llm_agent_session.id)
+                .unwrap_or_default()
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
+    let response = LlmAgentToolCallListResponse { tool_calls };
+
+    tracing::debug!(
+        "Retrieved {} tool calls for work {}",
+        response.tool_calls.len(),
+        work_id
+    );
+    Ok(HttpResponse::Ok().json(response))
+}
+
 pub async fn check_project_path_conflicts(
     database: &Database,
     requested_path: &std::path::Path,
@@ -1061,11 +1432,12 @@ pub async fn check_project_path_conflicts(
 pub async fn create_work(
     data: web::Data<AppState>,
     request: web::Json<CreateWorkRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
-    let req = request.into_inner();
+    let work_req = request.into_inner();
 
     // Validate work title
-    if req.title.trim().is_empty() {
+    if work_req.title.trim().is_empty() {
         return Err(AppError::InvalidRequest(
             "Work title cannot be empty".to_string(),
         ));
@@ -1079,18 +1451,31 @@ pub async fn create_work(
 
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
-        title: req.title.clone(),
-        project_id: req.project_id,
-        model: req.model.clone(),
+        title: work_req.title.clone(),
+        project_id: work_req.project_id,
+        model: work_req.model.clone(),
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
     };
 
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
     // Create work with initial message in a single transaction
-    let (work_id, message_id) = data.database.create_work_with_message(&work, req.title.clone())?;
+    let (work_id, message_id) = data
+        .database
+        .create_work_with_message(&work, work_req.title.clone())?;
     let mut work = work;
     work.id = work_id;
+
+    // Record ownership
+    let ownership = crate::models::ResourceOwnership::new("work".to_string(), work_id, user_id);
+    data.database.create_ownership(&ownership)?;
 
     // Broadcast work creation via WebSocket
     data.ws_broadcaster.broadcast_project_created(Project {
@@ -1111,8 +1496,10 @@ pub async fn create_work(
     );
 
     // Auto-start LLM agent session if requested (default: true)
-    if req.auto_start {
-        let tool_name = req.tool_name.unwrap_or_else(|| "llm-agent".to_string());
+    if work_req.auto_start {
+        let tool_name = work_req
+            .tool_name
+            .unwrap_or_else(|| "llm-agent".to_string());
 
         // Generate project context if work is associated with a project
         let project_context = if let Some(project_id) = work.project_id {
@@ -1162,7 +1549,7 @@ pub async fn create_work(
                 // Process the message in background task to avoid blocking HTTP response
                 let llm_agent_clone = llm_agent.clone();
                 let session_id = llm_session.id;
-                let message_content = req.title.clone();
+                let message_content = work_req.title.clone();
                 tokio::spawn(async move {
                     if let Err(e) = llm_agent_clone
                         .process_message(session_id, message_content)
@@ -1228,15 +1615,23 @@ pub async fn add_message_to_work(
     data: web::Data<AppState>,
     path: web::Path<i64>,
     request: web::Json<AddMessageRequest>,
+    http_req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    let req = request.into_inner();
+    let msg_req = request.into_inner();
 
     // Verify work exists
     let _work = data.database.get_work_by_id(work_id)?;
 
     // Get next sequence number
     let sequence_order = data.database.get_next_message_sequence(work_id)?;
+
+    // Get user ID from request
+    let user_id = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .map(|u| u.id)
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
 
     // Create the message object
     let now = SystemTime::now()
@@ -1247,10 +1642,10 @@ pub async fn add_message_to_work(
     let mut message = crate::models::WorkMessage {
         id: 0, // Will be set by database AUTOINCREMENT
         work_id,
-        content: req.content,
-        content_type: req.content_type,
-        author_type: req.author_type,
-        author_id: req.author_id,
+        content: msg_req.content,
+        content_type: msg_req.content_type,
+        author_type: msg_req.author_type,
+        author_id: Some(user_id.to_string()), // Use authenticated user ID
         sequence_order,
         created_at: now,
     };
@@ -1264,6 +1659,107 @@ pub async fn add_message_to_work(
         message.id,
         work_id
     );
+
+    // Auto-start AI session to continue the conversation
+    let work = data.database.get_work_by_id(work_id)?;
+    let tool_name = "llm-agent".to_string();
+
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(project_id) = work.project_id {
+        let project = data.database.get_project_by_id(project_id)?;
+        Some(format!("Project: {}\nPath: {}", project.name, project.path))
+    } else {
+        None
+    };
+
+    // Create AI session record
+    let session = crate::models::AiSession::new(
+        work_id,
+        message_id,
+        tool_name.clone(),
+        project_context.clone(),
+    );
+    let session_id = data.database.create_ai_session(&session)?;
+
+    tracing::info!(
+        "Auto-starting {} session {} for work {} (message continuation)",
+        tool_name,
+        session_id,
+        work_id
+    );
+
+    // Handle LLM agent
+    if let Some(ref llm_agent) = data.llm_agent {
+        // Get existing LLM agent session for this work
+        if let Ok(llm_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
+            // Use existing session - just process the new message
+            let session_id = llm_session.id;
+            let message_content = message.content.clone();
+            let llm_agent_clone = llm_agent.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) = llm_agent_clone
+                    .process_message(session_id, message_content)
+                    .await
+                {
+                    tracing::error!(
+                        "Failed to process LLM message for session {}: {}",
+                        session_id,
+                        e
+                    );
+                } else {
+                    tracing::info!(
+                        "Successfully completed LLM agent processing for session {}",
+                        session_id
+                    );
+                }
+            });
+        } else {
+            // No existing session - create a new one
+            let (provider, model) = if let Some(ref model_id) = work.model {
+                let provider = infer_provider_from_model(model_id);
+                (provider.to_string(), model_id.clone())
+            } else {
+                let provider =
+                    std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+                let model = std::env::var("MODEL")
+                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                (provider, model)
+            };
+
+            let llm_session = llm_agent
+                .create_session(work_id, provider, model, project_context)
+                .await?;
+
+            let llm_agent_clone = llm_agent.clone();
+            let session_id = llm_session.id;
+            let message_content = message.content.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) = llm_agent_clone
+                    .process_message(session_id, message_content)
+                    .await
+                {
+                    tracing::error!(
+                        "Failed to process LLM message for session {}: {}",
+                        session_id,
+                        e
+                    );
+                } else {
+                    tracing::info!(
+                        "Successfully completed LLM agent processing for session {}",
+                        session_id
+                    );
+                }
+            });
+        }
+    } else {
+        tracing::warn!(
+            "LLM agent not available - work {} message {} will not be processed",
+            work_id,
+            message_id
+        );
+    }
 
     let response = WorkMessageResponse { message };
     Ok(HttpResponse::Created().json(response))
@@ -1749,9 +2245,8 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
                 project.description = Some("Project".to_string());
             }
 
-            // Save to database
-            let project_id = data.database.create_project(&project)?;
-            project.id = project_id;
+            // This function only scans the filesystem, it doesn't create projects in the database
+            // The ownership recording code was misplaced here
 
             created_projects.push(project.clone());
 
@@ -1776,16 +2271,18 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
 /// Get list of supported and enabled models
 pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     tracing::info!("get_supported_models endpoint called");
-    let config = data
+    let api_key_config = data
         .config
         .read()
-        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?
+        .api_keys
+        .clone();
     let mut models = Vec::new();
 
     tracing::info!("Checking for configured API keys in get_supported_models");
 
     // Check if API keys are configured and add enabled models
-    if let Some(api_key_config) = &config.api_keys {
+    if let Some(api_key_config) = api_key_config {
         tracing::info!("API keys config found, checking individual keys");
         // OpenAI models
         if api_key_config.openai_api_key.is_some()
@@ -1942,5 +2439,220 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
 
     tracing::info!("Returning {} supported models", models.len());
     let response = crate::models::SupportedModelsResponse { models };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+// Authentication handlers
+
+/// Registration handler - allows self-registration, with bootstrap logic for first user
+pub async fn register(
+    data: web::Data<AppState>,
+    register_req: web::Json<crate::models::CreateUserRequest>,
+) -> Result<HttpResponse, AppError> {
+    let create_req = register_req.into_inner();
+    tracing::info!("Registration attempt for user: {}", create_req.username);
+
+    // Validate username
+    if create_req.username.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "Username cannot be empty".to_string(),
+        ));
+    }
+
+    // Check if user already exists
+    if data.database.get_user_by_username(&create_req.username).is_ok() {
+        return Err(AppError::InvalidRequest(
+            "Username already exists".to_string(),
+        ));
+    }
+
+    // Hash password
+    let password_hash = auth::hash_password(&create_req.password)?;
+
+    // Validate SSH key fields are present
+    let ssh_fingerprint = create_req.ssh_fingerprint.ok_or_else(|| {
+        AppError::InvalidRequest("SSH fingerprint is required".to_string())
+    })?;
+    let ssh_public_key = create_req.ssh_public_key.ok_or_else(|| {
+        AppError::InvalidRequest("SSH public key is required".to_string())
+    })?;
+
+    // Create user
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+
+    let user = User {
+        id: 0, // Will be set by database
+        username: create_req.username.clone(),
+        email: create_req.email.unwrap_or_default(),
+        password_hash,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let user_id = data.database.create_user(&user)?;
+    let mut user = user;
+    user.id = user_id;
+    tracing::info!("User created with ID: {}", user_id);
+
+    // Create SSH key record for the user
+    let ssh_key = crate::models::UserSshKey {
+        id: 0, // Will be set by database
+        user_id,
+        key_type: "ssh-ed25519".to_string(), // Default assumption, could be improved
+        fingerprint: ssh_fingerprint,
+        public_key_data: ssh_public_key,
+        label: Some("Registration Key".to_string()),
+        is_active: true,
+        created_at: now,
+        last_used_at: None,
+    };
+
+    let ssh_key_id = data.database.create_ssh_key(&ssh_key)?;
+    tracing::info!("SSH key created with ID: {} for user: {}", ssh_key_id, user.username);
+
+    // Check if this is the first user (bootstrap logic)
+    let user_count = data.database.get_all_users()?.len();
+    if user_count == 1 {
+        // This is the first user - create Super Admins team and grant admin permissions
+        tracing::info!("First user registered: {} - creating Super Admins team", user.username);
+
+        // Create "Super Admins" team
+        let super_admin_team = Team {
+            id: 0,
+            name: "Super Admins".to_string(),
+            description: Some("System administrators with full access".to_string()),
+            created_by: user_id,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let team_id = data.database.create_team(&super_admin_team)?;
+
+        // Add first user to the team
+        data.database.add_team_member(team_id, user_id, Some(user_id))?;
+
+        // Grant entity-level admin permissions on all resource types
+        let resource_types = ["project", "work", "settings", "user", "team"];
+        for resource_type in &resource_types {
+            let permission = Permission {
+                id: 0,
+                team_id,
+                resource_type: resource_type.to_string(),
+                resource_id: None, // Entity-level (all resources of this type)
+                action: "admin".to_string(),
+                granted_by: Some(user_id),
+                granted_at: now,
+            };
+            data.database.create_permission(&permission)?;
+        }
+
+        tracing::info!("Bootstrap complete: Super Admins team created with full admin permissions");
+    } else {
+        tracing::info!("User registered: {} (not first user, no auto-permissions)", user.username);
+    }
+
+    tracing::info!("Registration successful for user: {}", user.username);
+    let response = UserResponse { user };
+    Ok(HttpResponse::Created().json(response))
+}
+
+/// Login handler - authenticates user with password and SSH key fingerprint
+pub async fn login(
+    data: web::Data<AppState>,
+    login_req: web::Json<crate::models::LoginRequest>,
+) -> Result<HttpResponse> {
+    tracing::info!("Login attempt for user: {} with SSH fingerprint: {}", login_req.username, login_req.ssh_fingerprint);
+
+    // 1. Get user by username
+    let user = data
+        .database
+        .get_user_by_username(&login_req.username)
+        .map_err(|_| AppError::AuthenticationFailed("Invalid username or password".to_string()))?;
+
+    // 2. Check if user is active
+    if !user.is_active {
+        tracing::warn!("Login attempt for inactive user: {}", user.username);
+        return Err(AppError::AuthenticationFailed("User account is inactive".to_string()).into());
+    }
+
+    // 3. Verify password
+    let password_valid =
+        auth::verify_password(&login_req.password, &user.password_hash).map_err(|e| {
+            tracing::error!("Password verification error: {}", e);
+            AppError::Internal("Authentication system error".to_string())
+        })?;
+
+    if !password_valid {
+        tracing::warn!("Invalid password for user: {}", user.username);
+        return Err(
+            AppError::AuthenticationFailed("Invalid username or password".to_string()).into(),
+        );
+    }
+
+    // 4. Verify SSH key fingerprint
+    let ssh_key = data
+        .database
+        .get_ssh_key_by_fingerprint(&login_req.ssh_fingerprint)
+        .map_err(|_| {
+            tracing::warn!(
+                "SSH key not found for user {}: {}",
+                user.username,
+                login_req.ssh_fingerprint
+            );
+            AppError::AuthenticationFailed("Invalid SSH key".to_string())
+        })?;
+
+    // 5. Verify SSH key belongs to this user
+    if ssh_key.user_id != user.id {
+        tracing::warn!(
+            "SSH key {} does not belong to user {}",
+            login_req.ssh_fingerprint,
+            user.username
+        );
+        return Err(AppError::AuthenticationFailed("Invalid SSH key".to_string()).into());
+    }
+
+    // 6. Update SSH key last_used_at
+    if let Err(e) = data.database.update_ssh_key_last_used(ssh_key.id) {
+        tracing::error!("Failed to update SSH key last_used_at: {}", e);
+        // Non-fatal error, continue with login
+    }
+
+    // 7. Generate JWT token
+    let config = data.config.read().unwrap();
+    let jwt_secret = config
+        .auth
+        .as_ref()
+        .and_then(|a| a.jwt_secret.as_ref())
+        .ok_or_else(|| AppError::Internal("JWT secret not configured".to_string()))?;
+
+    let claims = auth::Claims::new(
+        user.id,
+        user.username.clone(),
+        Some(login_req.ssh_fingerprint.clone()),
+    );
+
+    let token = auth::generate_token(&claims, jwt_secret).map_err(|e| {
+        tracing::error!("Failed to generate token: {}", e);
+        AppError::Internal("Failed to generate authentication token".to_string())
+    })?;
+
+    tracing::info!("Successful login for user: {}", user.username);
+
+    // 8. Return success response
+    let user_info = crate::models::UserInfo {
+        id: user.id,
+        username: user.username.clone(),
+        email: user.email.clone(),
+    };
+    let response = crate::models::LoginResponse {
+        token,
+        user: user_info,
+    };
+    tracing::info!("Login response sent for user: {}", user.username);
     Ok(HttpResponse::Ok().json(response))
 }

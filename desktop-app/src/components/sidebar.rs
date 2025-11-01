@@ -1,7 +1,6 @@
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
-use crate::ui_text::{ContentText, WidgetText};
 use egui::{Color32, Context};
 
 pub struct Sidebar;
@@ -101,13 +100,6 @@ impl Sidebar {
 
                     if self.sidebar_link(ui, "Board", sidebar_bg, button_bg) {
                         new_page = Some(UiPage::Work);
-                        // Refresh works when navigating to Work page
-                        if state.connection_state == ConnectionState::Connected
-                            && state.works.is_empty()
-                            && !state.loading_works
-                        {
-                            self.refresh_works(state);
-                        }
                     }
                     if self.sidebar_link(ui, "Mentions", sidebar_bg, button_bg) {
                         new_page = Some(UiPage::Mentions);
@@ -174,11 +166,6 @@ impl Sidebar {
         );
 
         response.clicked()
-    }
-
-    fn refresh_works(&self, state: &mut AppState) {
-        let api_service = crate::services::ApiService::new();
-        api_service.refresh_works(state);
     }
 
     fn check_local_server(&self, state: &mut AppState) {

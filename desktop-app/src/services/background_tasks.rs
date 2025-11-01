@@ -21,6 +21,7 @@ impl BackgroundTasks {
         self.check_works_result(state);
         self.check_work_messages_result(state);
         self.check_ai_session_outputs_result(state);
+        self.check_ai_tool_calls_result(state);
         self.check_settings_result(state);
         self.check_project_details_result(state);
         self.check_supported_models_result(state);
@@ -30,6 +31,9 @@ impl BackgroundTasks {
         self.check_update_projects_path_result(state);
         self.check_scan_projects_result(state);
         self.check_local_server_result(state);
+        self.check_file_list_result(state);
+        self.check_file_content_result(state);
+        self.check_send_message_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -74,6 +78,8 @@ impl BackgroundTasks {
             match res {
                 Ok(projects) => {
                     state.projects = projects;
+                    // Clear any previous connection errors since we successfully loaded data
+                    state.ui_state.connection_error = None;
                 }
                 Err(e) => {
                     state.ui_state.connection_error =
@@ -130,6 +136,22 @@ impl BackgroundTasks {
         }
     }
 
+    fn check_ai_tool_calls_result(&self, state: &mut AppState) {
+        let mut result = state.ai_tool_calls_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_ai_tool_calls = false;
+            match res {
+                Ok(tool_calls) => {
+                    state.ai_tool_calls = tool_calls;
+                }
+                Err(e) => {
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to load AI tool calls: {}", e));
+                }
+            }
+        }
+    }
+
     fn check_settings_result(&self, state: &mut AppState) {
         let mut result = state.settings_result.lock().unwrap();
         if let Some(res) = result.take() {
@@ -153,8 +175,15 @@ impl BackgroundTasks {
                     }
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load settings: {}", e));
+                    // Only show settings error in status bar if we have no projects loaded
+                    // (meaning we're not properly authenticated yet)
+                    if state.projects.is_empty() {
+                        state.ui_state.connection_error =
+                            Some(format!("Failed to load settings: {}", e));
+                    } else {
+                        // Log the error but don't show it in status bar since we're authenticated
+                        tracing::warn!("Failed to load settings (non-critical): {}", e);
+                    }
                 }
             }
         }
@@ -308,6 +337,45 @@ impl BackgroundTasks {
         if let Some(res) = result.take() {
             state.ui_state.checking_local_server = false;
             state.ui_state.local_server_running = res;
+        }
+    }
+
+    fn check_file_list_result(&self, state: &mut AppState) {
+        let result = state.file_list_result.lock().unwrap();
+        if result.is_some() {
+            state.loading_file_list = false;
+        }
+    }
+
+    fn check_file_content_result(&self, state: &mut AppState) {
+        let result = state.file_content_result.lock().unwrap();
+        if result.is_some() {
+            state.loading_file_content = false;
+        }
+    }
+
+    fn check_send_message_result(&self, state: &mut AppState) {
+        let result_opt = {
+            let mut result = state.send_message_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
+            state.sending_message = false;
+            match res {
+                Ok(_message) => {
+                    // Clear the input
+                    state.ui_state.continue_message_input.clear();
+                    // Refresh messages to show the new message and AI response
+                    if let Some(work_id) = state.ui_state.selected_work_id {
+                        self.api_service.refresh_work_messages(work_id, state);
+                    }
+                }
+                Err(e) => {
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to send message: {}", e));
+                }
+            }
         }
     }
 }

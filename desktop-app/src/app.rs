@@ -1,4 +1,4 @@
-use crate::components::{ConnectionDialog, Sidebar, StatusBar};
+use crate::components::{AuthDialog, ConnectionDialog, Sidebar, StatusBar};
 use crate::pages::{
     MentionsPage, Page, ProjectDetailPage, ProjectsPage, ServersPage, SettingsPage,
     UiReferencePage, UiTwoColumnMainContentPage, WorkPage,
@@ -29,6 +29,8 @@ pub struct DesktopApp {
     status_bar: StatusBar,
     #[serde(skip)]
     connection_dialog: ConnectionDialog,
+    #[serde(skip)]
+    auth_dialog: AuthDialog,
 
     // Services
     #[serde(skip)]
@@ -42,24 +44,20 @@ impl Default for DesktopApp {
         let mut app = Self {
             state: AppState::default(),
             pages: std::collections::HashMap::new(),
-            sidebar: Sidebar::default(),
-            status_bar: StatusBar::default(),
-            connection_dialog: ConnectionDialog::default(),
-            api_service: Arc::new(ApiService::default()),
-            background_tasks: BackgroundTasks::new(Arc::new(ApiService::default())),
+            sidebar: Sidebar,
+            status_bar: StatusBar,
+            connection_dialog: ConnectionDialog,
+            auth_dialog: AuthDialog::default(),
+            api_service: Arc::new(ApiService),
+            background_tasks: BackgroundTasks::new(Arc::new(ApiService)),
         };
 
         // Initialize pages
-        app.pages
-            .insert(UiPage::Mentions, Box::new(MentionsPage::default()));
-        app.pages
-            .insert(UiPage::Projects, Box::new(ProjectsPage::default()));
-        app.pages
-            .insert(UiPage::Work, Box::new(WorkPage::default()));
-        app.pages
-            .insert(UiPage::Servers, Box::new(ServersPage::default()));
-        app.pages
-            .insert(UiPage::Settings, Box::new(SettingsPage::default()));
+        app.pages.insert(UiPage::Mentions, Box::new(MentionsPage));
+        app.pages.insert(UiPage::Projects, Box::new(ProjectsPage));
+        app.pages.insert(UiPage::Work, Box::new(WorkPage));
+        app.pages.insert(UiPage::Servers, Box::new(ServersPage));
+        app.pages.insert(UiPage::Settings, Box::new(SettingsPage));
         app.pages
             .insert(UiPage::UiReference, Box::new(UiReferencePage::default()));
         app.pages.insert(
@@ -73,6 +71,16 @@ impl Default for DesktopApp {
 
 impl eframe::App for DesktopApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Check if authentication is required (401 detected)
+        let auth_required_flag = self.state.connection_manager.get_auth_required_flag();
+        if let Ok(mut auth_required) = auth_required_flag.lock() {
+            if *auth_required {
+                tracing::info!("Authentication required - showing auth dialog");
+                self.state.ui_state.show_auth_dialog = true;
+                *auth_required = false; // Reset flag
+            }
+        }
+
         // Handle pending project details refresh
         if let Some(project_id) = self.state.pending_project_details_refresh.take() {
             tracing::info!(
@@ -112,6 +120,9 @@ impl eframe::App for DesktopApp {
 
         // Connection dialog
         self.connection_dialog.ui(ctx, &mut self.state);
+
+        // Auth dialog
+        self.auth_dialog.ui(ctx, &mut self.state);
     }
 }
 
@@ -211,11 +222,9 @@ impl DesktopApp {
                 })
                 .expect("Could not query favorites");
 
-            for result in favorites_iter {
-                if let Ok((entity_type, entity_id)) = result {
-                    if entity_type == "project" {
-                        app.state.favorite_projects.insert(entity_id);
-                    }
+            for (entity_type, entity_id) in favorites_iter.flatten() {
+                if entity_type == "project" {
+                    app.state.favorite_projects.insert(entity_id);
                 }
             }
         }
@@ -262,31 +271,53 @@ impl DesktopApp {
         );
 
         // Create custom font family for light UI widgets (labels, navigation, status)
+        // Add emoji support by including default emoji font as fallback
         fonts.families.insert(
             egui::FontFamily::Name("ui_light".into()),
-            vec!["ubuntu_light".to_owned()],
+            vec![
+                "ubuntu_light".to_owned(),
+                "NotoEmoji-Regular".to_owned(), // Fallback for emojis
+            ],
         );
 
         // Create custom font family for emphasized UI widgets (buttons, headings, CTAs)
+        // Add emoji support by including default emoji font as fallback
         fonts.families.insert(
             egui::FontFamily::Name("ui_semibold".into()),
-            vec!["ubuntu_semibold".to_owned()],
+            vec![
+                "ubuntu_semibold".to_owned(),
+                "NotoEmoji-Regular".to_owned(), // Fallback for emojis
+            ],
         );
 
         // Set Inter as the default font for user content (Proportional family)
         // This is used for project names, descriptions, file contents, etc.
+        // Add emoji support by keeping the default emoji font as fallback
         fonts
             .families
             .entry(egui::FontFamily::Proportional)
             .or_default()
             .insert(0, "inter_regular".to_owned());
+        // Ensure emoji font is present (should be there by default)
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .push("NotoEmoji-Regular".to_owned());
 
         // Set Inter Medium for code/monospace text
+        // Add emoji support by keeping the default emoji font as fallback
         fonts
             .families
             .entry(egui::FontFamily::Monospace)
             .or_default()
             .insert(0, "inter_medium".to_owned());
+        // Ensure emoji font is present (should be there by default)
+        fonts
+            .families
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .push("NotoEmoji-Regular".to_owned());
 
         // Apply fonts to the context
         ctx.set_fonts(fonts);
@@ -300,6 +331,17 @@ impl DesktopApp {
 
         // Update current page
         self.state.ui_state.current_page = page.clone();
+
+        // Set refresh flags based on the page we're navigating to
+        match &page {
+            UiPage::Projects => {
+                self.state.ui_state.pending_projects_refresh = true;
+            }
+            UiPage::Work => {
+                self.state.ui_state.pending_works_refresh = true;
+            }
+            _ => {}
+        }
 
         // Call on_navigate_to for new page
         if let Some(new_page) = self.pages.get_mut(&page) {

@@ -3,6 +3,7 @@ use crate::models::{
     AiSession, AiSessionResult, LlmAgentMessage, LlmAgentSession, LlmAgentToolCall, Project,
     ProjectComponent,
 };
+use crate::permissions::Action;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -340,6 +341,56 @@ impl Database {
             [],
         ); // Ignore error if index already exists
 
+        // User authentication tables
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 username TEXT NOT NULL UNIQUE,
+                 email TEXT NOT NULL UNIQUE,
+                 password_hash TEXT NOT NULL,
+                 is_active INTEGER NOT NULL DEFAULT 1,
+                 created_at INTEGER NOT NULL,
+                 updated_at INTEGER NOT NULL
+             )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS user_ssh_keys (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 user_id INTEGER NOT NULL,
+                 key_type TEXT NOT NULL,
+                 fingerprint TEXT NOT NULL UNIQUE,
+                 public_key_data TEXT NOT NULL,
+                 label TEXT,
+                 is_active INTEGER NOT NULL DEFAULT 1,
+                 created_at INTEGER NOT NULL,
+                 last_used_at INTEGER,
+                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+             )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_ssh_keys_user_id ON user_ssh_keys(user_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_ssh_keys_fingerprint ON user_ssh_keys(fingerprint)",
+            [],
+        )?;
+
         // GitHub Actions workflow tables
         conn.execute(
             r#"
@@ -507,6 +558,103 @@ impl Database {
             tracing::info!("Successfully migrated command_executions table schema");
         }
 
+        // Permission system tables (Phase 1: DB & Models)
+
+        // Teams table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS teams (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_by INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_teams_created_by ON teams(created_by)",
+            [],
+        )?;
+
+        // Team members table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS team_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                added_by INTEGER,
+                added_at INTEGER NOT NULL,
+                FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (added_by) REFERENCES users (id) ON DELETE SET NULL,
+                UNIQUE(team_id, user_id)
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_team_members_user_id ON team_members(user_id)",
+            [],
+        )?;
+
+        // Permissions table (team-based only)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS permissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id INTEGER NOT NULL,
+                resource_type TEXT NOT NULL CHECK (resource_type IN ('project', 'work', 'settings', 'user', 'team', 'ai_session')),
+                resource_id INTEGER,
+                action TEXT NOT NULL CHECK (action IN ('read', 'write', 'delete', 'admin')),
+                granted_by INTEGER,
+                granted_at INTEGER NOT NULL,
+                FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE,
+                FOREIGN KEY (granted_by) REFERENCES users (id) ON DELETE SET NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_permissions_team_id ON permissions(team_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_permissions_resource ON permissions(resource_type, resource_id)",
+            [],
+        )?;
+
+        // Resource ownership table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS resource_ownership (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                resource_type TEXT NOT NULL CHECK (resource_type IN ('project', 'work', 'settings', 'user', 'team', 'ai_session')),
+                resource_id INTEGER NOT NULL,
+                owner_id INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(resource_type, resource_id)
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_resource_ownership_owner ON resource_ownership(owner_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_resource_ownership_resource ON resource_ownership(resource_type, resource_id)",
+            [],
+        )?;
+
         tracing::info!("Database migrations completed");
         Ok(())
     }
@@ -672,6 +820,12 @@ impl Database {
 
         // First delete components
         conn.execute("DELETE FROM project_components WHERE project_id = ?", [id])?;
+
+        // Clean up ownership records for this project
+        conn.execute("DELETE FROM resource_ownership WHERE resource_type = 'project' AND resource_id = ?", [id])?;
+
+        // Clean up permissions referencing this specific project
+        conn.execute("DELETE FROM permissions WHERE resource_type = 'project' AND resource_id = ?", [id])?;
 
         let rows_affected = conn.execute("DELETE FROM projects WHERE id = ?", [id])?;
 
@@ -1030,6 +1184,7 @@ impl Database {
         Ok(works)
     }
 
+    #[allow(dead_code)]
     pub fn update_work(&self, work: &crate::models::Work) -> AppResult<()> {
         let conn = self
             .connection
@@ -1060,6 +1215,12 @@ impl Database {
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // Clean up ownership records for this work
+        conn.execute("DELETE FROM resource_ownership WHERE resource_type = 'work' AND resource_id = ?", [id])?;
+
+        // Clean up permissions referencing this specific work
+        conn.execute("DELETE FROM permissions WHERE resource_type = 'work' AND resource_id = ?", [id])?;
 
         let rows_affected = conn.execute("DELETE FROM works WHERE id = ?", [id])?;
 
@@ -1809,5 +1970,806 @@ impl Database {
         }
 
         Ok(executions)
+    }
+
+    // User authentication methods
+
+    pub fn create_user(&self, user: &crate::models::User) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let id_param = if user.id == 0 { None } else { Some(user.id) };
+
+        conn.execute(
+            "INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                user.username,
+                user.email,
+                user.password_hash,
+                if user.is_active { 1 } else { 0 },
+                user.created_at,
+                user.updated_at,
+            ],
+        )?;
+
+        let user_id = conn.last_insert_rowid();
+        tracing::info!("Created user: {} ({})", user.username, user_id);
+        Ok(user_id)
+    }
+
+    pub fn get_user_by_id(&self, id: i64) -> AppResult<crate::models::User> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let user = conn
+            .query_row(
+                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                 FROM users WHERE id = ?",
+                [id],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        username: row.get(1)?,
+                        email: row.get(2)?,
+                        password_hash: row.get(3)?,
+                        is_active: row.get::<_, i64>(4)? != 0,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", id))),
+        }
+    }
+
+    pub fn get_user_by_username(&self, username: &str) -> AppResult<crate::models::User> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let user = conn
+            .query_row(
+                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                 FROM users WHERE username = ?",
+                [username],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        username: row.get(1)?,
+                        email: row.get(2)?,
+                        password_hash: row.get(3)?,
+                        is_active: row.get::<_, i64>(4)? != 0,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", username))),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_user_by_email(&self, email: &str) -> AppResult<crate::models::User> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let user = conn
+            .query_row(
+                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                 FROM users WHERE email = ?",
+                [email],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        username: row.get(1)?,
+                        email: row.get(2)?,
+                        password_hash: row.get(3)?,
+                        is_active: row.get::<_, i64>(4)? != 0,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", email))),
+        }
+    }
+
+    // SSH key methods
+
+    #[allow(dead_code)]
+    pub fn create_ssh_key(&self, key: &crate::models::UserSshKey) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let id_param = if key.id == 0 { None } else { Some(key.id) };
+
+        conn.execute(
+            "INSERT INTO user_ssh_keys (id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                key.user_id,
+                key.key_type,
+                key.fingerprint,
+                key.public_key_data,
+                key.label,
+                if key.is_active { 1 } else { 0 },
+                key.created_at,
+                key.last_used_at,
+            ],
+        )?;
+
+        let key_id = conn.last_insert_rowid();
+        tracing::info!(
+            "Created SSH key for user {}: {} ({})",
+            key.user_id,
+            key.fingerprint,
+            key_id
+        );
+        Ok(key_id)
+    }
+
+    pub fn get_ssh_key_by_fingerprint(
+        &self,
+        fingerprint: &str,
+    ) -> AppResult<crate::models::UserSshKey> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let key = conn
+            .query_row(
+                "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
+                 FROM user_ssh_keys WHERE fingerprint = ? AND is_active = 1",
+                [fingerprint],
+                |row| {
+                    Ok(crate::models::UserSshKey {
+                        id: row.get(0)?,
+                        user_id: row.get(1)?,
+                        key_type: row.get(2)?,
+                        fingerprint: row.get(3)?,
+                        public_key_data: row.get(4)?,
+                        label: row.get(5)?,
+                        is_active: row.get::<_, i64>(6)? != 0,
+                        created_at: row.get(7)?,
+                        last_used_at: row.get(8)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        match key {
+            Some(key) => Ok(key),
+            None => Err(AppError::NotFound(format!(
+                "SSH key not found or inactive: {}",
+                fingerprint
+            ))),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
+             FROM user_ssh_keys WHERE user_id = ? ORDER BY created_at DESC",
+        )?;
+
+        let key_iter = stmt.query_map([user_id], |row| {
+            Ok(crate::models::UserSshKey {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                key_type: row.get(2)?,
+                fingerprint: row.get(3)?,
+                public_key_data: row.get(4)?,
+                label: row.get(5)?,
+                is_active: row.get::<_, i64>(6)? != 0,
+                created_at: row.get(7)?,
+                last_used_at: row.get(8)?,
+            })
+        })?;
+
+        let keys: Result<Vec<_>, _> = key_iter.collect();
+        keys.map_err(AppError::from)
+    }
+
+    pub fn update_ssh_key_last_used(&self, key_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        conn.execute(
+            "UPDATE user_ssh_keys SET last_used_at = ? WHERE id = ?",
+            params![now, key_id],
+        )?;
+
+        tracing::debug!("Updated SSH key last_used_at: {}", key_id);
+        Ok(())
+    }
+
+    // User management methods
+
+    pub fn get_all_users(&self) -> AppResult<Vec<crate::models::User>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+             FROM users ORDER BY username",
+        )?;
+
+        let user_iter = stmt.query_map([], |row| {
+            Ok(crate::models::User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                email: row.get(2)?,
+                password_hash: row.get(3)?,
+                is_active: row.get::<_, i64>(4)? != 0,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?;
+
+        let users: Result<Vec<_>, _> = user_iter.collect();
+        users.map_err(AppError::from)
+    }
+
+    pub fn update_user(
+        &self,
+        user_id: i64,
+        update: &crate::models::UpdateUserRequest,
+    ) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        if let Some(username) = &update.username {
+            conn.execute(
+                "UPDATE users SET username = ?, updated_at = ? WHERE id = ?",
+                params![username, now, user_id],
+            )?;
+        }
+
+        if let Some(email) = &update.email {
+            conn.execute(
+                "UPDATE users SET email = ?, updated_at = ? WHERE id = ?",
+                params![email, now, user_id],
+            )?;
+        }
+
+        if let Some(is_active) = update.is_active {
+            conn.execute(
+                "UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?",
+                params![is_active, now, user_id],
+            )?;
+        }
+
+        tracing::info!("Updated user {}", user_id);
+        Ok(())
+    }
+
+    pub fn delete_user(&self, user_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute("DELETE FROM users WHERE id = ?", params![user_id])?;
+        tracing::info!("Deleted user {}", user_id);
+        Ok(())
+    }
+
+    // Permission management methods
+
+    pub fn get_all_permissions(&self) -> AppResult<Vec<crate::models::Permission>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, team_id, resource_type, resource_id, action, granted_by, granted_at
+             FROM permissions ORDER BY granted_at DESC",
+        )?;
+
+        let permission_iter = stmt.query_map([], |row| {
+            Ok(crate::models::Permission {
+                id: row.get(0)?,
+                team_id: row.get(1)?,
+                resource_type: row.get(2)?,
+                resource_id: row.get(3)?,
+                action: row.get(4)?,
+                granted_by: row.get(5)?,
+                granted_at: row.get(6)?,
+            })
+        })?;
+
+        let permissions: Result<Vec<_>, _> = permission_iter.collect();
+        permissions.map_err(AppError::from)
+    }
+
+    // Permission system methods (Phase 2: Permission Checking)
+
+    /// Get all teams that a user belongs to
+    pub fn get_user_teams(&self, user_id: i64) -> AppResult<Vec<crate::models::Team>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.name, t.description, t.created_by, t.created_at, t.updated_at
+             FROM teams t
+             INNER JOIN team_members tm ON t.id = tm.team_id
+             WHERE tm.user_id = ?",
+        )?;
+
+        let team_iter = stmt.query_map([user_id], |row| {
+            Ok(crate::models::Team {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                created_by: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })?;
+
+        let teams: Result<Vec<_>, _> = team_iter.collect();
+        teams.map_err(AppError::from)
+    }
+
+    /// Check if a team has a specific permission
+    /// Checks action hierarchy (admin implies all, write implies read, etc.)
+    pub fn team_has_permission(
+        &self,
+        team_id: i64,
+        resource_type: &str,
+        resource_id: Option<i64>,
+        action: &str,
+    ) -> AppResult<bool> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // Parse the requested action
+        let requested_action = Action::parse(action)
+            .ok_or_else(|| AppError::InvalidRequest(format!("Invalid action: {}", action)))?;
+
+        // Query all permissions for this team on this resource
+        let mut stmt = conn.prepare(
+            "SELECT action FROM permissions
+             WHERE team_id = ?
+             AND resource_type = ?
+             AND (resource_id = ? OR (? IS NULL AND resource_id IS NULL))",
+        )?;
+
+        let action_iter = stmt.query_map(
+            params![team_id, resource_type, resource_id, resource_id],
+            |row| row.get::<_, String>(0),
+        )?;
+
+        // Check if any permission implies the requested action
+        for action_result in action_iter {
+            let action_str = action_result?;
+            if let Some(granted_action) = Action::parse(&action_str) {
+                if granted_action.implies(&requested_action) {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Check if a user owns a resource
+    pub fn is_owner(&self, user_id: i64, resource_type: &str, resource_id: i64) -> AppResult<bool> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM resource_ownership
+             WHERE owner_id = ? AND resource_type = ? AND resource_id = ?",
+            params![user_id, resource_type, resource_id],
+            |row| row.get(0),
+        )?;
+
+        Ok(count > 0)
+    }
+
+    /// Get the parent project ID for a project (for permission inheritance)
+    pub fn get_parent_project_id(&self, project_id: i64) -> AppResult<Option<i64>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let parent_id: Option<i64> = conn
+            .query_row(
+                "SELECT parent_id FROM projects WHERE id = ?",
+                [project_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        Ok(parent_id)
+    }
+
+    // Team CRUD methods
+
+    /// Create a new team
+    pub fn create_team(&self, team: &crate::models::Team) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO teams (name, description, created_by, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?)",
+            params![
+                team.name,
+                team.description,
+                team.created_by,
+                team.created_at,
+                team.updated_at,
+            ],
+        )?;
+
+        let id = conn.last_insert_rowid();
+        tracing::debug!("Created team: {} (id={})", team.name, id);
+        Ok(id)
+    }
+
+    /// Get a team by ID
+    pub fn get_team_by_id(&self, team_id: i64) -> AppResult<crate::models::Team> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let team = conn.query_row(
+            "SELECT id, name, description, created_by, created_at, updated_at
+             FROM teams WHERE id = ?",
+            [team_id],
+            |row| {
+                Ok(crate::models::Team {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: row.get(2)?,
+                    created_by: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            },
+        )?;
+
+        Ok(team)
+    }
+
+    /// Get all teams
+    pub fn get_all_teams(&self) -> AppResult<Vec<crate::models::Team>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, created_by, created_at, updated_at
+             FROM teams ORDER BY name",
+        )?;
+
+        let team_iter = stmt.query_map([], |row| {
+            Ok(crate::models::Team {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                created_by: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })?;
+
+        let teams: Result<Vec<_>, _> = team_iter.collect();
+        teams.map_err(AppError::from)
+    }
+
+    /// Update a team
+    pub fn update_team(
+        &self,
+        team_id: i64,
+        update: &crate::models::UpdateTeamRequest,
+    ) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        if let Some(name) = &update.name {
+            conn.execute(
+                "UPDATE teams SET name = ?, updated_at = ? WHERE id = ?",
+                params![name, now, team_id],
+            )?;
+        }
+
+        if let Some(description) = &update.description {
+            conn.execute(
+                "UPDATE teams SET description = ?, updated_at = ? WHERE id = ?",
+                params![description, now, team_id],
+            )?;
+        }
+
+        tracing::info!("Updated team {}", team_id);
+        Ok(())
+    }
+
+    /// Delete a team
+    pub fn delete_team(&self, team_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute("DELETE FROM teams WHERE id = ?", [team_id])?;
+
+        tracing::debug!("Deleted team: {}", team_id);
+        Ok(())
+    }
+
+    // Team member methods
+
+    /// Add a user to a team
+    pub fn add_team_member(
+        &self,
+        team_id: i64,
+        user_id: i64,
+        added_by: Option<i64>,
+    ) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let now = chrono::Utc::now().timestamp();
+
+        conn.execute(
+            "INSERT INTO team_members (team_id, user_id, added_by, added_at)
+             VALUES (?, ?, ?, ?)",
+            params![team_id, user_id, added_by, &now],
+        )?;
+
+        let member_id = conn.last_insert_rowid();
+        tracing::debug!("Added user {} to team {}", user_id, team_id);
+        Ok(member_id)
+    }
+
+    /// Remove a user from a team
+    pub fn remove_team_member(&self, team_id: i64, user_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "DELETE FROM team_members WHERE team_id = ? AND user_id = ?",
+            params![team_id, user_id],
+        )?;
+
+        tracing::debug!("Removed user {} from team {}", user_id, team_id);
+        Ok(())
+    }
+
+    /// Get all members of a team
+    pub fn get_team_members(&self, team_id: i64) -> AppResult<Vec<crate::models::TeamMember>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, team_id, user_id, added_by, added_at
+             FROM team_members WHERE team_id = ?",
+        )?;
+
+        let member_iter = stmt.query_map([team_id], |row| {
+            Ok(crate::models::TeamMember {
+                id: row.get(0)?,
+                team_id: row.get(1)?,
+                user_id: row.get(2)?,
+                added_by: row.get(3)?,
+                added_at: row.get(4)?,
+            })
+        })?;
+
+        let members: Result<Vec<_>, _> = member_iter.collect();
+        members.map_err(AppError::from)
+    }
+
+    // Permission methods
+
+    /// Create a new permission
+    pub fn create_permission(&self, permission: &crate::models::Permission) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO permissions (team_id, resource_type, resource_id, action, granted_by, granted_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            params![
+                permission.team_id,
+                permission.resource_type,
+                permission.resource_id,
+                permission.action,
+                permission.granted_by,
+                permission.granted_at,
+            ],
+        )?;
+
+        let id = conn.last_insert_rowid();
+        tracing::debug!(
+            "Created permission: team={}, resource={}:{:?}, action={} (id={})",
+            permission.team_id,
+            permission.resource_type,
+            permission.resource_id,
+            permission.action,
+            id
+        );
+        Ok(id)
+    }
+
+    /// Get all permissions for a team
+    pub fn get_team_permissions(&self, team_id: i64) -> AppResult<Vec<crate::models::Permission>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, team_id, resource_type, resource_id, action, granted_by, granted_at
+             FROM permissions WHERE team_id = ?",
+        )?;
+
+        let perm_iter = stmt.query_map([team_id], |row| {
+            Ok(crate::models::Permission {
+                id: row.get(0)?,
+                team_id: row.get(1)?,
+                resource_type: row.get(2)?,
+                resource_id: row.get(3)?,
+                action: row.get(4)?,
+                granted_by: row.get(5)?,
+                granted_at: row.get(6)?,
+            })
+        })?;
+
+        let permissions: Result<Vec<_>, _> = perm_iter.collect();
+        permissions.map_err(AppError::from)
+    }
+
+    /// Delete a permission
+    pub fn delete_permission(&self, permission_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute("DELETE FROM permissions WHERE id = ?", [permission_id])?;
+
+        tracing::debug!("Deleted permission: {}", permission_id);
+        Ok(())
+    }
+
+    // Resource ownership methods
+
+    /// Create a resource ownership record
+    pub fn create_ownership(&self, ownership: &crate::models::ResourceOwnership) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO resource_ownership (resource_type, resource_id, owner_id, created_at)
+             VALUES (?, ?, ?, ?)",
+            params![
+                ownership.resource_type,
+                ownership.resource_id,
+                ownership.owner_id,
+                ownership.created_at,
+            ],
+        )?;
+
+        let id = conn.last_insert_rowid();
+        tracing::debug!(
+            "Created ownership: user={} owns {}:{} (id={})",
+            ownership.owner_id,
+            ownership.resource_type,
+            ownership.resource_id,
+            id
+        );
+        Ok(id)
+    }
+
+    /// Get the owner of a resource
+    #[allow(dead_code)]
+    pub fn get_resource_owner(
+        &self,
+        resource_type: &str,
+        resource_id: i64,
+    ) -> AppResult<Option<i64>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let owner_id: Option<i64> = conn
+            .query_row(
+                "SELECT owner_id FROM resource_ownership
+                 WHERE resource_type = ? AND resource_id = ?",
+                params![resource_type, resource_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        Ok(owner_id)
+    }
+
+    /// Delete a resource ownership record
+    #[allow(dead_code)]
+    pub fn delete_ownership(&self, resource_type: &str, resource_id: i64) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "DELETE FROM resource_ownership WHERE resource_type = ? AND resource_id = ?",
+            params![resource_type, resource_id],
+        )?;
+
+        tracing::debug!("Deleted ownership: {}:{}", resource_type, resource_id);
+        Ok(())
     }
 }

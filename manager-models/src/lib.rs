@@ -223,6 +223,11 @@ pub struct AiSessionOutputListResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct LlmAgentToolCallListResponse {
+    pub tool_calls: Vec<LlmAgentToolCall>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
     pub name: String,
     pub path: String, // Required - must be existing directory
@@ -834,4 +839,58 @@ pub struct UpdateApiKeysRequest {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
+}
+
+// ============ Authentication & User Management ============
+
+/// Login request with username, password, and SSH fingerprint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+    pub ssh_fingerprint: String, // SHA256 fingerprint from client
+}
+
+/// Login response with JWT token and user info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub user: UserInfo,
+}
+
+/// User information returned after login
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserInfo {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+}
+
+/// Request to create a new user (registration)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub email: Option<String>,
+    pub password: String,
+    pub ssh_public_key: String,
+    pub ssh_fingerprint: String,
+}
+
+/// Response after user creation/registration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserResponse {
+    pub user: User,
+}
+
+/// User model (full details, including password hash - only for internal use)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    #[serde(skip_serializing)] // Never send password hash to client
+    pub password_hash: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
 }

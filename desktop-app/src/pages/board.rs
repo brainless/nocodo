@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{ListFilesRequest, ToolRequest};
+use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse};
 
 pub struct WorkPage;
 
@@ -22,7 +22,20 @@ impl crate::pages::Page for WorkPage {
         "Board"
     }
 
+    fn on_navigate_to(&mut self) {
+        // Set flag to trigger works refresh in the update loop
+    }
+
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Trigger refresh if flag is set
+        if state.ui_state.pending_works_refresh {
+            state.ui_state.pending_works_refresh = false;
+            if state.connection_state == ConnectionState::Connected && !state.loading_works {
+                let api_service = crate::services::ApiService::new();
+                api_service.refresh_works(state);
+            }
+        }
+
         ui.heading("Board");
 
         // Two-column layout: left column for form and list, right column for details
@@ -305,12 +318,12 @@ impl crate::pages::Page for WorkPage {
                                         });
                                     }
                                     ConnectionState::Connected => {
-                                        if state.loading_work_messages || state.loading_ai_session_outputs {
+                                        if state.loading_work_messages || state.loading_ai_session_outputs || state.loading_ai_tool_calls {
                                             ui.vertical_centered(|ui| {
                                                 ui.label("Loading messages...");
                                                 ui.add(egui::Spinner::new());
                                             });
-                                        } else if state.work_messages.is_empty() && state.ai_session_outputs.is_empty() {
+                                        } else if state.work_messages.is_empty() && state.ai_session_outputs.is_empty() && state.ai_tool_calls.is_empty() {
                                             ui.vertical_centered(|ui| {
                                                 ui.label("No messages found");
                                                 if ui.button("Refresh").clicked() {
@@ -319,11 +332,15 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Use remaining space in this column for scrolling
+                                            // Reserve space for reply form at bottom (approximately 120px)
+                                            let reply_form_height = 120.0;
+                                            let available_height = ui.available_height() - reply_form_height;
                                             let available_width = ui.available_width();
+
                                             let mut scroll_area = egui::ScrollArea::vertical()
                                                 .id_salt("work_messages_scroll")
                                                 .auto_shrink(false)
+                                                .max_height(available_height)
                                                 .max_width(available_width);
 
                                             // Reset scroll to top if a new work item was selected
@@ -387,32 +404,20 @@ impl crate::pages::Page for WorkPage {
                                                             // Check if this is a list_files tool request using proper Rust types
                                                             let list_files_requests = if output.role.as_deref() == Some("assistant") {
                                                                 // Try multiple parsing approaches for robustness
-
-                                                                // Debug: Log the content we're trying to parse
-                                                                tracing::debug!(
-                                                                    content_preview = %output.content.chars().take(200).collect::<String>(),
-                                                                    content_length = %output.content.len(),
-                                                                    "Attempting to parse AI output for tool calls"
-                                                                );
-
-                                                                // 1. Try to parse as structured JSON with tool_calls (standard format)
                                                                 let mut requests = Vec::new();
 
+                                                                // 1. Try to parse as structured JSON with tool_calls (standard format)
                                                                 if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
-                                                                    tracing::debug!("Successfully parsed as structured JSON");
                                                                     // Look for tool_calls array in the structured response
                                                                     if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
-                                                                        tracing::debug!(tool_calls_count = %tool_calls.len(), "Found tool_calls array");
                                                                         for tool_call in tool_calls {
                                                                             if let Some(function) = tool_call.get("function") {
                                                                                 if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
-                                                                                    tracing::debug!(tool_name = %name, "Found tool call");
                                                                                     if name == "list_files" {
                                                                                         if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
                                                                                             // Use proper Rust type for parsing ListFilesRequest
                                                                                             match serde_json::from_str::<ListFilesRequest>(args) {
                                                                                                 Ok(list_files_req) => {
-                                                                                                    tracing::debug!(path = %list_files_req.path, "Successfully parsed ListFilesRequest");
                                                                                                     requests.push(list_files_req);
                                                                                                 }
                                                                                                 Err(e) => {
@@ -424,43 +429,29 @@ impl crate::pages::Page for WorkPage {
                                                                                 }
                                                                             }
                                                                         }
-                                                                    } else {
-                                                                        tracing::debug!("No tool_calls array found in structured JSON");
                                                                     }
-                                                                } else {
-                                                                    tracing::debug!("Failed to parse as structured JSON");
                                                                 }
 
                                                                 // 2. Try to parse as direct ToolRequest (fallback format)
                                                                 if requests.is_empty() {
-                                                                    tracing::debug!("Trying to parse as direct ToolRequest");
-                                                                    match serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        Ok(tool_request) => {
-                                                                            tracing::debug!("Successfully parsed as direct ToolRequest");
-                                                                            if let ToolRequest::ListFiles(list_files_req) = tool_request {
-                                                                                tracing::debug!(path = %list_files_req.path, "Found ListFiles in direct ToolRequest");
-                                                                                requests.push(list_files_req);
-                                                                            }
-                                                                        }
-                                                                        Err(e) => {
-                                                                            tracing::debug!(error = %e, "Failed to parse as direct ToolRequest");
+                                                                    if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        if let ToolRequest::ListFiles(list_files_req) = tool_request {
+                                                                            requests.push(list_files_req);
                                                                         }
                                                                     }
                                                                 }
 
                                                                 if !requests.is_empty() {
-                                                                    tracing::debug!(requests_count = %requests.len(), "Successfully extracted list_files requests");
                                                                     Some(requests)
                                                                 } else {
-                                                                    tracing::debug!("No list_files requests found");
                                                                     None
                                                                 }
                                                             } else {
                                                                 None
                                                             };
 
-                                                            if let Some(requests) = list_files_requests {
-                                                                // Display each list_files tool request in a rounded box with enhanced info
+                                                            if let Some(ref requests) = list_files_requests {
+                                                                // Display each list_files tool request in full width box with no rounded corners
                                                                 for req in requests {
                                                                     let mut description = format!("List files: {}", req.path);
 
@@ -480,16 +471,18 @@ impl crate::pages::Page for WorkPage {
                                                                         description.push_str(&format!(" ({})", options.join(", ")));
                                                                     }
 
-                                                                    // Use the same styling as User box
+                                                                    // Use the same styling as User box but full width with no rounded corners
                                                                     let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
 
                                                                     egui::Frame::NONE
                                                                         .fill(bg_color)
-                                                                        .corner_radius(8.0)
-                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .corner_radius(0.0)
+                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
                                                                         .show(ui, |ui| {
+                                                                            ui.set_width(ui.available_width());
                                                                             ui.vertical(|ui| {
                                                                                 ui.horizontal(|ui| {
+                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
                                                                                     ui.label(egui::RichText::new("📁").size(16.0));
                                                                                     ui.label(egui::RichText::new(description).size(12.0).strong());
                                                                                 });
@@ -497,7 +490,169 @@ impl crate::pages::Page for WorkPage {
                                                                         });
                                                                     ui.add_space(4.0);
                                                                 }
+                                                            }
+
+                                                            // Check if this is a read_file tool request using proper Rust types
+                                                            let read_file_requests = if output.role.as_deref() == Some("assistant") {
+                                                                // Try multiple parsing approaches for robustness
+                                                                let mut requests = Vec::new();
+
+                                                                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    // Look for tool_calls array in the structured response
+                                                                    if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
+                                                                        for tool_call in tool_calls {
+                                                                            if let Some(function) = tool_call.get("function") {
+                                                                                if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
+                                                                                    if name == "read_file" {
+                                                                                        if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
+                                                                                            // Use proper Rust type for parsing ReadFileRequest
+                                                                                            match serde_json::from_str::<ReadFileRequest>(args) {
+                                                                                                Ok(read_file_req) => {
+                                                                                                    requests.push(read_file_req);
+                                                                                                }
+                                                                                                Err(e) => {
+                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse ReadFileRequest");
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                // Try to parse as direct ToolRequest (fallback format)
+                                                                if requests.is_empty() {
+                                                                    if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        if let ToolRequest::ReadFile(read_file_req) = tool_request {
+                                                                            requests.push(read_file_req);
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                if !requests.is_empty() {
+                                                                    Some(requests)
+                                                                } else {
+                                                                    None
+                                                                }
                                                             } else {
+                                                                None
+                                                            };
+
+                                                            if let Some(ref requests) = read_file_requests {
+                                                                // Display each read_file tool request in full width box with no rounded corners
+                                                                for req in requests {
+                                                                    let mut description = format!("Read file: {}", req.path);
+
+                                                                    // Add optional parameters to the description
+                                                                    if let Some(max_size) = req.max_size {
+                                                                        description.push_str(&format!(" (max size: {} bytes)", max_size));
+                                                                    }
+
+                                                                    // Use the same styling as list_files box but full width with no rounded corners
+                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                    egui::Frame::NONE
+                                                                        .fill(bg_color)
+                                                                        .corner_radius(0.0)
+                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                        .show(ui, |ui| {
+                                                                            ui.set_width(ui.available_width());
+                                                                            ui.vertical(|ui| {
+                                                                                ui.horizontal(|ui| {
+                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
+                                                                                    ui.label(egui::RichText::new("📄").size(16.0));
+                                                                                    ui.label(egui::RichText::new(description).size(12.0).strong());
+                                                                                });
+                                                                            });
+                                                                        });
+                                                                    ui.add_space(4.0);
+                                                                }
+                                                            }
+
+                                                            // Show tool responses (from ai_session_outputs with role='tool')
+                                                            // Check if this output is a tool response
+                                                            if output.role.as_deref() == Some("tool") {
+                                                                // Parse the tool response - it's wrapped in {"content": <ToolResponse>, "tool_use_id": "..."}
+                                                                if let Ok(wrapped_response) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    if let Some(content) = wrapped_response.get("content") {
+                                                                        // Try to parse the content as ToolResponse
+                                                                        if let Ok(ToolResponse::ListFiles(list_files_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
+                                                                                // Check if this tool response is expanded (use output.id)
+                                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
+
+                                                                                // Use the same styling as tool request box
+                                                                                let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                                let response = egui::Frame::NONE
+                                                                                    .fill(bg_color)
+                                                                                    .corner_radius(0.0)
+                                                                                    .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                                    .show(ui, |ui| {
+                                                                                        ui.set_width(ui.available_width());
+                                                                                        ui.vertical(|ui| {
+                                                                                            // Header row - clickable
+                                                                                            ui.horizontal(|ui| {
+                                                                                                ui.label(egui::RichText::new("🤖").size(16.0));
+                                                                                                ui.label(egui::RichText::new("📁").size(16.0));
+                                                                                                let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                                ui.label(egui::RichText::new(arrow).size(12.0));
+                                                                                                ui.label(egui::RichText::new(format!(
+                                                                                                    "Listed {} files in {}",
+                                                                                                    list_files_response.total_files,
+                                                                                                    list_files_response.current_path
+                                                                                                )).size(12.0).strong());
+                                                                                            });
+
+                                                                                            // Show file list if expanded
+                                                                                            if is_expanded {
+                                                                                                ui.add_space(8.0);
+                                                                                                ui.separator();
+                                                                                                ui.add_space(4.0);
+
+                                                                                                // Display the file tree
+                                                                                                ui.label(&list_files_response.files);
+
+                                                                                                // Show truncation warning if needed
+                                                                                                if list_files_response.truncated {
+                                                                                                    ui.add_space(4.0);
+                                                                                                    ui.label(
+                                                                                                        egui::RichText::new(format!(
+                                                                                                            "⚠ Truncated at {} files",
+                                                                                                            list_files_response.limit
+                                                                                                        ))
+                                                                                                        .size(11.0)
+                                                                                                        .color(egui::Color32::from_rgb(255, 165, 0))
+                                                                                                    );
+                                                                                                }
+                                                                                            }
+                                                                                        });
+                                                                                    })
+                                                                                    .response;
+
+                                                                                // Make the widget clickable to toggle expansion
+                                                                                if response.interact(egui::Sense::click()).clicked() {
+                                                                                    if is_expanded {
+                                                                                        state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                                    } else {
+                                                                                        state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                                    }
+                                                                                }
+
+                                                                                // Change cursor to pointer on hover
+                                                                                if response.hovered() {
+                                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                                }
+
+                                                                                ui.add_space(4.0);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // Show regular AI response if not a tool request or tool response
+                                                            if list_files_requests.is_none() && read_file_requests.is_none() && output.role.as_deref() != Some("tool") {
                                                                 // Regular AI response message
                                                                 let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 
@@ -532,6 +687,42 @@ impl crate::pages::Page for WorkPage {
                                                     ui.add_space(8.0);
                                                 }
                                             });
+
+                                            // Message continuation input (outside scroll area)
+                                            ui.separator();
+                                            ui.add_space(8.0);
+
+                                            ui.horizontal(|ui| {
+                                                ui.label("Continue conversation:");
+                                            });
+
+                                            ui.add_space(4.0);
+
+                                            let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
+                                                .desired_width(ui.available_width())
+                                                .desired_rows(3)
+                                                .hint_text("Type your message here...");
+
+                                            ui.add(text_edit);
+
+                                            ui.add_space(8.0);
+
+                                            ui.horizontal(|ui| {
+                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                    let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
+                                                        && !state.sending_message;
+
+                                                    if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
+                                                        let api_service = crate::services::ApiService::new();
+                                                        api_service.send_message_to_work(selected_work_id, state);
+                                                    }
+
+                                                    if state.sending_message {
+                                                        ui.add(egui::Spinner::new());
+                                                        ui.label("Sending...");
+                                                    }
+                                                });
+                                            });
                                         }
                                     }
                                     ConnectionState::Error(error) => {
@@ -545,14 +736,14 @@ impl crate::pages::Page for WorkPage {
                                     ui.label("Work not found");
                                 });
                             }
-                        } else {
-                            // No work selected - show create work form
-                            if matches!(state.connection_state, ConnectionState::Connected) {
-                                // Load models only once when form is opened
-                                if !state.models_fetch_attempted && !state.loading_supported_models {
-                                    let api_service = crate::services::ApiService::new();
-                                    api_service.refresh_supported_models(state);
-                                }
+                             } else {
+                                 // No work selected - show create work form
+                                 if matches!(state.connection_state, ConnectionState::Connected) {
+                                     // Load models only once when form is opened
+                                     if !state.models_fetch_attempted && !state.loading_supported_models {
+                                         let api_service = crate::services::ApiService::new();
+                                         api_service.refresh_supported_models(state);
+                                     }
 
                                 // Create form - full width of second column
                                 ui.allocate_ui_with_layout(

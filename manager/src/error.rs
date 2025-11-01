@@ -27,6 +27,12 @@ pub enum AppError {
 
     #[error("LLM agent error: {0}")]
     LlmAgent(#[from] anyhow::Error),
+
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthenticationFailed(String),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -47,6 +53,9 @@ impl ResponseError for AppError {
                 HttpResponse::NotFound().json(error_response)
             }
             AppError::InvalidRequest(_) => HttpResponse::BadRequest().json(error_response),
+            AppError::Unauthorized(_) | AppError::AuthenticationFailed(_) => {
+                HttpResponse::Unauthorized().json(error_response)
+            }
             AppError::Database(_)
             | AppError::Config(_)
             | AppError::Io(_)
@@ -67,6 +76,8 @@ impl AppError {
             AppError::InvalidRequest(_) => "invalid_request".to_string(),
             AppError::Internal(_) => "internal_error".to_string(),
             AppError::LlmAgent(_) => "llm_agent_error".to_string(),
+            AppError::Unauthorized(_) => "unauthorized".to_string(),
+            AppError::AuthenticationFailed(_) => "authentication_failed".to_string(),
         }
     }
 }

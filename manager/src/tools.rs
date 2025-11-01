@@ -329,6 +329,56 @@ impl ToolExecutor {
         }))
     }
 
+    /// Convert glob pattern to regex pattern
+    /// Examples:
+    /// - *.rs -> .*\.rs$
+    /// - *.py -> .*\.py$
+    /// - test*.txt -> ^test.*\.txt$
+    /// - **/*.rs -> .*/.*\.rs$ (for nested paths)
+    fn glob_to_regex(glob: &str) -> String {
+        let mut regex = String::new();
+        let mut chars = glob.chars().peekable();
+
+        // Add start anchor unless pattern starts with ** or *
+        if !glob.starts_with("**") && !glob.starts_with('*') {
+            regex.push('^');
+        }
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                '*' => {
+                    // Check for ** pattern (match any directory depth)
+                    if chars.peek() == Some(&'*') {
+                        chars.next(); // consume second *
+                        regex.push_str(".*");
+                    } else {
+                        // Single * matches any characters except path separator
+                        regex.push_str("[^/]*");
+                    }
+                }
+                '?' => {
+                    // ? matches any single character except path separator
+                    regex.push_str("[^/]");
+                }
+                '.' | '+' | '^' | '$' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '\\' => {
+                    // Escape regex special characters
+                    regex.push('\\');
+                    regex.push(ch);
+                }
+                _ => {
+                    regex.push(ch);
+                }
+            }
+        }
+
+        // Add end anchor if pattern doesn't contain directory separators or wildcards at the end
+        if !regex.ends_with(".*") {
+            regex.push('$');
+        }
+
+        regex
+    }
+
     /// Search files using grep
     async fn grep_search(&self, request: GrepRequest) -> Result<ToolResponse> {
         use regex::RegexBuilder;
@@ -356,10 +406,11 @@ impl ToolExecutor {
             .build()
             .map_err(|e| ToolError::InvalidPath(format!("Invalid regex pattern: {}", e)))?;
 
-        // Compile include/exclude patterns
+        // Compile include/exclude patterns (convert from glob to regex)
         let include_regex =
             if let Some(pattern) = &request.include_pattern {
-                Some(RegexBuilder::new(pattern).build().map_err(|e| {
+                let regex_pattern = Self::glob_to_regex(pattern);
+                Some(RegexBuilder::new(&regex_pattern).build().map_err(|e| {
                     ToolError::InvalidPath(format!("Invalid include pattern: {}", e))
                 })?)
             } else {
@@ -368,7 +419,8 @@ impl ToolExecutor {
 
         let exclude_regex =
             if let Some(pattern) = &request.exclude_pattern {
-                Some(RegexBuilder::new(pattern).build().map_err(|e| {
+                let regex_pattern = Self::glob_to_regex(pattern);
+                Some(RegexBuilder::new(&regex_pattern).build().map_err(|e| {
                     ToolError::InvalidPath(format!("Invalid exclude pattern: {}", e))
                 })?)
             } else {
@@ -397,10 +449,21 @@ impl ToolExecutor {
 
             // Check include/exclude patterns
             let file_path = entry.path();
-            let relative_path = file_path
-                .strip_prefix(&search_path)
-                .unwrap_or(file_path)
-                .to_string_lossy();
+
+            // Calculate relative path for display
+            // When searching a single file, use the file name instead of empty string
+            let relative_path = if search_path.is_file() {
+                file_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| file_path.to_string_lossy().to_string())
+            } else {
+                file_path
+                    .strip_prefix(&search_path)
+                    .unwrap_or(file_path)
+                    .to_string_lossy()
+                    .to_string()
+            };
 
             // Apply include filter
             if let Some(ref include_re) = include_regex {
@@ -445,7 +508,7 @@ impl ToolExecutor {
                     let matched_text = mat.as_str().to_string();
 
                     let grep_match = GrepMatch {
-                        file_path: relative_path.to_string(),
+                        file_path: relative_path.clone(),
                         line_number: if request.include_line_numbers.unwrap_or(true) {
                             Some((line_num + 1) as u32)
                         } else {
@@ -495,13 +558,11 @@ impl ToolExecutor {
         };
 
         // Change to base directory before applying patch
-        let original_dir = std::env::current_dir().map_err(|e| {
-            anyhow::anyhow!("Failed to get current directory: {}", e)
-        })?;
+        let original_dir = std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
 
-        std::env::set_current_dir(&self.base_path).map_err(|e| {
-            anyhow::anyhow!("Failed to change to base directory: {}", e)
-        })?;
+        std::env::set_current_dir(&self.base_path)
+            .map_err(|e| anyhow::anyhow!("Failed to change to base directory: {}", e))?;
 
         let mut files_changed = Vec::new();
         let mut total_additions = 0;
@@ -600,15 +661,69 @@ impl ToolExecutor {
                         original_lines.pop();
                     }
 
-                    // Count additions/deletions from chunks
+                    // Apply each chunk to the file
+                    let mut modified_content = original_content.clone();
+
                     for chunk in chunks {
                         total_deletions += chunk.old_lines.len();
                         total_additions += chunk.new_lines.len();
+
+                        // Find and replace the old_lines with new_lines
+                        let old_text = chunk.old_lines.join("\n");
+                        let new_text = chunk.new_lines.join("\n");
+
+                        // Try to find the exact match first
+                        if let Some(pos) = modified_content.find(&old_text) {
+                            // Replace the found text
+                            modified_content.replace_range(pos..pos + old_text.len(), &new_text);
+                        } else {
+                            // If exact match fails, try with context
+                            if let Some(ref context) = chunk.change_context {
+                                // Find the context line first
+                                if let Some(context_pos) = modified_content.find(context) {
+                                    // Search for old_lines after the context
+                                    let search_start = context_pos + context.len();
+                                    if let Some(relative_pos) =
+                                        modified_content[search_start..].find(&old_text)
+                                    {
+                                        let absolute_pos = search_start + relative_pos;
+                                        modified_content.replace_range(
+                                            absolute_pos..absolute_pos + old_text.len(),
+                                            &new_text,
+                                        );
+                                    } else {
+                                        errors.push(format!(
+                                            "Could not find old lines in '{}' after context '{}'",
+                                            path_str, context
+                                        ));
+                                        continue;
+                                    }
+                                } else {
+                                    errors.push(format!(
+                                        "Could not find context '{}' in '{}'",
+                                        context, path_str
+                                    ));
+                                    continue;
+                                }
+                            } else {
+                                errors.push(format!(
+                                    "Could not find old lines in '{}' and no context provided",
+                                    path_str
+                                ));
+                                continue;
+                            }
+                        }
                     }
 
-                    // For simplicity, we'll let codex-apply-patch handle the actual application
-                    // by writing a temporary single-hunk patch and using its apply logic
-                    // For now, we'll just track the operation
+                    // Write the modified content back to the file
+                    if let Err(e) = fs::write(path, modified_content) {
+                        errors.push(format!(
+                            "Failed to write modified file '{}': {}",
+                            path_str, e
+                        ));
+                        continue;
+                    }
+
                     let operation = if move_path.is_some() {
                         "move"
                     } else {
@@ -940,6 +1055,80 @@ impl ToolExecutor {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_glob_to_regex() {
+        // Test simple wildcard patterns (no start anchor for patterns starting with *)
+        assert_eq!(ToolExecutor::glob_to_regex("*.rs"), r"[^/]*\.rs$");
+        assert_eq!(ToolExecutor::glob_to_regex("*.py"), r"[^/]*\.py$");
+        assert_eq!(ToolExecutor::glob_to_regex("*.txt"), r"[^/]*\.txt$");
+
+        // Test patterns with prefix (start anchor for patterns not starting with *)
+        assert_eq!(ToolExecutor::glob_to_regex("test*.rs"), r"^test[^/]*\.rs$");
+        assert_eq!(ToolExecutor::glob_to_regex("mod*.py"), r"^mod[^/]*\.py$");
+
+        // Test double wildcard for directory depth
+        assert_eq!(ToolExecutor::glob_to_regex("**/*.rs"), r".*/[^/]*\.rs$");
+        assert_eq!(
+            ToolExecutor::glob_to_regex("src/**/*.rs"),
+            r"^src/.*/[^/]*\.rs$"
+        );
+
+        // Test question mark (single character)
+        assert_eq!(ToolExecutor::glob_to_regex("test?.rs"), r"^test[^/]\.rs$");
+
+        // Test escaping of regex special characters
+        assert_eq!(
+            ToolExecutor::glob_to_regex("test+file.rs"),
+            r"^test\+file\.rs$"
+        );
+        assert_eq!(
+            ToolExecutor::glob_to_regex("test[1].rs"),
+            r"^test\[1\]\.rs$"
+        );
+
+        // Test patterns without wildcards
+        assert_eq!(ToolExecutor::glob_to_regex("test.rs"), r"^test\.rs$");
+    }
+
+    #[test]
+    fn test_glob_to_regex_matching() {
+        use regex::Regex;
+
+        // Test *.rs matches - should match filenames ending in .rs
+        // Note: The pattern is applied to relative file paths, so src/main.rs will match
+        let pattern = ToolExecutor::glob_to_regex("*.rs");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("main.rs"));
+        assert!(regex.is_match("lib.rs"));
+        assert!(!regex.is_match("main.py"));
+
+        // In grep_search, this is matched against relative_path which includes directories
+        // For file-only matching, the grep tool filters by filename, not full path
+        // So *.rs pattern will be matched against just "main.rs" not "src/main.rs"
+
+        // Test *.py matches
+        let pattern = ToolExecutor::glob_to_regex("*.py");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("test.py"));
+        assert!(regex.is_match("module.py"));
+        assert!(!regex.is_match("test.rs"));
+
+        // Test **/*.rs matches (nested paths) - this should match full paths
+        let pattern = ToolExecutor::glob_to_regex("**/*.rs");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("src/main.rs"));
+        assert!(regex.is_match("src/lib/mod.rs"));
+        assert!(regex.is_match("tests/integration.rs"));
+        assert!(!regex.is_match("main.py"));
+
+        // Test that patterns are properly anchored
+        let pattern = ToolExecutor::glob_to_regex("test.rs");
+        let regex = Regex::new(&pattern).unwrap();
+        assert!(regex.is_match("test.rs"));
+        assert!(!regex.is_match("test.rs.bak"));
+        assert!(!regex.is_match("my_test.rs"));
+    }
 
     #[tokio::test]
     async fn test_tool_executor_list_files() {

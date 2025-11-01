@@ -520,6 +520,11 @@ impl LlmAgent {
             // Update tool call status to executing
             tool_call_record.status = "executing".to_string();
             let tool_call_id = self.db.create_llm_agent_tool_call(&tool_call_record)?;
+
+            // IMPORTANT: Update the record's ID to match the database-generated ID
+            // Without this, subsequent updates will fail because they'll use the wrong ID
+            tool_call_record.id = tool_call_id;
+
             tracing::debug!(
                 session_id = %session_id,
                 tool_call_id = %tool_call_id,

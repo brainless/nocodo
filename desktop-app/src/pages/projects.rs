@@ -1,4 +1,3 @@
-use crate::pages::Page;
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
@@ -24,7 +23,19 @@ impl crate::pages::Page for ProjectsPage {
         "Projects"
     }
 
+    fn on_navigate_to(&mut self) {
+        // Set flag to trigger projects refresh in the update loop
+    }
+
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Trigger refresh if flag is set
+        if state.ui_state.pending_projects_refresh {
+            state.ui_state.pending_projects_refresh = false;
+            if state.connection_state == ConnectionState::Connected && !state.loading_projects {
+                self.refresh_projects(state);
+            }
+        }
+
         // Page heading - Ubuntu SemiBold
         ui.heading(WidgetText::page_heading("Projects"));
 
@@ -152,8 +163,7 @@ impl crate::pages::Page for ProjectsPage {
 
 impl ProjectsPage {
     fn refresh_projects(&self, state: &mut AppState) {
-        // This will be implemented when we extract the API methods
-        // For now, this is a placeholder
-        state.loading_projects = true;
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_projects(state);
     }
 }

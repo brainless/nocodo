@@ -55,6 +55,7 @@ impl TestConfig {
                 anthropic_api_key: Some("test-anthropic-key".to_string()),
             }),
             projects: None,
+            jwt_secret: Some("test-jwt-secret-key-for-testing-purposes-only".to_string()),
         };
 
         Self {
