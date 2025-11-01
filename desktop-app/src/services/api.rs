@@ -48,7 +48,8 @@ impl ApiService {
             let result_clone = Arc::clone(&state.projects_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.list_projects().await;
                     let mut projects_result = result_clone.lock().unwrap();
 
@@ -79,7 +80,8 @@ impl ApiService {
             let result_clone = Arc::clone(&state.works_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.list_works().await;
                     let mut works_result = result_clone.lock().unwrap();
 
@@ -110,7 +112,8 @@ impl ApiService {
             let result_clone = Arc::clone(&state.settings_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_settings().await;
                     let mut settings_result = result_clone.lock().unwrap();
 
@@ -142,7 +145,8 @@ impl ApiService {
             let result_clone = Arc::clone(&state.supported_models_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     // Check if we have a JWT token before making the API call
                     if api_client.get_jwt_token().is_some() {
                         let result = api_client.get_supported_models().await;
@@ -187,7 +191,8 @@ impl ApiService {
             let model = state.ui_state.new_work_model.clone();
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let request = manager_models::CreateWorkRequest {
                         title,
                         project_id,
@@ -227,7 +232,8 @@ impl ApiService {
             let message_content = state.ui_state.continue_message_input.clone();
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let request = manager_models::AddMessageRequest {
                         content: message_content,
                         content_type: manager_models::MessageContentType::Text,
@@ -274,7 +280,8 @@ impl ApiService {
 
             // Fetch work messages (user input)
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_work_messages(work_id).await;
                     let mut work_messages_result = messages_result_clone.lock().unwrap();
 
@@ -296,7 +303,8 @@ impl ApiService {
 
             // Fetch AI session outputs (AI responses and tool results)
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager2.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager2.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_ai_session_outputs(work_id).await;
                     let mut ai_session_outputs_result = outputs_result_clone.lock().unwrap();
 
@@ -318,7 +326,8 @@ impl ApiService {
 
             // Fetch AI tool calls (tool requests and responses)
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager3.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager3.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_ai_tool_calls(work_id).await;
                     let mut ai_tool_calls_result = tool_calls_result_clone.lock().unwrap();
 
@@ -354,7 +363,8 @@ impl ApiService {
 
             tokio::spawn(async move {
                 tracing::info!("Fetching project details for project_id={}", project_id);
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_project_details(project_id).await;
                     match &result {
                         Ok(details) => tracing::info!(
@@ -394,7 +404,8 @@ impl ApiService {
             let path = state.ui_state.projects_default_path.clone();
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.set_projects_default_path(path).await;
                     let mut update_result = result_clone.lock().unwrap();
 
@@ -425,7 +436,8 @@ impl ApiService {
             let result_clone = Arc::clone(&state.scan_projects_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.scan_projects().await;
                     let mut scan_result = result_clone.lock().unwrap();
 
@@ -472,7 +484,8 @@ impl ApiService {
             };
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let request = manager_models::UpdateApiKeysRequest {
                         xai_api_key: xai_key,
                         openai_api_key: openai_key,

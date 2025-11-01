@@ -23,7 +23,7 @@ pub enum ConnectionType {
 pub struct ConnectionManager {
     connection_type: Arc<RwLock<Option<ConnectionType>>>,
     tunnel: Arc<Mutex<Option<SshTunnel>>>,
-    api_client: Arc<RwLock<Option<ApiClient>>>,
+    api_client: Arc<RwLock<Option<Arc<RwLock<ApiClient>>>>>, // Shared ApiClient across all consumers
     connected: Arc<RwLock<bool>>,
     keepalive_shutdown: Arc<tokio::sync::Notify>,
     health_check_shutdown: Arc<tokio::sync::Notify>,
@@ -79,7 +79,7 @@ impl ConnectionManager {
         let local_port = tunnel.local_port();
         tracing::info!("SSH tunnel established on port {}", local_port);
 
-        // Create API client
+        // Create API client wrapped in Arc<RwLock>
         let mut api_client = ApiClient::new(format!("http://localhost:{}", local_port));
 
         // Restore JWT token if we have one
@@ -87,9 +87,9 @@ impl ConnectionManager {
             api_client.set_jwt_token(Some(token.clone()));
         }
 
-        // Store tunnel and client
+        // Store tunnel and client (wrapped in Arc<RwLock> for sharing)
         *self.tunnel.lock().await = Some(tunnel);
-        *self.api_client.write().await = Some(api_client);
+        *self.api_client.write().await = Some(Arc::new(RwLock::new(api_client)));
         *self.connected.write().await = true;
 
         // Start keepalive and health check tasks
@@ -106,7 +106,7 @@ impl ConnectionManager {
         let conn_type = ConnectionType::Local { port };
         *self.connection_type.write().await = Some(conn_type);
 
-        // Create API client
+        // Create API client wrapped in Arc<RwLock>
         let mut api_client = ApiClient::new(format!("http://localhost:{}", port));
 
         // Restore JWT token if we have one
@@ -117,7 +117,7 @@ impl ConnectionManager {
         // Test connection
         match api_client.health_check().await {
             Ok(_) => {
-                *self.api_client.write().await = Some(api_client);
+                *self.api_client.write().await = Some(Arc::new(RwLock::new(api_client)));
                 *self.connected.write().await = true;
 
                 // Start health check task
@@ -160,8 +160,8 @@ impl ConnectionManager {
         *self.connected.read().await
     }
 
-    /// Get the API client if connected
-    pub async fn get_api_client(&self) -> Option<ApiClient> {
+    /// Get the API client if connected (returns Arc to share same instance)
+    pub async fn get_api_client(&self) -> Option<Arc<RwLock<ApiClient>>> {
         self.api_client.read().await.clone()
     }
 
@@ -171,7 +171,8 @@ impl ConnectionManager {
             return false;
         }
 
-        if let Some(client) = self.api_client.read().await.as_ref() {
+        if let Some(client_arc) = self.api_client.read().await.as_ref() {
+            let client = client_arc.read().await;
             // Try a lightweight API call to verify connection
             match tokio::time::timeout(Duration::from_secs(5), client.health_check()).await {
                 Ok(Ok(_)) => true,
@@ -273,7 +274,8 @@ impl ConnectionManager {
                     _ = ticker.tick() => {
                         if *connection_manager.connected.read().await {
                             // Perform health check
-                            if let Some(client) = connection_manager.api_client.read().await.as_ref() {
+                            if let Some(client_arc) = connection_manager.api_client.read().await.as_ref() {
+                                let client = client_arc.read().await;
                                 match tokio::time::timeout(
                                     Duration::from_secs(5),
                                     client.health_check()
@@ -345,7 +347,7 @@ impl ConnectionManager {
                                                                  }
 
                                                                  *connection_manager.tunnel.lock().await = Some(tunnel);
-                                                                 *connection_manager.api_client.write().await = Some(api_client);
+                                                                 *connection_manager.api_client.write().await = Some(Arc::new(RwLock::new(api_client)));
                                                                 *connection_manager.connected.write().await = true;
                                                                 consecutive_failures = 0;
                                                             }
@@ -364,7 +366,7 @@ impl ConnectionManager {
                                                          }
 
                                                          if api_client.health_check().await.is_ok() {
-                                                             *connection_manager.api_client.write().await = Some(api_client);
+                                                             *connection_manager.api_client.write().await = Some(Arc::new(RwLock::new(api_client)));
                                                             *connection_manager.connected.write().await = true;
                                                             consecutive_failures = 0;
                                                             tracing::info!("Reconnected to local manager");
@@ -414,20 +416,23 @@ impl ConnectionManager {
         password: &str,
         ssh_fingerprint: &str,
     ) -> Result<manager_models::LoginResponse, ConnectionError> {
-        let api_client = self.api_client.read().await;
-        let client = api_client
+        let api_client_arc = self.api_client.read().await;
+        let client_arc = api_client_arc
             .as_ref()
             .ok_or(ConnectionError::NoConnectionInfo)?;
 
+        let client = client_arc.read().await;
         let response = client.login(username, password, ssh_fingerprint).await?;
+        drop(client); // Release read lock on ApiClient
 
-        // Store JWT token separately and in the API client
+        // Store JWT token separately and in the shared API client
         *self.jwt_token.write().await = Some(response.token.clone());
-        drop(api_client); // Release read lock
-        let mut api_client = self.api_client.write().await;
-        if let Some(client) = api_client.as_mut() {
-            client.set_jwt_token(Some(response.token.clone()));
-        }
+
+        // Update JWT token in the shared ApiClient instance
+        let mut client = client_arc.write().await;
+        client.set_jwt_token(Some(response.token.clone()));
+        drop(client); // Release write lock
+        drop(api_client_arc); // Release read lock on Option
 
         // Reset auth required flag since we now have authentication
         if let Ok(mut auth_required) = self.auth_required.lock() {
@@ -446,11 +451,12 @@ impl ConnectionManager {
         ssh_public_key: &str,
         ssh_fingerprint: &str,
     ) -> Result<manager_models::UserResponse, ConnectionError> {
-        let api_client = self.api_client.read().await;
-        let client = api_client
+        let api_client_arc = self.api_client.read().await;
+        let client_arc = api_client_arc
             .as_ref()
             .ok_or(ConnectionError::NoConnectionInfo)?;
 
+        let client = client_arc.read().await;
         let response = client.register(username, password, email, ssh_public_key, ssh_fingerprint).await?;
 
         // Reset auth required flag since registration might provide auth
@@ -467,7 +473,7 @@ impl ConnectionManager {
 struct ConnectionManagerHandle {
     connection_type: Arc<RwLock<Option<ConnectionType>>>,
     tunnel: Arc<Mutex<Option<SshTunnel>>>,
-    api_client: Arc<RwLock<Option<ApiClient>>>,
+    api_client: Arc<RwLock<Option<Arc<RwLock<ApiClient>>>>>,
     connected: Arc<RwLock<bool>>,
     #[allow(dead_code)]
     keepalive_shutdown: Arc<tokio::sync::Notify>,

@@ -517,7 +517,8 @@ impl ProjectDetailPage {
             let file_list_result_clone = Arc::clone(&state.file_list_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.list_files(project_id, path.as_deref()).await;
                     let mut file_list_result = file_list_result_clone.lock().unwrap();
                     *file_list_result = Some(result.map_err(|e| e.to_string()));
@@ -543,7 +544,8 @@ impl ProjectDetailPage {
             let file_content_result_clone = Arc::clone(&state.file_content_result);
 
             tokio::spawn(async move {
-                if let Some(api_client) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
                     let result = api_client.get_file_content(project_id, &path).await;
                     let mut file_content_result = file_content_result_clone.lock().unwrap();
                     *file_content_result = Some(result.map_err(|e| e.to_string()));

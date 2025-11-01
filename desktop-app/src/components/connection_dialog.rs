@@ -103,7 +103,8 @@ impl ConnectionDialog {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
                     // Verify we can reach the API through the tunnel
-                    if let Some(api_client) = connection_manager.get_api_client().await {
+                    if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                        let api_client = api_client_arc.read().await;
                         tracing::info!("API client created, testing connection...");
                         match api_client.health_check().await {
                             Ok(_) => {
