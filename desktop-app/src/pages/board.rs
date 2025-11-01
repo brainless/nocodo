@@ -1,9 +1,7 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{
-    ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse,
-};
+use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse};
 
 pub struct WorkPage;
 
@@ -393,32 +391,20 @@ impl crate::pages::Page for WorkPage {
                                                             // Check if this is a list_files tool request using proper Rust types
                                                             let list_files_requests = if output.role.as_deref() == Some("assistant") {
                                                                 // Try multiple parsing approaches for robustness
-
-                                                                // Debug: Log the content we're trying to parse
-                                                                tracing::debug!(
-                                                                    content_preview = %output.content.chars().take(200).collect::<String>(),
-                                                                    content_length = %output.content.len(),
-                                                                    "Attempting to parse AI output for tool calls"
-                                                                );
-
-                                                                // 1. Try to parse as structured JSON with tool_calls (standard format)
                                                                 let mut requests = Vec::new();
 
+                                                                // 1. Try to parse as structured JSON with tool_calls (standard format)
                                                                 if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
-                                                                    tracing::debug!("Successfully parsed as structured JSON");
                                                                     // Look for tool_calls array in the structured response
                                                                     if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
-                                                                        tracing::debug!(tool_calls_count = %tool_calls.len(), "Found tool_calls array");
                                                                         for tool_call in tool_calls {
                                                                             if let Some(function) = tool_call.get("function") {
                                                                                 if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
-                                                                                    tracing::debug!(tool_name = %name, "Found tool call");
                                                                                     if name == "list_files" {
                                                                                         if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
                                                                                             // Use proper Rust type for parsing ListFilesRequest
                                                                                             match serde_json::from_str::<ListFilesRequest>(args) {
                                                                                                 Ok(list_files_req) => {
-                                                                                                    tracing::debug!(path = %list_files_req.path, "Successfully parsed ListFilesRequest");
                                                                                                     requests.push(list_files_req);
                                                                                                 }
                                                                                                 Err(e) => {
@@ -430,35 +416,21 @@ impl crate::pages::Page for WorkPage {
                                                                                 }
                                                                             }
                                                                         }
-                                                                    } else {
-                                                                        tracing::debug!("No tool_calls array found in structured JSON");
                                                                     }
-                                                                } else {
-                                                                    tracing::debug!("Failed to parse as structured JSON");
                                                                 }
 
                                                                 // 2. Try to parse as direct ToolRequest (fallback format)
                                                                 if requests.is_empty() {
-                                                                    tracing::debug!("Trying to parse as direct ToolRequest");
-                                                                    match serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        Ok(tool_request) => {
-                                                                            tracing::debug!("Successfully parsed as direct ToolRequest");
-                                                                            if let ToolRequest::ListFiles(list_files_req) = tool_request {
-                                                                                tracing::debug!(path = %list_files_req.path, "Found ListFiles in direct ToolRequest");
-                                                                                requests.push(list_files_req);
-                                                                            }
-                                                                        }
-                                                                        Err(e) => {
-                                                                            tracing::debug!(error = %e, "Failed to parse as direct ToolRequest");
+                                                                    if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        if let ToolRequest::ListFiles(list_files_req) = tool_request {
+                                                                            requests.push(list_files_req);
                                                                         }
                                                                     }
                                                                 }
 
                                                                 if !requests.is_empty() {
-                                                                    tracing::debug!(requests_count = %requests.len(), "Successfully extracted list_files requests");
                                                                     Some(requests)
                                                                 } else {
-                                                                    tracing::debug!("No list_files requests found");
                                                                     None
                                                                 }
                                                             } else {
@@ -523,7 +495,6 @@ impl crate::pages::Page for WorkPage {
                                                                                             // Use proper Rust type for parsing ReadFileRequest
                                                                                             match serde_json::from_str::<ReadFileRequest>(args) {
                                                                                                 Ok(read_file_req) => {
-                                                                                                    tracing::debug!(path = %read_file_req.path, "Successfully parsed ReadFileRequest");
                                                                                                     requests.push(read_file_req);
                                                                                                 }
                                                                                                 Err(e) => {
@@ -540,15 +511,9 @@ impl crate::pages::Page for WorkPage {
 
                                                                 // Try to parse as direct ToolRequest (fallback format)
                                                                 if requests.is_empty() {
-                                                                    match serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        Ok(tool_request) => {
-                                                                            if let ToolRequest::ReadFile(read_file_req) = tool_request {
-                                                                                tracing::debug!(path = %read_file_req.path, "Found ReadFile in direct ToolRequest");
-                                                                                requests.push(read_file_req);
-                                                                            }
-                                                                        }
-                                                                        Err(_e) => {
-                                                                            // Silent error for read_file
+                                                                    if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        if let ToolRequest::ReadFile(read_file_req) = tool_request {
+                                                                            requests.push(read_file_req);
                                                                         }
                                                                     }
                                                                 }

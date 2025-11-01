@@ -78,6 +78,8 @@ impl BackgroundTasks {
             match res {
                 Ok(projects) => {
                     state.projects = projects;
+                    // Clear any previous connection errors since we successfully loaded data
+                    state.ui_state.connection_error = None;
                 }
                 Err(e) => {
                     state.ui_state.connection_error =
@@ -173,8 +175,15 @@ impl BackgroundTasks {
                     }
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load settings: {}", e));
+                    // Only show settings error in status bar if we have no projects loaded
+                    // (meaning we're not properly authenticated yet)
+                    if state.projects.is_empty() {
+                        state.ui_state.connection_error =
+                            Some(format!("Failed to load settings: {}", e));
+                    } else {
+                        // Log the error but don't show it in status bar since we're authenticated
+                        tracing::warn!("Failed to load settings (non-critical): {}", e);
+                    }
                 }
             }
         }
