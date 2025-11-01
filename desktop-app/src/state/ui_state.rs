@@ -51,4 +51,9 @@ pub struct UiState {
     pub expanded_folders: std::collections::HashSet<String>,
     /// Message continuation input for work detail
     pub continue_message_input: String,
+    /// Flags to trigger data refresh on page navigation
+    #[serde(skip)]
+    pub pending_projects_refresh: bool,
+    #[serde(skip)]
+    pub pending_works_refresh: bool,
 }

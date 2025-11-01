@@ -23,7 +23,19 @@ impl crate::pages::Page for ProjectsPage {
         "Projects"
     }
 
+    fn on_navigate_to(&mut self) {
+        // Set flag to trigger projects refresh in the update loop
+    }
+
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Trigger refresh if flag is set
+        if state.ui_state.pending_projects_refresh {
+            state.ui_state.pending_projects_refresh = false;
+            if state.connection_state == ConnectionState::Connected && !state.loading_projects {
+                self.refresh_projects(state);
+            }
+        }
+
         // Page heading - Ubuntu SemiBold
         ui.heading(WidgetText::page_heading("Projects"));
 

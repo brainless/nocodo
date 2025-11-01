@@ -22,7 +22,20 @@ impl crate::pages::Page for WorkPage {
         "Board"
     }
 
+    fn on_navigate_to(&mut self) {
+        // Set flag to trigger works refresh in the update loop
+    }
+
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Trigger refresh if flag is set
+        if state.ui_state.pending_works_refresh {
+            state.ui_state.pending_works_refresh = false;
+            if state.connection_state == ConnectionState::Connected && !state.loading_works {
+                let api_service = crate::services::ApiService::new();
+                api_service.refresh_works(state);
+            }
+        }
+
         ui.heading("Board");
 
         // Two-column layout: left column for form and list, right column for details

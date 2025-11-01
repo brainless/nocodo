@@ -332,6 +332,17 @@ impl DesktopApp {
         // Update current page
         self.state.ui_state.current_page = page.clone();
 
+        // Set refresh flags based on the page we're navigating to
+        match &page {
+            UiPage::Projects => {
+                self.state.ui_state.pending_projects_refresh = true;
+            }
+            UiPage::Work => {
+                self.state.ui_state.pending_works_refresh = true;
+            }
+            _ => {}
+        }
+
         // Call on_navigate_to for new page
         if let Some(new_page) = self.pages.get_mut(&page) {
             new_page.on_navigate_to();
