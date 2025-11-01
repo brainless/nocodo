@@ -1,7 +1,7 @@
 use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
-    ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse, UpdateApiKeysRequest, Work,
-    WorkListResponse, WorkResponse,
+    ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
+    UpdateApiKeysRequest, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -14,7 +14,10 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new(base_url: String) -> Self {
-        Self { base_url, jwt_token: None }
+        Self {
+            base_url,
+            jwt_token: None,
+        }
     }
 
     pub fn set_jwt_token(&mut self, token: Option<String>) {

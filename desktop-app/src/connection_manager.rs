@@ -28,7 +28,7 @@ pub struct ConnectionManager {
     keepalive_shutdown: Arc<tokio::sync::Notify>,
     health_check_shutdown: Arc<tokio::sync::Notify>,
     auth_required: Arc<std::sync::Mutex<bool>>, // Shared flag for 401 detection
-    jwt_token: Arc<RwLock<Option<String>>>, // Store JWT token separately for reconnection
+    jwt_token: Arc<RwLock<Option<String>>>,     // Store JWT token separately for reconnection
 }
 
 impl ConnectionManager {
@@ -457,7 +457,9 @@ impl ConnectionManager {
             .ok_or(ConnectionError::NoConnectionInfo)?;
 
         let client = client_arc.read().await;
-        let response = client.register(username, password, email, ssh_public_key, ssh_fingerprint).await?;
+        let response = client
+            .register(username, password, email, ssh_public_key, ssh_fingerprint)
+            .await?;
 
         // Reset auth required flag since registration might provide auth
         if let Ok(mut auth_required) = self.auth_required.lock() {

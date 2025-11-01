@@ -140,9 +140,15 @@ impl AuthDialog {
 
         // Spawn async task for login
         tokio::spawn(async move {
-            match connection_manager.login(&username, &password, &ssh_fingerprint).await {
+            match connection_manager
+                .login(&username, &password, &ssh_fingerprint)
+                .await
+            {
                 Ok(login_response) => {
-                    tracing::info!("Login successful for user: {}", login_response.user.username);
+                    tracing::info!(
+                        "Login successful for user: {}",
+                        login_response.user.username
+                    );
 
                     // Refresh all data after successful login
                     if let Some(api_client_arc) = connection_manager.get_api_client().await {
@@ -172,7 +178,8 @@ impl AuthDialog {
                         // Refresh supported models
                         let result = api_client.get_supported_models().await;
                         {
-                            let mut supported_models_result_lock = supported_models_result.lock().unwrap();
+                            let mut supported_models_result_lock =
+                                supported_models_result.lock().unwrap();
                             *supported_models_result_lock = Some(result.map_err(|e| e.to_string()));
                         }
                     }
@@ -209,19 +216,18 @@ impl AuthDialog {
             }
         };
 
-        let ssh_public_key = match crate::ssh::read_ssh_public_key(
-            if state.config.ssh.ssh_key_path.is_empty() {
+        let ssh_public_key =
+            match crate::ssh::read_ssh_public_key(if state.config.ssh.ssh_key_path.is_empty() {
                 None
             } else {
                 Some(&state.config.ssh.ssh_key_path)
-            },
-        ) {
-            Ok(public_key) => public_key,
-            Err(e) => {
-                self.error_message = Some(format!("Failed to read SSH public key: {}", e));
-                return;
-            }
-        };
+            }) {
+                Ok(public_key) => public_key,
+                Err(e) => {
+                    self.error_message = Some(format!("Failed to read SSH public key: {}", e));
+                    return;
+                }
+            };
 
         let username = self.username.clone();
         let password = self.password.clone();
@@ -234,9 +240,21 @@ impl AuthDialog {
 
         // Spawn async task for registration
         tokio::spawn(async move {
-            match connection_manager.register(&username, &password, email.as_deref(), &ssh_public_key, &ssh_fingerprint).await {
+            match connection_manager
+                .register(
+                    &username,
+                    &password,
+                    email.as_deref(),
+                    &ssh_public_key,
+                    &ssh_fingerprint,
+                )
+                .await
+            {
                 Ok(user_response) => {
-                    tracing::info!("Registration successful for user: {}", user_response.user.username);
+                    tracing::info!(
+                        "Registration successful for user: {}",
+                        user_response.user.username
+                    );
                     // After registration, automatically log in
                 }
                 Err(e) => {

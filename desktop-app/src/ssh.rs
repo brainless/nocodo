@@ -1,13 +1,13 @@
+use base64::{engine::general_purpose, Engine as _};
 use russh::keys::{key::PrivateKeyWithHashAlg, load_secret_key, ssh_key, PublicKeyBase64};
 use russh::*;
+use sha2::{Digest, Sha256};
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio::sync::Mutex;
-use sha2::{Sha256, Digest};
-use base64::{Engine as _, engine::general_purpose};
 
 pub struct SshTunnel {
     local_port: u16,
@@ -339,7 +339,9 @@ pub fn read_ssh_public_key(key_path: Option<&str>) -> Result<String, SshError> {
         }
     }
 
-    Err(SshError::AuthenticationFailed("No SSH public key found".to_string()))
+    Err(SshError::AuthenticationFailed(
+        "No SSH public key found".to_string(),
+    ))
 }
 
 /// Calculate SSH key fingerprint in SHA256 format

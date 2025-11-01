@@ -56,7 +56,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -88,7 +90,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -120,7 +124,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -155,7 +161,9 @@ impl ApiService {
                         // Check for 401 Unauthorized and set auth required flag
                         if let Err(ref e) = result {
                             if e.is_unauthorized() {
-                                if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                                if let Ok(mut auth_required) =
+                                    connection_manager.get_auth_required_flag().lock()
+                                {
                                     *auth_required = true;
                                 }
                             }
@@ -164,7 +172,9 @@ impl ApiService {
                         *supported_models_result = Some(result.map_err(|e| e.to_string()));
                     } else {
                         // No token, set auth required
-                        if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                        if let Ok(mut auth_required) =
+                            connection_manager.get_auth_required_flag().lock()
+                        {
                             *auth_required = true;
                         }
                         let mut supported_models_result = result_clone.lock().unwrap();
@@ -206,7 +216,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -246,7 +258,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -288,7 +302,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -311,7 +327,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager2.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager2.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -334,7 +352,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager3.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager3.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -375,7 +395,9 @@ impl ApiService {
                             tracing::error!("Failed to load project details: {}", e);
                             // Check for 401 Unauthorized and set auth required flag
                             if e.is_unauthorized() {
-                                if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                                if let Ok(mut auth_required) =
+                                    connection_manager.get_auth_required_flag().lock()
+                                {
                                     *auth_required = true;
                                 }
                             }
@@ -412,7 +434,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -444,7 +468,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
@@ -497,7 +523,9 @@ impl ApiService {
                     // Check for 401 Unauthorized and set auth required flag
                     if let Err(ref e) = result {
                         if e.is_unauthorized() {
-                            if let Ok(mut auth_required) = connection_manager.get_auth_required_flag().lock() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
                                 *auth_required = true;
                             }
                         }
