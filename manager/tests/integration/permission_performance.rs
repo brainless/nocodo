@@ -59,6 +59,8 @@ async fn test_performance_many_teams_and_permissions() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -107,6 +109,8 @@ async fn test_performance_many_teams_and_permissions() {
             username: format!("user{}", i),
             email: Some(format!("user{}@example.com", i)),
             password: "password123".to_string(),
+            ssh_public_key: Some(format!("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test{}@example.com", i)),
+            ssh_fingerprint: Some(format!("SHA256:testfingerprint{}", i)),
         };
 
         let req = test::TestRequest::post()

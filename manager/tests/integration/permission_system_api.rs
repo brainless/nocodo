@@ -101,6 +101,8 @@ async fn test_complete_team_management_workflow() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -152,6 +154,8 @@ async fn test_complete_team_management_workflow() {
         username: "developer".to_string(),
         email: Some("dev@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint456".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -260,6 +264,8 @@ async fn test_permission_revocation() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -355,6 +361,8 @@ async fn test_team_member_removal() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -390,6 +398,8 @@ async fn test_team_member_removal() {
         username: "member".to_string(),
         email: Some("member@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint456".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -460,6 +470,8 @@ async fn test_super_admin_permissions() {
         username: "superadmin".to_string(),
         email: Some("super@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -527,6 +539,8 @@ async fn test_list_all_permissions_admin_only() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -559,6 +573,8 @@ async fn test_team_deletion_cascades() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
     let req = test::TestRequest::post()
@@ -610,6 +626,8 @@ async fn test_team_deletion_cascades() {
         username: "member".to_string(),
         email: Some("member@example.com".to_string()),
         password: "password123".to_string(),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com".to_string()),
+        ssh_fingerprint: Some("SHA256:testfingerprint456".to_string()),
     };
 
     let req = test::TestRequest::post()

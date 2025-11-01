@@ -2593,36 +2593,80 @@ pub async fn login(
         );
     }
 
-    // 4. Verify SSH key fingerprint
-    let ssh_key = data
-        .database
-        .get_ssh_key_by_fingerprint(&login_req.ssh_fingerprint)
-        .map_err(|_| {
-            tracing::warn!(
-                "SSH key not found for user {}: {}",
+    // 4. Find or auto-add SSH key fingerprint
+    let ssh_key = match data.database.get_ssh_key_by_fingerprint(&login_req.ssh_fingerprint) {
+        Ok(key) => {
+            // Key exists - verify it belongs to this user
+            if key.user_id != user.id {
+                tracing::warn!(
+                    "SSH key {} does not belong to user {}",
+                    login_req.ssh_fingerprint,
+                    user.username
+                );
+                return Err(AppError::AuthenticationFailed("Invalid SSH key".to_string()).into());
+            }
+            key
+        }
+        Err(_) => {
+            // SSH key fingerprint not found - auto-add it since SSH tunnel is already established
+            tracing::info!(
+                "Auto-adding new SSH key fingerprint for user {}: {}",
                 user.username,
                 login_req.ssh_fingerprint
             );
-            AppError::AuthenticationFailed("Invalid SSH key".to_string())
-        })?;
 
-    // 5. Verify SSH key belongs to this user
-    if ssh_key.user_id != user.id {
-        tracing::warn!(
-            "SSH key {} does not belong to user {}",
-            login_req.ssh_fingerprint,
-            user.username
-        );
-        return Err(AppError::AuthenticationFailed("Invalid SSH key".to_string()).into());
-    }
+            // Check current number of SSH keys for this user (limit: 10)
+            let existing_keys = data.database.get_ssh_keys_for_user(user.id)?;
+            if existing_keys.len() >= 10 {
+                tracing::warn!(
+                    "User {} has reached maximum SSH key limit (10), cannot add new key: {}",
+                    user.username,
+                    login_req.ssh_fingerprint
+                );
+                return Err(AppError::AuthenticationFailed(
+                    "Maximum number of SSH keys reached. Please contact administrator to manage your SSH keys.".to_string()
+                ).into());
+            }
 
-    // 6. Update SSH key last_used_at
+            // Add new SSH key record
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64;
+
+            let new_ssh_key = crate::models::UserSshKey {
+                id: 0, // Will be set by database
+                user_id: user.id,
+                key_type: "ssh-ed25519".to_string(), // Default assumption
+                fingerprint: login_req.ssh_fingerprint.clone(),
+                public_key_data: "".to_string(), // Not available during login
+                label: Some(format!("Auto-added on login {}", now)),
+                is_active: true,
+                created_at: now,
+                last_used_at: Some(now),
+            };
+
+            let key_id = data.database.create_ssh_key(&new_ssh_key)?;
+            let mut key = new_ssh_key;
+            key.id = key_id;
+
+            tracing::info!(
+                "Successfully auto-added SSH key {} for user {}",
+                login_req.ssh_fingerprint,
+                user.username
+            );
+
+            key
+        }
+    };
+
+    // 5. Update SSH key last_used_at
     if let Err(e) = data.database.update_ssh_key_last_used(ssh_key.id) {
         tracing::error!("Failed to update SSH key last_used_at: {}", e);
         // Non-fatal error, continue with login
     }
 
-    // 7. Generate JWT token
+    // 6. Generate JWT token
     let config = data.config.read().unwrap();
     let jwt_secret = config
         .auth
@@ -2643,7 +2687,7 @@ pub async fn login(
 
     tracing::info!("Successful login for user: {}", user.username);
 
-    // 8. Return success response
+    // 7. Return success response
     let user_info = crate::models::UserInfo {
         id: user.id,
         username: user.username.clone(),
