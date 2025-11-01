@@ -9,7 +9,7 @@
 Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help teams of all sizes collaborate on software development with AI assistance - whether you're working solo, in a small startup, or part of a large organization.
 
 
-![nocodo Desktop app connected over SSH, showing past prompts](./website/src/assets/nocodo_Board_Writing_a_Prompt_Existing_Prompt_List_Work_Details.png "Desktop app showing past prompts, current prompt, on connected manager instance")
+![nocodo Desktop app shows the agent is analysing its own code](./website/src/assets/nocodo_Analysing_Own_Code.png "nocodo Desktop app shows the agent is analysing its own code")
 
 > ⚠️ **Under Active Development** - the desktop app shows tool call outputs as raw JSON, a better UI will come soon.
 

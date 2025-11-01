@@ -1,596 +1,891 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import Section from '../components/theme/Section.astro';
-import SectionHeader from '../components/theme/SectionHeader.astro';
-import Card from '../components/theme/Card.astro';
-import FeatureCard from '../components/theme/FeatureCard.astro';
-import heroScreenshot from '../assets/nocodo_Board_Writing_a_Prompt_Existing_Prompt_List_Work_Details.png';
-import connectionScreenshot from '../assets/nocodo_Connection_Screen_Local_Remote_SSH_Options.png';
-import lanConnectScreenshot from '../assets/nocodo_Connect_Remote_Within_LAN.png';
+import Layout from "../layouts/Layout.astro";
+import Section from "../components/theme/Section.astro";
+import SectionHeader from "../components/theme/SectionHeader.astro";
+import Card from "../components/theme/Card.astro";
+import FeatureCard from "../components/theme/FeatureCard.astro";
+import heroScreenshot from "../assets/nocodo_Analysing_Own_Code.png";
+import connectionScreenshot from "../assets/nocodo_Connection_Screen_Local_Remote_SSH_Options.png";
+import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png";
 ---
 
 <Layout
-  title="nocodo - Collaborative coding agent for teams"
-  description="Collaborative coding agent that empowers everyone in your team to contribute to software development using AI assistance."
+    title="nocodo - Collaborative coding agent for teams"
+    description="Collaborative coding agent that empowers everyone in your team to contribute to software development using AI assistance."
 >
-  <!-- Hero Section -->
-  <section class="relative overflow-hidden bg-gradient-to-b from-bg-primary via-bg-secondary to-bg-primary text-text-primary">
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-10">
-      <svg class="absolute inset-0 h-full w-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M0 32V0h32" fill="none" stroke="currentColor" stroke-width="1"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)"/>
-      </svg>
-    </div>
-
-    <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
-      <div class="text-center">
-        <!-- Logo/Brand -->
-        <h1 class="text-6xl sm:text-7xl lg:text-8xl font-bold mb-8 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent">
-          nocodo
-        </h1>
-
-        <!-- Tagline -->
-        <p class="text-2xl sm:text-3xl lg:text-4xl text-text-secondary max-w-4xl mx-auto mb-6 leading-tight font-light">
-          Collaborative coding agent for businesses
-        </p>
-
-        <p class="text-lg sm:text-xl text-text-tertiary max-w-3xl mx-auto mb-12">
-          From solo founders to large enterprises
-        </p>
-
-        <!-- CTA -->
-        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a
-            href="https://github.com/brainless/nocodo"
-            class="inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg class="mr-3 w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    <!-- Hero Section -->
+    <section
+        class="relative overflow-hidden bg-gradient-to-b from-bg-primary via-bg-secondary to-bg-primary text-text-primary"
+    >
+        <!-- Background Pattern -->
+        <div class="absolute inset-0 opacity-10">
+            <svg
+                class="absolute inset-0 h-full w-full"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <defs>
+                    <pattern
+                        id="grid"
+                        width="32"
+                        height="32"
+                        patternUnits="userSpaceOnUse"
+                    >
+                        <path
+                            d="M0 32V0h32"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1"></path>
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)"></rect>
             </svg>
-            Star on GitHub
-          </a>
         </div>
 
-        <p class="text-sm text-text-muted mt-8">
-          Under active development • Star and watch for updates
-        </p>
-      </div>
-    </div>
-  </section>
+        <div
+            class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32"
+        >
+            <div class="text-center">
+                <!-- Logo/Brand -->
+                <h1
+                    class="text-6xl sm:text-7xl lg:text-8xl font-bold mb-8 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent"
+                >
+                    nocodo
+                </h1>
 
-  <!-- Hero Screenshot -->
-  <Section background="primary" paddingY="sm">
-    <div class="relative">
-      <img
-        src={heroScreenshot.src}
-        alt="nocodo Desktop app connected over SSH, showing past prompts"
-        title="Desktop app showing past prompts, current prompt, on connected manager instance"
-        class="w-full rounded-lg shadow-2xl border border-border-primary"
-      />
-    </div>
-    <div class="mt-4 text-center">
-      <p class="text-sm text-text-muted">
-        ⚠️ Under active development - the desktop app shows tool call outputs as raw JSON, a better UI will come soon
-      </p>
-    </div>
-  </Section>
+                <!-- Tagline -->
+                <p
+                    class="text-2xl sm:text-3xl lg:text-4xl text-text-secondary max-w-4xl mx-auto mb-6 leading-tight font-light"
+                >
+                    Collaborative coding agent for businesses
+                </p>
 
-  <!-- Problem Statement Section -->
-  <Section background="secondary" containerWidth="5xl">
-    <SectionHeader title="The Challenge" />
+                <p
+                    class="text-lg sm:text-xl text-text-tertiary max-w-3xl mx-auto mb-12"
+                >
+                    From solo founders to large enterprises
+                </p>
 
-    <Card class="p-8 sm:p-12">
-      <p class="text-xl sm:text-2xl text-text-secondary leading-relaxed mb-6">
-        Collaborating with coding agents in a team is not easy.
-      </p>
-      <p class="text-lg sm:text-xl text-text-secondary leading-relaxed">
-        As LLMs become better at coding, we want to empower more people within a business to share ideas,
-        report bugs, and work with LLMs to contribute to the software that runs their business.
-      </p>
-    </Card>
-  </Section>
+                <!-- CTA -->
+                <div
+                    class="flex flex-col sm:flex-row gap-4 justify-center items-center"
+                >
+                    <a
+                        href="https://github.com/brainless/nocodo"
+                        class="inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <svg
+                            class="mr-3 w-6 h-6"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                            ></path>
+                        </svg>
+                        Star on GitHub
+                    </a>
+                </div>
 
-  <!-- Solution Section -->
-  <Section background="primary">
-    <SectionHeader
-      title="The nocodo Approach"
-      subtitle="A hybrid solution combining cloud-based agents with native desktop access"
-    />
-
-    <div class="grid lg:grid-cols-2 gap-8">
-      <!-- Manager (Cloud) -->
-      <Card variant="gradient" class="hover:border-accent-emerald/50 transition-all duration-300">
-        <div class="flex items-center mb-6">
-          <div class="w-12 h-12 bg-accent-emerald/10 rounded-lg flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
-            </svg>
-          </div>
-          <h3 class="text-2xl font-bold text-text-primary">nocodo Manager</h3>
+                <p class="text-sm text-text-muted mt-8">
+                    Under active development • Star and watch for updates
+                </p>
+            </div>
         </div>
-        <p class="text-text-secondary mb-6 leading-relaxed">
-          Cloud-based daemon running on your own infrastructure
-        </p>
-        <ul class="space-y-3 text-text-secondary">
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>AI coding agent integrated with LLMs</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Full development environment management</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Supports all major languages and frameworks</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Database, cache, and message queue integration</span>
-          </li>
-        </ul>
-      </Card>
+    </section>
 
-      <!-- Desktop App -->
-      <Card variant="gradient" class="hover:border-accent-cyan/50 transition-all duration-300">
-        <div class="flex items-center mb-6">
-          <div class="w-12 h-12 bg-accent-cyan/10 rounded-lg flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-            </svg>
-          </div>
-          <h3 class="text-2xl font-bold text-text-primary">Desktop App</h3>
+    <!-- Hero Screenshot -->
+    <Section background="primary" paddingY="sm">
+        <div class="relative">
+            <img
+                src={heroScreenshot.src}
+                alt="nocodo Desktop app connected over SSH, showing past prompts"
+                title="Desktop app showing past prompts, current prompt, on connected manager instance"
+                class="w-full rounded-lg shadow-2xl border border-border-primary"
+            />
         </div>
-        <p class="text-text-secondary mb-6 leading-relaxed">
-          Native cross-platform client for secure team collaboration
-        </p>
-        <ul class="space-y-3 text-text-secondary">
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Secure SSH connection to manager</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Join multiple teams easily</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Integrated project management and tasks</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Review generated code and demos</span>
-          </li>
-        </ul>
-      </Card>
-    </div>
+        <div class="mt-4 text-center">
+            <p class="text-sm text-text-muted">
+                ⚠️ Under active development - the desktop app shows tool call
+                outputs as raw JSON, a better UI will come soon
+            </p>
+        </div>
+    </Section>
 
-    <!-- Connection Screenshots -->
-    <div class="mt-12 space-y-8">
-      <div class="relative">
-        <img
-          src={connectionScreenshot.src}
-          alt="nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH"
-          title="Connect to nocodo manager running locally or remote over SSH"
-          class="w-full rounded-lg border border-border-primary shadow-2xl"
+    <!-- Problem Statement Section -->
+    <Section background="secondary" containerWidth="5xl">
+        <SectionHeader title="The Challenge" />
+
+        <Card class="p-8 sm:p-12">
+            <p
+                class="text-xl sm:text-2xl text-text-secondary leading-relaxed mb-6"
+            >
+                Collaborating with coding agents in a team is not easy.
+            </p>
+            <p class="text-lg sm:text-xl text-text-secondary leading-relaxed">
+                As LLMs become better at coding, we want to empower more people
+                within a business to share ideas, report bugs, and work with
+                LLMs to contribute to the software that runs their business.
+            </p>
+        </Card>
+    </Section>
+
+    <!-- Solution Section -->
+    <Section background="primary">
+        <SectionHeader
+            title="The nocodo Approach"
+            subtitle="A hybrid solution combining cloud-based agents with native desktop access"
         />
-      </div>
-      <div class="relative">
-        <img
-          src={lanConnectScreenshot.src}
-          alt="nocodo Desktop app, connecting to my other computer in LAN over SSH"
-          title="Connecting to my other computer in LAN over SSH"
-          class="w-full rounded-lg border border-border-primary shadow-2xl"
+
+        <div class="grid lg:grid-cols-2 gap-8">
+            <!-- Manager (Cloud) -->
+            <Card
+                variant="gradient"
+                class="hover:border-accent-emerald/50 transition-all duration-300"
+            >
+                <div class="flex items-center mb-6">
+                    <div
+                        class="w-12 h-12 bg-accent-emerald/10 rounded-lg flex items-center justify-center mr-4"
+                    >
+                        <svg
+                            class="w-6 h-6 text-accent-emerald"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
+                            ></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-text-primary">
+                        nocodo Manager
+                    </h3>
+                </div>
+                <p class="text-text-secondary mb-6 leading-relaxed">
+                    Cloud-based daemon running on your own infrastructure
+                </p>
+                <ul class="space-y-3 text-text-secondary">
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>AI coding agent integrated with LLMs</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Full development environment management</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Supports all major languages and frameworks</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span
+                            >Database, cache, and message queue integration</span
+                        >
+                    </li>
+                </ul>
+            </Card>
+
+            <!-- Desktop App -->
+            <Card
+                variant="gradient"
+                class="hover:border-accent-cyan/50 transition-all duration-300"
+            >
+                <div class="flex items-center mb-6">
+                    <div
+                        class="w-12 h-12 bg-accent-cyan/10 rounded-lg flex items-center justify-center mr-4"
+                    >
+                        <svg
+                            class="w-6 h-6 text-accent-cyan"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                            ></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-text-primary">
+                        Desktop App
+                    </h3>
+                </div>
+                <p class="text-text-secondary mb-6 leading-relaxed">
+                    Native cross-platform client for secure team collaboration
+                </p>
+                <ul class="space-y-3 text-text-secondary">
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Secure SSH connection to manager</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Join multiple teams easily</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Integrated project management and tasks</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Review generated code and demos</span>
+                    </li>
+                </ul>
+            </Card>
+        </div>
+
+        <!-- Connection Screenshots -->
+        <div class="mt-12 space-y-8">
+            <div class="relative">
+                <img
+                    src={connectionScreenshot.src}
+                    alt="nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH"
+                    title="Connect to nocodo manager running locally or remote over SSH"
+                    class="w-full rounded-lg border border-border-primary shadow-2xl"
+                />
+            </div>
+            <div class="relative">
+                <img
+                    src={lanConnectScreenshot.src}
+                    alt="nocodo Desktop app, connecting to my other computer in LAN over SSH"
+                    title="Connecting to my other computer in LAN over SSH"
+                    class="w-full rounded-lg border border-border-primary shadow-2xl"
+                />
+            </div>
+        </div>
+
+        <div class="mt-12 text-center">
+            <p class="text-text-tertiary text-lg">Mobile apps coming soon</p>
+        </div>
+    </Section>
+
+    <!-- How It Works -->
+    <Section background="secondary">
+        <SectionHeader title="How It Works" />
+
+        <div class="space-y-8">
+            <!-- Step 1 -->
+            <Card class="p-8">
+                <div class="flex items-start">
+                    <div
+                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
+                    >
+                        1
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-text-primary mb-3">
+                            Deploy Manager on Your Infrastructure
+                        </h3>
+                        <p class="text-text-secondary leading-relaxed">
+                            Run nocodo manager on any Linux server -
+                            DigitalOcean, Scaleway, Linode, Vultr, AWS, GCP, or
+                            your own hardware. Bring your own API keys for
+                            OpenAI, Anthropic, or other LLM providers.
+                        </p>
+                    </div>
+                </div>
+            </Card>
+
+            <!-- Step 2 -->
+            <Card class="p-8">
+                <div class="flex items-start">
+                    <div
+                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
+                    >
+                        2
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-text-primary mb-3">
+                            Team Members Connect via Desktop App
+                        </h3>
+                        <p class="text-text-secondary leading-relaxed">
+                            Everyone on the team installs the desktop app and
+                            connects securely via SSH. Users can join multiple
+                            teams, making it easy to contribute to projects
+                            across different organizations.
+                        </p>
+                    </div>
+                </div>
+            </Card>
+
+            <!-- Step 3 -->
+            <Card class="p-8">
+                <div class="flex items-start">
+                    <div
+                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
+                    >
+                        3
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-text-primary mb-3">
+                            Collaborate, Create, and Deploy
+                        </h3>
+                        <p class="text-text-secondary leading-relaxed">
+                            Share ideas, create tasks, discuss with AI to
+                            generate solutions. The coding agent analyzes your
+                            codebase and will soon write code autonomously.
+                            Review and test deployed demos directly in the app.
+                        </p>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    </Section>
+
+    <!-- What's Included -->
+    <Section background="primary">
+        <SectionHeader title="What's Included" />
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    AI Coding Agent
+                </h3>
+                <p class="text-text-tertiary">
+                    Uses LLMs to analyze codebases, soon able to write code
+                    autonomously
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Project Management
+                </h3>
+                <p class="text-text-tertiary">
+                    Tasks, ideas, and discussions integrated in one place
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Team Collaboration
+                </h3>
+                <p class="text-text-tertiary">
+                    Everyone can share ideas and contribute to software
+                    development
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Multi-Team Support
+                </h3>
+                <p class="text-text-tertiary">
+                    Join and contribute to multiple organizations seamlessly
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Your Infrastructure
+                </h3>
+                <p class="text-text-tertiary">
+                    Use your own cloud servers and AI provider API keys
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Full Dev Environment
+                </h3>
+                <p class="text-text-tertiary">
+                    Manages languages, frameworks, databases, cache, message
+                    queues
+                </p>
+            </Card>
+        </div>
+    </Section>
+
+    <!-- Future Plans -->
+    <Section background="secondary">
+        <SectionHeader
+            title="What's Coming"
+            subtitle="Our roadmap for the future"
         />
-      </div>
-    </div>
 
-    <div class="mt-12 text-center">
-      <p class="text-text-tertiary text-lg">
-        Mobile apps coming soon
-      </p>
-    </div>
-  </Section>
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Near-term -->
+            <Card class="p-8">
+                <h3 class="text-2xl font-bold text-text-primary mb-6">
+                    Near-Term
+                </h3>
+                <ul class="space-y-4 text-text-secondary">
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Automatic Git worktree per task</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Task dependency resolution</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Parallel or serial agent execution</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Build and launch demo URLs</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>GitHub/GitLab integration</span>
+                    </li>
+                </ul>
+            </Card>
 
-  <!-- How It Works -->
-  <Section background="secondary">
-    <SectionHeader title="How It Works" />
+            <!-- Long-term -->
+            <Card class="p-8">
+                <h3 class="text-2xl font-bold text-text-primary mb-6">
+                    Long-Term
+                </h3>
+                <ul class="space-y-4 text-text-secondary">
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Mobile apps for iOS and Android</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Mobile emulator testing in desktop app</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>nocodo-managed cloud infrastructure</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                        <span>Full-stack app deployment automation</span>
+                    </li>
+                </ul>
+            </Card>
+        </div>
 
-    <div class="space-y-8">
-      <!-- Step 1 -->
-      <Card class="p-8">
-        <div class="flex items-start">
-          <div class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg">
-            1
-          </div>
-          <div>
-            <h3 class="text-xl font-bold text-text-primary mb-3">
-              Deploy Manager on Your Infrastructure
-            </h3>
-            <p class="text-text-secondary leading-relaxed">
-              Run nocodo manager on any Linux server - DigitalOcean, Scaleway, Linode, Vultr, AWS, GCP, or your own hardware.
-              Bring your own API keys for OpenAI, Anthropic, or other LLM providers.
+        <div
+            class="mt-12 bg-gradient-to-r from-accent-emerald/10 to-accent-cyan/10 rounded-2xl p-8 border border-accent-emerald/20"
+        >
+            <div class="text-center">
+                <h3 class="text-2xl font-bold text-text-primary mb-4">
+                    Pricing
+                </h3>
+                <p class="text-text-secondary mb-4">
+                    Team collaboration will be a paid feature:
+                </p>
+                <div
+                    class="flex flex-col sm:flex-row gap-4 justify-center items-center text-text-secondary"
+                >
+                    <div
+                        class="bg-bg-secondary rounded-lg px-6 py-3 border border-border-primary"
+                    >
+                        <span class="font-semibold">Up to 100 members:</span> $99/year
+                    </div>
+                    <div
+                        class="bg-bg-secondary rounded-lg px-6 py-3 border border-border-primary"
+                    >
+                        <span class="font-semibold">Unlimited members:</span> $1,999/year
+                    </div>
+                </div>
+                <p class="text-text-tertiary mt-4 text-sm">
+                    Demo URL sharing is always free
+                </p>
+            </div>
+        </div>
+    </Section>
+
+    <!-- Privacy & Control -->
+    <Section background="primary" containerWidth="5xl">
+        <SectionHeader title="Privacy & Control" />
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <Card class="p-6">
+                <div class="flex items-center mb-3">
+                    <svg
+                        class="w-6 h-6 text-accent-emerald mr-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        ></path>
+                    </svg>
+                    <h3 class="text-lg font-bold text-text-primary">
+                        Your Infrastructure
+                    </h3>
+                </div>
+                <p class="text-text-tertiary">
+                    Run on your own cloud servers - you control everything
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <div class="flex items-center mb-3">
+                    <svg
+                        class="w-6 h-6 text-accent-emerald mr-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                        ></path>
+                    </svg>
+                    <h3 class="text-lg font-bold text-text-primary">
+                        Your API Keys
+                    </h3>
+                </div>
+                <p class="text-text-tertiary">
+                    Bring your own keys for OpenAI, Anthropic, or any LLM
+                    provider
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <div class="flex items-center mb-3">
+                    <svg
+                        class="w-6 h-6 text-accent-emerald mr-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                        ></path>
+                    </svg>
+                    <h3 class="text-lg font-bold text-text-primary">
+                        No Vendor Lock-in
+                    </h3>
+                </div>
+                <p class="text-text-tertiary">
+                    Switch cloud providers or AI models anytime
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <div class="flex items-center mb-3">
+                    <svg
+                        class="w-6 h-6 text-accent-emerald mr-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        ></path>
+                    </svg>
+                    <h3 class="text-lg font-bold text-text-primary">
+                        Complete Privacy
+                    </h3>
+                </div>
+                <p class="text-text-tertiary">
+                    Your code never leaves your infrastructure
+                </p>
+            </Card>
+        </div>
+    </Section>
+
+    <!-- Built with Agents -->
+    <Section background="secondary">
+        <SectionHeader
+            title="Built with Agents"
+            subtitle="nocodo is itself built with coding agents"
+        />
+
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="text-center">
+                <Card class="p-8">
+                    <h3 class="text-xl font-bold text-text-primary mb-4">
+                        Manager
+                    </h3>
+                    <p class="text-text-tertiary mb-4">Actix Web • SQLite</p>
+                    <p class="text-sm text-text-muted">
+                        API daemon for cloud deployment
+                    </p>
+                </Card>
+            </div>
+
+            <div class="text-center">
+                <Card class="p-8">
+                    <h3 class="text-xl font-bold text-text-primary mb-4">
+                        Desktop App
+                    </h3>
+                    <p class="text-text-tertiary mb-4">egui/eframe</p>
+                    <p class="text-sm text-text-muted">
+                        Cross-platform native GUI
+                    </p>
+                </Card>
+            </div>
+
+            <div class="text-center">
+                <Card class="p-8">
+                    <h3 class="text-xl font-bold text-text-primary mb-4">
+                        Communication
+                    </h3>
+                    <p class="text-text-tertiary mb-4">SSH • HTTP/WebSocket</p>
+                    <p class="text-sm text-text-muted">
+                        Secure encrypted tunnel
+                    </p>
+                </Card>
+            </div>
+        </div>
+    </Section>
+
+    <!-- CTA Section -->
+    <section
+        class="py-24 bg-gradient-to-b from-bg-primary to-bg-secondary text-text-primary"
+    >
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2
+                class="text-4xl sm:text-5xl font-bold mb-6 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent"
+            >
+                Join the Journey
+            </h2>
+            <p class="text-xl text-text-secondary mb-12 max-w-2xl mx-auto">
+                nocodo is under active development. Star the project on GitHub
+                to follow our progress and be notified of updates.
             </p>
-          </div>
-        </div>
-      </Card>
-
-      <!-- Step 2 -->
-      <Card class="p-8">
-        <div class="flex items-start">
-          <div class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg">
-            2
-          </div>
-          <div>
-            <h3 class="text-xl font-bold text-text-primary mb-3">
-              Team Members Connect via Desktop App
-            </h3>
-            <p class="text-text-secondary leading-relaxed">
-              Everyone on the team installs the desktop app and connects securely via SSH.
-              Users can join multiple teams, making it easy to contribute to projects across different organizations.
+            <a
+                href="https://github.com/brainless/nocodo"
+                class="inline-flex items-center px-10 py-5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold text-lg rounded-lg shadow-xl hover:shadow-2xl transition-all duration-200"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                <svg
+                    class="mr-3 w-7 h-7"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                    ></path>
+                </svg>
+                Star on GitHub
+            </a>
+            <p class="text-text-muted mt-8 text-sm">
+                Privacy-focused • No vendor lock-in • Works for teams of all
+                sizes
             </p>
-          </div>
         </div>
-      </Card>
+    </section>
 
-      <!-- Step 3 -->
-      <Card class="p-8">
-        <div class="flex items-start">
-          <div class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg">
-            3
-          </div>
-          <div>
-            <h3 class="text-xl font-bold text-text-primary mb-3">
-              Collaborate, Create, and Deploy
-            </h3>
-            <p class="text-text-secondary leading-relaxed">
-              Share ideas, create tasks, discuss with AI to generate solutions. The coding agent analyzes your codebase
-              and will soon write code autonomously. Review and test deployed demos directly in the app.
+    <!-- Footer Note -->
+    <section
+        class="py-12 bg-bg-primary text-text-primary border-t border-border-secondary"
+    >
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-text-tertiary">
+                Hello! I am Sumit, a software engineer living in a small
+                Himalayan village in India.
             </p>
-          </div>
+            <p class="text-text-tertiary mt-2">
+                I am building nocodo to help teams of all sizes collaborate on
+                software development with AI assistance.
+            </p>
         </div>
-      </Card>
-    </div>
-  </Section>
-
-  <!-- What's Included -->
-  <Section background="primary">
-    <SectionHeader title="What's Included" />
-
-    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Card class="p-6">
-        <h3 class="text-lg font-bold text-text-primary mb-2">
-          AI Coding Agent
-        </h3>
-        <p class="text-text-tertiary">
-          Uses LLMs to analyze codebases, soon able to write code autonomously
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <h3 class="text-lg font-bold text-text-primary mb-2">
-          Project Management
-        </h3>
-        <p class="text-text-tertiary">
-          Tasks, ideas, and discussions integrated in one place
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <h3 class="text-lg font-bold text-text-primary mb-2">
-          Team Collaboration
-        </h3>
-        <p class="text-text-tertiary">
-          Everyone can share ideas and contribute to software development
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <h3 class="text-lg font-bold text-text-primary mb-2">
-          Multi-Team Support
-        </h3>
-        <p class="text-text-tertiary">
-          Join and contribute to multiple organizations seamlessly
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <h3 class="text-lg font-bold text-text-primary mb-2">
-          Your Infrastructure
-        </h3>
-        <p class="text-text-tertiary">
-          Use your own cloud servers and AI provider API keys
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <h3 class="text-lg font-bold text-text-primary mb-2">
-          Full Dev Environment
-        </h3>
-        <p class="text-text-tertiary">
-          Manages languages, frameworks, databases, cache, message queues
-        </p>
-      </Card>
-    </div>
-  </Section>
-
-  <!-- Future Plans -->
-  <Section background="secondary">
-    <SectionHeader
-      title="What's Coming"
-      subtitle="Our roadmap for the future"
-    />
-
-    <div class="grid md:grid-cols-2 gap-8">
-      <!-- Near-term -->
-      <Card class="p-8">
-        <h3 class="text-2xl font-bold text-text-primary mb-6">
-          Near-Term
-        </h3>
-        <ul class="space-y-4 text-text-secondary">
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Automatic Git worktree per task</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Task dependency resolution</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Parallel or serial agent execution</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Build and launch demo URLs</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>GitHub/GitLab integration</span>
-          </li>
-        </ul>
-      </Card>
-
-      <!-- Long-term -->
-      <Card class="p-8">
-        <h3 class="text-2xl font-bold text-text-primary mb-6">
-          Long-Term
-        </h3>
-        <ul class="space-y-4 text-text-secondary">
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Mobile apps for iOS and Android</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Mobile emulator testing in desktop app</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>nocodo-managed cloud infrastructure</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-            </svg>
-            <span>Full-stack app deployment automation</span>
-          </li>
-        </ul>
-      </Card>
-    </div>
-
-    <div class="mt-12 bg-gradient-to-r from-accent-emerald/10 to-accent-cyan/10 rounded-2xl p-8 border border-accent-emerald/20">
-      <div class="text-center">
-        <h3 class="text-2xl font-bold text-text-primary mb-4">
-          Pricing
-        </h3>
-        <p class="text-text-secondary mb-4">
-          Team collaboration will be a paid feature:
-        </p>
-        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center text-text-secondary">
-          <div class="bg-bg-secondary rounded-lg px-6 py-3 border border-border-primary">
-            <span class="font-semibold">Up to 100 members:</span> $99/year
-          </div>
-          <div class="bg-bg-secondary rounded-lg px-6 py-3 border border-border-primary">
-            <span class="font-semibold">Unlimited members:</span> $1,999/year
-          </div>
-        </div>
-        <p class="text-text-tertiary mt-4 text-sm">
-          Demo URL sharing is always free
-        </p>
-      </div>
-    </div>
-  </Section>
-
-  <!-- Privacy & Control -->
-  <Section background="primary" containerWidth="5xl">
-    <SectionHeader title="Privacy & Control" />
-
-    <div class="grid md:grid-cols-2 gap-6">
-      <Card class="p-6">
-        <div class="flex items-center mb-3">
-          <svg class="w-6 h-6 text-accent-emerald mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-          </svg>
-          <h3 class="text-lg font-bold text-text-primary">
-            Your Infrastructure
-          </h3>
-        </div>
-        <p class="text-text-tertiary">
-          Run on your own cloud servers - you control everything
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <div class="flex items-center mb-3">
-          <svg class="w-6 h-6 text-accent-emerald mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-          </svg>
-          <h3 class="text-lg font-bold text-text-primary">
-            Your API Keys
-          </h3>
-        </div>
-        <p class="text-text-tertiary">
-          Bring your own keys for OpenAI, Anthropic, or any LLM provider
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <div class="flex items-center mb-3">
-          <svg class="w-6 h-6 text-accent-emerald mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-          </svg>
-          <h3 class="text-lg font-bold text-text-primary">
-            No Vendor Lock-in
-          </h3>
-        </div>
-        <p class="text-text-tertiary">
-          Switch cloud providers or AI models anytime
-        </p>
-      </Card>
-
-      <Card class="p-6">
-        <div class="flex items-center mb-3">
-          <svg class="w-6 h-6 text-accent-emerald mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
-          </svg>
-          <h3 class="text-lg font-bold text-text-primary">
-            Complete Privacy
-          </h3>
-        </div>
-        <p class="text-text-tertiary">
-          Your code never leaves your infrastructure
-        </p>
-      </Card>
-    </div>
-  </Section>
-
-  <!-- Built with Agents -->
-  <Section background="secondary">
-    <SectionHeader
-      title="Built with Agents"
-      subtitle="nocodo is itself built with coding agents"
-    />
-
-    <div class="grid md:grid-cols-3 gap-8">
-      <div class="text-center">
-        <Card class="p-8">
-          <h3 class="text-xl font-bold text-text-primary mb-4">
-            Manager
-          </h3>
-          <p class="text-text-tertiary mb-4">
-            Actix Web • SQLite
-          </p>
-          <p class="text-sm text-text-muted">
-            API daemon for cloud deployment
-          </p>
-        </Card>
-      </div>
-
-      <div class="text-center">
-        <Card class="p-8">
-          <h3 class="text-xl font-bold text-text-primary mb-4">
-            Desktop App
-          </h3>
-          <p class="text-text-tertiary mb-4">
-            egui/eframe
-          </p>
-          <p class="text-sm text-text-muted">
-            Cross-platform native GUI
-          </p>
-        </Card>
-      </div>
-
-      <div class="text-center">
-        <Card class="p-8">
-          <h3 class="text-xl font-bold text-text-primary mb-4">
-            Communication
-          </h3>
-          <p class="text-text-tertiary mb-4">
-            SSH • HTTP/WebSocket
-          </p>
-          <p class="text-sm text-text-muted">
-            Secure encrypted tunnel
-          </p>
-        </Card>
-      </div>
-    </div>
-  </Section>
-
-  <!-- CTA Section -->
-  <section class="py-24 bg-gradient-to-b from-bg-primary to-bg-secondary text-text-primary">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-      <h2 class="text-4xl sm:text-5xl font-bold mb-6 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent">
-        Join the Journey
-      </h2>
-      <p class="text-xl text-text-secondary mb-12 max-w-2xl mx-auto">
-        nocodo is under active development. Star the project on GitHub to follow our progress and be notified of updates.
-      </p>
-      <a
-        href="https://github.com/brainless/nocodo"
-        class="inline-flex items-center px-10 py-5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold text-lg rounded-lg shadow-xl hover:shadow-2xl transition-all duration-200"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <svg class="mr-3 w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-        </svg>
-        Star on GitHub
-      </a>
-      <p class="text-text-muted mt-8 text-sm">
-        Privacy-focused • No vendor lock-in • Works for teams of all sizes
-      </p>
-    </div>
-  </section>
-
-  <!-- Footer Note -->
-  <section class="py-12 bg-bg-primary text-text-primary border-t border-border-secondary">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-      <p class="text-text-tertiary">
-        Hello! I am Sumit, a software engineer living in a small Himalayan village in India.
-      </p>
-      <p class="text-text-tertiary mt-2">
-        I am building nocodo to help teams of all sizes collaborate on software development with AI assistance.
-      </p>
-    </div>
-  </section>
+    </section>
 </Layout>
