@@ -3,13 +3,18 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AuthConfig {
+    pub jwt_secret: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub socket: SocketConfig,
+    pub auth: Option<AuthConfig>,
     pub api_keys: Option<ApiKeysConfig>,
     pub projects: Option<ProjectsConfig>,
-    pub jwt_secret: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -53,9 +58,9 @@ impl Default for AppConfig {
             socket: SocketConfig {
                 path: "/tmp/nocodo-manager.sock".to_string(),
             },
+            auth: None,
             api_keys: None,
             projects: None,
-            jwt_secret: None,
         }
     }
 }
@@ -84,6 +89,7 @@ path = "~/.local/share/nocodo/manager.db"
 [socket]
 path = "/tmp/nocodo-manager.sock"
 
+[auth]
 # JWT secret for authentication tokens (IMPORTANT: Change this in production!)
 # jwt_secret = "change-this-to-a-secure-random-string-in-production"
 

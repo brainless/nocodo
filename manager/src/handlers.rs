@@ -2469,6 +2469,14 @@ pub async fn register(
     // Hash password
     let password_hash = auth::hash_password(&create_req.password)?;
 
+    // Validate SSH key fields are present
+    let ssh_fingerprint = create_req.ssh_fingerprint.ok_or_else(|| {
+        AppError::InvalidRequest("SSH fingerprint is required".to_string())
+    })?;
+    let ssh_public_key = create_req.ssh_public_key.ok_or_else(|| {
+        AppError::InvalidRequest("SSH public key is required".to_string())
+    })?;
+
     // Create user
     let now = std::time::SystemTime::now()
         .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -2495,8 +2503,8 @@ pub async fn register(
         id: 0, // Will be set by database
         user_id,
         key_type: "ssh-ed25519".to_string(), // Default assumption, could be improved
-        fingerprint: create_req.ssh_fingerprint.clone(),
-        public_key_data: create_req.ssh_public_key.clone(),
+        fingerprint: ssh_fingerprint,
+        public_key_data: ssh_public_key,
         label: Some("Registration Key".to_string()),
         is_active: true,
         created_at: now,
@@ -2617,8 +2625,9 @@ pub async fn login(
     // 7. Generate JWT token
     let config = data.config.read().unwrap();
     let jwt_secret = config
-        .jwt_secret
+        .auth
         .as_ref()
+        .and_then(|a| a.jwt_secret.as_ref())
         .ok_or_else(|| AppError::Internal("JWT secret not configured".to_string()))?;
 
     let claims = auth::Claims::new(

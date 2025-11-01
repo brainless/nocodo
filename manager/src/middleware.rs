@@ -1,5 +1,4 @@
 use crate::auth::validate_token;
-use crate::config::AppConfig;
 use crate::error::AppError;
 use crate::models::UserInfo;
 use actix_web::{
@@ -8,7 +7,6 @@ use actix_web::{
     web, Error, HttpMessage,
 };
 use futures_util::future::{ready, Ready};
-use std::sync::Arc;
 
 /// Authentication middleware that extracts JWT token and attaches user info to request
 pub struct AuthenticationMiddleware;
@@ -49,8 +47,6 @@ where
 
     #[allow(unused_mut)]
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
-        let config = req.app_data::<web::Data<Arc<AppConfig>>>().cloned();
-
         let path = req.path().to_string();
         let method = req.method().to_string();
         tracing::info!("Incoming request: {} {} (auth required: {})", method, path, !matches!(path.as_str(), "/api/health" | "/api/auth/login" | "/api/auth/register"));
@@ -61,8 +57,27 @@ where
             return Box::pin(fut);
         }
 
-        let config = match config {
-            Some(cfg) => cfg,
+        // Get config from app state
+        let jwt_secret = match req.app_data::<web::Data<crate::handlers::AppState>>() {
+            Some(state) => {
+                match state.config.read() {
+                    Ok(config) => {
+                        match config.auth.as_ref().and_then(|a| a.jwt_secret.as_ref()) {
+                            Some(secret) => secret.clone(),
+                            None => {
+                                return Box::pin(async {
+                                    Err(ErrorUnauthorized("JWT secret not configured"))
+                                });
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        return Box::pin(async {
+                            Err(ErrorUnauthorized("Server configuration error"))
+                        });
+                    }
+                }
+            }
             None => {
                 return Box::pin(async {
                     Err(ErrorUnauthorized("Server configuration error"))
@@ -100,14 +115,6 @@ where
         };
 
         // Validate token
-        let jwt_secret = match config.jwt_secret.as_ref() {
-            Some(secret) => secret.clone(),
-            None => {
-                return Box::pin(async {
-                    Err(ErrorUnauthorized("JWT secret not configured"))
-                });
-            }
-        };
 
         match validate_token(&token, &jwt_secret) {
             Ok(claims) => {
