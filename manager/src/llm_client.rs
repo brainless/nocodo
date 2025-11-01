@@ -1130,9 +1130,11 @@ impl ClaudeClient {
             if let Some(content_str) = &message.content {
                 if let Ok(tool_result_data) = serde_json::from_str::<serde_json::Value>(content_str)
                 {
-                    // Check for Claude-specific tool result format (with tool_use_id)
+                    // Check for tool result format (tool_use_id for Claude, tool_call_id for OpenAI-compatible)
                     if let (Some(tool_use_id), Some(content_value)) = (
-                        tool_result_data.get("tool_use_id").and_then(|v| v.as_str()),
+                        tool_result_data.get("tool_use_id")
+                            .or_else(|| tool_result_data.get("tool_call_id"))
+                            .and_then(|v| v.as_str()),
                         tool_result_data.get("content"),
                     ) {
                         // Convert the content value to a string

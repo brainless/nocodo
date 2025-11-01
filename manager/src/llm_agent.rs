@@ -619,8 +619,12 @@ impl LlmAgent {
                 });
                 serde_json::to_string(&tool_result_content)?
             } else {
-                // For other providers, store tool results as simple JSON
-                serde_json::to_string(&response_value)?
+                // For OpenAI-compatible providers, store tool results with tool_call_id for follow-up reconstruction
+                let tool_result_content = serde_json::json!({
+                    "tool_call_id": tool_call.id,
+                    "content": response_value
+                });
+                serde_json::to_string(&tool_result_content)?
             };
             let message_id =
                 self.db
@@ -744,17 +748,8 @@ impl LlmAgent {
 
             let llm_client = create_llm_client(config)?;
 
-            // Build conversation for LLM (simplified to avoid conversation corruption)
-            let messages: Vec<_> = history
-                .into_iter()
-                .map(|msg| LlmMessage {
-                    role: msg.role,
-                    content: Some(msg.content),
-                    tool_calls: None,
-                    function_call: None,
-                    tool_call_id: None,
-                })
-                .collect();
+            // Build conversation for LLM with proper tool call reconstruction
+            let messages = self.reconstruct_conversation_for_followup(&history, session_id)?;
 
             tracing::debug!(
                 session_id = %session_id,
@@ -989,6 +984,122 @@ impl LlmAgent {
         );
 
         Ok(())
+    }
+
+    /// Reconstruct conversation history for follow-up LLM calls with proper tool call handling
+    fn reconstruct_conversation_for_followup(
+        &self,
+        history: &[crate::models::LlmAgentMessage],
+        session_id: i64,
+    ) -> Result<Vec<LlmMessage>> {
+        let mut messages = Vec::new();
+        let mut tool_call_map = std::collections::HashMap::new();
+
+        // First pass: collect tool calls from assistant messages
+        for msg in history {
+            if msg.role == "assistant" {
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                    if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                        for tool_call in tool_calls_array {
+                            if let Some(id) = tool_call.get("id").and_then(|v| v.as_str()) {
+                                tool_call_map.insert(id.to_string(), tool_call.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Second pass: reconstruct messages with proper tool call information
+        for msg in history {
+            match msg.role.as_str() {
+                "assistant" => {
+                    // Parse assistant message to extract text and tool calls
+                    if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                        let text = assistant_data.get("text")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        let tool_calls = if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                            let mut calls = Vec::new();
+                            for tool_call_value in tool_calls_array {
+                                if let Ok(tool_call) = serde_json::from_value::<crate::llm_client::LlmToolCall>(tool_call_value.clone()) {
+                                    calls.push(tool_call);
+                                }
+                            }
+                            if calls.is_empty() { None } else { Some(calls) }
+                        } else {
+                            None
+                        };
+
+                        messages.push(LlmMessage {
+                            role: msg.role.clone(),
+                            content: if text.is_empty() { None } else { Some(text) },
+                            tool_calls,
+                            function_call: None,
+                            tool_call_id: None,
+                        });
+                    } else {
+                        // Fallback for non-JSON content
+                        messages.push(LlmMessage {
+                            role: msg.role.clone(),
+                            content: Some(msg.content.clone()),
+                            tool_calls: None,
+                            function_call: None,
+                            tool_call_id: None,
+                        });
+                    }
+                }
+                "tool" => {
+                    // Parse tool result and associate with tool call ID
+                    if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                        // For OpenAI-compatible providers, tool results should be sent as tool messages with tool_call_id
+                        // For Anthropic, they are converted to user messages in the client
+                        let tool_call_id = tool_result.get("tool_call_id")
+                            .or_else(|| tool_result.get("tool_use_id"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        messages.push(LlmMessage {
+                            role: "tool".to_string(),
+                            content: Some(msg.content.clone()),
+                            tool_calls: None,
+                            function_call: None,
+                            tool_call_id,
+                        });
+                    } else {
+                        // Fallback for non-JSON tool results
+                        messages.push(LlmMessage {
+                            role: "tool".to_string(),
+                            content: Some(msg.content.clone()),
+                            tool_calls: None,
+                            function_call: None,
+                            tool_call_id: None,
+                        });
+                    }
+                }
+                _ => {
+                    // System and user messages remain as-is
+                    messages.push(LlmMessage {
+                        role: msg.role.clone(),
+                        content: Some(msg.content.clone()),
+                        tool_calls: None,
+                        function_call: None,
+                        tool_call_id: None,
+                    });
+                }
+            }
+        }
+
+        tracing::debug!(
+            session_id = %session_id,
+            total_messages = %messages.len(),
+            tool_calls_found = %tool_call_map.len(),
+            "Reconstructed conversation for follow-up with proper tool call handling"
+        );
+
+        Ok(messages)
     }
 
     /// Create native tool definitions for supported providers

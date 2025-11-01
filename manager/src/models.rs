@@ -428,6 +428,8 @@ pub struct GrepRequest {
     pub include_line_numbers: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_results: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_files_searched: Option<u32>,
 }
 
 impl GrepRequest {
@@ -472,6 +474,11 @@ impl GrepRequest {
                     "type": "number",
                     "description": "Maximum number of results to return",
                     "default": 100
+                },
+                "max_files_searched": {
+                    "type": "number",
+                    "description": "Maximum number of files to search through",
+                    "default": 1000
                 }
             },
             "required": ["pattern"]

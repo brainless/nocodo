@@ -430,6 +430,7 @@ impl ToolExecutor {
         let mut matches = Vec::new();
         let mut files_searched = 0;
         let max_results = request.max_results.unwrap_or(100) as usize;
+        let max_files_searched = request.max_files_searched.unwrap_or(1000) as usize;
 
         // Use walkdir for recursive search if requested
         let recursive = request.recursive.unwrap_or(true);
@@ -481,11 +482,66 @@ impl ToolExecutor {
 
             // Skip files that don't match common patterns (like .gitignore)
             let file_name = entry.file_name().to_string_lossy();
-            if file_name.starts_with('.') || file_name == "target" || file_name == "node_modules" {
+            let file_path_str = relative_path.clone();
+
+            // Skip common build artifacts and directories
+            let skip_patterns = [
+                "target", "node_modules", ".git", "dist", "build", "__pycache__",
+                ".next", ".nuxt", ".vuepress", ".cache", ".parcel-cache",
+                ".DS_Store", "Thumbs.db", "desktop.ini"
+            ];
+
+            let should_skip = file_name.starts_with('.')
+                || skip_patterns.contains(&file_name.as_ref())
+                || file_name.ends_with(".pyc")
+                || file_name.ends_with(".pyo")
+                || file_name == "Cargo.lock"
+                || file_name == "package-lock.json"
+                || file_name == "yarn.lock"
+                || file_name == "pnpm-lock.yaml"
+                || file_path_str.contains("/target/")
+                || file_path_str.contains("/node_modules/")
+                || file_path_str.contains("/.git/")
+                || file_path_str.contains("/dist/")
+                || file_path_str.contains("/build/")
+                || file_path_str.contains("/__pycache__/");
+
+            if should_skip {
+                continue;
+            }
+
+            // Skip binary files by checking file extension and attempting to read as UTF-8
+            let is_likely_binary = file_name.ends_with(".exe")
+                || file_name.ends_with(".dll")
+                || file_name.ends_with(".so")
+                || file_name.ends_with(".dylib")
+                || file_name.ends_with(".bin")
+                || file_name.ends_with(".jpg")
+                || file_name.ends_with(".jpeg")
+                || file_name.ends_with(".png")
+                || file_name.ends_with(".gif")
+                || file_name.ends_with(".bmp")
+                || file_name.ends_with(".tiff")
+                || file_name.ends_with(".ico")
+                || file_name.ends_with(".pdf")
+                || file_name.ends_with(".zip")
+                || file_name.ends_with(".tar")
+                || file_name.ends_with(".gz")
+                || file_name.ends_with(".bz2")
+                || file_name.ends_with(".xz")
+                || file_name.ends_with(".7z")
+                || file_name.ends_with(".rar");
+
+            if is_likely_binary {
                 continue;
             }
 
             files_searched += 1;
+
+            // Check if we've reached the max files searched limit
+            if files_searched >= max_files_searched {
+                break;
+            }
 
             // Search file content
             let content = match fs::read_to_string(file_path) {
@@ -530,13 +586,39 @@ impl ToolExecutor {
             }
         }
 
-        let total_matches = matches.len() as u32;
-        let truncated = matches.len() >= max_results;
+        let mut total_matches = matches.len() as u32;
+        let mut truncated = matches.len() >= max_results;
+
+        // Check response size and truncate if necessary (limit to ~100KB)
+        const MAX_RESPONSE_SIZE: usize = 100 * 1024; // 100KB
+        let response_size_estimate = matches.iter()
+            .map(|m| m.file_path.len() + m.line_content.len() + m.matched_text.len() + 100) // rough estimate
+            .sum::<usize>();
+
+        if response_size_estimate > MAX_RESPONSE_SIZE {
+            // Truncate matches to fit within size limit
+            let mut truncated_matches = Vec::new();
+            let mut current_size = 0;
+
+            for match_item in matches {
+                let item_size = match_item.file_path.len() + match_item.line_content.len() + match_item.matched_text.len() + 100;
+                if current_size + item_size > MAX_RESPONSE_SIZE {
+                    truncated = true;
+                    break;
+                }
+                current_size += item_size;
+                truncated_matches.push(match_item);
+            }
+
+            matches = truncated_matches;
+            total_matches = matches.len() as u32;
+        }
+
         Ok(ToolResponse::Grep(GrepResponse {
             pattern: request.pattern,
             matches,
             total_matches,
-            files_searched,
+            files_searched: files_searched as u32,
             truncated,
         }))
     }
@@ -1478,6 +1560,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_tool_executor_grep_search_excludes_binary_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
+
+        // Create test files including binary-like files
+        fs::write(
+            temp_dir.path().join("test.txt"),
+            "This is a text file with some content",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join("binary.exe"),
+            b"\x00\x01\x02\x03binary content",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join("image.jpg"),
+            b"\xff\xd8\xff\xe0\x00\x10JFIFbinary image data",
+        )
+        .unwrap();
+
+        let request = GrepRequest {
+            pattern: "content".to_string(),
+            path: None,
+            include_pattern: None,
+            exclude_pattern: None,
+            recursive: Some(false),
+            case_sensitive: Some(false),
+            include_line_numbers: Some(true),
+            max_results: Some(10),
+            max_files_searched: Some(100),
+        };
+
+        let response = executor.execute(ToolRequest::Grep(request)).await.unwrap();
+
+        match response {
+            ToolResponse::Grep(grep_response) => {
+                // Should find content in text file but not in binary files
+                assert_eq!(grep_response.files_searched, 1); // Only the .txt file should be searched
+                assert!(grep_response.matches.iter().any(|m| m.file_path == "test.txt"));
+                // Should not find matches in binary files
+                assert!(!grep_response.matches.iter().any(|m| m.file_path.contains("binary.exe")));
+                assert!(!grep_response.matches.iter().any(|m| m.file_path.contains("image.jpg")));
+            }
+            _ => panic!("Expected Grep response"),
+        }
+    }
+
+    #[tokio::test]
     async fn test_tool_executor_grep_search() {
         let temp_dir = TempDir::new().unwrap();
         let executor = ToolExecutor::new(temp_dir.path().to_path_buf());
@@ -1503,6 +1634,7 @@ mod tests {
             case_sensitive: Some(false),
             include_line_numbers: Some(true),
             max_results: Some(10),
+            max_files_searched: Some(100),
         };
 
         let response = executor.execute(ToolRequest::Grep(request)).await.unwrap();
