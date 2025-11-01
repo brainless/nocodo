@@ -151,8 +151,7 @@ impl crate::pages::Page for ProjectsPage {
 
 impl ProjectsPage {
     fn refresh_projects(&self, state: &mut AppState) {
-        // This will be implemented when we extract the API methods
-        // For now, this is a placeholder
-        state.loading_projects = true;
+        let api_service = crate::services::ApiService::new();
+        api_service.refresh_projects(state);
     }
 }

@@ -132,12 +132,50 @@ impl AuthDialog {
         let password = self.password.clone();
         let connection_manager = Arc::clone(&state.connection_manager);
 
+        // Clone state fields needed for refresh
+        let projects_result = Arc::clone(&state.projects_result);
+        let works_result = Arc::clone(&state.works_result);
+        let settings_result = Arc::clone(&state.settings_result);
+        let supported_models_result = Arc::clone(&state.supported_models_result);
+
         // Spawn async task for login
         tokio::spawn(async move {
             match connection_manager.login(&username, &password, &ssh_fingerprint).await {
                 Ok(login_response) => {
                     tracing::info!("Login successful for user: {}", login_response.user.username);
-                    // Connection manager will handle setting the token on ApiClient
+
+                    // Refresh all data after successful login
+                    if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                        let api_client = api_client_arc.read().await;
+
+                        // Refresh projects
+                        let result = api_client.list_projects().await;
+                        {
+                            let mut projects_result_lock = projects_result.lock().unwrap();
+                            *projects_result_lock = Some(result.map_err(|e| e.to_string()));
+                        }
+
+                        // Refresh works
+                        let result = api_client.list_works().await;
+                        {
+                            let mut works_result_lock = works_result.lock().unwrap();
+                            *works_result_lock = Some(result.map_err(|e| e.to_string()));
+                        }
+
+                        // Refresh settings
+                        let result = api_client.get_settings().await;
+                        {
+                            let mut settings_result_lock = settings_result.lock().unwrap();
+                            *settings_result_lock = Some(result.map_err(|e| e.to_string()));
+                        }
+
+                        // Refresh supported models
+                        let result = api_client.get_supported_models().await;
+                        {
+                            let mut supported_models_result_lock = supported_models_result.lock().unwrap();
+                            *supported_models_result_lock = Some(result.map_err(|e| e.to_string()));
+                        }
+                    }
                 }
                 Err(e) => {
                     tracing::error!("Login failed: {}", e);
