@@ -264,6 +264,82 @@ pub struct LlmCompletionChunk {
     pub choices: Vec<LlmChoice>,
 }
 
+/// OpenAI Responses API structures
+
+/// Content item for Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ContentItem {
+    #[serde(rename = "input_text")]
+    InputText { text: String },
+    #[serde(rename = "output_text")]
+    OutputText { text: String },
+}
+
+/// Response item for Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ResponseItem {
+    #[serde(rename = "message")]
+    Message {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        role: String,
+        content: Vec<ContentItem>,
+    },
+    #[serde(rename = "function_call")]
+    FunctionCall {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        name: String,
+        arguments: String,
+        #[serde(rename = "call_id")]
+        call_id: String,
+    },
+}
+
+/// Tool definition for Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponsesToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
+/// Responses API request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponsesApiRequest {
+    pub model: String,
+    pub instructions: String,
+    pub input: Vec<ResponseItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ResponsesToolDefinition>>,
+    pub tool_choice: String, // "auto", "required", or "none"
+    pub stream: bool,
+}
+
+/// Responses API response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponsesApiResponse {
+    pub id: String,
+    pub r#type: String,
+    pub model: String,
+    pub output: Vec<ResponseItem>,
+    pub usage: Option<LlmUsage>,
+}
+
+/// Streaming event for Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ResponsesStreamEvent {
+    #[serde(rename = "response.created")]
+    ResponseCreated { response: serde_json::Value },
+    #[serde(rename = "response.output_item.done")]
+    ResponseOutputItemDone { item: ResponseItem },
+    #[serde(rename = "response.completed")]
+    ResponseCompleted { response: serde_json::Value },
+}
+
 /// Streaming response chunk
 #[derive(Debug, Clone, Default)]
 #[allow(dead_code)]
@@ -393,10 +469,17 @@ impl OpenAiCompatibleClient {
     }
 
     fn get_api_url(&self) -> String {
-        if let Some(base_url) = &self.config.base_url {
-            format!("{}/v1/chat/completions", base_url.trim_end_matches('/'))
+        // gpt-5-codex requires the v1/responses endpoint instead of v1/chat/completions
+        let endpoint = if self.config.model == "gpt-5-codex" {
+            "v1/responses"
         } else {
-            "https://api.openai.com/v1/chat/completions".to_string()
+            "v1/chat/completions"
+        };
+
+        if let Some(base_url) = &self.config.base_url {
+            format!("{}/{}", base_url.trim_end_matches('/'), endpoint)
+        } else {
+            format!("https://api.openai.com/{}", endpoint)
         }
     }
 
@@ -644,11 +727,230 @@ impl OpenAiCompatibleClient {
 
         Ok(req.send().await?)
     }
+
+    /// Complete a request using the OpenAI Responses API (for gpt-5-codex)
+    async fn complete_with_responses_api(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
+        let start_time = std::time::Instant::now();
+
+        // Convert LlmCompletionRequest to ResponsesApiRequest
+        let responses_request = self.convert_to_responses_request(request.clone())?;
+
+        // Log the request
+        let request_json = serde_json::to_string_pretty(&responses_request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string());
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            api_url = %self.get_api_url(),
+            raw_request = %request_json,
+            "Sending Responses API request"
+        );
+
+        // Make the request
+        let client = reqwest::Client::new();
+        let response = client
+            .post(self.get_api_url())
+            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .header("Content-Type", "application/json")
+            .header("OpenAI-Beta", "responses=experimental")
+            .json(&responses_request)
+            .send()
+            .await?;
+
+        let response_time = start_time.elapsed();
+        let status = response.status();
+
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+
+            tracing::error!(
+                provider = %self.config.provider,
+                model = %request.model,
+                status = %status,
+                response_time_ms = %response_time.as_millis(),
+                error = %error_text,
+                "Responses API request failed"
+            );
+
+            return Err(anyhow::anyhow!(
+                "Responses API error: {} - {}",
+                status,
+                error_text
+            ));
+        }
+
+        // Parse the response
+        let response_text = response.text().await?;
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            raw_response = %response_text,
+            "Raw Responses API response received"
+        );
+
+        let responses_response: ResponsesApiResponse = serde_json::from_str(&response_text)?;
+
+        // Convert ResponsesApiResponse to LlmCompletionResponse
+        let llm_response = self.convert_from_responses_response(responses_response)?;
+
+        tracing::info!(
+            provider = %self.config.provider,
+            model = %request.model,
+            status = %status,
+            response_time_ms = %response_time.as_millis(),
+            completion_id = %llm_response.id,
+            output_count = %llm_response.choices.len(),
+            usage = ?llm_response.usage,
+            "Responses API request completed successfully"
+        );
+
+        Ok(llm_response)
+    }
+
+    /// Convert LlmCompletionRequest to ResponsesApiRequest
+    fn convert_to_responses_request(&self, request: LlmCompletionRequest) -> Result<ResponsesApiRequest> {
+        // Extract system message for instructions
+        let mut instructions = String::new();
+        let mut input_items = Vec::new();
+
+        for message in &request.messages {
+            match message.role.as_str() {
+                "system" => {
+                    if let Some(content) = &message.content {
+                        if !instructions.is_empty() {
+                            instructions.push('\n');
+                        }
+                        instructions.push_str(content);
+                    }
+                }
+                "user" | "assistant" => {
+                    let content_items = if let Some(content) = &message.content {
+                        vec![ContentItem::InputText { text: content.clone() }]
+                    } else {
+                        vec![]
+                    };
+
+                    input_items.push(ResponseItem::Message {
+                        id: None,
+                        role: message.role.clone(),
+                        content: content_items,
+                    });
+                }
+                "tool" => {
+                    // Handle tool results - these should be converted to function call outputs
+                    // For now, treat as user message
+                    if let Some(content) = &message.content {
+                        input_items.push(ResponseItem::Message {
+                            id: None,
+                            role: "user".to_string(),
+                            content: vec![ContentItem::InputText { text: content.clone() }],
+                        });
+                    }
+                }
+                _ => {
+                    tracing::warn!("Unknown message role: {}", message.role);
+                }
+            }
+        }
+
+        // Convert tools
+        let tools = if let Some(tools) = &request.tools {
+            Some(tools.iter().map(|tool| {
+                ResponsesToolDefinition {
+                    name: tool.function.name.clone(),
+                    description: tool.function.description.clone(),
+                    parameters: tool.function.parameters.clone(),
+                }
+            }).collect())
+        } else {
+            None
+        };
+
+        let tool_choice = if request.tools.is_some() {
+            "auto".to_string()
+        } else {
+            "none".to_string()
+        };
+
+        Ok(ResponsesApiRequest {
+            model: request.model,
+            instructions: instructions,
+            input: input_items,
+            tools,
+            tool_choice,
+            stream: false,
+        })
+    }
+
+    /// Convert ResponsesApiResponse to LlmCompletionResponse
+    fn convert_from_responses_response(&self, response: ResponsesApiResponse) -> Result<LlmCompletionResponse> {
+        let mut choices = Vec::new();
+        let mut tool_calls = Vec::new();
+
+        for item in response.output {
+            match item {
+                ResponseItem::Message { role, content, .. } => {
+                    let mut content_text = String::new();
+                    for content_item in content {
+                        match content_item {
+                            ContentItem::OutputText { text } => {
+                                content_text.push_str(&text);
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    choices.push(LlmChoice {
+                        index: choices.len() as u32,
+                        message: Some(LlmMessage {
+                            role,
+                            content: if content_text.is_empty() { None } else { Some(content_text) },
+                            tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls.clone()) },
+                            function_call: None,
+                            tool_call_id: None,
+                        }),
+                        delta: None,
+                        finish_reason: Some("stop".to_string()),
+                        tool_calls: None,
+                    });
+                }
+                ResponseItem::FunctionCall { name, arguments, call_id, .. } => {
+                    tool_calls.push(LlmToolCall {
+                        id: call_id,
+                        r#type: "function".to_string(),
+                        function: LlmToolCallFunction {
+                            name,
+                            arguments,
+                        },
+                    });
+                }
+            }
+        }
+
+        Ok(LlmCompletionResponse {
+            id: response.id,
+            object: "response".to_string(),
+            created: 0, // Responses API doesn't provide this
+            model: response.model,
+            choices,
+            usage: response.usage,
+        })
+    }
 }
 
 #[async_trait]
 impl LlmClient for OpenAiCompatibleClient {
     async fn complete(&self, mut request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
+        // Check if this is a gpt-5-codex model that requires the responses API
+        if self.config.model == "gpt-5-codex" {
+            return self.complete_with_responses_api(request).await;
+        }
+
         // Apply config defaults
         if request.max_tokens.is_none() {
             request.max_tokens = self.config.max_tokens;
@@ -974,6 +1276,8 @@ impl LlmClient for OpenAiCompatibleClient {
             }
         })
     }
+
+
 
     fn extract_tool_calls_from_response(
         &self,
