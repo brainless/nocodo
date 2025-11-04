@@ -318,7 +318,8 @@ impl ListFilesRequest {
                     "default": 1000
                 }
             },
-            "required": ["path"]
+            "required": ["path"],
+            "additionalProperties": false
         })
     }
 }
@@ -347,7 +348,8 @@ impl ReadFileRequest {
                     "default": 10000
                 }
             },
-            "required": ["path"]
+            "required": ["path"],
+            "additionalProperties": false
         })
     }
 }
@@ -406,7 +408,8 @@ impl WriteFileRequest {
                     "default": false
                 }
             },
-            "required": ["path", "content"]
+            "required": ["path", "content"],
+            "additionalProperties": false
         })
     }
 }
@@ -481,7 +484,8 @@ impl GrepRequest {
                     "default": 1000
                 }
             },
-            "required": ["pattern"]
+            "required": ["pattern"],
+            "additionalProperties": false
         })
     }
 }
@@ -503,7 +507,8 @@ impl ApplyPatchRequest {
                     "description": "The patch content in the format:\n*** Begin Patch\n*** Add File: path/to/new.txt\n+line content\n*** Update File: path/to/existing.txt\n@@ optional context\n-old line\n+new line\n*** Delete File: path/to/remove.txt\n*** End Patch\n\nSupports:\n- Add File: Create new files with + prefixed lines\n- Update File: Modify files with diff hunks (- for removed, + for added)\n- Delete File: Remove files\n- Move to: Rename files (after Update File header)\n- @@ context headers for targeting specific code blocks\n\nAll file paths must be relative to the project root."
                 }
             },
-            "required": ["patch"]
+            "required": ["patch"],
+            "additionalProperties": false
         })
     }
 }

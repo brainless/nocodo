@@ -287,6 +287,12 @@ pub enum ResponseItem {
         role: String,
         content: Vec<ContentItem>,
     },
+    #[serde(rename = "reasoning")]
+    Reasoning {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        summary: Vec<serde_json::Value>,
+    },
     #[serde(rename = "function_call")]
     FunctionCall {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -298,11 +304,24 @@ pub enum ResponseItem {
     },
 }
 
+/// Usage statistics for Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponsesUsage {
+    pub input_tokens: u32,
+    pub input_tokens_details: Option<serde_json::Value>,
+    pub output_tokens: u32,
+    pub output_tokens_details: Option<serde_json::Value>,
+    pub total_tokens: u32,
+}
+
 /// Tool definition for Responses API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponsesToolDefinition {
+    #[serde(rename = "type")]
+    pub r#type: String,
     pub name: String,
     pub description: String,
+    pub strict: bool,
     pub parameters: serde_json::Value,
 }
 
@@ -322,10 +341,11 @@ pub struct ResponsesApiRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponsesApiResponse {
     pub id: String,
-    pub r#type: String,
+    #[serde(rename = "type")]
+    pub r#type: Option<String>,
     pub model: String,
     pub output: Vec<ResponseItem>,
-    pub usage: Option<LlmUsage>,
+    pub usage: Option<ResponsesUsage>,
 }
 
 /// Streaming event for Responses API
@@ -862,8 +882,10 @@ impl OpenAiCompatibleClient {
         let tools = if let Some(tools) = &request.tools {
             Some(tools.iter().map(|tool| {
                 ResponsesToolDefinition {
+                    r#type: "function".to_string(),
                     name: tool.function.name.clone(),
                     description: tool.function.description.clone(),
+                    strict: false,
                     parameters: tool.function.parameters.clone(),
                 }
             }).collect())
@@ -919,6 +941,10 @@ impl OpenAiCompatibleClient {
                         tool_calls: None,
                     });
                 }
+                ResponseItem::Reasoning { .. } => {
+                    // Reasoning items are internal to the model and don't contribute to the final response
+                    // Just skip them
+                }
                 ResponseItem::FunctionCall { name, arguments, call_id, .. } => {
                     tool_calls.push(LlmToolCall {
                         id: call_id,
@@ -938,7 +964,11 @@ impl OpenAiCompatibleClient {
             created: 0, // Responses API doesn't provide this
             model: response.model,
             choices,
-            usage: response.usage,
+            usage: response.usage.map(|u| LlmUsage {
+                prompt_tokens: u.input_tokens,
+                completion_tokens: u.output_tokens,
+                total_tokens: u.total_tokens,
+            }),
         })
     }
 }
