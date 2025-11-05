@@ -37,7 +37,12 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
+          # Use a stable cache key based on Cargo.lock to share cache across builds
+          key: desktop-app-release-${{ hashFiles('**/Cargo.lock') }}
+          # Cache the workspace
           workspaces: "."
+          # Share cache across different jobs/workflows
+          shared-key: "desktop-app"
 
       - name: Build desktop app
         run: cargo build --release -p nocodo-desktop-app
