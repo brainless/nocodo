@@ -34,9 +34,9 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     exit 1
 fi
 
-# Check if working directory is clean
-if [ -n "$(git status --porcelain)" ]; then
-    echo -e "${RED}Error: Working directory is not clean. Please commit or stash your changes.${NC}"
+# Check if there are uncommitted changes (ignore untracked files)
+if [ -n "$(git diff --name-only)" ] || [ -n "$(git diff --cached --name-only)" ]; then
+    echo -e "${RED}Error: You have uncommitted changes. Please commit or stash your changes.${NC}"
     git status --short
     exit 1
 fi

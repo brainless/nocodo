@@ -115,8 +115,7 @@ To create a new release of the desktop app:
 
 ### Prerequisites
 - Be on the `main` branch
-- Have a clean working directory
-- All changes committed and pushed
+- All changes committed (untracked files are okay)
 
 ### Release Process
 
