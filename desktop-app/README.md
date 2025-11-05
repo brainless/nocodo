@@ -147,9 +147,15 @@ The script can be run from anywhere and will automatically change to the project
 
 ### Automated Build
 Once the tag is pushed, GitHub Actions automatically:
-- Builds binaries for Linux x86_64 and macOS x86_64
-- Creates release archives for each platform
+- Builds binaries for Linux x86_64, macOS x86_64, and Windows 11 x86_64
+- Creates release archives for each platform (tar.gz for Linux/macOS, zip for Windows)
 - Publishes a GitHub Release with release notes
 - Attaches the build artifacts to the release
 
 Monitor builds at: https://github.com/your-org/nocodo/actions
+
+### Platform Support
+The desktop app is built and tested on:
+- **Linux** (Ubuntu latest) - requires X11/Wayland and GTK3 dependencies
+- **macOS** (latest)
+- **Windows 11** (latest)
