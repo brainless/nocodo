@@ -2159,7 +2159,10 @@ pub async fn set_projects_default_path(
 }
 
 /// Scan projects default path and save as Project entities
-pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+pub async fn scan_projects(
+    data: web::Data<AppState>,
+    http_req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
     tracing::info!("scan_projects endpoint called");
 
     // Reload config from file to get latest projects_default_path
@@ -2250,8 +2253,24 @@ pub async fn scan_projects(data: web::Data<AppState>) -> Result<HttpResponse, Ap
                 project.description = Some("Project".to_string());
             }
 
-            // This function only scans the filesystem, it doesn't create projects in the database
-            // The ownership recording code was misplaced here
+            // Save to database
+            let project_id = data.database.create_project(&project)?;
+            project.id = project_id;
+
+            // Get user ID from request and record ownership
+            let user_id = http_req
+                .extensions()
+                .get::<crate::models::UserInfo>()
+                .map(|u| u.id)
+                .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+            let ownership =
+                crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+            data.database.create_ownership(&ownership)?;
+
+            // Broadcast project creation via WebSocket
+            data.ws_broadcaster
+                .broadcast_project_created(project.clone());
 
             created_projects.push(project.clone());
 
