@@ -205,17 +205,7 @@ async fn test_llm_e2e_saleor() {
             }
         }
 
-        // Debug: Print all outputs for analysis after 25 seconds
-        if elapsed.as_secs() >= 25 && !printed_output_ids.contains(&-1) {
-            // Use -1 as a flag to indicate we've printed debug info
-            printed_output_ids.insert(-1);
-            println!(
-                "   🔍 DEBUG: Total AI outputs after {} seconds: {}",
-                elapsed.as_secs(),
-                ai_outputs.len()
-            );
 
-        }
 
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
@@ -237,12 +227,6 @@ async fn test_llm_e2e_saleor() {
         }
 
         // Continue waiting for a final text response
-        if has_new_outputs {
-            println!(
-                "   🔧 Found {} total outputs, waiting for final text response...",
-                ai_outputs.len()
-            );
-        }
 
         // Only print waiting message if we didn't just print new outputs
         if !has_new_outputs {
