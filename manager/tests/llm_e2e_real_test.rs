@@ -157,6 +157,9 @@ async fn test_llm_e2e_saleor() {
         scenario.context.git_repo
     );
 
+    // Record start time for timeout calculation
+    let start_time = std::time::Instant::now();
+
     // PHASE 3: Test real LLM interaction with keyword validation
     println!("\n🎯 Phase 3: Testing LLM interaction with keyword validation");
     println!("   📤 Prompt sent to AI session: {}", scenario.prompt);
@@ -166,14 +169,21 @@ async fn test_llm_e2e_saleor() {
 
     // Give the AI session some time to process (background task + real API call takes time)
     // In real scenarios this would be done via WebSocket, but for testing we poll the database directly
-    let mut attempts = 0;
-    let max_attempts = 48; // 240 seconds total - give more time for tool calls
     let mut response_content = String::new();
     let mut printed_output_ids = std::collections::HashSet::new(); // Track which outputs we've printed
 
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        attempts += 1;
+
+        // Check for timeout (300 seconds from work creation)
+        let elapsed = start_time.elapsed();
+        if elapsed.as_secs() >= 300 {
+            println!(
+                "   ❌ Timeout waiting for AI response after {} seconds - no final text response received",
+                elapsed.as_secs()
+            );
+            panic!("Test failed: AI did not provide a final text response within 300 seconds");
+        }
 
         // Check AI session outputs using the manager API
         let ai_outputs = get_ai_outputs_for_work(&test_app, work_id)
@@ -195,26 +205,16 @@ async fn test_llm_e2e_saleor() {
             }
         }
 
-        // Debug: Print all outputs for analysis
-        if attempts == 5 {
-            // Print detailed debug info after 25 seconds
+        // Debug: Print all outputs for analysis after 25 seconds
+        if elapsed.as_secs() >= 25 && !printed_output_ids.contains(&-1) {
+            // Use -1 as a flag to indicate we've printed debug info
+            printed_output_ids.insert(-1);
             println!(
-                "   🔍 DEBUG: Total AI outputs after {} attempts: {}",
-                attempts,
+                "   🔍 DEBUG: Total AI outputs after {} seconds: {}",
+                elapsed.as_secs(),
                 ai_outputs.len()
             );
-            for (i, output) in ai_outputs.iter().enumerate() {
-                println!(
-                    "   🔍 DEBUG: Output {}: content_len={}, preview={}",
-                    i,
-                    output.content.len(),
-                    if output.content.len() > 100 {
-                        format!("{}...", &output.content[..100])
-                    } else {
-                        output.content.clone()
-                    }
-                );
-            }
+
         }
 
         // Check if we have a text response (not just tool calls)
@@ -230,72 +230,25 @@ async fn test_llm_e2e_saleor() {
         }) {
             response_content = output.content.clone();
             println!(
-                "   ✅ AI text response received after {} attempts ({} seconds)",
-                attempts,
-                attempts * 5
+                "   ✅ AI text response received after {} seconds",
+                elapsed.as_secs()
             );
             break;
         }
 
-        // If we have tool responses with actual file content (not just directory listings), we can use those for validation
-        let has_file_content = ai_outputs.iter().any(
-            |output| {
-                // Look for actual file reads that contain configuration content (not just directory listings)
-                (output.content.contains("\"type\":\"read_file\"") && (
-                    output.content.contains("package.json") ||
-                    output.content.contains("pyproject.toml") ||
-                    output.content.contains("requirements") ||
-                    output.content.contains("django") ||
-                    output.content.contains("graphql") ||
-                    output.content.contains("postgresql") ||
-                    output.content.contains("uvicorn")
-                )) ||
-                // Or if we have a final text response with tech stack keywords
-                (output.content.contains("Django") && output.content.contains("Python") && output.content.contains("GraphQL"))
-            }
-        );
-
-        // If we have at least some outputs but no text response yet, keep waiting longer
-        if !ai_outputs.is_empty() && attempts < max_attempts - 8 && !has_file_content {
-            if has_new_outputs {
-                println!(
-                    "   🔧 Found {} total outputs, waiting for final text response...",
-                    ai_outputs.len()
-                );
-            }
-        } else if !ai_outputs.is_empty() {
-            // We have tool outputs but no final text - this might be the final state
-            // Combine all tool responses to extract keywords
-            let mut combined_content = String::new();
-            for output in ai_outputs.iter() {
-                if !output.content.is_empty() {
-                    combined_content.push_str(&output.content);
-                    combined_content.push(' ');
-                }
-            }
-
-            // For git-based approach, we rely on the LLM to analyze the cloned repository
-            let _combined_lower = combined_content.to_lowercase();
-            println!("   🔍 Analyzing response content for tech stack keywords");
-
-            response_content = combined_content;
-            println!("   📝 No final text response found, using combined tool responses for validation after {} attempts", attempts);
-            break;
-        }
-
-        if attempts >= max_attempts {
+        // Continue waiting for a final text response
+        if has_new_outputs {
             println!(
-                "   ⚠️  Timeout waiting for AI response after {} seconds",
-                max_attempts * 5
+                "   🔧 Found {} total outputs, waiting for final text response...",
+                ai_outputs.len()
             );
-            break;
         }
 
         // Only print waiting message if we didn't just print new outputs
         if !has_new_outputs {
             println!(
-                "   ⏳ Waiting for AI response... (attempt {}/{})",
-                attempts, max_attempts
+                "   ⏳ Waiting for AI response... ({}s elapsed)",
+                elapsed.as_secs()
             );
         }
     }
@@ -329,30 +282,7 @@ async fn test_llm_e2e_saleor() {
         }) {
             response_content = output.content.clone();
         } else {
-            // If no final text response, combine all tool responses to extract keywords
-            // This handles the case where LLM uses tools but doesn't provide a final summary
-            let mut combined_content = String::new();
-            for output in ai_outputs.iter() {
-                if !output.content.is_empty() {
-                    combined_content.push_str(&output.content);
-                    combined_content.push(' ');
-                }
-            }
-
-            println!(
-                "   📝 No final text response found, using combined tool responses for validation"
-            );
-            println!(
-                "   🔍 Combined content preview: {}...",
-                &combined_content[..std::cmp::min(200, combined_content.len())]
-            );
-
-            // If the combined tool responses don't contain all expected keywords,
-            // For git-based approach, we rely on the LLM to analyze the cloned repository
-            let _combined_lower = combined_content.to_lowercase();
-            println!("   🔍 Analyzing response content for tech stack keywords");
-
-            response_content = combined_content;
+            panic!("Test failed: No final text response from AI found - only tool calls or responses were received");
         }
     }
 
