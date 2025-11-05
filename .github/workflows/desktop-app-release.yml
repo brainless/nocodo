@@ -60,20 +60,19 @@ jobs:
 
       - name: Create release archive
         run: |
-          cd desktop-app/target/release
-          tar -czf nocodo-desktop-app-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz nocodo-desktop-app
+          tar -czf nocodo-desktop-app-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz -C desktop-app/target/release nocodo-desktop-app
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
           name: nocodo-desktop-app-linux-x86_64
-          path: desktop-app/target/release/nocodo-desktop-app-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
+          path: nocodo-desktop-app-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: desktop-app/target/release/nocodo-desktop-app-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
+          files: nocodo-desktop-app-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
           draft: false
           prerelease: false
           generate_release_notes: true
