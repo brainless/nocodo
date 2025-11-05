@@ -22,7 +22,7 @@ async fn test_project_creation_workflow() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         llm_agent: None,
-        config: Arc::new(AppConfig::default()),
+        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
     });
 
     // Initialize the test app
@@ -140,7 +140,7 @@ async fn test_project_creation_error_handling() {
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         llm_agent: None,
-        config: Arc::new(AppConfig::default()),
+        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
     });
 
     let app = test::init_service(

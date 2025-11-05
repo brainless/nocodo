@@ -9,6 +9,14 @@ use std::pin::Pin;
 use std::sync::Arc;
 use uuid::Uuid;
 
+// Module declarations for adapter pattern
+pub mod adapters;
+pub mod types;
+pub mod unified_client;
+
+pub use adapters::ProviderAdapter;
+pub use unified_client::UnifiedLlmClient;
+
 /// Provider type enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -273,7 +281,13 @@ pub enum ContentItem {
     #[serde(rename = "input_text")]
     InputText { text: String },
     #[serde(rename = "output_text")]
-    OutputText { text: String },
+    OutputText {
+        text: String,
+        #[serde(default)]
+        annotations: Vec<serde_json::Value>,
+        #[serde(default)]
+        logprobs: Vec<serde_json::Value>,
+    },
 }
 
 /// Response item for Responses API
@@ -330,8 +344,7 @@ pub struct ResponsesToolDefinition {
 pub struct ResponsesApiRequest {
     pub model: String,
     pub instructions: String,
-    pub input: Vec<ResponseItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Vec<serde_json::Value>, // Raw message objects like [{"role": "user", "content": "..."}]
     pub tools: Option<Vec<ResponsesToolDefinition>>,
     pub tool_choice: String, // "auto", "required", or "none"
     pub stream: bool,
@@ -351,6 +364,7 @@ pub struct ResponsesApiResponse {
 /// Streaming event for Responses API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 pub enum ResponsesStreamEvent {
     #[serde(rename = "response.created")]
     ResponseCreated { response: serde_json::Value },
@@ -813,7 +827,18 @@ impl OpenAiCompatibleClient {
             "Raw Responses API response received"
         );
 
-        let responses_response: ResponsesApiResponse = serde_json::from_str(&response_text)?;
+        let responses_response: ResponsesApiResponse = match serde_json::from_str(&response_text) {
+            Ok(response) => response,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to parse Responses API response: {} - Response text length: {} - First 500 chars: {}",
+                    e,
+                    response_text.len(),
+                    &response_text[..response_text.len().min(500)]
+                );
+                return Err(e.into());
+            }
+        };
 
         // Convert ResponsesApiResponse to LlmCompletionResponse
         let llm_response = self.convert_from_responses_response(responses_response)?;
@@ -832,60 +857,251 @@ impl OpenAiCompatibleClient {
         Ok(llm_response)
     }
 
-    /// Convert LlmCompletionRequest to ResponsesApiRequest
-    fn convert_to_responses_request(&self, request: LlmCompletionRequest) -> Result<ResponsesApiRequest> {
-        // Extract system message for instructions
+    /// Get Codex-specific instructions for gpt-5-codex
+    fn get_codex_instructions(&self, _request: &LlmCompletionRequest) -> String {
+        // Base Codex instructions for gpt-5-codex - shortened for API limits
+        r#"You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's computer.
+
+## General
+
+- The arguments to `shell` will be passed to execvp(). Most terminal commands should be prefixed with ["bash", "-lc"].
+- Always set the `workdir` param when using the shell function. Do not use `cd` unless absolutely necessary.
+- When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)
+
+## Editing constraints
+
+- Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.
+- Add succinct code comments that explain what is going on if code is not self-explanatory. You should not add comments like "Assigns the value to the variable", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out. Usage of these comments should be rare.
+
+## Plan tool
+
+When using the planning tool:
+- Skip using the planning tool for straightforward tasks (roughly the easiest 25%).
+- Do not make single-step plans.
+- When you made a plan, update it after having performed one of the sub-tasks that you shared on the plan.
+
+## Codex CLI harness, sandboxing, and approvals
+
+The Codex CLI harness supports different configurations for sandboxing and escalation approvals.
+
+Filesystem sandboxing defines which files can be read or written. Network sandboxing defines whether network can be accessed without approval. Approvals are your mechanism to get user consent to run shell commands without the sandbox.
+
+You will be told what filesystem sandboxing, network sandboxing, and approval mode are active. If you are not told about this, assume that you are running with workspace-write, network sandboxing enabled, and approval on-failure.
+
+## Presenting your work and final message
+
+You are producing plain text that will later be styled by the CLI. Be very concise; friendly coding teammate tone. Ask only when needed; suggest ideas; mirror the user's style.
+
+For code changes: Lead with a quick explanation of the change, and then give more details on the context. If there are natural next steps, suggest them at the end.
+
+File References: When referencing files, include the relevant start line and always follow the format: `file_path:line_number`."
+
+## General
+
+- The arguments to `shell` will be passed to execvp(). Most terminal commands should be prefixed with ["bash", "-lc"].
+- Always set the `workdir` param when using the shell function. Do not use `cd` unless absolutely necessary.
+- When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)
+
+## Editing constraints
+
+- Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.
+- Add succinct code comments that explain what is going on if code is not self-explanatory. You should not add comments like "Assigns the value to the variable", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out. Usage of these comments should be rare.
+- Try to use apply_patch for single file edits, but it is fine to explore other options to make the edit if it does not work well. Do not use apply_patch for changes that are auto-generated (i.e. generating package.json or running a lint or format command like gofmt) or when scripting is more efficient (such as search and replacing a string across a codebase).
+- You may be in a dirty git worktree.
+    * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.
+    * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.
+    * If the changes are in files you've touched recently, you should read carefully and understand how you can work with the changes rather than reverting them.
+    * If the changes are in unrelated files, just ignore them and don't revert them.
+- While you are working, you might notice unexpected changes that you didn't make. If this happens, STOP IMMEDIATELY and ask the user how they would like to proceed.
+- **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.
+
+## Plan tool
+
+When using the planning tool:
+- Skip using the planning tool for straightforward tasks (roughly the easiest 25%).
+- Do not make single-step plans.
+- When you made a plan, update it after having performed one of the sub-tasks that you shared on the plan.
+
+## Codex CLI harness, sandboxing, and approvals
+
+The Codex CLI harness supports several different configurations for sandboxing and escalation approvals that the user can choose from.
+
+Filesystem sandboxing defines which files can be read or written. The options for `sandbox_mode` are:
+- **read-only**: The sandbox only permits reading files.
+- **workspace-write**: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval.
+- **danger-full-access**: No filesystem sandboxing - all commands are permitted.
+
+Network sandboxing defines whether network can be accessed without approval. Options for `network_access` are:
+- **restricted**: Requires approval
+- **enabled**: No approval needed
+
+Approvals are your mechanism to get user consent to run shell commands without the sandbox. Possible configuration options for `approval_policy` are
+- **untrusted**: The harness will escalate most commands for user approval, apart from a limited allowlist of safe "read" commands.
+- **on-failure**: The harness will allow all commands to run in the sandbox (if enabled), and failures will be escalated to the user for approval to run again without the sandbox.
+- **on-request**: Commands will be run in the sandbox by default, and you can specify in your tool call if you want to escalate a command to run without sandboxing. (Note that this mode is not always available. If it is, you'll see parameters for it in the `shell` command description.)
+- **never**: This is a non-interactive mode where you may NEVER ask the user for approval to run commands. Instead, you must always persist and work around constraints to solve the task for the user. You MUST do your utmost best to finish the task and validate your work before yielding. If this mode is paired with `danger-full-access`, take advantage of it to deliver the best outcome for the user. Further, in this mode, your default testing philosophy is overridden: Even if you don't see local patterns for testing, you may add tests and scripts to validate your work. Just remove them before yielding.
+
+When you are running with `approval_policy == on-request`, and sandboxing enabled, here are scenarios where you'll need to request approval:
+- You need to run a command that writes to a directory that requires it (e.g. running tests that write to /var)
+- You need to run a GUI app (e.g., open/xdg-open/osascript) to open browsers or files.
+- You are running sandboxed and need to run a command that requires network access (e.g. installing packages)
+- If you run a command that is important to solving the user's query, but it fails because of sandboxing, rerun the command with approval. ALWAYS proceed to use the `with_escalated_permissions` and `justification` parameters - do not message the user before requesting approval for the command.
+- You are about to take a potentially destructive action such as an `rm` or `git reset` that the user did not explicitly ask for
+- (for all of these, you should weigh alternative paths that do not require approval)
+
+When `sandbox_mode` is set to read-only, you'll need to request approval for any command that isn't a read.
+
+You will be told what filesystem sandboxing, network sandboxing, and approval mode are active in a developer or user message. If you are not told about this, assume that you are running with workspace-write, network sandboxing enabled, and approval on-failure.
+
+Although they introduce friction to the user because your work is paused until the user responds, you should leverage them when necessary to accomplish important work. If the completing the task requires escalated permissions, Do not let these settings or the sandbox deter you from attempting to accomplish the user's task unless it is set to "never", in which case never ask for approvals.
+
+When requesting approval to execute a command that will require escalated privileges:
+  - Provide the `with_escalated_permissions` parameter with the boolean value true
+  - Include a short, 1 sentence explanation for why you need to enable `with_escalated_permissions` in the justification parameter
+
+## Special user requests
+
+- If the user makes a simple request (such as asking for the time) which you can fulfill by running a terminal command (such as `date`), you should do so.
+- If the user asks for a "review", default to a code review mindset: prioritise identifying bugs, risks, behavioural regressions, and missing tests. Findings must be the primary focus of the response - keep summaries or overviews brief and only after enumerating the issues. Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail. If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.
+
+## Presenting your work and final message
+
+You are producing plain text that will later be styled by the CLI. Follow these rules exactly. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value.
+
+- Default: be very concise; friendly coding teammate tone.
+- Ask only when needed; suggest ideas; mirror the user's style.
+- For substantial work, summarize clearly; follow final‑answer formatting.
+- Skip heavy formatting for simple confirmations.
+- Don't dump large files you've written; reference paths only.
+- No "save/copy this file" - User is on the same machine.
+- Offer logical next steps (tests, commits, build) briefly; add verify steps if you couldn't do something.
+- For code changes:
+  * Lead with a quick explanation of the change, and then give more details on the context covering where and why a change was made. Do not start this explanation with "summary", just jump right in.
+  * If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps.
+  * When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.
+- The user does not command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.
+
+### Final answer structure and style guidelines
+
+- Plain text; CLI handles styling. Use structure only when it helps scanability.
+- Headers: optional; short Title Case (1-3 words) wrapped in **…**; no blank line before the first header; add only if they truly help.
+- Bullets: use - ; merge related points; keep to one line when possible; 4–6 per list ordered by importance; keep phrasing consistent.
+- Monospace: backticks for commands/paths/env vars/code ids and inline examples; use for literal keyword bullets; never combine with **.
+- Code samples or multi-line snippets should be wrapped in fenced code blocks; include an info string as often as possible.
+- Structure: group related bullets; order sections general → specific → supporting; for subsections, start with a bolded keyword bullet, then items; match complexity to the task.
+- Tone: collaborative, concise, factual; present tense, active voice; self‑contained; no "above/below"; parallel wording.
+- Don'ts: no nested bullets/hierarchies; no ANSI codes; don't cram unrelated keywords; keep keyword lists short—wrap/reformat if long; avoid naming formatting styles in answers.
+- Adaptation: code explanations → precise, structured with code refs; simple tasks → lead with outcome; big changes → logical walkthrough + rationale + next actions; casual one-offs → plain sentences, no headers/bullets.
+- File References: When referencing files in your response, make sure to include the relevant start line and always follow the below rules:
+  * Use inline code to make file paths clickable.
+  * Each reference should have a stand alone path. Even if it's the same file.
+  * Accepted: absolute, workspace‑relative, a/ or b/ diff prefixes, or bare filename/suffix.
+  * Line/column (1‑based, optional): :line[:column] or #Lline[Ccolumn] (column defaults to 1).
+  * Do not use URIs like file://, vscode://, or https://.
+  * Do not provide range of lines
+  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\repo\project\main.rs:12:5"#.to_string()
+    }
+
+    /// Get standard instructions for other models
+    #[allow(dead_code)]
+    fn get_standard_instructions(&self, request: &LlmCompletionRequest) -> String {
         let mut instructions = String::new();
-        let mut input_items = Vec::new();
 
         for message in &request.messages {
-            match message.role.as_str() {
-                "system" => {
-                    if let Some(content) = &message.content {
-                        if !instructions.is_empty() {
-                            instructions.push('\n');
-                        }
-                        instructions.push_str(content);
+            if message.role == "system" {
+                if let Some(content) = &message.content {
+                    if !instructions.is_empty() {
+                        instructions.push('\n');
                     }
-                }
-                "user" | "assistant" => {
-                    let content_items = if let Some(content) = &message.content {
-                        vec![ContentItem::InputText { text: content.clone() }]
-                    } else {
-                        vec![]
-                    };
-
-                    input_items.push(ResponseItem::Message {
-                        id: None,
-                        role: message.role.clone(),
-                        content: content_items,
-                    });
-                }
-                "tool" => {
-                    // Handle tool results - these should be converted to function call outputs
-                    // For now, treat as user message
-                    if let Some(content) = &message.content {
-                        input_items.push(ResponseItem::Message {
-                            id: None,
-                            role: "user".to_string(),
-                            content: vec![ContentItem::InputText { text: content.clone() }],
-                        });
-                    }
-                }
-                _ => {
-                    tracing::warn!("Unknown message role: {}", message.role);
+                    instructions.push_str(content);
                 }
             }
         }
 
-        // Convert tools
+        instructions
+    }
+
+    /// Convert LlmCompletionRequest to ResponsesApiRequest
+    fn convert_to_responses_request(&self, request: LlmCompletionRequest) -> Result<ResponsesApiRequest> {
+        // Extract instructions from system messages
+        let instructions = self.get_codex_instructions(&request);
+
+        // Convert messages to simple JSON format for input
+        let mut input = Vec::new();
+
+        for message in &request.messages {
+            match message.role.as_str() {
+                "system" => {
+                    // System messages are handled in instructions, skip here
+                    continue;
+                }
+                "user" => {
+                    if let Some(content) = &message.content {
+                        input.push(serde_json::json!({
+                            "role": "user",
+                            "content": content
+                        }));
+                    }
+                }
+                "assistant" => {
+                    let mut msg_obj = serde_json::json!({
+                        "role": "assistant"
+                    });
+
+                    // Add text content if present
+                    if let Some(text) = &message.content {
+                        msg_obj["content"] = serde_json::Value::String(text.clone());
+                    }
+
+                    // Add tool calls if present (for conversation history)
+                    if let Some(tool_calls) = &message.tool_calls {
+                        let tool_calls_json: Vec<serde_json::Value> = tool_calls.iter().map(|tc| {
+                            serde_json::json!({
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            })
+                        }).collect();
+                        msg_obj["tool_calls"] = serde_json::Value::Array(tool_calls_json);
+                    }
+
+                    input.push(msg_obj);
+                }
+                "tool" => {
+                    // Tool results - add as user message with tool result
+                    if let Some(content) = &message.content {
+                        if let Some(tool_call_id) = &message.tool_call_id {
+                            input.push(serde_json::json!({
+                                "role": "tool",
+                                "content": content,
+                                "tool_call_id": tool_call_id
+                            }));
+                        } else {
+                            // Fallback: treat as user message
+                            input.push(serde_json::json!({
+                                "role": "user",
+                                "content": content
+                            }));
+                        }
+                    }
+                }
+                _ => {
+                    // Skip unknown roles
+                }
+            }
+        }
+
+        // Convert tools to ResponsesToolDefinition format
         let tools = if let Some(tools) = &request.tools {
             Some(tools.iter().map(|tool| {
                 ResponsesToolDefinition {
-                    r#type: "function".to_string(),
+                    r#type: tool.r#type.clone(),
                     name: tool.function.name.clone(),
                     description: tool.function.description.clone(),
-                    strict: false,
+                    strict: true, // Enable strict mode for better tool calling
                     parameters: tool.function.parameters.clone(),
                 }
             }).collect())
@@ -893,53 +1109,53 @@ impl OpenAiCompatibleClient {
             None
         };
 
-        let tool_choice = if request.tools.is_some() {
-            "auto".to_string()
+        // Determine tool_choice
+        let tool_choice = if tools.is_some() {
+            match &request.tool_choice {
+                Some(ToolChoice::None(_)) => "none".to_string(),
+                Some(ToolChoice::Auto(_)) => "auto".to_string(),
+                Some(ToolChoice::Required(_)) => "required".to_string(),
+                Some(ToolChoice::Specific { .. }) => "required".to_string(), // For specific tools, use required
+                None => "auto".to_string(),
+            }
         } else {
             "none".to_string()
         };
 
         Ok(ResponsesApiRequest {
             model: request.model,
-            instructions: instructions,
-            input: input_items,
+            instructions,
+            input,
             tools,
             tool_choice,
-            stream: false,
+            stream: request.stream.unwrap_or(false),
         })
     }
 
     /// Convert ResponsesApiResponse to LlmCompletionResponse
     fn convert_from_responses_response(&self, response: ResponsesApiResponse) -> Result<LlmCompletionResponse> {
-        let mut choices = Vec::new();
+        tracing::debug!(
+            "Converting Responses API response with {} output items",
+            response.output.len()
+        );
+        let mut content_text = String::new();
         let mut tool_calls = Vec::new();
 
-        for item in response.output {
+        // Aggregate all text content and collect all tool calls
+        for item in &response.output {
             match item {
-                ResponseItem::Message { role, content, .. } => {
-                    let mut content_text = String::new();
+                ResponseItem::Message { content, .. } => {
                     for content_item in content {
                         match content_item {
-                            ContentItem::OutputText { text } => {
-                                content_text.push_str(&text);
+                            ContentItem::OutputText { text, .. } => {
+                                if !content_text.is_empty() {
+                                    content_text.push('\n');
+                                }
+                                content_text.push_str(text);
                             }
                             _ => {}
                         }
                     }
-
-                    choices.push(LlmChoice {
-                        index: choices.len() as u32,
-                        message: Some(LlmMessage {
-                            role,
-                            content: if content_text.is_empty() { None } else { Some(content_text) },
-                            tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls.clone()) },
-                            function_call: None,
-                            tool_call_id: None,
-                        }),
-                        delta: None,
-                        finish_reason: Some("stop".to_string()),
-                        tool_calls: None,
-                    });
                 }
                 ResponseItem::Reasoning { .. } => {
                     // Reasoning items are internal to the model and don't contribute to the final response
@@ -947,23 +1163,38 @@ impl OpenAiCompatibleClient {
                 }
                 ResponseItem::FunctionCall { name, arguments, call_id, .. } => {
                     tool_calls.push(LlmToolCall {
-                        id: call_id,
+                        id: call_id.clone(),
                         r#type: "function".to_string(),
                         function: LlmToolCallFunction {
-                            name,
-                            arguments,
+                            name: name.clone(),
+                            arguments: arguments.clone(),
                         },
                     });
                 }
             }
         }
 
+        // Create a single choice with all aggregated content
+        let choice = LlmChoice {
+            index: 0,
+            message: Some(LlmMessage {
+                role: "assistant".to_string(),
+                content: if content_text.is_empty() { None } else { Some(content_text) },
+                tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+                function_call: None,
+                tool_call_id: None,
+            }),
+            delta: None,
+            finish_reason: Some("stop".to_string()),
+            tool_calls: None, // Tool calls are in the message, not at choice level
+        };
+
         Ok(LlmCompletionResponse {
             id: response.id,
             object: "response".to_string(),
             created: 0, // Responses API doesn't provide this
             model: response.model,
-            choices,
+            choices: vec![choice],
             usage: response.usage.map(|u| LlmUsage {
                 prompt_tokens: u.input_tokens,
                 completion_tokens: u.output_tokens,
@@ -1418,6 +1649,7 @@ pub struct ClaudeClient {
 }
 
 impl ClaudeClient {
+    #[allow(dead_code)]
     pub fn new(config: LlmProviderConfig) -> Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -1904,21 +2136,67 @@ impl LlmClient for ClaudeClient {
 }
 
 /// Factory function to create LLM clients
+/// This uses the adapter pattern for Claude 4.5/4.1 models
 pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
-    match config.provider.to_lowercase().as_str() {
-        "openai" | "grok" | "xai" => {
+    match (config.provider.to_lowercase().as_str(), config.model.as_str()) {
+        // Claude 4.5/4.1 models - current generation (use adapter)
+        ("anthropic" | "claude", model) if is_claude_45_or_41(model) => {
+            let adapter = Box::new(adapters::ClaudeMessagesAdapter::new(config.clone())?);
+            Ok(Box::new(UnifiedLlmClient::new(adapter, config)?))
+        }
+
+        // Reject legacy Claude 3.x models with helpful error
+        ("anthropic" | "claude", model) if is_legacy_claude_model(model) => {
+            Err(anyhow::anyhow!(
+                "Legacy Claude model '{}' is not supported. Please use one of the current models:\n\
+                 - claude-sonnet-4-5-20250929 (or alias: claude-sonnet-4-5)\n\
+                 - claude-haiku-4-5-20251001 (or alias: claude-haiku-4-5)\n\
+                 - claude-opus-4-1-20250805 (or alias: claude-opus-4-1)",
+                model
+            ))
+        }
+
+        // Unknown Claude model
+        ("anthropic" | "claude", model) => {
+            Err(anyhow::anyhow!(
+                "Unknown Claude model '{}'. Supported models:\n\
+                 - claude-sonnet-4-5-20250929 (or alias: claude-sonnet-4-5)\n\
+                 - claude-haiku-4-5-20251001 (or alias: claude-haiku-4-5)\n\
+                 - claude-opus-4-1-20250805 (or alias: claude-opus-4-1)",
+                model
+            ))
+        }
+
+        // OpenAI, Grok, xAI - use existing client
+        ("openai" | "grok" | "xai", _) => {
             let client = OpenAiCompatibleClient::new(config)?;
             Ok(Box::new(client))
         }
-        "anthropic" | "claude" => {
-            let client = ClaudeClient::new(config)?;
-            Ok(Box::new(client))
-        }
+
+        // Unsupported provider
         _ => Err(anyhow::anyhow!(
             "Unsupported LLM provider: {}",
             config.provider
         )),
     }
+}
+
+/// Helper function to check if a model is Claude 4.5 or 4.1
+fn is_claude_45_or_41(model: &str) -> bool {
+    matches!(
+        model,
+        "claude-sonnet-4-5-20250929" | "claude-sonnet-4-5" |
+        "claude-haiku-4-5-20251001" | "claude-haiku-4-5" |
+        "claude-opus-4-1-20250805" | "claude-opus-4-1"
+    )
+}
+
+/// Helper function to check if a model is a legacy Claude model
+fn is_legacy_claude_model(model: &str) -> bool {
+    model.starts_with("claude-3-") ||
+    model == "claude-sonnet-4-20250514" ||
+    model == "claude-opus-4-20250514" ||
+    model == "claude-3-7-sonnet-20250219"
 }
 
 /// Factory function to create LLM clients with model information

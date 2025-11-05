@@ -995,6 +995,12 @@ impl LlmAgent {
         let mut messages = Vec::new();
         let mut tool_call_map = std::collections::HashMap::new();
 
+        tracing::info!(
+            session_id = %session_id,
+            message_count = %history.len(),
+            "CLAUDE_DEBUG: Starting conversation reconstruction for follow-up"
+        );
+
         // First pass: collect tool calls from assistant messages
         for msg in history {
             if msg.role == "assistant" {
@@ -1053,6 +1059,12 @@ impl LlmAgent {
                 }
                 "tool" => {
                     // Parse tool result and associate with tool call ID
+                    tracing::info!(
+                        session_id = %session_id,
+                        tool_message_content = %msg.content,
+                        "CLAUDE_DEBUG: Processing tool message in conversation reconstruction"
+                    );
+
                     if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content) {
                         // For OpenAI-compatible providers, tool results should be sent as tool messages with tool_call_id
                         // For Anthropic, they are converted to user messages in the client
@@ -1060,6 +1072,15 @@ impl LlmAgent {
                             .or_else(|| tool_result.get("tool_use_id"))
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
+
+                        let content_value = tool_result.get("content");
+
+                        tracing::info!(
+                            session_id = %session_id,
+                            tool_call_id = ?tool_call_id,
+                            content_type = %content_value.map(|v| v.to_string()).unwrap_or_else(|| "none".to_string()),
+                            "CLAUDE_DEBUG: Parsed tool result - tool_call_id and content"
+                        );
 
                         messages.push(LlmMessage {
                             role: "tool".to_string(),
@@ -1070,6 +1091,11 @@ impl LlmAgent {
                         });
                     } else {
                         // Fallback for non-JSON tool results
+                        tracing::warn!(
+                            session_id = %session_id,
+                            tool_content = %msg.content,
+                            "CLAUDE_DEBUG: Tool message is not valid JSON, using fallback"
+                        );
                         messages.push(LlmMessage {
                             role: "tool".to_string(),
                             content: Some(msg.content.clone()),

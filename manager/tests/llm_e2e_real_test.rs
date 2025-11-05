@@ -1,6 +1,6 @@
 mod common;
 
-use actix_web::{test, web, App};
+use actix_web::{test, web, App, HttpMessage};
 use std::env;
 
 use crate::common::{
@@ -8,6 +8,7 @@ use crate::common::{
     llm_config::LlmTestConfig,
     TestApp,
 };
+use nocodo_manager::handlers;
 use nocodo_manager::models::{
     AddMessageRequest, CreateAiSessionRequest, CreateWorkRequest, MessageAuthorType,
     MessageContentType,
@@ -83,87 +84,74 @@ async fn test_llm_e2e_saleor() {
         .await
         .expect("Failed to create project from scenario");
 
+    // Verify project was created
+    let projects = test_app.db().get_all_projects().unwrap();
+    println!("   📁 Found {} projects in database", projects.len());
+    for p in &projects {
+        println!("     - Project {}: {} (path: {})", p.id, p.name, p.path);
+    }
+    assert!(projects.iter().any(|p| p.id == project_id), "Project {} not found in database", project_id);
+
+    // Create a test user in the database
+    let test_user = nocodo_manager::models::User {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+        password_hash: "test_hash".to_string(),
+        is_active: true,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+    test_app.db().create_user(&test_user).unwrap();
+    println!("   👤 Created test user with ID: {}", test_user.id);
+
+    // Read work title from prompts configuration
+    let work_title = crate::common::keyword_validation::PromptsConfig::load_from_file(
+        std::path::Path::new("prompts/default.toml")
+    )
+    .map(|config| config.tech_stack_analysis.prompt.clone())
+    .unwrap_or_else(|_| "Tech Stack Analysis".to_string());
+
     // Follow the exact manager-web homepage form flow:
-    // 1. Create the work
+    // 1. Create the work with auto_start=true (this creates work, message, and AI session automatically)
     let work_request = CreateWorkRequest {
-        title: "LLM E2E Test Work".to_string(),
+        title: work_title,
         project_id: Some(project_id),
         model: Some(model.clone()),
+        auto_start: true,  // Auto-start creates work, message, and AI session
+        tool_name: Some("llm-agent".to_string()),
     };
 
     let req = test::TestRequest::post()
-        .uri("/work")
+        .uri("/api/work")
         .set_json(&work_request)
         .to_request();
 
+    // Add mock user authentication for testing
+    let mock_user = nocodo_manager::models::UserInfo {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+    };
+    req.extensions_mut().insert(mock_user.clone());
+
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work",
+        "/api/work",
         web::post().to(nocodo_manager::handlers::create_work),
     ))
     .await;
     let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to create work session");
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        panic!("Failed to create work session. Status: {}, Body: {}", status, body_str);
+    }
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let work_id = body["work"]["id"].as_i64().expect("No work ID returned");
 
     println!("   ✅ Created work session: {}", work_id);
-
-    // 2. Add the initial message (using same values as browser: {"content_type":"text","author_type":"user"})
-    let message_request = AddMessageRequest {
-        content: scenario.prompt.clone(),
-        content_type: MessageContentType::Text, // serializes to "text"
-        author_type: MessageAuthorType::User,   // serializes to "user"
-        author_id: None,
-    };
-
-    let uri = format!("/work/{}/messages", work_id);
-    let req = test::TestRequest::post()
-        .uri(&uri)
-        .set_json(&message_request)
-        .to_request();
-
-    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work/{work_id}/messages",
-        web::post().to(nocodo_manager::handlers::add_message_to_work),
-    ))
-    .await;
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to add message to work");
-
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    let message_id = body["message"]["id"]
-        .as_i64()
-        .expect("No message ID returned");
-
-    println!("   ✅ Added initial message: {}", message_id);
-
-    // 3. Create the AI session with llm-agent tool
-    let ai_session_request = CreateAiSessionRequest {
-        message_id: message_id.to_string(),
-        tool_name: "llm-agent".to_string(),
-    };
-
-    let uri = format!("/work/{}/sessions", work_id);
-    let req = test::TestRequest::post()
-        .uri(&uri)
-        .set_json(&ai_session_request)
-        .to_request();
-
-    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work/{work_id}/sessions",
-        web::post().to(nocodo_manager::handlers::create_ai_session),
-    ))
-    .await;
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to create AI session");
-
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    let ai_session_id = body["session"]["id"]
-        .as_i64()
-        .expect("No AI session ID returned");
-
-    println!("   ✅ Created AI session: {}", ai_session_id);
     println!(
         "   ✅ Project context created from git repository: {}",
         scenario.context.git_repo
@@ -511,6 +499,8 @@ async fn test_llm_multiple_scenarios() {
             title: format!("Multi Scenario Work {}", i + 1),
             project_id: Some(project_id),
             model: Some(model),
+            auto_start: true,
+            tool_name: Some("llm-agent".to_string()),
         };
 
         let req = test::TestRequest::post()
@@ -520,7 +510,7 @@ async fn test_llm_multiple_scenarios() {
 
         let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
             "/work",
-            web::post().to(nocodo_manager::handlers::create_work),
+        web::post().to(handlers::create_work),
         ))
         .await;
         let resp = test::call_service(&service, req).await;
@@ -639,11 +629,19 @@ async fn get_ai_outputs_for_work(
     use actix_web::test;
 
     // Make API call to get AI session outputs using the manager API endpoint
-    let uri = format!("/work/{}/outputs", work_id);
+    let uri = format!("/api/work/{}/outputs", work_id);
     let req = test::TestRequest::get().uri(&uri).to_request();
 
+    // Add mock user authentication for testing
+    let mock_user = nocodo_manager::models::UserInfo {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+    };
+    req.extensions_mut().insert(mock_user);
+
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work/{id}/outputs",
+        "/api/work/{id}/outputs",
         web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
     ))
     .await;

@@ -121,9 +121,16 @@ async fn test_llm_e2e_real_manager_saleor() {
     // PHASE 3: Execute LLM workflow via real API
     println!("\n🎯 Phase 3: Executing LLM workflow via real manager API");
 
+    // Read work title from prompts configuration
+    let work_title = crate::common::keyword_validation::PromptsConfig::load_from_file(
+        std::path::Path::new("prompts/default.toml")
+    )
+    .map(|config| config.tech_stack_analysis.prompt.clone())
+    .unwrap_or_else(|_| "Tech Stack Analysis".to_string());
+
     // 1. Create work session
     let work_id = manager
-        .create_work("LLM E2E Test Work", Some(project_id.clone()))
+        .create_work(&work_title, Some(project_id.clone()))
         .await
         .expect("Failed to create work");
 

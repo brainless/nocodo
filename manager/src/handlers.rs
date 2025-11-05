@@ -1248,8 +1248,10 @@ pub async fn create_ai_session(
             };
 
             // Create LLM agent session with provider/model from environment
+            // Note: Not passing project_context as system prompt - system prompt should be None
+            // to allow the LLM agent to use its default behavior
             let llm_session = llm_agent
-                .create_session(work_id, provider, model, session.project_context.clone())
+                .create_session(work_id, provider, model, None)
                 .await?;
 
             // Process the message in background task to avoid blocking HTTP response

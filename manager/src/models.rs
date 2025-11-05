@@ -318,7 +318,7 @@ impl ListFilesRequest {
                     "default": 1000
                 }
             },
-            "required": ["path"],
+            "required": ["path", "recursive", "include_hidden", "max_files"],
             "additionalProperties": false
         })
     }
@@ -348,7 +348,7 @@ impl ReadFileRequest {
                     "default": 10000
                 }
             },
-            "required": ["path"],
+            "required": ["path", "max_size"],
             "additionalProperties": false
         })
     }
@@ -408,7 +408,7 @@ impl WriteFileRequest {
                     "default": false
                 }
             },
-            "required": ["path", "content"],
+            "required": ["path", "content", "create_dirs", "append", "search", "replace", "create_if_not_exists"],
             "additionalProperties": false
         })
     }
@@ -484,7 +484,7 @@ impl GrepRequest {
                     "default": 1000
                 }
             },
-            "required": ["pattern"],
+            "required": ["pattern", "path", "include_pattern", "exclude_pattern", "recursive", "case_sensitive", "include_line_numbers", "max_results", "max_files_searched"],
             "additionalProperties": false
         })
     }
