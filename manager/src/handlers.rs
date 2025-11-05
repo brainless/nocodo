@@ -28,7 +28,6 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-
 pub struct AppState {
     pub database: Arc<Database>,
     pub start_time: SystemTime,
@@ -229,7 +228,11 @@ pub async fn create_user(
     }
 
     // Check if user already exists
-    if data.database.get_user_by_username(&create_req.username).is_ok() {
+    if data
+        .database
+        .get_user_by_username(&create_req.username)
+        .is_ok()
+    {
         return Err(AppError::InvalidRequest(
             "Username already exists".to_string(),
         ));
@@ -2462,7 +2465,11 @@ pub async fn register(
     }
 
     // Check if user already exists
-    if data.database.get_user_by_username(&create_req.username).is_ok() {
+    if data
+        .database
+        .get_user_by_username(&create_req.username)
+        .is_ok()
+    {
         return Err(AppError::InvalidRequest(
             "Username already exists".to_string(),
         ));
@@ -2472,12 +2479,12 @@ pub async fn register(
     let password_hash = auth::hash_password(&create_req.password)?;
 
     // Validate SSH key fields are present
-    let ssh_fingerprint = create_req.ssh_fingerprint.ok_or_else(|| {
-        AppError::InvalidRequest("SSH fingerprint is required".to_string())
-    })?;
-    let ssh_public_key = create_req.ssh_public_key.ok_or_else(|| {
-        AppError::InvalidRequest("SSH public key is required".to_string())
-    })?;
+    let ssh_fingerprint = create_req
+        .ssh_fingerprint
+        .ok_or_else(|| AppError::InvalidRequest("SSH fingerprint is required".to_string()))?;
+    let ssh_public_key = create_req
+        .ssh_public_key
+        .ok_or_else(|| AppError::InvalidRequest("SSH public key is required".to_string()))?;
 
     // Create user
     let now = std::time::SystemTime::now()
@@ -2514,13 +2521,20 @@ pub async fn register(
     };
 
     let ssh_key_id = data.database.create_ssh_key(&ssh_key)?;
-    tracing::info!("SSH key created with ID: {} for user: {}", ssh_key_id, user.username);
+    tracing::info!(
+        "SSH key created with ID: {} for user: {}",
+        ssh_key_id,
+        user.username
+    );
 
     // Check if this is the first user (bootstrap logic)
     let user_count = data.database.get_all_users()?.len();
     if user_count == 1 {
         // This is the first user - create Super Admins team and grant admin permissions
-        tracing::info!("First user registered: {} - creating Super Admins team", user.username);
+        tracing::info!(
+            "First user registered: {} - creating Super Admins team",
+            user.username
+        );
 
         // Create "Super Admins" team
         let super_admin_team = Team {
@@ -2535,7 +2549,8 @@ pub async fn register(
         let team_id = data.database.create_team(&super_admin_team)?;
 
         // Add first user to the team
-        data.database.add_team_member(team_id, user_id, Some(user_id))?;
+        data.database
+            .add_team_member(team_id, user_id, Some(user_id))?;
 
         // Grant entity-level admin permissions on all resource types
         let resource_types = ["project", "work", "settings", "user", "team"];
@@ -2554,7 +2569,10 @@ pub async fn register(
 
         tracing::info!("Bootstrap complete: Super Admins team created with full admin permissions");
     } else {
-        tracing::info!("User registered: {} (not first user, no auto-permissions)", user.username);
+        tracing::info!(
+            "User registered: {} (not first user, no auto-permissions)",
+            user.username
+        );
     }
 
     tracing::info!("Registration successful for user: {}", user.username);
@@ -2567,7 +2585,11 @@ pub async fn login(
     data: web::Data<AppState>,
     login_req: web::Json<crate::models::LoginRequest>,
 ) -> Result<HttpResponse> {
-    tracing::info!("Login attempt for user: {} with SSH fingerprint: {}", login_req.username, login_req.ssh_fingerprint);
+    tracing::info!(
+        "Login attempt for user: {} with SSH fingerprint: {}",
+        login_req.username,
+        login_req.ssh_fingerprint
+    );
 
     // 1. Get user by username
     let user = data
@@ -2596,7 +2618,10 @@ pub async fn login(
     }
 
     // 4. Find or auto-add SSH key fingerprint
-    let ssh_key = match data.database.get_ssh_key_by_fingerprint(&login_req.ssh_fingerprint) {
+    let ssh_key = match data
+        .database
+        .get_ssh_key_by_fingerprint(&login_req.ssh_fingerprint)
+    {
         Ok(key) => {
             // Key exists - verify it belongs to this user
             if key.user_id != user.id {

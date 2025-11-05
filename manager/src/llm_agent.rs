@@ -143,22 +143,34 @@ impl LlmAgent {
         for msg in &history {
             // Parse assistant messages to extract tool calls from stored JSON format
             let (content, tool_calls) = if msg.role == "assistant" {
-                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content)
+                {
                     // Extract text content
-                    let text = assistant_data.get("text")
+                    let text = assistant_data
+                        .get("text")
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
 
                     // Extract tool calls if present
-                    let tool_calls = if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                    let tool_calls = if let Some(tool_calls_array) =
+                        assistant_data.get("tool_calls").and_then(|v| v.as_array())
+                    {
                         let mut calls = Vec::new();
                         for tool_call_value in tool_calls_array {
-                            if let Ok(tool_call) = serde_json::from_value::<crate::llm_client::LlmToolCall>(tool_call_value.clone()) {
+                            if let Ok(tool_call) =
+                                serde_json::from_value::<crate::llm_client::LlmToolCall>(
+                                    tool_call_value.clone(),
+                                )
+                            {
                                 calls.push(tool_call);
                             }
                         }
-                        if calls.is_empty() { None } else { Some(calls) }
+                        if calls.is_empty() {
+                            None
+                        } else {
+                            Some(calls)
+                        }
                     } else {
                         None
                     };
@@ -441,7 +453,7 @@ impl LlmAgent {
                                 "TOOL_DEBUG: Successfully parsed list_files arguments"
                             );
                             crate::models::ToolRequest::ListFiles(request)
-                        },
+                        }
                         Err(e) => {
                             tracing::error!(
                                 session_id = %session_id,
@@ -1061,8 +1073,11 @@ impl LlmAgent {
         // First pass: collect tool calls from assistant messages
         for msg in history {
             if msg.role == "assistant" {
-                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
-                    if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content)
+                {
+                    if let Some(tool_calls_array) =
+                        assistant_data.get("tool_calls").and_then(|v| v.as_array())
+                    {
                         for tool_call in tool_calls_array {
                             if let Some(id) = tool_call.get("id").and_then(|v| v.as_str()) {
                                 tool_call_map.insert(id.to_string(), tool_call.clone());
@@ -1078,20 +1093,33 @@ impl LlmAgent {
             match msg.role.as_str() {
                 "assistant" => {
                     // Parse assistant message to extract text and tool calls
-                    if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
-                        let text = assistant_data.get("text")
+                    if let Ok(assistant_data) =
+                        serde_json::from_str::<serde_json::Value>(&msg.content)
+                    {
+                        let text = assistant_data
+                            .get("text")
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
 
-                        let tool_calls = if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                        let tool_calls = if let Some(tool_calls_array) =
+                            assistant_data.get("tool_calls").and_then(|v| v.as_array())
+                        {
                             let mut calls = Vec::new();
                             for tool_call_value in tool_calls_array {
-                                if let Ok(tool_call) = serde_json::from_value::<crate::llm_client::LlmToolCall>(tool_call_value.clone()) {
+                                if let Ok(tool_call) =
+                                    serde_json::from_value::<crate::llm_client::LlmToolCall>(
+                                        tool_call_value.clone(),
+                                    )
+                                {
                                     calls.push(tool_call);
                                 }
                             }
-                            if calls.is_empty() { None } else { Some(calls) }
+                            if calls.is_empty() {
+                                None
+                            } else {
+                                Some(calls)
+                            }
                         } else {
                             None
                         };
@@ -1122,10 +1150,12 @@ impl LlmAgent {
                         "CLAUDE_DEBUG: Processing tool message in conversation reconstruction"
                     );
 
-                    if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                    if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content)
+                    {
                         // For OpenAI-compatible providers, tool results should be sent as tool messages with tool_call_id
                         // For Anthropic, they are converted to user messages in the client
-                        let tool_call_id = tool_result.get("tool_call_id")
+                        let tool_call_id = tool_result
+                            .get("tool_call_id")
                             .or_else(|| tool_result.get("tool_use_id"))
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());

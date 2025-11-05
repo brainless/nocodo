@@ -486,9 +486,20 @@ impl ToolExecutor {
 
             // Skip common build artifacts and directories
             let skip_patterns = [
-                "target", "node_modules", ".git", "dist", "build", "__pycache__",
-                ".next", ".nuxt", ".vuepress", ".cache", ".parcel-cache",
-                ".DS_Store", "Thumbs.db", "desktop.ini"
+                "target",
+                "node_modules",
+                ".git",
+                "dist",
+                "build",
+                "__pycache__",
+                ".next",
+                ".nuxt",
+                ".vuepress",
+                ".cache",
+                ".parcel-cache",
+                ".DS_Store",
+                "Thumbs.db",
+                "desktop.ini",
             ];
 
             let should_skip = file_name.starts_with('.')
@@ -591,7 +602,8 @@ impl ToolExecutor {
 
         // Check response size and truncate if necessary (limit to ~100KB)
         const MAX_RESPONSE_SIZE: usize = 100 * 1024; // 100KB
-        let response_size_estimate = matches.iter()
+        let response_size_estimate = matches
+            .iter()
             .map(|m| m.file_path.len() + m.line_content.len() + m.matched_text.len() + 100) // rough estimate
             .sum::<usize>();
 
@@ -601,7 +613,10 @@ impl ToolExecutor {
             let mut current_size = 0;
 
             for match_item in matches {
-                let item_size = match_item.file_path.len() + match_item.line_content.len() + match_item.matched_text.len() + 100;
+                let item_size = match_item.file_path.len()
+                    + match_item.line_content.len()
+                    + match_item.matched_text.len()
+                    + 100;
                 if current_size + item_size > MAX_RESPONSE_SIZE {
                     truncated = true;
                     break;
@@ -1599,10 +1614,19 @@ mod tests {
             ToolResponse::Grep(grep_response) => {
                 // Should find content in text file but not in binary files
                 assert_eq!(grep_response.files_searched, 1); // Only the .txt file should be searched
-                assert!(grep_response.matches.iter().any(|m| m.file_path == "test.txt"));
+                assert!(grep_response
+                    .matches
+                    .iter()
+                    .any(|m| m.file_path == "test.txt"));
                 // Should not find matches in binary files
-                assert!(!grep_response.matches.iter().any(|m| m.file_path.contains("binary.exe")));
-                assert!(!grep_response.matches.iter().any(|m| m.file_path.contains("image.jpg")));
+                assert!(!grep_response
+                    .matches
+                    .iter()
+                    .any(|m| m.file_path.contains("binary.exe")));
+                assert!(!grep_response
+                    .matches
+                    .iter()
+                    .any(|m| m.file_path.contains("image.jpg")));
             }
             _ => panic!("Expected Grep response"),
         }

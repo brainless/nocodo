@@ -763,7 +763,10 @@ impl OpenAiCompatibleClient {
     }
 
     /// Complete a request using the OpenAI Responses API (for gpt-5-codex)
-    async fn complete_with_responses_api(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
+    async fn complete_with_responses_api(
+        &self,
+        request: LlmCompletionRequest,
+    ) -> Result<LlmCompletionResponse> {
         let start_time = std::time::Instant::now();
 
         // Convert LlmCompletionRequest to ResponsesApiRequest
@@ -1022,7 +1025,10 @@ You are producing plain text that will later be styled by the CLI. Follow these 
     }
 
     /// Convert LlmCompletionRequest to ResponsesApiRequest
-    fn convert_to_responses_request(&self, request: LlmCompletionRequest) -> Result<ResponsesApiRequest> {
+    fn convert_to_responses_request(
+        &self,
+        request: LlmCompletionRequest,
+    ) -> Result<ResponsesApiRequest> {
         // Extract instructions from system messages
         let instructions = self.get_codex_instructions(&request);
 
@@ -1055,16 +1061,19 @@ You are producing plain text that will later be styled by the CLI. Follow these 
 
                     // Add tool calls if present (for conversation history)
                     if let Some(tool_calls) = &message.tool_calls {
-                        let tool_calls_json: Vec<serde_json::Value> = tool_calls.iter().map(|tc| {
-                            serde_json::json!({
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.function.name,
-                                    "arguments": tc.function.arguments
-                                }
+                        let tool_calls_json: Vec<serde_json::Value> = tool_calls
+                            .iter()
+                            .map(|tc| {
+                                serde_json::json!({
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments
+                                    }
+                                })
                             })
-                        }).collect();
+                            .collect();
                         msg_obj["tool_calls"] = serde_json::Value::Array(tool_calls_json);
                     }
 
@@ -1096,15 +1105,20 @@ You are producing plain text that will later be styled by the CLI. Follow these 
 
         // Convert tools to ResponsesToolDefinition format
         let tools = if let Some(tools) = &request.tools {
-            Some(tools.iter().map(|tool| {
-                ResponsesToolDefinition {
-                    r#type: tool.r#type.clone(),
-                    name: tool.function.name.clone(),
-                    description: tool.function.description.clone(),
-                    strict: true, // Enable strict mode for better tool calling
-                    parameters: tool.function.parameters.clone(),
-                }
-            }).collect())
+            Some(
+                tools
+                    .iter()
+                    .map(|tool| {
+                        ResponsesToolDefinition {
+                            r#type: tool.r#type.clone(),
+                            name: tool.function.name.clone(),
+                            description: tool.function.description.clone(),
+                            strict: true, // Enable strict mode for better tool calling
+                            parameters: tool.function.parameters.clone(),
+                        }
+                    })
+                    .collect(),
+            )
         } else {
             None
         };
@@ -1133,7 +1147,10 @@ You are producing plain text that will later be styled by the CLI. Follow these 
     }
 
     /// Convert ResponsesApiResponse to LlmCompletionResponse
-    fn convert_from_responses_response(&self, response: ResponsesApiResponse) -> Result<LlmCompletionResponse> {
+    fn convert_from_responses_response(
+        &self,
+        response: ResponsesApiResponse,
+    ) -> Result<LlmCompletionResponse> {
         tracing::debug!(
             "Converting Responses API response with {} output items",
             response.output.len()
@@ -1161,7 +1178,12 @@ You are producing plain text that will later be styled by the CLI. Follow these 
                     // Reasoning items are internal to the model and don't contribute to the final response
                     // Just skip them
                 }
-                ResponseItem::FunctionCall { name, arguments, call_id, .. } => {
+                ResponseItem::FunctionCall {
+                    name,
+                    arguments,
+                    call_id,
+                    ..
+                } => {
                     tool_calls.push(LlmToolCall {
                         id: call_id.clone(),
                         r#type: "function".to_string(),
@@ -1179,8 +1201,16 @@ You are producing plain text that will later be styled by the CLI. Follow these 
             index: 0,
             message: Some(LlmMessage {
                 role: "assistant".to_string(),
-                content: if content_text.is_empty() { None } else { Some(content_text) },
-                tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+                content: if content_text.is_empty() {
+                    None
+                } else {
+                    Some(content_text)
+                },
+                tool_calls: if tool_calls.is_empty() {
+                    None
+                } else {
+                    Some(tool_calls)
+                },
                 function_call: None,
                 tool_call_id: None,
             }),
@@ -1538,8 +1568,6 @@ impl LlmClient for OpenAiCompatibleClient {
         })
     }
 
-
-
     fn extract_tool_calls_from_response(
         &self,
         response: &LlmCompletionResponse,
@@ -1698,7 +1726,8 @@ impl ClaudeClient {
                 {
                     // Check for tool result format (tool_use_id for Claude, tool_call_id for OpenAI-compatible)
                     if let (Some(tool_use_id), Some(content_value)) = (
-                        tool_result_data.get("tool_use_id")
+                        tool_result_data
+                            .get("tool_use_id")
                             .or_else(|| tool_result_data.get("tool_call_id"))
                             .and_then(|v| v.as_str()),
                         tool_result_data.get("content"),
@@ -2138,7 +2167,10 @@ impl LlmClient for ClaudeClient {
 /// Factory function to create LLM clients
 /// This uses the adapter pattern for Claude 4.5/4.1 models
 pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
-    match (config.provider.to_lowercase().as_str(), config.model.as_str()) {
+    match (
+        config.provider.to_lowercase().as_str(),
+        config.model.as_str(),
+    ) {
         // Claude 4.5/4.1 models - current generation (use adapter)
         ("anthropic" | "claude", model) if is_claude_45_or_41(model) => {
             let adapter = Box::new(adapters::ClaudeMessagesAdapter::new(config.clone())?);
@@ -2146,26 +2178,22 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
         }
 
         // Reject legacy Claude 3.x models with helpful error
-        ("anthropic" | "claude", model) if is_legacy_claude_model(model) => {
-            Err(anyhow::anyhow!(
-                "Legacy Claude model '{}' is not supported. Please use one of the current models:\n\
+        ("anthropic" | "claude", model) if is_legacy_claude_model(model) => Err(anyhow::anyhow!(
+            "Legacy Claude model '{}' is not supported. Please use one of the current models:\n\
                  - claude-sonnet-4-5-20250929 (or alias: claude-sonnet-4-5)\n\
                  - claude-haiku-4-5-20251001 (or alias: claude-haiku-4-5)\n\
                  - claude-opus-4-1-20250805 (or alias: claude-opus-4-1)",
-                model
-            ))
-        }
+            model
+        )),
 
         // Unknown Claude model
-        ("anthropic" | "claude", model) => {
-            Err(anyhow::anyhow!(
-                "Unknown Claude model '{}'. Supported models:\n\
+        ("anthropic" | "claude", model) => Err(anyhow::anyhow!(
+            "Unknown Claude model '{}'. Supported models:\n\
                  - claude-sonnet-4-5-20250929 (or alias: claude-sonnet-4-5)\n\
                  - claude-haiku-4-5-20251001 (or alias: claude-haiku-4-5)\n\
                  - claude-opus-4-1-20250805 (or alias: claude-opus-4-1)",
-                model
-            ))
-        }
+            model
+        )),
 
         // OpenAI, Grok, xAI - use existing client
         ("openai" | "grok" | "xai", _) => {
@@ -2185,18 +2213,21 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
 fn is_claude_45_or_41(model: &str) -> bool {
     matches!(
         model,
-        "claude-sonnet-4-5-20250929" | "claude-sonnet-4-5" |
-        "claude-haiku-4-5-20251001" | "claude-haiku-4-5" |
-        "claude-opus-4-1-20250805" | "claude-opus-4-1"
+        "claude-sonnet-4-5-20250929"
+            | "claude-sonnet-4-5"
+            | "claude-haiku-4-5-20251001"
+            | "claude-haiku-4-5"
+            | "claude-opus-4-1-20250805"
+            | "claude-opus-4-1"
     )
 }
 
 /// Helper function to check if a model is a legacy Claude model
 fn is_legacy_claude_model(model: &str) -> bool {
-    model.starts_with("claude-3-") ||
-    model == "claude-sonnet-4-20250514" ||
-    model == "claude-opus-4-20250514" ||
-    model == "claude-3-7-sonnet-20250219"
+    model.starts_with("claude-3-")
+        || model == "claude-sonnet-4-20250514"
+        || model == "claude-opus-4-20250514"
+        || model == "claude-3-7-sonnet-20250219"
 }
 
 /// Factory function to create LLM clients with model information

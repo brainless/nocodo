@@ -90,7 +90,11 @@ async fn test_llm_e2e_saleor() {
     for p in &projects {
         println!("     - Project {}: {} (path: {})", p.id, p.name, p.path);
     }
-    assert!(projects.iter().any(|p| p.id == project_id), "Project {} not found in database", project_id);
+    assert!(
+        projects.iter().any(|p| p.id == project_id),
+        "Project {} not found in database",
+        project_id
+    );
 
     // Create a test user in the database
     let test_user = nocodo_manager::models::User {
@@ -107,7 +111,7 @@ async fn test_llm_e2e_saleor() {
 
     // Read work title from prompts configuration
     let work_title = crate::common::keyword_validation::PromptsConfig::load_from_file(
-        std::path::Path::new("prompts/default.toml")
+        std::path::Path::new("prompts/default.toml"),
     )
     .map(|config| config.tech_stack_analysis.prompt.clone())
     .unwrap_or_else(|_| "Tech Stack Analysis".to_string());
@@ -118,7 +122,7 @@ async fn test_llm_e2e_saleor() {
         title: work_title,
         project_id: Some(project_id),
         model: Some(model.clone()),
-        auto_start: true,  // Auto-start creates work, message, and AI session
+        auto_start: true, // Auto-start creates work, message, and AI session
         tool_name: Some("llm-agent".to_string()),
     };
 
@@ -145,7 +149,10 @@ async fn test_llm_e2e_saleor() {
         let status = resp.status();
         let body = test::read_body(resp).await;
         let body_str = String::from_utf8_lossy(&body);
-        panic!("Failed to create work session. Status: {}, Body: {}", status, body_str);
+        panic!(
+            "Failed to create work session. Status: {}, Body: {}",
+            status, body_str
+        );
     }
 
     let body: serde_json::Value = test::read_body_json(resp).await;
@@ -204,8 +211,6 @@ async fn test_llm_e2e_saleor() {
                 has_new_outputs = true;
             }
         }
-
-
 
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
@@ -422,10 +427,11 @@ async fn test_llm_multiple_scenarios() {
             .set_json(&work_request)
             .to_request();
 
-        let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-            "/work",
-        web::post().to(handlers::create_work),
-        ))
+        let service = test::init_service(
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .route("/work", web::post().to(handlers::create_work)),
+        )
         .await;
         let resp = test::call_service(&service, req).await;
         assert!(resp.status().is_success());

@@ -49,7 +49,15 @@ where
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let path = req.path().to_string();
         let method = req.method().to_string();
-        tracing::info!("Incoming request: {} {} (auth required: {})", method, path, !matches!(path.as_str(), "/api/health" | "/api/auth/login" | "/api/auth/register"));
+        tracing::info!(
+            "Incoming request: {} {} (auth required: {})",
+            method,
+            path,
+            !matches!(
+                path.as_str(),
+                "/api/health" | "/api/auth/login" | "/api/auth/register"
+            )
+        );
 
         // Skip authentication for health check, login, and register endpoints
         if path == "/api/health" || path == "/api/auth/login" || path == "/api/auth/register" {
@@ -59,29 +67,23 @@ where
 
         // Get config from app state
         let jwt_secret = match req.app_data::<web::Data<crate::handlers::AppState>>() {
-            Some(state) => {
-                match state.config.read() {
-                    Ok(config) => {
-                        match config.auth.as_ref().and_then(|a| a.jwt_secret.as_ref()) {
-                            Some(secret) => secret.clone(),
-                            None => {
-                                return Box::pin(async {
-                                    Err(ErrorUnauthorized("JWT secret not configured"))
-                                });
-                            }
-                        }
-                    }
-                    Err(_) => {
+            Some(state) => match state.config.read() {
+                Ok(config) => match config.auth.as_ref().and_then(|a| a.jwt_secret.as_ref()) {
+                    Some(secret) => secret.clone(),
+                    None => {
                         return Box::pin(async {
-                            Err(ErrorUnauthorized("Server configuration error"))
+                            Err(ErrorUnauthorized("JWT secret not configured"))
                         });
                     }
+                },
+                Err(_) => {
+                    return Box::pin(async {
+                        Err(ErrorUnauthorized("Server configuration error"))
+                    });
                 }
-            }
+            },
             None => {
-                return Box::pin(async {
-                    Err(ErrorUnauthorized("Server configuration error"))
-                });
+                return Box::pin(async { Err(ErrorUnauthorized("Server configuration error")) });
             }
         };
 
@@ -96,9 +98,7 @@ where
             Some(h) => h,
             None => {
                 tracing::warn!("Auth failed: missing Authorization header");
-                return Box::pin(async {
-                    Err(ErrorUnauthorized("Missing Authorization header"))
-                });
+                return Box::pin(async { Err(ErrorUnauthorized("Missing Authorization header")) });
             }
         };
 
@@ -135,7 +135,7 @@ where
             Err(_) => {
                 tracing::warn!("Auth failed: invalid or expired token");
                 Box::pin(async { Err(ErrorUnauthorized("Invalid or expired token")) })
-            },
+            }
         }
     }
 }
@@ -234,7 +234,9 @@ where
             Some(state) => state.database.clone(),
             None => {
                 return Box::pin(async {
-                    Err(actix_web::error::ErrorInternalServerError("Database not available"))
+                    Err(actix_web::error::ErrorInternalServerError(
+                        "Database not available",
+                    ))
                 });
             }
         };
@@ -243,9 +245,7 @@ where
         let user_id = match get_user_id_from_request(&req) {
             Ok(id) => id,
             Err(_) => {
-                return Box::pin(async {
-                    Err(ErrorUnauthorized("Authentication required"))
-                });
+                return Box::pin(async { Err(ErrorUnauthorized("Authentication required")) });
             }
         };
 
@@ -263,12 +263,12 @@ where
             match crate::permissions::ResourceType::parse(&requirement.resource_type) {
                 Some(rt) => rt,
                 None => {
-                return Box::pin(async move {
-                    Err(actix_web::error::ErrorInternalServerError(format!(
-                        "Invalid resource type: {}",
-                        requirement.resource_type
-                    )))
-                });
+                    return Box::pin(async move {
+                        Err(actix_web::error::ErrorInternalServerError(format!(
+                            "Invalid resource type: {}",
+                            requirement.resource_type
+                        )))
+                    });
                 }
             };
 
@@ -307,9 +307,9 @@ where
                 Err(e) => {
                     // Error checking permission
                     tracing::error!("Permission check error: {}", e);
-                    Err(
-                        actix_web::error::ErrorInternalServerError("Permission check failed"),
-                    )
+                    Err(actix_web::error::ErrorInternalServerError(
+                        "Permission check failed",
+                    ))
                 }
             }
         })

@@ -822,10 +822,16 @@ impl Database {
         conn.execute("DELETE FROM project_components WHERE project_id = ?", [id])?;
 
         // Clean up ownership records for this project
-        conn.execute("DELETE FROM resource_ownership WHERE resource_type = 'project' AND resource_id = ?", [id])?;
+        conn.execute(
+            "DELETE FROM resource_ownership WHERE resource_type = 'project' AND resource_id = ?",
+            [id],
+        )?;
 
         // Clean up permissions referencing this specific project
-        conn.execute("DELETE FROM permissions WHERE resource_type = 'project' AND resource_id = ?", [id])?;
+        conn.execute(
+            "DELETE FROM permissions WHERE resource_type = 'project' AND resource_id = ?",
+            [id],
+        )?;
 
         let rows_affected = conn.execute("DELETE FROM projects WHERE id = ?", [id])?;
 
@@ -1217,10 +1223,16 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         // Clean up ownership records for this work
-        conn.execute("DELETE FROM resource_ownership WHERE resource_type = 'work' AND resource_id = ?", [id])?;
+        conn.execute(
+            "DELETE FROM resource_ownership WHERE resource_type = 'work' AND resource_id = ?",
+            [id],
+        )?;
 
         // Clean up permissions referencing this specific work
-        conn.execute("DELETE FROM permissions WHERE resource_type = 'work' AND resource_id = ?", [id])?;
+        conn.execute(
+            "DELETE FROM permissions WHERE resource_type = 'work' AND resource_id = ?",
+            [id],
+        )?;
 
         let rows_affected = conn.execute("DELETE FROM works WHERE id = ?", [id])?;
 

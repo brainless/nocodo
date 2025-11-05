@@ -8,7 +8,9 @@
 use actix_web::{test, web, App};
 use std::time::Instant;
 
-use nocodo_manager::models::{CreateTeamRequest, AddTeamMemberRequest, CreatePermissionRequest, CreateUserRequest};
+use nocodo_manager::models::{
+    AddTeamMemberRequest, CreatePermissionRequest, CreateTeamRequest, CreateUserRequest,
+};
 
 use crate::common::{TestApp, TestDataGenerator};
 
@@ -17,7 +19,10 @@ macro_rules! create_perf_test_routes {
     ($app:expr) => {
         $app
             // Auth endpoints
-            .route("/api/auth/register", web::post().to(nocodo_manager::handlers::register))
+            .route(
+                "/api/auth/register",
+                web::post().to(nocodo_manager::handlers::register),
+            )
             // Team management endpoints
             .service(
                 web::scope("/api/teams")
@@ -29,28 +34,36 @@ macro_rules! create_perf_test_routes {
                     .service(
                         web::scope("/{id}")
                             .route("", web::get().to(nocodo_manager::handlers::get_team))
-                            .route("/members", web::get().to(nocodo_manager::handlers::get_team_members))
-                            .route("/permissions", web::get().to(nocodo_manager::handlers::get_team_permissions))
+                            .route(
+                                "/members",
+                                web::get().to(nocodo_manager::handlers::get_team_members),
+                            )
+                            .route(
+                                "/permissions",
+                                web::get().to(nocodo_manager::handlers::get_team_permissions),
+                            )
                             .service(
-                                web::resource("/members")
-                                    .route(web::post().to(nocodo_manager::handlers::add_team_member)),
+                                web::resource("/members").route(
+                                    web::post().to(nocodo_manager::handlers::add_team_member),
+                                ),
                             ),
                     ),
             )
             // Permission management endpoints
-            .service(
-                web::scope("/api/permissions")
-                    .route("", web::post().to(nocodo_manager::handlers::create_permission))
-            )
+            .service(web::scope("/api/permissions").route(
+                "",
+                web::post().to(nocodo_manager::handlers::create_permission),
+            ))
     };
 }
 
 #[actix_rt::test]
 async fn test_performance_many_teams_and_permissions() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_perf_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_perf_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     let start_time = Instant::now();
 
@@ -59,7 +72,10 @@ async fn test_performance_many_teams_and_permissions() {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -109,7 +125,10 @@ async fn test_performance_many_teams_and_permissions() {
             username: format!("user{}", i),
             email: Some(format!("user{}@example.com", i)),
             password: "password123".to_string(),
-            ssh_public_key: Some(format!("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test{}@example.com", i)),
+            ssh_public_key: Some(format!(
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test{}@example.com",
+                i
+            )),
             ssh_fingerprint: Some(format!("SHA256:testfingerprint{}", i)),
         };
 
@@ -125,7 +144,10 @@ async fn test_performance_many_teams_and_permissions() {
         user_ids.push(body["user"]["id"].as_i64().unwrap());
     }
 
-    println!("✅ Registered 100 users: {:?}", user_registration_start.elapsed());
+    println!(
+        "✅ Registered 100 users: {:?}",
+        user_registration_start.elapsed()
+    );
 
     // 4. Add users to teams (distribute users across teams)
     let member_assignment_start = Instant::now();
@@ -147,7 +169,11 @@ async fn test_performance_many_teams_and_permissions() {
         assignment_count += 1;
     }
 
-    println!("✅ Assigned {} team memberships: {:?}", assignment_count, member_assignment_start.elapsed());
+    println!(
+        "✅ Assigned {} team memberships: {:?}",
+        assignment_count,
+        member_assignment_start.elapsed()
+    );
 
     // 5. Create permissions for each team (200 permissions total)
     let permission_creation_start = Instant::now();
@@ -181,7 +207,11 @@ async fn test_performance_many_teams_and_permissions() {
         }
     }
 
-    println!("✅ Created {} permissions: {:?}", permission_count, permission_creation_start.elapsed());
+    println!(
+        "✅ Created {} permissions: {:?}",
+        permission_count,
+        permission_creation_start.elapsed()
+    );
 
     // 6. Performance test: List all teams
     let list_teams_start = Instant::now();
@@ -196,12 +226,16 @@ async fn test_performance_many_teams_and_permissions() {
         assert_eq!(teams.len(), 51); // 50 created + 1 Super Admins
     }
 
-    println!("✅ 10 team listings (avg): {:?}", list_teams_start.elapsed() / 10);
+    println!(
+        "✅ 10 team listings (avg): {:?}",
+        list_teams_start.elapsed() / 10
+    );
 
     // 7. Performance test: Get team details with members and permissions
     let team_details_start = Instant::now();
 
-    for &team_id in &team_ids[..5] { // Test first 5 teams
+    for &team_id in &team_ids[..5] {
+        // Test first 5 teams
         // Get team details
         let req = test::TestRequest::get()
             .uri(&format!("/api/teams/{}", team_id))
@@ -227,7 +261,10 @@ async fn test_performance_many_teams_and_permissions() {
         assert!(resp.status().is_success());
     }
 
-    println!("✅ Team details queries (5 teams): {:?}", team_details_start.elapsed());
+    println!(
+        "✅ Team details queries (5 teams): {:?}",
+        team_details_start.elapsed()
+    );
 
     // 8. Verify final state
     let final_check_start = Instant::now();
@@ -275,7 +312,10 @@ async fn test_permission_check_performance() {
         for j in 0..num_teams {
             let team_index = (i + j) % team_ids.len();
             let team_id = team_ids[team_index];
-            test_app.db().add_team_member(team_id, user_id, Some(admin_user_id)).unwrap();
+            test_app
+                .db()
+                .add_team_member(team_id, user_id, Some(admin_user_id))
+                .unwrap();
         }
     }
 
@@ -288,12 +328,15 @@ async fn test_permission_check_performance() {
     let check_start = Instant::now();
     let mut check_count = 0;
 
-    for &user_id in &user_ids[..10] { // Test first 10 users
-        for &team_id in &team_ids[..5] { // Check against first 5 teams
+    for &user_id in &user_ids[..10] {
+        // Test first 10 users
+        for &team_id in &team_ids[..5] {
+            // Check against first 5 teams
             // This simulates the permission checking that happens in middleware
             let teams = test_app.db().get_user_teams(user_id).unwrap();
             for team in teams {
-                let has_perm = test_app.db()
+                let has_perm = test_app
+                    .db()
                     .team_has_permission(team.id, "project", Some(1), "write")
                     .unwrap();
                 check_count += 1;
@@ -302,12 +345,22 @@ async fn test_permission_check_performance() {
     }
 
     let check_duration = check_start.elapsed();
-    println!("✅ Permission checks ({} operations): {:?}", check_count, check_duration);
-    println!("   - Average per check: {:?}", check_duration / check_count as u32);
+    println!(
+        "✅ Permission checks ({} operations): {:?}",
+        check_count, check_duration
+    );
+    println!(
+        "   - Average per check: {:?}",
+        check_duration / check_count as u32
+    );
 
     // The test passes if it completes within reasonable time
     // With proper indexing, this should be fast even with many teams/users
-    assert!(check_duration.as_millis() < 1000, "Permission checks took too long: {:?}", check_duration);
+    assert!(
+        check_duration.as_millis() < 1000,
+        "Permission checks took too long: {:?}",
+        check_duration
+    );
 }
 
 #[actix_rt::test]
@@ -333,10 +386,14 @@ async fn test_database_query_performance() {
 
     // Distribute users across teams (each user in multiple teams)
     for (i, &user_id) in user_ids.iter().enumerate() {
-        for j in 0..3 { // Each user in 3 teams
+        for j in 0..3 {
+            // Each user in 3 teams
             let team_index = (i * 3 + j) % team_ids.len();
             let team_id = team_ids[team_index];
-            test_app.db().add_team_member(team_id, user_id, Some(admin_user_id)).unwrap();
+            test_app
+                .db()
+                .add_team_member(team_id, user_id, Some(admin_user_id))
+                .unwrap();
         }
     }
 
@@ -368,8 +425,17 @@ async fn test_database_query_performance() {
 
     let query_duration = query_start.elapsed();
     println!("✅ Database queries performance: {:?}", query_duration);
-    println!("   - Tested with {} teams, {} users, {} memberships", team_ids.len(), user_ids.len(), user_ids.len() * 3);
+    println!(
+        "   - Tested with {} teams, {} users, {} memberships",
+        team_ids.len(),
+        user_ids.len(),
+        user_ids.len() * 3
+    );
 
     // Should complete within reasonable time
-    assert!(query_duration.as_millis() < 500, "Database queries took too long: {:?}", query_duration);
+    assert!(
+        query_duration.as_millis() < 500,
+        "Database queries took too long: {:?}",
+        query_duration
+    );
 }

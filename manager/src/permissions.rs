@@ -251,10 +251,7 @@ mod tests {
 
     #[test]
     fn test_resource_type_parse() {
-        assert_eq!(
-            ResourceType::parse("project"),
-            Some(ResourceType::Project)
-        );
+        assert_eq!(ResourceType::parse("project"), Some(ResourceType::Project));
         assert_eq!(ResourceType::parse("work"), Some(ResourceType::Work));
         assert_eq!(
             ResourceType::parse("settings"),
@@ -266,10 +263,7 @@ mod tests {
             ResourceType::parse("ai_session"),
             Some(ResourceType::AiSession)
         );
-        assert_eq!(
-            ResourceType::parse("PROJECT"),
-            Some(ResourceType::Project)
-        ); // Case insensitive
+        assert_eq!(ResourceType::parse("PROJECT"), Some(ResourceType::Project)); // Case insensitive
         assert_eq!(ResourceType::parse("invalid"), None);
     }
 }

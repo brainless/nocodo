@@ -275,8 +275,10 @@ async fn test_multiple_team_memberships() {
     let team2_id = db.create_team(&team2).unwrap();
 
     // Add user to both teams
-    db.add_team_member(team1_id, user_id, Some(user_id)).unwrap();
-    db.add_team_member(team2_id, user_id, Some(user_id)).unwrap();
+    db.add_team_member(team1_id, user_id, Some(user_id))
+        .unwrap();
+    db.add_team_member(team2_id, user_id, Some(user_id))
+        .unwrap();
 
     // Grant different permissions to each team
     let permission1 = Permission::new(
@@ -759,7 +761,13 @@ fn test_bootstrap_first_user_creates_super_admin_team() {
     assert_eq!(team_permissions.len(), 6); // One permission per resource type
 
     // Verify admin permissions work
-    assert!(db.team_has_permission(team_id, "project", None, "admin").unwrap());
-    assert!(db.team_has_permission(team_id, "user", None, "admin").unwrap());
-    assert!(db.team_has_permission(team_id, "settings", None, "admin").unwrap());
+    assert!(db
+        .team_has_permission(team_id, "project", None, "admin")
+        .unwrap());
+    assert!(db
+        .team_has_permission(team_id, "user", None, "admin")
+        .unwrap());
+    assert!(db
+        .team_has_permission(team_id, "settings", None, "admin")
+        .unwrap());
 }

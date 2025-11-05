@@ -123,7 +123,7 @@ async fn test_llm_e2e_real_manager_saleor() {
 
     // Read work title from prompts configuration
     let work_title = crate::common::keyword_validation::PromptsConfig::load_from_file(
-        std::path::Path::new("prompts/default.toml")
+        std::path::Path::new("prompts/default.toml"),
     )
     .map(|config| config.tech_stack_analysis.prompt.clone())
     .unwrap_or_else(|_| "Tech Stack Analysis".to_string());

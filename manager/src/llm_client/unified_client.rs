@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use futures_util::Stream;
 use std::pin::Pin;
 
+use crate::llm_client::adapters::ProviderAdapter;
 use crate::llm_client::{
     LlmClient, LlmCompletionRequest, LlmCompletionResponse, LlmToolCall, StreamChunk,
 };
-use crate::llm_client::adapters::ProviderAdapter;
 use crate::models::LlmProviderConfig;
 
 /// Unified LLM client that delegates to provider-specific adapters

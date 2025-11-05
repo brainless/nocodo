@@ -25,16 +25,10 @@ pub trait ProviderAdapter: Send + Sync {
     fn supports_native_tools(&self) -> bool;
 
     /// Convert unified request to provider-specific format
-    fn prepare_request(
-        &self,
-        request: LlmCompletionRequest,
-    ) -> Result<Box<dyn ProviderRequest>>;
+    fn prepare_request(&self, request: LlmCompletionRequest) -> Result<Box<dyn ProviderRequest>>;
 
     /// Send request to provider and get raw response
-    async fn send_request(
-        &self,
-        request: Box<dyn ProviderRequest>,
-    ) -> Result<reqwest::Response>;
+    async fn send_request(&self, request: Box<dyn ProviderRequest>) -> Result<reqwest::Response>;
 
     /// Convert provider-specific response to unified format
     fn parse_response(&self, response_text: &str) -> Result<LlmCompletionResponse>;

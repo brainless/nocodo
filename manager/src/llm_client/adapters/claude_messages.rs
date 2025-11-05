@@ -2,14 +2,14 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::llm_client::{
-    LlmChoice, LlmCompletionRequest, LlmCompletionResponse, LlmMessage, LlmToolCall,
-    LlmToolCallFunction, LlmUsage, ToolChoice,
-};
 use crate::llm_client::adapters::{ProviderAdapter, ProviderRequest};
 use crate::llm_client::types::{
     ClaudeCompletionRequest, ClaudeCompletionResponse, ClaudeContentBlock, ClaudeMessage,
     ClaudeToolChoice, ClaudeToolDefinition,
+};
+use crate::llm_client::{
+    LlmChoice, LlmCompletionRequest, LlmCompletionResponse, LlmMessage, LlmToolCall,
+    LlmToolCallFunction, LlmUsage, ToolChoice,
 };
 use crate::models::LlmProviderConfig;
 
@@ -87,7 +87,8 @@ impl ClaudeMessagesAdapter {
             // Add tool calls if present (from conversation reconstruction)
             if let Some(tool_calls) = &message.tool_calls {
                 for tool_call in tool_calls {
-                    if let Ok(input) = serde_json::from_str::<Value>(&tool_call.function.arguments) {
+                    if let Ok(input) = serde_json::from_str::<Value>(&tool_call.function.arguments)
+                    {
                         content_blocks.push(ClaudeContentBlock::ToolUse {
                             id: tool_call.id.clone(),
                             name: tool_call.function.name.clone(),

@@ -10,8 +10,8 @@
 use actix_web::{test, web, App};
 
 use nocodo_manager::models::{
-    CreateTeamRequest, UpdateTeamRequest, AddTeamMemberRequest, CreatePermissionRequest,
-    CreateUserRequest
+    AddTeamMemberRequest, CreatePermissionRequest, CreateTeamRequest, CreateUserRequest,
+    UpdateTeamRequest,
 };
 
 use crate::common::TestApp;
@@ -21,10 +21,19 @@ macro_rules! create_test_routes {
     ($app:expr) => {
         $app
             // Health check
-            .route("/api/health", web::get().to(nocodo_manager::handlers::health_check))
+            .route(
+                "/api/health",
+                web::get().to(nocodo_manager::handlers::health_check),
+            )
             // Auth endpoints
-            .route("/api/auth/login", web::post().to(nocodo_manager::handlers::login))
-            .route("/api/auth/register", web::post().to(nocodo_manager::handlers::register))
+            .route(
+                "/api/auth/login",
+                web::post().to(nocodo_manager::handlers::login),
+            )
+            .route(
+                "/api/auth/register",
+                web::post().to(nocodo_manager::handlers::register),
+            )
             // Team management endpoints
             .service(
                 web::scope("/api/teams")
@@ -38,27 +47,40 @@ macro_rules! create_test_routes {
                             .route("", web::get().to(nocodo_manager::handlers::get_team))
                             .route("", web::put().to(nocodo_manager::handlers::update_team))
                             .route("", web::delete().to(nocodo_manager::handlers::delete_team))
-                            .route("/members", web::get().to(nocodo_manager::handlers::get_team_members))
-                            .route("/permissions", web::get().to(nocodo_manager::handlers::get_team_permissions))
-                            .service(
-                                web::resource("/members")
-                                    .route(web::post().to(nocodo_manager::handlers::add_team_member)),
+                            .route(
+                                "/members",
+                                web::get().to(nocodo_manager::handlers::get_team_members),
+                            )
+                            .route(
+                                "/permissions",
+                                web::get().to(nocodo_manager::handlers::get_team_permissions),
                             )
                             .service(
-                                web::scope("/members/{user_id}")
-                                    .route("", web::delete().to(nocodo_manager::handlers::remove_team_member)),
-                            ),
+                                web::resource("/members").route(
+                                    web::post().to(nocodo_manager::handlers::add_team_member),
+                                ),
+                            )
+                            .service(web::scope("/members/{user_id}").route(
+                                "",
+                                web::delete().to(nocodo_manager::handlers::remove_team_member),
+                            )),
                     ),
             )
             // Permission management endpoints
             .service(
                 web::scope("/api/permissions")
-                    .route("", web::get().to(nocodo_manager::handlers::list_permissions))
-                    .route("", web::post().to(nocodo_manager::handlers::create_permission))
-                    .service(
-                        web::scope("/{id}")
-                            .route("", web::delete().to(nocodo_manager::handlers::delete_permission)),
-                    ),
+                    .route(
+                        "",
+                        web::get().to(nocodo_manager::handlers::list_permissions),
+                    )
+                    .route(
+                        "",
+                        web::post().to(nocodo_manager::handlers::create_permission),
+                    )
+                    .service(web::scope("/{id}").route(
+                        "",
+                        web::delete().to(nocodo_manager::handlers::delete_permission),
+                    )),
             )
             // User management endpoints
             .service(
@@ -83,7 +105,10 @@ macro_rules! create_test_routes {
                     .service(
                         web::scope("/{id}")
                             .route("", web::get().to(nocodo_manager::handlers::get_project))
-                            .route("", web::delete().to(nocodo_manager::handlers::delete_project)),
+                            .route(
+                                "",
+                                web::delete().to(nocodo_manager::handlers::delete_project),
+                            ),
                     ),
             )
     };
@@ -92,16 +117,20 @@ macro_rules! create_test_routes {
 #[actix_rt::test]
 async fn test_complete_team_management_workflow() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     // 1. Register first user (should create Super Admins team)
     let register_req = CreateUserRequest {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -154,7 +183,10 @@ async fn test_complete_team_management_workflow() {
         username: "developer".to_string(),
         email: Some("dev@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint456".to_string()),
     };
 
@@ -170,7 +202,9 @@ async fn test_complete_team_management_workflow() {
     let second_user_id = body["user"]["id"].as_i64().unwrap();
 
     // 4. Add second user to developers team
-    let add_member_req = AddTeamMemberRequest { user_id: second_user_id };
+    let add_member_req = AddTeamMemberRequest {
+        user_id: second_user_id,
+    };
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/teams/{}/members", dev_team_id))
@@ -255,16 +289,20 @@ async fn test_complete_team_management_workflow() {
 #[actix_rt::test]
 async fn test_permission_revocation() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     // Create first user (Super Admin)
     let register_req = CreateUserRequest {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -352,16 +390,20 @@ async fn test_permission_revocation() {
 #[actix_rt::test]
 async fn test_team_member_removal() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     // Create first user (Super Admin)
     let register_req = CreateUserRequest {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -398,7 +440,10 @@ async fn test_team_member_removal() {
         username: "member".to_string(),
         email: Some("member@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint456".to_string()),
     };
 
@@ -414,7 +459,9 @@ async fn test_team_member_removal() {
     let member_user_id = body["user"]["id"].as_i64().unwrap();
 
     // Add member to team
-    let add_member_req = AddTeamMemberRequest { user_id: member_user_id };
+    let add_member_req = AddTeamMemberRequest {
+        user_id: member_user_id,
+    };
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/teams/{}/members", team_id))
@@ -438,7 +485,10 @@ async fn test_team_member_removal() {
 
     // Remove member from team
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/teams/{}/members/{}", team_id, member_user_id))
+        .uri(&format!(
+            "/api/teams/{}/members/{}",
+            team_id, member_user_id
+        ))
         .to_request();
 
     let resp = test::call_service(&service, req).await;
@@ -461,16 +511,20 @@ async fn test_team_member_removal() {
 #[actix_rt::test]
 async fn test_super_admin_permissions() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     // Register first user (should get Super Admin permissions)
     let register_req = CreateUserRequest {
         username: "superadmin".to_string(),
         email: Some("super@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -530,16 +584,20 @@ async fn test_super_admin_permissions() {
 #[actix_rt::test]
 async fn test_list_all_permissions_admin_only() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     // Register first user (Super Admin)
     let register_req = CreateUserRequest {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -552,7 +610,9 @@ async fn test_list_all_permissions_admin_only() {
     assert!(resp.status().is_success());
 
     // List all permissions (should work for admin)
-    let req = test::TestRequest::get().uri("/api/permissions").to_request();
+    let req = test::TestRequest::get()
+        .uri("/api/permissions")
+        .to_request();
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success());
 
@@ -564,16 +624,20 @@ async fn test_list_all_permissions_admin_only() {
 #[actix_rt::test]
 async fn test_team_deletion_cascades() {
     let test_app = TestApp::new().await;
-    let service = test::init_service(
-        create_test_routes!(App::new().app_data(test_app.app_state.clone()))
-    ).await;
+    let service = test::init_service(create_test_routes!(
+        App::new().app_data(test_app.app_state.clone())
+    ))
+    .await;
 
     // Create first user (Super Admin)
     let register_req = CreateUserRequest {
         username: "admin".to_string(),
         email: Some("admin@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint123".to_string()),
     };
 
@@ -626,7 +690,10 @@ async fn test_team_deletion_cascades() {
         username: "member".to_string(),
         email: Some("member@example.com".to_string()),
         password: "password123".to_string(),
-        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com".to_string()),
+        ssh_public_key: Some(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGmJyR2T/DLSG6Q4Y5l2Hg test2@example.com"
+                .to_string(),
+        ),
         ssh_fingerprint: Some("SHA256:testfingerprint456".to_string()),
     };
 
@@ -641,7 +708,9 @@ async fn test_team_deletion_cascades() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let member_user_id = body["user"]["id"].as_i64().unwrap();
 
-    let add_member_req = AddTeamMemberRequest { user_id: member_user_id };
+    let add_member_req = AddTeamMemberRequest {
+        user_id: member_user_id,
+    };
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/teams/{}/members", team_id))
@@ -678,7 +747,9 @@ async fn test_team_deletion_cascades() {
     assert_eq!(teams.len(), 1); // Only Super Admins remains
 
     // Verify permissions are gone (cascading delete)
-    let req = test::TestRequest::get().uri("/api/permissions").to_request();
+    let req = test::TestRequest::get()
+        .uri("/api/permissions")
+        .to_request();
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success());
 
