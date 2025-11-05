@@ -108,3 +108,49 @@ cargo clippy --manifest-path desktop-app/Cargo.toml
 - `reqwest`: HTTP client
 - `tokio`: Async runtime
 - `manager-models`: Shared data models with manager
+
+## Releasing
+
+To create a new release of the desktop app:
+
+### Prerequisites
+- Be on the `main` branch
+- Have a clean working directory
+- All changes committed and pushed
+
+### Release Process
+
+Run the release script from the project root:
+
+1. **Automatic patch version bump:**
+   ```bash
+   scripts/release-desktop-app.sh
+   ```
+   This will automatically increment the patch version (e.g., 0.1.0 → 0.1.1)
+
+2. **Manual version override:**
+   ```bash
+   scripts/release-desktop-app.sh 1.0.0
+   ```
+   Specify any semantic version to override the automatic bump
+
+The script can be run from anywhere and will automatically change to the project root.
+
+### What the script does:
+1. Verifies you're on the main branch
+2. Checks for a clean working directory
+3. Pulls latest changes
+4. Updates version in `Cargo.toml`
+5. Updates `Cargo.lock`
+6. Commits the version bump
+7. Creates a git tag (`desktop-app-v*`)
+8. Pushes commits and tags to GitHub
+
+### Automated Build
+Once the tag is pushed, GitHub Actions automatically:
+- Builds the Linux x86_64 binary
+- Creates a release archive
+- Publishes a GitHub Release with release notes
+- Attaches the build artifact to the release
+
+Monitor builds at: https://github.com/your-org/nocodo/actions
