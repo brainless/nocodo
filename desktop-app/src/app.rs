@@ -81,6 +81,31 @@ impl eframe::App for DesktopApp {
             }
         }
 
+        // Check if servers list needs refresh after SSH connection
+        if let Ok(mut refresh_needed) = self.state.ui_state.servers_refresh_needed.lock() {
+            if *refresh_needed {
+                tracing::info!("Refreshing servers list after successful SSH connection");
+                // Reload servers from database
+                if let Some(db) = &self.state.db {
+                    let mut stmt = db
+                        .prepare("SELECT host, user, key_path, COALESCE(port, 22) FROM servers")
+                        .expect("Could not prepare statement");
+                    let server_iter = stmt
+                        .query_map([], |row| {
+                            Ok(Server {
+                                host: row.get(0)?,
+                                user: row.get(1)?,
+                                key_path: row.get(2)?,
+                                port: row.get(3)?,
+                            })
+                        })
+                        .expect("Could not query servers");
+                    self.state.servers = server_iter.filter_map(|s| s.ok()).collect();
+                }
+                *refresh_needed = false;
+            }
+        }
+
         // Handle pending project details refresh
         if let Some(project_id) = self.state.pending_project_details_refresh.take() {
             tracing::info!(

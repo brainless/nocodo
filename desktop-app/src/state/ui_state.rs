@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Page {
@@ -21,7 +22,7 @@ pub enum ProjectDetailTab {
     Components,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiState {
     pub show_connection_dialog: bool,
     pub show_auth_dialog: bool,
@@ -56,4 +57,40 @@ pub struct UiState {
     pub pending_projects_refresh: bool,
     #[serde(skip)]
     pub pending_works_refresh: bool,
+    /// Flag to trigger servers list refresh after successful SSH connection
+    #[serde(skip)]
+    pub servers_refresh_needed: Arc<std::sync::Mutex<bool>>,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            show_connection_dialog: false,
+            show_auth_dialog: false,
+            show_new_work_dialog: false,
+            new_work_title: String::new(),
+            new_work_project_id: None,
+            new_work_model: None,
+            connection_error: None,
+            connected_host: None,
+            current_page: Page::default(),
+            selected_work_id: None,
+            reset_work_details_scroll: false,
+            local_server_running: false,
+            checking_local_server: false,
+            projects_default_path: String::new(),
+            ui_reference_card_titles: Vec::new(),
+            ui_reference_form_text: String::new(),
+            ui_reference_form_dropdown: None,
+            ui_reference_readme_content: String::new(),
+            expanded_tool_calls: std::collections::HashSet::new(),
+            project_detail_tab: ProjectDetailTab::default(),
+            selected_file_path: None,
+            expanded_folders: std::collections::HashSet::new(),
+            continue_message_input: String::new(),
+            pending_projects_refresh: false,
+            pending_works_refresh: false,
+            servers_refresh_needed: Arc::new(std::sync::Mutex::new(false)),
+        }
+    }
 }

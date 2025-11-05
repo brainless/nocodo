@@ -1,4 +1,4 @@
-use crate::state::{AppState, ConnectionState};
+use crate::state::{AppState, ConnectionState, Server};
 use egui::Context;
 use std::sync::Arc;
 
@@ -82,6 +82,10 @@ impl ConnectionDialog {
         let connection_manager = Arc::clone(&state.connection_manager);
         let result_arc = Arc::clone(&state.connection_result);
 
+        // Get a flag to signal when to refresh servers list
+        let servers_refresh_needed = Arc::new(std::sync::Mutex::new(false));
+        let servers_refresh_flag = Arc::clone(&servers_refresh_needed);
+
         tracing::info!(
             "Initiating SSH connection to {}@{}:{}",
             username,
@@ -98,6 +102,50 @@ impl ConnectionDialog {
             {
                 Ok(_) => {
                     tracing::info!("SSH tunnel established successfully");
+
+                    // Save server to database if not already saved
+                    // We need to do this here because SSH has successfully connected
+                    // Get the database path
+                    if let Some(config_dir) = dirs::config_dir() {
+                        let nocodo_dir = config_dir.join("nocodo");
+                        let db_path = nocodo_dir.join("local.sqlite3");
+
+                        if let Ok(db) = rusqlite::Connection::open(&db_path) {
+                            let new_server = Server {
+                                host: server.clone(),
+                                user: username.clone(),
+                                key_path: key_path.clone(),
+                                port,
+                            };
+
+                            // Check if this server already exists
+                            let exists: Result<i64, _> = db.query_row(
+                                "SELECT COUNT(*) FROM servers WHERE host = ?1 AND user = ?2 AND COALESCE(key_path, '') = COALESCE(?3, '') AND port = ?4",
+                                rusqlite::params![&new_server.host, &new_server.user, &new_server.key_path, new_server.port],
+                                |row| row.get(0),
+                            );
+
+                            if let Ok(count) = exists {
+                                if count == 0 {
+                                    // Insert the new server
+                                    if db.execute(
+                                        "INSERT INTO servers (host, user, key_path, port) VALUES (?1, ?2, ?3, ?4)",
+                                        rusqlite::params![&new_server.host, &new_server.user, &new_server.key_path, new_server.port],
+                                    ).is_ok() {
+                                        tracing::info!("Saved new server to database: {}@{}", username, server);
+                                        // Signal that servers list needs refresh
+                                        if let Ok(mut flag) = servers_refresh_flag.lock() {
+                                            *flag = true;
+                                        }
+                                    } else {
+                                        tracing::warn!("Failed to save server to database");
+                                    }
+                                } else {
+                                    tracing::debug!("Server already exists in database");
+                                }
+                            }
+                        }
+                    }
 
                     // Wait a moment for the tunnel to be fully ready
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -137,5 +185,8 @@ impl ConnectionDialog {
                 }
             }
         });
+
+        // Store the refresh flag in the state so we can check it in the UI loop
+        state.ui_state.servers_refresh_needed = servers_refresh_needed;
     }
 }
