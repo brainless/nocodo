@@ -220,13 +220,13 @@ async fn test_llm_e2e_saleor() {
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
             !output.content.is_empty() &&
+            !output.content.trim().starts_with("{\"text") && // Not structured assistant message with tool calls
             !output.content.trim().starts_with("{\"type") && // Not a tool call (with or without colon)
             !output.content.trim().starts_with("{\"files") && // Not a tool response
             !output.content.trim().starts_with("{\"content") && // Not a file content response
             !output.content.trim().starts_with("type") && // Not a malformed tool call
-            !output.content.trim().contains("\"type") && // Not containing tool call syntax
-            !output.content.trim().contains("read_file") && // Not containing tool names
-            !output.content.trim().contains("list_files") // Not containing tool names
+            // Only filter out if it's clearly a tool call/response, not just mentioning these words
+            !(output.content.trim().contains("\"tool_call\"") || output.content.trim().contains("\"tool_use_id\""))
         }) {
             response_content = output.content.clone();
             println!(

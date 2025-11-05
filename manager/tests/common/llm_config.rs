@@ -344,7 +344,7 @@ mod tests {
         assert_eq!(anthropic.api_key_env, "ANTHROPIC_API_KEY");
         assert!(anthropic
             .models
-            .contains(&"claude-3-sonnet-20240229".to_string()));
+            .contains(&"claude-sonnet-4-5-20250929".to_string()));
     }
 
     #[test]

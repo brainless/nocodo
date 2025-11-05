@@ -72,59 +72,80 @@ impl ClaudeMessagesAdapter {
                 text: message.content.as_deref().unwrap_or("").to_string(),
             }]
         } else if message.role == "assistant" {
-            // Handle assistant messages - check if they contain structured tool call data
+            // Handle assistant messages - prioritize tool_calls field over content parsing
+            let mut content_blocks = vec![];
+
+            // Add text content if present
             if let Some(content_str) = &message.content {
-                // Try to parse as structured tool call data first
-                if let Ok(assistant_data) = serde_json::from_str::<Value>(content_str) {
-                    if let (Some(text), Some(tool_calls_array)) = (
-                        assistant_data.get("text").and_then(|v| v.as_str()),
-                        assistant_data.get("tool_calls").and_then(|v| v.as_array()),
-                    ) {
-                        // Build content blocks with text + tool_use blocks
-                        let mut content_blocks = vec![];
+                if !content_str.trim().is_empty() {
+                    content_blocks.push(ClaudeContentBlock::Text {
+                        text: content_str.clone(),
+                    });
+                }
+            }
 
-                        // Add text block if present
-                        if !text.trim().is_empty() {
-                            content_blocks.push(ClaudeContentBlock::Text {
-                                text: text.to_string(),
-                            });
-                        }
+            // Add tool calls if present (from conversation reconstruction)
+            if let Some(tool_calls) = &message.tool_calls {
+                for tool_call in tool_calls {
+                    if let Ok(input) = serde_json::from_str::<Value>(&tool_call.function.arguments) {
+                        content_blocks.push(ClaudeContentBlock::ToolUse {
+                            id: tool_call.id.clone(),
+                            name: tool_call.function.name.clone(),
+                            input,
+                        });
+                    }
+                }
+            }
 
-                        // Add tool_use blocks
-                        for tool_call in tool_calls_array {
-                            if let (Some(id), Some(name), Some(args_str)) = (
-                                tool_call.get("id").and_then(|v| v.as_str()),
-                                tool_call
-                                    .get("function")
-                                    .and_then(|f| f.get("name"))
-                                    .and_then(|v| v.as_str()),
-                                tool_call
-                                    .get("function")
-                                    .and_then(|f| f.get("arguments"))
-                                    .and_then(|v| v.as_str()),
-                            ) {
-                                if let Ok(input) = serde_json::from_str::<Value>(args_str) {
-                                    content_blocks.push(ClaudeContentBlock::ToolUse {
-                                        id: id.to_string(),
-                                        name: name.to_string(),
-                                        input,
-                                    });
+            // If no content blocks were created, try parsing content as JSON (fallback for old format)
+            if content_blocks.is_empty() {
+                if let Some(content_str) = &message.content {
+                    if let Ok(assistant_data) = serde_json::from_str::<Value>(content_str) {
+                        if let (Some(text), Some(tool_calls_array)) = (
+                            assistant_data.get("text").and_then(|v| v.as_str()),
+                            assistant_data.get("tool_calls").and_then(|v| v.as_array()),
+                        ) {
+                            // Add text block if present
+                            if !text.trim().is_empty() {
+                                content_blocks.push(ClaudeContentBlock::Text {
+                                    text: text.to_string(),
+                                });
+                            }
+
+                            // Add tool_use blocks
+                            for tool_call in tool_calls_array {
+                                if let (Some(id), Some(name), Some(args_str)) = (
+                                    tool_call.get("id").and_then(|v| v.as_str()),
+                                    tool_call
+                                        .get("function")
+                                        .and_then(|f| f.get("name"))
+                                        .and_then(|v| v.as_str()),
+                                    tool_call
+                                        .get("function")
+                                        .and_then(|f| f.get("arguments"))
+                                        .and_then(|v| v.as_str()),
+                                ) {
+                                    if let Ok(input) = serde_json::from_str::<Value>(args_str) {
+                                        content_blocks.push(ClaudeContentBlock::ToolUse {
+                                            id: id.to_string(),
+                                            name: name.to_string(),
+                                            input,
+                                        });
+                                    }
                                 }
                             }
                         }
-
-                        return ClaudeMessage {
-                            role: message.role.clone(),
-                            content: content_blocks,
-                        };
                     }
                 }
-                // Fallback to text content
+            }
+
+            if content_blocks.is_empty() {
+                // Final fallback
                 vec![ClaudeContentBlock::Text {
-                    text: content_str.clone(),
+                    text: message.content.as_deref().unwrap_or("").to_string(),
                 }]
             } else {
-                vec![]
+                content_blocks
             }
         } else if let Some(content_str) = &message.content {
             vec![ClaudeContentBlock::Text {
@@ -353,6 +374,56 @@ mod tests {
         match &claude_message.content[0] {
             ClaudeContentBlock::Text { text } => assert_eq!(text, "Hello Claude"),
             _ => panic!("Expected text block"),
+        }
+    }
+
+    #[test]
+    fn test_assistant_message_with_tool_calls() {
+        let config = LlmProviderConfig {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5-20250929".to_string(),
+            api_key: "test-key".to_string(),
+            base_url: None,
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+        };
+
+        let adapter = ClaudeMessagesAdapter::new(config).unwrap();
+
+        // Test assistant message with tool calls (populated from conversation reconstruction)
+        let tool_call = crate::llm_client::LlmToolCall {
+            id: "call_123".to_string(),
+            r#type: "function".to_string(),
+            function: crate::llm_client::LlmToolCallFunction {
+                name: "read_file".to_string(),
+                arguments: r#"{"path":"test.txt"}"#.to_string(),
+            },
+        };
+
+        let assistant_message = LlmMessage {
+            role: "assistant".to_string(),
+            content: Some("I'll read that file for you.".to_string()),
+            tool_calls: Some(vec![tool_call]),
+            function_call: None,
+            tool_call_id: None,
+        };
+
+        let claude_message = adapter.convert_to_claude_message(&assistant_message);
+        assert_eq!(claude_message.role, "assistant");
+        assert_eq!(claude_message.content.len(), 2); // text + tool_use
+
+        match &claude_message.content[0] {
+            ClaudeContentBlock::Text { text } => assert_eq!(text, "I'll read that file for you."),
+            _ => panic!("Expected text block first"),
+        }
+
+        match &claude_message.content[1] {
+            ClaudeContentBlock::ToolUse { id, name, input } => {
+                assert_eq!(id, "call_123");
+                assert_eq!(name, "read_file");
+                assert_eq!(input["path"], "test.txt");
+            }
+            _ => panic!("Expected tool_use block second"),
         }
     }
 }

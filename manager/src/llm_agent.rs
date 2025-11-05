@@ -141,10 +141,42 @@ impl LlmAgent {
         // Build conversation for LLM
         let mut messages = Vec::new();
         for msg in &history {
+            // Parse assistant messages to extract tool calls from stored JSON format
+            let (content, tool_calls) = if msg.role == "assistant" {
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                    // Extract text content
+                    let text = assistant_data.get("text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    // Extract tool calls if present
+                    let tool_calls = if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                        let mut calls = Vec::new();
+                        for tool_call_value in tool_calls_array {
+                            if let Ok(tool_call) = serde_json::from_value::<crate::llm_client::LlmToolCall>(tool_call_value.clone()) {
+                                calls.push(tool_call);
+                            }
+                        }
+                        if calls.is_empty() { None } else { Some(calls) }
+                    } else {
+                        None
+                    };
+
+                    (if text.is_empty() { None } else { Some(text) }, tool_calls)
+                } else {
+                    // Not JSON format, use content as-is
+                    (Some(msg.content.clone()), None)
+                }
+            } else {
+                // Non-assistant messages use content as-is
+                (Some(msg.content.clone()), None)
+            };
+
             messages.push(LlmMessage {
                 role: msg.role.clone(),
-                content: Some(msg.content.clone()),
-                tool_calls: None,
+                content,
+                tool_calls,
                 function_call: None,
                 tool_call_id: None,
             });
@@ -393,10 +425,23 @@ impl LlmAgent {
             // Parse the tool arguments based on function name for native function calling
             let tool_request: crate::models::ToolRequest = match tool_call.function.name.as_str() {
                 "list_files" => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        tool_index = %index,
+                        arguments = %tool_call.function.arguments,
+                        "TOOL_DEBUG: Attempting to parse list_files arguments"
+                    );
                     match serde_json::from_str::<crate::models::ListFilesRequest>(
                         &tool_call.function.arguments,
                     ) {
-                        Ok(request) => crate::models::ToolRequest::ListFiles(request),
+                        Ok(request) => {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                "TOOL_DEBUG: Successfully parsed list_files arguments"
+                            );
+                            crate::models::ToolRequest::ListFiles(request)
+                        },
                         Err(e) => {
                             tracing::error!(
                                 session_id = %session_id,
@@ -648,10 +693,10 @@ impl LlmAgent {
         }
 
         // After processing all tool calls, follow up with LLM
-        tracing::warn!(  // Use warn to make it more visible
+        tracing::error!(  // Use error to ensure it's visible
             session_id = %session_id,
             tool_calls_count = %tool_calls.len(),
-            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls",
+            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls - REACHED END OF PROCESS_NATIVE_TOOL_CALLS",
             tool_calls.len()
         );
 
@@ -661,11 +706,23 @@ impl LlmAgent {
             "FOLLOW_UP_DEBUG: Checking if follow-up calls are enabled and agent is available"
         );
 
-        self.follow_up_with_llm_with_depth(session_id, 1).await?;
-        tracing::warn!(  // Use warn to make it more visible
-            session_id = %session_id,
-            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed successfully"
-        );
+        match self.follow_up_with_llm_with_depth(session_id, 1).await {
+            Ok(response) => {
+                tracing::warn!(  // Use warn to make it more visible
+                    session_id = %session_id,
+                    response_length = %response.len(),
+                    "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed successfully"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    session_id = %session_id,
+                    error = %e,
+                    "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth failed"
+                );
+                return Err(e);
+            }
+        }
 
         tracing::info!(
             session_id = %session_id,
@@ -690,7 +747,7 @@ impl LlmAgent {
         Box::pin(async move {
             const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
-            tracing::warn!(
+            tracing::error!(  // Use error to ensure it's visible
                 session_id = %session_id,
                 current_depth = %depth,
                 "FOLLOW_UP_DEBUG: ENTERED follow_up_with_llm_with_depth method - this should appear in both manual and E2E test"
