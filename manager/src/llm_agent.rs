@@ -141,10 +141,42 @@ impl LlmAgent {
         // Build conversation for LLM
         let mut messages = Vec::new();
         for msg in &history {
+            // Parse assistant messages to extract tool calls from stored JSON format
+            let (content, tool_calls) = if msg.role == "assistant" {
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                    // Extract text content
+                    let text = assistant_data.get("text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    // Extract tool calls if present
+                    let tool_calls = if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                        let mut calls = Vec::new();
+                        for tool_call_value in tool_calls_array {
+                            if let Ok(tool_call) = serde_json::from_value::<crate::llm_client::LlmToolCall>(tool_call_value.clone()) {
+                                calls.push(tool_call);
+                            }
+                        }
+                        if calls.is_empty() { None } else { Some(calls) }
+                    } else {
+                        None
+                    };
+
+                    (if text.is_empty() { None } else { Some(text) }, tool_calls)
+                } else {
+                    // Not JSON format, use content as-is
+                    (Some(msg.content.clone()), None)
+                }
+            } else {
+                // Non-assistant messages use content as-is
+                (Some(msg.content.clone()), None)
+            };
+
             messages.push(LlmMessage {
                 role: msg.role.clone(),
-                content: Some(msg.content.clone()),
-                tool_calls: None,
+                content,
+                tool_calls,
                 function_call: None,
                 tool_call_id: None,
             });
@@ -393,10 +425,23 @@ impl LlmAgent {
             // Parse the tool arguments based on function name for native function calling
             let tool_request: crate::models::ToolRequest = match tool_call.function.name.as_str() {
                 "list_files" => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        tool_index = %index,
+                        arguments = %tool_call.function.arguments,
+                        "TOOL_DEBUG: Attempting to parse list_files arguments"
+                    );
                     match serde_json::from_str::<crate::models::ListFilesRequest>(
                         &tool_call.function.arguments,
                     ) {
-                        Ok(request) => crate::models::ToolRequest::ListFiles(request),
+                        Ok(request) => {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                "TOOL_DEBUG: Successfully parsed list_files arguments"
+                            );
+                            crate::models::ToolRequest::ListFiles(request)
+                        },
                         Err(e) => {
                             tracing::error!(
                                 session_id = %session_id,
@@ -619,8 +664,12 @@ impl LlmAgent {
                 });
                 serde_json::to_string(&tool_result_content)?
             } else {
-                // For other providers, store tool results as simple JSON
-                serde_json::to_string(&response_value)?
+                // For OpenAI-compatible providers, store tool results with tool_call_id for follow-up reconstruction
+                let tool_result_content = serde_json::json!({
+                    "tool_call_id": tool_call.id,
+                    "content": response_value
+                });
+                serde_json::to_string(&tool_result_content)?
             };
             let message_id =
                 self.db
@@ -644,10 +693,10 @@ impl LlmAgent {
         }
 
         // After processing all tool calls, follow up with LLM
-        tracing::warn!(  // Use warn to make it more visible
+        tracing::error!(  // Use error to ensure it's visible
             session_id = %session_id,
             tool_calls_count = %tool_calls.len(),
-            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls",
+            "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls - REACHED END OF PROCESS_NATIVE_TOOL_CALLS",
             tool_calls.len()
         );
 
@@ -657,11 +706,23 @@ impl LlmAgent {
             "FOLLOW_UP_DEBUG: Checking if follow-up calls are enabled and agent is available"
         );
 
-        self.follow_up_with_llm_with_depth(session_id, 1).await?;
-        tracing::warn!(  // Use warn to make it more visible
-            session_id = %session_id,
-            "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed successfully"
-        );
+        match self.follow_up_with_llm_with_depth(session_id, 1).await {
+            Ok(response) => {
+                tracing::warn!(  // Use warn to make it more visible
+                    session_id = %session_id,
+                    response_length = %response.len(),
+                    "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth completed successfully"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    session_id = %session_id,
+                    error = %e,
+                    "FOLLOW_UP_DEBUG: follow_up_with_llm_with_depth failed"
+                );
+                return Err(e);
+            }
+        }
 
         tracing::info!(
             session_id = %session_id,
@@ -686,7 +747,7 @@ impl LlmAgent {
         Box::pin(async move {
             const MAX_RECURSION_DEPTH: u32 = 5; // Prevent infinite loops
 
-            tracing::warn!(
+            tracing::error!(  // Use error to ensure it's visible
                 session_id = %session_id,
                 current_depth = %depth,
                 "FOLLOW_UP_DEBUG: ENTERED follow_up_with_llm_with_depth method - this should appear in both manual and E2E test"
@@ -744,17 +805,8 @@ impl LlmAgent {
 
             let llm_client = create_llm_client(config)?;
 
-            // Build conversation for LLM (simplified to avoid conversation corruption)
-            let messages: Vec<_> = history
-                .into_iter()
-                .map(|msg| LlmMessage {
-                    role: msg.role,
-                    content: Some(msg.content),
-                    tool_calls: None,
-                    function_call: None,
-                    tool_call_id: None,
-                })
-                .collect();
+            // Build conversation for LLM with proper tool call reconstruction
+            let messages = self.reconstruct_conversation_for_followup(&history, session_id)?;
 
             tracing::debug!(
                 session_id = %session_id,
@@ -989,6 +1041,148 @@ impl LlmAgent {
         );
 
         Ok(())
+    }
+
+    /// Reconstruct conversation history for follow-up LLM calls with proper tool call handling
+    fn reconstruct_conversation_for_followup(
+        &self,
+        history: &[crate::models::LlmAgentMessage],
+        session_id: i64,
+    ) -> Result<Vec<LlmMessage>> {
+        let mut messages = Vec::new();
+        let mut tool_call_map = std::collections::HashMap::new();
+
+        tracing::info!(
+            session_id = %session_id,
+            message_count = %history.len(),
+            "CLAUDE_DEBUG: Starting conversation reconstruction for follow-up"
+        );
+
+        // First pass: collect tool calls from assistant messages
+        for msg in history {
+            if msg.role == "assistant" {
+                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                    if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                        for tool_call in tool_calls_array {
+                            if let Some(id) = tool_call.get("id").and_then(|v| v.as_str()) {
+                                tool_call_map.insert(id.to_string(), tool_call.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Second pass: reconstruct messages with proper tool call information
+        for msg in history {
+            match msg.role.as_str() {
+                "assistant" => {
+                    // Parse assistant message to extract text and tool calls
+                    if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                        let text = assistant_data.get("text")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        let tool_calls = if let Some(tool_calls_array) = assistant_data.get("tool_calls").and_then(|v| v.as_array()) {
+                            let mut calls = Vec::new();
+                            for tool_call_value in tool_calls_array {
+                                if let Ok(tool_call) = serde_json::from_value::<crate::llm_client::LlmToolCall>(tool_call_value.clone()) {
+                                    calls.push(tool_call);
+                                }
+                            }
+                            if calls.is_empty() { None } else { Some(calls) }
+                        } else {
+                            None
+                        };
+
+                        messages.push(LlmMessage {
+                            role: msg.role.clone(),
+                            content: if text.is_empty() { None } else { Some(text) },
+                            tool_calls,
+                            function_call: None,
+                            tool_call_id: None,
+                        });
+                    } else {
+                        // Fallback for non-JSON content
+                        messages.push(LlmMessage {
+                            role: msg.role.clone(),
+                            content: Some(msg.content.clone()),
+                            tool_calls: None,
+                            function_call: None,
+                            tool_call_id: None,
+                        });
+                    }
+                }
+                "tool" => {
+                    // Parse tool result and associate with tool call ID
+                    tracing::info!(
+                        session_id = %session_id,
+                        tool_message_content = %msg.content,
+                        "CLAUDE_DEBUG: Processing tool message in conversation reconstruction"
+                    );
+
+                    if let Ok(tool_result) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                        // For OpenAI-compatible providers, tool results should be sent as tool messages with tool_call_id
+                        // For Anthropic, they are converted to user messages in the client
+                        let tool_call_id = tool_result.get("tool_call_id")
+                            .or_else(|| tool_result.get("tool_use_id"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        let content_value = tool_result.get("content");
+
+                        tracing::info!(
+                            session_id = %session_id,
+                            tool_call_id = ?tool_call_id,
+                            content_type = %content_value.map(|v| v.to_string()).unwrap_or_else(|| "none".to_string()),
+                            "CLAUDE_DEBUG: Parsed tool result - tool_call_id and content"
+                        );
+
+                        messages.push(LlmMessage {
+                            role: "tool".to_string(),
+                            content: Some(msg.content.clone()),
+                            tool_calls: None,
+                            function_call: None,
+                            tool_call_id,
+                        });
+                    } else {
+                        // Fallback for non-JSON tool results
+                        tracing::warn!(
+                            session_id = %session_id,
+                            tool_content = %msg.content,
+                            "CLAUDE_DEBUG: Tool message is not valid JSON, using fallback"
+                        );
+                        messages.push(LlmMessage {
+                            role: "tool".to_string(),
+                            content: Some(msg.content.clone()),
+                            tool_calls: None,
+                            function_call: None,
+                            tool_call_id: None,
+                        });
+                    }
+                }
+                _ => {
+                    // System and user messages remain as-is
+                    messages.push(LlmMessage {
+                        role: msg.role.clone(),
+                        content: Some(msg.content.clone()),
+                        tool_calls: None,
+                        function_call: None,
+                        tool_call_id: None,
+                    });
+                }
+            }
+        }
+
+        tracing::debug!(
+            session_id = %session_id,
+            total_messages = %messages.len(),
+            tool_calls_found = %tool_call_map.len(),
+            "Reconstructed conversation for follow-up with proper tool call handling"
+        );
+
+        Ok(messages)
     }
 
     /// Create native tool definitions for supported providers

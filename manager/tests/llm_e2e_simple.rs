@@ -65,7 +65,7 @@ async fn test_simple_llm_e2e() {
         start_time: SystemTime::now(),
         ws_broadcaster,
         llm_agent,
-        config: Arc::new(AppConfig::default()),
+        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
     });
 
     // Create test app with minimal routes
@@ -91,7 +91,6 @@ async fn test_simple_llm_e2e() {
     let work = nocodo_manager::models::Work {
         id: 300, // Test ID
         title: "Test Work".to_string(),
-        tool_name: Some("llm_e2e_test".to_string()),
         model: Some("gpt-5".to_string()),
         status: "active".to_string(),
         project_id: None,

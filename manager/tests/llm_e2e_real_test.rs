@@ -1,6 +1,6 @@
 mod common;
 
-use actix_web::{test, web, App};
+use actix_web::{test, web, App, HttpMessage};
 use std::env;
 
 use crate::common::{
@@ -8,6 +8,7 @@ use crate::common::{
     llm_config::LlmTestConfig,
     TestApp,
 };
+use nocodo_manager::handlers;
 use nocodo_manager::models::{
     AddMessageRequest, CreateAiSessionRequest, CreateWorkRequest, MessageAuthorType,
     MessageContentType,
@@ -83,91 +84,81 @@ async fn test_llm_e2e_saleor() {
         .await
         .expect("Failed to create project from scenario");
 
+    // Verify project was created
+    let projects = test_app.db().get_all_projects().unwrap();
+    println!("   📁 Found {} projects in database", projects.len());
+    for p in &projects {
+        println!("     - Project {}: {} (path: {})", p.id, p.name, p.path);
+    }
+    assert!(projects.iter().any(|p| p.id == project_id), "Project {} not found in database", project_id);
+
+    // Create a test user in the database
+    let test_user = nocodo_manager::models::User {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+        password_hash: "test_hash".to_string(),
+        is_active: true,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+    };
+    test_app.db().create_user(&test_user).unwrap();
+    println!("   👤 Created test user with ID: {}", test_user.id);
+
+    // Read work title from prompts configuration
+    let work_title = crate::common::keyword_validation::PromptsConfig::load_from_file(
+        std::path::Path::new("prompts/default.toml")
+    )
+    .map(|config| config.tech_stack_analysis.prompt.clone())
+    .unwrap_or_else(|_| "Tech Stack Analysis".to_string());
+
     // Follow the exact manager-web homepage form flow:
-    // 1. Create the work
+    // 1. Create the work with auto_start=true (this creates work, message, and AI session automatically)
     let work_request = CreateWorkRequest {
-        title: "LLM E2E Test Work".to_string(),
+        title: work_title,
         project_id: Some(project_id),
         model: Some(model.clone()),
+        auto_start: true,  // Auto-start creates work, message, and AI session
+        tool_name: Some("llm-agent".to_string()),
     };
 
     let req = test::TestRequest::post()
-        .uri("/work")
+        .uri("/api/work")
         .set_json(&work_request)
         .to_request();
 
+    // Add mock user authentication for testing
+    let mock_user = nocodo_manager::models::UserInfo {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+    };
+    req.extensions_mut().insert(mock_user.clone());
+
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work",
+        "/api/work",
         web::post().to(nocodo_manager::handlers::create_work),
     ))
     .await;
     let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to create work session");
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        panic!("Failed to create work session. Status: {}, Body: {}", status, body_str);
+    }
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let work_id = body["work"]["id"].as_i64().expect("No work ID returned");
 
     println!("   ✅ Created work session: {}", work_id);
-
-    // 2. Add the initial message (using same values as browser: {"content_type":"text","author_type":"user"})
-    let message_request = AddMessageRequest {
-        content: scenario.prompt.clone(),
-        content_type: MessageContentType::Text, // serializes to "text"
-        author_type: MessageAuthorType::User,   // serializes to "user"
-        author_id: None,
-    };
-
-    let uri = format!("/work/{}/messages", work_id);
-    let req = test::TestRequest::post()
-        .uri(&uri)
-        .set_json(&message_request)
-        .to_request();
-
-    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work/{work_id}/messages",
-        web::post().to(nocodo_manager::handlers::add_message_to_work),
-    ))
-    .await;
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to add message to work");
-
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    let message_id = body["message"]["id"]
-        .as_i64()
-        .expect("No message ID returned");
-
-    println!("   ✅ Added initial message: {}", message_id);
-
-    // 3. Create the AI session with llm-agent tool
-    let ai_session_request = CreateAiSessionRequest {
-        message_id: message_id.to_string(),
-        tool_name: "llm-agent".to_string(),
-    };
-
-    let uri = format!("/work/{}/sessions", work_id);
-    let req = test::TestRequest::post()
-        .uri(&uri)
-        .set_json(&ai_session_request)
-        .to_request();
-
-    let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work/{work_id}/sessions",
-        web::post().to(nocodo_manager::handlers::create_ai_session),
-    ))
-    .await;
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success(), "Failed to create AI session");
-
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    let ai_session_id = body["session"]["id"]
-        .as_i64()
-        .expect("No AI session ID returned");
-
-    println!("   ✅ Created AI session: {}", ai_session_id);
     println!(
         "   ✅ Project context created from git repository: {}",
         scenario.context.git_repo
     );
+
+    // Record start time for timeout calculation
+    let start_time = std::time::Instant::now();
 
     // PHASE 3: Test real LLM interaction with keyword validation
     println!("\n🎯 Phase 3: Testing LLM interaction with keyword validation");
@@ -178,14 +169,21 @@ async fn test_llm_e2e_saleor() {
 
     // Give the AI session some time to process (background task + real API call takes time)
     // In real scenarios this would be done via WebSocket, but for testing we poll the database directly
-    let mut attempts = 0;
-    let max_attempts = 48; // 240 seconds total - give more time for tool calls
     let mut response_content = String::new();
     let mut printed_output_ids = std::collections::HashSet::new(); // Track which outputs we've printed
 
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        attempts += 1;
+
+        // Check for timeout (300 seconds from work creation)
+        let elapsed = start_time.elapsed();
+        if elapsed.as_secs() >= 300 {
+            println!(
+                "   ❌ Timeout waiting for AI response after {} seconds - no final text response received",
+                elapsed.as_secs()
+            );
+            panic!("Test failed: AI did not provide a final text response within 300 seconds");
+        }
 
         // Check AI session outputs using the manager API
         let ai_outputs = get_ai_outputs_for_work(&test_app, work_id)
@@ -207,107 +205,34 @@ async fn test_llm_e2e_saleor() {
             }
         }
 
-        // Debug: Print all outputs for analysis
-        if attempts == 5 {
-            // Print detailed debug info after 25 seconds
-            println!(
-                "   🔍 DEBUG: Total AI outputs after {} attempts: {}",
-                attempts,
-                ai_outputs.len()
-            );
-            for (i, output) in ai_outputs.iter().enumerate() {
-                println!(
-                    "   🔍 DEBUG: Output {}: content_len={}, preview={}",
-                    i,
-                    output.content.len(),
-                    if output.content.len() > 100 {
-                        format!("{}...", &output.content[..100])
-                    } else {
-                        output.content.clone()
-                    }
-                );
-            }
-        }
+
 
         // Check if we have a text response (not just tool calls)
         if let Some(output) = ai_outputs.iter().rev().find(|output| {
             !output.content.is_empty() &&
+            !output.content.trim().starts_with("{\"text") && // Not structured assistant message with tool calls
             !output.content.trim().starts_with("{\"type") && // Not a tool call (with or without colon)
             !output.content.trim().starts_with("{\"files") && // Not a tool response
             !output.content.trim().starts_with("{\"content") && // Not a file content response
             !output.content.trim().starts_with("type") && // Not a malformed tool call
-            !output.content.trim().contains("\"type") && // Not containing tool call syntax
-            !output.content.trim().contains("read_file") && // Not containing tool names
-            !output.content.trim().contains("list_files") // Not containing tool names
+            // Only filter out if it's clearly a tool call/response, not just mentioning these words
+            !(output.content.trim().contains("\"tool_call\"") || output.content.trim().contains("\"tool_use_id\""))
         }) {
             response_content = output.content.clone();
             println!(
-                "   ✅ AI text response received after {} attempts ({} seconds)",
-                attempts,
-                attempts * 5
+                "   ✅ AI text response received after {} seconds",
+                elapsed.as_secs()
             );
             break;
         }
 
-        // If we have tool responses with actual file content (not just directory listings), we can use those for validation
-        let has_file_content = ai_outputs.iter().any(
-            |output| {
-                // Look for actual file reads that contain configuration content (not just directory listings)
-                (output.content.contains("\"type\":\"read_file\"") && (
-                    output.content.contains("package.json") ||
-                    output.content.contains("pyproject.toml") ||
-                    output.content.contains("requirements") ||
-                    output.content.contains("django") ||
-                    output.content.contains("graphql") ||
-                    output.content.contains("postgresql") ||
-                    output.content.contains("uvicorn")
-                )) ||
-                // Or if we have a final text response with tech stack keywords
-                (output.content.contains("Django") && output.content.contains("Python") && output.content.contains("GraphQL"))
-            }
-        );
-
-        // If we have at least some outputs but no text response yet, keep waiting longer
-        if !ai_outputs.is_empty() && attempts < max_attempts - 8 && !has_file_content {
-            if has_new_outputs {
-                println!(
-                    "   🔧 Found {} total outputs, waiting for final text response...",
-                    ai_outputs.len()
-                );
-            }
-        } else if !ai_outputs.is_empty() {
-            // We have tool outputs but no final text - this might be the final state
-            // Combine all tool responses to extract keywords
-            let mut combined_content = String::new();
-            for output in ai_outputs.iter() {
-                if !output.content.is_empty() {
-                    combined_content.push_str(&output.content);
-                    combined_content.push(' ');
-                }
-            }
-
-            // For git-based approach, we rely on the LLM to analyze the cloned repository
-            let _combined_lower = combined_content.to_lowercase();
-            println!("   🔍 Analyzing response content for tech stack keywords");
-
-            response_content = combined_content;
-            println!("   📝 No final text response found, using combined tool responses for validation after {} attempts", attempts);
-            break;
-        }
-
-        if attempts >= max_attempts {
-            println!(
-                "   ⚠️  Timeout waiting for AI response after {} seconds",
-                max_attempts * 5
-            );
-            break;
-        }
+        // Continue waiting for a final text response
 
         // Only print waiting message if we didn't just print new outputs
         if !has_new_outputs {
             println!(
-                "   ⏳ Waiting for AI response... (attempt {}/{})",
-                attempts, max_attempts
+                "   ⏳ Waiting for AI response... ({}s elapsed)",
+                elapsed.as_secs()
             );
         }
     }
@@ -341,30 +266,7 @@ async fn test_llm_e2e_saleor() {
         }) {
             response_content = output.content.clone();
         } else {
-            // If no final text response, combine all tool responses to extract keywords
-            // This handles the case where LLM uses tools but doesn't provide a final summary
-            let mut combined_content = String::new();
-            for output in ai_outputs.iter() {
-                if !output.content.is_empty() {
-                    combined_content.push_str(&output.content);
-                    combined_content.push(' ');
-                }
-            }
-
-            println!(
-                "   📝 No final text response found, using combined tool responses for validation"
-            );
-            println!(
-                "   🔍 Combined content preview: {}...",
-                &combined_content[..std::cmp::min(200, combined_content.len())]
-            );
-
-            // If the combined tool responses don't contain all expected keywords,
-            // For git-based approach, we rely on the LLM to analyze the cloned repository
-            let _combined_lower = combined_content.to_lowercase();
-            println!("   🔍 Analyzing response content for tech stack keywords");
-
-            response_content = combined_content;
+            panic!("Test failed: No final text response from AI found - only tool calls or responses were received");
         }
     }
 
@@ -511,6 +413,8 @@ async fn test_llm_multiple_scenarios() {
             title: format!("Multi Scenario Work {}", i + 1),
             project_id: Some(project_id),
             model: Some(model),
+            auto_start: true,
+            tool_name: Some("llm-agent".to_string()),
         };
 
         let req = test::TestRequest::post()
@@ -520,7 +424,7 @@ async fn test_llm_multiple_scenarios() {
 
         let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
             "/work",
-            web::post().to(nocodo_manager::handlers::create_work),
+        web::post().to(handlers::create_work),
         ))
         .await;
         let resp = test::call_service(&service, req).await;
@@ -639,11 +543,19 @@ async fn get_ai_outputs_for_work(
     use actix_web::test;
 
     // Make API call to get AI session outputs using the manager API endpoint
-    let uri = format!("/work/{}/outputs", work_id);
+    let uri = format!("/api/work/{}/outputs", work_id);
     let req = test::TestRequest::get().uri(&uri).to_request();
 
+    // Add mock user authentication for testing
+    let mock_user = nocodo_manager::models::UserInfo {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+    };
+    req.extensions_mut().insert(mock_user);
+
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
-        "/work/{id}/outputs",
+        "/api/work/{id}/outputs",
         web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
     ))
     .await;

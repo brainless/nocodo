@@ -222,9 +222,9 @@ impl LlmProviderTestConfig {
         Self::anthropic_with_validation(None).unwrap_or_else(|| Self {
             name: "anthropic".to_string(),
             models: vec![
-                "claude-sonnet-4-20250514".to_string(),
-                "claude-3-sonnet-20240229".to_string(),
-                "claude-3-opus-20240229".to_string(),
+                "claude-sonnet-4-5-20250929".to_string(),
+                "claude-haiku-4-5-20251001".to_string(),
+                "claude-opus-4-1-20250805".to_string(),
             ],
             api_key_env: "ANTHROPIC_API_KEY".to_string(),
             enabled: false,
@@ -248,12 +248,16 @@ impl LlmProviderTestConfig {
 
     /// Get available Anthropic models from the actual provider implementation
     fn get_available_anthropic_models() -> Vec<String> {
-        // This would ideally query the actual provider, but for now we'll hardcode
-        // the models that are actually implemented in the provider
+        // Claude 4.5/4.1 models - current generation (ONLY these are supported)
         vec![
-            "claude-sonnet-4-20250514".to_string(),
-            "claude-3-sonnet-20240229".to_string(),
-            "claude-3-haiku-20240307".to_string(),
+            // Full model IDs
+            "claude-sonnet-4-5-20250929".to_string(),
+            "claude-haiku-4-5-20251001".to_string(),
+            "claude-opus-4-1-20250805".to_string(),
+            // Aliases (for convenience)
+            "claude-sonnet-4-5".to_string(),
+            "claude-haiku-4-5".to_string(),
+            "claude-opus-4-1".to_string(),
         ]
     }
 
@@ -284,6 +288,9 @@ impl LlmProviderTestConfig {
             socket: SocketConfig {
                 path: "/tmp/test.sock".to_string(),
             },
+            auth: Some(nocodo_manager::config::AuthConfig {
+                jwt_secret: Some("test-jwt-secret-for-llm-tests".to_string()),
+            }),
             api_keys: Some(ApiKeysConfig {
                 xai_api_key: if self.name == "xai" {
                     api_key.clone()
@@ -302,7 +309,6 @@ impl LlmProviderTestConfig {
                 },
             }),
             projects: None,
-            jwt_secret: Some("test-jwt-secret-for-llm-tests".to_string()),
         }
     }
 }
@@ -338,7 +344,7 @@ mod tests {
         assert_eq!(anthropic.api_key_env, "ANTHROPIC_API_KEY");
         assert!(anthropic
             .models
-            .contains(&"claude-3-sonnet-20240229".to_string()));
+            .contains(&"claude-sonnet-4-5-20250929".to_string()));
     }
 
     #[test]

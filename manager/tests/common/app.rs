@@ -327,11 +327,23 @@ impl TestApp {
         // Create a test project directory in /tmp with dynamic naming
         let temp_dir = std::env::temp_dir();
         let project_dir_name = format!("nocodo-test-{}", project_name);
-        let project_path = temp_dir.join(&project_dir_name);
+        let mut project_path = temp_dir.join(&project_dir_name);
 
         // Remove existing directory if it exists
         if project_path.exists() {
-            fs::remove_dir_all(&project_path)?;
+            // Try to remove, but don't fail if it doesn't work (might be in use by another process)
+            let _ = fs::remove_dir_all(&project_path);
+            // Wait a bit and try again
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            if project_path.exists() {
+                // If it still exists, use a unique name
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis();
+                let project_dir_name = format!("nocodo-test-{}-{}", project_name, timestamp);
+                project_path = temp_dir.join(&project_dir_name);
+            }
         }
 
         // Clone the git repository with depth 1 for faster testing
