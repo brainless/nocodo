@@ -143,6 +143,13 @@ async fn main() -> AppResult<()> {
                                         .route(web::post().to(handlers::add_existing_project)),
                                 )
                                 .service(
+                                    web::resource("/scan")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("project", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::scan_projects)),
+                                )
+                                .service(
                                     web::scope("/{id}")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("project", "read")
@@ -303,13 +310,6 @@ async fn main() -> AppResult<()> {
                                         ))
                                         .route(web::post().to(handlers::set_projects_default_path)),
                                 ),
-                        )
-                        .service(
-                            web::resource("/projects/scan")
-                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
-                                    "project", "write",
-                                )))
-                                .route(web::post().to(handlers::scan_projects)),
                         )
                         .service(
                             web::resource("/models")
