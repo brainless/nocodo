@@ -147,9 +147,9 @@ The script can be run from anywhere and will automatically change to the project
 
 ### Automated Build
 Once the tag is pushed, GitHub Actions automatically:
-- Builds the Linux x86_64 binary
-- Creates a release archive
+- Builds binaries for Linux x86_64 and macOS x86_64
+- Creates release archives for each platform
 - Publishes a GitHub Release with release notes
-- Attaches the build artifact to the release
+- Attaches the build artifacts to the release
 
 Monitor builds at: https://github.com/your-org/nocodo/actions
