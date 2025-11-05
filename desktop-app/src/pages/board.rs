@@ -434,10 +434,8 @@ impl crate::pages::Page for WorkPage {
 
                                                                 // 2. Try to parse as direct ToolRequest (fallback format)
                                                                 if requests.is_empty() {
-                                                                    if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        if let ToolRequest::ListFiles(list_files_req) = tool_request {
-                                                                            requests.push(list_files_req);
-                                                                        }
+                                                                    if let Ok(ToolRequest::ListFiles(list_files_req)) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        requests.push(list_files_req);
                                                                     }
                                                                 }
 
@@ -524,10 +522,8 @@ impl crate::pages::Page for WorkPage {
 
                                                                 // Try to parse as direct ToolRequest (fallback format)
                                                                 if requests.is_empty() {
-                                                                    if let Ok(tool_request) = serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        if let ToolRequest::ReadFile(read_file_req) = tool_request {
-                                                                            requests.push(read_file_req);
-                                                                        }
+                                                                    if let Ok(ToolRequest::ReadFile(read_file_req)) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        requests.push(read_file_req);
                                                                     }
                                                                 }
 

@@ -7,6 +7,8 @@
 //! - Permission revocation
 //! - Bootstrap logic for first user
 
+#![allow(unused_variables)]
+
 use actix_web::{test, web, App};
 
 use nocodo_manager::models::{

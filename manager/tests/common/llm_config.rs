@@ -48,6 +48,7 @@ impl Default for LlmTestTimeouts {
 
 impl LlmTestConfig {
     /// Create configuration from environment variables
+    #[allow(dead_code)]
     pub fn from_environment() -> Self {
         let mut providers = Vec::new();
 
@@ -89,11 +90,13 @@ impl LlmTestConfig {
     }
 
     /// Check if any LLM providers are available
+    #[allow(dead_code)]
     pub fn has_available_providers(&self) -> bool {
         !self.enabled_providers.is_empty()
     }
 
     /// Get the first available provider for simple tests
+    #[allow(dead_code)]
     pub fn get_default_provider(&self) -> Option<&LlmProviderTestConfig> {
         self.enabled_providers.first()
     }

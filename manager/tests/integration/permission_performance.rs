@@ -5,6 +5,9 @@
 //! - Query optimization for permission checks
 //! - Scalability testing
 
+#![allow(unused_variables)]
+#![allow(clippy::needless_borrow)]
+
 use actix_web::{test, web, App};
 use std::time::Instant;
 

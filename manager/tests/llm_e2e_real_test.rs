@@ -1,3 +1,6 @@
+#![allow(unused_variables)]
+#![allow(unused_assignments)]
+
 mod common;
 
 use actix_web::{test, web, App, HttpMessage};

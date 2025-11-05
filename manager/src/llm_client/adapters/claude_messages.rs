@@ -325,6 +325,78 @@ impl ProviderRequest for ClaudeCompletionRequest {
     }
 }
 
+#[async_trait]
+impl ProviderAdapter for ClaudeMessagesAdapter {
+    fn get_api_url(&self) -> String {
+        if let Some(base_url) = &self.config.base_url {
+            format!("{}/v1/messages", base_url.trim_end_matches('/'))
+        } else {
+            "https://api.anthropic.com/v1/messages".to_string()
+        }
+    }
+
+    fn supports_native_tools(&self) -> bool {
+        true // All Claude 4.5/4.1 models support native tools
+    }
+
+    fn prepare_request(&self, request: LlmCompletionRequest) -> Result<Box<dyn ProviderRequest>> {
+        // Apply config defaults
+        let mut request = request;
+        if request.max_tokens.is_none() {
+            request.max_tokens = self.config.max_tokens;
+        }
+        if request.temperature.is_none() {
+            request.temperature = self.config.temperature;
+        }
+
+        let claude_request = self.convert_request(request);
+        Ok(Box::new(claude_request))
+    }
+
+    async fn send_request(&self, request: Box<dyn ProviderRequest>) -> Result<reqwest::Response> {
+        let json = request.to_json()?;
+        let headers = request.custom_headers();
+
+        let mut req = self
+            .client
+            .post(self.get_api_url())
+            .header("x-api-key", &self.config.api_key)
+            .header("Content-Type", "application/json");
+
+        // Add custom headers
+        for (key, value) in headers {
+            req = req.header(&key, &value);
+        }
+
+        let response = req.json(&json).send().await?;
+
+        Ok(response)
+    }
+
+    fn parse_response(&self, response_text: &str) -> Result<LlmCompletionResponse> {
+        let claude_response: ClaudeCompletionResponse = serde_json::from_str(response_text)?;
+        Ok(self.convert_response(claude_response))
+    }
+
+    fn extract_tool_calls(&self, response: &LlmCompletionResponse) -> Vec<LlmToolCall> {
+        // Tool calls are already in the message from conversion
+        response
+            .choices
+            .first()
+            .and_then(|choice| choice.message.as_ref())
+            .and_then(|message| message.tool_calls.clone())
+            .unwrap_or_default()
+    }
+
+    fn provider_name(&self) -> &str {
+        &self.config.provider
+    }
+
+    fn model_name(&self) -> &str {
+        &self.config.model
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,77 +498,5 @@ mod tests {
             }
             _ => panic!("Expected tool_use block second"),
         }
-    }
-}
-
-#[async_trait]
-impl ProviderAdapter for ClaudeMessagesAdapter {
-    fn get_api_url(&self) -> String {
-        if let Some(base_url) = &self.config.base_url {
-            format!("{}/v1/messages", base_url.trim_end_matches('/'))
-        } else {
-            "https://api.anthropic.com/v1/messages".to_string()
-        }
-    }
-
-    fn supports_native_tools(&self) -> bool {
-        true // All Claude 4.5/4.1 models support native tools
-    }
-
-    fn prepare_request(&self, request: LlmCompletionRequest) -> Result<Box<dyn ProviderRequest>> {
-        // Apply config defaults
-        let mut request = request;
-        if request.max_tokens.is_none() {
-            request.max_tokens = self.config.max_tokens;
-        }
-        if request.temperature.is_none() {
-            request.temperature = self.config.temperature;
-        }
-
-        let claude_request = self.convert_request(request);
-        Ok(Box::new(claude_request))
-    }
-
-    async fn send_request(&self, request: Box<dyn ProviderRequest>) -> Result<reqwest::Response> {
-        let json = request.to_json()?;
-        let headers = request.custom_headers();
-
-        let mut req = self
-            .client
-            .post(self.get_api_url())
-            .header("x-api-key", &self.config.api_key)
-            .header("Content-Type", "application/json");
-
-        // Add custom headers
-        for (key, value) in headers {
-            req = req.header(&key, &value);
-        }
-
-        let response = req.json(&json).send().await?;
-
-        Ok(response)
-    }
-
-    fn parse_response(&self, response_text: &str) -> Result<LlmCompletionResponse> {
-        let claude_response: ClaudeCompletionResponse = serde_json::from_str(response_text)?;
-        Ok(self.convert_response(claude_response))
-    }
-
-    fn extract_tool_calls(&self, response: &LlmCompletionResponse) -> Vec<LlmToolCall> {
-        // Tool calls are already in the message from conversion
-        response
-            .choices
-            .first()
-            .and_then(|choice| choice.message.as_ref())
-            .and_then(|message| message.tool_calls.clone())
-            .unwrap_or_default()
-    }
-
-    fn provider_name(&self) -> &str {
-        &self.config.provider
-    }
-
-    fn model_name(&self) -> &str {
-        &self.config.model
     }
 }

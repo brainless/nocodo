@@ -273,7 +273,6 @@ pub struct LlmCompletionChunk {
 }
 
 /// OpenAI Responses API structures
-
 /// Content item for Responses API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -365,6 +364,7 @@ pub struct ResponsesApiResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
 pub enum ResponsesStreamEvent {
     #[serde(rename = "response.created")]
     ResponseCreated { response: serde_json::Value },
@@ -1104,24 +1104,20 @@ You are producing plain text that will later be styled by the CLI. Follow these 
         }
 
         // Convert tools to ResponsesToolDefinition format
-        let tools = if let Some(tools) = &request.tools {
-            Some(
-                tools
-                    .iter()
-                    .map(|tool| {
-                        ResponsesToolDefinition {
-                            r#type: tool.r#type.clone(),
-                            name: tool.function.name.clone(),
-                            description: tool.function.description.clone(),
-                            strict: true, // Enable strict mode for better tool calling
-                            parameters: tool.function.parameters.clone(),
-                        }
-                    })
-                    .collect(),
-            )
-        } else {
-            None
-        };
+        let tools = request.tools.as_ref().map(|tools| {
+            tools
+                .iter()
+                .map(|tool| {
+                    ResponsesToolDefinition {
+                        r#type: tool.r#type.clone(),
+                        name: tool.function.name.clone(),
+                        description: tool.function.description.clone(),
+                        strict: true, // Enable strict mode for better tool calling
+                        parameters: tool.function.parameters.clone(),
+                    }
+                })
+                .collect()
+        });
 
         // Determine tool_choice
         let tool_choice = if tools.is_some() {
@@ -1163,14 +1159,11 @@ You are producing plain text that will later be styled by the CLI. Follow these 
             match item {
                 ResponseItem::Message { content, .. } => {
                     for content_item in content {
-                        match content_item {
-                            ContentItem::OutputText { text, .. } => {
-                                if !content_text.is_empty() {
-                                    content_text.push('\n');
-                                }
-                                content_text.push_str(text);
+                        if let ContentItem::OutputText { text, .. } = content_item {
+                            if !content_text.is_empty() {
+                                content_text.push('\n');
                             }
-                            _ => {}
+                            content_text.push_str(text);
                         }
                     }
                 }
