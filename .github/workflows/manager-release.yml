@@ -11,6 +11,8 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=lld"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
