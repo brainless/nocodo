@@ -58,7 +58,7 @@ jobs:
           files: nocodo-manager-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
           draft: false
           prerelease: false
-         env:
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
