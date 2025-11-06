@@ -11,8 +11,6 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "-C linker=mold"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,11 +21,6 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
