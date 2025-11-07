@@ -2011,7 +2011,7 @@ impl Database {
         )?;
 
         let user_id = conn.last_insert_rowid();
-        tracing::info!("Created user: {} ({})", user.username, user_id);
+        tracing::info!("Created user: {} ({})", user.name, user_id);
         Ok(user_id)
     }
 
@@ -2332,7 +2332,7 @@ impl Database {
                 email: row.get(2)?,
                 role: row.get(3)?,
                 password_hash: row.get(4)?,
-                is_active: row.get(5)?,
+                is_active: row.get::<_, i64>(5)? != 0,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
                 last_login_at: row.get(8)?,
