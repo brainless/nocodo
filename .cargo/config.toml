@@ -3,6 +3,5 @@ incremental = true
 rustc-wrapper = "/usr/bin/sccache"
 
 [target.x86_64-unknown-linux-gnu]
-rustc-wrapper = "/usr/bin/sccache"
 linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
