@@ -546,4 +546,75 @@ impl ApiService {
         // This will be implemented with actual API calls
         Ok(())
     }
+
+    // User management methods
+    pub fn refresh_users(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_users = true;
+            state.users_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.users_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.list_users().await;
+                    *result_clone.lock().unwrap() = Some(result.map_err(|e| e.to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn refresh_teams(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_teams = true;
+            state.teams_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.teams_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.list_teams().await;
+                    *result_clone.lock().unwrap() = Some(result.map_err(|e| e.to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn update_user(&self, state: &mut AppState, user_id: i64, request: manager_models::UpdateUserRequest) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.updating_user = true;
+            state.update_user_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.update_user_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.update_user(user_id, request).await;
+                    *result_clone.lock().unwrap() = Some(result.map_err(|e| e.to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn apply_user_search_filter(&self, state: &mut AppState) {
+        let query = state.user_search_query.to_lowercase();
+        if query.is_empty() {
+            state.filtered_users = state.users.clone();
+        } else {
+            state.filtered_users = state.users
+                .iter()
+                .filter(|u| {
+                    u.name.to_lowercase().contains(&query) ||
+                    u.email.to_lowercase().contains(&query)
+                })
+                .cloned()
+                .collect();
+        }
+    }
 }

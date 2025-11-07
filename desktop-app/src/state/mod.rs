@@ -61,6 +61,31 @@ pub struct AppState {
     pub settings: Option<manager_models::SettingsResponse>,
     pub supported_models: Vec<manager_models::SupportedModel>,
 
+    // Users management
+    pub users: Vec<manager_models::User>,
+    pub filtered_users: Vec<manager_models::User>,
+    pub user_search_query: String,
+    pub selected_user_ids: std::collections::HashSet<i64>,
+    pub loading_users: bool,
+    #[serde(skip)]
+    pub users_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::User>, String>>>>,
+
+    // User detail modal
+    pub show_user_modal: bool,
+    pub editing_user: Option<manager_models::User>,
+    pub editing_user_teams: Vec<i64>,
+
+    // Teams
+    pub teams: Vec<manager_models::Team>,
+    pub loading_teams: bool,
+    #[serde(skip)]
+    pub teams_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Team>, String>>>>,
+
+    // Update results
+    #[serde(skip)]
+    pub update_user_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub updating_user: bool,
+
     // Favorite state
     pub favorite_projects: std::collections::HashSet<i64>,
 

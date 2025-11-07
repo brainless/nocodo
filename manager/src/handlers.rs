@@ -11,9 +11,9 @@ use crate::models::{
     CreateProjectRequest, CreateTeamRequest, CreateWorkRequest, FileContentResponse,
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
     FileUpdateRequest, LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse,
-    ProjectResponse, ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest, UpdateTeamRequest,
-    UpdateUserRequest, User, UserListResponse, UserResponse, WorkListResponse, WorkMessageResponse,
-    WorkResponse,
+    ProjectResponse, SearchQuery, ServerStatus, SettingsResponse, Team, TeamListResponse,
+    UpdateApiKeysRequest, UpdateTeamRequest, UpdateUserRequest, User, UserDetailResponse,
+    UserListResponse, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -300,10 +300,41 @@ pub async fn update_user(
         .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
 
     // Update user
-    data.database.update_user(user_id, &update_req)?;
+    data.database.update_user(
+        user_id,
+        update_req.name.as_deref(),
+        update_req.email.as_deref(),
+    )?;
+
+    // Update team memberships if provided
+    if let Some(team_ids) = &update_req.team_ids {
+        data.database.update_user_teams(user_id, team_ids)?;
+    }
 
     let user = data.database.get_user_by_id(user_id)?;
     let response = UserResponse { user };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn search_users(
+    data: web::Data<AppState>,
+    query: web::Query<SearchQuery>,
+    _req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let search_query = query.into_inner();
+    let users = data.database.search_users(&search_query.q)?;
+    let response = UserListResponse { users };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn get_user_teams(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    _req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let user_id = path.into_inner();
+    let teams = data.database.get_user_teams(user_id)?;
+    let response = TeamListResponse { teams };
     Ok(HttpResponse::Ok().json(response))
 }
 

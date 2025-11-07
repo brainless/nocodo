@@ -7,6 +7,8 @@ pub enum Page {
     Work,
     ProjectDetail(i64), // Project ID
     Mentions,
+    Users,
+    Teams,
     #[default]
     Servers,
     Settings,

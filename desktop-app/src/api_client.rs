@@ -1,7 +1,8 @@
 use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
-    ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
-    UpdateApiKeysRequest, Work, WorkListResponse, WorkResponse,
+    ProjectListResponse, SearchQuery, ServerStatus, SettingsResponse, SupportedModelsResponse,
+    Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, User, UserDetailResponse,
+    UserListResponse, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -489,6 +490,107 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(login_response)
+    }
+
+    pub async fn list_users(&self) -> Result<Vec<User>, ApiError> {
+        let url = format!("{}/api/users", self.base_url);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let user_response: UserListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(user_response.users)
+    }
+
+    pub async fn get_user(&self, user_id: i64) -> Result<UserDetailResponse, ApiError> {
+        let url = format!("{}/api/users/{}", self.base_url, user_id);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let user_detail: UserDetailResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(user_detail)
+    }
+
+    pub async fn update_user(&self, user_id: i64, request: UpdateUserRequest) -> Result<(), ApiError> {
+        let url = format!("{}/api/users/{}", self.base_url, user_id);
+        let request_builder = self.client().patch(&url);
+        let request_builder = self.add_auth_header(request_builder);
+        let response = request_builder
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        Ok(())
+    }
+
+    pub async fn search_users(&self, query: &str) -> Result<Vec<User>, ApiError> {
+        let url = format!("{}/api/users/search?q={}", self.base_url, urlencoding::encode(query));
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let user_response: UserListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(user_response.users)
+    }
+
+    pub async fn list_teams(&self) -> Result<Vec<Team>, ApiError> {
+        let url = format!("{}/api/teams", self.base_url);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let team_response: TeamListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(team_response.teams)
     }
 }
 

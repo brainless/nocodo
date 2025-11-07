@@ -886,11 +886,51 @@ pub struct UserResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: i64,
-    pub username: String,
+    pub name: String,
     pub email: String,
+    pub role: Option<String>,
     #[serde(skip_serializing)] // Never send password hash to client
     pub password_hash: String,
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub last_login_at: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserListResponse {
+    pub users: Vec<User>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserDetailResponse {
+    pub user: User,
+    pub teams: Vec<Team>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateUserRequest {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub team_ids: Option<Vec<i64>>,  // Update team memberships
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SearchQuery {
+    pub q: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Team {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub created_by: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TeamListResponse {
+    pub teams: Vec<Team>,
 }

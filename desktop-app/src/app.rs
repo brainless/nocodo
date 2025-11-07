@@ -58,6 +58,7 @@ impl Default for DesktopApp {
         app.pages.insert(UiPage::Work, Box::new(WorkPage));
         app.pages.insert(UiPage::Servers, Box::new(ServersPage));
         app.pages.insert(UiPage::Settings, Box::new(SettingsPage));
+        app.pages.insert(UiPage::Users, Box::new(UsersPage));
         app.pages
             .insert(UiPage::UiReference, Box::new(UiReferencePage::default()));
         app.pages.insert(

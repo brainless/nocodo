@@ -109,6 +109,9 @@ impl Sidebar {
                     ui.add_space(50.0);
 
                     // Bottom navigation
+                    if self.sidebar_link(ui, "Users", sidebar_bg, button_bg) {
+                        new_page = Some(UiPage::Users);
+                    }
                     if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg) {
                         new_page = Some(UiPage::Servers);
                         // Check local server when navigating to Servers page

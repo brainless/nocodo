@@ -34,6 +34,9 @@ impl BackgroundTasks {
         self.check_file_list_result(state);
         self.check_file_content_result(state);
         self.check_send_message_result(state);
+        self.check_users_result(state);
+        self.check_teams_result(state);
+        self.check_update_user_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -376,6 +379,78 @@ impl BackgroundTasks {
                         Some(format!("Failed to send message: {}", e));
                 }
             }
+        }
+    }
+
+    fn check_users_result(&self, state: &mut AppState) {
+        // Check users result
+        {
+            let mut result = state.users_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.loading_users = false;
+                match result {
+                    Ok(users) => {
+                        state.users = users;
+                        self.apply_user_search_filter(state);
+                    }
+                    Err(e) => {
+                        state.connection_state = crate::state::ConnectionState::Error(e);
+                    }
+                }
+            }
+        }
+    }
+
+    fn check_teams_result(&self, state: &mut AppState) {
+        // Check teams result
+        {
+            let mut result = state.teams_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.loading_teams = false;
+                match result {
+                    Ok(teams) => {
+                        state.teams = teams;
+                    }
+                    Err(e) => {
+                        state.connection_state = crate::state::ConnectionState::Error(e);
+                    }
+                }
+            }
+        }
+    }
+
+    fn check_update_user_result(&self, state: &mut AppState) {
+        // Check update user result
+        {
+            let mut result = state.update_user_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.updating_user = false;
+                match result {
+                    Ok(_) => {
+                        state.show_user_modal = false;
+                        self.api_service.refresh_users(state);  // Refresh list
+                    }
+                    Err(e) => {
+                        state.connection_state = crate::state::ConnectionState::Error(e);
+                    }
+                }
+            }
+        }
+    }
+
+    fn apply_user_search_filter(&self, state: &mut AppState) {
+        let query = state.user_search_query.to_lowercase();
+        if query.is_empty() {
+            state.filtered_users = state.users.clone();
+        } else {
+            state.filtered_users = state.users
+                .iter()
+                .filter(|u| {
+                    u.name.to_lowercase().contains(&query) ||
+                    u.email.to_lowercase().contains(&query)
+                })
+                .cloned()
+                .collect();
         }
     }
 }
