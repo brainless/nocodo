@@ -384,6 +384,7 @@ impl BackgroundTasks {
 
     fn check_users_result(&self, state: &mut AppState) {
         // Check users result
+        let mut users_updated = false;
         {
             let mut result = state.users_result.lock().unwrap();
             if let Some(result) = result.take() {
@@ -391,13 +392,16 @@ impl BackgroundTasks {
                 match result {
                     Ok(users) => {
                         state.users = users;
-                        self.apply_user_search_filter(state);
+                        users_updated = true;
                     }
                     Err(e) => {
                         state.connection_state = crate::state::ConnectionState::Error(e);
                     }
                 }
             }
+        }
+        if users_updated {
+            self.apply_user_search_filter(state);
         }
     }
 
@@ -421,6 +425,7 @@ impl BackgroundTasks {
 
     fn check_update_user_result(&self, state: &mut AppState) {
         // Check update user result
+        let mut refresh_users = false;
         {
             let mut result = state.update_user_result.lock().unwrap();
             if let Some(result) = result.take() {
@@ -428,13 +433,16 @@ impl BackgroundTasks {
                 match result {
                     Ok(_) => {
                         state.show_user_modal = false;
-                        self.api_service.refresh_users(state);  // Refresh list
+                        refresh_users = true;
                     }
                     Err(e) => {
                         state.connection_state = crate::state::ConnectionState::Error(e);
                     }
                 }
             }
+        }
+        if refresh_users {
+            self.api_service.refresh_users(state);  // Refresh list
         }
     }
 

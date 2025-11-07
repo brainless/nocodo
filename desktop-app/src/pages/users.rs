@@ -3,7 +3,7 @@ use crate::state::{AppState, ConnectionState};
 use crate::ui_text::{ContentText, WidgetText};
 use crate::services::ApiService;
 use egui::{Context, Ui};
-use manager_models::{UpdateUserRequest, User};
+use manager_models::UpdateUserRequest;
 
 pub struct UsersPage;
 
@@ -33,11 +33,11 @@ impl Page for UsersPage {
             ConnectionState::Disconnected => {
                 ui.vertical_centered(|ui| {
                     ui.label(WidgetText::status("Not connected to server"));
-                    if ui.button(WidgetText::button("Connect")).clicked() {
-                        state.ui_state.show_connection_dialog = true;
-                    }
-                });
-            }
+                     if ui.button(WidgetText::button("Connect")).clicked() {
+                         state.ui_state.show_connection_dialog = true;
+                          }
+                      });
+                 }
             ConnectionState::Connected => {
                 self.render_connected_ui(ctx, ui, state);
             }
@@ -113,6 +113,7 @@ impl UsersPage {
         ui.separator();
 
         // Table rows
+        let mut clicked_user: Option<manager_models::User> = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
             for user in &state.filtered_users {
                 // NOTE: Checkboxes disabled until bulk actions are defined
@@ -139,17 +140,22 @@ impl UsersPage {
                 let row_rect = ui.min_rect();
                 let response = ui.interact(row_rect, ui.id().with(user.id), egui::Sense::click());
                 if response.clicked() {
-                    state.editing_user = Some(user.clone());
-                    state.show_user_modal = true;
-
-                    // Load teams for this user
-                    let api_service = ApiService::new();
-                    api_service.refresh_teams(state);
+                    clicked_user = Some(user.clone());
                 }
 
                 ui.separator();
             }
         });
+
+        // Handle clicked user
+        if let Some(user) = clicked_user {
+            state.editing_user = Some(user);
+            state.show_user_modal = true;
+
+            // Load teams for this user
+            let api_service = ApiService::new();
+            api_service.refresh_teams(state);
+        }
 
         // User detail modal
         if state.show_user_modal {
@@ -191,25 +197,40 @@ impl UsersPage {
                     }
                     ui.add_space(16.0);
 
+                    // Clone values to avoid borrow issues
+                    let user_id = user.id;
+                    let user_name = user.name.clone();
+                    let user_email = user.email.clone();
+
                     // Buttons
-                    ui.horizontal(|ui| {
+                    let mut update_clicked = false;
+                    let mut cancel_clicked = false;
+                     ui.horizontal(|ui| {
                         if ui.button(WidgetText::button("Update")).clicked() {
-                            let api_service = ApiService::new();
-                            let request = UpdateUserRequest {
-                                name: Some(user.name.clone()),
-                                email: Some(user.email.clone()),
-                                team_ids: Some(state.editing_user_teams.clone()),
-                            };
-                            api_service.update_user(state, user.id, request);
+                            update_clicked = true;
                         }
 
                         if ui.button(WidgetText::button("Cancel")).clicked() {
-                            state.show_user_modal = false;
-                            state.editing_user = None;
-                            state.editing_user_teams.clear();
-                        }
-                    });
-                }
+                            cancel_clicked = true;
+                         }
+                     });
+
+                      if update_clicked {
+                          let api_service = ApiService::new();
+                          let request = UpdateUserRequest {
+                              name: Some(user_name),
+                              email: Some(user_email),
+                              team_ids: Some(state.editing_user_teams.clone()),
+                          };
+                          api_service.update_user(state, user_id, request);
+                      }
+
+                      if cancel_clicked {
+                          state.show_user_modal = false;
+                          state.editing_user = None;
+                          state.editing_user_teams.clear();
+                      }
+                  }
             });
     }
 }

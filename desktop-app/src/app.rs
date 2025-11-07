@@ -1,7 +1,7 @@
 use crate::components::{AuthDialog, ConnectionDialog, Sidebar, StatusBar};
 use crate::pages::{
     MentionsPage, Page, ProjectDetailPage, ProjectsPage, ServersPage, SettingsPage,
-    UiReferencePage, UiTwoColumnMainContentPage, WorkPage,
+    UiReferencePage, UiTwoColumnMainContentPage, UsersPage, WorkPage,
 };
 use crate::services::{ApiService, BackgroundTasks};
 use crate::state::ui_state::Page as UiPage;

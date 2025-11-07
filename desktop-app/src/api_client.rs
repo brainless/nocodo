@@ -1,6 +1,6 @@
 use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
-    ProjectListResponse, SearchQuery, ServerStatus, SettingsResponse, SupportedModelsResponse,
+    ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
     Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, User, UserDetailResponse,
     UserListResponse, Work, WorkListResponse, WorkResponse,
 };
