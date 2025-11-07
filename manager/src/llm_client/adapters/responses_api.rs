@@ -102,31 +102,30 @@ File References: When referencing files, include the relevant start line and alw
                     }
                 }
                 "assistant" => {
-                    let mut msg_obj = serde_json::json!({"role": "assistant"});
+                    // Always include assistant message if there are tool calls, even with empty content
+                    let has_content = message.content.as_ref().map(|c| !c.is_empty()).unwrap_or(false);
+                    let has_tool_calls = message.tool_calls.is_some();
 
-                    // Always include content field - use empty string if no text content
-                    let content = message.content.as_deref().unwrap_or("");
-                    msg_obj["content"] = Value::String(content.to_string());
+                    if has_content || has_tool_calls {
+                        // Add assistant message with content (empty string if no content)
+                        let content = message.content.as_deref().unwrap_or("");
+                        input.push(serde_json::json!({
+                            "role": "assistant",
+                            "content": content
+                        }));
 
-                    // Add tool calls if present (for conversation history)
-                    if let Some(tool_calls) = &message.tool_calls {
-                        let tool_calls_json: Vec<Value> = tool_calls
-                            .iter()
-                            .map(|tc| {
-                                serde_json::json!({
-                                    "id": tc.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tc.function.name,
-                                        "arguments": tc.function.arguments
-                                    }
-                                })
-                            })
-                            .collect();
-                        msg_obj["tool_calls"] = Value::Array(tool_calls_json);
+                        // Add function calls as SEPARATE items with type "function_call"
+                        if let Some(tool_calls) = &message.tool_calls {
+                            for tc in tool_calls {
+                                input.push(serde_json::json!({
+                                    "type": "function_call",
+                                    "call_id": tc.id,
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }));
+                            }
+                        }
                     }
-
-                    input.push(msg_obj);
                 }
                 "tool" => {
                     // Tool results - add as function_call_output type
@@ -542,19 +541,29 @@ mod tests {
 
         let responses_request = adapter.convert_to_responses_request(request).unwrap();
 
-        // Should have 2 items in input array (user + assistant)
-        assert_eq!(responses_request.input.len(), 2);
+        // Should have 3 items in input array (user + assistant + function_call)
+        assert_eq!(responses_request.input.len(), 3);
 
         // First item should be user message
         let user_msg = &responses_request.input[0];
         assert_eq!(user_msg["role"], "user");
         assert_eq!(user_msg["content"], "Hello!");
 
-        // Second item should be assistant message with empty content and tool calls
+        // Second item should be assistant message with empty content (no tool_calls field)
         let assistant_msg = &responses_request.input[1];
         assert_eq!(assistant_msg["role"], "assistant");
         assert_eq!(assistant_msg["content"], ""); // Should be empty string
-        assert!(assistant_msg.get("tool_calls").is_some());
+        assert!(assistant_msg.get("tool_calls").is_none()); // tool_calls should NOT be in assistant message
+
+        // Third item should be the function_call
+        let function_call = &responses_request.input[2];
+        assert_eq!(function_call["type"], "function_call");
+        assert_eq!(function_call["call_id"], "call_123");
+        assert_eq!(function_call["name"], "read_file");
+        assert_eq!(function_call["arguments"], "{\"path\":\"test.txt\"}");
+
+        // Should have 3 items total
+        assert_eq!(responses_request.input.len(), 3);
     }
 
     #[test]

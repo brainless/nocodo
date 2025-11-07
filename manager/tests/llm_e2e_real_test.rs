@@ -25,6 +25,17 @@ use nocodo_manager::models::{
 /// - Phase 3: Keyword-based validation
 #[actix_rt::test]
 async fn test_llm_e2e_saleor() {
+    // Initialize logging to capture ERROR logs in test output
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("nocodo_manager=error".parse().unwrap()),
+        )
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .try_init();
+
     // Get LLM configuration from environment and skip if no providers available
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
@@ -185,14 +196,14 @@ async fn test_llm_e2e_saleor() {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-        // Check for timeout (300 seconds from work creation)
+        // Check for timeout (120 seconds from work creation)
         let elapsed = start_time.elapsed();
-        if elapsed.as_secs() >= 300 {
+        if elapsed.as_secs() >= 120 {
             println!(
                 "   ❌ Timeout waiting for AI response after {} seconds - no final text response received",
                 elapsed.as_secs()
             );
-            panic!("Test failed: AI did not provide a final text response within 300 seconds");
+            panic!("Test failed: AI did not provide a final text response within 120 seconds");
         }
 
         // Check AI session outputs using the manager API
@@ -383,6 +394,17 @@ async fn test_llm_e2e_saleor() {
 /// Test multiple scenarios in sequence
 #[actix_rt::test]
 async fn test_llm_multiple_scenarios() {
+    // Initialize logging to capture ERROR logs in test output
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("nocodo_manager=error".parse().unwrap()),
+        )
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .try_init();
+
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
         println!("⚠️  Skipping multiple scenarios test - no API keys available");
