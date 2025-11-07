@@ -991,6 +991,7 @@ impl LlmAgent {
                 "xai" => &api_keys.xai_api_key,
                 "openai" => &api_keys.openai_api_key,
                 "anthropic" | "claude" => &api_keys.anthropic_api_key,
+                "zai" => &api_keys.zai_api_key,
                 _ => &None,
             };
 
@@ -1006,6 +1007,7 @@ impl LlmAgent {
             "grok" | "xai" => "XAI_API_KEY",
             "openai" => "OPENAI_API_KEY",
             "anthropic" | "claude" => "ANTHROPIC_API_KEY",
+            "zai" => "ZAI_API_KEY",
             _ => {
                 return Err(anyhow::anyhow!(
                     "No API key configured for provider: {}",
@@ -1027,6 +1029,7 @@ impl LlmAgent {
             "grok" | "xai" => Some("https://api.x.ai".to_string()),
             "openai" => None, // Use default OpenAI URL
             "anthropic" | "claude" => Some("https://api.anthropic.com".to_string()),
+            "zai" => Some("https://api.z.ai/api".to_string()),
             _ => None,
         }
     }

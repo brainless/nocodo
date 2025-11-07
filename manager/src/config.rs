@@ -22,6 +22,7 @@ pub struct ApiKeysConfig {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
+    pub zai_api_key: Option<String>, // NEW: zAI API key
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

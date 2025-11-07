@@ -2109,6 +2109,12 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
             Ok(Box::new(client))
         }
 
+        // zAI GLM models - NEW
+        ("zai" | "glm", _) => {
+            let adapter = Box::new(adapters::GlmChatCompletionsAdapter::new(config.clone())?);
+            Ok(Box::new(UnifiedLlmClient::new(adapter, config)?))
+        }
+
         // Unsupported provider
         _ => Err(anyhow::anyhow!(
             "Unsupported LLM provider: {}",
