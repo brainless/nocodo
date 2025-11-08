@@ -5,11 +5,11 @@ use serde_json::Value;
 
 use crate::llm_client::{
     LlmCompletionRequest, LlmCompletionResponse, LlmToolCall, LlmToolCallFunction,
-    LlmMessage, LlmChoice, LlmUsage, ToolChoice,
+    LlmMessage, LlmChoice, LlmUsage,
 };
 use crate::llm_client::adapters::trait_adapter::{ProviderAdapter, ProviderRequest};
 use crate::llm_client::types::{
-    GlmChatCompletionsRequest, GlmChatCompletionsResponse, GlmThinkingConfig,
+    GlmChatCompletionsRequest, GlmChatCompletionsResponse,
 };
 use crate::models::LlmProviderConfig;
 

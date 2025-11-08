@@ -558,7 +558,7 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 description TEXT,
-                created_by INTEGER NOT NULL,
+                created_by INTEGER,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
@@ -667,6 +667,12 @@ impl Database {
         if has_username_column && !has_name_column {
             tracing::info!("Migrating users table: renaming username to name and adding role, last_login_at");
 
+            // Temporarily disable foreign keys during migration
+            conn.execute("PRAGMA foreign_keys = OFF", [])?;
+
+            // Drop users_new if it exists (from a previous interrupted migration)
+            conn.execute("DROP TABLE IF EXISTS users_new", [])?;
+
             // Create new users table with updated schema
             conn.execute(
                 "CREATE TABLE users_new (
@@ -697,6 +703,9 @@ impl Database {
             // Rename new table
             conn.execute("ALTER TABLE users_new RENAME TO users", [])?;
 
+            // Re-enable foreign keys
+            conn.execute("PRAGMA foreign_keys = ON", [])?;
+
             tracing::info!("Successfully migrated users table schema");
         }
 
@@ -710,6 +719,75 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
             [],
         )?;
+
+        // Migration: Fix teams table created_by to be nullable (consistent with ON DELETE SET NULL)
+        let teams_created_by_nullable: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name = 'created_by' AND \"notnull\" = 0",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        if !teams_created_by_nullable {
+            // Check if teams table exists
+            let teams_exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='teams'",
+                    [],
+                    |row| row.get::<_, i32>(0)
+                )
+                .unwrap_or(0) > 0;
+
+            if teams_exists {
+                tracing::info!("Migrating teams table: making created_by nullable");
+
+                // Temporarily disable foreign keys during migration
+                conn.execute("PRAGMA foreign_keys = OFF", [])?;
+
+                // Drop teams_new if it exists (from a previous interrupted migration)
+                conn.execute("DROP TABLE IF EXISTS teams_new", [])?;
+
+                // Create new teams table with updated schema
+                conn.execute(
+                    "CREATE TABLE teams_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        created_by INTEGER,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+                    )",
+                    [],
+                )?;
+
+                // Copy data from old table to new table
+                conn.execute(
+                    "INSERT INTO teams_new (id, name, description, created_by, created_at, updated_at)
+                     SELECT id, name, description, created_by, created_at, updated_at
+                     FROM teams",
+                    [],
+                )?;
+
+                // Drop old table
+                conn.execute("DROP TABLE teams", [])?;
+
+                // Rename new table
+                conn.execute("ALTER TABLE teams_new RENAME TO teams", [])?;
+
+                // Recreate index
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_teams_created_by ON teams(created_by)",
+                    [],
+                )?;
+
+                // Re-enable foreign keys
+                conn.execute("PRAGMA foreign_keys = ON", [])?;
+
+                tracing::info!("Successfully migrated teams table schema");
+            }
+        }
 
         tracing::info!("Database migrations completed");
         Ok(())
