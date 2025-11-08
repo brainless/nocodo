@@ -1,7 +1,12 @@
 [build]
 incremental = true
-rustc-wrapper = "/usr/bin/sccache"
 
+# Linux-specific sccache configuration
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "linker=sccache"]
+
+# Windows-specific configuration (sccache should be in PATH)
+[target.x86_64-pc-windows-msvc]
+# Uncomment if sccache is in PATH:
+# rustflags = ["-C", "linker=sccache"]
