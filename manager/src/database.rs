@@ -345,23 +345,15 @@ impl Database {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS users (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 username TEXT NOT NULL UNIQUE,
+                 name TEXT NOT NULL UNIQUE,
                  email TEXT NOT NULL UNIQUE,
+                 role TEXT,
                  password_hash TEXT NOT NULL,
                  is_active INTEGER NOT NULL DEFAULT 1,
                  created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
+                 updated_at INTEGER NOT NULL,
+                 last_login_at INTEGER
              )",
-            [],
-        )?;
-
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
-            [],
-        )?;
-
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
             [],
         )?;
 
@@ -652,6 +644,70 @@ impl Database {
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_resource_ownership_resource ON resource_ownership(resource_type, resource_id)",
+            [],
+        )?;
+
+        // Migration: Rename username to name and add role, last_login_at columns to users table
+        let has_username_column: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'username'",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        let has_name_column: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'name'",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        if has_username_column && !has_name_column {
+            tracing::info!("Migrating users table: renaming username to name and adding role, last_login_at");
+
+            // Create new users table with updated schema
+            conn.execute(
+                "CREATE TABLE users_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL UNIQUE,
+                    role TEXT,
+                    password_hash TEXT NOT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    last_login_at INTEGER
+                )",
+                [],
+            )?;
+
+            // Copy data from old table to new table
+            conn.execute(
+                "INSERT INTO users_new (id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at)
+                 SELECT id, username, email, NULL, password_hash, is_active, created_at, updated_at, NULL
+                 FROM users",
+                [],
+            )?;
+
+            // Drop old table
+            conn.execute("DROP TABLE users", [])?;
+
+            // Rename new table
+            conn.execute("ALTER TABLE users_new RENAME TO users", [])?;
+
+            tracing::info!("Successfully migrated users table schema");
+        }
+
+        // Create indexes for users table (after migration)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_name ON users(name)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
             [],
         )?;
 
