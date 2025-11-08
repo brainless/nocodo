@@ -1,70 +1,42 @@
-# Rust build artifacts
-/target/
-**/*.rs.bk
-*.pdb
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
 
-# Cargo lock file (controversial, but typically ignored for applications)
-# Cargo.lock
+# Files for the ART/Dalvik VM
+*.dex
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Java class files
+*.class
 
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Temporary files
-*.tmp
-*.temp
-
-# Node.js dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Build outputs
-dist/
-build/
+# Generated files
+bin/
+gen/
 out/
+release/
 
-# Astro specific
-.astro/
+# Gradle files
+.gradle/
+build/
 
-# Logs from manual tests
-test-logs/
+# Local configuration file (sdk path, etc)
+local.properties
 
-# Test results
-test-results/
-manager-web/test-results/
-playwright-report/
-manager-web/playwright-report/
+# Android Studio files
+.idea/
+*.iml
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services (e.g. APIs or Firebase)
+google-services.json
+
+# Android Profiling
+*.hprof
