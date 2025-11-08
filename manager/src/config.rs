@@ -23,6 +23,7 @@ pub struct ApiKeysConfig {
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
     pub zai_api_key: Option<String>, // NEW: zAI API key
+    pub zai_coding_plan: Option<bool>, // NEW: Use zAI Coding Plan endpoint
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -98,6 +99,8 @@ path = "/tmp/nocodo-manager.sock"
 # xai_api_key = "your-xai-key"
 # openai_api_key = "your-openai-key"
 # anthropic_api_key = "your-anthropic-key"
+# zai_api_key = "your-zai-key"
+# zai_coding_plan = true  # Set to true if using GLM Coding Plan subscription
 
 [projects]
 # default_path = "~/projects"

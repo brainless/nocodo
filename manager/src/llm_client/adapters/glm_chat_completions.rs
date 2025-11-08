@@ -39,8 +39,12 @@ impl GlmChatCompletionsAdapter {
                     "role": msg.role
                 });
 
+                // Add content field - required for most message types
                 if let Some(content) = &msg.content {
                     message["content"] = Value::String(content.clone());
+                } else if msg.role == "tool" {
+                    // Tool messages require content field
+                    message["content"] = Value::String(String::new());
                 }
 
                 // Handle tool calls for assistant messages
@@ -62,20 +66,92 @@ impl GlmChatCompletionsAdapter {
             })
             .collect();
 
-        // Convert tools to GLM format (compatible with OpenAI format)
-        let tools = request.tools.as_ref().map(|tools| {
-            tools
+        // Convert tools to GLM format and fix required fields
+        // IMPORTANT: If tools array is empty, set to None to avoid sending empty array which causes 400 error
+        let tools = request.tools.as_ref().and_then(|tools| {
+            if tools.is_empty() {
+                tracing::info!("Tools array is empty, setting tools=None to avoid 400 error");
+                return None;
+            }
+
+            Some(tools
                 .iter()
-                .map(|tool| serde_json::to_value(tool).unwrap_or(Value::Null))
-                .collect()
+                .map(|tool| {
+                    let mut tool_value = serde_json::to_value(tool).unwrap_or(Value::Null);
+
+                    // Fix the tool schema for GLM compatibility
+                    if let Some(function) = tool_value.get_mut("function") {
+                        // Get function name early for logging
+                        let func_name = function.get("name").and_then(|n| n.as_str()).unwrap_or("unknown").to_string();
+
+                        if let Some(params) = function.get_mut("parameters") {
+                            // Collect field names that should NOT be required:
+                            // 1. Fields with default values
+                            // 2. Conditionally optional fields (search/replace in write_file, etc.)
+                            let optional_fields: Vec<String> = params
+                                .get("properties")
+                                .and_then(|p| p.as_object())
+                                .map(|properties| {
+                                    properties
+                                        .iter()
+                                        .filter_map(|(name, prop)| {
+                                            // Has a default value = optional
+                                            if prop.get("default").is_some() {
+                                                return Some(name.clone());
+                                            }
+                                            None
+                                        })
+                                        .collect()
+                                })
+                                .unwrap_or_default();
+
+                            // Also remove known conditionally-optional fields
+                            // These are fields that are only needed in certain contexts
+                            let mut fields_to_remove = optional_fields;
+                            fields_to_remove.extend(vec![
+                                "search".to_string(),      // write_file: only for search-replace
+                                "replace".to_string(),     // write_file: only for search-replace
+                                "append".to_string(),      // write_file: optional mode
+                                "create_dirs".to_string(), // write_file: optional mode
+                                "create_if_not_exists".to_string(), // write_file: optional mode
+                                "include_pattern".to_string(), // grep: optional file filter
+                                "exclude_pattern".to_string(), // grep: optional file filter
+                            ]);
+
+                            // Remove optional fields from required array
+                            if let Some(required) = params.get_mut("required").and_then(|r| r.as_array_mut()) {
+                                let before = required.clone();
+                                required.retain(|req_field| {
+                                    if let Some(field_name) = req_field.as_str() {
+                                        !fields_to_remove.contains(&field_name.to_string())
+                                    } else {
+                                        true
+                                    }
+                                });
+                                let after = required.clone();
+
+                                tracing::error!(
+                                    "Tool schema fix for {}: required before: {:?}, after: {:?}, removed: {:?}",
+                                    func_name, before, after, fields_to_remove
+                                );
+                            }
+
+                            // Remove additionalProperties: false as it may be too strict
+                            params.as_object_mut().and_then(|obj| obj.remove("additionalProperties"));
+                        }
+                    }
+
+                    tool_value
+                })
+                .collect())
         });
 
-        // Convert tool_choice
-        let tool_choice = match request.tool_choice {
-            Some(ToolChoice::Auto(_)) => Some("auto".to_string()),
-            Some(ToolChoice::None(_)) => Some("none".to_string()),
-            Some(ToolChoice::Required(_)) => Some("required".to_string()),
-            _ => Some("auto".to_string()),
+        // Convert tool_choice - GLM only supports "auto" according to docs
+        // IMPORTANT: Only set tool_choice if we have tools, otherwise None (to avoid 400 error)
+        let tool_choice = if tools.is_some() {
+            Some("auto".to_string())
+        } else {
+            None
         };
 
         Ok(GlmChatCompletionsRequest {
@@ -84,13 +160,11 @@ impl GlmChatCompletionsAdapter {
             request_id: None, // Optional: could generate UUID
             tools,
             tool_choice,
-            temperature: request.temperature,
+            temperature: request.temperature, // Custom serializer handles rounding
             top_p: None, // Could add if needed
             max_tokens: request.max_tokens,
-            stream: request.stream,
-            thinking: Some(GlmThinkingConfig {
-                r#type: "enabled".to_string(), // Enable chain-of-thought for GLM-4.6
-            }),
+            stream: None, // Omit stream parameter - let API use default
+            thinking: None, // Disable thinking for now - might not be supported in Coding Plan
             response_format: None, // Default to text
         })
     }
@@ -182,11 +256,19 @@ impl ProviderAdapter for GlmChatCompletionsAdapter {
     async fn send_request(&self, request: Box<dyn ProviderRequest>) -> Result<reqwest::Response> {
         let json = request.to_json()?;
         let custom_headers = request.custom_headers();
+        let api_url = self.get_api_url();
 
-        tracing::debug!(
+        tracing::info!(
             provider = self.provider_name(),
             model = self.model_name(),
+            url = %api_url,
             "Sending request to GLM API"
+        );
+
+        // Log the full request for debugging (using error level to ensure it shows)
+        tracing::error!(
+            request = %serde_json::to_string_pretty(&json).unwrap_or_else(|_| "Failed to serialize".to_string()),
+            "GLM API Request (DEBUG)"
         );
 
         let mut req_builder = self

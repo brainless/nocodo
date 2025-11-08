@@ -147,6 +147,12 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
         ZAI_KEY=$(grep '^zai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
         export ZAI_API_KEY="$ZAI_KEY"
         echo "   ✅ Set ZAI_API_KEY from config (selected provider)"
+
+        # Check for zAI coding plan setting
+        if grep -q '^zai_coding_plan\s*=\s*true' "$CONFIG_FILE"; then
+            export ZAI_CODING_PLAN="true"
+            echo "   ✅ Set ZAI_CODING_PLAN=true from config"
+        fi
     else
         echo "   ⚠️  Selected provider '$PROVIDER' API key not found in config"
         echo "   Available providers: ${AVAILABLE_PROVIDERS[*]}"

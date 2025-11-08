@@ -57,6 +57,7 @@ impl TestConfig {
                 openai_api_key: Some("test-openai-key".to_string()),
                 anthropic_api_key: Some("test-anthropic-key".to_string()),
                 zai_api_key: Some("test-zai-key".to_string()),
+                zai_coding_plan: None,
             }),
             projects: None,
         };

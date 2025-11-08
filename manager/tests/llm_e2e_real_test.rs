@@ -25,11 +25,14 @@ use nocodo_manager::models::{
 /// - Phase 3: Keyword-based validation
 #[actix_rt::test]
 async fn test_llm_e2e_saleor() {
-    // Initialize logging to capture ERROR logs in test output
+    // Initialize logging to capture all logs in test output
+    // This will show DEBUG logs from GLM adapter and ERROR logs from unified_client
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("nocodo_manager=error".parse().unwrap()),
+                .add_directive("nocodo_manager=debug".parse().unwrap())
+                .add_directive("nocodo_manager::llm_client::adapters::glm_chat_completions=error".parse().unwrap())
+                .add_directive("nocodo_manager::llm_client::unified_client=error".parse().unwrap()),
         )
         .with_target(true)
         .with_file(true)
@@ -394,11 +397,14 @@ async fn test_llm_e2e_saleor() {
 /// Test multiple scenarios in sequence
 #[actix_rt::test]
 async fn test_llm_multiple_scenarios() {
-    // Initialize logging to capture ERROR logs in test output
+    // Initialize logging to capture all logs in test output
+    // This will show DEBUG logs from GLM adapter and ERROR logs from unified_client
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("nocodo_manager=error".parse().unwrap()),
+                .add_directive("nocodo_manager=debug".parse().unwrap())
+                .add_directive("nocodo_manager::llm_client::adapters::glm_chat_completions=error".parse().unwrap())
+                .add_directive("nocodo_manager::llm_client::unified_client=error".parse().unwrap()),
         )
         .with_target(true)
         .with_file(true)

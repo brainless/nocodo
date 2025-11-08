@@ -118,13 +118,20 @@ impl LlmAgent {
         );
 
         // Create LLM client
+        // Omit temperature for zAI/GLM to avoid floating point precision issues
+        let temperature = if session.provider.to_lowercase() == "zai" {
+            None
+        } else {
+            Some(0.7)
+        };
+
         let config = LlmProviderConfig {
             provider: session.provider.clone(),
             model: session.model.clone(),
             api_key: self.get_api_key(&session.provider)?,
             base_url: self.get_base_url(&session.provider),
             max_tokens: Some(4000),
-            temperature: Some(0.7),
+            temperature,
         };
 
         tracing::debug!(
@@ -225,11 +232,19 @@ impl LlmAgent {
         // Create tool definitions for native tool calling
         let tools = Some(self.create_native_tool_definitions());
 
+        // Determine temperature based on provider
+        // GLM API has issues with floating point precision, so omit it to use API default
+        let temperature = if session.provider.to_lowercase() == "zai" {
+            None
+        } else {
+            Some(0.3)
+        };
+
         let request = LlmCompletionRequest {
             model: session.model.clone(),
             messages,
             max_tokens: Some(4000),
-            temperature: Some(0.3),
+            temperature,
             stream: Some(false),
             tools,
             tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
@@ -799,13 +814,20 @@ impl LlmAgent {
             );
 
             // Create LLM client
+            // Omit temperature for zAI/GLM to avoid floating point precision issues
+            let temperature = if session.provider.to_lowercase() == "zai" {
+                None
+            } else {
+                Some(0.3)
+            };
+
             let config = LlmProviderConfig {
                 provider: session.provider.clone(),
                 model: session.model.clone(),
                 api_key: self.get_api_key(&session.provider)?,
                 base_url: self.get_base_url(&session.provider),
                 max_tokens: Some(4000),
-                temperature: Some(0.3), // Use same temperature as initial request for consistency
+                temperature,
             };
 
             tracing::debug!(
@@ -869,11 +891,18 @@ impl LlmAgent {
             // Create tool definitions for native tool calling in follow-up
             let tools = Some(self.create_native_tool_definitions());
 
+            // Omit temperature for zAI/GLM to avoid floating point precision issues
+            let temperature = if session.provider.to_lowercase() == "zai" {
+                None
+            } else {
+                Some(0.3)
+            };
+
             let request = LlmCompletionRequest {
                 model: session.model.clone(),
                 messages,
                 max_tokens: Some(4000),
-                temperature: Some(0.3), // Use same temperature as initial request for consistency
+                temperature,
                 stream: Some(false),
                 tools,
                 tool_choice: Some(crate::llm_client::ToolChoice::Auto("auto".to_string())), // Explicitly allow tool usage
@@ -1029,7 +1058,29 @@ impl LlmAgent {
             "grok" | "xai" => Some("https://api.x.ai".to_string()),
             "openai" => None, // Use default OpenAI URL
             "anthropic" | "claude" => Some("https://api.anthropic.com".to_string()),
-            "zai" => Some("https://api.z.ai/api".to_string()),
+            "zai" => {
+                // Check if using GLM Coding Plan subscription
+                let use_coding_plan = self.config
+                    .api_keys
+                    .as_ref()
+                    .and_then(|keys| keys.zai_coding_plan)
+                    .unwrap_or(false);
+
+                let base_url = if use_coding_plan {
+                    "https://api.z.ai/api/coding".to_string()
+                } else {
+                    "https://api.z.ai/api".to_string()
+                };
+
+                tracing::info!(
+                    provider = provider,
+                    coding_plan = use_coding_plan,
+                    base_url = %base_url,
+                    "Selected zAI base URL"
+                );
+
+                Some(base_url)
+            },
             _ => None,
         }
     }
@@ -1224,53 +1275,112 @@ impl LlmAgent {
             ApplyPatchRequest, GrepRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest,
         };
 
-        vec![
-            crate::llm_client::ToolDefinition {
-                r#type: "function".to_string(),
-                function: crate::llm_client::FunctionDefinition {
-                    name: "list_files".to_string(),
-                    description: "List files and directories in a given path".to_string(),
-                    parameters: serde_json::to_value(ListFilesRequest::example_schema())
-                        .unwrap_or_default(),
-                },
-            },
-            crate::llm_client::ToolDefinition {
-                r#type: "function".to_string(),
-                function: crate::llm_client::FunctionDefinition {
-                    name: "read_file".to_string(),
-                    description: "Read the contents of a file".to_string(),
-                    parameters: serde_json::to_value(ReadFileRequest::example_schema())
-                        .unwrap_or_default(),
-                },
-            },
-            crate::llm_client::ToolDefinition {
-                r#type: "function".to_string(),
-                function: crate::llm_client::FunctionDefinition {
-                    name: "write_file".to_string(),
-                    description: "Write or modify a file".to_string(),
-                    parameters: serde_json::to_value(WriteFileRequest::example_schema())
-                        .unwrap_or_default(),
-                },
-            },
-            crate::llm_client::ToolDefinition {
-                r#type: "function".to_string(),
-                function: crate::llm_client::FunctionDefinition {
-                    name: "grep".to_string(),
-                    description: "Search for patterns in files using grep".to_string(),
-                    parameters: serde_json::to_value(GrepRequest::example_schema())
-                        .unwrap_or_default(),
-                },
-            },
-            crate::llm_client::ToolDefinition {
-                r#type: "function".to_string(),
-                function: crate::llm_client::FunctionDefinition {
-                    name: "apply_patch".to_string(),
-                    description: "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format".to_string(),
-                    parameters: serde_json::to_value(ApplyPatchRequest::example_schema())
-                        .unwrap_or_default(),
-                },
-            },
-        ]
+        // Support progressive testing via environment variable:
+        // ENABLE_TOOLS=none - No tools (tests basic chat)
+        // ENABLE_TOOLS=list_files - Only list_files
+        // ENABLE_TOOLS=list_read - list_files + read_file
+        // ENABLE_TOOLS=all (default) - All tools
+        let enable_tools = std::env::var("ENABLE_TOOLS").unwrap_or_else(|_| "all".to_string());
+
+        tracing::info!(
+            enable_tools = %enable_tools,
+            "Creating native tool definitions with ENABLE_TOOLS={}", enable_tools
+        );
+
+        match enable_tools.as_str() {
+            "none" => {
+                tracing::info!("ENABLE_TOOLS=none: Returning NO tools for progressive testing");
+                vec![]
+            }
+            "list_files" => {
+                tracing::info!("ENABLE_TOOLS=list_files: Returning ONLY list_files tool");
+                vec![
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "list_files".to_string(),
+                            description: "List files and directories in a given path".to_string(),
+                            parameters: serde_json::to_value(ListFilesRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                ]
+            }
+            "list_read" => {
+                tracing::info!("ENABLE_TOOLS=list_read: Returning list_files + read_file tools");
+                vec![
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "list_files".to_string(),
+                            description: "List files and directories in a given path".to_string(),
+                            parameters: serde_json::to_value(ListFilesRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "read_file".to_string(),
+                            description: "Read the contents of a file".to_string(),
+                            parameters: serde_json::to_value(ReadFileRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                ]
+            }
+            _ => {
+                // "all" or any other value - return all tools
+                tracing::info!("ENABLE_TOOLS={}: Returning ALL tools (default)", enable_tools);
+                vec![
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "list_files".to_string(),
+                            description: "List files and directories in a given path".to_string(),
+                            parameters: serde_json::to_value(ListFilesRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "read_file".to_string(),
+                            description: "Read the contents of a file".to_string(),
+                            parameters: serde_json::to_value(ReadFileRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "write_file".to_string(),
+                            description: "Write or modify a file".to_string(),
+                            parameters: serde_json::to_value(WriteFileRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "grep".to_string(),
+                            description: "Search for patterns in files using grep".to_string(),
+                            parameters: serde_json::to_value(GrepRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "apply_patch".to_string(),
+                            description: "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format".to_string(),
+                            parameters: serde_json::to_value(ApplyPatchRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                ]
+            }
+        }
     }
 }
 

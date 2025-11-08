@@ -368,6 +368,14 @@ impl LlmProviderTestConfig {
                 } else {
                     None
                 },
+                zai_coding_plan: if self.name == "zai" {
+                    // Read coding plan setting from environment variable
+                    env::var("ZAI_CODING_PLAN")
+                        .ok()
+                        .and_then(|v| v.parse::<bool>().ok())
+                } else {
+                    None
+                },
             }),
             projects: None,
         }

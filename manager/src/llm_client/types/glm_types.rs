@@ -1,7 +1,22 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
 use anyhow::Result;
 use crate::llm_client::adapters::trait_adapter::ProviderRequest;
+
+/// Custom serializer for temperature to avoid floating point precision issues
+fn serialize_rounded_f32<S>(value: &Option<f32>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match value {
+        Some(v) => {
+            // Round to 1 decimal place to avoid precision issues like 0.30000001192092896
+            let rounded = (v * 10.0).round() / 10.0;
+            serializer.serialize_f32(rounded)
+        }
+        None => serializer.serialize_none(),
+    }
+}
 
 /// GLM Chat Completions API Request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,7 +33,7 @@ pub struct GlmChatCompletionsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<String>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", serialize_with = "serialize_rounded_f32")]
     pub temperature: Option<f32>,
 
     #[serde(skip_serializing_if = "Option::is_none")]

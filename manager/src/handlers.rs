@@ -2036,6 +2036,7 @@ pub async fn update_api_keys(
             openai_api_key: None,
             anthropic_api_key: None,
             zai_api_key: None,
+            zai_coding_plan: None,
         });
     }
 
@@ -2079,6 +2080,11 @@ pub async fn update_api_keys(
                 api_keys.zai_api_key = None;
                 tracing::info!("Cleared zAI API key");
             }
+        }
+
+        if let Some(coding_plan) = req.zai_coding_plan {
+            api_keys.zai_coding_plan = Some(coding_plan);
+            tracing::info!("Updated zAI coding plan setting: {}", coding_plan);
         }
     }
 
