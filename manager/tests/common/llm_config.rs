@@ -79,6 +79,13 @@ impl LlmTestConfig {
                 providers.push(provider_config);
             }
         }
+        if env::var("ZAI_API_KEY").is_ok() {
+            if let Some(provider_config) =
+                LlmProviderTestConfig::zai_with_validation(forced_model.as_deref())
+            {
+                providers.push(provider_config);
+            }
+        }
 
         let default_provider = providers.first().map(|p| p.name.clone());
 
@@ -235,6 +242,52 @@ impl LlmProviderTestConfig {
         })
     }
 
+    /// Create zAI provider configuration with validation
+    pub fn zai_with_validation(requested_model: Option<&str>) -> Option<Self> {
+        // Check if API key is available
+        if env::var("ZAI_API_KEY").is_err() {
+            return None;
+        }
+
+        // Get available models from actual provider implementation
+        let available_models = Self::get_available_zai_models();
+
+        // If a specific model was requested, validate it exists
+        if let Some(model) = requested_model {
+            if !available_models.contains(&model.to_string()) {
+                eprintln!("❌ Error: Model '{}' not available for zAI provider", model);
+                eprintln!("   Available models: {:?}", available_models);
+                return None;
+            }
+        }
+
+        Some(Self {
+            name: "zai".to_string(),
+            models: available_models,
+            api_key_env: "ZAI_API_KEY".to_string(),
+            enabled: true,
+            test_prompts: LlmTestPrompts::default(),
+        })
+    }
+
+    /// Get available zAI models from the actual provider implementation
+    fn get_available_zai_models() -> Vec<String> {
+        // This would ideally query the actual provider, but for now we'll hardcode
+        // the models that are actually implemented in the provider
+        vec!["glm-4.6".to_string()]
+    }
+
+    /// Create zAI provider configuration (legacy method)
+    pub fn zai() -> Self {
+        Self::zai_with_validation(None).unwrap_or_else(|| Self {
+            name: "zai".to_string(),
+            models: vec!["glm-4.6".to_string()],
+            api_key_env: "ZAI_API_KEY".to_string(),
+            enabled: false,
+            test_prompts: LlmTestPrompts::default(),
+        })
+    }
+
     /// Get available xAI models from the actual provider implementation
     fn get_available_xai_models() -> Vec<String> {
         // This would ideally query the actual provider, but for now we'll hardcode
@@ -307,6 +360,19 @@ impl LlmProviderTestConfig {
                 },
                 anthropic_api_key: if self.name == "anthropic" {
                     api_key.clone()
+                } else {
+                    None
+                },
+                zai_api_key: if self.name == "zai" {
+                    api_key.clone()
+                } else {
+                    None
+                },
+                zai_coding_plan: if self.name == "zai" {
+                    // Read coding plan setting from environment variable
+                    env::var("ZAI_CODING_PLAN")
+                        .ok()
+                        .and_then(|v| v.parse::<bool>().ok())
                 } else {
                     None
                 },

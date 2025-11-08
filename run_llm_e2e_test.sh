@@ -75,6 +75,12 @@ case "$PROVIDER" in
             echo "✅ anthropic_api_key found in config"
         fi
         ;;
+    "zai")
+        if grep -q '^zai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*zai_api_key' "$CONFIG_FILE"; then
+            API_KEY_FOUND=true
+            echo "✅ zai_api_key found in config"
+        fi
+        ;;
 esac
 
 if [[ "$API_KEY_FOUND" != "true" ]]; then
@@ -92,6 +98,9 @@ if [[ "$API_KEY_FOUND" != "true" ]]; then
             ;;
         "anthropic")
             echo "anthropic_api_key = \"your-anthropic-api-key\""
+            ;;
+        "zai")
+            echo "zai_api_key = \"your-zai-api-key\""
             ;;
     esac
     echo ""
@@ -112,6 +121,10 @@ if grep -q '^anthropic_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*anthropic_a
     AVAILABLE_PROVIDERS+=("anthropic")
 fi
 
+if grep -q '^zai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*zai_api_key' "$CONFIG_FILE"; then
+    AVAILABLE_PROVIDERS+=("zai")
+fi
+
 # Set environment variables from config file for the test
 if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
     echo ""
@@ -130,6 +143,16 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
         ANTHROPIC_KEY=$(grep '^anthropic_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
         export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
         echo "   ✅ Set ANTHROPIC_API_KEY from config (selected provider)"
+    elif [[ "$PROVIDER" == "zai" ]] && grep -q '^zai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*zai_api_key' "$CONFIG_FILE"; then
+        ZAI_KEY=$(grep '^zai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+        export ZAI_API_KEY="$ZAI_KEY"
+        echo "   ✅ Set ZAI_API_KEY from config (selected provider)"
+
+        # Check for zAI coding plan setting
+        if grep -q '^zai_coding_plan\s*=\s*true' "$CONFIG_FILE"; then
+            export ZAI_CODING_PLAN="true"
+            echo "   ✅ Set ZAI_CODING_PLAN=true from config"
+        fi
     else
         echo "   ⚠️  Selected provider '$PROVIDER' API key not found in config"
         echo "   Available providers: ${AVAILABLE_PROVIDERS[*]}"
@@ -148,6 +171,11 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
             ANTHROPIC_KEY=$(grep '^anthropic_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
             export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
             echo "   ✅ Set ANTHROPIC_API_KEY from config (fallback)"
+        fi
+        if grep -q '^zai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*zai_api_key' "$CONFIG_FILE"; then
+            ZAI_KEY=$(grep '^zai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+            export ZAI_API_KEY="$ZAI_KEY"
+            echo "   ✅ Set ZAI_API_KEY from config (fallback)"
         fi
     fi
 

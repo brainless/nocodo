@@ -516,6 +516,8 @@ impl ApiService {
                         xai_api_key: xai_key,
                         openai_api_key: openai_key,
                         anthropic_api_key: anthropic_key,
+                        zai_api_key: None,
+                        zai_coding_plan: None,
                     };
                     let result = api_client.update_api_keys(request).await;
                     let mut update_result = result_clone.lock().unwrap();

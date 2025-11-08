@@ -839,6 +839,8 @@ pub struct UpdateApiKeysRequest {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
+    pub zai_api_key: Option<String>,
+    pub zai_coding_plan: Option<bool>,
 }
 
 // ============ Authentication & User Management ============
