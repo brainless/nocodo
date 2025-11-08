@@ -51,6 +51,8 @@ fn infer_provider_from_model(model_id: &str) -> &str {
         "anthropic"
     } else if model_lower.contains("grok") {
         "xai"
+    } else if model_lower.contains("glm") {
+        "zai"
     } else {
         // Default to anthropic if we can't determine
         "anthropic"
@@ -1955,6 +1957,24 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                     .unwrap()
                     .is_empty(),
         });
+
+        // zAI API Key - NEW
+        api_keys.push(ApiKeyConfig {
+            name: "zAI API Key".to_string(),
+            key: api_key_config.zai_api_key.as_ref().map(|key| {
+                if key.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("{}****", &key[..key.len().min(4)])
+                }
+            }),
+            is_configured: api_key_config.zai_api_key.is_some()
+                && !api_key_config
+                    .zai_api_key
+                    .as_ref()
+                    .unwrap()
+                    .is_empty(),
+        });
     } else {
         tracing::info!("No API keys config section found");
         // If no API keys config section exists, show as not configured
@@ -1970,6 +1990,11 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
         });
         api_keys.push(ApiKeyConfig {
             name: "Anthropic API Key".to_string(),
+            key: None,
+            is_configured: false,
+        });
+        api_keys.push(ApiKeyConfig {
+            name: "zAI API Key".to_string(),
             key: None,
             is_configured: false,
         });
@@ -2010,6 +2035,8 @@ pub async fn update_api_keys(
             xai_api_key: None,
             openai_api_key: None,
             anthropic_api_key: None,
+            zai_api_key: None,
+            zai_coding_plan: None,
         });
     }
 
@@ -2043,6 +2070,21 @@ pub async fn update_api_keys(
                 api_keys.anthropic_api_key = None;
                 tracing::info!("Cleared Anthropic API key");
             }
+        }
+
+        if let Some(zai_key) = req.zai_api_key {
+            if !zai_key.is_empty() {
+                api_keys.zai_api_key = Some(zai_key);
+                tracing::info!("Updated zAI API key");
+            } else {
+                api_keys.zai_api_key = None;
+                tracing::info!("Cleared zAI API key");
+            }
+        }
+
+        if let Some(coding_plan) = req.zai_coding_plan {
+            api_keys.zai_coding_plan = Some(coding_plan);
+            tracing::info!("Updated zAI coding plan setting: {}", coding_plan);
         }
     }
 
@@ -2458,6 +2500,56 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
             }
         } else {
             tracing::info!("xAI API key not configured");
+        }
+
+        // zAI models
+        if api_key_config.zai_api_key.is_some()
+            && !api_key_config.zai_api_key.as_ref().unwrap().is_empty()
+        {
+            tracing::info!("zAI API key is configured, creating provider");
+            let zai_config = LlmProviderConfig {
+                provider: "zai".to_string(),
+                model: "glm-4.6".to_string(), // Default model for checking
+                api_key: api_key_config.zai_api_key.as_ref().unwrap().clone(),
+                base_url: Some("https://api.z.ai".to_string()),
+                max_tokens: Some(1000),
+                temperature: Some(0.7),
+            };
+
+            match crate::llm_providers::ZaiProvider::new(zai_config) {
+                Ok(provider) => {
+                    tracing::info!("zAI provider created successfully");
+                    match provider.list_available_models().await {
+                        Ok(available_models) => {
+                            tracing::info!("Found {} zAI models", available_models.len());
+                            for model in available_models {
+                                models.push(crate::models::SupportedModel {
+                                    provider: "zai".to_string(),
+                                    model_id: model.id().to_string(),
+                                    name: model.name().to_string(),
+                                    context_length: model.context_length(),
+                                    supports_streaming: model.supports_streaming(),
+                                    supports_tool_calling: model.supports_tool_calling(),
+                                    supports_vision: model.supports_vision(),
+                                    supports_reasoning: model.supports_reasoning(),
+                                    input_cost_per_token: model.input_cost_per_token(),
+                                    output_cost_per_token: model.output_cost_per_token(),
+                                    default_temperature: model.default_temperature(),
+                                    default_max_tokens: model.default_max_tokens(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to list zAI models: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create zAI provider: {}", e);
+                }
+            }
+        } else {
+            tracing::info!("zAI API key not configured");
         }
     }
 
