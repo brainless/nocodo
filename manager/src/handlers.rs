@@ -229,7 +229,7 @@ pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppEr
             name: user.name,
             email: user.email,
             role: user.role,
-            password_hash: user.password_hash,
+            password_hash: String::new(), // Empty string since it won't be serialized
             is_active: user.is_active,
             created_at: user.created_at,
             updated_at: user.updated_at,
@@ -376,7 +376,7 @@ pub async fn search_users(
             name: user.name,
             email: user.email,
             role: user.role,
-            password_hash: user.password_hash,
+            password_hash: String::new(), // Empty string since it won't be serialized
             is_active: user.is_active,
             created_at: user.created_at,
             updated_at: user.updated_at,
