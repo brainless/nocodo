@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
+import net.schmizz.sshj.connection.channel.direct.Parameters
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -52,13 +53,10 @@ class SshManager @Inject constructor(
             val serverSocket = ServerSocket(0)
             val boundPort = serverSocket.localPort
 
-            // Create the port forwarder - note: SSHJ API uses InetSocketAddress directly
-            val localAddress = InetSocketAddress("127.0.0.1", boundPort)
-            val remoteAddress = InetSocketAddress("127.0.0.1", params.remotePort)
-            val forwardingClient = client.newLocalPortForwarder(
-                localAddress,
-                remoteAddress
-            )
+            // Create the port forwarder using SSHJ API
+            // Parameters: localHost, localPort, remoteHost, remotePort
+            val forwardParams = Parameters("127.0.0.1", boundPort, "127.0.0.1", params.remotePort)
+            val forwardingClient = client.newLocalPortForwarder(forwardParams, serverSocket)
 
             sshClient = client
             forwarder = forwardingClient
