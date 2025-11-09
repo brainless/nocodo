@@ -48,18 +48,11 @@ class SshManager @Inject constructor(
             val localAddress = InetSocketAddress("127.0.0.1", 0)
             val remoteAddress = InetSocketAddress("127.0.0.1", params.remotePort)
 
-            val parameters = LocalPortForwarder.Parameters(
-                "127.0.0.1",
-                0,
-                "127.0.0.1",
-                params.remotePort
-            )
-
             Log.d(TAG, "Setting up port forwarding to remote port ${params.remotePort}")
-            val forwardingClient = client.newLocalPortForwarder(parameters, null)
+            val forwardingClient = client.newLocalPortForwarder(localAddress, remoteAddress)
 
-            // Start forwarding in background thread
-            val boundPort = forwardingClient.boundPort
+            // The local port is determined from the server socket
+            val boundPort = forwardingClient.localPort
 
             sshClient = client
             forwarder = forwardingClient

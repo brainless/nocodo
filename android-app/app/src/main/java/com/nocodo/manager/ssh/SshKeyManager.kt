@@ -60,10 +60,10 @@ class SshKeyManager @Inject constructor(
 
             // Save private key in OpenSSH format using SSHJ's key file writer
             val keyFile = OpenSSHKeyFile()
-            keyFile.init(keyPair.private, keyPair.public)
-            FileWriter(privateKeyFile).use { writer ->
-                keyFile.write(writer)
-            }
+            keyFile.init(privateKeyFile.absolutePath, null)
+            // Note: SSHJ's OpenSSHKeyFile doesn't provide a direct way to generate and save keys
+            // We'll use Java's key serialization instead
+            privateKeyFile.writeText(formatPrivateKey(keyPair))
             privateKeyFile.setReadable(false, false)
             privateKeyFile.setReadable(true, true)
 
@@ -76,6 +76,17 @@ class SshKeyManager @Inject constructor(
         } catch (e: Exception) {
             throw RuntimeException("Failed to generate SSH key: ${e.message}", e)
         }
+    }
+
+    private fun formatPrivateKey(keyPair: KeyPair): String {
+        // For now, we'll use PEM format which is widely compatible
+        // In production, you might want to use a proper OpenSSH key format library
+        val privateKeyBytes = keyPair.private.encoded
+        val base64Key = Base64.encodeToString(privateKeyBytes, Base64.DEFAULT)
+        return """
+            -----BEGIN PRIVATE KEY-----
+            $base64Key-----END PRIVATE KEY-----
+        """.trimIndent()
     }
 
     private fun formatPublicKey(keyPair: KeyPair): String {
