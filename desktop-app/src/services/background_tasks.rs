@@ -67,7 +67,7 @@ impl BackgroundTasks {
                 Err(error) => {
                     tracing::error!("Connection failed: {}", error);
                     state.connection_state = ConnectionState::Error(error.clone());
-                    state.ui_state.connection_error = Some(error);
+                    state.ui_state.connection_error = Some(error.clone());
                     state.ui_state.connected_host = None;
                 }
             }
@@ -85,8 +85,9 @@ impl BackgroundTasks {
                     state.ui_state.connection_error = None;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load projects: {}", e));
+                    let error_msg = format!("Failed to load projects: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -101,7 +102,9 @@ impl BackgroundTasks {
                     state.works = works;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error = Some(format!("Failed to load works: {}", e));
+                    let error_msg = format!("Failed to load works: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -116,8 +119,9 @@ impl BackgroundTasks {
                     state.work_messages = messages;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load work messages: {}", e));
+                    let error_msg = format!("Failed to load work messages: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -132,8 +136,9 @@ impl BackgroundTasks {
                     state.ai_session_outputs = outputs;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load AI outputs: {}", e));
+                    let error_msg = format!("Failed to load AI outputs: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -148,8 +153,9 @@ impl BackgroundTasks {
                     state.ai_tool_calls = tool_calls;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load AI tool calls: {}", e));
+                    let error_msg = format!("Failed to load AI tool calls: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -178,11 +184,12 @@ impl BackgroundTasks {
                     }
                 }
                 Err(e) => {
+                    let error_msg = format!("Failed to load settings: {}", e);
                     // Only show settings error in status bar if we have no projects loaded
                     // (meaning we're not properly authenticated yet)
                     if state.projects.is_empty() {
-                        state.ui_state.connection_error =
-                            Some(format!("Failed to load settings: {}", e));
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
                     } else {
                         // Log the error but don't show it in status bar since we're authenticated
                         tracing::warn!("Failed to load settings (non-critical): {}", e);
@@ -207,9 +214,9 @@ impl BackgroundTasks {
                     state.project_details = Some(details);
                 }
                 Err(e) => {
-                    tracing::error!("Failed to load project details: {}", e);
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load project details: {}", e));
+                    let error_msg = format!("Failed to load project details: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -224,8 +231,9 @@ impl BackgroundTasks {
                     state.supported_models = models;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load supported models: {}", e));
+                    let error_msg = format!("Failed to load supported models: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -249,7 +257,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_works(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error = Some(format!("Failed to create work: {}", e));
+                    let error_msg = format!("Failed to create work: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -263,8 +273,9 @@ impl BackgroundTasks {
                     // AI session created successfully
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to create AI session: {}", e));
+                    let error_msg = format!("Failed to create AI session: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -285,8 +296,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_settings(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to update API keys: {}", e));
+                    let error_msg = format!("Failed to update API keys: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -307,8 +319,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_settings(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to update projects path: {}", e));
+                    let error_msg = format!("Failed to update projects path: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -328,8 +341,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_projects(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to scan projects: {}", e));
+                    let error_msg = format!("Failed to scan projects: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -375,8 +389,9 @@ impl BackgroundTasks {
                     }
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to send message: {}", e));
+                    let error_msg = format!("Failed to send message: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -397,8 +412,9 @@ impl BackgroundTasks {
                         state.ui_state.connection_error = None;
                     }
                     Err(e) => {
-                        state.ui_state.connection_error =
-                            Some(format!("Failed to load users: {}", e));
+                        let error_msg = format!("Failed to load users: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
                     }
                 }
             }
@@ -421,8 +437,9 @@ impl BackgroundTasks {
                         state.ui_state.connection_error = None;
                     }
                     Err(e) => {
-                        state.ui_state.connection_error =
-                            Some(format!("Failed to load teams: {}", e));
+                        let error_msg = format!("Failed to load teams: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
                     }
                 }
             }
@@ -444,8 +461,9 @@ impl BackgroundTasks {
                         state.ui_state.connection_error = None;
                     }
                     Err(e) => {
-                        state.ui_state.connection_error =
-                            Some(format!("Failed to update user: {}", e));
+                        let error_msg = format!("Failed to update user: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
                     }
                 }
             }
