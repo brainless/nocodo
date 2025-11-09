@@ -62,13 +62,13 @@ pub struct AppState {
     pub supported_models: Vec<manager_models::SupportedModel>,
 
     // Users management
-    pub users: Vec<manager_models::User>,
-    pub filtered_users: Vec<manager_models::User>,
+    pub users: Vec<manager_models::UserWithTeams>,
+    pub filtered_users: Vec<manager_models::UserWithTeams>,
     pub user_search_query: String,
     pub selected_user_ids: std::collections::HashSet<i64>,
     pub loading_users: bool,
     #[serde(skip)]
-    pub users_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::User>, String>>>>,
+    pub users_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::UserWithTeams>, String>>>>,
 
     // User detail modal
     pub show_user_modal: bool,

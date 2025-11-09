@@ -900,8 +900,14 @@ pub struct User {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct UserWithTeams {
+    pub user: User,
+    pub teams: Vec<Team>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct UserListResponse {
-    pub users: Vec<User>,
+    pub users: Vec<UserWithTeams>,
 }
 
 #[derive(Serialize, Deserialize)]

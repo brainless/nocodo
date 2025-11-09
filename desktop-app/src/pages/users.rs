@@ -64,8 +64,8 @@ impl UsersPage {
                     state.filtered_users = state.users
                         .iter()
                         .filter(|u| {
-                            u.name.to_lowercase().contains(&query) ||
-                            u.email.to_lowercase().contains(&query)
+                            u.user.name.to_lowercase().contains(&query) ||
+                            u.user.email.to_lowercase().contains(&query)
                         })
                         .cloned()
                         .collect();
@@ -124,30 +124,39 @@ impl UsersPage {
                     });
                 })
                 .body(|mut body| {
-                    for user in &state.filtered_users {
+                    for user_with_teams in &state.filtered_users {
                         body.row(18.0, |mut row| {
                             row.col(|ui| {
-                                let id_text = ContentText::text(user.id.to_string());
+                                let id_text = ContentText::text(user_with_teams.user.id.to_string());
                                 if ui.label(id_text).clicked() {
-                                    clicked_user = Some(user.clone());
+                                    clicked_user = Some(user_with_teams.user.clone());
                                 }
                             });
                             row.col(|ui| {
-                                let name_text = ContentText::text(&user.name);
+                                let name_text = ContentText::text(&user_with_teams.user.name);
                                 if ui.label(name_text).clicked() {
-                                    clicked_user = Some(user.clone());
+                                    clicked_user = Some(user_with_teams.user.clone());
                                 }
                             });
                             row.col(|ui| {
-                                let email_text = ContentText::text(&user.email);
+                                let email_text = ContentText::text(&user_with_teams.user.email);
                                 if ui.label(email_text).clicked() {
-                                    clicked_user = Some(user.clone());
+                                    clicked_user = Some(user_with_teams.user.clone());
                                 }
                             });
                             row.col(|ui| {
-                                let teams_text = ContentText::text("Team1, Team2");  // TODO: Get from user
+                                let team_names: Vec<String> = user_with_teams.teams
+                                    .iter()
+                                    .map(|team| team.name.clone())
+                                    .collect();
+                                let teams_text = if team_names.is_empty() {
+                                    "No teams".to_string()
+                                } else {
+                                    team_names.join(", ")
+                                };
+                                let teams_text = ContentText::text(&teams_text);
                                 if ui.label(teams_text).clicked() {
-                                    clicked_user = Some(user.clone());
+                                    clicked_user = Some(user_with_teams.user.clone());
                                 }
                             });
                         });
@@ -163,6 +172,19 @@ impl UsersPage {
             // Load teams for this user
             let api_service = ApiService::new();
             api_service.refresh_teams(state);
+            
+            // Load user's current team memberships
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let user_id = user.id;
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    if let Ok(user_teams) = api_client.get_user_teams(user_id).await {
+                        // Update state - this needs to be handled in the UI thread
+                        // For now, the teams will be loaded when the modal opens
+                    }
+                }
+            });
         }
 
         // User detail modal
@@ -191,6 +213,18 @@ impl UsersPage {
 
                     ui.label(WidgetText::section_heading("Teams"));
                     ui.separator();
+
+                    // Load user teams if not already loaded
+                    if state.editing_user_teams.is_empty() && !state.teams.is_empty() {
+                        let connection_manager = Arc::clone(&state.connection_manager);
+                        let user_id = user.id;
+                        let teams = state.teams.clone();
+                        
+                        // Find current teams for this user from the users list
+                        if let Some(user_with_teams) = state.users.iter().find(|u| u.user.id == user_id) {
+                            state.editing_user_teams = user_with_teams.teams.iter().map(|t| t.id).collect();
+                        }
+                    }
 
                     // Team checkboxes
                     for team in &state.teams {

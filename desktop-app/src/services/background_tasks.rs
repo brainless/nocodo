@@ -463,8 +463,8 @@ impl BackgroundTasks {
             state.filtered_users = state.users
                 .iter()
                 .filter(|u| {
-                    u.name.to_lowercase().contains(&query) ||
-                    u.email.to_lowercase().contains(&query)
+                    u.user.name.to_lowercase().contains(&query) ||
+                    u.user.email.to_lowercase().contains(&query)
                 })
                 .cloned()
                 .collect();

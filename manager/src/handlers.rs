@@ -212,7 +212,26 @@ pub async fn get_project_details(
 
 pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let users = data.database.get_all_users()?;
-    let response = UserListResponse { users };
+    let mut users_with_teams = Vec::new();
+    
+    for user in users {
+        let teams = data.database.get_user_teams(user.id)?;
+        let user_teams: Vec<manager_models::Team> = teams.into_iter().map(|team| manager_models::Team {
+            id: team.id,
+            name: team.name,
+            description: team.description,
+            created_at: team.created_at,
+            updated_at: team.updated_at,
+            created_by: team.created_by,
+        }).collect();
+        
+        users_with_teams.push(manager_models::UserWithTeams {
+            user,
+            teams: user_teams,
+        });
+    }
+    
+    let response = UserListResponse { users: users_with_teams };
     Ok(HttpResponse::Ok().json(response))
 }
 

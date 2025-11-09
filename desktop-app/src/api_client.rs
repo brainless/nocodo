@@ -2,7 +2,7 @@ use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
     ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
     Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, User, UserDetailResponse,
-    UserListResponse, Work, WorkListResponse, WorkResponse,
+    UserListResponse, UserWithTeams, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -532,6 +532,27 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(user_detail)
+    }
+
+    pub async fn get_user_teams(&self, user_id: i64) -> Result<TeamListResponse, ApiError> {
+        let url = format!("{}/api/users/{}/teams", self.base_url, user_id);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let teams_response: TeamListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(teams_response)
     }
 
     pub async fn update_user(&self, user_id: i64, request: UpdateUserRequest) -> Result<(), ApiError> {
