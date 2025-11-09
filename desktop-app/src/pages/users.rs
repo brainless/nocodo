@@ -4,6 +4,7 @@ use crate::ui_text::{ContentText, WidgetText};
 use crate::services::ApiService;
 use egui::{Context, Ui};
 use manager_models::UpdateUserRequest;
+use std::sync::Arc;
 
 pub struct UsersPage;
 
@@ -166,6 +167,7 @@ impl UsersPage {
 
         // Handle clicked user
         if let Some(user) = clicked_user {
+            let user_id = user.id;
             state.editing_user = Some(user);
             state.show_user_modal = true;
 
@@ -175,7 +177,6 @@ impl UsersPage {
             
             // Load user's current team memberships
             let connection_manager = Arc::clone(&state.connection_manager);
-            let user_id = user.id;
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;

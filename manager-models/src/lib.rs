@@ -899,7 +899,7 @@ pub struct User {
     pub last_login_at: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UserWithTeams {
     pub user: User,
     pub teams: Vec<Team>,
