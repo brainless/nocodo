@@ -51,3 +51,12 @@
 - On completion of a Work, manager will check git commit or request commits
 - For manual review of Work, manager will create PR if it is configured for Project
 - Otherwise manager will wait for manual testing and then merge to main
+
+### Android and iOS apps
+- Native apps for Android and iOS devices to enable access to company's software tools on the go
+- Team members can ask for custom reports or landing pages right when they need
+- manager, running in company's own cloud, can gather all needed info and build the software, host and share access through port forwarding
+
+### Cloud instance isolation
+- manager can spin up on demand cloud instance (DigitalOcean, AWS, GPC, etc.)
+- Testing a feature branch can be done in an isolated instance when needed - offers DB, cache, system dependencies isolation
