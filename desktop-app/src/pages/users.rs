@@ -65,8 +65,8 @@ impl UsersPage {
                     state.filtered_users = state.users
                         .iter()
                         .filter(|u| {
-                            u.user.name.to_lowercase().contains(&query) ||
-                            u.user.email.to_lowercase().contains(&query)
+                            u.name.to_lowercase().contains(&query) ||
+                            u.email.to_lowercase().contains(&query)
                         })
                         .cloned()
                         .collect();
@@ -125,28 +125,61 @@ impl UsersPage {
                     });
                 })
                 .body(|mut body| {
-                    for user_with_teams in &state.filtered_users {
+                    for user_item in &state.filtered_users {
                         body.row(18.0, |mut row| {
                             row.col(|ui| {
-                                let id_text = ContentText::text(user_with_teams.user.id.to_string());
+                                let id_text = ContentText::text(user_item.id.to_string());
                                 if ui.label(id_text).clicked() {
-                                    clicked_user = Some(user_with_teams.user.clone());
+                                    // Create a full User object for editing
+                                    clicked_user = Some(manager_models::User {
+                                        id: user_item.id,
+                                        name: user_item.name.clone(),
+                                        email: user_item.email.clone(),
+                                        role: None,
+                                        password_hash: String::new(),
+                                        is_active: true,
+                                        created_at: 0,
+                                        updated_at: 0,
+                                        last_login_at: None,
+                                    });
                                 }
                             });
                             row.col(|ui| {
-                                let name_text = ContentText::text(&user_with_teams.user.name);
+                                let name_text = ContentText::text(&user_item.name);
                                 if ui.label(name_text).clicked() {
-                                    clicked_user = Some(user_with_teams.user.clone());
+                                    // Create a full User object for editing
+                                    clicked_user = Some(manager_models::User {
+                                        id: user_item.id,
+                                        name: user_item.name.clone(),
+                                        email: user_item.email.clone(),
+                                        role: None,
+                                        password_hash: String::new(),
+                                        is_active: true,
+                                        created_at: 0,
+                                        updated_at: 0,
+                                        last_login_at: None,
+                                    });
                                 }
                             });
                             row.col(|ui| {
-                                let email_text = ContentText::text(&user_with_teams.user.email);
+                                let email_text = ContentText::text(&user_item.email);
                                 if ui.label(email_text).clicked() {
-                                    clicked_user = Some(user_with_teams.user.clone());
+                                    // Create a full User object for editing
+                                    clicked_user = Some(manager_models::User {
+                                        id: user_item.id,
+                                        name: user_item.name.clone(),
+                                        email: user_item.email.clone(),
+                                        role: None,
+                                        password_hash: String::new(),
+                                        is_active: true,
+                                        created_at: 0,
+                                        updated_at: 0,
+                                        last_login_at: None,
+                                    });
                                 }
                             });
                             row.col(|ui| {
-                                let team_names: Vec<String> = user_with_teams.teams
+                                let team_names: Vec<String> = user_item.teams
                                     .iter()
                                     .map(|team| team.name.clone())
                                     .collect();
@@ -157,7 +190,18 @@ impl UsersPage {
                                 };
                                 let teams_text = ContentText::text(&teams_text);
                                 if ui.label(teams_text).clicked() {
-                                    clicked_user = Some(user_with_teams.user.clone());
+                                    // Create a full User object for editing
+                                    clicked_user = Some(manager_models::User {
+                                        id: user_item.id,
+                                        name: user_item.name.clone(),
+                                        email: user_item.email.clone(),
+                                        role: None,
+                                        password_hash: String::new(),
+                                        is_active: true,
+                                        created_at: 0,
+                                        updated_at: 0,
+                                        last_login_at: None,
+                                    });
                                 }
                             });
                         });
@@ -222,8 +266,8 @@ impl UsersPage {
                         let teams = state.teams.clone();
                         
                         // Find current teams for this user from the users list
-                        if let Some(user_with_teams) = state.users.iter().find(|u| u.user.id == user_id) {
-                            state.editing_user_teams = user_with_teams.teams.iter().map(|t| t.id).collect();
+                        if let Some(user_item) = state.users.iter().find(|u| u.id == user_id) {
+                            state.editing_user_teams = user_item.teams.iter().map(|t| t.id).collect();
                         }
                     }
 

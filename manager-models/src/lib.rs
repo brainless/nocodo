@@ -906,11 +906,6 @@ pub struct UserWithTeams {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UserListResponse {
-    pub users: Vec<UserWithTeams>,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct UserDetailResponse {
     pub user: User,
     pub teams: Vec<Team>,
@@ -941,4 +936,24 @@ pub struct Team {
 #[derive(Serialize, Deserialize)]
 pub struct TeamListResponse {
     pub teams: Vec<Team>,
+}
+
+// Clean models specifically for user list display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserListItem {
+    pub id: i64,
+    pub name: String,
+    pub email: String,
+    pub teams: Vec<TeamItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamItem {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserListResponse {
+    pub users: Vec<UserListItem>,
 }

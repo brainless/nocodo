@@ -211,38 +211,26 @@ pub async fn get_project_details(
 
 pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let users = data.database.get_all_users()?;
-    let mut users_with_teams = Vec::new();
+    let mut user_list_items = Vec::new();
     
     for user in users {
         let teams = data.database.get_user_teams(user.id)?;
-        let user_teams: Vec<manager_models::Team> = teams.into_iter().map(|team| manager_models::Team {
+        let team_items: Vec<manager_models::TeamItem> = teams.into_iter().map(|team| manager_models::TeamItem {
             id: team.id,
             name: team.name,
-            description: team.description,
-            created_at: team.created_at,
-            updated_at: team.updated_at,
-            created_by: team.created_by,
         }).collect();
         
-        let manager_user = manager_models::User {
+        let user_item = manager_models::UserListItem {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
-            password_hash: String::new(), // Empty string since it won't be serialized
-            is_active: user.is_active,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
-            last_login_at: user.last_login_at,
+            teams: team_items,
         };
         
-        users_with_teams.push(manager_models::UserWithTeams {
-            user: manager_user,
-            teams: user_teams,
-        });
+        user_list_items.push(user_item);
     }
     
-    let response = manager_models::UserListResponse { users: users_with_teams };
+    let response = manager_models::UserListResponse { users: user_list_items };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -358,38 +346,26 @@ pub async fn search_users(
 ) -> Result<HttpResponse, AppError> {
     let search_query = query.into_inner();
     let users = data.database.search_users(&search_query.q)?;
-    let mut users_with_teams = Vec::new();
+    let mut user_list_items = Vec::new();
     
     for user in users {
         let teams = data.database.get_user_teams(user.id)?;
-        let user_teams: Vec<manager_models::Team> = teams.into_iter().map(|team| manager_models::Team {
+        let team_items: Vec<manager_models::TeamItem> = teams.into_iter().map(|team| manager_models::TeamItem {
             id: team.id,
             name: team.name,
-            description: team.description,
-            created_at: team.created_at,
-            updated_at: team.updated_at,
-            created_by: team.created_by,
         }).collect();
         
-        let manager_user = manager_models::User {
+        let user_item = manager_models::UserListItem {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
-            password_hash: String::new(), // Empty string since it won't be serialized
-            is_active: user.is_active,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
-            last_login_at: user.last_login_at,
+            teams: team_items,
         };
         
-        users_with_teams.push(manager_models::UserWithTeams {
-            user: manager_user,
-            teams: user_teams,
-        });
+        user_list_items.push(user_item);
     }
     
-    let response = manager_models::UserListResponse { users: users_with_teams };
+    let response = manager_models::UserListResponse { users: user_list_items };
     Ok(HttpResponse::Ok().json(response))
 }
 

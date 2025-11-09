@@ -2,7 +2,7 @@ use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
     ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
     Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, User, UserDetailResponse,
-    UserListResponse, UserWithTeams, Work, WorkListResponse, WorkResponse,
+    UserListResponse, UserListItem, TeamItem, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
@@ -492,7 +492,7 @@ impl ApiClient {
         Ok(login_response)
     }
 
-    pub async fn list_users(&self) -> Result<Vec<UserWithTeams>, ApiError> {
+    pub async fn list_users(&self) -> Result<Vec<UserListItem>, ApiError> {
         let url = format!("{}/api/users", self.base_url);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -572,7 +572,7 @@ impl ApiClient {
         Ok(())
     }
 
-    pub async fn search_users(&self, query: &str) -> Result<Vec<UserWithTeams>, ApiError> {
+    pub async fn search_users(&self, query: &str) -> Result<Vec<UserListItem>, ApiError> {
         let url = format!("{}/api/users/search?q={}", self.base_url, urlencoding::encode(query));
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
