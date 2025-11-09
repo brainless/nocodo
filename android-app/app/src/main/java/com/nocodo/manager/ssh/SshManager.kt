@@ -4,7 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.connection.channel.forwarded.LocalPortForwarder
+import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.net.InetSocketAddress
 import javax.inject.Inject
@@ -59,7 +59,7 @@ class SshManager @Inject constructor(
             val forwardingClient = client.newLocalPortForwarder(parameters, null)
 
             // Start forwarding in background thread
-            val boundPort = forwardingClient.localPort
+            val boundPort = forwardingClient.boundPort
 
             sshClient = client
             forwarder = forwardingClient

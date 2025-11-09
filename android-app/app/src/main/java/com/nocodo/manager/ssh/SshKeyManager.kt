@@ -5,7 +5,7 @@ import android.util.Base64
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.userauth.keyprovider.KeyProvider
-import net.schmizz.sshj.userauth.keyprovider.OpenSSHKeyV1KeyFile
+import net.schmizz.sshj.userauth.keyprovider.OpenSSHKeyFile
 import java.io.File
 import java.io.FileWriter
 import java.security.KeyPair
@@ -59,11 +59,10 @@ class SshKeyManager @Inject constructor(
             val keyPair = keyPairGenerator.generateKeyPair()
 
             // Save private key in OpenSSH format using SSHJ's key file writer
-            val keyFile = OpenSSHKeyV1KeyFile()
+            val keyFile = OpenSSHKeyFile()
             keyFile.init(keyPair.private, keyPair.public)
-            val privateKeyContent: String = keyFile.toString()
             FileWriter(privateKeyFile).use { writer ->
-                writer.write(privateKeyContent)
+                keyFile.write(writer)
             }
             privateKeyFile.setReadable(false, false)
             privateKeyFile.setReadable(true, true)

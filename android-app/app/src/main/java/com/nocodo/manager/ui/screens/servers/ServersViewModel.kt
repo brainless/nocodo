@@ -12,8 +12,10 @@ import com.nocodo.manager.ssh.SshKeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,7 +29,7 @@ class ServersViewModel @Inject constructor(
     val servers: StateFlow<List<Server>> = serverRepository.getAllServers()
         .stateIn(
             scope = viewModelScope,
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
@@ -71,9 +73,3 @@ class ServersViewModel @Inject constructor(
         context.startForegroundService(intent)
     }
 }
-
-private fun <T> kotlinx.coroutines.flow.Flow<T>.stateIn(
-    scope: kotlinx.coroutines.CoroutineScope,
-    started: kotlinx.coroutines.flow.SharingStarted,
-    initialValue: T
-): StateFlow<T> = kotlinx.coroutines.flow.stateIn(scope, started, initialValue)
