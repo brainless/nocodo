@@ -5,10 +5,13 @@ import android.util.Base64
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.userauth.keyprovider.KeyProvider
+import net.schmizz.sshj.userauth.keyprovider.OpenSSHKeyV1KeyFile
 import java.io.File
 import java.io.FileWriter
+import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
+import java.security.interfaces.EdECPublicKey
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,14 +58,18 @@ class SshKeyManager @Inject constructor(
             val keyPairGenerator = KeyPairGenerator.getInstance("Ed25519", "BC")
             val keyPair = keyPairGenerator.generateKeyPair()
 
-            // Save private key in OpenSSH format
-            val privateKeyContent = SecurityUtils.formatPrivateKey(keyPair.private, "Ed25519")
-            FileWriter(privateKeyFile).use { it.write(privateKeyContent) }
+            // Save private key in OpenSSH format using SSHJ's key file writer
+            val keyFile = OpenSSHKeyV1KeyFile()
+            keyFile.init(keyPair.private, keyPair.public)
+            val privateKeyContent: String = keyFile.toString()
+            FileWriter(privateKeyFile).use { writer ->
+                writer.write(privateKeyContent)
+            }
             privateKeyFile.setReadable(false, false)
             privateKeyFile.setReadable(true, true)
 
             // Save public key in OpenSSH format
-            val publicKeyContent = SecurityUtils.formatPublicKey(keyPair.public, "Ed25519")
+            val publicKeyContent = formatPublicKey(keyPair)
             FileWriter(publicKeyFile).use { it.write(publicKeyContent) }
 
             val fingerprint = calculateFingerprint(publicKeyContent)
@@ -70,6 +77,34 @@ class SshKeyManager @Inject constructor(
         } catch (e: Exception) {
             throw RuntimeException("Failed to generate SSH key: ${e.message}", e)
         }
+    }
+
+    private fun formatPublicKey(keyPair: KeyPair): String {
+        // Format Ed25519 public key in OpenSSH format
+        val publicKey = keyPair.public
+        val keyBytes = when (publicKey) {
+            is EdECPublicKey -> {
+                // Extract the raw key bytes
+                val encoded = publicKey.encoded
+                // Ed25519 public key is 32 bytes, extract from the DER encoding
+                encoded.takeLast(32).toByteArray()
+            }
+            else -> publicKey.encoded
+        }
+
+        // Build OpenSSH public key format: "ssh-ed25519 <base64-encoded-key>"
+        val keyType = "ssh-ed25519"
+        val keyTypeBytes = keyType.toByteArray()
+
+        // OpenSSH format: length + type + length + key
+        val buffer = java.io.ByteArrayOutputStream()
+        buffer.write(byteArrayOf(0, 0, 0, keyTypeBytes.size.toByte()))
+        buffer.write(keyTypeBytes)
+        buffer.write(byteArrayOf(0, 0, 0, keyBytes.size.toByte()))
+        buffer.write(keyBytes)
+
+        val base64Key = Base64.encodeToString(buffer.toByteArray(), Base64.NO_WRAP)
+        return "$keyType $base64Key"
     }
 
     fun calculateFingerprint(publicKey: String): String {
