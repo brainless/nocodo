@@ -12,8 +12,7 @@ use crate::models::{
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
     FileUpdateRequest, LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse,
     ProjectResponse, ServerStatus, SettingsResponse, Team,
-    UpdateApiKeysRequest, UpdateTeamRequest, UpdateUserRequest, User,
-    UserListResponse, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    UpdateApiKeysRequest, UpdateTeamRequest, UpdateUserRequest, User, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use manager_models::{SearchQuery, TeamListResponse, CreateWorkRequest};
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -225,13 +224,25 @@ pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppEr
             created_by: team.created_by,
         }).collect();
         
+        let manager_user = manager_models::User {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            password_hash: user.password_hash,
+            is_active: user.is_active,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+            last_login_at: user.last_login_at,
+        };
+        
         users_with_teams.push(manager_models::UserWithTeams {
-            user,
+            user: manager_user,
             teams: user_teams,
         });
     }
     
-    let response = UserListResponse { users: users_with_teams };
+    let response = manager_models::UserListResponse { users: users_with_teams };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -347,7 +358,38 @@ pub async fn search_users(
 ) -> Result<HttpResponse, AppError> {
     let search_query = query.into_inner();
     let users = data.database.search_users(&search_query.q)?;
-    let response = UserListResponse { users };
+    let mut users_with_teams = Vec::new();
+    
+    for user in users {
+        let teams = data.database.get_user_teams(user.id)?;
+        let user_teams: Vec<manager_models::Team> = teams.into_iter().map(|team| manager_models::Team {
+            id: team.id,
+            name: team.name,
+            description: team.description,
+            created_at: team.created_at,
+            updated_at: team.updated_at,
+            created_by: team.created_by,
+        }).collect();
+        
+        let manager_user = manager_models::User {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            password_hash: user.password_hash,
+            is_active: user.is_active,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+            last_login_at: user.last_login_at,
+        };
+        
+        users_with_teams.push(manager_models::UserWithTeams {
+            user: manager_user,
+            teams: user_teams,
+        });
+    }
+    
+    let response = manager_models::UserListResponse { users: users_with_teams };
     Ok(HttpResponse::Ok().json(response))
 }
 
