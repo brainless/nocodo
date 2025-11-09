@@ -101,50 +101,58 @@ impl UsersPage {
             return;
         }
 
-        // Table header
-        ui.horizontal(|ui| {
-            // NOTE: Checkboxes disabled until bulk actions are defined
-            // ui.checkbox(&mut false, "");  // Select all checkbox
-            ui.label(WidgetText::table_header("ID"));
-            ui.label(WidgetText::table_header("Username"));
-            ui.label(WidgetText::table_header("Email"));
-            ui.label(WidgetText::table_header("Teams"));
-        });
-        ui.separator();
-
-        // Table rows
+        // Table with proper column layout
         let mut clicked_user: Option<manager_models::User> = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
-            for user in &state.filtered_users {
-                // NOTE: Checkboxes disabled until bulk actions are defined
-                // let is_selected = state.selected_user_ids.contains(&user.id);
-
-                ui.horizontal(|ui| {
-                    // NOTE: Checkboxes disabled until bulk actions are defined
-                    // let mut selected = is_selected;
-                    // if ui.checkbox(&mut selected, "").changed() {
-                    //     if selected {
-                    //         state.selected_user_ids.insert(user.id);
-                    //     } else {
-                    //         state.selected_user_ids.remove(&user.id);
-                    //     }
-                    // }
-
-                    ui.label(ContentText::text(&user.id.to_string()));
-                    ui.label(ContentText::text(&user.name));
-                    ui.label(ContentText::text(&user.email));
-                    ui.label(ContentText::text("Team1, Team2"));  // TODO: Get from user
+            egui_extras::TableBuilder::new(ui)
+                .column(egui_extras::Column::remainder()) // ID column
+                .column(egui_extras::Column::remainder()) // Username column  
+                .column(egui_extras::Column::remainder()) // Email column
+                .column(egui_extras::Column::remainder()) // Teams column
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.label(WidgetText::table_header("ID"));
+                    });
+                    header.col(|ui| {
+                        ui.label(WidgetText::table_header("Username"));
+                    });
+                    header.col(|ui| {
+                        ui.label(WidgetText::table_header("Email"));
+                    });
+                    header.col(|ui| {
+                        ui.label(WidgetText::table_header("Teams"));
+                    });
+                })
+                .body(|mut body| {
+                    for user in &state.filtered_users {
+                        body.row(18.0, |mut row| {
+                            row.col(|ui| {
+                                let id_text = ContentText::text(user.id.to_string());
+                                if ui.label(id_text).clicked() {
+                                    clicked_user = Some(user.clone());
+                                }
+                            });
+                            row.col(|ui| {
+                                let name_text = ContentText::text(&user.name);
+                                if ui.label(name_text).clicked() {
+                                    clicked_user = Some(user.clone());
+                                }
+                            });
+                            row.col(|ui| {
+                                let email_text = ContentText::text(&user.email);
+                                if ui.label(email_text).clicked() {
+                                    clicked_user = Some(user.clone());
+                                }
+                            });
+                            row.col(|ui| {
+                                let teams_text = ContentText::text("Team1, Team2");  // TODO: Get from user
+                                if ui.label(teams_text).clicked() {
+                                    clicked_user = Some(user.clone());
+                                }
+                            });
+                        });
+                    }
                 });
-
-                // Make row clickable
-                let row_rect = ui.min_rect();
-                let response = ui.interact(row_rect, ui.id().with(user.id), egui::Sense::click());
-                if response.clicked() {
-                    clicked_user = Some(user.clone());
-                }
-
-                ui.separator();
-            }
         });
 
         // Handle clicked user
@@ -170,7 +178,7 @@ impl UsersPage {
             .show(ctx, |ui| {
                 if let Some(ref mut user) = state.editing_user {
                     ui.label(WidgetText::label("ID:"));
-                    ui.label(ContentText::text(&user.id.to_string()));
+                    ui.label(ContentText::text(user.id.to_string()));
                     ui.add_space(8.0);
 
                     ui.label(WidgetText::label("Username:"));
