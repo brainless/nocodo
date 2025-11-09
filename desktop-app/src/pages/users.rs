@@ -220,11 +220,11 @@ impl UsersPage {
             api_service.refresh_teams(state);
             
             // Load user's current team memberships
-            let connection_manager = Arc::clone(&state.connection_manager);
+            let _connection_manager = Arc::clone(&state.connection_manager);
             tokio::spawn(async move {
-                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                if let Some(api_client_arc) = _connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    if let Ok(user_teams) = api_client.get_user_teams(user_id).await {
+                    if let Ok(_user_teams) = api_client.get_user_teams(user_id).await {
                         // Update state - this needs to be handled in the UI thread
                         // For now, the teams will be loaded when the modal opens
                     }
@@ -261,9 +261,9 @@ impl UsersPage {
 
                     // Load user teams if not already loaded
                     if state.editing_user_teams.is_empty() && !state.teams.is_empty() {
-                        let connection_manager = Arc::clone(&state.connection_manager);
+                        let _connection_manager = Arc::clone(&state.connection_manager);
                         let user_id = user.id;
-                        let teams = state.teams.clone();
+                        let _teams = state.teams.clone();
                         
                         // Find current teams for this user from the users list
                         if let Some(user_item) = state.users.iter().find(|u| u.id == user_id) {

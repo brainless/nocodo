@@ -659,7 +659,7 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    if let Ok(user_teams) = api_client.get_user_teams(user_id).await {
+                    if let Ok(_user_teams) = api_client.get_user_teams(user_id).await {
                         // Update editing_user_teams in the main thread
                         // Note: This would need to be handled differently in a real async context
                         // For now, we'll handle this in the UI layer

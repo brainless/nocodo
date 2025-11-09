@@ -1,8 +1,8 @@
 use manager_models::{
     CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
     ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
-    Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, User, UserDetailResponse,
-    UserListResponse, UserListItem, TeamItem, Work, WorkListResponse, WorkResponse,
+    Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, UserDetailResponse,
+    UserListResponse, UserListItem, Work, WorkListResponse, WorkResponse,
 };
 use serde_json::Value;
 
