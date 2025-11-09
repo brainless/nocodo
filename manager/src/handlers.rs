@@ -364,7 +364,16 @@ pub async fn delete_user(
 
 pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let teams = data.database.get_all_teams()?;
-    Ok(HttpResponse::Ok().json(teams))
+    let manager_teams: Vec<manager_models::Team> = teams.into_iter().map(|team| manager_models::Team {
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        created_at: team.created_at,
+        updated_at: team.updated_at,
+        created_by: team.created_by,
+    }).collect();
+    let response = TeamListResponse { teams: manager_teams };
+    Ok(HttpResponse::Ok().json(response))
 }
 
 pub async fn create_team(
