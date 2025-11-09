@@ -393,9 +393,12 @@ impl BackgroundTasks {
                     Ok(users) => {
                         state.users = users;
                         users_updated = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
                     }
                     Err(e) => {
-                        state.connection_state = crate::state::ConnectionState::Error(e);
+                        state.ui_state.connection_error =
+                            Some(format!("Failed to load users: {}", e));
                     }
                 }
             }
@@ -414,9 +417,12 @@ impl BackgroundTasks {
                 match result {
                     Ok(teams) => {
                         state.teams = teams;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
                     }
                     Err(e) => {
-                        state.connection_state = crate::state::ConnectionState::Error(e);
+                        state.ui_state.connection_error =
+                            Some(format!("Failed to load teams: {}", e));
                     }
                 }
             }
@@ -434,9 +440,12 @@ impl BackgroundTasks {
                     Ok(_) => {
                         state.show_user_modal = false;
                         refresh_users = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
                     }
                     Err(e) => {
-                        state.connection_state = crate::state::ConnectionState::Error(e);
+                        state.ui_state.connection_error =
+                            Some(format!("Failed to update user: {}", e));
                     }
                 }
             }

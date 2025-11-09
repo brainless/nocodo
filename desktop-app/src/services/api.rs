@@ -562,7 +562,23 @@ impl ApiService {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
                     let result = api_client.list_users().await;
-                    *result_clone.lock().unwrap() = Some(result.map_err(|e| e.to_string()));
+                    let mut users_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *users_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut users_result = result_clone.lock().unwrap();
+                    *users_result = Some(Err("Not connected".to_string()));
                 }
             });
         }
@@ -580,7 +596,23 @@ impl ApiService {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
                     let result = api_client.list_teams().await;
-                    *result_clone.lock().unwrap() = Some(result.map_err(|e| e.to_string()));
+                    let mut teams_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *teams_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut teams_result = result_clone.lock().unwrap();
+                    *teams_result = Some(Err("Not connected".to_string()));
                 }
             });
         }
@@ -598,7 +630,23 @@ impl ApiService {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
                     let result = api_client.update_user(user_id, request).await;
-                    *result_clone.lock().unwrap() = Some(result.map_err(|e| e.to_string()));
+                    let mut update_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *update_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(Err("Not connected".to_string()));
                 }
             });
         }
