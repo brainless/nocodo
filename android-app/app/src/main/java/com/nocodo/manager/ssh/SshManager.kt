@@ -52,15 +52,12 @@ class SshManager @Inject constructor(
             val serverSocket = ServerSocket(0)
             val boundPort = serverSocket.localPort
 
-            // Create the port forwarder
+            // Create the port forwarder - note: SSHJ API uses InetSocketAddress directly
+            val localAddress = InetSocketAddress("127.0.0.1", boundPort)
+            val remoteAddress = InetSocketAddress("127.0.0.1", params.remotePort)
             val forwardingClient = client.newLocalPortForwarder(
-                LocalPortForwarder.Parameters(
-                    "127.0.0.1",
-                    boundPort,
-                    "127.0.0.1",
-                    params.remotePort
-                ),
-                serverSocket
+                localAddress,
+                remoteAddress
             )
 
             sshClient = client
