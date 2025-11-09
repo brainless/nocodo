@@ -7,6 +7,7 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.net.InetSocketAddress
+import java.net.ServerSocket
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,12 +48,20 @@ class SshManager @Inject constructor(
             // Set up port forwarding
             Log.d(TAG, "Setting up port forwarding to remote port ${params.remotePort}")
 
-            // Create the port forwarder parameters
-            val parameters = LocalPortForwarder.Parameters("127.0.0.1", 0, "127.0.0.1", params.remotePort)
-            val forwardingClient = client.newLocalPortForwarder(parameters, client.newDirectConnection())
+            // Create a server socket on a dynamic port (port 0)
+            val serverSocket = ServerSocket(0)
+            val boundPort = serverSocket.localPort
 
-            // The local port is determined from the bound address
-            val boundPort = forwardingClient.boundAddress.port
+            // Create the port forwarder
+            val forwardingClient = client.newLocalPortForwarder(
+                LocalPortForwarder.Parameters(
+                    "127.0.0.1",
+                    boundPort,
+                    "127.0.0.1",
+                    params.remotePort
+                ),
+                serverSocket
+            )
 
             sshClient = client
             forwarder = forwardingClient
