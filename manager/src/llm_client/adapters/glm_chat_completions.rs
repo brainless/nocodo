@@ -3,13 +3,11 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::Value;
 
-use crate::llm_client::{
-    LlmCompletionRequest, LlmCompletionResponse, LlmToolCall, LlmToolCallFunction,
-    LlmMessage, LlmChoice, LlmUsage,
-};
 use crate::llm_client::adapters::trait_adapter::{ProviderAdapter, ProviderRequest};
-use crate::llm_client::types::{
-    GlmChatCompletionsRequest, GlmChatCompletionsResponse,
+use crate::llm_client::types::{GlmChatCompletionsRequest, GlmChatCompletionsResponse};
+use crate::llm_client::{
+    LlmChoice, LlmCompletionRequest, LlmCompletionResponse, LlmMessage, LlmToolCall,
+    LlmToolCallFunction, LlmUsage,
 };
 use crate::models::LlmProviderConfig;
 
@@ -29,7 +27,10 @@ impl GlmChatCompletionsAdapter {
     }
 
     /// Convert LlmCompletionRequest to GlmChatCompletionsRequest
-    fn convert_to_glm_request(&self, request: LlmCompletionRequest) -> Result<GlmChatCompletionsRequest> {
+    fn convert_to_glm_request(
+        &self,
+        request: LlmCompletionRequest,
+    ) -> Result<GlmChatCompletionsRequest> {
         // Convert messages to GLM format (mostly compatible with OpenAI)
         let messages: Vec<Value> = request
             .messages
@@ -50,8 +51,8 @@ impl GlmChatCompletionsAdapter {
                 // Handle tool calls for assistant messages
                 if msg.role == "assistant" {
                     if let Some(tool_calls) = &msg.tool_calls {
-                        message["tool_calls"] = serde_json::to_value(tool_calls)
-                            .unwrap_or(Value::Array(vec![]));
+                        message["tool_calls"] =
+                            serde_json::to_value(tool_calls).unwrap_or(Value::Array(vec![]));
                     }
                 }
 
@@ -161,16 +162,19 @@ impl GlmChatCompletionsAdapter {
             tools,
             tool_choice,
             temperature: request.temperature, // Custom serializer handles rounding
-            top_p: None, // Could add if needed
+            top_p: None,                      // Could add if needed
             max_tokens: request.max_tokens,
-            stream: None, // Omit stream parameter - let API use default
+            stream: None,          // Omit stream parameter - let API use default
             thinking: None, // Disable thinking for now - might not be supported in Coding Plan
             response_format: None, // Default to text
         })
     }
 
     /// Convert GlmChatCompletionsResponse to LlmCompletionResponse
-    fn convert_from_glm_response(&self, response: GlmChatCompletionsResponse) -> Result<LlmCompletionResponse> {
+    fn convert_from_glm_response(
+        &self,
+        response: GlmChatCompletionsResponse,
+    ) -> Result<LlmCompletionResponse> {
         let choices = response
             .choices
             .iter()
@@ -237,7 +241,10 @@ impl ProviderAdapter for GlmChatCompletionsAdapter {
     fn get_api_url(&self) -> String {
         // Support custom base_url for testing, otherwise use production
         if let Some(base_url) = &self.config.base_url {
-            format!("{}/paas/v4/chat/completions", base_url.trim_end_matches('/'))
+            format!(
+                "{}/paas/v4/chat/completions",
+                base_url.trim_end_matches('/')
+            )
         } else {
             "https://api.z.ai/api/paas/v4/chat/completions".to_string()
         }

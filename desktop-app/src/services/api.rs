@@ -618,7 +618,12 @@ impl ApiService {
         }
     }
 
-    pub fn update_user(&self, state: &mut AppState, user_id: i64, request: manager_models::UpdateUserRequest) {
+    pub fn update_user(
+        &self,
+        state: &mut AppState,
+        user_id: i64,
+        request: manager_models::UpdateUserRequest,
+    ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.updating_user = true;
             state.update_user_result = Arc::new(std::sync::Mutex::new(None));
@@ -674,11 +679,12 @@ impl ApiService {
         if query.is_empty() {
             state.filtered_users = state.users.clone();
         } else {
-            state.filtered_users = state.users
+            state.filtered_users = state
+                .users
                 .iter()
                 .filter(|u| {
-                    u.name.to_lowercase().contains(&query) ||
-                    u.email.to_lowercase().contains(&query)
+                    u.name.to_lowercase().contains(&query)
+                        || u.email.to_lowercase().contains(&query)
                 })
                 .cloned()
                 .collect();
@@ -719,7 +725,12 @@ impl ApiService {
         }
     }
 
-    pub fn update_team(&self, state: &mut AppState, team_id: i64, request: manager_models::UpdateTeamRequest) {
+    pub fn update_team(
+        &self,
+        state: &mut AppState,
+        team_id: i64,
+        request: manager_models::UpdateTeamRequest,
+    ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.updating_team = true;
             state.update_team_result = Arc::new(std::sync::Mutex::new(None));
@@ -774,11 +785,14 @@ impl ApiService {
         if query.is_empty() {
             state.filtered_teams = state.team_list_items.clone();
         } else {
-            state.filtered_teams = state.team_list_items
+            state.filtered_teams = state
+                .team_list_items
                 .iter()
                 .filter(|t| {
-                    t.name.to_lowercase().contains(&query) ||
-                    t.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&query))
+                    t.name.to_lowercase().contains(&query)
+                        || t.description
+                            .as_ref()
+                            .is_some_and(|d| d.to_lowercase().contains(&query))
                 })
                 .cloned()
                 .collect();

@@ -652,20 +652,24 @@ impl Database {
             .query_row(
                 "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'username'",
                 [],
-                |row| row.get::<_, i32>(0)
+                |row| row.get::<_, i32>(0),
             )
-            .unwrap_or(0) > 0;
+            .unwrap_or(0)
+            > 0;
 
         let has_name_column: bool = conn
             .query_row(
                 "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'name'",
                 [],
-                |row| row.get::<_, i32>(0)
+                |row| row.get::<_, i32>(0),
             )
-            .unwrap_or(0) > 0;
+            .unwrap_or(0)
+            > 0;
 
         if has_username_column && !has_name_column {
-            tracing::info!("Migrating users table: renaming username to name and adding role, last_login_at");
+            tracing::info!(
+                "Migrating users table: renaming username to name and adding role, last_login_at"
+            );
 
             // Temporarily disable foreign keys during migration
             conn.execute("PRAGMA foreign_keys = OFF", [])?;
@@ -735,9 +739,10 @@ impl Database {
                 .query_row(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='teams'",
                     [],
-                    |row| row.get::<_, i32>(0)
+                    |row| row.get::<_, i32>(0),
                 )
-                .unwrap_or(0) > 0;
+                .unwrap_or(0)
+                > 0;
 
             if teams_exists {
                 tracing::info!("Migrating teams table: making created_by nullable");
@@ -2484,7 +2489,10 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         // Remove user from all teams first
-        conn.execute("DELETE FROM team_members WHERE user_id = ?", params![user_id])?;
+        conn.execute(
+            "DELETE FROM team_members WHERE user_id = ?",
+            params![user_id],
+        )?;
 
         // Add user to specified teams
         for &team_id in team_ids {

@@ -1,9 +1,9 @@
 use manager_models::{
-    CreateWorkRequest, FileContentResponse, FileInfo, Project, ProjectDetailsResponse,
-    ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
-    Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, UserDetailResponse,
-    UserListResponse, UserListItem, Work, WorkListResponse, WorkResponse,
-    TeamListItem, PermissionItem,
+    CreateWorkRequest, FileContentResponse, FileInfo, PermissionItem, Project,
+    ProjectDetailsResponse, ProjectListResponse, ServerStatus, SettingsResponse,
+    SupportedModelsResponse, Team, TeamListItem, TeamListResponse, UpdateApiKeysRequest,
+    UpdateUserRequest, UserDetailResponse, UserListItem, UserListResponse, Work, WorkListResponse,
+    WorkResponse,
 };
 use serde_json::Value;
 
@@ -556,7 +556,11 @@ impl ApiClient {
         Ok(teams_response)
     }
 
-    pub async fn update_user(&self, user_id: i64, request: UpdateUserRequest) -> Result<(), ApiError> {
+    pub async fn update_user(
+        &self,
+        user_id: i64,
+        request: UpdateUserRequest,
+    ) -> Result<(), ApiError> {
         let url = format!("{}/api/users/{}", self.base_url, user_id);
         let request_builder = self.client().patch(&url);
         let request_builder = self.add_auth_header(request_builder);
@@ -574,7 +578,11 @@ impl ApiClient {
     }
 
     pub async fn search_users(&self, query: &str) -> Result<Vec<UserListItem>, ApiError> {
-        let url = format!("{}/api/users/search?q={}", self.base_url, urlencoding::encode(query));
+        let url = format!(
+            "{}/api/users/search?q={}",
+            self.base_url,
+            urlencoding::encode(query)
+        );
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
         let response = request
@@ -636,7 +644,11 @@ impl ApiClient {
         Ok(team)
     }
 
-    pub async fn update_team(&self, team_id: i64, update_request: manager_models::UpdateTeamRequest) -> Result<Team, ApiError> {
+    pub async fn update_team(
+        &self,
+        team_id: i64,
+        update_request: manager_models::UpdateTeamRequest,
+    ) -> Result<Team, ApiError> {
         let url = format!("{}/api/teams/{}", self.base_url, team_id);
         let request = self.client().patch(&url);
         let request = self.add_auth_header(request);
@@ -658,7 +670,10 @@ impl ApiClient {
         Ok(team)
     }
 
-    pub async fn get_team_permissions(&self, team_id: i64) -> Result<Vec<PermissionItem>, ApiError> {
+    pub async fn get_team_permissions(
+        &self,
+        team_id: i64,
+    ) -> Result<Vec<PermissionItem>, ApiError> {
         let url = format!("{}/api/teams/{}/permissions", self.base_url, team_id);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -677,12 +692,15 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         // Convert Permission to PermissionItem
-        let permission_items: Vec<PermissionItem> = permissions.into_iter().map(|p| PermissionItem {
-            id: p.id,
-            resource_type: p.resource_type,
-            resource_id: p.resource_id,
-            action: p.action,
-        }).collect();
+        let permission_items: Vec<PermissionItem> = permissions
+            .into_iter()
+            .map(|p| PermissionItem {
+                id: p.id,
+                resource_type: p.resource_type,
+                resource_id: p.resource_id,
+                action: p.action,
+            })
+            .collect();
 
         Ok(permission_items)
     }

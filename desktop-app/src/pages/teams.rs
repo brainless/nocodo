@@ -1,10 +1,9 @@
 use crate::pages::Page;
+use crate::services::ApiService;
 use crate::state::{AppState, ConnectionState};
 use crate::ui_text::{ContentText, WidgetText};
-use crate::services::ApiService;
 use egui::{Context, Ui};
 use manager_models::UpdateTeamRequest;
-
 
 pub struct TeamsPage;
 
@@ -43,11 +42,11 @@ impl Page for TeamsPage {
             ConnectionState::Disconnected => {
                 ui.vertical_centered(|ui| {
                     ui.label(WidgetText::status("Not connected to server"));
-                     if ui.button(WidgetText::button("Connect")).clicked() {
-                         state.ui_state.show_connection_dialog = true;
-                          }
-                      });
-                 }
+                    if ui.button(WidgetText::button("Connect")).clicked() {
+                        state.ui_state.show_connection_dialog = true;
+                    }
+                });
+            }
             ConnectionState::Connected => {
                 self.render_connected_ui(ctx, ui, state);
             }
@@ -97,7 +96,7 @@ impl TeamsPage {
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui_extras::TableBuilder::new(ui)
                 .column(egui_extras::Column::remainder()) // ID column
-                .column(egui_extras::Column::remainder()) // Name column  
+                .column(egui_extras::Column::remainder()) // Name column
                 .column(egui_extras::Column::remainder()) // Description column
                 .column(egui_extras::Column::remainder()) // Permissions column
                 .header(20.0, |mut header| {
@@ -121,7 +120,9 @@ impl TeamsPage {
                                 let id_text = ContentText::text(team_item.id.to_string());
                                 if ui.label(id_text).clicked() {
                                     // Create a full Team object for editing
-                                    if let Some(team) = state.teams.iter().find(|t| t.id == team_item.id) {
+                                    if let Some(team) =
+                                        state.teams.iter().find(|t| t.id == team_item.id)
+                                    {
                                         clicked_team = Some(team.clone());
                                     }
                                 }
@@ -130,24 +131,29 @@ impl TeamsPage {
                                 let name_text = ContentText::text(&team_item.name);
                                 if ui.label(name_text).clicked() {
                                     // Create a full Team object for editing
-                                    if let Some(team) = state.teams.iter().find(|t| t.id == team_item.id) {
+                                    if let Some(team) =
+                                        state.teams.iter().find(|t| t.id == team_item.id)
+                                    {
                                         clicked_team = Some(team.clone());
                                     }
                                 }
                             });
                             row.col(|ui| {
                                 let desc_text = ContentText::text(
-                                    team_item.description.as_ref().unwrap_or(&"-".to_string())
+                                    team_item.description.as_ref().unwrap_or(&"-".to_string()),
                                 );
                                 if ui.label(desc_text).clicked() {
                                     // Create a full Team object for editing
-                                    if let Some(team) = state.teams.iter().find(|t| t.id == team_item.id) {
+                                    if let Some(team) =
+                                        state.teams.iter().find(|t| t.id == team_item.id)
+                                    {
                                         clicked_team = Some(team.clone());
                                     }
                                 }
                             });
                             row.col(|ui| {
-                                let permission_names: Vec<String> = team_item.permissions
+                                let permission_names: Vec<String> = team_item
+                                    .permissions
                                     .iter()
                                     .map(|p| format!("{}:{}", p.resource_type, p.action))
                                     .collect();
@@ -159,7 +165,9 @@ impl TeamsPage {
                                 let permissions_text = ContentText::text(&permissions_text);
                                 if ui.label(permissions_text).clicked() {
                                     // Create a full Team object for editing
-                                    if let Some(team) = state.teams.iter().find(|t| t.id == team_item.id) {
+                                    if let Some(team) =
+                                        state.teams.iter().find(|t| t.id == team_item.id)
+                                    {
                                         clicked_team = Some(team.clone());
                                     }
                                 }
@@ -203,7 +211,11 @@ impl TeamsPage {
                     let mut description = team.description.clone().unwrap_or_default();
                     ui.text_edit_multiline(&mut description);
                     // Update the team description when changed
-                    team.description = if description.trim().is_empty() { None } else { Some(description) };
+                    team.description = if description.trim().is_empty() {
+                        None
+                    } else {
+                        Some(description)
+                    };
                     ui.add_space(8.0);
 
                     ui.label(WidgetText::section_heading("Permissions"));
@@ -211,7 +223,9 @@ impl TeamsPage {
 
                     // For now, show a placeholder for permissions
                     // In a full implementation, this would load and display actual permissions
-                    ui.label(WidgetText::label("Permission management will be implemented in a future update."));
+                    ui.label(WidgetText::label(
+                        "Permission management will be implemented in a future update.",
+                    ));
                     ui.add_space(16.0);
 
                     // Clone values to avoid borrow issues
@@ -222,31 +236,31 @@ impl TeamsPage {
                     // Buttons
                     let mut update_clicked = false;
                     let mut cancel_clicked = false;
-                     ui.horizontal(|ui| {
+                    ui.horizontal(|ui| {
                         if ui.button(WidgetText::button("Update")).clicked() {
                             update_clicked = true;
                         }
 
                         if ui.button(WidgetText::button("Cancel")).clicked() {
                             cancel_clicked = true;
-                         }
-                     });
+                        }
+                    });
 
-                     if update_clicked {
-                         let api_service = ApiService::new();
-                         let request = UpdateTeamRequest {
-                             name: Some(team_name),
-                             description: team_description,
-                         };
-                         api_service.update_team(state, team_id, request);
-                     }
+                    if update_clicked {
+                        let api_service = ApiService::new();
+                        let request = UpdateTeamRequest {
+                            name: Some(team_name),
+                            description: team_description,
+                        };
+                        api_service.update_team(state, team_id, request);
+                    }
 
-                     if cancel_clicked {
-                         state.show_team_modal = false;
-                         state.editing_team = None;
-                         state.editing_team_permissions.clear();
-                     }
-                 }
+                    if cancel_clicked {
+                        state.show_team_modal = false;
+                        state.editing_team = None;
+                        state.editing_team_permissions.clear();
+                    }
+                }
             });
     }
 }

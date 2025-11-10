@@ -1,7 +1,7 @@
 use crate::pages::Page;
+use crate::services::ApiService;
 use crate::state::{AppState, ConnectionState};
 use crate::ui_text::{ContentText, WidgetText};
-use crate::services::ApiService;
 use egui::{Context, Ui};
 use manager_models::UpdateUserRequest;
 use std::sync::Arc;
@@ -43,11 +43,11 @@ impl Page for UsersPage {
             ConnectionState::Disconnected => {
                 ui.vertical_centered(|ui| {
                     ui.label(WidgetText::status("Not connected to server"));
-                     if ui.button(WidgetText::button("Connect")).clicked() {
-                         state.ui_state.show_connection_dialog = true;
-                          }
-                      });
-                 }
+                    if ui.button(WidgetText::button("Connect")).clicked() {
+                        state.ui_state.show_connection_dialog = true;
+                    }
+                });
+            }
             ConnectionState::Connected => {
                 self.render_connected_ui(ctx, ui, state);
             }
@@ -71,11 +71,12 @@ impl UsersPage {
                 if query.is_empty() {
                     state.filtered_users = state.users.clone();
                 } else {
-                    state.filtered_users = state.users
+                    state.filtered_users = state
+                        .users
                         .iter()
                         .filter(|u| {
-                            u.name.to_lowercase().contains(&query) ||
-                            u.email.to_lowercase().contains(&query)
+                            u.name.to_lowercase().contains(&query)
+                                || u.email.to_lowercase().contains(&query)
                         })
                         .cloned()
                         .collect();
@@ -108,7 +109,7 @@ impl UsersPage {
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui_extras::TableBuilder::new(ui)
                 .column(egui_extras::Column::remainder()) // ID column
-                .column(egui_extras::Column::remainder()) // Username column  
+                .column(egui_extras::Column::remainder()) // Username column
                 .column(egui_extras::Column::remainder()) // Email column
                 .column(egui_extras::Column::remainder()) // Teams column
                 .header(20.0, |mut header| {
@@ -180,7 +181,8 @@ impl UsersPage {
                                 }
                             });
                             row.col(|ui| {
-                                let team_names: Vec<String> = user_item.teams
+                                let team_names: Vec<String> = user_item
+                                    .teams
                                     .iter()
                                     .map(|team| team.name.clone())
                                     .collect();
@@ -219,7 +221,7 @@ impl UsersPage {
             // Load teams for this user
             let api_service = ApiService::new();
             api_service.refresh_teams(state);
-            
+
             // Load user's current team memberships
             let _connection_manager = Arc::clone(&state.connection_manager);
             tokio::spawn(async move {
@@ -265,10 +267,11 @@ impl UsersPage {
                         let _connection_manager = Arc::clone(&state.connection_manager);
                         let user_id = user.id;
                         let _teams = state.teams.clone();
-                        
+
                         // Find current teams for this user from the users list
                         if let Some(user_item) = state.users.iter().find(|u| u.id == user_id) {
-                            state.editing_user_teams = user_item.teams.iter().map(|t| t.id).collect();
+                            state.editing_user_teams =
+                                user_item.teams.iter().map(|t| t.id).collect();
                         }
                     }
 
@@ -293,32 +296,32 @@ impl UsersPage {
                     // Buttons
                     let mut update_clicked = false;
                     let mut cancel_clicked = false;
-                     ui.horizontal(|ui| {
+                    ui.horizontal(|ui| {
                         if ui.button(WidgetText::button("Update")).clicked() {
                             update_clicked = true;
                         }
 
                         if ui.button(WidgetText::button("Cancel")).clicked() {
                             cancel_clicked = true;
-                         }
-                     });
+                        }
+                    });
 
-                      if update_clicked {
-                          let api_service = ApiService::new();
-                          let request = UpdateUserRequest {
-                              name: Some(user_name),
-                              email: Some(user_email),
-                              team_ids: Some(state.editing_user_teams.clone()),
-                          };
-                          api_service.update_user(state, user_id, request);
-                      }
+                    if update_clicked {
+                        let api_service = ApiService::new();
+                        let request = UpdateUserRequest {
+                            name: Some(user_name),
+                            email: Some(user_email),
+                            team_ids: Some(state.editing_user_teams.clone()),
+                        };
+                        api_service.update_user(state, user_id, request);
+                    }
 
-                      if cancel_clicked {
-                          state.show_user_modal = false;
-                          state.editing_user = None;
-                          state.editing_user_teams.clear();
-                      }
-                  }
+                    if cancel_clicked {
+                        state.show_user_modal = false;
+                        state.editing_user = None;
+                        state.editing_user_teams.clear();
+                    }
+                }
             });
     }
 }

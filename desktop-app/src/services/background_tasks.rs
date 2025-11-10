@@ -475,7 +475,7 @@ impl BackgroundTasks {
             }
         }
         if refresh_users {
-            self.api_service.refresh_users(state);  // Refresh list
+            self.api_service.refresh_users(state); // Refresh list
         }
     }
 
@@ -484,11 +484,12 @@ impl BackgroundTasks {
         if query.is_empty() {
             state.filtered_users = state.users.clone();
         } else {
-            state.filtered_users = state.users
+            state.filtered_users = state
+                .users
                 .iter()
                 .filter(|u| {
-                    u.name.to_lowercase().contains(&query) ||
-                    u.email.to_lowercase().contains(&query)
+                    u.name.to_lowercase().contains(&query)
+                        || u.email.to_lowercase().contains(&query)
                 })
                 .cloned()
                 .collect();
@@ -518,7 +519,7 @@ impl BackgroundTasks {
             }
         }
         if refresh_teams {
-            self.api_service.refresh_team_list(state);  // Refresh list
+            self.api_service.refresh_team_list(state); // Refresh list
         }
     }
 
@@ -527,11 +528,14 @@ impl BackgroundTasks {
         if query.is_empty() {
             state.filtered_teams = state.team_list_items.clone();
         } else {
-            state.filtered_teams = state.team_list_items
+            state.filtered_teams = state
+                .team_list_items
                 .iter()
                 .filter(|t| {
-                    t.name.to_lowercase().contains(&query) ||
-                    t.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&query))
+                    t.name.to_lowercase().contains(&query)
+                        || t.description
+                            .as_ref()
+                            .is_some_and(|d| d.to_lowercase().contains(&query))
                 })
                 .cloned()
                 .collect();

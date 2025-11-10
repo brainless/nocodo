@@ -8,17 +8,17 @@ use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateTeamRequest, FileContentResponse, Permission, UpdateTeamRequest,
-    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
-    FileUpdateRequest, LlmAgentToolCallListResponse, Project, ProjectListResponse,
-    ProjectResponse, ServerStatus, SettingsResponse, Team,
-    UpdateApiKeysRequest, UpdateUserRequest, User, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateTeamRequest, FileContentResponse, FileCreateRequest, FileInfo,
+    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest,
+    LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse, ProjectResponse,
+    ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest, UpdateTeamRequest,
+    UpdateUserRequest, User, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
-use manager_models::{SearchQuery, TeamListResponse, CreateWorkRequest};
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpMessage, HttpResponse, Result};
 use handlebars::Handlebars;
+use manager_models::{CreateWorkRequest, SearchQuery, TeamListResponse};
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
 };
@@ -212,25 +212,30 @@ pub async fn get_project_details(
 pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let users = data.database.get_all_users()?;
     let mut user_list_items = Vec::new();
-    
+
     for user in users {
         let teams = data.database.get_user_teams(user.id)?;
-        let team_items: Vec<manager_models::TeamItem> = teams.into_iter().map(|team| manager_models::TeamItem {
-            id: team.id,
-            name: team.name,
-        }).collect();
-        
+        let team_items: Vec<manager_models::TeamItem> = teams
+            .into_iter()
+            .map(|team| manager_models::TeamItem {
+                id: team.id,
+                name: team.name,
+            })
+            .collect();
+
         let user_item = manager_models::UserListItem {
             id: user.id,
             name: user.name,
             email: user.email,
             teams: team_items,
         };
-        
+
         user_list_items.push(user_item);
     }
-    
-    let response = manager_models::UserListResponse { users: user_list_items };
+
+    let response = manager_models::UserListResponse {
+        users: user_list_items,
+    };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -249,11 +254,7 @@ pub async fn create_user(
     }
 
     // Check if user already exists
-    if data
-        .database
-        .get_user_by_name(&create_req.username)
-        .is_ok()
-    {
+    if data.database.get_user_by_name(&create_req.username).is_ok() {
         return Err(AppError::InvalidRequest(
             "Username already exists".to_string(),
         ));
@@ -347,25 +348,30 @@ pub async fn search_users(
     let search_query = query.into_inner();
     let users = data.database.search_users(&search_query.q)?;
     let mut user_list_items = Vec::new();
-    
+
     for user in users {
         let teams = data.database.get_user_teams(user.id)?;
-        let team_items: Vec<manager_models::TeamItem> = teams.into_iter().map(|team| manager_models::TeamItem {
-            id: team.id,
-            name: team.name,
-        }).collect();
-        
+        let team_items: Vec<manager_models::TeamItem> = teams
+            .into_iter()
+            .map(|team| manager_models::TeamItem {
+                id: team.id,
+                name: team.name,
+            })
+            .collect();
+
         let user_item = manager_models::UserListItem {
             id: user.id,
             name: user.name,
             email: user.email,
             teams: team_items,
         };
-        
+
         user_list_items.push(user_item);
     }
-    
-    let response = manager_models::UserListResponse { users: user_list_items };
+
+    let response = manager_models::UserListResponse {
+        users: user_list_items,
+    };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -376,12 +382,15 @@ pub async fn get_user_teams(
 ) -> Result<HttpResponse, AppError> {
     let user_id = path.into_inner();
     let teams = data.database.get_user_teams(user_id)?;
-    let teams: Vec<manager_models::TeamListItem> = teams.into_iter().map(|t| manager_models::TeamListItem {
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        permissions: Vec::new(), // Will be loaded separately
-    }).collect();
+    let teams: Vec<manager_models::TeamListItem> = teams
+        .into_iter()
+        .map(|t| manager_models::TeamListItem {
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            permissions: Vec::new(), // Will be loaded separately
+        })
+        .collect();
     let response = TeamListResponse { teams };
     Ok(HttpResponse::Ok().json(response))
 }
@@ -399,13 +408,18 @@ pub async fn delete_user(
 
 pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let teams = data.database.get_all_teams()?;
-    let manager_teams: Vec<manager_models::TeamListItem> = teams.into_iter().map(|team| manager_models::TeamListItem {
-        id: team.id,
-        name: team.name,
-        description: team.description,
-        permissions: Vec::new(), // Will be loaded separately
-    }).collect();
-    let response = TeamListResponse { teams: manager_teams };
+    let manager_teams: Vec<manager_models::TeamListItem> = teams
+        .into_iter()
+        .map(|team| manager_models::TeamListItem {
+            id: team.id,
+            name: team.name,
+            description: team.description,
+            permissions: Vec::new(), // Will be loaded separately
+        })
+        .collect();
+    let response = TeamListResponse {
+        teams: manager_teams,
+    };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -2053,11 +2067,7 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
                 }
             }),
             is_configured: api_key_config.zai_api_key.is_some()
-                && !api_key_config
-                    .zai_api_key
-                    .as_ref()
-                    .unwrap()
-                    .is_empty(),
+                && !api_key_config.zai_api_key.as_ref().unwrap().is_empty(),
         });
     } else {
         tracing::info!("No API keys config section found");
@@ -2660,11 +2670,7 @@ pub async fn register(
     }
 
     // Check if user already exists
-    if data
-        .database
-        .get_user_by_name(&create_req.username)
-        .is_ok()
-    {
+    if data.database.get_user_by_name(&create_req.username).is_ok() {
         return Err(AppError::InvalidRequest(
             "Username already exists".to_string(),
         ));

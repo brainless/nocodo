@@ -795,6 +795,7 @@ impl ResourceOwnership {
 // Additional request/response models
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct UserListResponse {
     pub users: Vec<User>,
 }
@@ -819,7 +820,7 @@ pub struct CreateUserRequest {
 pub struct UpdateUserRequest {
     pub name: Option<String>,
     pub email: Option<String>,
-    pub team_ids: Option<Vec<i64>>,  // Update team memberships
+    pub team_ids: Option<Vec<i64>>, // Update team memberships
 }
 
 // Team management models
