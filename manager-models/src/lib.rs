@@ -935,7 +935,7 @@ pub struct Team {
 
 #[derive(Serialize, Deserialize)]
 pub struct TeamListResponse {
-    pub teams: Vec<Team>,
+    pub teams: Vec<TeamListItem>,
 }
 
 // Clean models specifically for user list display
@@ -956,4 +956,40 @@ pub struct TeamItem {
 #[derive(Serialize, Deserialize)]
 pub struct UserListResponse {
     pub users: Vec<UserListItem>,
+}
+
+// Clean models specifically for team list display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamListItem {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub permissions: Vec<PermissionItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionItem {
+    pub id: i64,
+    pub resource_type: String,
+    pub resource_id: Option<i64>,
+    pub action: String,
+}
+
+// Permission model for full permission details
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Permission {
+    pub id: i64,
+    pub team_id: i64,
+    pub resource_type: String,
+    pub resource_id: Option<i64>,
+    pub action: String,
+    pub granted_by: Option<i64>,
+    pub granted_at: i64,
+}
+
+// Request model for updating teams
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTeamRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
 }

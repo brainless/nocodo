@@ -8,11 +8,11 @@ use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateTeamRequest, FileContentResponse,
+    CreateProjectRequest, CreateTeamRequest, FileContentResponse, Permission, UpdateTeamRequest,
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
-    FileUpdateRequest, LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse,
+    FileUpdateRequest, LlmAgentToolCallListResponse, Project, ProjectListResponse,
     ProjectResponse, ServerStatus, SettingsResponse, Team,
-    UpdateApiKeysRequest, UpdateTeamRequest, UpdateUserRequest, User, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    UpdateApiKeysRequest, UpdateUserRequest, User, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
 };
 use manager_models::{SearchQuery, TeamListResponse, CreateWorkRequest};
 use crate::templates::{ProjectTemplate, TemplateManager};
@@ -376,13 +376,11 @@ pub async fn get_user_teams(
 ) -> Result<HttpResponse, AppError> {
     let user_id = path.into_inner();
     let teams = data.database.get_user_teams(user_id)?;
-    let teams: Vec<manager_models::Team> = teams.into_iter().map(|t| manager_models::Team {
+    let teams: Vec<manager_models::TeamListItem> = teams.into_iter().map(|t| manager_models::TeamListItem {
         id: t.id,
         name: t.name,
         description: t.description,
-        created_at: t.created_at,
-        updated_at: t.updated_at,
-        created_by: t.created_by,
+        permissions: Vec::new(), // Will be loaded separately
     }).collect();
     let response = TeamListResponse { teams };
     Ok(HttpResponse::Ok().json(response))
@@ -401,13 +399,11 @@ pub async fn delete_user(
 
 pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let teams = data.database.get_all_teams()?;
-    let manager_teams: Vec<manager_models::Team> = teams.into_iter().map(|team| manager_models::Team {
+    let manager_teams: Vec<manager_models::TeamListItem> = teams.into_iter().map(|team| manager_models::TeamListItem {
         id: team.id,
         name: team.name,
         description: team.description,
-        created_at: team.created_at,
-        updated_at: team.updated_at,
-        created_by: team.created_by,
+        permissions: Vec::new(), // Will be loaded separately
     }).collect();
     let response = TeamListResponse { teams: manager_teams };
     Ok(HttpResponse::Ok().json(response))

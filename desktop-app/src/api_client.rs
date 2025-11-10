@@ -3,6 +3,7 @@ use manager_models::{
     ProjectListResponse, ServerStatus, SettingsResponse, SupportedModelsResponse,
     Team, TeamListResponse, UpdateApiKeysRequest, UpdateUserRequest, UserDetailResponse,
     UserListResponse, UserListItem, Work, WorkListResponse, WorkResponse,
+    TeamListItem, PermissionItem,
 };
 use serde_json::Value;
 
@@ -593,7 +594,7 @@ impl ApiClient {
         Ok(user_response.users)
     }
 
-    pub async fn list_teams(&self) -> Result<Vec<Team>, ApiError> {
+    pub async fn list_teams(&self) -> Result<Vec<TeamListItem>, ApiError> {
         let url = format!("{}/api/teams", self.base_url);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -612,6 +613,78 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(team_response.teams)
+    }
+
+    pub async fn get_team(&self, team_id: i64) -> Result<Team, ApiError> {
+        let url = format!("{}/api/teams/{}", self.base_url, team_id);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let team: Team = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(team)
+    }
+
+    pub async fn update_team(&self, team_id: i64, update_request: manager_models::UpdateTeamRequest) -> Result<Team, ApiError> {
+        let url = format!("{}/api/teams/{}", self.base_url, team_id);
+        let request = self.client().patch(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .json(&update_request)
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let team: Team = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(team)
+    }
+
+    pub async fn get_team_permissions(&self, team_id: i64) -> Result<Vec<PermissionItem>, ApiError> {
+        let url = format!("{}/api/teams/{}/permissions", self.base_url, team_id);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let permissions: Vec<manager_models::Permission> = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        // Convert Permission to PermissionItem
+        let permission_items: Vec<PermissionItem> = permissions.into_iter().map(|p| PermissionItem {
+            id: p.id,
+            resource_type: p.resource_type,
+            resource_id: p.resource_id,
+            action: p.action,
+        }).collect();
+
+        Ok(permission_items)
     }
 }
 

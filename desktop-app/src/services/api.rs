@@ -684,4 +684,104 @@ impl ApiService {
                 .collect();
         }
     }
+
+    pub fn refresh_team_list(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_teams = true;
+            state.teams_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.teams_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.list_teams().await;
+                    let mut teams_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *teams_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut teams_result = result_clone.lock().unwrap();
+                    *teams_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn update_team(&self, state: &mut AppState, team_id: i64, request: manager_models::UpdateTeamRequest) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.updating_team = true;
+            state.update_team_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.update_team_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.update_team(team_id, request).await;
+                    let mut update_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *update_result = Some(result.map(|_| ()).map_err(|e| e.to_string()));
+                } else {
+                    let mut update_result = result_clone.lock().unwrap();
+                    *update_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn refresh_team_permissions(&self, state: &mut AppState, team_id: i64) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            let connection_manager = Arc::clone(&state.connection_manager);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    if let Ok(_permissions) = api_client.get_team_permissions(team_id).await {
+                        // Update state - this needs to be handled in UI thread
+                        // For now, permissions will be loaded when modal opens
+                    }
+                }
+            });
+        }
+    }
+
+    pub fn apply_team_search_filter(&self, state: &mut AppState) {
+        let query = state.team_search_query.to_lowercase();
+        if query.is_empty() {
+            state.filtered_teams = state.team_list_items.clone();
+        } else {
+            state.filtered_teams = state.team_list_items
+                .iter()
+                .filter(|t| {
+                    t.name.to_lowercase().contains(&query) ||
+                    t.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&query))
+                })
+                .cloned()
+                .collect();
+        }
+    }
 }

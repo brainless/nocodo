@@ -14,6 +14,7 @@ pub mod project_detail;
 pub mod projects;
 pub mod servers;
 pub mod settings;
+pub mod teams;
 pub mod ui_reference;
 pub mod users;
 
@@ -23,5 +24,6 @@ pub use project_detail::*;
 pub use projects::*;
 pub use servers::*;
 pub use settings::*;
+pub use teams::*;
 pub use ui_reference::*;
 pub use users::*;

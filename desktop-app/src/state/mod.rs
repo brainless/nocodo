@@ -77,14 +77,26 @@ pub struct AppState {
 
     // Teams
     pub teams: Vec<manager_models::Team>,
+    pub team_list_items: Vec<manager_models::TeamListItem>,
+    pub filtered_teams: Vec<manager_models::TeamListItem>,
+    pub team_search_query: String,
+    pub selected_team_ids: std::collections::HashSet<i64>,
     pub loading_teams: bool,
     #[serde(skip)]
-    pub teams_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Team>, String>>>>,
+    pub teams_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamListItem>, String>>>>,
+
+    // Team detail modal
+    pub show_team_modal: bool,
+    pub editing_team: Option<manager_models::Team>,
+    pub editing_team_permissions: Vec<i64>,  // Permission IDs for team being edited
 
     // Update results
     #[serde(skip)]
     pub update_user_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
     pub updating_user: bool,
+    #[serde(skip)]
+    pub update_team_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub updating_team: bool,
 
     // Favorite state
     pub favorite_projects: std::collections::HashSet<i64>,
@@ -238,10 +250,19 @@ impl Default for AppState {
             editing_user: None,
             editing_user_teams: Vec::new(),
             teams: Vec::new(),
+            team_list_items: Vec::new(),
+            filtered_teams: Vec::new(),
+            team_search_query: String::new(),
+            selected_team_ids: std::collections::HashSet::new(),
             loading_teams: false,
             teams_result: Arc::new(std::sync::Mutex::new(None)),
+            show_team_modal: false,
+            editing_team: None,
+            editing_team_permissions: Vec::new(),
             update_user_result: Arc::new(std::sync::Mutex::new(None)),
             updating_user: false,
+            update_team_result: Arc::new(std::sync::Mutex::new(None)),
+            updating_team: false,
             favorite_projects: std::collections::HashSet::new(),
             projects_default_path_modified: false,
             xai_api_key_input: String::new(),

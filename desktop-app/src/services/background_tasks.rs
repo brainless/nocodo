@@ -37,6 +37,7 @@ impl BackgroundTasks {
         self.check_users_result(state);
         self.check_teams_result(state);
         self.check_update_user_result(state);
+        self.check_update_team_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -426,13 +427,15 @@ impl BackgroundTasks {
 
     fn check_teams_result(&self, state: &mut AppState) {
         // Check teams result
+        let mut teams_updated = false;
         {
             let mut result = state.teams_result.lock().unwrap();
             if let Some(result) = result.take() {
                 state.loading_teams = false;
                 match result {
-                    Ok(teams) => {
-                        state.teams = teams;
+                    Ok(team_list_items) => {
+                        state.team_list_items = team_list_items.clone();
+                        teams_updated = true;
                         // Clear any previous connection errors since we successfully loaded data
                         state.ui_state.connection_error = None;
                     }
@@ -443,6 +446,9 @@ impl BackgroundTasks {
                     }
                 }
             }
+        }
+        if teams_updated {
+            self.apply_team_search_filter(state);
         }
     }
 
@@ -483,6 +489,49 @@ impl BackgroundTasks {
                 .filter(|u| {
                     u.name.to_lowercase().contains(&query) ||
                     u.email.to_lowercase().contains(&query)
+                })
+                .cloned()
+                .collect();
+        }
+    }
+
+    fn check_update_team_result(&self, state: &mut AppState) {
+        // Check update team result
+        let mut refresh_teams = false;
+        {
+            let mut result = state.update_team_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.updating_team = false;
+                match result {
+                    Ok(_) => {
+                        state.show_team_modal = false;
+                        refresh_teams = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to update team: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
+                    }
+                }
+            }
+        }
+        if refresh_teams {
+            self.api_service.refresh_team_list(state);  // Refresh list
+        }
+    }
+
+    fn apply_team_search_filter(&self, state: &mut AppState) {
+        let query = state.team_search_query.to_lowercase();
+        if query.is_empty() {
+            state.filtered_teams = state.team_list_items.clone();
+        } else {
+            state.filtered_teams = state.team_list_items
+                .iter()
+                .filter(|t| {
+                    t.name.to_lowercase().contains(&query) ||
+                    t.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&query))
                 })
                 .cloned()
                 .collect();

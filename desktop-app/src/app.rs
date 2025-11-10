@@ -1,7 +1,7 @@
 use crate::components::{AuthDialog, ConnectionDialog, Sidebar, StatusBar};
 use crate::pages::{
     MentionsPage, Page, ProjectDetailPage, ProjectsPage, ServersPage, SettingsPage,
-    UiReferencePage, UiTwoColumnMainContentPage, UsersPage, WorkPage,
+    TeamsPage, UiReferencePage, UiTwoColumnMainContentPage, UsersPage, WorkPage,
 };
 use crate::services::{ApiService, BackgroundTasks};
 use crate::state::ui_state::Page as UiPage;
@@ -59,6 +59,7 @@ impl Default for DesktopApp {
         app.pages.insert(UiPage::Servers, Box::new(ServersPage));
         app.pages.insert(UiPage::Settings, Box::new(SettingsPage));
         app.pages.insert(UiPage::Users, Box::new(UsersPage));
+        app.pages.insert(UiPage::Teams, Box::new(TeamsPage));
         app.pages
             .insert(UiPage::UiReference, Box::new(UiReferencePage::default()));
         app.pages.insert(
