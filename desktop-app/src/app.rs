@@ -367,6 +367,12 @@ impl DesktopApp {
             UiPage::Work => {
                 self.state.ui_state.pending_works_refresh = true;
             }
+            UiPage::Users => {
+                self.state.ui_state.pending_users_refresh = true;
+            }
+            UiPage::Teams => {
+                self.state.ui_state.pending_teams_refresh = true;
+            }
             _ => {}
         }
 

@@ -59,6 +59,10 @@ pub struct UiState {
     pub pending_projects_refresh: bool,
     #[serde(skip)]
     pub pending_works_refresh: bool,
+    #[serde(skip)]
+    pub pending_users_refresh: bool,
+    #[serde(skip)]
+    pub pending_teams_refresh: bool,
     /// Flag to trigger servers list refresh after successful SSH connection
     #[serde(skip)]
     pub servers_refresh_needed: Arc<std::sync::Mutex<bool>>,
@@ -92,6 +96,8 @@ impl Default for UiState {
             continue_message_input: String::new(),
             pending_projects_refresh: false,
             pending_works_refresh: false,
+            pending_users_refresh: false,
+            pending_teams_refresh: false,
             servers_refresh_needed: Arc::new(std::sync::Mutex::new(false)),
         }
     }

@@ -30,6 +30,15 @@ impl Page for UsersPage {
     }
 
     fn ui(&mut self, ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Trigger refresh if flag is set
+        if state.ui_state.pending_users_refresh {
+            state.ui_state.pending_users_refresh = false;
+            if state.connection_state == ConnectionState::Connected && !state.loading_users {
+                let api_service = ApiService::new();
+                api_service.refresh_users(state);
+            }
+        }
+
         match &state.connection_state {
             ConnectionState::Disconnected => {
                 ui.vertical_centered(|ui| {
@@ -75,22 +84,14 @@ impl UsersPage {
         });
         ui.add_space(8.0);
 
-        // Action buttons
-        ui.horizontal(|ui| {
-            if ui.button(WidgetText::button("Refresh")).clicked() {
-                let api_service = ApiService::new();
-                api_service.refresh_users(state);
-            }
-
-            // NOTE: Checkboxes are disabled until bulk actions are defined
-            // Uncomment when implementing bulk operations (delete, team assignment, etc.)
-            // if !state.selected_user_ids.is_empty() {
-            //     ui.label(WidgetText::status(&format!(
-            //         "{} selected",
-            //         state.selected_user_ids.len()
-            //     )));
-            // }
-        });
+        // NOTE: Checkboxes are disabled until bulk actions are defined
+        // Uncomment when implementing bulk operations (delete, team assignment, etc.)
+        // if !state.selected_user_ids.is_empty() {
+        //     ui.label(WidgetText::status(&format!(
+        //         "{} selected",
+        //         state.selected_user_ids.len()
+        //     )));
+        // }
         ui.add_space(16.0);
 
         // Loading state
