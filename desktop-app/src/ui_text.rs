@@ -8,12 +8,12 @@
 /// Usage examples:
 /// ```
 /// use nocodo_desktop_app::ui_text::{WidgetText, ContentText};
-/// 
+///
 /// // UI widget text (Ubuntu) - returns RichText that can be used with ui
 /// let heading = WidgetText::page_heading("Projects");
 /// let label = WidgetText::label("API Key:");
 /// let button = WidgetText::button("Connect");
-/// 
+///
 /// // User content text (Inter) - returns RichText that can be used with ui
 /// let title = ContentText::title("Project Name");
 /// // Note: Some methods require a &ui parameter for styling
