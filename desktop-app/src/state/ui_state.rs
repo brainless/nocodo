@@ -17,9 +17,8 @@ pub enum Page {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ProjectDetailTab {
     #[default]
-    Dashboard,
+    Work,
     Files,
-    Components,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
