@@ -627,12 +627,13 @@ impl ProjectDetailPage {
                                     ui.add(egui::Spinner::new());
                                 });
                             } else {
-                                // Filter works for this project
-                                let project_works: Vec<_> = state.works.iter()
+                                // Filter works for this project - collect IDs to avoid borrow issues
+                                let project_work_ids: Vec<i64> = state.works.iter()
                                     .filter(|work| work.project_id == Some(self.project_id))
+                                    .map(|work| work.id)
                                     .collect();
 
-                                if project_works.is_empty() {
+                                if project_work_ids.is_empty() {
                                     ui.vertical_centered(|ui| {
                                         ui.label("No work found for this project");
                                         if ui.button("Refresh").clicked() {
@@ -648,11 +649,18 @@ impl ProjectDetailPage {
                                             ui.add_space(8.0);
 
                                             // Sort works by created_at (most recent first)
-                                            let mut sorted_works = project_works;
-                                            sorted_works.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                                            let mut sorted_work_ids = project_work_ids.clone();
+                                            sorted_work_ids.sort_by(|&a, &b| {
+                                                let work_a = state.works.iter().find(|w| w.id == a);
+                                                let work_b = state.works.iter().find(|w| w.id == b);
+                                                match (work_a, work_b) {
+                                                    (Some(wa), Some(wb)) => wb.created_at.cmp(&wa.created_at),
+                                                    _ => std::cmp::Ordering::Equal,
+                                                }
+                                            });
 
-                                            for work in sorted_works {
-                                                let work_id = work.id;
+                                            for &work_id in &sorted_work_ids {
+                                                if let Some(work) = state.works.iter().find(|w| w.id == work_id) {
                                                 let is_selected = state.ui_state.selected_work_id == Some(work_id);
 
                                                 // Card frame with different styling for selected item
@@ -724,6 +732,7 @@ impl ProjectDetailPage {
                                                 }
 
                                                 ui.add_space(8.0);
+                                                }
                                             }
                                         });
                                 }
