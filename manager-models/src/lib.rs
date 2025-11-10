@@ -915,7 +915,7 @@ pub struct UserDetailResponse {
 pub struct UpdateUserRequest {
     pub name: Option<String>,
     pub email: Option<String>,
-    pub team_ids: Option<Vec<i64>>,  // Update team memberships
+    pub team_ids: Option<Vec<i64>>, // Update team memberships
 }
 
 #[derive(Serialize, Deserialize)]
