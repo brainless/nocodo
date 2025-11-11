@@ -253,7 +253,7 @@ impl AuthDialog {
                 Ok(user_response) => {
                     tracing::info!(
                         "Registration successful for user: {}",
-                        user_response.user.username
+                        user_response.user.name
                     );
                     // After registration, automatically log in
                 }

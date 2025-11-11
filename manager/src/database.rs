@@ -345,23 +345,15 @@ impl Database {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS users (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 username TEXT NOT NULL UNIQUE,
+                 name TEXT NOT NULL UNIQUE,
                  email TEXT NOT NULL UNIQUE,
+                 role TEXT,
                  password_hash TEXT NOT NULL,
                  is_active INTEGER NOT NULL DEFAULT 1,
                  created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
+                 updated_at INTEGER NOT NULL,
+                 last_login_at INTEGER
              )",
-            [],
-        )?;
-
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
-            [],
-        )?;
-
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
             [],
         )?;
 
@@ -566,7 +558,7 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 description TEXT,
-                created_by INTEGER NOT NULL,
+                created_by INTEGER,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
@@ -654,6 +646,153 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_resource_ownership_resource ON resource_ownership(resource_type, resource_id)",
             [],
         )?;
+
+        // Migration: Rename username to name and add role, last_login_at columns to users table
+        let has_username_column: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'username'",
+                [],
+                |row| row.get::<_, i32>(0),
+            )
+            .unwrap_or(0)
+            > 0;
+
+        let has_name_column: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'name'",
+                [],
+                |row| row.get::<_, i32>(0),
+            )
+            .unwrap_or(0)
+            > 0;
+
+        if has_username_column && !has_name_column {
+            tracing::info!(
+                "Migrating users table: renaming username to name and adding role, last_login_at"
+            );
+
+            // Temporarily disable foreign keys during migration
+            conn.execute("PRAGMA foreign_keys = OFF", [])?;
+
+            // Drop users_new if it exists (from a previous interrupted migration)
+            conn.execute("DROP TABLE IF EXISTS users_new", [])?;
+
+            // Create new users table with updated schema
+            conn.execute(
+                "CREATE TABLE users_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL UNIQUE,
+                    role TEXT,
+                    password_hash TEXT NOT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    last_login_at INTEGER
+                )",
+                [],
+            )?;
+
+            // Copy data from old table to new table
+            conn.execute(
+                "INSERT INTO users_new (id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at)
+                 SELECT id, username, email, NULL, password_hash, is_active, created_at, updated_at, NULL
+                 FROM users",
+                [],
+            )?;
+
+            // Drop old table
+            conn.execute("DROP TABLE users", [])?;
+
+            // Rename new table
+            conn.execute("ALTER TABLE users_new RENAME TO users", [])?;
+
+            // Re-enable foreign keys
+            conn.execute("PRAGMA foreign_keys = ON", [])?;
+
+            tracing::info!("Successfully migrated users table schema");
+        }
+
+        // Create indexes for users table (after migration)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_name ON users(name)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+            [],
+        )?;
+
+        // Migration: Fix teams table created_by to be nullable (consistent with ON DELETE SET NULL)
+        let teams_created_by_nullable: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name = 'created_by' AND \"notnull\" = 0",
+                [],
+                |row| row.get::<_, i32>(0)
+            )
+            .unwrap_or(0) > 0;
+
+        if !teams_created_by_nullable {
+            // Check if teams table exists
+            let teams_exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='teams'",
+                    [],
+                    |row| row.get::<_, i32>(0),
+                )
+                .unwrap_or(0)
+                > 0;
+
+            if teams_exists {
+                tracing::info!("Migrating teams table: making created_by nullable");
+
+                // Temporarily disable foreign keys during migration
+                conn.execute("PRAGMA foreign_keys = OFF", [])?;
+
+                // Drop teams_new if it exists (from a previous interrupted migration)
+                conn.execute("DROP TABLE IF EXISTS teams_new", [])?;
+
+                // Create new teams table with updated schema
+                conn.execute(
+                    "CREATE TABLE teams_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        created_by INTEGER,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+                    )",
+                    [],
+                )?;
+
+                // Copy data from old table to new table
+                conn.execute(
+                    "INSERT INTO teams_new (id, name, description, created_by, created_at, updated_at)
+                     SELECT id, name, description, created_by, created_at, updated_at
+                     FROM teams",
+                    [],
+                )?;
+
+                // Drop old table
+                conn.execute("DROP TABLE teams", [])?;
+
+                // Rename new table
+                conn.execute("ALTER TABLE teams_new RENAME TO teams", [])?;
+
+                // Recreate index
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_teams_created_by ON teams(created_by)",
+                    [],
+                )?;
+
+                // Re-enable foreign keys
+                conn.execute("PRAGMA foreign_keys = ON", [])?;
+
+                tracing::info!("Successfully migrated teams table schema");
+            }
+        }
 
         tracing::info!("Database migrations completed");
         Ok(())
@@ -1995,21 +2134,23 @@ impl Database {
         let id_param = if user.id == 0 { None } else { Some(user.id) };
 
         conn.execute(
-            "INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO users (id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 id_param,
-                user.username,
+                user.name,
                 user.email,
+                user.role,
                 user.password_hash,
                 if user.is_active { 1 } else { 0 },
                 user.created_at,
                 user.updated_at,
+                user.last_login_at,
             ],
         )?;
 
         let user_id = conn.last_insert_rowid();
-        tracing::info!("Created user: {} ({})", user.username, user_id);
+        tracing::info!("Created user: {} ({})", user.name, user_id);
         Ok(user_id)
     }
 
@@ -2021,18 +2162,20 @@ impl Database {
 
         let user = conn
             .query_row(
-                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
                  FROM users WHERE id = ?",
                 [id],
                 |row| {
                     Ok(crate::models::User {
                         id: row.get(0)?,
-                        username: row.get(1)?,
+                        name: row.get(1)?,
                         email: row.get(2)?,
-                        password_hash: row.get(3)?,
-                        is_active: row.get::<_, i64>(4)? != 0,
-                        created_at: row.get(5)?,
-                        updated_at: row.get(6)?,
+                        role: row.get(3)?,
+                        password_hash: row.get(4)?,
+                        is_active: row.get::<_, i64>(5)? != 0,
+                        created_at: row.get(6)?,
+                        updated_at: row.get(7)?,
+                        last_login_at: row.get(8)?,
                     })
                 },
             )
@@ -2044,7 +2187,7 @@ impl Database {
         }
     }
 
-    pub fn get_user_by_username(&self, username: &str) -> AppResult<crate::models::User> {
+    pub fn get_user_by_name(&self, name: &str) -> AppResult<crate::models::User> {
         let conn = self
             .connection
             .lock()
@@ -2052,18 +2195,20 @@ impl Database {
 
         let user = conn
             .query_row(
-                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
-                 FROM users WHERE username = ?",
-                [username],
+                "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
+                 FROM users WHERE name = ?",
+                [name],
                 |row| {
                     Ok(crate::models::User {
                         id: row.get(0)?,
-                        username: row.get(1)?,
+                        name: row.get(1)?,
                         email: row.get(2)?,
-                        password_hash: row.get(3)?,
-                        is_active: row.get::<_, i64>(4)? != 0,
-                        created_at: row.get(5)?,
-                        updated_at: row.get(6)?,
+                        role: row.get(3)?,
+                        password_hash: row.get(4)?,
+                        is_active: row.get::<_, i64>(5)? != 0,
+                        created_at: row.get(6)?,
+                        updated_at: row.get(7)?,
+                        last_login_at: row.get(8)?,
                     })
                 },
             )
@@ -2071,7 +2216,7 @@ impl Database {
 
         match user {
             Some(user) => Ok(user),
-            None => Err(AppError::NotFound(format!("User not found: {}", username))),
+            None => Err(AppError::NotFound(format!("User not found: {}", name))),
         }
     }
 
@@ -2084,18 +2229,20 @@ impl Database {
 
         let user = conn
             .query_row(
-                "SELECT id, username, email, password_hash, is_active, created_at, updated_at
+                "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
                  FROM users WHERE email = ?",
                 [email],
                 |row| {
                     Ok(crate::models::User {
                         id: row.get(0)?,
-                        username: row.get(1)?,
+                        name: row.get(1)?,
                         email: row.get(2)?,
-                        password_hash: row.get(3)?,
-                        is_active: row.get::<_, i64>(4)? != 0,
-                        created_at: row.get(5)?,
-                        updated_at: row.get(6)?,
+                        role: row.get(3)?,
+                        password_hash: row.get(4)?,
+                        is_active: row.get::<_, i64>(5)? != 0,
+                        created_at: row.get(6)?,
+                        updated_at: row.get(7)?,
+                        last_login_at: row.get(8)?,
                     })
                 },
             )
@@ -2239,19 +2386,21 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, username, email, password_hash, is_active, created_at, updated_at
-             FROM users ORDER BY username",
+            "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
+             FROM users ORDER BY name",
         )?;
 
         let user_iter = stmt.query_map([], |row| {
             Ok(crate::models::User {
                 id: row.get(0)?,
-                username: row.get(1)?,
+                name: row.get(1)?,
                 email: row.get(2)?,
-                password_hash: row.get(3)?,
-                is_active: row.get::<_, i64>(4)? != 0,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
+                role: row.get(3)?,
+                password_hash: row.get(4)?,
+                is_active: row.get::<_, i64>(5)? != 0,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+                last_login_at: row.get(8)?,
             })
         })?;
 
@@ -2262,7 +2411,8 @@ impl Database {
     pub fn update_user(
         &self,
         user_id: i64,
-        update: &crate::models::UpdateUserRequest,
+        name: Option<&str>,
+        email: Option<&str>,
     ) -> AppResult<()> {
         let conn = self
             .connection
@@ -2271,24 +2421,17 @@ impl Database {
 
         let now = chrono::Utc::now().timestamp();
 
-        if let Some(username) = &update.username {
+        if let Some(name) = name {
             conn.execute(
-                "UPDATE users SET username = ?, updated_at = ? WHERE id = ?",
-                params![username, now, user_id],
+                "UPDATE users SET name = ?, updated_at = ? WHERE id = ?",
+                params![name, now, user_id],
             )?;
         }
 
-        if let Some(email) = &update.email {
+        if let Some(email) = email {
             conn.execute(
                 "UPDATE users SET email = ?, updated_at = ? WHERE id = ?",
                 params![email, now, user_id],
-            )?;
-        }
-
-        if let Some(is_active) = update.is_active {
-            conn.execute(
-                "UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?",
-                params![is_active, now, user_id],
             )?;
         }
 
@@ -2304,6 +2447,62 @@ impl Database {
 
         conn.execute("DELETE FROM users WHERE id = ?", params![user_id])?;
         tracing::info!("Deleted user {}", user_id);
+        Ok(())
+    }
+
+    pub fn search_users(&self, query: &str) -> AppResult<Vec<crate::models::User>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let search_pattern = format!("%{}%", query);
+        let mut stmt = conn.prepare(
+            "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
+             FROM users
+             WHERE name LIKE ? OR email LIKE ?
+             ORDER BY name",
+        )?;
+
+        let user_iter = stmt.query_map(params![search_pattern, search_pattern], |row| {
+            Ok(crate::models::User {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                email: row.get(2)?,
+                role: row.get(3)?,
+                password_hash: row.get(4)?,
+                is_active: row.get::<_, i64>(5)? != 0,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+                last_login_at: row.get(8)?,
+            })
+        })?;
+
+        let users: Result<Vec<_>, _> = user_iter.collect();
+        users.map_err(AppError::from)
+    }
+
+    pub fn update_user_teams(&self, user_id: i64, team_ids: &[i64]) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        // Remove user from all teams first
+        conn.execute(
+            "DELETE FROM team_members WHERE user_id = ?",
+            params![user_id],
+        )?;
+
+        // Add user to specified teams
+        for &team_id in team_ids {
+            conn.execute(
+                "INSERT INTO team_members (team_id, user_id, added_at) VALUES (?, ?, ?)",
+                params![team_id, user_id, chrono::Utc::now().timestamp()],
+            )?;
+        }
+
+        tracing::info!("Updated teams for user {}", user_id);
         Ok(())
     }
 

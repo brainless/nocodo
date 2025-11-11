@@ -708,12 +708,14 @@ fn test_bootstrap_first_user_creates_super_admin_team() {
     // Create first user (simulating registration)
     let first_user = User {
         id: 0,
-        username: "admin".to_string(),
+        name: "admin".to_string(),
         email: "admin@example.com".to_string(),
         password_hash: "hashed_password".to_string(),
         is_active: true,
         created_at: chrono::Utc::now().timestamp(),
         updated_at: chrono::Utc::now().timestamp(),
+        role: None,
+        last_login_at: None,
     };
 
     let user_id = db.create_user(&first_user).unwrap();

@@ -1,10 +1,12 @@
 use actix::Actor;
 use actix_web::{test, web, App};
+use chrono::Utc;
 use nocodo_manager::{
     config::AppConfig,
     database::Database,
     handlers::{create_project, get_projects, health_check, AppState},
-    models::CreateProjectRequest,
+    middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement},
+    models::{CreateProjectRequest, User},
     websocket::{WebSocketBroadcaster, WebSocketServer},
 };
 use std::sync::Arc;
@@ -29,6 +31,7 @@ async fn test_health_check() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
+            .wrap(AuthenticationMiddleware)
             .route("/api/health", web::get().to(health_check)),
     )
     .await;
@@ -62,7 +65,8 @@ async fn test_get_projects_empty() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/projects", web::get().to(get_projects)),
+            .route("/api/projects", web::get().to(get_projects))
+            .route("/api/projects", web::post().to(create_project)),
     )
     .await;
 
@@ -81,13 +85,28 @@ async fn test_create_project() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    // Create a test user
+    let test_user = User {
+        id: 1,
+        name: "testuser".to_string(),
+        email: "test@example.com".to_string(),
+        role: Some("admin".to_string()),
+        password_hash: "".to_string(),
+        is_active: true,
+        created_at: Utc::now().timestamp(),
+        updated_at: Utc::now().timestamp(),
+        last_login_at: None,
+    };
+    database.create_user(&test_user).unwrap();
+
     let ws_server = WebSocketServer::default().start();
+    let config = AppConfig::default(); // auth is None by default
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         llm_agent: None,
-        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
+        config: Arc::new(std::sync::RwLock::new(config)),
     });
 
     let app = test::init_service(
@@ -145,18 +164,37 @@ async fn test_create_project_with_default_path() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    // Create a test user
+    let test_user = User {
+        id: 1,
+        name: "testuser".to_string(),
+        email: "test@example.com".to_string(),
+        role: Some("admin".to_string()),
+        password_hash: "".to_string(),
+        is_active: true,
+        created_at: Utc::now().timestamp(),
+        updated_at: Utc::now().timestamp(),
+        last_login_at: None,
+    };
+    database.create_user(&test_user).unwrap();
+
     let ws_server = WebSocketServer::default().start();
+    let config = AppConfig::default(); // auth is None by default
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         llm_agent: None,
-        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
+        config: Arc::new(std::sync::RwLock::new(config)),
     });
 
     let app = test::init_service(
         App::new()
             .app_data(app_state)
+            .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                "project", "write",
+            )))
+            .wrap(AuthenticationMiddleware)
             .route("/api/projects", web::post().to(create_project)),
     )
     .await;
@@ -258,19 +296,33 @@ async fn test_get_projects_after_creation() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    // Create a test user
+    let test_user = User {
+        id: 1,
+        name: "testuser".to_string(),
+        email: "test@example.com".to_string(),
+        role: Some("admin".to_string()),
+        password_hash: "".to_string(),
+        is_active: true,
+        created_at: Utc::now().timestamp(),
+        updated_at: Utc::now().timestamp(),
+        last_login_at: None,
+    };
+    database.create_user(&test_user).unwrap();
+
     let ws_server = WebSocketServer::default().start();
+    let config = AppConfig::default(); // auth is None by default
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         llm_agent: None,
-        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
+        config: Arc::new(std::sync::RwLock::new(config)),
     });
 
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .route("/api/projects", web::get().to(get_projects))
             .route("/api/projects", web::post().to(create_project)),
     )
     .await;
@@ -302,7 +354,15 @@ async fn test_get_projects_after_creation() {
     let req = test::TestRequest::get().uri("/api/projects").to_request();
 
     let resp = test::call_service(&app, req).await;
-    assert!(resp.status().is_success());
+    let status = resp.status();
+    if !status.is_success() {
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        eprintln!(
+            "Get projects failed with status: {}, body: {}",
+            status, body
+        );
+        panic!("Get projects failed");
+    }
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let projects = body["projects"].as_array().unwrap();
@@ -318,18 +378,37 @@ async fn test_technology_detection_for_rust_project() {
     let db_path = temp_dir.path().join("test.db");
     let database = Arc::new(Database::new(&db_path).unwrap());
 
+    // Create a test user
+    let test_user = User {
+        id: 1,
+        name: "testuser".to_string(),
+        email: "test@example.com".to_string(),
+        role: Some("admin".to_string()),
+        password_hash: "".to_string(),
+        is_active: true,
+        created_at: Utc::now().timestamp(),
+        updated_at: Utc::now().timestamp(),
+        last_login_at: None,
+    };
+    database.create_user(&test_user).unwrap();
+
     let ws_server = WebSocketServer::default().start();
+    let config = AppConfig::default(); // auth is None by default
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: Arc::new(WebSocketBroadcaster::new(ws_server)),
         llm_agent: None,
-        config: Arc::new(std::sync::RwLock::new(AppConfig::default())),
+        config: Arc::new(std::sync::RwLock::new(config)),
     });
 
     let app = test::init_service(
         App::new()
             .app_data(app_state)
+            .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                "project", "write",
+            )))
+            .wrap(AuthenticationMiddleware)
             .route("/api/projects", web::post().to(create_project)),
     )
     .await;

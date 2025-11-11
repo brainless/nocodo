@@ -16,26 +16,30 @@ pub use manager_models::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: i64,
-    pub username: String,
+    pub name: String,
     pub email: String,
+    pub role: Option<String>,
     pub password_hash: String,
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub last_login_at: Option<i64>,
 }
 
 impl User {
     #[allow(dead_code)]
-    pub fn new(username: String, email: String, password_hash: String) -> Self {
+    pub fn new(name: String, email: String, password_hash: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
             id: 0, // Will be set by database AUTOINCREMENT
-            username,
+            name,
             email,
+            role: None,
             password_hash,
             is_active: true,
             created_at: now,
             updated_at: now,
+            last_login_at: None,
         }
     }
 
@@ -791,6 +795,7 @@ impl ResourceOwnership {
 // Additional request/response models
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct UserListResponse {
     pub users: Vec<User>,
 }
@@ -813,9 +818,9 @@ pub struct CreateUserRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateUserRequest {
-    pub username: Option<String>,
+    pub name: Option<String>,
     pub email: Option<String>,
-    pub is_active: Option<bool>,
+    pub team_ids: Option<Vec<i64>>, // Update team memberships
 }
 
 // Team management models

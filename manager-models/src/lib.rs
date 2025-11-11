@@ -888,11 +888,108 @@ pub struct UserResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: i64,
-    pub username: String,
+    pub name: String,
     pub email: String,
+    pub role: Option<String>,
     #[serde(skip_serializing)] // Never send password hash to client
     pub password_hash: String,
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub last_login_at: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UserWithTeams {
+    pub user: User,
+    pub teams: Vec<Team>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserDetailResponse {
+    pub user: User,
+    pub teams: Vec<Team>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateUserRequest {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub team_ids: Option<Vec<i64>>, // Update team memberships
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SearchQuery {
+    pub q: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Team {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub created_by: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TeamListResponse {
+    pub teams: Vec<TeamListItem>,
+}
+
+// Clean models specifically for user list display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserListItem {
+    pub id: i64,
+    pub name: String,
+    pub email: String,
+    pub teams: Vec<TeamItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamItem {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserListResponse {
+    pub users: Vec<UserListItem>,
+}
+
+// Clean models specifically for team list display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamListItem {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub permissions: Vec<PermissionItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionItem {
+    pub id: i64,
+    pub resource_type: String,
+    pub resource_id: Option<i64>,
+    pub action: String,
+}
+
+// Permission model for full permission details
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Permission {
+    pub id: i64,
+    pub team_id: i64,
+    pub resource_type: String,
+    pub resource_id: Option<i64>,
+    pub action: String,
+    pub granted_by: Option<i64>,
+    pub granted_at: i64,
+}
+
+// Request model for updating teams
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTeamRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
 }

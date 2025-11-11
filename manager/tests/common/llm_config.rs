@@ -278,6 +278,7 @@ impl LlmProviderTestConfig {
     }
 
     /// Create zAI provider configuration (legacy method)
+    #[allow(dead_code)]
     pub fn zai() -> Self {
         Self::zai_with_validation(None).unwrap_or_else(|| Self {
             name: "zai".to_string(),

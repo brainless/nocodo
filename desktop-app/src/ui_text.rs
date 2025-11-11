@@ -7,15 +7,16 @@
 ///
 /// Usage examples:
 /// ```
-/// // UI widget text (Ubuntu)
-/// ui.heading(WidgetText::page_heading("Projects"));
-/// ui.label(WidgetText::label("API Key:"));
-/// ui.button(WidgetText::button("Connect"));
+/// use nocodo_desktop_app::ui_text::{WidgetText, ContentText};
 ///
-/// // User content text (Inter)
-/// ui.label(ContentText::title(&project.name));
-/// ui.label(ContentText::description(ui, &project.description));
-/// ui.label(ContentText::metadata(ui, &created_at));
+/// // UI widget text (Ubuntu) - returns RichText that can be used with ui
+/// let heading = WidgetText::page_heading("Projects");
+/// let label = WidgetText::label("API Key:");
+/// let button = WidgetText::button("Connect");
+///
+/// // User content text (Inter) - returns RichText that can be used with ui
+/// let title = ContentText::title("Project Name");
+/// // Note: Some methods require a &ui parameter for styling
 /// ```
 use egui::{Color32, RichText, Ui};
 

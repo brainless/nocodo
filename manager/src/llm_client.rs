@@ -18,7 +18,9 @@ pub use adapters::ProviderAdapter;
 pub use unified_client::UnifiedLlmClient;
 
 // Re-export types for backward compatibility
-pub use types::{ResponsesApiRequest, ResponsesApiResponse, ResponsesToolDefinition, ResponseItem, ContentItem};
+pub use types::{
+    ContentItem, ResponseItem, ResponsesApiRequest, ResponsesApiResponse, ResponsesToolDefinition,
+};
 
 /// Provider type enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -274,8 +276,6 @@ pub struct LlmCompletionChunk {
     pub model: String,
     pub choices: Vec<LlmChoice>,
 }
-
-
 
 /// Streaming response chunk
 #[derive(Debug, Clone, Default)]
