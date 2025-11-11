@@ -1,7 +1,8 @@
+use crate::bash_executor::BashExecutor;
 use crate::models::{
-    ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, FileInfo, FileType, GrepMatch,
-    GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse, ReadFileRequest,
-    ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse, WriteFileRequest,
+    ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, BashRequest, BashResponse, FileInfo,
+    FileType, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
+    ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse, WriteFileRequest,
     WriteFileResponse,
 };
 use anyhow::Result;
@@ -9,7 +10,7 @@ use base64::Engine;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::time::{UNIX_EPOCH, Instant};
 use walkdir::WalkDir;
 
 #[allow(clippy::needless_borrow)]
@@ -49,6 +50,7 @@ impl From<serde_json::Error> for ToolError {
 pub struct ToolExecutor {
     base_path: PathBuf,
     max_file_size: u64,
+    bash_executor: Option<BashExecutor>,
 }
 
 impl ToolExecutor {
@@ -56,7 +58,13 @@ impl ToolExecutor {
         Self {
             base_path,
             max_file_size: 1024 * 1024, // 1MB default
+            bash_executor: None, // Bash executor will be initialized separately
         }
+    }
+
+    pub fn with_bash_executor(mut self, bash_executor: BashExecutor) -> Self {
+        self.bash_executor = Some(bash_executor);
+        self
     }
 
     #[allow(dead_code)]
@@ -77,6 +85,7 @@ impl ToolExecutor {
             ToolRequest::WriteFile(req) => self.write_file(req).await,
             ToolRequest::Grep(req) => self.grep_search(req).await,
             ToolRequest::ApplyPatch(req) => self.apply_patch(req).await,
+            ToolRequest::Bash(req) => self.execute_bash(req).await,
         }
     }
 
@@ -866,6 +875,68 @@ impl ToolExecutor {
         }))
     }
 
+    /// Execute a bash command
+    async fn execute_bash(&self, request: BashRequest) -> Result<ToolResponse> {
+        // Check if bash executor is available
+        let bash_executor = match &self.bash_executor {
+            Some(executor) => executor,
+            None => {
+                return Ok(ToolResponse::Error(ToolErrorResponse {
+                    tool: "bash".to_string(),
+                    error: "BashExecutorNotAvailable".to_string(),
+                    message: "Bash executor is not configured".to_string(),
+                }));
+            }
+        };
+
+        let start_time = Instant::now();
+        
+        // Determine working directory
+        let working_dir = if let Some(dir) = &request.working_dir {
+            // Validate and resolve the working directory
+            match self.validate_and_resolve_path(dir) {
+                Ok(path) => path,
+                Err(e) => {
+                    return Ok(ToolResponse::Error(ToolErrorResponse {
+                        tool: "bash".to_string(),
+                        error: "InvalidWorkingDirectory".to_string(),
+                        message: format!("Invalid working directory '{}': {}", dir, e),
+                    }));
+                }
+            }
+        } else {
+            self.base_path.clone()
+        };
+
+        // Execute the command
+        let result = bash_executor
+            .execute_with_cwd(&request.command, &working_dir, request.timeout_secs)
+            .await;
+
+        let execution_time = start_time.elapsed().as_secs_f64();
+
+        match result {
+            Ok(bash_result) => {
+                Ok(ToolResponse::Bash(BashResponse {
+                    command: request.command,
+                    working_dir: request.working_dir,
+                    stdout: bash_result.stdout,
+                    stderr: bash_result.stderr,
+                    exit_code: bash_result.exit_code,
+                    timed_out: bash_result.timed_out,
+                    execution_time_secs: execution_time,
+                }))
+            }
+            Err(e) => {
+                Ok(ToolResponse::Error(ToolErrorResponse {
+                    tool: "bash".to_string(),
+                    error: "BashExecutionError".to_string(),
+                    message: format!("Failed to execute bash command: {}", e),
+                }))
+            }
+        }
+    }
+
     /// Validate and resolve a path relative to the base path
     fn validate_and_resolve_path(&self, path: &str) -> Result<PathBuf> {
         use std::path::Path;
@@ -1141,6 +1212,7 @@ impl ToolExecutor {
             ToolResponse::WriteFile(response) => serde_json::to_value(response)?,
             ToolResponse::Grep(response) => serde_json::to_value(response)?,
             ToolResponse::ApplyPatch(response) => serde_json::to_value(response)?,
+            ToolResponse::Bash(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 

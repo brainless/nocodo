@@ -278,6 +278,8 @@ pub enum ToolRequest {
     Grep(GrepRequest),
     #[serde(rename = "apply_patch")]
     ApplyPatch(ApplyPatchRequest),
+    #[serde(rename = "bash")]
+    Bash(BashRequest),
 }
 
 /// List files tool request
@@ -527,6 +529,8 @@ pub enum ToolResponse {
     Grep(GrepResponse),
     #[serde(rename = "apply_patch")]
     ApplyPatch(ApplyPatchResponse),
+    #[serde(rename = "bash")]
+    Bash(BashResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
@@ -845,4 +849,351 @@ pub struct CreatePermissionRequest {
     pub resource_type: String,
     pub resource_id: Option<i64>,
     pub action: String,
+}
+
+// Bash tool configuration models
+
+/// Configuration for the Bash tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashToolConfig {
+    pub enabled: bool,
+    pub default_timeout_secs: u64,
+    pub max_timeout_secs: u64,
+    pub permissions: BashPermissionConfig,
+    pub sandbox: BashSandboxConfig,
+    pub logging: BashLoggingConfig,
+}
+
+impl Default for BashToolConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            default_timeout_secs: 30,
+            max_timeout_secs: 300, // 5 minutes max
+            permissions: BashPermissionConfig::default(),
+            sandbox: BashSandboxConfig::default(),
+            logging: BashLoggingConfig::default(),
+        }
+    }
+}
+
+/// Permission configuration for the Bash tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashPermissionConfig {
+    pub default_action: String, // "allow" or "deny"
+    pub allowed_working_dirs: Vec<String>,
+    pub deny_changing_to_sensitive_dirs: bool,
+    pub custom_rules: Vec<BashPermissionRuleConfig>,
+}
+
+impl Default for BashPermissionConfig {
+    fn default() -> Self {
+        Self {
+            default_action: "deny".to_string(),
+            allowed_working_dirs: vec![
+                "/tmp".to_string(),
+                "/home".to_string(),
+                "/workspace".to_string(),
+                "/project".to_string(),
+            ],
+            deny_changing_to_sensitive_dirs: true,
+            custom_rules: vec![
+                BashPermissionRuleConfig {
+                    pattern: "echo*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow echo commands".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "ls*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow listing files".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "cat*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow reading files".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "pwd".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow showing current directory".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "which*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow finding commands".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "git status".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow git status".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "git log*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow git log".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "git diff*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow git diff".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "git show*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow git show".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "cargo check".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow cargo check".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "cargo test".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow cargo test".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "cargo build".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow cargo build".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "npm test".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow npm test".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "npm run build".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow npm build".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "find*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow finding files".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "grep*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow grep search".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "head*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow head command".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "tail*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow tail command".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "wc*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow word count".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "sort*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow sort".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "uniq*".to_string(),
+                    action: "allow".to_string(),
+                    description: Some("Allow uniq".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "rm -rf /*".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent catastrophic deletion".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "rm -rf /".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent root deletion".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "chmod 777 /*".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent global permission changes".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "chmod 777 /".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent root permission changes".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "sudo *".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent sudo usage".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "su *".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent su usage".to_string()),
+                },
+                BashPermissionRuleConfig {
+                    pattern: "passwd*".to_string(),
+                    action: "deny".to_string(),
+                    description: Some("Prevent password changes".to_string()),
+                },
+            ],
+        }
+    }
+}
+
+/// Individual permission rule configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashPermissionRuleConfig {
+    pub pattern: String,
+    pub action: String, // "allow" or "deny"
+    pub description: Option<String>,
+}
+
+/// Sandbox configuration for the Bash tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashSandboxConfig {
+    pub enabled: bool,
+    pub use_landlock: bool, // Phase 2: Linux sandboxing
+    pub use_seccomp: bool,
+    pub no_new_privileges: bool,
+    pub isolate_filesystem: bool,
+    pub restricted_network: bool,
+}
+
+impl Default for BashSandboxConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            use_landlock: false, // Will be enabled in Phase 2
+            use_seccomp: true,
+            no_new_privileges: true,
+            isolate_filesystem: false, // Will be enabled in Phase 2
+            restricted_network: false,
+        }
+    }
+}
+
+/// Logging configuration for the Bash tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashLoggingConfig {
+    pub log_commands: bool,
+    pub log_stdout: bool,
+    pub log_stderr: bool,
+    pub log_working_directory: bool,
+    pub max_log_size_bytes: Option<u64>,
+}
+
+impl Default for BashLoggingConfig {
+    fn default() -> Self {
+        Self {
+            log_commands: true,
+            log_stdout: true,
+            log_stderr: true,
+            log_working_directory: true,
+            max_log_size_bytes: Some(1024 * 1024), // 1MB max log entry
+        }
+    }
+}
+
+/// Bash tool request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashRequest {
+    pub command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_secs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl BashRequest {
+    /// Generate example JSON schema for this request type
+    pub fn example_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The bash command to execute"
+                },
+                "working_dir": {
+                    "type": "string",
+                    "description": "Working directory for command execution (optional)",
+                    "default": null
+                },
+                "timeout_secs": {
+                    "type": "number",
+                    "description": "Timeout in seconds (optional, uses default if not specified)",
+                    "default": null
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable description of what the command does (optional)",
+                    "default": null
+                }
+            },
+            "required": ["command"],
+            "additionalProperties": false
+        })
+    }
+}
+
+/// Bash tool response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashResponse {
+    pub command: String,
+    pub working_dir: Option<String>,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+    pub timed_out: bool,
+    pub execution_time_secs: f64,
+}
+
+/// Bash execution log entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashExecutionLog {
+    pub id: i64,
+    pub work_id: i64,
+    pub user_id: i64,
+    pub command: String,
+    pub working_dir: Option<String>,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+    pub timed_out: bool,
+    pub execution_time_secs: f64,
+    pub created_at: i64,
+}
+
+impl BashExecutionLog {
+    pub fn new(
+        work_id: i64,
+        user_id: i64,
+        command: String,
+        working_dir: Option<String>,
+        stdout: String,
+        stderr: String,
+        exit_code: i32,
+        timed_out: bool,
+        execution_time_secs: f64,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            work_id,
+            user_id,
+            command,
+            working_dir,
+            stdout,
+            stderr,
+            exit_code,
+            timed_out,
+            execution_time_secs,
+            created_at: now,
+        }
+    }
 }
