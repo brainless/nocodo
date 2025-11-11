@@ -1087,7 +1087,8 @@ impl LlmAgent {
             "anthropic" | "claude" => Some("https://api.anthropic.com".to_string()),
             "zai" => {
                 // Check if using GLM Coding Plan subscription
-                let use_coding_plan = self.config
+                let use_coding_plan = self
+                    .config
                     .api_keys
                     .as_ref()
                     .and_then(|keys| keys.zai_coding_plan)
@@ -1107,7 +1108,7 @@ impl LlmAgent {
                 );
 
                 Some(base_url)
-            },
+            }
             _ => None,
         }
     }
@@ -1321,17 +1322,15 @@ impl LlmAgent {
             }
             "list_files" => {
                 tracing::info!("ENABLE_TOOLS=list_files: Returning ONLY list_files tool");
-                vec![
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "list_files".to_string(),
-                            description: "List files and directories in a given path".to_string(),
-                            parameters: serde_json::to_value(ListFilesRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
+                vec![crate::llm_client::ToolDefinition {
+                    r#type: "function".to_string(),
+                    function: crate::llm_client::FunctionDefinition {
+                        name: "list_files".to_string(),
+                        description: "List files and directories in a given path".to_string(),
+                        parameters: serde_json::to_value(ListFilesRequest::example_schema())
+                            .unwrap_or_default(),
                     },
-                ]
+                }]
             }
             "list_read" => {
                 tracing::info!("ENABLE_TOOLS=list_read: Returning list_files + read_file tools");
@@ -1358,7 +1357,10 @@ impl LlmAgent {
             }
             _ => {
                 // "all" or any other value - return all tools
-                tracing::info!("ENABLE_TOOLS={}: Returning ALL tools (default)", enable_tools);
+                tracing::info!(
+                    "ENABLE_TOOLS={}: Returning ALL tools (default)",
+                    enable_tools
+                );
                 vec![
                     crate::llm_client::ToolDefinition {
                         r#type: "function".to_string(),

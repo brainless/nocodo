@@ -329,8 +329,10 @@ async fn main() -> AppResult<()> {
                                 .route("", web::get().to(handlers::list_users))
                                 .route("", web::post().to(handlers::create_user))
                                 .route("/{id}", web::get().to(handlers::get_user))
-                                .route("/{id}", web::put().to(handlers::update_user))
-                                .route("/{id}", web::delete().to(handlers::delete_user)),
+                                .route("/{id}", web::patch().to(handlers::update_user))
+                                .route("/{id}", web::delete().to(handlers::delete_user))
+                                .route("/search", web::get().to(handlers::search_users))
+                                .route("/{id}/teams", web::get().to(handlers::get_user_teams)),
                         )
                         // Team management endpoints
                         .service(

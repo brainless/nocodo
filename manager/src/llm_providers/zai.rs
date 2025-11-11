@@ -27,9 +27,7 @@ impl ZaiProvider {
 
     fn initialize_models(&mut self) {
         // Initialize zAI models
-        let models: Vec<Arc<dyn LlmModel>> = vec![
-            Arc::new(Glm46Model::new()),
-        ];
+        let models: Vec<Arc<dyn LlmModel>> = vec![Arc::new(Glm46Model::new())];
 
         for model in models {
             self.models.insert(model.id().to_string(), model);

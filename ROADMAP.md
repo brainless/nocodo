@@ -10,6 +10,11 @@
 - In the User detail modal, team list should be checkboxes (show all tables and select the ones the user is part of)
 - "Update" and "Cancel" buttons in the modal and should update the data or cancel the modal - doing either should refresh the table (with the search filters as they are)
 
+### Tools for LLM agent
+- Bash tool
+- Save command tool, can be used to save common commands like "Run project"
+- Show saved commands in desktop/mobile apps
+
 ### Teams and Permissions
 - Desktop app > "Team" page (left sidebar, after "Users" item)
 - Teams page should have a table with ID,
@@ -60,3 +65,6 @@
 ### Cloud instance isolation
 - manager can spin up on demand cloud instance (DigitalOcean, AWS, GPC, etc.)
 - Testing a feature branch can be done in an isolated instance when needed - offers DB, cache, system dependencies isolation
+
+### Multi server connections from desktop app
+- Refer `specs/DESKTOP_APP_MULTI_SERVER_CONNECTION.md`
