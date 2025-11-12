@@ -60,6 +60,7 @@ pub struct AppState {
     pub servers: Vec<Server>,
     pub settings: Option<manager_models::SettingsResponse>,
     pub supported_models: Vec<manager_models::SupportedModel>,
+    pub worktree_branches: Vec<String>,
 
     // Favorite state
     pub favorite_projects: std::collections::HashSet<i64>,
@@ -98,6 +99,10 @@ pub struct AppState {
         Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
+    pub worktree_branches_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
     pub works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
@@ -125,12 +130,10 @@ pub struct AppState {
     pub loading_projects: bool,
     #[serde(skip)]
     pub loading_works: bool,
-    #[serde(skip)]
     pub loading_work_messages: bool,
-    #[serde(skip)]
     pub loading_ai_session_outputs: bool,
-    #[serde(skip)]
     pub loading_ai_tool_calls: bool,
+    pub loading_worktree_branches: bool,
     #[serde(skip)]
     pub loading_settings: bool,
     #[serde(skip)]
@@ -139,6 +142,7 @@ pub struct AppState {
     pub loading_supported_models: bool,
     #[serde(skip)]
     pub models_fetch_attempted: bool,
+    pub worktree_branches_fetch_attempted: bool,
     #[serde(skip)]
     pub creating_work: bool,
     #[serde(skip)]
@@ -203,6 +207,7 @@ impl Default for AppState {
             servers: Vec::new(),
             settings: None,
             supported_models: Vec::new(),
+            worktree_branches: Vec::new(),
             favorite_projects: std::collections::HashSet::new(),
             projects_default_path_modified: false,
             xai_api_key_input: String::new(),
@@ -219,6 +224,7 @@ impl Default for AppState {
             project_details_result: Arc::new(std::sync::Mutex::new(None)),
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
+            worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
@@ -230,10 +236,12 @@ impl Default for AppState {
             loading_work_messages: false,
             loading_ai_session_outputs: false,
             loading_ai_tool_calls: false,
+            loading_worktree_branches: false,
             loading_settings: false,
             loading_project_details: false,
             loading_supported_models: false,
             models_fetch_attempted: false,
+            worktree_branches_fetch_attempted: false,
             creating_work: false,
             updating_projects_path: false,
             scanning_projects: false,

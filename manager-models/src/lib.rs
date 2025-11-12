@@ -896,3 +896,17 @@ pub struct User {
     pub created_at: i64,
     pub updated_at: i64,
 }
+
+/// Git branch information for worktree support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitBranch {
+    pub name: String,
+    pub is_worktree: bool,
+    pub path: Option<String>, // Path for worktree branches
+}
+
+/// Response containing list of git branches with worktree information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitBranchListResponse {
+    pub branches: Vec<GitBranch>,
+}

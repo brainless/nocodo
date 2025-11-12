@@ -2,6 +2,7 @@ use crate::auth;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
+use crate::git;
 use crate::llm_agent::LlmAgent;
 use crate::llm_client::LlmProvider;
 use crate::models::LlmProviderConfig;
@@ -10,10 +11,10 @@ use crate::models::{
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
     CreateProjectRequest, CreateTeamRequest, CreateWorkRequest, FileContentResponse,
     FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
-    FileUpdateRequest, LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse,
-    ProjectResponse, ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest, UpdateTeamRequest,
-    UpdateUserRequest, User, UserListResponse, UserResponse, WorkListResponse, WorkMessageResponse,
-    WorkResponse,
+    FileUpdateRequest, GitBranchListResponse, LlmAgentToolCallListResponse, Permission, Project,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest,
+    UpdateTeamRequest, UpdateUserRequest, User, UserListResponse, UserResponse, WorkListResponse,
+    WorkMessageResponse, WorkResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
@@ -1892,6 +1893,25 @@ pub async fn get_command_executions(
 }
 
 /// Get settings information including API key configuration
+// Git-related handlers
+
+pub async fn list_worktree_branches(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let project_id = path.into_inner();
+
+    // Get project to verify it exists and get path
+    let project = data.database.get_project_by_id(project_id)?;
+    let project_path = std::path::Path::new(&project.path);
+
+    // Get branches with worktrees
+    let branches = git::list_local_branches_with_worktrees(project_path)?;
+
+    let response = GitBranchListResponse { branches };
+    Ok(HttpResponse::Ok().json(response))
+}
+
 pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     // Use the in-memory config to get latest settings
     let config = data

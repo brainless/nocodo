@@ -89,6 +89,13 @@ impl UserSshKey {
 
 // Login request and response models
 
+// Git-related models
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GitBranchListResponse {
+    pub branches: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     pub username: String,
