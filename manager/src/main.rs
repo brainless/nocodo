@@ -168,6 +168,15 @@ async fn main() -> AppResult<()> {
                                                         .with_resource_id("id"),
                                                 ))
                                                 .route(web::delete().to(handlers::delete_project)),
+                                        )
+                                        // Git endpoints
+                                        .service(
+                                            web::scope("/git")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("project", "read")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route("/worktree-branches", web::get().to(handlers::list_worktree_branches)),
                                         ),
                                 ),
                         )
@@ -289,15 +298,6 @@ async fn main() -> AppResult<()> {
                                             web::get().to(handlers::get_command_executions),
                                         ),
                                 ),
-                        )
-                        // Git endpoints
-                        .service(
-                            web::scope("/projects/{id}/git")
-                                .wrap(PermissionMiddleware::new(
-                                    PermissionRequirement::new("project", "read")
-                                        .with_resource_id("id"),
-                                ))
-                                .route("/worktree-branches", web::get().to(handlers::list_worktree_branches)),
                         )
                         // Settings endpoints
                         .service(
