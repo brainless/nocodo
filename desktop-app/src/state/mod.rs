@@ -2,6 +2,12 @@ use rusqlite::Connection;
 use serde_json::Value;
 use std::sync::Arc;
 
+// Type aliases to reduce complexity
+pub type UsersResult =
+    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::UserListItem>, String>>>>;
+pub type TeamsResult =
+    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamListItem>, String>>>>;
+
 pub mod connection;
 pub mod ui_state;
 
@@ -61,6 +67,43 @@ pub struct AppState {
     pub settings: Option<manager_models::SettingsResponse>,
     pub supported_models: Vec<manager_models::SupportedModel>,
     pub worktree_branches: Vec<String>,
+
+    // Users management
+    pub users: Vec<manager_models::UserListItem>,
+    pub filtered_users: Vec<manager_models::UserListItem>,
+    pub user_search_query: String,
+    pub selected_user_ids: std::collections::HashSet<i64>,
+    pub loading_users: bool,
+    #[serde(skip)]
+    pub users_result: UsersResult,
+
+    // User detail modal
+    pub show_user_modal: bool,
+    pub editing_user: Option<manager_models::User>,
+    pub editing_user_teams: Vec<i64>,
+
+    // Teams
+    pub teams: Vec<manager_models::Team>,
+    pub team_list_items: Vec<manager_models::TeamListItem>,
+    pub filtered_teams: Vec<manager_models::TeamListItem>,
+    pub team_search_query: String,
+    pub selected_team_ids: std::collections::HashSet<i64>,
+    pub loading_teams: bool,
+    #[serde(skip)]
+    pub teams_result: TeamsResult,
+
+    // Team detail modal
+    pub show_team_modal: bool,
+    pub editing_team: Option<manager_models::Team>,
+    pub editing_team_permissions: Vec<i64>, // Permission IDs for team being edited
+
+    // Update results
+    #[serde(skip)]
+    pub update_user_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub updating_user: bool,
+    #[serde(skip)]
+    pub update_team_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub updating_team: bool,
 
     // Favorite state
     pub favorite_projects: std::collections::HashSet<i64>,
@@ -208,6 +251,29 @@ impl Default for AppState {
             settings: None,
             supported_models: Vec::new(),
             worktree_branches: Vec::new(),
+            users: Vec::new(),
+            filtered_users: Vec::new(),
+            user_search_query: String::new(),
+            selected_user_ids: std::collections::HashSet::new(),
+            loading_users: false,
+            users_result: Arc::new(std::sync::Mutex::new(None)),
+            show_user_modal: false,
+            editing_user: None,
+            editing_user_teams: Vec::new(),
+            teams: Vec::new(),
+            team_list_items: Vec::new(),
+            filtered_teams: Vec::new(),
+            team_search_query: String::new(),
+            selected_team_ids: std::collections::HashSet::new(),
+            loading_teams: false,
+            teams_result: Arc::new(std::sync::Mutex::new(None)),
+            show_team_modal: false,
+            editing_team: None,
+            editing_team_permissions: Vec::new(),
+            update_user_result: Arc::new(std::sync::Mutex::new(None)),
+            updating_user: false,
+            update_team_result: Arc::new(std::sync::Mutex::new(None)),
+            updating_team: false,
             favorite_projects: std::collections::HashSet::new(),
             projects_default_path_modified: false,
             xai_api_key_input: String::new(),

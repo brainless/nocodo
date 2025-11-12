@@ -31,8 +31,16 @@ async fn test_llm_e2e_saleor() {
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive("nocodo_manager=debug".parse().unwrap())
-                .add_directive("nocodo_manager::llm_client::adapters::glm_chat_completions=error".parse().unwrap())
-                .add_directive("nocodo_manager::llm_client::unified_client=error".parse().unwrap()),
+                .add_directive(
+                    "nocodo_manager::llm_client::adapters::glm_chat_completions=error"
+                        .parse()
+                        .unwrap(),
+                )
+                .add_directive(
+                    "nocodo_manager::llm_client::unified_client=error"
+                        .parse()
+                        .unwrap(),
+                ),
         )
         .with_target(true)
         .with_file(true)
@@ -116,12 +124,14 @@ async fn test_llm_e2e_saleor() {
     // Create a test user in the database
     let test_user = nocodo_manager::models::User {
         id: 1,
-        username: "test_user".to_string(),
+        name: "test_user".to_string(),
         email: "test@example.com".to_string(),
         password_hash: "test_hash".to_string(),
         is_active: true,
         created_at: chrono::Utc::now().timestamp(),
         updated_at: chrono::Utc::now().timestamp(),
+        role: None,
+        last_login_at: None,
     };
     test_app.db().create_user(&test_user).unwrap();
     println!("   👤 Created test user with ID: {}", test_user.id);
@@ -403,8 +413,16 @@ async fn test_llm_multiple_scenarios() {
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive("nocodo_manager=debug".parse().unwrap())
-                .add_directive("nocodo_manager::llm_client::adapters::glm_chat_completions=error".parse().unwrap())
-                .add_directive("nocodo_manager::llm_client::unified_client=error".parse().unwrap()),
+                .add_directive(
+                    "nocodo_manager::llm_client::adapters::glm_chat_completions=error"
+                        .parse()
+                        .unwrap(),
+                )
+                .add_directive(
+                    "nocodo_manager::llm_client::unified_client=error"
+                        .parse()
+                        .unwrap(),
+                ),
         )
         .with_target(true)
         .with_file(true)

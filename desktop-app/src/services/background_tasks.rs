@@ -35,6 +35,10 @@ impl BackgroundTasks {
         self.check_file_list_result(state);
         self.check_file_content_result(state);
         self.check_send_message_result(state);
+        self.check_users_result(state);
+        self.check_teams_result(state);
+        self.check_update_user_result(state);
+        self.check_update_team_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -65,7 +69,7 @@ impl BackgroundTasks {
                 Err(error) => {
                     tracing::error!("Connection failed: {}", error);
                     state.connection_state = ConnectionState::Error(error.clone());
-                    state.ui_state.connection_error = Some(error);
+                    state.ui_state.connection_error = Some(error.clone());
                     state.ui_state.connected_host = None;
                 }
             }
@@ -83,8 +87,9 @@ impl BackgroundTasks {
                     state.ui_state.connection_error = None;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load projects: {}", e));
+                    let error_msg = format!("Failed to load projects: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -115,7 +120,9 @@ impl BackgroundTasks {
                     state.works = works;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error = Some(format!("Failed to load works: {}", e));
+                    let error_msg = format!("Failed to load works: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -130,8 +137,9 @@ impl BackgroundTasks {
                     state.work_messages = messages;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load work messages: {}", e));
+                    let error_msg = format!("Failed to load work messages: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -146,8 +154,9 @@ impl BackgroundTasks {
                     state.ai_session_outputs = outputs;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load AI outputs: {}", e));
+                    let error_msg = format!("Failed to load AI outputs: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -162,8 +171,9 @@ impl BackgroundTasks {
                     state.ai_tool_calls = tool_calls;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load AI tool calls: {}", e));
+                    let error_msg = format!("Failed to load AI tool calls: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -192,11 +202,12 @@ impl BackgroundTasks {
                     }
                 }
                 Err(e) => {
+                    let error_msg = format!("Failed to load settings: {}", e);
                     // Only show settings error in status bar if we have no projects loaded
                     // (meaning we're not properly authenticated yet)
                     if state.projects.is_empty() {
-                        state.ui_state.connection_error =
-                            Some(format!("Failed to load settings: {}", e));
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
                     } else {
                         // Log the error but don't show it in status bar since we're authenticated
                         tracing::warn!("Failed to load settings (non-critical): {}", e);
@@ -221,9 +232,9 @@ impl BackgroundTasks {
                     state.project_details = Some(details);
                 }
                 Err(e) => {
-                    tracing::error!("Failed to load project details: {}", e);
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load project details: {}", e));
+                    let error_msg = format!("Failed to load project details: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -238,8 +249,9 @@ impl BackgroundTasks {
                     state.supported_models = models;
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load supported models: {}", e));
+                    let error_msg = format!("Failed to load supported models: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -263,7 +275,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_works(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error = Some(format!("Failed to create work: {}", e));
+                    let error_msg = format!("Failed to create work: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -277,8 +291,9 @@ impl BackgroundTasks {
                     // AI session created successfully
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to create AI session: {}", e));
+                    let error_msg = format!("Failed to create AI session: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -299,8 +314,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_settings(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to update API keys: {}", e));
+                    let error_msg = format!("Failed to update API keys: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -321,8 +337,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_settings(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to update projects path: {}", e));
+                    let error_msg = format!("Failed to update projects path: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -342,8 +359,9 @@ impl BackgroundTasks {
                     self.api_service.refresh_projects(state);
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to scan projects: {}", e));
+                    let error_msg = format!("Failed to scan projects: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
         }
@@ -389,10 +407,155 @@ impl BackgroundTasks {
                     }
                 }
                 Err(e) => {
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to send message: {}", e));
+                    let error_msg = format!("Failed to send message: {}", e);
+                    tracing::error!("{}", error_msg);
+                    state.ui_state.connection_error = Some(error_msg);
                 }
             }
+        }
+    }
+
+    fn check_users_result(&self, state: &mut AppState) {
+        // Check users result
+        let mut users_updated = false;
+        {
+            let mut result = state.users_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.loading_users = false;
+                match result {
+                    Ok(users) => {
+                        state.users = users;
+                        users_updated = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to load users: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
+                    }
+                }
+            }
+        }
+        if users_updated {
+            self.apply_user_search_filter(state);
+        }
+    }
+
+    fn check_teams_result(&self, state: &mut AppState) {
+        // Check teams result
+        let mut teams_updated = false;
+        {
+            let mut result = state.teams_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.loading_teams = false;
+                match result {
+                    Ok(team_list_items) => {
+                        state.team_list_items = team_list_items.clone();
+                        teams_updated = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to load teams: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
+                    }
+                }
+            }
+        }
+        if teams_updated {
+            self.apply_team_search_filter(state);
+        }
+    }
+
+    fn check_update_user_result(&self, state: &mut AppState) {
+        // Check update user result
+        let mut refresh_users = false;
+        {
+            let mut result = state.update_user_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.updating_user = false;
+                match result {
+                    Ok(_) => {
+                        state.show_user_modal = false;
+                        refresh_users = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to update user: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
+                    }
+                }
+            }
+        }
+        if refresh_users {
+            self.api_service.refresh_users(state); // Refresh list
+        }
+    }
+
+    fn apply_user_search_filter(&self, state: &mut AppState) {
+        let query = state.user_search_query.to_lowercase();
+        if query.is_empty() {
+            state.filtered_users = state.users.clone();
+        } else {
+            state.filtered_users = state
+                .users
+                .iter()
+                .filter(|u| {
+                    u.name.to_lowercase().contains(&query)
+                        || u.email.to_lowercase().contains(&query)
+                })
+                .cloned()
+                .collect();
+        }
+    }
+
+    fn check_update_team_result(&self, state: &mut AppState) {
+        // Check update team result
+        let mut refresh_teams = false;
+        {
+            let mut result = state.update_team_result.lock().unwrap();
+            if let Some(result) = result.take() {
+                state.updating_team = false;
+                match result {
+                    Ok(_) => {
+                        state.show_team_modal = false;
+                        refresh_teams = true;
+                        // Clear any previous connection errors since we successfully loaded data
+                        state.ui_state.connection_error = None;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to update team: {}", e);
+                        tracing::error!("{}", error_msg);
+                        state.ui_state.connection_error = Some(error_msg);
+                    }
+                }
+            }
+        }
+        if refresh_teams {
+            self.api_service.refresh_team_list(state); // Refresh list
+        }
+    }
+
+    fn apply_team_search_filter(&self, state: &mut AppState) {
+        let query = state.team_search_query.to_lowercase();
+        if query.is_empty() {
+            state.filtered_teams = state.team_list_items.clone();
+        } else {
+            state.filtered_teams = state
+                .team_list_items
+                .iter()
+                .filter(|t| {
+                    t.name.to_lowercase().contains(&query)
+                        || t.description
+                            .as_ref()
+                            .is_some_and(|d| d.to_lowercase().contains(&query))
+                })
+                .cloned()
+                .collect();
         }
     }
 }

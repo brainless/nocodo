@@ -3,14 +3,13 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::Value;
 
-use crate::llm_client::{
-    LlmCompletionRequest, LlmCompletionResponse, LlmToolCall, LlmToolCallFunction, LlmMessage,
-    LlmChoice, LlmUsage, ToolChoice,
-};
 use crate::llm_client::adapters::trait_adapter::{ProviderAdapter, ProviderRequest};
 use crate::llm_client::types::{
-    ResponsesApiRequest, ResponsesApiResponse, ResponsesToolDefinition,
-    ResponseItem, ContentItem,
+    ContentItem, ResponseItem, ResponsesApiRequest, ResponsesApiResponse, ResponsesToolDefinition,
+};
+use crate::llm_client::{
+    LlmChoice, LlmCompletionRequest, LlmCompletionResponse, LlmMessage, LlmToolCall,
+    LlmToolCallFunction, LlmUsage, ToolChoice,
 };
 use crate::models::LlmProviderConfig;
 
@@ -74,15 +73,22 @@ File References: When referencing files, include the relevant start line and alw
     }
 
     /// Convert LlmCompletionRequest to ResponsesApiRequest
-    fn convert_to_responses_request(&self, request: LlmCompletionRequest) -> Result<ResponsesApiRequest> {
+    fn convert_to_responses_request(
+        &self,
+        request: LlmCompletionRequest,
+    ) -> Result<ResponsesApiRequest> {
         // Extract instructions from system messages or use model-specific instructions
-        let instructions = if let Some(system_msg) = request.messages.iter().find(|m| m.role == "system") {
-            system_msg.content.clone().unwrap_or_else(|| self.get_default_instructions())
-        } else if self.config.model == "gpt-5-codex" {
-            self.get_codex_instructions()
-        } else {
-            self.get_default_instructions()
-        };
+        let instructions =
+            if let Some(system_msg) = request.messages.iter().find(|m| m.role == "system") {
+                system_msg
+                    .content
+                    .clone()
+                    .unwrap_or_else(|| self.get_default_instructions())
+            } else if self.config.model == "gpt-5-codex" {
+                self.get_codex_instructions()
+            } else {
+                self.get_default_instructions()
+            };
 
         // Convert messages to input array
         let mut input = Vec::new();
@@ -103,7 +109,11 @@ File References: When referencing files, include the relevant start line and alw
                 }
                 "assistant" => {
                     // Always include assistant message if there are tool calls, even with empty content
-                    let has_content = message.content.as_ref().map(|c| !c.is_empty()).unwrap_or(false);
+                    let has_content = message
+                        .content
+                        .as_ref()
+                        .map(|c| !c.is_empty())
+                        .unwrap_or(false);
                     let has_tool_calls = message.tool_calls.is_some();
 
                     if has_content || has_tool_calls {
@@ -187,7 +197,10 @@ File References: When referencing files, include the relevant start line and alw
     }
 
     /// Convert ResponsesApiResponse to LlmCompletionResponse
-    fn convert_from_responses_response(&self, response: ResponsesApiResponse) -> Result<LlmCompletionResponse> {
+    fn convert_from_responses_response(
+        &self,
+        response: ResponsesApiResponse,
+    ) -> Result<LlmCompletionResponse> {
         tracing::debug!(
             "Converting Responses API response with {} output items",
             response.output.len()
@@ -275,9 +288,10 @@ impl ProviderRequest for ResponsesApiRequest {
     }
 
     fn custom_headers(&self) -> Vec<(String, String)> {
-        vec![
-            ("OpenAI-Beta".to_string(), "responses=experimental".to_string()),
-        ]
+        vec![(
+            "OpenAI-Beta".to_string(),
+            "responses=experimental".to_string(),
+        )]
     }
 }
 
@@ -303,7 +317,8 @@ impl ProviderAdapter for ResponsesApiAdapter {
     async fn send_request(&self, request: Box<dyn ProviderRequest>) -> Result<reqwest::Response> {
         let json = request.to_json()?;
 
-        let mut request_builder = self.client
+        let mut request_builder = self
+            .client
             .post(self.get_api_url())
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .header("Content-Type", "application/json")
@@ -409,7 +424,10 @@ mod tests {
 
         let responses_request = adapter.convert_to_responses_request(request).unwrap();
 
-        assert_eq!(responses_request.instructions, "You are a helpful assistant.");
+        assert_eq!(
+            responses_request.instructions,
+            "You are a helpful assistant."
+        );
         assert_eq!(responses_request.input.len(), 1);
     }
 
@@ -420,15 +438,13 @@ mod tests {
 
         let request = LlmCompletionRequest {
             model: "gpt-5-codex".to_string(),
-            messages: vec![
-                LlmMessage {
-                    role: "user".to_string(),
-                    content: Some("Hello!".to_string()),
-                    tool_calls: None,
-                    function_call: None,
-                    tool_call_id: None,
-                },
-            ],
+            messages: vec![LlmMessage {
+                role: "user".to_string(),
+                content: Some("Hello!".to_string()),
+                tool_calls: None,
+                function_call: None,
+                tool_call_id: None,
+            }],
             tools: None,
             tool_choice: None,
             max_tokens: Some(1000),
