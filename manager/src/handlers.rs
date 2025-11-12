@@ -16,11 +16,11 @@ use crate::models::{
     UpdateTeamRequest, UpdateUserRequest, User, UserResponse, WorkListResponse,
     WorkMessageResponse, WorkResponse,
 };
+use manager_models::{GitBranch, SearchQuery, TeamListResponse};
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpMessage, HttpResponse, Result};
 use handlebars::Handlebars;
-use manager_models::{SearchQuery, TeamListResponse};
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
 };
@@ -2008,7 +2008,17 @@ pub async fn list_worktree_branches(
     let project_path = std::path::Path::new(&project.path);
 
     // Get branches with worktrees
-    let branches = git::list_local_branches_with_worktrees(project_path)?;
+    let branch_names = git::list_local_branches_with_worktrees(project_path)?;
+    
+    // Convert string branches to GitBranch objects
+    let branches: Vec<GitBranch> = branch_names
+        .into_iter()
+        .map(|name| GitBranch {
+            name: name.clone(),
+            is_worktree: true, // These are all worktree branches by definition
+            path: None, // Could be enhanced to include actual worktree path if needed
+        })
+        .collect();
 
     let response = GitBranchListResponse { branches };
     Ok(HttpResponse::Ok().json(response))

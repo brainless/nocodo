@@ -97,7 +97,7 @@ impl UserSshKey {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GitBranchListResponse {
-    pub branches: Vec<String>,
+    pub branches: Vec<manager_models::GitBranch>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
