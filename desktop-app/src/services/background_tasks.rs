@@ -99,6 +99,7 @@ impl BackgroundTasks {
         let mut result = state.worktree_branches_result.lock().unwrap();
         if let Some(res) = result.take() {
             state.loading_worktree_branches = false;
+            state.worktree_branches_fetch_attempted = true;
             match res {
                 Ok(branches) => {
                     state.worktree_branches = branches;

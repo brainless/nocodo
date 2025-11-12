@@ -824,6 +824,7 @@ impl crate::pages::Page for WorkPage {
                                                  if previous_project_id != state.ui_state.new_work_project_id {
                                                      state.worktree_branches.clear();
                                                      state.worktree_branches_fetch_attempted = false;
+                                                     state.loading_worktree_branches = false;
                                                      state.ui_state.new_work_branch = None;
                                                  }
 
