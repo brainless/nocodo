@@ -425,14 +425,21 @@ impl LlmAgent {
         // Get work to find project_id
         let work = self.db.get_work_by_id(session.work_id)?;
 
-        if let Some(project_id) = work.project_id {
+        let mut executor = if let Some(project_id) = work.project_id {
             // Get project to find project path
             let project = self.db.get_project_by_id(project_id)?;
-            Ok(ToolExecutor::new(PathBuf::from(project.path)))
+            ToolExecutor::new(PathBuf::from(project.path))
         } else {
             // Fallback to the default tool executor
-            Ok(ToolExecutor::new(self.tool_executor.base_path().clone()))
+            ToolExecutor::new(self.tool_executor.base_path().clone())
+        };
+
+        // Attach bash executor if available
+        if let Some(bash_executor) = self.tool_executor.bash_executor() {
+            executor = executor.with_bash_executor(bash_executor.clone());
         }
+
+        Ok(executor)
     }
 
     /// Process native tool calls from LLM response

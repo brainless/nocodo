@@ -67,6 +67,10 @@ impl ToolExecutor {
         self
     }
 
+    pub fn bash_executor(&self) -> Option<&BashExecutor> {
+        self.bash_executor.as_ref()
+    }
+
     #[allow(dead_code)]
     pub fn with_max_file_size(mut self, max_size: u64) -> Self {
         self.max_file_size = max_size;

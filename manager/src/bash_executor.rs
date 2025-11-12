@@ -9,6 +9,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::bash_permissions::BashPermissions;
 
+#[derive(Clone)]
 pub struct BashExecutor {
     permissions: BashPermissions,
     default_timeout: Duration,
