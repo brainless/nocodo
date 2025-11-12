@@ -346,6 +346,8 @@ impl SocketServer {
                     status: "active".to_string(),
                     created_at: now,
                     updated_at: now,
+                    git_branch: None,
+                    working_directory: None,
                 };
 
                 match database.create_work(&work) {

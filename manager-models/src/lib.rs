@@ -337,6 +337,8 @@ pub struct Work {
     pub status: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub git_branch: Option<String>, // Git branch for worktree support
+    pub working_directory: Option<String>, // Absolute path to working directory (set at creation)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -362,6 +364,7 @@ pub struct CreateWorkRequest {
     #[serde(default = "default_auto_start")]
     pub auto_start: bool, // Whether to automatically start LLM agent session (default: true)
     pub tool_name: Option<String>, // Tool to use for auto-started session (default: "llm-agent")
+    pub git_branch: Option<String>, // Git branch for worktree support
 }
 
 fn default_auto_start() -> bool {

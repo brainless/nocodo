@@ -413,11 +413,14 @@ impl LlmAgent {
         // Get session to find work_id
         let session = self.db.get_llm_agent_session(session_id)?;
 
-        // Get work to find project_id
+        // Get work to find working directory
         let work = self.db.get_work_by_id(session.work_id)?;
 
-        if let Some(project_id) = work.project_id {
-            // Get project to find project path
+        // Use working_directory if set, otherwise fall back to project.path or default
+        if let Some(working_directory) = work.working_directory {
+            Ok(ToolExecutor::new(PathBuf::from(working_directory)))
+        } else if let Some(project_id) = work.project_id {
+            // Fallback to project path for backward compatibility with old Work items
             let project = self.db.get_project_by_id(project_id)?;
             Ok(ToolExecutor::new(PathBuf::from(project.path)))
         } else {

@@ -234,6 +234,7 @@ impl ApiService {
             let title = state.ui_state.new_work_title.clone();
             let project_id = state.ui_state.new_work_project_id;
             let model = state.ui_state.new_work_model.clone();
+            let git_branch = state.ui_state.new_work_branch.clone();
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
@@ -244,6 +245,7 @@ impl ApiService {
                         model,
                         auto_start: true, // Automatically start LLM agent session
                         tool_name: Some("llm-agent".to_string()),
+                        git_branch,
                     };
                     let result = api_client.create_work(request).await;
                     let mut create_work_result = result_clone.lock().unwrap();

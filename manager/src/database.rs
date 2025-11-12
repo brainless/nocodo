@@ -223,6 +223,10 @@ impl Database {
             [],
         )?;
 
+        // Migration: Add git_branch and working_directory columns for worktree support
+        let _ = conn.execute("ALTER TABLE works ADD COLUMN git_branch TEXT", []);
+        let _ = conn.execute("ALTER TABLE works ADD COLUMN working_directory TEXT", []);
+
         // Create work messages with content types and history
         conn.execute(
              "CREATE TABLE IF NOT EXISTS work_messages (
@@ -1247,8 +1251,8 @@ impl Database {
         let id_param = if work.id == 0 { None } else { Some(work.id) };
 
         conn.execute(
-            "INSERT INTO works (id, title, project_id, model, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO works (id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 id_param,
                 work.title,
@@ -1256,7 +1260,9 @@ impl Database {
                 work.model,
                 work.status,
                 work.created_at,
-                work.updated_at
+                work.updated_at,
+                work.git_branch,
+                work.working_directory
             ],
         )?;
 
@@ -1272,7 +1278,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, model, status, created_at, updated_at
+            "SELECT id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory
              FROM works WHERE id = ?",
         )?;
 
@@ -1286,6 +1292,8 @@ impl Database {
                     status: row.get(4)?,
                     created_at: row.get(5)?,
                     updated_at: row.get(6)?,
+                    git_branch: row.get(7)?,
+                    working_directory: row.get(8)?,
                 })
             })
             .map_err(|e| match e {
@@ -1305,7 +1313,7 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, model, status, created_at, updated_at
+            "SELECT id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory
              FROM works ORDER BY created_at DESC",
         )?;
 
@@ -1318,6 +1326,8 @@ impl Database {
                 status: row.get(4)?,
                 created_at: row.get(5)?,
                 updated_at: row.get(6)?,
+                git_branch: row.get(7)?,
+                working_directory: row.get(8)?,
             })
         })?;
 
@@ -1402,8 +1412,8 @@ impl Database {
         let id_param = if work.id == 0 { None } else { Some(work.id) };
 
         tx.execute(
-            "INSERT INTO works (id, title, project_id, model, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO works (id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 id_param,
                 work.title,
@@ -1411,7 +1421,9 @@ impl Database {
                 work.model,
                 work.status,
                 work.created_at,
-                work.updated_at
+                work.updated_at,
+                work.git_branch,
+                work.working_directory
             ],
         )?;
 

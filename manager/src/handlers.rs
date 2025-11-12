@@ -1593,6 +1593,28 @@ pub async fn create_work(
         .map_err(|e| AppError::Internal(format!("Failed to get timestamp: {e}")))?
         .as_secs() as i64;
 
+    // Resolve working_directory from git_branch if provided
+    let working_directory = if let (Some(git_branch), Some(project_id)) = (&work_req.git_branch, work_req.project_id) {
+        // Get project to find project path
+        let project = data.database.get_project_by_id(project_id)?;
+        let project_path = std::path::Path::new(&project.path);
+
+        // Resolve the working directory for the given branch
+        match crate::git::get_working_directory_for_branch(project_path, git_branch) {
+            Ok(path) => Some(path),
+            Err(e) => {
+                tracing::warn!("Failed to resolve working directory for branch '{}': {}. Using project path.", git_branch, e);
+                Some(project.path.clone())
+            }
+        }
+    } else if let Some(project_id) = work_req.project_id {
+        // No git_branch specified, use project path as working_directory
+        let project = data.database.get_project_by_id(project_id)?;
+        Some(project.path.clone())
+    } else {
+        None
+    };
+
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
         title: work_req.title.clone(),
@@ -1601,6 +1623,8 @@ pub async fn create_work(
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
+        git_branch: work_req.git_branch.clone(),
+        working_directory,
     };
 
     // Get user ID from request
