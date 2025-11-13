@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use codex_core::sandboxing::{execute_env, ExecEnv};
 use codex_core::exec::SandboxType;
+use codex_core::sandboxing::{execute_env, ExecEnv};
 use codex_process_hardening::pre_main_hardening;
 use std::path::Path;
 use std::time::Duration;
@@ -23,10 +23,11 @@ pub struct BashExecutionResult {
     pub timed_out: bool,
 }
 
+#[allow(dead_code)]
 impl BashExecutor {
     pub fn new(permissions: BashPermissions, default_timeout_secs: u64) -> Result<Self> {
         let default_timeout = Duration::from_secs(default_timeout_secs);
-        
+
         // Apply process hardening (this is called automatically in Codex binaries)
         // Note: In a real Codex integration, this would be called pre-main
         // For our use case, we'll apply it manually
@@ -38,7 +39,11 @@ impl BashExecutor {
         })
     }
 
-    pub async fn execute(&self, command: &str, timeout_secs: Option<u64>) -> Result<BashExecutionResult> {
+    pub async fn execute(
+        &self,
+        command: &str,
+        timeout_secs: Option<u64>,
+    ) -> Result<BashExecutionResult> {
         let execution_timeout = timeout_secs
             .map(Duration::from_secs)
             .unwrap_or(self.default_timeout);
@@ -70,7 +75,8 @@ impl BashExecutor {
         // Execute with timeout using Codex's execute_env
         let execution_result = timeout(execution_timeout, async {
             execute_env(&exec_env, &sandbox_policy, None).await
-        }).await;
+        })
+        .await;
 
         match execution_result {
             Ok(Ok(result)) => {
@@ -97,10 +103,16 @@ impl BashExecutor {
                 Err(anyhow::anyhow!("Command execution failed: {}", e))
             }
             Err(_) => {
-                warn!("Command timed out after {} seconds", execution_timeout.as_secs());
+                warn!(
+                    "Command timed out after {} seconds",
+                    execution_timeout.as_secs()
+                );
                 Ok(BashExecutionResult {
                     stdout: String::new(),
-                    stderr: format!("Command timed out after {} seconds", execution_timeout.as_secs()),
+                    stderr: format!(
+                        "Command timed out after {} seconds",
+                        execution_timeout.as_secs()
+                    ),
                     exit_code: 124, // Standard timeout exit code
                     timed_out: true,
                 })
@@ -128,8 +140,14 @@ impl BashExecutor {
 
         // Check working directory permissions
         if let Err(denied_reason) = self.permissions.check_working_directory(working_dir) {
-            warn!("Working directory denied: {:?} - {}", working_dir, denied_reason);
-            return Err(anyhow::anyhow!("Working directory denied: {}", denied_reason));
+            warn!(
+                "Working directory denied: {:?} - {}",
+                working_dir, denied_reason
+            );
+            return Err(anyhow::anyhow!(
+                "Working directory denied: {}",
+                denied_reason
+            ));
         }
 
         // Create exec env for command with custom working directory
@@ -150,7 +168,8 @@ impl BashExecutor {
         // Execute with timeout using Codex's execute_env
         let execution_result = timeout(execution_timeout, async {
             execute_env(&exec_env, &sandbox_policy, None).await
-        }).await;
+        })
+        .await;
 
         match execution_result {
             Ok(Ok(result)) => {
@@ -160,7 +179,10 @@ impl BashExecutor {
 
                 info!(
                     "Command completed in {:?} - Exit code: {}, stdout_len: {}, stderr_len: {}",
-                    working_dir, exit_code, stdout.len(), stderr.len()
+                    working_dir,
+                    exit_code,
+                    stdout.len(),
+                    stderr.len()
                 );
 
                 Ok(BashExecutionResult {
@@ -175,10 +197,16 @@ impl BashExecutor {
                 Err(anyhow::anyhow!("Command execution failed: {}", e))
             }
             Err(_) => {
-                warn!("Command timed out after {} seconds", execution_timeout.as_secs());
+                warn!(
+                    "Command timed out after {} seconds",
+                    execution_timeout.as_secs()
+                );
                 Ok(BashExecutionResult {
                     stdout: String::new(),
-                    stderr: format!("Command timed out after {} seconds", execution_timeout.as_secs()),
+                    stderr: format!(
+                        "Command timed out after {} seconds",
+                        execution_timeout.as_secs()
+                    ),
                     exit_code: 124,
                     timed_out: true,
                 })
@@ -200,17 +228,17 @@ impl BashExecutor {
 mod tests {
     use super::*;
     use crate::bash_permissions::{BashPermissions, PermissionRule};
-    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_basic_execution() {
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("echo*").unwrap(),
-        ]);
-        
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 5).unwrap();
-        let result = executor.execute("echo 'Hello, World!'", None).await.unwrap();
-        
+        let result = executor
+            .execute("echo 'Hello, World!'", None)
+            .await
+            .unwrap();
+
         assert_eq!(result.exit_code, 0);
         assert!(result.stdout.contains("Hello, World!"));
         assert!(!result.timed_out);
@@ -218,13 +246,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_timeout() {
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("sleep*").unwrap(),
-        ]);
-        
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("sleep*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 2).unwrap();
         let result = executor.execute("sleep 5", None).await.unwrap();
-        
+
         assert_eq!(result.exit_code, 124);
         assert!(result.timed_out);
         assert!(result.stderr.contains("timed out"));
@@ -232,38 +258,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_permission_denied() {
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("echo*").unwrap(),
-        ]);
-        
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 5).unwrap();
         let result = executor.execute("rm -rf /", None).await;
-        
+
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("denied"));
     }
 
     #[tokio::test]
     async fn test_bash_executor_creation() {
-        let executor = BashExecutor::new(
-            BashPermissions::default(),
-            30,
-        ).unwrap();
-        
-        assert_eq!(executor.default_timeout_secs, 30);
+        let executor = BashExecutor::new(BashPermissions::default(), 30).unwrap();
+
+        assert_eq!(executor.default_timeout.as_secs(), 30);
     }
 
     #[tokio::test]
     async fn test_bash_executor_command_with_stderr() {
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("echo*").unwrap(),
-        ]);
-        
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
+
         // This command writes to stderr
-        let result = executor.execute("echo 'Error message' >&2", None).await.unwrap();
-        
+        let result = executor
+            .execute("echo 'Error message' >&2", None)
+            .await
+            .unwrap();
+
         assert_eq!(result.exit_code, 0);
         assert!(result.stdout.is_empty());
         assert!(result.stderr.contains("Error message"));
@@ -271,14 +293,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_nonexistent_command() {
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("*").unwrap(),
-        ]);
-        
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
-        let result = executor.execute("nonexistent_command_12345", None).await.unwrap();
-        
+
+        let result = executor
+            .execute("nonexistent_command_12345", None)
+            .await
+            .unwrap();
+
         assert!(result.exit_code != 0);
         assert!(result.stderr.contains("not found") || result.stderr.contains("command not found"));
     }
@@ -286,21 +309,21 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_working_directory() {
         let temp_dir = tempfile::TempDir::new().unwrap();
-        
+
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("ls*").unwrap(),
             PermissionRule::allow("test*").unwrap(),
         ]);
-        
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
+
         // Create a test file in the project directory
         let test_file = temp_dir.path().join("test_file.txt");
         std::fs::write(&test_file, "test content").unwrap();
-        
+
         // List files in the project directory
         let result = executor.execute("ls test_file.txt", None).await.unwrap();
-        
+
         assert_eq!(result.exit_code, 0);
         assert!(result.stdout.contains("test_file.txt"));
     }
@@ -308,44 +331,45 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_git_commands() {
         let temp_dir = tempfile::TempDir::new().unwrap();
-        
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("git*").unwrap(),
-        ]);
-        
+
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("git*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
+
         // Initialize git repository
         let init_result = executor.execute("git init", None).await.unwrap();
         assert_eq!(init_result.exit_code, 0);
-        
+
         // Check git status
         let status_result = executor.execute("git status", None).await.unwrap();
         assert_eq!(status_result.exit_code, 0);
-        
+
         // Create a test file and add it
         let test_file = temp_dir.path().join("test.txt");
         std::fs::write(&test_file, "test").unwrap();
-        
+
         let add_result = executor.execute("git add test.txt", None).await.unwrap();
         assert_eq!(add_result.exit_code, 0);
     }
 
     #[tokio::test]
     async fn test_bash_executor_cargo_commands() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        
+        let _temp_dir = tempfile::TempDir::new().unwrap();
+
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("cargo*").unwrap(),
             PermissionRule::allow("ls*").unwrap(),
         ]);
-        
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
+
         // Initialize a minimal Rust project
-        let init_result = executor.execute("cargo init --bin test_project", None).await.unwrap();
+        let init_result = executor
+            .execute("cargo init --bin test_project", None)
+            .await
+            .unwrap();
         assert_eq!(init_result.exit_code, 0);
-        
+
         // Check if project was created
         let check_result = executor.execute("ls test_project", None).await.unwrap();
         assert_eq!(check_result.exit_code, 0);
@@ -354,22 +378,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_permissions_get_set() {
-        let mut executor = BashExecutor::new(
-            BashPermissions::default(),
-            10,
-        ).unwrap();
-        
+        let mut executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
+
         // Get initial permissions
         let initial_perms = executor.get_permissions();
         assert!(initial_perms.is_command_allowed("git status"));
-        
+
         // Update permissions to block git
-        let new_perms = BashPermissions::new(vec![
-            PermissionRule::deny("git*").unwrap(),
-        ]);
-        
+        let new_perms = BashPermissions::new(vec![PermissionRule::deny("git*").unwrap()]);
+
         executor.update_permissions(new_perms);
-        
+
         // Check that git is now blocked
         let updated_perms = executor.get_permissions();
         assert!(!updated_perms.is_command_allowed("git status"));
@@ -378,37 +397,38 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_complex_command() {
         let temp_dir = tempfile::TempDir::new().unwrap();
-        
+
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("cat*").unwrap(),
             PermissionRule::allow("grep*").unwrap(),
             PermissionRule::allow("wc*").unwrap(),
         ]);
-        
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
+
         // Create a test file
         let test_file = temp_dir.path().join("test.txt");
         std::fs::write(&test_file, "hello\nworld\ntest").unwrap();
-        
+
         // Run a complex command with pipes and redirects
-        let result = executor.execute("cat test.txt | grep hello | wc -l", None).await.unwrap();
-        
+        let result = executor
+            .execute("cat test.txt | grep hello | wc -l", None)
+            .await
+            .unwrap();
+
         assert_eq!(result.exit_code, 0);
         assert!(result.stdout.trim().parse::<u32>().unwrap() > 0);
     }
 
     #[tokio::test]
     async fn test_bash_executor_environment_variables() {
-        let permissions = BashPermissions::new(vec![
-            PermissionRule::allow("echo*").unwrap(),
-        ]);
-        
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()]);
+
         let executor = BashExecutor::new(permissions, 10).unwrap();
-        
+
         // Test environment variable usage
         let result = executor.execute("echo $HOME", None).await.unwrap();
-        
+
         assert_eq!(result.exit_code, 0);
         assert!(!result.stdout.trim().is_empty());
     }

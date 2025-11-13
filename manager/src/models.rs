@@ -860,6 +860,7 @@ pub struct CreatePermissionRequest {
 
 /// Configuration for the Bash tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BashToolConfig {
     pub enabled: bool,
     pub default_timeout_secs: u64,
@@ -884,6 +885,7 @@ impl Default for BashToolConfig {
 
 /// Permission configuration for the Bash tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BashPermissionConfig {
     pub default_action: String, // "allow" or "deny"
     pub allowed_working_dirs: Vec<String>,
@@ -1050,6 +1052,7 @@ impl Default for BashPermissionConfig {
 
 /// Individual permission rule configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BashPermissionRuleConfig {
     pub pattern: String,
     pub action: String, // "allow" or "deny"
@@ -1058,6 +1061,7 @@ pub struct BashPermissionRuleConfig {
 
 /// Sandbox configuration for the Bash tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BashSandboxConfig {
     pub enabled: bool,
     pub use_landlock: bool, // Phase 2: Linux sandboxing
@@ -1082,6 +1086,7 @@ impl Default for BashSandboxConfig {
 
 /// Logging configuration for the Bash tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BashLoggingConfig {
     pub log_commands: bool,
     pub log_stdout: bool,
@@ -1160,6 +1165,7 @@ pub struct BashResponse {
 
 /// Bash execution log entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BashExecutionLog {
     pub id: i64,
     pub work_id: i64,
@@ -1175,6 +1181,7 @@ pub struct BashExecutionLog {
 }
 
 impl BashExecutionLog {
+    #[allow(clippy::too_many_arguments, dead_code)]
     pub fn new(
         work_id: i64,
         user_id: i64,

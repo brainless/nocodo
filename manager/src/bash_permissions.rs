@@ -62,6 +62,7 @@ pub struct BashPermissions {
     deny_changing_to_sensitive_dirs: bool,
 }
 
+#[allow(dead_code)]
 impl BashPermissions {
     pub fn new(rules: Vec<PermissionRule>) -> Self {
         Self {
@@ -106,7 +107,10 @@ impl BashPermissions {
                     return Err(anyhow!(
                         "Command denied by rule: {}{}",
                         rule.pattern,
-                        rule.description.as_ref().map(|d| format!(" ({})", d)).unwrap_or_default()
+                        rule.description
+                            .as_ref()
+                            .map(|d| format!(" ({})", d))
+                            .unwrap_or_default()
                     ));
                 }
             }
@@ -125,14 +129,22 @@ impl BashPermissions {
         }
     }
 
+    pub fn is_command_allowed(&self, command: &str) -> bool {
+        self.check_command(command).is_ok()
+    }
+
     pub fn check_working_directory(&self, working_dir: &Path) -> Result<()> {
         let working_dir_str = working_dir.to_string_lossy();
-        debug!("Checking working directory permissions: {}", working_dir_str);
+        debug!(
+            "Checking working directory permissions: {}",
+            working_dir_str
+        );
 
         // Check if directory is in allowed list
-        let is_allowed = self.allowed_working_dirs.iter().any(|allowed| {
-            working_dir_str.starts_with(allowed) || working_dir_str == *allowed
-        });
+        let is_allowed = self
+            .allowed_working_dirs
+            .iter()
+            .any(|allowed| working_dir_str.starts_with(allowed) || working_dir_str == *allowed);
 
         if !is_allowed {
             warn!("Working directory not in allowed list: {}", working_dir_str);
@@ -197,34 +209,90 @@ impl BashPermissions {
 impl Default for BashPermissions {
     fn default() -> Self {
         let rules = vec![
-            PermissionRule::allow("echo*").unwrap().with_description("Allow echo commands"),
-            PermissionRule::allow("ls*").unwrap().with_description("Allow listing files"),
-            PermissionRule::allow("cat*").unwrap().with_description("Allow reading files"),
-            PermissionRule::allow("pwd").unwrap().with_description("Allow showing current directory"),
-            PermissionRule::allow("which*").unwrap().with_description("Allow finding commands"),
-            PermissionRule::allow("git status").unwrap().with_description("Allow git status"),
-            PermissionRule::allow("git log*").unwrap().with_description("Allow git log"),
-            PermissionRule::allow("git diff*").unwrap().with_description("Allow git diff"),
-            PermissionRule::allow("git show*").unwrap().with_description("Allow git show"),
-            PermissionRule::allow("cargo check").unwrap().with_description("Allow cargo check"),
-            PermissionRule::allow("cargo test").unwrap().with_description("Allow cargo test"),
-            PermissionRule::allow("cargo build").unwrap().with_description("Allow cargo build"),
-            PermissionRule::allow("npm test").unwrap().with_description("Allow npm test"),
-            PermissionRule::allow("npm run build").unwrap().with_description("Allow npm build"),
-            PermissionRule::allow("find*").unwrap().with_description("Allow finding files"),
-            PermissionRule::allow("grep*").unwrap().with_description("Allow grep search"),
-            PermissionRule::allow("head*").unwrap().with_description("Allow head command"),
-            PermissionRule::allow("tail*").unwrap().with_description("Allow tail command"),
-            PermissionRule::allow("wc*").unwrap().with_description("Allow word count"),
-            PermissionRule::allow("sort*").unwrap().with_description("Allow sort"),
-            PermissionRule::allow("uniq*").unwrap().with_description("Allow uniq"),
-            PermissionRule::deny("rm -rf /*").unwrap().with_description("Prevent catastrophic deletion"),
-            PermissionRule::deny("rm -rf /").unwrap().with_description("Prevent root deletion"),
-            PermissionRule::deny("chmod 777 /*").unwrap().with_description("Prevent global permission changes"),
-            PermissionRule::deny("chmod 777 /").unwrap().with_description("Prevent root permission changes"),
-            PermissionRule::deny("sudo *").unwrap().with_description("Prevent sudo usage"),
-            PermissionRule::deny("su *").unwrap().with_description("Prevent su usage"),
-            PermissionRule::deny("passwd*").unwrap().with_description("Prevent password changes"),
+            PermissionRule::allow("echo*")
+                .unwrap()
+                .with_description("Allow echo commands"),
+            PermissionRule::allow("ls*")
+                .unwrap()
+                .with_description("Allow listing files"),
+            PermissionRule::allow("cat*")
+                .unwrap()
+                .with_description("Allow reading files"),
+            PermissionRule::allow("pwd")
+                .unwrap()
+                .with_description("Allow showing current directory"),
+            PermissionRule::allow("which*")
+                .unwrap()
+                .with_description("Allow finding commands"),
+            PermissionRule::allow("git status")
+                .unwrap()
+                .with_description("Allow git status"),
+            PermissionRule::allow("git log*")
+                .unwrap()
+                .with_description("Allow git log"),
+            PermissionRule::allow("git diff*")
+                .unwrap()
+                .with_description("Allow git diff"),
+            PermissionRule::allow("git show*")
+                .unwrap()
+                .with_description("Allow git show"),
+            PermissionRule::allow("cargo check")
+                .unwrap()
+                .with_description("Allow cargo check"),
+            PermissionRule::allow("cargo test")
+                .unwrap()
+                .with_description("Allow cargo test"),
+            PermissionRule::allow("cargo build")
+                .unwrap()
+                .with_description("Allow cargo build"),
+            PermissionRule::allow("npm test")
+                .unwrap()
+                .with_description("Allow npm test"),
+            PermissionRule::allow("npm run build")
+                .unwrap()
+                .with_description("Allow npm build"),
+            PermissionRule::allow("find*")
+                .unwrap()
+                .with_description("Allow finding files"),
+            PermissionRule::allow("grep*")
+                .unwrap()
+                .with_description("Allow grep search"),
+            PermissionRule::allow("head*")
+                .unwrap()
+                .with_description("Allow head command"),
+            PermissionRule::allow("tail*")
+                .unwrap()
+                .with_description("Allow tail command"),
+            PermissionRule::allow("wc*")
+                .unwrap()
+                .with_description("Allow word count"),
+            PermissionRule::allow("sort*")
+                .unwrap()
+                .with_description("Allow sort"),
+            PermissionRule::allow("uniq*")
+                .unwrap()
+                .with_description("Allow uniq"),
+            PermissionRule::deny("rm -rf /*")
+                .unwrap()
+                .with_description("Prevent catastrophic deletion"),
+            PermissionRule::deny("rm -rf /")
+                .unwrap()
+                .with_description("Prevent root deletion"),
+            PermissionRule::deny("chmod 777 /*")
+                .unwrap()
+                .with_description("Prevent global permission changes"),
+            PermissionRule::deny("chmod 777 /")
+                .unwrap()
+                .with_description("Prevent root permission changes"),
+            PermissionRule::deny("sudo *")
+                .unwrap()
+                .with_description("Prevent sudo usage"),
+            PermissionRule::deny("su *")
+                .unwrap()
+                .with_description("Prevent su usage"),
+            PermissionRule::deny("passwd*")
+                .unwrap()
+                .with_description("Prevent password changes"),
         ];
 
         Self::new(rules)
@@ -275,23 +343,31 @@ mod tests {
     #[test]
     fn test_working_directory_permissions() {
         let permissions = BashPermissions::default();
-        
-        assert!(permissions.check_working_directory(Path::new("/tmp")).is_ok());
-        assert!(permissions.check_working_directory(Path::new("/home/user")).is_ok());
-        assert!(permissions.check_working_directory(Path::new("/etc")).is_err());
-        assert!(permissions.check_working_directory(Path::new("/root")).is_err());
+
+        assert!(permissions
+            .check_working_directory(Path::new("/tmp"))
+            .is_ok());
+        assert!(permissions
+            .check_working_directory(Path::new("/home/user"))
+            .is_ok());
+        assert!(permissions
+            .check_working_directory(Path::new("/etc"))
+            .is_err());
+        assert!(permissions
+            .check_working_directory(Path::new("/root"))
+            .is_err());
     }
 
     #[test]
     fn test_default_permissions() {
         let permissions = BashPermissions::default();
-        
+
         // Should allow safe commands
         assert!(permissions.check_command("echo hello").is_ok());
         assert!(permissions.check_command("ls -la").is_ok());
         assert!(permissions.check_command("git status").is_ok());
         assert!(permissions.check_command("cargo check").is_ok());
-        
+
         // Should deny dangerous commands
         assert!(permissions.check_command("rm -rf /").is_err());
         assert!(permissions.check_command("sudo rm -rf /").is_err());
@@ -301,17 +377,19 @@ mod tests {
     #[test]
     fn test_bash_permissions_custom_rules() {
         let mut perms = BashPermissions::default();
-        
+
         // Add custom allow rule
-        let allow_rule = PermissionRule::allow("make*").unwrap()
+        let allow_rule = PermissionRule::allow("make*")
+            .unwrap()
             .with_description("Allow make commands");
         perms.add_rule(allow_rule);
-        
+
         // Add custom deny rule
-        let deny_rule = PermissionRule::deny("docker*").unwrap()
+        let deny_rule = PermissionRule::deny("docker*")
+            .unwrap()
             .with_description("Block docker commands");
         perms.add_rule(deny_rule);
-        
+
         assert!(perms.is_command_allowed("make build"));
         assert!(!perms.is_command_allowed("docker run ubuntu"));
     }
@@ -320,14 +398,14 @@ mod tests {
     fn test_bash_permissions_working_directory() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let allowed_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let perms = BashPermissions::default()
-            .with_allowed_working_dirs(vec![allowed_path.clone()]);
-        
+
+        let perms =
+            BashPermissions::default().with_allowed_working_dirs(vec![allowed_path.clone()]);
+
         // Should allow commands in allowed directory
         let allowed_cmd = format!("cd {}", allowed_path);
         assert!(perms.is_command_allowed(&allowed_cmd));
-        
+
         // Should block commands outside allowed directory
         assert!(!perms.is_command_allowed("cd /etc"));
         assert!(!perms.is_command_allowed("cd /root"));
@@ -336,19 +414,20 @@ mod tests {
     #[test]
     fn test_bash_permissions_rule_management() {
         let mut perms = BashPermissions::default();
-        
+
         // Add rule
-        let rule = PermissionRule::allow("test*").unwrap()
+        let rule = PermissionRule::allow("test*")
+            .unwrap()
             .with_description("Test rule");
         perms.add_rule(rule);
-        
+
         // Check rule was added
         assert_eq!(perms.get_rules().len(), 1);
-        
+
         // Remove rule
         assert!(perms.remove_rule("test*"));
         assert_eq!(perms.get_rules().len(), 0);
-        
+
         // Try to remove non-existent rule
         assert!(!perms.remove_rule("nonexistent*"));
     }
@@ -356,24 +435,24 @@ mod tests {
     #[test]
     fn test_bash_permissions_working_dir_management() {
         let mut perms = BashPermissions::default();
-        
+
         // Add allowed directory
         let dir1 = "/tmp/test1".to_string();
         let dir2 = "/tmp/test2".to_string();
-        
+
         perms.add_allowed_working_dir(dir1.clone());
         perms.add_allowed_working_dir(dir2.clone());
-        
+
         assert_eq!(perms.get_allowed_working_dirs().len(), 2);
         assert!(perms.get_allowed_working_dirs().contains(&dir1));
         assert!(perms.get_allowed_working_dirs().contains(&dir2));
-        
+
         // Remove allowed directory
         assert!(perms.remove_allowed_working_dir(&dir1));
         assert_eq!(perms.get_allowed_working_dirs().len(), 1);
         assert!(!perms.get_allowed_working_dirs().contains(&dir1));
         assert!(perms.get_allowed_working_dirs().contains(&dir2));
-        
+
         // Try to remove non-existent directory
         assert!(!perms.remove_allowed_working_dir("/nonexistent"));
     }
@@ -381,12 +460,12 @@ mod tests {
     #[test]
     fn test_command_sanitization() {
         let perms = BashPermissions::default();
-        
+
         // Test command sanitization
         assert!(perms.is_command_allowed("echo hello"));
         assert!(perms.is_command_allowed("echo 'hello world'"));
         assert!(perms.is_command_allowed("echo \"hello world\""));
-        
+
         // Test dangerous command patterns
         assert!(!perms.is_command_allowed("rm -rf /"));
         assert!(!perms.is_command_allowed("sudo rm -rf /"));
@@ -399,16 +478,16 @@ mod tests {
     #[test]
     fn test_pattern_matching_edge_cases() {
         let perms = BashPermissions::default();
-        
+
         // Test exact matches
         assert!(perms.is_command_allowed("git"));
         assert!(perms.is_command_allowed("ls"));
         assert!(perms.is_command_allowed("cargo"));
-        
+
         // Test partial matches (should not match)
         assert!(perms.is_command_allowed("git-status")); // This is actually safe
         assert!(perms.is_command_allowed("ls-l")); // This is actually safe
-        
+
         // Test complex patterns
         assert!(perms.is_command_allowed("cargo build --release"));
         assert!(perms.is_command_allowed("npm run test"));
@@ -418,7 +497,7 @@ mod tests {
     #[test]
     fn test_default_deny_patterns() {
         let perms = BashPermissions::default();
-        
+
         // Test that dangerous patterns are blocked by default
         let dangerous_commands = vec![
             "rm -rf /",
@@ -430,16 +509,20 @@ mod tests {
             "format c:",
             "del /s /q c:\\*.*",
         ];
-        
+
         for cmd in dangerous_commands {
-            assert!(!perms.is_command_allowed(cmd), "Command should be blocked: {}", cmd);
+            assert!(
+                !perms.is_command_allowed(cmd),
+                "Command should be blocked: {}",
+                cmd
+            );
         }
     }
 
     #[test]
     fn test_default_allow_patterns() {
         let perms = BashPermissions::default();
-        
+
         // Test that safe patterns are allowed by default
         let safe_commands = vec![
             "git status",
@@ -457,9 +540,13 @@ mod tests {
             "grep -r \"pattern\" src/",
             "find . -name \"*.rs\"",
         ];
-        
+
         for cmd in safe_commands {
-            assert!(perms.is_command_allowed(cmd), "Command should be allowed: {}", cmd);
+            assert!(
+                perms.is_command_allowed(cmd),
+                "Command should be allowed: {}",
+                cmd
+            );
         }
     }
 }
