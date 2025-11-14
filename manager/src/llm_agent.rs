@@ -30,10 +30,10 @@ impl LlmAgent {
     ) -> Self {
         // Initialize bash permissions with default safe rules
         let bash_permissions = BashPermissions::default();
-        
+
         // Initialize bash executor with 30 second default timeout
-        let bash_executor = BashExecutor::new(bash_permissions, 30)
-            .expect("Failed to initialize bash executor");
+        let bash_executor =
+            BashExecutor::new(bash_permissions, 30).expect("Failed to initialize bash executor");
 
         Self {
             db,
@@ -1307,7 +1307,8 @@ impl LlmAgent {
     /// Create native tool definitions for supported providers
     fn create_native_tool_definitions(&self) -> Vec<crate::llm_client::ToolDefinition> {
         use crate::models::{
-            ApplyPatchRequest, BashRequest, GrepRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest,
+            ApplyPatchRequest, BashRequest, GrepRequest, ListFilesRequest, ReadFileRequest,
+            WriteFileRequest,
         };
 
         // Support progressive testing via environment variable:

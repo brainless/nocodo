@@ -1,16 +1,16 @@
 use crate::bash_executor::BashExecutor;
 use crate::models::{
-    ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, BashRequest, BashResponse, FileInfo,
-    FileType, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
-    ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse, WriteFileRequest,
-    WriteFileResponse,
+    ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, BashRequest, BashResponse,
+    FileInfo, FileType, GrepMatch, GrepRequest, GrepResponse, ListFilesRequest, ListFilesResponse,
+    ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolRequest, ToolResponse,
+    WriteFileRequest, WriteFileResponse,
 };
 use anyhow::Result;
 use base64::Engine;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{UNIX_EPOCH, Instant};
+use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
 
 #[allow(clippy::needless_borrow)]
@@ -58,7 +58,7 @@ impl ToolExecutor {
         Self {
             base_path,
             max_file_size: 1024 * 1024, // 1MB default
-            bash_executor: None, // Bash executor will be initialized separately
+            bash_executor: None,        // Bash executor will be initialized separately
         }
     }
 
@@ -894,7 +894,7 @@ impl ToolExecutor {
         };
 
         let start_time = Instant::now();
-        
+
         // Determine working directory
         let working_dir = if let Some(dir) = &request.working_dir {
             // Validate and resolve the working directory
@@ -920,24 +920,20 @@ impl ToolExecutor {
         let execution_time = start_time.elapsed().as_secs_f64();
 
         match result {
-            Ok(bash_result) => {
-                Ok(ToolResponse::Bash(BashResponse {
-                    command: request.command,
-                    working_dir: request.working_dir,
-                    stdout: bash_result.stdout,
-                    stderr: bash_result.stderr,
-                    exit_code: bash_result.exit_code,
-                    timed_out: bash_result.timed_out,
-                    execution_time_secs: execution_time,
-                }))
-            }
-            Err(e) => {
-                Ok(ToolResponse::Error(ToolErrorResponse {
-                    tool: "bash".to_string(),
-                    error: "BashExecutionError".to_string(),
-                    message: format!("Failed to execute bash command: {}", e),
-                }))
-            }
+            Ok(bash_result) => Ok(ToolResponse::Bash(BashResponse {
+                command: request.command,
+                working_dir: request.working_dir,
+                stdout: bash_result.stdout,
+                stderr: bash_result.stderr,
+                exit_code: bash_result.exit_code,
+                timed_out: bash_result.timed_out,
+                execution_time_secs: execution_time,
+            })),
+            Err(e) => Ok(ToolResponse::Error(ToolErrorResponse {
+                tool: "bash".to_string(),
+                error: "BashExecutionError".to_string(),
+                message: format!("Failed to execute bash command: {}", e),
+            })),
         }
     }
 
