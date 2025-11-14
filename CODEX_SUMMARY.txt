@@ -1,0 +1,315 @@
+CODEX PROJECT ANALYSIS FOR NOCODO BASH TOOL
+============================================
+
+Generated: 2025-11-10
+Analysis Path: ~/Projects/codex
+
+DOCUMENTS CREATED:
+1. CODEX_ANALYSIS.md (790 lines) - Comprehensive technical analysis
+2. CODEX_QUICK_REFERENCE.md - Quick start guide with code patterns
+3. CODEX_SUMMARY.txt - This file
+
+============================================
+TOP RECOMMENDATIONS (Priority Order)
+============================================
+
+MUST ADOPT:
+1. tokio async runtime with timeout handling
+2. Output streaming pattern from codex-core/exec.rs
+3. bash.rs safe command parsing module
+4. process-hardening module for security
+5. Sandbox manager abstraction pattern
+
+SHOULD ADOPT:
+6. async-channel for delta event streaming
+7. landlock filesystem restrictions (Linux)
+8. seccompiler network filtering (Linux)
+9. Event-driven architecture from codex-exec
+
+NICE-TO-HAVE:
+10. portable-pty for interactive sessions
+11. codex-async-utils cancellation trait
+12. codex-protocol types for events
+
+============================================
+KEY FILES TO STUDY (in order)
+============================================
+
+HIGH PRIORITY (Core Patterns):
+- /home/brainless/Projects/codex/codex-rs/core/src/exec.rs (693 lines)
+  → Timeout handling (508-527)
+  → Output streaming (493-604)
+  → Real-time delta events (552-604)
+
+- /home/brainless/Projects/codex/codex-rs/core/src/bash.rs (290+ lines)
+  → Safe command parsing (24-89)
+  → Tree-sitter integration
+
+- /home/brainless/Projects/codex/codex-rs/process-hardening/src/lib.rs (115 lines)
+  → Process hardening (27-92)
+  → Platform-specific security
+
+- /home/brainless/Projects/codex/codex-rs/core/src/spawn.rs (108 lines)
+  → Process spawning (38-107)
+  → Parent death signal (68-86)
+
+MEDIUM PRIORITY (Sandboxing):
+- /home/brainless/Projects/codex/codex-rs/linux-sandbox/src/landlock.rs (146 lines)
+  → Filesystem restrictions (59-82)
+  → Network seccomp filter (87-145)
+
+- /home/brainless/Projects/codex/codex-rs/core/src/sandboxing/mod.rs
+  → Sandbox manager pattern (64-150)
+
+LOW PRIORITY (Advanced/Optional):
+- /home/brainless/Projects/codex/codex-rs/exec/src/lib.rs
+  → Event loop architecture
+- /home/brainless/Projects/codex/codex-rs/utils/pty/src/lib.rs
+  → Interactive PTY handling
+- /home/brainless/Projects/codex/codex-rs/windows-sandbox-rs/src/lib.rs
+  → Windows-specific sandbox
+
+============================================
+CRITICAL PATTERNS (Copy These)
+============================================
+
+Pattern 1: Timeout with Signal Handling
+├─ Location: core/src/exec.rs:508-527
+├─ Uses: tokio::select!, tokio::time::timeout()
+├─ Key: Multiplexes process completion, timeout, Ctrl+C
+└─ Reusability: 5/5 ⭐⭐⭐⭐⭐
+
+Pattern 2: Real-Time Output Streaming  
+├─ Location: core/src/exec.rs:493-604
+├─ Uses: async-channel, tokio::spawn, BufReader
+├─ Key: Concurrent stdout/stderr reading with capped deltas
+└─ Reusability: 5/5 ⭐⭐⭐⭐⭐
+
+Pattern 3: Delta Event Emission
+├─ Location: core/src/exec.rs:552-604
+├─ Uses: AsyncRead, EventMsg, channel send
+├─ Key: Emit events while process running, not after
+└─ Reusability: 5/5 ⭐⭐⭐⭐⭐
+
+Pattern 4: Cross-Platform Sandbox
+├─ Location: core/src/sandboxing/mod.rs:88-142
+├─ Uses: match on SandboxType, conditional wrapping
+├─ Key: Unified interface for Linux/macOS/Windows
+└─ Reusability: 5/5 ⭐⭐⭐⭐⭐
+
+Pattern 5: Safe Bash Parsing
+├─ Location: core/src/bash.rs:24-89
+├─ Uses: tree-sitter, node validation
+├─ Key: Only accepts simple commands + safe operators
+└─ Reusability: 5/5 ⭐⭐⭐⭐⭐
+
+============================================
+IMPLEMENTATION ROADMAP
+============================================
+
+Phase 1: Core (1-2 weeks)
+├─ Add tokio dependencies
+├─ Implement timeout + signal handling
+├─ Add output streaming with channels
+├─ Copy bash parsing module
+└─ Implement basic bash tool
+
+Phase 2: Enhancement (1 week)
+├─ Add real-time delta events
+├─ Implement EventProcessor trait
+├─ Add human + JSON output formats
+└─ Performance tuning
+
+Phase 3: Linux Sandboxing (2 weeks)
+├─ Add landlock/seccompiler deps
+├─ Either:
+│  ├─ Option A: Embed codex-linux-sandbox directly
+│  ├─ Option B: Wrap as external binary
+│  └─ Option C: Copy patterns for custom impl
+└─ Test sandbox restrictions
+
+Phase 4: Cross-Platform (3 weeks)
+├─ Windows: Integrate windows-sandbox
+├─ macOS: Implement Seatbelt wrapper
+└─ Implement SandboxManager abstraction
+
+Phase 5: Hardening (1 week)
+├─ Integrate process-hardening module
+├─ Add PR_SET_PDEATHSIG for child cleanup
+└─ Security audit
+
+Total Estimate: 8-9 weeks for fully featured implementation
+
+============================================
+EXTERNAL CRATES TO ADOPT
+============================================
+
+Runtime & Async:
+├─ tokio v1.x (5/5) - Essential for async process mgmt
+├─ async-channel v2.3 (4/5) - Output streaming channels
+└─ async-trait v0.1 (3/5) - Nice-to-have utility
+
+Linux Sandbox:
+├─ landlock v0.4 (4/5) - Filesystem restrictions
+├─ seccompiler v0.5 (3/5) - Network filtering (optional)
+└─ libc v0.2 (4/5) - Process hardening
+
+Parsing & Validation:
+├─ tree-sitter v0.25 (4/5) - Bash parsing
+├─ tree-sitter-bash v0.25 (4/5) - Grammar
+└─ shlex v1.3 (4/5) - Arg parsing
+
+Platform-Specific:
+├─ portable-pty v0.9 (3/5) - PTY support (optional)
+├─ windows-sys v0.52 (4/5) - Windows sandbox
+└─ core-foundation v0.9 (3/5) - macOS support
+
+============================================
+INTERNAL CODEX CRATES - REUSABILITY
+============================================
+
+Tier 1 (Direct Reuse):
+├─ codex-core:exec ⭐⭐⭐⭐⭐ - Core execution engine
+├─ codex-core:bash ⭐⭐⭐⭐⭐ - Safe bash parsing
+├─ codex-linux-sandbox ⭐⭐⭐⭐⭐ - Linux sandbox
+└─ codex-process-hardening ⭐⭐⭐⭐ - Security hardening
+
+Tier 2 (Reference/Adapt):
+├─ codex-exec ⭐⭐⭐⭐⭐ - Event-driven architecture
+├─ codex-core:spawn ⭐⭐⭐⭐ - Process spawning
+├─ codex-core:sandboxing ⭐⭐⭐⭐ - Sandbox abstraction
+└─ codex-async-utils ⭐⭐⭐ - Cancellation utility
+
+Tier 3 (Optional/Advanced):
+├─ codex-utils-pty ⭐⭐⭐ - Interactive PTY
+├─ codex-windows-sandbox ⭐⭐⭐⭐ - Windows sandbox
+└─ codex-protocol ⭐⭐⭐ - Event protocol
+
+============================================
+CODE COPY CHECKLIST
+============================================
+
+exec.rs Functions (MUST COPY):
+├─ consume_truncated_output() - Main streaming
+├─ read_capped() - Delta event emission
+├─ timeout enforcement (tokio::select! pattern)
+└─ process_exec_tool_call() - High-level interface
+
+bash.rs Functions (MUST COPY):
+├─ try_parse_shell() - Parser init
+├─ try_parse_word_only_commands_sequence() - Validation
+└─ parse_shell_lc_plain_commands() - Main parsing entry
+
+process-hardening/lib.rs (MUST COPY):
+├─ pre_main_hardening() - Entry point
+├─ pre_main_hardening_linux() - Linux hardening
+└─ set_core_file_size_limit_to_zero() - Helper
+
+spawn.rs Functions (SHOULD COPY):
+├─ spawn_child_async() - Process spawning
+└─ pre_exec() block for parent death signal
+
+linux-sandbox/landlock.rs (SHOULD COPY):
+├─ apply_sandbox_policy_to_current_thread() - Dispatcher
+├─ install_filesystem_landlock_rules_on_current_thread() - FS ACLs
+└─ install_network_seccomp_filter_on_current_thread() - Network
+
+============================================
+TESTING REQUIREMENTS
+============================================
+
+Unit Tests:
+├─ Command execution (exit codes, output)
+├─ Timeout enforcement
+├─ Output streaming (complete capture)
+├─ Bash parsing (valid/invalid commands)
+└─ Sandbox restrictions (if enabled)
+
+Integration Tests:
+├─ Long-running commands with streaming
+├─ Timeout + output capture
+├─ Multiple concurrent executions
+├─ Child process cleanup on parent exit
+├─ Cross-platform execution
+└─ Sandbox + output combination
+
+Performance Tests:
+├─ Simple command execution latency
+├─ Output streaming throughput
+├─ Sandbox overhead measurement
+├─ Memory usage under load
+└─ Large output handling
+
+============================================
+COMMON PITFALLS (DO NOT MAKE THESE MISTAKES)
+============================================
+
+1. ❌ Blocking on output reading
+   ✓ Use async I/O with tokio
+   ✓ Emit events while process running
+   ✓ Don't await on process for output
+
+2. ❌ Ignoring timeouts
+   ✓ Use tokio::time::timeout() everywhere
+   ✓ Call child.start_kill() on timeout
+   ✓ Track timed_out flag in output
+
+3. ❌ Platform-agnostic sandbox handling
+   ✓ Use conditional compilation
+   ✓ Each OS has different mechanisms
+   ✓ Implement SandboxManager abstraction
+
+4. ❌ Leaking child processes
+   ✓ Set PR_SET_PDEATHSIG on Linux
+   ✓ Use job objects on Windows
+   ✓ Enable kill_on_drop
+
+5. ❌ Trusting user bash input
+   ✓ Use bash.rs safe parsing
+   ✓ Only allow simple commands
+   ✓ Reject complex constructs
+
+============================================
+REFERENCES & CONTACT
+============================================
+
+Codex Repository:
+└─ /home/brainless/Projects/codex/
+
+Codex Rust Code:
+└─ /home/brainless/Projects/codex/codex-rs/
+
+Documentation Files (in nocodo/):
+├─ CODEX_ANALYSIS.md - Full technical details
+├─ CODEX_QUICK_REFERENCE.md - Code patterns
+└─ CODEX_SUMMARY.txt - This file
+
+For Implementation Help:
+1. Read CODEX_ANALYSIS.md for context
+2. Check CODEX_QUICK_REFERENCE.md for patterns
+3. Look at line numbers referenced
+4. Study Codex source directly (well-documented)
+5. Test incrementally, pattern by pattern
+
+============================================
+ESTIMATED EFFORT & TIMELINE
+============================================
+
+Analysis Complete: 2025-11-10
+Documentation Created: 790 lines + quick ref + summary
+
+Development Effort (Experienced Rust Dev):
+├─ Phase 1 (Core): 5-10 days
+├─ Phase 2 (Enhanced): 3-5 days
+├─ Phase 3 (Linux): 5-8 days
+├─ Phase 4 (Cross-platform): 7-10 days
+├─ Phase 5 (Hardening): 2-3 days
+└─ Total: 22-36 days (1-1.5 months)
+
+With Codex Reference Material:
+└─ Estimated 30-40% time savings vs. from scratch
+
+============================================
+
+Analysis completed successfully!
+Check nocodo/ directory for detailed documentation.

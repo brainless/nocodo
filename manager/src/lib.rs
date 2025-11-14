@@ -1,4 +1,6 @@
 pub mod auth;
+pub mod bash_executor;
+pub mod bash_permissions;
 pub mod config;
 pub mod database;
 pub mod error;
