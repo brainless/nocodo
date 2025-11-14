@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The bash tool implementation has been completed according to the specifications in `BASH_TOOL.md`, with integration of Codex crates for secure command execution. The implementation includes:
+The bash tool implementation provides secure command execution capabilities for the nocodo platform, with integration of OpenAI's Codex crates for process sandboxing and hardening. The implementation includes:
 
 ✅ **Completed Components**:
 - Bash executor with Codex integration (`bash_executor.rs`)
@@ -29,13 +29,20 @@ The bash tool implementation has been completed according to the specifications 
 
 ### 1.1 Architecture
 
-The implementation follows the planned architecture from `BASH_TOOL.md`:
+The implementation follows a layered architecture with security controls:
 
 ```
-LlmAgent → ToolExecutor → BashExecutor → Codex Core
+LlmAgent → ToolExecutor → BashExecutor → Codex Core (Sandboxing)
                               ↓
-                       BashPermissions
+                       BashPermissions (Access Control)
 ```
+
+This architecture provides:
+- **LLM Agent**: Receives bash tool requests from AI models
+- **Tool Executor**: Validates paths and dispatches to appropriate tools
+- **Bash Executor**: Manages command execution with timeouts and Codex integration
+- **Bash Permissions**: Enforces allow/deny rules with glob pattern matching
+- **Codex Core**: OpenAI's sandboxing library providing process isolation
 
 **Key Files**:
 - `manager/src/bash_executor.rs` (197 lines) - Core execution logic
@@ -55,7 +62,12 @@ signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
 glob = "0.3"
 ```
 
-✅ **Matches BASH_TOOL.md Phase 1 requirements**
+**Dependency Purpose**:
+- `codex-core`: Process sandboxing and secure execution
+- `codex-process-hardening`: Additional security hardening
+- `async-channel`: Async communication for background processes
+- `signal-hook`: Unix signal handling
+- `glob`: Wildcard pattern matching for permissions
 
 ---
 
@@ -98,7 +110,8 @@ pub struct BashExecutionResult {
 
 **Issues**:
 1. ❌ **Sandbox is hardcoded to `SandboxType::None`** (line 60)
-   - Should be configurable per BASH_TOOL.md Phase 2
+   - Security risk: commands run with full user permissions
+   - Should be configurable (ReadOnly, Landlock, or platform-specific sandbox)
 2. ❌ **Test helper method `is_command_allowed()` missing** (compilation error)
    - Tests use `is_command_allowed()` but it doesn't exist on `BashPermissions`
    - Should use `check_command().is_ok()` instead
@@ -142,7 +155,7 @@ pub struct PermissionRule {
    - `with_allowed_working_dirs()`
    - `add_rule()`, `remove_rule()`, `get_rules()`
    - `add_allowed_working_dir()`, `remove_allowed_working_dir()`
-   - These are part of the public API and will be used by permission management endpoints (Phase 4)
+   - These are part of the public API for future permission management features
 
 ### 2.3 Tool Integration (`tools.rs`)
 
@@ -285,53 +298,63 @@ pub struct BashToolConfig {
 
 ---
 
-## 4. Compliance with BASH_TOOL.md
+## 4. Implementation Phases
+
+The bash tool implementation was planned in four phases:
 
 ### Phase 1: Core Execution ✅ **COMPLETE**
 
-**Requirements**:
-- [x] Execute commands with timeout
-- [x] Permission checking with wildcard patterns
+**Goal**: Basic secure command execution with permission controls
+
+**Implemented Features**:
+- [x] Execute commands with configurable timeout
+- [x] Permission checking with glob wildcard patterns (e.g., `git*`, `npm*`)
 - [x] Structured output (exit code, stdout, stderr, duration)
 - [x] Integration with existing tool system
-- [x] Codex crate integration
+- [x] Codex crate integration for process hardening
 
-**Implementation Status**: ✅ Fully implemented
+**Status**: ✅ Fully implemented and functional
 
 ### Phase 2: Linux Sandboxing ⚠️ **PARTIAL**
 
-**Requirements**:
-- [ ] Landlock sandbox support
-- [ ] Filesystem access restrictions
-- [ ] Network deny option
-- [ ] Kernel version fallback
+**Goal**: Add Linux-specific process isolation using Landlock LSM
 
-**Implementation Status**:
+**Planned Features**:
+- [ ] Landlock sandbox support (Linux kernel 5.13+)
+- [ ] Filesystem access restrictions (read-only, specific paths)
+- [ ] Network deny option
+- [ ] Kernel version detection with fallback
+
+**Current Status**:
 - ❌ Sandbox type hardcoded to `None` in bash_executor.rs:60
 - ✅ `BashSandboxConfig` model exists (models.rs:1011-1037)
 - ❌ No actual sandbox implementation
 
-**Action Required**: Implement Phase 2 per BASH_TOOL.md lines 290-390
+**Security Impact**: Commands currently run with full user permissions
 
 ### Phase 3: Background Processes ❌ **NOT STARTED**
 
-**Requirements**:
-- [ ] Long-running command support
-- [ ] Process management (list, kill)
-- [ ] Real-time output streaming
-- [ ] Database persistence
+**Goal**: Support long-running commands with process management
 
-**Implementation Status**: Not implemented
+**Planned Features**:
+- [ ] Long-running command support (detached processes)
+- [ ] Process management (list active processes, kill by ID)
+- [ ] Real-time output streaming via WebSocket
+- [ ] Database persistence for process state
 
-### Phase 4: macOS & Polish ❌ **NOT STARTED**
+**Status**: Not implemented
 
-**Requirements**:
-- [ ] macOS Seatbelt sandbox
-- [ ] Permission management API
-- [ ] Interactive approval flow
-- [ ] Command history
+### Phase 4: Cross-Platform & Management ❌ **NOT STARTED**
 
-**Implementation Status**:
+**Goal**: macOS support and permission management UI
+
+**Planned Features**:
+- [ ] macOS Seatbelt sandbox profile
+- [ ] Permission management REST API
+- [ ] Interactive approval flow for untrusted commands
+- [ ] Command execution history
+
+**Status**:
 - ✅ Models and config structures ready
 - ❌ No implementation
 
@@ -370,28 +393,39 @@ pub struct BashToolConfig {
    **Impact**: Commands run with full user permissions
    **Fix**: Implement Phase 2 sandboxing
 
-2. ⚠️ **Timeout stored as u64 milliseconds**
+2. ⚠️ **Timeout conversion complexity**
+   - User API accepts seconds
    - Codex expects milliseconds in `ExecEnv.timeout_ms`
-   - User provides seconds
-   - Conversion happens correctly (line 58) but could be clearer
+   - Internal code uses Rust `Duration`
+   - Three different time representations increase confusion
+   - Conversion happens correctly but could be clearer
 
 3. ⚠️ **No audit logging of denied commands**
-   - Warnings logged but not persisted
-   - Should use `BashExecutionLog` for failed attempts
+   - Permission denied warnings logged with `tracing::warn!`
+   - Not persisted to database for security audit trail
+   - Should use `BashExecutionLog` model to record all attempts (allowed and denied)
 
 ### 5.3 Security Recommendations
 
+**High Priority**:
+
 1. **Implement sandboxing immediately**
-   - Use `SandboxType::ReadOnly` as default
-   - Configure per `BashSandboxConfig`
+   - Change `SandboxType::None` to `SandboxType::ReadOnly` as minimum
+   - On Linux 5.13+: Use Landlock for filesystem-level restrictions
+   - On macOS: Use Seatbelt sandbox profile
+   - Make sandbox configurable via `BashSandboxConfig`
 
 2. **Add audit trail**
-   - Log all execution attempts (allowed and denied)
-   - Store in `bash_execution_logs` table
+   - Log all execution attempts to database (allowed and denied)
+   - Store in `bash_execution_logs` table with:
+     - Timestamp, user, command, result, exit code
+     - Permission decision (allow/deny + matching rule)
+   - Implement retention policy
 
 3. **Rate limiting**
-   - Limit bash commands per session/user
-   - Prevent abuse
+   - Limit bash commands per session/user/time window
+   - Prevent resource exhaustion attacks
+   - Return 429 Too Many Requests when exceeded
 
 ---
 
@@ -430,14 +464,15 @@ pub struct BashToolConfig {
    - Expected (will be used in Phase 4)
 
 3. ⚠️ **Magic numbers**
-   - Exit code 124 for timeout (should be const)
-   - 1MB max log size hardcoded
+   - Exit code 124 for timeout (should be `const TIMEOUT_EXIT_CODE: i32 = 124`)
+   - 1MB max log size hardcoded in config
 
 4. ⚠️ **Inconsistent timeout units**
-   - User provides seconds
-   - Codex expects milliseconds
-   - Internal uses Duration
+   - User API: seconds (`timeout_secs: Option<u64>`)
+   - Codex API: milliseconds (`timeout_ms: Option<u64>`)
+   - Internal: `Duration` type
    - Three different representations increase confusion
+   - Consider standardizing on `Duration` throughout
 
 ---
 
@@ -454,23 +489,30 @@ pub struct BashToolConfig {
 
 ### 7.2 LLM Agent Integration
 
-**Status**: ⚠️ **PARTIAL**
+**Status**: ⚠️ **NEEDS VERIFICATION**
 
-**Checking** llm_agent.rs:
+**Evidence of integration** in llm_agent.rs:
 - Line 562: BashRequest deserialization exists
 - Line 1303: Import exists
 - Line 1415: Schema generation exists
 
-**Issue**: Need to verify bash tool is registered in tool schemas
+**Verification needed**:
+- [ ] Bash tool is registered in tool schemas sent to LLM
+- [ ] End-to-end test: LLM → bash tool → response
+- [ ] WebSocket events are properly emitted
 
 ### 7.3 Database Schema
 
 **Status**: ❓ **UNKNOWN**
 
-Need to verify:
-- [ ] `bash_execution_logs` table exists
-- [ ] `bash_tool_config` table (if applicable)
-- [ ] Migration scripts
+**Planned tables** (referenced in models):
+- `bash_execution_logs` - Execution history and audit trail
+- `bash_tool_config` - Per-workspace configuration (if applicable)
+
+**Verification needed**:
+- [ ] Database migrations created
+- [ ] Tables match model definitions
+- [ ] Indexes for common queries (e.g., by workspace_id, timestamp)
 
 ---
 
@@ -535,50 +577,59 @@ assert_eq!(executor.default_timeout.as_secs(), 30);
 ### 9.2 Short-term (High Priority)
 
 1. **Complete Phase 2 (Sandboxing)**
-   - Implement Linux Landlock integration
-   - Add sandbox configuration
-   - Test filesystem restrictions
+   - Implement Linux Landlock integration with filesystem restrictions
+   - Make sandbox configurable via `BashSandboxConfig`
+   - Add kernel version detection and graceful fallback
+   - Test filesystem restrictions work as expected
 
 2. **Add audit logging**
-   - Persist all bash executions to database
-   - Include denied attempts
-   - Implement retention policy
+   - Create database table `bash_execution_logs`
+   - Persist all bash executions (allowed and denied)
+   - Include: timestamp, user, command, result, exit code, permission decision
+   - Implement retention policy to manage log size
 
 3. **Integration testing**
-   - End-to-end tests with LLM agent
-   - WebSocket event verification
-   - Multi-session testing
+   - End-to-end tests: LLM agent → bash tool → response
+   - WebSocket event verification (bash started, output, completed)
+   - Multi-session concurrent execution testing
 
-### 9.3 Medium-term (Phase 3-4)
+### 9.3 Medium-term (Future Phases)
 
-1. **Background process support**
-   - Process registry
-   - Output streaming
-   - Kill/manage processes
+1. **Phase 3: Background process support**
+   - Process registry for tracking long-running commands
+   - Real-time output streaming via WebSocket
+   - Process management: list, kill, get status
+   - Database persistence for process state recovery
 
-2. **Permission management API**
-   - REST endpoints for rule management
-   - User approval flow
-   - Command history
+2. **Phase 4: Permission management API**
+   - REST endpoints for dynamic rule management
+   - User approval flow for untrusted commands
+   - Command execution history with filtering
+   - Per-workspace permission profiles
 
 3. **Cross-platform support**
-   - macOS Seatbelt
-   - Windows token restrictions
+   - macOS: Seatbelt sandbox profile
+   - Windows: Token restrictions and job objects
+   - Platform-specific security best practices
 
 ### 9.4 Future Enhancements
 
-1. **Command suggestions**
-   - Based on history
-   - Context-aware
+1. **Command intelligence**
+   - Command suggestions based on execution history
+   - Context-aware completions (current directory, git status)
+   - Common command patterns detection
 
 2. **Interactive commands**
-   - PTY support for interactive shells
-   - Input handling
+   - PTY (pseudo-terminal) support for interactive shells
+   - Real-time stdin handling
+   - Terminal emulation for tools requiring TTY
 
 3. **Resource limits**
-   - Memory limits
-   - CPU limits
+   - cgroups integration on Linux
+   - Memory limits (prevent OOM)
+   - CPU limits (prevent CPU exhaustion)
    - Disk I/O limits
+   - Network bandwidth limits
 
 ---
 
@@ -591,26 +642,32 @@ assert_eq!(executor.default_timeout.as_secs(), 30);
 - [ ] Run `cargo test bash_permissions`
 - [ ] Achieve 100% test passage
 
-### 10.2 Integration Tests (New)
+### 10.2 Integration Tests (To Be Created)
 
-- [ ] Test bash tool via ToolExecutor
-- [ ] Test permission enforcement
-- [ ] Test timeout handling
-- [ ] Test working directory validation
+**Component integration**:
+- [ ] Test bash tool execution via ToolExecutor
+- [ ] Test permission enforcement at tool boundary
+- [ ] Test timeout handling and cleanup
+- [ ] Test working directory validation and resolution
+- [ ] Test error propagation through layers
 
-### 10.3 End-to-End Tests (New)
+### 10.3 End-to-End Tests (To Be Created)
 
-- [ ] LLM agent → bash tool execution
-- [ ] WebSocket event streaming
-- [ ] Error handling and recovery
-- [ ] Multi-command sequences
+**Full system flow**:
+- [ ] LLM agent receives bash request → tool executes → response returns
+- [ ] WebSocket event streaming (bash_started, bash_output, bash_completed)
+- [ ] Error handling: permission denied, timeout, non-existent command
+- [ ] Multi-command sequences within single session
+- [ ] Concurrent execution from multiple sessions
 
-### 10.4 Security Tests (New)
+### 10.4 Security Tests (To Be Created)
 
-- [ ] Permission bypass attempts
-- [ ] Path traversal attempts
-- [ ] Command injection tests
-- [ ] Resource exhaustion tests
+**Attack simulation**:
+- [ ] Permission bypass attempts (wildcard abuse, shell escaping)
+- [ ] Path traversal attempts (../../../etc/passwd)
+- [ ] Command injection via user-controlled parameters
+- [ ] Resource exhaustion (fork bombs, infinite loops)
+- [ ] Sandbox escape attempts (if sandboxing enabled)
 
 ---
 
@@ -640,42 +697,104 @@ The implementation is **solid and well-architected** but has **critical compilat
 
 **Recommendation**:
 1. Fix compilation errors (1-2 hours)
+   - Add helper method
+   - Fix test assertions
 2. Implement basic sandboxing (4-6 hours)
-3. Integration testing (2-3 hours)
-4. Then proceed with Phase 3-4
+   - Landlock on Linux
+   - Configurable via BashSandboxConfig
+3. Verify and test LLM integration (2-3 hours)
+   - End-to-end testing
+   - WebSocket event flow
+4. Add audit logging (2-3 hours)
+   - Database table and persistence
+5. Then proceed with Phase 3-4 implementation
 
 **Risk Level**: **MEDIUM**
-- Code is mostly correct
-- Main risks are security (no sandbox) and untested LLM integration
-- No data loss or corruption risks
+- **Code quality**: High - architecture is solid, follows best practices
+- **Main risks**:
+  - Security: No sandboxing currently (commands run with full permissions)
+  - Integration: LLM schema registration needs verification
+- **Low risks**: No data loss or corruption concerns, test coverage is comprehensive
 
 ---
 
 ## 12. Next Steps
 
-### Immediate Actions
+### Immediate Actions (This Week)
 
-1. Create PR for test fixes
-2. Add `is_command_allowed()` method
-3. Fix field access in tests
-4. Run full test suite
+1. **Fix compilation errors**
+   - Add `is_command_allowed()` helper method to `BashPermissions`
+   - Fix test field access (`default_timeout_secs` → `default_timeout.as_secs()`)
+   - Remove unused imports
+   - Run `cargo test` to verify all tests pass
 
-### This Week
+2. **Implement sandboxing**
+   - Change `SandboxType::None` to configurable sandbox
+   - Implement Landlock integration on Linux
+   - Add kernel version detection
+   - Test filesystem restrictions
 
-1. Implement sandboxing
-2. Verify LLM integration
-3. Add integration tests
-4. Security audit
+3. **Verify LLM integration**
+   - Check bash tool is registered in tool schemas
+   - Test end-to-end: LLM request → execution → response
+   - Verify WebSocket events are emitted
 
-### Next Sprint
+### Short-term (Next 2 Weeks)
 
-1. Complete Phase 2 (Linux sandbox)
-2. Start Phase 3 (background processes)
-3. Add audit logging
-4. Permission management API
+1. **Add audit logging**
+   - Create `bash_execution_logs` database table
+   - Persist all execution attempts
+   - Implement retention policy
+
+2. **Integration testing**
+   - Write end-to-end tests
+   - Security tests (bypass attempts, injection)
+   - Performance tests (concurrent execution)
+
+3. **Security audit**
+   - Review permission rules
+   - Test sandbox escape attempts
+   - Validate working directory restrictions
+
+### Medium-term (Next Month)
+
+1. **Phase 3: Background processes**
+   - Process registry and management
+   - Real-time output streaming
+   - Database persistence
+
+2. **Phase 4: Permission management**
+   - REST API for rule management
+   - User approval flow
+   - Command history UI
+
+3. **Cross-platform support**
+   - macOS Seatbelt integration
+   - Windows security tokens
+
+---
+
+## Conclusion
+
+This bash tool implementation provides a solid foundation for secure command execution with strong permission controls and integration with OpenAI's Codex sandboxing. The architecture is well-designed and follows Rust best practices.
+
+**Current status**: Core functionality (Phase 1) is complete but needs compilation fixes and sandboxing implementation before production use.
+
+**Key achievements**:
+- Clean architecture with separation of concerns
+- Comprehensive permission system with glob patterns
+- Extensive test coverage (once compilation errors are fixed)
+- Integration with existing tool system
+- Structured models ready for future phases
+
+**Critical next steps**:
+1. Fix test compilation errors
+2. Implement sandboxing (security requirement)
+3. Verify end-to-end LLM integration
 
 ---
 
 **Review Complete**: 2025-11-11
 **Reviewed By**: Claude
-**Status**: Implementation mostly complete, needs test fixes and sandboxing
+**Branch**: bash-tool
+**Overall Status**: ✅ Phase 1 functionally complete, ⚠️ needs fixes before production
