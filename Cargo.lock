@@ -4330,7 +4330,7 @@ dependencies = [
 
 [[package]]
 name = "nocodo-desktop-app"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "base64 0.22.1",
  "chrono",
