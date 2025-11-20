@@ -10,6 +10,12 @@
 - In the User detail modal, team list should be checkboxes (show all tables and select the ones the user is part of)
 - "Update" and "Cancel" buttons in the modal and should update the data or cancel the modal - doing either should refresh the table (with the search filters as they are)
 
+### System setup and management
+- Manage system dependencies, updates (maybe a separate daemon)
+- Manage installation of dependencies needed to run generated code
+- Manage SSH public keys for all users
+- These will be accessible to LLMs using tools
+
 ### Tools for LLM agent
 - Bash tool
 - Save command tool, can be used to save common commands like "Run project"

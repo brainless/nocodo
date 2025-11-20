@@ -1,3 +1,5 @@
+use crate::bash_executor::BashExecutor;
+use crate::bash_permissions::BashPermissions;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::llm_client::{create_llm_client, LlmCompletionRequest, LlmMessage};
@@ -26,10 +28,17 @@ impl LlmAgent {
         project_path: PathBuf,
         config: Arc<AppConfig>,
     ) -> Self {
+        // Initialize bash permissions with default safe rules
+        let bash_permissions = BashPermissions::default();
+
+        // Initialize bash executor with 30 second default timeout
+        let bash_executor =
+            BashExecutor::new(bash_permissions, 30).expect("Failed to initialize bash executor");
+
         Self {
             db,
             ws,
-            tool_executor: ToolExecutor::new(project_path),
+            tool_executor: ToolExecutor::new(project_path).with_bash_executor(bash_executor),
             config,
         }
     }
@@ -417,16 +426,23 @@ impl LlmAgent {
         let work = self.db.get_work_by_id(session.work_id)?;
 
         // Use working_directory if set, otherwise fall back to project.path or default
-        if let Some(working_directory) = work.working_directory {
-            Ok(ToolExecutor::new(PathBuf::from(working_directory)))
+        let mut executor = if let Some(working_directory) = work.working_directory {
+            ToolExecutor::new(PathBuf::from(working_directory))
         } else if let Some(project_id) = work.project_id {
             // Fallback to project path for backward compatibility with old Work items
             let project = self.db.get_project_by_id(project_id)?;
-            Ok(ToolExecutor::new(PathBuf::from(project.path)))
+            ToolExecutor::new(PathBuf::from(project.path))
         } else {
             // Fallback to the default tool executor
-            Ok(ToolExecutor::new(self.tool_executor.base_path().clone()))
+            ToolExecutor::new(self.tool_executor.base_path().clone())
+        };
+
+        // Attach bash executor if available
+        if let Some(bash_executor) = self.tool_executor.bash_executor() {
+            executor = executor.with_bash_executor(bash_executor.clone());
         }
+
+        Ok(executor)
     }
 
     /// Process native tool calls from LLM response
@@ -552,6 +568,23 @@ impl LlmAgent {
                         }
                     }
                 }
+                "bash" => {
+                    match serde_json::from_str::<crate::models::BashRequest>(
+                        &tool_call.function.arguments,
+                    ) {
+                        Ok(request) => crate::models::ToolRequest::Bash(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse bash arguments"
+                            );
+                            continue;
+                        }
+                    }
+                }
                 unknown_function => {
                     tracing::error!(
                         session_id = %session_id,
@@ -577,6 +610,7 @@ impl LlmAgent {
                 crate::models::ToolRequest::WriteFile(_) => "write_file",
                 crate::models::ToolRequest::Grep(_) => "grep",
                 crate::models::ToolRequest::ApplyPatch(_) => "apply_patch",
+                crate::models::ToolRequest::Bash(_) => "bash",
             };
 
             tracing::debug!(
@@ -1276,7 +1310,8 @@ impl LlmAgent {
     /// Create native tool definitions for supported providers
     fn create_native_tool_definitions(&self) -> Vec<crate::llm_client::ToolDefinition> {
         use crate::models::{
-            ApplyPatchRequest, GrepRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest,
+            ApplyPatchRequest, BashRequest, GrepRequest, ListFilesRequest, ReadFileRequest,
+            WriteFileRequest,
         };
 
         // Support progressive testing via environment variable:
@@ -1380,6 +1415,15 @@ impl LlmAgent {
                             name: "apply_patch".to_string(),
                             description: "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format".to_string(),
                             parameters: serde_json::to_value(ApplyPatchRequest::example_schema())
+                                .unwrap_or_default(),
+                        },
+                    },
+                    crate::llm_client::ToolDefinition {
+                        r#type: "function".to_string(),
+                        function: crate::llm_client::FunctionDefinition {
+                            name: "bash".to_string(),
+                            description: "Execute bash commands with timeout and permission checking".to_string(),
+                            parameters: serde_json::to_value(BashRequest::example_schema())
                                 .unwrap_or_default(),
                         },
                     },
