@@ -111,10 +111,6 @@ impl Sidebar {
                         // Bottom navigation (in reverse order since we're going bottom-up)
                         if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg, true) {
                             new_page = Some(UiPage::Servers);
-                            // Check local server when navigating to Servers page
-                            if !state.ui_state.checking_local_server {
-                                self.check_local_server(state);
-                            }
                         }
                         if self.sidebar_link(ui, "Settings", sidebar_bg, button_bg, is_connected) {
                             new_page = Some(UiPage::Settings);
@@ -183,10 +179,5 @@ impl Sidebar {
         );
 
         enabled && response.clicked()
-    }
-
-    fn check_local_server(&self, state: &mut AppState) {
-        state.ui_state.checking_local_server = true;
-        // This will be implemented when we extract the API methods
     }
 }
