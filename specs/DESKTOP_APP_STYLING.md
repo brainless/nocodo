@@ -93,13 +93,9 @@ ui.horizontal(|ui| {
 });
 ```
 
-### Comparison with Non-Updated Forms
+### Applied To
 
-The Register/Login forms (`desktop-app/src/components/auth_dialog.rs`) do NOT follow these specifications:
-- No inner frame margin
-- No consistent vertical spacing between fields (uses default spacing)
-- Text inputs do not have explicit full-width setting
-- Button padding is not explicitly set
-- Section spacing is inconsistent (uses `10.0` pixels in some places but not systematically)
-
-These forms should be updated to match the "+ New Server" modal specifications.
+These specifications have been applied to:
+- "+ New Server" modal in Servers page (`desktop-app/src/components/connection_dialog.rs`)
+- "Connect" form in Servers page (`desktop-app/src/components/connection_dialog.rs`)
+- Register/Login forms (`desktop-app/src/components/auth_dialog.rs`)

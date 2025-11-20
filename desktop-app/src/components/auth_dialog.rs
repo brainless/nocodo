@@ -42,64 +42,87 @@ impl AuthDialog {
             egui::Window::new(title)
                 .collapsible(false)
                 .resizable(false)
+                .fixed_size(egui::vec2(320.0, 0.0))
                 .show(ctx, |ui| {
-                    // Show error message if any
-                    if let Some(ref error) = self.error_message {
-                        ui.colored_label(egui::Color32::RED, error);
-                    }
+                    egui::Frame::NONE
+                        .inner_margin(egui::Margin::same(4))
+                        .show(ui, |ui| {
+                            // Show error message if any
+                            if let Some(ref error) = self.error_message {
+                                ui.colored_label(egui::Color32::RED, error);
+                                ui.add_space(4.0);
+                            }
 
-                    ui.label("Username:");
-                    ui.text_edit_singleline(&mut self.username);
+                            ui.label("Username:");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.username)
+                                    .desired_width(f32::INFINITY)
+                            );
+                            ui.add_space(4.0);
 
-                    if self.is_register_mode {
-                        ui.label("Email (optional):");
-                        ui.text_edit_singleline(&mut self.email);
-                    }
-
-                    ui.label("Password:");
-                    ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
-
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        let button_text = if self.is_register_mode {
-                            "Register"
-                        } else {
-                            "Login"
-                        };
-
-                        if ui.button(button_text).clicked() {
                             if self.is_register_mode {
-                                self.register(state);
-                            } else {
-                                self.login(state);
+                                ui.label("Email (optional):");
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut self.email)
+                                        .desired_width(f32::INFINITY)
+                                );
+                                ui.add_space(4.0);
                             }
-                        }
 
-                        if ui.button("Cancel").clicked() {
-                            state.ui_state.show_auth_dialog = false;
-                            should_close = true;
-                        }
-                    });
+                            ui.label("Password:");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.password)
+                                    .password(true)
+                                    .desired_width(f32::INFINITY)
+                            );
 
-                    ui.add_space(10.0);
+                            ui.separator();
+                            ui.add_space(4.0);
 
-                    // Toggle between login and register
-                    ui.horizontal(|ui| {
-                        if self.is_register_mode {
-                            ui.label("Already have an account?");
-                            if ui.link("Login").clicked() {
-                                self.is_register_mode = false;
-                                self.error_message = None;
-                            }
-                        } else {
-                            ui.label("Don't have an account?");
-                            if ui.link("Register").clicked() {
-                                self.is_register_mode = true;
-                                self.error_message = None;
-                            }
-                        }
-                    });
+                            ui.horizontal(|ui| {
+                                ui.scope(|ui| {
+                                    ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+
+                                    let button_text = if self.is_register_mode {
+                                        "Register"
+                                    } else {
+                                        "Login"
+                                    };
+
+                                    if ui.button(button_text).clicked() {
+                                        if self.is_register_mode {
+                                            self.register(state);
+                                        } else {
+                                            self.login(state);
+                                        }
+                                    }
+
+                                    if ui.button("Cancel").clicked() {
+                                        state.ui_state.show_auth_dialog = false;
+                                        should_close = true;
+                                    }
+                                });
+                            });
+
+                            ui.add_space(10.0);
+
+                            // Toggle between login and register
+                            ui.horizontal(|ui| {
+                                if self.is_register_mode {
+                                    ui.label("Already have an account?");
+                                    if ui.link("Login").clicked() {
+                                        self.is_register_mode = false;
+                                        self.error_message = None;
+                                    }
+                                } else {
+                                    ui.label("Don't have an account?");
+                                    if ui.link("Register").clicked() {
+                                        self.is_register_mode = true;
+                                        self.error_message = None;
+                                    }
+                                }
+                            });
+                        });
                 });
         }
 
