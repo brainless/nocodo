@@ -28,9 +28,12 @@ impl crate::pages::Page for ServersPage {
         // Local server section
         ui.heading("Local server:");
 
-        if ui.button("Refresh Local Server Status").clicked() {
-            self.check_local_server(state);
-        }
+        ui.scope(|ui| {
+            ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+            if ui.button("Refresh Local Server Status").clicked() {
+                self.check_local_server(state);
+            }
+        });
 
         if state.ui_state.checking_local_server {
             ui.horizontal(|ui| {
@@ -144,15 +147,18 @@ impl crate::pages::Page for ServersPage {
                                     }
                                 });
                                 row.col(|ui| {
-                                    if ui.button("Connect").clicked() {
-                                        state.config.ssh.server = server.host.clone();
-                                        state.config.ssh.username = server.user.clone();
-                                        state.config.ssh.port = server.port;
-                                        state.config.ssh.ssh_key_path =
-                                            server.key_path.clone().unwrap_or_default();
-                                        state.ui_state.is_adding_new_server = false;
-                                        state.ui_state.show_connection_dialog = true;
-                                    }
+                                    ui.scope(|ui| {
+                                        ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+                                        if ui.button("Connect").clicked() {
+                                            state.config.ssh.server = server.host.clone();
+                                            state.config.ssh.username = server.user.clone();
+                                            state.config.ssh.port = server.port;
+                                            state.config.ssh.ssh_key_path =
+                                                server.key_path.clone().unwrap_or_default();
+                                            state.ui_state.is_adding_new_server = false;
+                                            state.ui_state.show_connection_dialog = true;
+                                        }
+                                    });
                                 });
                             });
                         }
@@ -163,15 +169,18 @@ impl crate::pages::Page for ServersPage {
         ui.add_space(10.0);
 
         // Add New Server button
-        if ui.button("+ New Server").clicked() {
-            // Clear the form fields and set defaults
-            state.config.ssh.server = String::new();
-            state.config.ssh.username = String::new();
-            state.config.ssh.port = 22;
-            state.config.ssh.ssh_key_path = crate::ssh::get_default_ssh_key_path();
-            state.ui_state.is_adding_new_server = true;
-            state.ui_state.show_connection_dialog = true;
-        }
+        ui.scope(|ui| {
+            ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+            if ui.button("+ New Server").clicked() {
+                // Clear the form fields and set defaults
+                state.config.ssh.server = String::new();
+                state.config.ssh.username = String::new();
+                state.config.ssh.port = 22;
+                state.config.ssh.ssh_key_path = crate::ssh::get_default_ssh_key_path();
+                state.ui_state.is_adding_new_server = true;
+                state.ui_state.show_connection_dialog = true;
+            }
+        });
     }
 }
 

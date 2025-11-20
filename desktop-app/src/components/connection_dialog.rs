@@ -24,68 +24,93 @@ impl ConnectionDialog {
             egui::Window::new("Connect to Server")
                 .collapsible(false)
                 .resizable(false)
+                .fixed_size(egui::vec2(320.0, 0.0))
                 .show(ctx, |ui| {
-                    ui.label("SSH Server:");
-                    ui.text_edit_singleline(&mut state.config.ssh.server);
+                    egui::Frame::NONE
+                        .inner_margin(egui::Margin::same(4))
+                        .show(ui, |ui| {
+                            ui.label("SSH Server:");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut state.config.ssh.server)
+                                    .desired_width(f32::INFINITY)
+                            );
+                            ui.add_space(4.0);
 
-                    ui.label("Username:");
-                    ui.text_edit_singleline(&mut state.config.ssh.username);
+                            ui.label("Username:");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut state.config.ssh.username)
+                                    .desired_width(f32::INFINITY)
+                            );
+                            ui.add_space(4.0);
 
-                    ui.label("Port:");
-                    ui.add(egui::DragValue::new(&mut state.config.ssh.port).range(1..=65535));
+                            ui.label("Port:");
+                            ui.add(egui::DragValue::new(&mut state.config.ssh.port).range(1..=65535));
+                            ui.add_space(4.0);
 
-                    ui.label("SSH Key Path:");
-                    ui.text_edit_singleline(&mut state.config.ssh.ssh_key_path);
+                            ui.label("SSH Key Path:");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut state.config.ssh.ssh_key_path)
+                                    .desired_width(f32::INFINITY)
+                            );
 
-                    // Only show SSH public key when adding a new server
-                    if state.ui_state.is_adding_new_server {
-                        ui.add_space(10.0);
+                            // Only show SSH public key when adding a new server
+                            if state.ui_state.is_adding_new_server {
+                                ui.add_space(10.0);
 
-                        // Display SSH public key
-                        ui.separator();
-                        ui.label(egui::RichText::new("Your SSH Public Key:").strong());
+                                // Display SSH public key
+                                ui.separator();
+                                ui.label(egui::RichText::new("Your SSH Public Key:").strong());
 
-                        let key_path = if state.config.ssh.ssh_key_path.is_empty() {
-                            None
-                        } else {
-                            Some(state.config.ssh.ssh_key_path.as_str())
-                        };
+                                let key_path = if state.config.ssh.ssh_key_path.is_empty() {
+                                    None
+                                } else {
+                                    Some(state.config.ssh.ssh_key_path.as_str())
+                                };
 
-                        match crate::ssh::read_ssh_public_key(key_path) {
-                            Ok(public_key) => {
-                                egui::ScrollArea::vertical()
-                                    .max_height(80.0)
-                                    .show(ui, |ui| {
-                                        ui.add(
-                                            egui::TextEdit::multiline(&mut public_key.as_str())
-                                                .desired_width(f32::INFINITY)
-                                                .font(egui::TextStyle::Monospace)
+                                match crate::ssh::read_ssh_public_key(key_path) {
+                                    Ok(public_key) => {
+                                        egui::ScrollArea::vertical()
+                                            .max_height(80.0)
+                                            .show(ui, |ui| {
+                                                ui.add(
+                                                    egui::TextEdit::multiline(&mut public_key.as_str())
+                                                        .desired_width(f32::INFINITY)
+                                                        .font(egui::TextStyle::Monospace)
+                                                );
+                                            });
+                                    }
+                                    Err(e) => {
+                                        ui.label(
+                                            egui::RichText::new(format!("Could not read public key: {}", e))
+                                                .color(ui.style().visuals.warn_fg_color)
                                         );
-                                    });
-                            }
-                            Err(e) => {
-                                ui.label(
-                                    egui::RichText::new(format!("Could not read public key: {}", e))
-                                        .color(ui.style().visuals.warn_fg_color)
-                                );
-                            }
-                        }
+                                    }
+                                }
 
-                        ui.add_space(10.0);
-                    }
+                                ui.add_space(10.0);
+                            }
 
-                    ui.horizontal(|ui| {
-                        if ui.button("Connect").clicked() {
-                            self.connect(state);
-                            state.ui_state.show_connection_dialog = false;
-                            should_close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            state.ui_state.show_connection_dialog = false;
-                            should_close = true;
-                        }
+                            ui.separator();
+                            ui.add_space(4.0);
+
+                            ui.horizontal(|ui| {
+                                ui.scope(|ui| {
+                                    ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+
+                                    if ui.button("Connect").clicked() {
+                                        self.connect(state);
+                                        state.ui_state.show_connection_dialog = false;
+                                        should_close = true;
+                                    }
+
+                                    if ui.button("Cancel").clicked() {
+                                        state.ui_state.show_connection_dialog = false;
+                                        should_close = true;
+                                    }
+                                });
+                            });
+                        });
                     });
-                });
         }
 
         should_close
