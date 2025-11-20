@@ -309,6 +309,29 @@ async fn handle_tunnel_connection(
     Ok(())
 }
 
+/// Get the default SSH key path that exists on the system
+/// Returns the first existing SSH key path or the default id_rsa path if none exist
+pub fn get_default_ssh_key_path() -> String {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_default();
+
+    let ssh_dir = Path::new(&home).join(".ssh");
+
+    let key_names = vec!["id_ed25519", "id_rsa", "id_ecdsa"];
+
+    // Return the first key that exists
+    for key_name in &key_names {
+        let key_path = ssh_dir.join(key_name);
+        if key_path.exists() {
+            return key_path.to_string_lossy().to_string();
+        }
+    }
+
+    // If no keys exist, return the default id_rsa path
+    ssh_dir.join("id_rsa").to_string_lossy().to_string()
+}
+
 /// Read SSH public key from .pub file
 /// Returns the full public key content
 pub fn read_ssh_public_key(key_path: Option<&str>) -> Result<String, SshError> {
@@ -316,8 +339,10 @@ pub fn read_ssh_public_key(key_path: Option<&str>) -> Result<String, SshError> {
     let key_paths: Vec<String> = if let Some(key_path) = key_path {
         vec![key_path.to_string()]
     } else {
-        // Try default key locations
-        let home = std::env::var("HOME").unwrap_or_default();
+        // Try default key locations - use HOME on Unix, USERPROFILE on Windows
+        let home = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap_or_default();
         vec![
             format!("{}/.ssh/id_rsa", home),
             format!("{}/.ssh/id_ed25519", home),

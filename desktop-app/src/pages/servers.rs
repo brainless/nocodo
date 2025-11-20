@@ -150,6 +150,7 @@ impl crate::pages::Page for ServersPage {
                                         state.config.ssh.port = server.port;
                                         state.config.ssh.ssh_key_path =
                                             server.key_path.clone().unwrap_or_default();
+                                        state.ui_state.is_adding_new_server = false;
                                         state.ui_state.show_connection_dialog = true;
                                     }
                                 });
@@ -157,6 +158,19 @@ impl crate::pages::Page for ServersPage {
                         }
                     });
             });
+        }
+
+        ui.add_space(10.0);
+
+        // Add New Server button
+        if ui.button("+ New Server").clicked() {
+            // Clear the form fields and set defaults
+            state.config.ssh.server = String::new();
+            state.config.ssh.username = String::new();
+            state.config.ssh.port = 22;
+            state.config.ssh.ssh_key_path = crate::ssh::get_default_ssh_key_path();
+            state.ui_state.is_adding_new_server = true;
+            state.ui_state.show_connection_dialog = true;
         }
     }
 }

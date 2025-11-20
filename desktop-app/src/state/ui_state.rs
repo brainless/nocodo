@@ -66,6 +66,9 @@ pub struct UiState {
     /// Flag to trigger servers list refresh after successful SSH connection
     #[serde(skip)]
     pub servers_refresh_needed: Arc<std::sync::Mutex<bool>>,
+    /// Flag to indicate if we're adding a new server (vs connecting to existing)
+    #[serde(skip)]
+    pub is_adding_new_server: bool,
 }
 
 impl Default for UiState {
@@ -100,6 +103,7 @@ impl Default for UiState {
             pending_users_refresh: false,
             pending_teams_refresh: false,
             servers_refresh_needed: Arc::new(std::sync::Mutex::new(false)),
+            is_adding_new_server: false,
         }
     }
 }

@@ -37,6 +37,43 @@ impl ConnectionDialog {
                     ui.label("SSH Key Path:");
                     ui.text_edit_singleline(&mut state.config.ssh.ssh_key_path);
 
+                    // Only show SSH public key when adding a new server
+                    if state.ui_state.is_adding_new_server {
+                        ui.add_space(10.0);
+
+                        // Display SSH public key
+                        ui.separator();
+                        ui.label(egui::RichText::new("Your SSH Public Key:").strong());
+
+                        let key_path = if state.config.ssh.ssh_key_path.is_empty() {
+                            None
+                        } else {
+                            Some(state.config.ssh.ssh_key_path.as_str())
+                        };
+
+                        match crate::ssh::read_ssh_public_key(key_path) {
+                            Ok(public_key) => {
+                                egui::ScrollArea::vertical()
+                                    .max_height(80.0)
+                                    .show(ui, |ui| {
+                                        ui.add(
+                                            egui::TextEdit::multiline(&mut public_key.as_str())
+                                                .desired_width(f32::INFINITY)
+                                                .font(egui::TextStyle::Monospace)
+                                        );
+                                    });
+                            }
+                            Err(e) => {
+                                ui.label(
+                                    egui::RichText::new(format!("Could not read public key: {}", e))
+                                        .color(ui.style().visuals.warn_fg_color)
+                                );
+                            }
+                        }
+
+                        ui.add_space(10.0);
+                    }
+
                     ui.horizontal(|ui| {
                         if ui.button("Connect").clicked() {
                             self.connect(state);
