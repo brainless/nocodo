@@ -27,40 +27,69 @@ impl ProjectsView {
         }
 
         egui::ScrollArea::vertical().show(ui, |ui| {
-            let card_width = 300.0;
+            let card_width = 320.0;
             let card_height = 100.0;
-            let card_spacing = 10.0;
+            let card_spacing = 16.0;
+            let available_width = ui.available_width();
 
-            // Set spacing between items
-            ui.spacing_mut().item_spacing = egui::Vec2::new(card_spacing, card_spacing);
+            // Calculate number of columns (1, 2, or 3) based on available width
+            let num_columns = if available_width >= (card_width * 3.0 + card_spacing * 2.0) {
+                3
+            } else if available_width >= (card_width * 2.0 + card_spacing * 1.0) {
+                2
+            } else {
+                1
+            };
 
-            // Use horizontal_wrapped to automatically create a responsive grid
-            ui.horizontal_wrapped(|ui| {
-                for project in &self.projects {
-                    // Use allocate_ui with fixed size to enable proper wrapping
-                    let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
-                        ui.group(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label(egui::RichText::new(&project.name).strong());
-                                ui.label(egui::RichText::new(&project.path).small());
-                                if let Some(description) = &project.description {
-                                    ui.label(egui::RichText::new(description).italics().small());
-                                }
-                            });
-                        });
-                    });
+            // Create rows with the calculated number of columns
+            for row_start in (0..self.projects.len()).step_by(num_columns) {
+                ui.horizontal(|ui| {
+                    for col in 0..num_columns {
+                        let idx = row_start + col;
+                        if idx >= self.projects.len() {
+                            break;
+                        }
 
-                    if response.response.clicked() {
-                        if let Some(ref callback) = self.on_project_click {
-                            callback(project.id);
+                        let project = &self.projects[idx];
+
+                        // Allocate fixed width for the card
+                        let response = ui.allocate_ui(
+                            egui::vec2(card_width, card_height),
+                            |ui| {
+                                ui.set_width(card_width);
+                                ui.group(|ui| {
+                                    ui.set_width(card_width - 24.0); // Account for group margins
+                                    ui.vertical(|ui| {
+                                        ui.label(egui::RichText::new(&project.name).strong());
+                                        ui.label(egui::RichText::new(&project.path).small());
+                                        if let Some(description) = &project.description {
+                                            ui.label(egui::RichText::new(description).italics().small());
+                                        }
+                                    });
+                                });
+                            },
+                        );
+
+                        if response.response.clicked() {
+                            if let Some(ref callback) = self.on_project_click {
+                                callback(project.id);
+                            }
+                        }
+
+                        if response.response.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+
+                        // Add spacing between columns (except after the last column)
+                        if col < num_columns - 1 && idx < self.projects.len() - 1 {
+                            ui.add_space(card_spacing);
                         }
                     }
+                });
 
-                    if response.response.hovered() {
-                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                    }
-                }
-            });
+                // Add spacing between rows
+                ui.add_space(card_spacing);
+            }
         });
     }
 }
