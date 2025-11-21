@@ -27,7 +27,7 @@ thiserror = "1.0"
 clap = { version = "4.0", features = ["derive"] }
 
 [workspace.package]
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 authors = ["nocodo team"]
 license = "MIT"
