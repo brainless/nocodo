@@ -2640,6 +2640,8 @@ impl Database {
     }
 
     /// Get the parent project ID for a project (for permission inheritance)
+
+
     pub fn get_parent_project_id(&self, project_id: i64) -> AppResult<Option<i64>> {
         let conn = self
             .connection
@@ -2650,14 +2652,16 @@ impl Database {
             .query_row(
                 "SELECT parent_id FROM projects WHERE id = ?",
                 [project_id],
-                |row| row.get(0),
+                |row| {
+                    let value: Option<i64> = row.get(0)?;
+                    Ok(value)
+                },
             )
-            .optional()?;
+            .optional()?
+            .flatten();
 
         Ok(parent_id)
-    }
-
-    // Team CRUD methods
+    }    // Team CRUD methods
 
     /// Create a new team
     pub fn create_team(&self, team: &crate::models::Team) -> AppResult<i64> {
