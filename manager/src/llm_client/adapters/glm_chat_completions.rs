@@ -184,8 +184,14 @@ impl GlmChatCompletionsAdapter {
                     tcs.iter()
                         .map(|tc| {
                             // Handle arguments that could be object or string
+                            // Parse and re-serialize strings to normalize/deduplicate keys
                             let arguments = match &tc.function.arguments {
-                                Value::String(s) => s.clone(),
+                                Value::String(s) => {
+                                    // Parse and re-serialize to normalize (deduplicates keys)
+                                    serde_json::from_str::<Value>(s)
+                                        .and_then(|v| serde_json::to_string(&v))
+                                        .unwrap_or_else(|_| s.clone())
+                                }
                                 Value::Object(_) => serde_json::to_string(&tc.function.arguments)
                                     .unwrap_or_else(|_| "{}".to_string()),
                                 _ => "{}".to_string(),

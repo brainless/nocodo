@@ -232,14 +232,16 @@ pub struct AppState {
     pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
     #[serde(skip)]
     pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub login_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
 }
 
 impl AppState {
     /// Check if user is authenticated (connected to server AND logged in)
-    /// We determine authentication by checking if projects have been successfully loaded,
-    /// which only happens after successful login/register
     pub fn is_authenticated(&self) -> bool {
-        self.connection_state == ConnectionState::Connected && !self.projects.is_empty()
+        self.connection_state == ConnectionState::Connected && self.auth_state.jwt_token.is_some()
     }
 }
 
@@ -335,6 +337,7 @@ impl Default for AppState {
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
             connection_result: Arc::new(std::sync::Mutex::new(None)),
             auth_required: Arc::new(std::sync::Mutex::new(false)),
+            login_result: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 }

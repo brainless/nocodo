@@ -2827,7 +2827,6 @@ pub async fn register(
         user.name
     );
 
-    // Check if this is the first user (bootstrap logic)
     let user_count = data.database.get_all_users()?.len();
     if user_count == 1 {
         // This is the first user - create Super Admins team and grant admin permissions
@@ -2853,7 +2852,7 @@ pub async fn register(
             .add_team_member(team_id, user_id, Some(user_id))?;
 
         // Grant entity-level admin permissions on all resource types
-        let resource_types = ["project", "work", "settings", "user", "team"];
+        let resource_types = ["project", "work", "settings", "user", "team", "ai_session"];
         for resource_type in &resource_types {
             let permission = Permission {
                 id: 0,
@@ -2869,10 +2868,75 @@ pub async fn register(
 
         tracing::info!("Bootstrap complete: Super Admins team created with full admin permissions");
     } else {
+        // This is not the first user - create or use Default Team
         tracing::info!(
-            "User registered: {} (not first user, no auto-permissions)",
+            "User registered: {} (not first user, adding to Default Team)",
             user.name
         );
+
+        // Try to find existing Default Team, or create it
+        let default_team_id = match data.database.get_team_by_name("Default Team") {
+            Ok(team) => {
+                tracing::info!("Found existing Default Team with ID: {}", team.id);
+                team.id
+            }
+            Err(_) => {
+                // Create Default Team
+                tracing::info!("Creating Default Team");
+                let default_team = Team {
+                    id: 0,
+                    name: "Default Team".to_string(),
+                    description: Some("Default team for all users with standard permissions".to_string()),
+                    created_by: user_id,
+                    created_at: now,
+                    updated_at: now,
+                };
+
+                let team_id = data.database.create_team(&default_team)?;
+                tracing::info!("Default Team created with ID: {}", team_id);
+
+                // Grant permissions to Default Team
+                // Read + Write for Project and Work
+                let rw_resource_types = ["project", "work"];
+                for resource_type in &rw_resource_types {
+                    for action in &["read", "write"] {
+                        let permission = Permission {
+                            id: 0,
+                            team_id,
+                            resource_type: resource_type.to_string(),
+                            resource_id: None, // Entity-level (all resources of this type)
+                            action: action.to_string(),
+                            granted_by: Some(user_id),
+                            granted_at: now,
+                        };
+                        data.database.create_permission(&permission)?;
+                    }
+                }
+
+                // Read only for Settings, User, Team, AiSession
+                let read_only_resource_types = ["settings", "user", "team", "ai_session"];
+                for resource_type in &read_only_resource_types {
+                    let permission = Permission {
+                        id: 0,
+                        team_id,
+                        resource_type: resource_type.to_string(),
+                        resource_id: None, // Entity-level (all resources of this type)
+                        action: "read".to_string(),
+                        granted_by: Some(user_id),
+                        granted_at: now,
+                    };
+                    data.database.create_permission(&permission)?;
+                }
+
+                tracing::info!("Default Team permissions granted");
+                team_id
+            }
+        };
+
+        // Add user to Default Team
+        data.database
+            .add_team_member(default_team_id, user_id, Some(user_id))?;
+        tracing::info!("User {} added to Default Team", user.name);
     }
 
     tracing::info!("Registration successful for user: {}", user.name);

@@ -263,10 +263,8 @@ impl UsersPage {
                     ui.separator();
 
                     // Load user teams if not already loaded
-                    if state.editing_user_teams.is_empty() && !state.teams.is_empty() {
-                        let _connection_manager = Arc::clone(&state.connection_manager);
+                    if state.editing_user_teams.is_empty() && !state.team_list_items.is_empty() {
                         let user_id = user.id;
-                        let _teams = state.teams.clone();
 
                         // Find current teams for this user from the users list
                         if let Some(user_item) = state.users.iter().find(|u| u.id == user_id) {
@@ -276,7 +274,7 @@ impl UsersPage {
                     }
 
                     // Team checkboxes
-                    for team in &state.teams {
+                    for team in &state.team_list_items {
                         let mut is_member = state.editing_user_teams.contains(&team.id);
                         if ui.checkbox(&mut is_member, &team.name).changed() {
                             if is_member {

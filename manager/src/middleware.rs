@@ -65,18 +65,6 @@ where
             return Box::pin(fut);
         }
 
-        // For test paths, insert a test user
-        if req.path().contains("projects") {
-            let test_user = crate::models::UserInfo {
-                id: 1,
-                username: "testuser".to_string(),
-                email: "test@example.com".to_string(),
-            };
-            req.extensions_mut().insert(test_user);
-            let fut = self.service.call(req);
-            return Box::pin(fut);
-        }
-
         // Get config from app state
         let jwt_secret = match req.app_data::<web::Data<crate::handlers::AppState>>() {
             Some(state) => match state.config.read() {
@@ -271,11 +259,6 @@ where
             }
         };
 
-        // For test user, skip permission check
-        if user_id == 1 {
-            let fut = self.service.call(req);
-            return Box::pin(fut);
-        }
 
         // Extract resource_id if needed
         let resource_id = if let Some(param_name) = &requirement.resource_id_param {
