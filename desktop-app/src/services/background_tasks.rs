@@ -39,6 +39,7 @@ impl BackgroundTasks {
         self.check_teams_result(state);
         self.check_update_user_result(state);
         self.check_update_team_result(state);
+        self.check_login_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -577,6 +578,25 @@ impl BackgroundTasks {
                 })
                 .cloned()
                 .collect();
+        }
+    }
+
+    fn check_login_result(&self, state: &mut AppState) {
+        let mut result = state.login_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            match res {
+                Ok(login_response) => {
+                    // Update auth_state with login info
+                    state.auth_state.jwt_token = Some(login_response.token);
+                    state.auth_state.user_id = Some(login_response.user.id);
+                    state.auth_state.username = Some(login_response.user.username);
+                    tracing::info!("Auth state updated after successful login");
+                }
+                Err(e) => {
+                    tracing::error!("Login failed: {}", e);
+                    state.ui_state.connection_error = Some(format!("Login failed: {}", e));
+                }
+            }
         }
     }
 }

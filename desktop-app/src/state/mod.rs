@@ -232,6 +232,10 @@ pub struct AppState {
     pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
     #[serde(skip)]
     pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub login_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
 }
 
 impl AppState {
@@ -333,6 +337,7 @@ impl Default for AppState {
             local_server_check_result: Arc::new(std::sync::Mutex::new(None)),
             connection_result: Arc::new(std::sync::Mutex::new(None)),
             auth_required: Arc::new(std::sync::Mutex::new(false)),
+            login_result: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 }
