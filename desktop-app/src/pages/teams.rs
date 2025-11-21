@@ -116,26 +116,26 @@ impl TeamsPage {
                 .body(|mut body| {
                     for team_item in &state.filtered_teams {
                         body.row(18.0, |mut row| {
+                            // Helper to create Team from TeamListItem
+                            let create_team_from_item = || manager_models::Team {
+                                id: team_item.id,
+                                name: team_item.name.clone(),
+                                description: team_item.description.clone(),
+                                created_at: 0,
+                                updated_at: 0,
+                                created_by: 0,
+                            };
+
                             row.col(|ui| {
                                 let id_text = ContentText::text(team_item.id.to_string());
                                 if ui.label(id_text).clicked() {
-                                    // Create a full Team object for editing
-                                    if let Some(team) =
-                                        state.teams.iter().find(|t| t.id == team_item.id)
-                                    {
-                                        clicked_team = Some(team.clone());
-                                    }
+                                    clicked_team = Some(create_team_from_item());
                                 }
                             });
                             row.col(|ui| {
                                 let name_text = ContentText::text(&team_item.name);
                                 if ui.label(name_text).clicked() {
-                                    // Create a full Team object for editing
-                                    if let Some(team) =
-                                        state.teams.iter().find(|t| t.id == team_item.id)
-                                    {
-                                        clicked_team = Some(team.clone());
-                                    }
+                                    clicked_team = Some(create_team_from_item());
                                 }
                             });
                             row.col(|ui| {
@@ -143,12 +143,7 @@ impl TeamsPage {
                                     team_item.description.as_ref().unwrap_or(&"-".to_string()),
                                 );
                                 if ui.label(desc_text).clicked() {
-                                    // Create a full Team object for editing
-                                    if let Some(team) =
-                                        state.teams.iter().find(|t| t.id == team_item.id)
-                                    {
-                                        clicked_team = Some(team.clone());
-                                    }
+                                    clicked_team = Some(create_team_from_item());
                                 }
                             });
                             row.col(|ui| {
@@ -164,12 +159,7 @@ impl TeamsPage {
                                 };
                                 let permissions_text = ContentText::text(&permissions_text);
                                 if ui.label(permissions_text).clicked() {
-                                    // Create a full Team object for editing
-                                    if let Some(team) =
-                                        state.teams.iter().find(|t| t.id == team_item.id)
-                                    {
-                                        clicked_team = Some(team.clone());
-                                    }
+                                    clicked_team = Some(create_team_from_item());
                                 }
                             });
                         });
