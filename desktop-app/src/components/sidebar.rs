@@ -1,6 +1,5 @@
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
-use crate::state::ConnectionState;
 use egui::{Color32, Context};
 
 pub struct Sidebar;
@@ -27,28 +26,41 @@ impl Sidebar {
                 ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
                 ui.vertical(|ui| {
                     let sidebar_bg = ui.style().visuals.panel_fill;
-                    let button_bg = ui.style().visuals.widgets.inactive.bg_fill;
-                    let is_connected = state.connection_state == ConnectionState::Connected;
+                    let selected_bg = ui.style().visuals.widgets.active.bg_fill;
+                    let hover_bg = ui.style().visuals.widgets.hovered.bg_fill;
+                    let is_authenticated = state.is_authenticated();
+                    let current_page = &state.ui_state.current_page;
 
-                    // Branding - Ubuntu Light with white color
+                    // Branding - Ubuntu Light with color that adapts to theme
                     ui.add_space(8.0);
+                    let logo_color = if ui.visuals().dark_mode {
+                        Color32::WHITE
+                    } else {
+                        Color32::from_gray(40) // Dark color for light mode
+                    };
                     ui.label(
                         egui::RichText::new("nocodo")
                             .size(20.0)
                             .family(egui::FontFamily::Name("ui_light".into()))
-                            .color(Color32::WHITE),
+                            .color(logo_color),
                     );
                     ui.add_space(20.0);
 
                     // Top navigation
-                    if self.sidebar_link(ui, "Projects", sidebar_bg, button_bg, is_connected) {
+                    if self.sidebar_link(
+                        ui,
+                        "Projects",
+                        sidebar_bg,
+                        hover_bg,
+                        selected_bg,
+                        is_authenticated,
+                        current_page == &UiPage::Projects,
+                    ) {
                         new_page = Some(UiPage::Projects);
                     }
 
                     // Favorite projects section
-                    if !state.favorite_projects.is_empty()
-                        && state.connection_state == ConnectionState::Connected
-                    {
+                    if !state.favorite_projects.is_empty() && is_authenticated {
                         ui.add_space(4.0);
 
                         // Show favorite projects
@@ -65,9 +77,17 @@ impl Sidebar {
                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                 }
 
-                                // Determine background color based on hover state (same as sidebar_link)
-                                let bg_color = if response.hovered() {
-                                    button_bg
+                                // Check if this project is the currently selected one
+                                let is_selected = matches!(
+                                    current_page,
+                                    UiPage::ProjectDetail(id) if *id == project.id
+                                );
+
+                                // Determine background color based on state
+                                let bg_color = if is_selected {
+                                    selected_bg
+                                } else if response.hovered() {
+                                    hover_bg
                                 } else {
                                     sidebar_bg
                                 };
@@ -99,26 +119,74 @@ impl Sidebar {
                         ui.add_space(4.0);
                     }
 
-                    if self.sidebar_link(ui, "Board", sidebar_bg, button_bg, is_connected) {
+                    if self.sidebar_link(
+                        ui,
+                        "Board",
+                        sidebar_bg,
+                        hover_bg,
+                        selected_bg,
+                        is_authenticated,
+                        current_page == &UiPage::Work,
+                    ) {
                         new_page = Some(UiPage::Work);
                     }
-                    if self.sidebar_link(ui, "Mentions", sidebar_bg, button_bg, is_connected) {
+                    if self.sidebar_link(
+                        ui,
+                        "Mentions",
+                        sidebar_bg,
+                        hover_bg,
+                        selected_bg,
+                        is_authenticated,
+                        current_page == &UiPage::Mentions,
+                    ) {
                         new_page = Some(UiPage::Mentions);
                     }
 
                     // Expanding space - pushes bottom items to the bottom
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                         // Bottom navigation (in reverse order since we're going bottom-up)
-                        if self.sidebar_link(ui, "Servers", sidebar_bg, button_bg, true) {
+                        if self.sidebar_link(
+                            ui,
+                            "Servers",
+                            sidebar_bg,
+                            hover_bg,
+                            selected_bg,
+                            true, // Servers is always enabled
+                            current_page == &UiPage::Servers,
+                        ) {
                             new_page = Some(UiPage::Servers);
                         }
-                        if self.sidebar_link(ui, "Settings", sidebar_bg, button_bg, is_connected) {
+                        if self.sidebar_link(
+                            ui,
+                            "Settings",
+                            sidebar_bg,
+                            hover_bg,
+                            selected_bg,
+                            is_authenticated,
+                            current_page == &UiPage::Settings,
+                        ) {
                             new_page = Some(UiPage::Settings);
                         }
-                        if self.sidebar_link(ui, "Teams", sidebar_bg, button_bg, is_connected) {
+                        if self.sidebar_link(
+                            ui,
+                            "Teams",
+                            sidebar_bg,
+                            hover_bg,
+                            selected_bg,
+                            is_authenticated,
+                            current_page == &UiPage::Teams,
+                        ) {
                             new_page = Some(UiPage::Teams);
                         }
-                        if self.sidebar_link(ui, "Users", sidebar_bg, button_bg, is_connected) {
+                        if self.sidebar_link(
+                            ui,
+                            "Users",
+                            sidebar_bg,
+                            hover_bg,
+                            selected_bg,
+                            is_authenticated,
+                            current_page == &UiPage::Users,
+                        ) {
                             new_page = Some(UiPage::Users);
                         }
                     });
@@ -134,7 +202,9 @@ impl Sidebar {
         text: &str,
         default_bg: Color32,
         hover_bg: Color32,
+        selected_bg: Color32,
         enabled: bool,
+        is_selected: bool,
     ) -> bool {
         let available_width = ui.available_width();
         let sense = if enabled {
@@ -149,8 +219,10 @@ impl Sidebar {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
 
-        // Determine background color based on hover state (only if enabled)
-        let bg_color = if enabled && response.hovered() {
+        // Determine background color based on state
+        let bg_color = if is_selected {
+            selected_bg
+        } else if enabled && response.hovered() {
             hover_bg
         } else {
             default_bg

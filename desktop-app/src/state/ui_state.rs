@@ -69,6 +69,9 @@ pub struct UiState {
     /// Flag to indicate if we're adding a new server (vs connecting to existing)
     #[serde(skip)]
     pub is_adding_new_server: bool,
+    /// Flag to trigger navigation to Board after successful authentication
+    #[serde(skip)]
+    pub should_navigate_after_auth: bool,
 }
 
 impl Default for UiState {
@@ -104,6 +107,7 @@ impl Default for UiState {
             pending_teams_refresh: false,
             servers_refresh_needed: Arc::new(std::sync::Mutex::new(false)),
             is_adding_new_server: false,
+            should_navigate_after_auth: false,
         }
     }
 }

@@ -161,6 +161,9 @@ impl AuthDialog {
         let settings_result = Arc::clone(&state.settings_result);
         let supported_models_result = Arc::clone(&state.supported_models_result);
 
+        // Set flag to navigate after successful authentication
+        state.ui_state.should_navigate_after_auth = true;
+
         // Spawn async task for login
         tokio::spawn(async move {
             match connection_manager
@@ -260,6 +263,9 @@ impl AuthDialog {
             Some(self.email.clone())
         };
         let connection_manager = Arc::clone(&state.connection_manager);
+
+        // Set flag to navigate after successful authentication
+        state.ui_state.should_navigate_after_auth = true;
 
         // Spawn async task for registration
         tokio::spawn(async move {

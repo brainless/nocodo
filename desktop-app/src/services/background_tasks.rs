@@ -59,6 +59,9 @@ impl BackgroundTasks {
                     state.ui_state.connection_error = None;
                     state.models_fetch_attempted = false; // Reset to allow fetching models
 
+                    // Don't navigate yet - wait for authentication (projects load) to complete
+                    // Navigation will happen in check_projects_result after successful auth
+
                     // Refresh data after connecting
                     let api_service = crate::services::ApiService::new();
                     api_service.refresh_settings(state);
@@ -77,14 +80,31 @@ impl BackgroundTasks {
     }
 
     fn check_projects_result(&self, state: &mut AppState) {
+        use crate::state::ui_state::Page as UiPage;
+
         let mut result = state.projects_result.lock().unwrap();
         if let Some(res) = result.take() {
             state.loading_projects = false;
             match res {
                 Ok(projects) => {
+                    let was_empty = state.projects.is_empty();
                     state.projects = projects;
                     // Clear any previous connection errors since we successfully loaded data
                     state.ui_state.connection_error = None;
+
+                    // If this is the first successful projects load (indicating successful auth)
+                    // and we're on the Servers page, and the user explicitly triggered auth,
+                    // then navigate to Board page
+                    if was_empty
+                        && !state.projects.is_empty()
+                        && state.ui_state.current_page == UiPage::Servers
+                        && state.ui_state.should_navigate_after_auth
+                    {
+                        tracing::info!("Authentication successful, navigating to Board page");
+                        state.ui_state.current_page = UiPage::Work;
+                        state.ui_state.pending_works_refresh = true;
+                        state.ui_state.should_navigate_after_auth = false; // Reset flag
+                    }
                 }
                 Err(e) => {
                     let error_msg = format!("Failed to load projects: {}", e);
