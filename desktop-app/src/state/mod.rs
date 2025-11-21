@@ -237,7 +237,7 @@ pub struct AppState {
 impl AppState {
     /// Check if user is authenticated (connected to server AND logged in)
     pub fn is_authenticated(&self) -> bool {
-        self.connection_state == ConnectionState::Connected
+        self.connection_state == ConnectionState::Connected && self.auth_state.jwt_token.is_some()
     }
 }
 
