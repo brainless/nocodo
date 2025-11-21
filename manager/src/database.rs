@@ -2736,6 +2736,32 @@ impl Database {
         teams.map_err(AppError::from)
     }
 
+    /// Get a team by name
+    pub fn get_team_by_name(&self, name: &str) -> AppResult<crate::models::Team> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let team = conn.query_row(
+            "SELECT id, name, description, created_by, created_at, updated_at
+             FROM teams WHERE name = ?",
+            [name],
+            |row| {
+                Ok(crate::models::Team {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: row.get(2)?,
+                    created_by: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            },
+        )?;
+
+        Ok(team)
+    }
+
     /// Update a team
     pub fn update_team(
         &self,
