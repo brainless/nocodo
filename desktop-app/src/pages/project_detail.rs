@@ -996,82 +996,122 @@ impl ProjectDetailPage {
 
                                             ui.add_space(12.0);
 
-                                            ui.horizontal(|ui| {
-                                                ui.vertical(|ui| {
-                                                    ui.label("Project:");
+                                            // Pre-select the current project when form is opened
+                                            if state.ui_state.new_work_project_id != Some(self.project_id) {
+                                                state.ui_state.new_work_project_id = Some(self.project_id);
+                                                // Reset worktree branches when project changes
+                                                state.worktree_branches.clear();
+                                                state.worktree_branches_fetch_attempted = false;
+                                                state.loading_worktree_branches = false;
+                                                state.ui_state.new_work_branch = None;
+                                            }
+
+                                            // Load worktree branches when a project is selected
+                                            if let Some(project_id) = state.ui_state.new_work_project_id {
+                                                if !state.worktree_branches_fetch_attempted && !state.loading_worktree_branches {
+                                                    let api_service = crate::services::ApiService::new();
+                                                    api_service.refresh_worktree_branches(state, project_id);
+                                                }
+                                            }
+
+                                            ui.vertical(|ui| {
+                                                // Project field - disabled and showing current project
+                                                ui.label("Project:");
+                                                ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+
+                                                ui.add_enabled(
+                                                    false,
+                                                    egui::Button::new(
+                                                        state.projects.iter()
+                                                            .find(|p| p.id == self.project_id)
+                                                            .map(|p| p.name.clone())
+                                                            .unwrap_or_else(|| "Unknown".to_string())
+                                                    )
+                                                    .min_size(egui::vec2(200.0, 0.0))
+                                                );
+
+                                                ui.add_space(12.0);
+
+                                                // Work Branch field
+                                                ui.label("Work Branch:");
+                                                if state.loading_worktree_branches {
+                                                    ui.add(egui::Spinner::new());
+                                                } else {
+                                                    // Set button padding for dropdown widget itself
                                                     ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
-                                                    egui::ComboBox::from_id_salt("project_work_project_combo")
+                                                    egui::ComboBox::from_id_salt("project_work_branch_combo")
                                                         .width(200.0)
                                                         .selected_text(
-                                                            state.ui_state.new_work_project_id
-                                                                .and_then(|id| state.projects.iter().find(|p| p.id == id))
-                                                                .map(|p| p.name.clone())
+                                                            state.ui_state.new_work_branch
+                                                                .clone()
                                                                 .unwrap_or_else(|| "None".to_string()),
                                                         )
                                                         .show_ui(ui, |ui| {
+                                                            // Add padding to dropdown items
                                                             ui.style_mut().spacing.item_spacing = egui::vec2(8.0, 4.0);
                                                             ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
-                                                            let none_response = ui.selectable_value(&mut state.ui_state.new_work_project_id, None, "None");
+                                                            let none_response = ui.selectable_value(&mut state.ui_state.new_work_branch, None, "None");
                                                             if none_response.hovered() {
                                                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                             }
 
-                                                            for project in &state.projects {
-                                                                let project_response = ui.selectable_value(
-                                                                    &mut state.ui_state.new_work_project_id,
-                                                                    Some(project.id),
-                                                                    &project.name,
+                                                            for branch in &state.worktree_branches {
+                                                                let branch_response = ui.selectable_value(
+                                                                    &mut state.ui_state.new_work_branch,
+                                                                    Some(branch.clone()),
+                                                                    branch,
                                                                 );
-                                                                if project_response.hovered() {
+                                                                if branch_response.hovered() {
                                                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                                 }
                                                             }
                                                         });
-                                                });
+                                                }
 
-                                                ui.add_space(16.0);
+                                                ui.add_space(12.0);
 
-                                                ui.vertical(|ui| {
-                                                    ui.label("Model:");
-                                                    if state.loading_supported_models {
-                                                        ui.add(egui::Spinner::new());
-                                                    } else {
-                                                        ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+                                                // Model field
+                                                ui.label("Model:");
+                                                if state.loading_supported_models {
+                                                    ui.add(egui::Spinner::new());
+                                                } else {
+                                                    // Set button padding for dropdown widget itself
+                                                    ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
-                                                        egui::ComboBox::from_id_salt("project_work_model_combo")
-                                                            .width(200.0)
-                                                            .selected_text(
-                                                                state.ui_state.new_work_model
-                                                                    .as_ref()
-                                                                    .and_then(|model_id| state.supported_models.iter()
-                                                                        .find(|m| m.model_id == *model_id))
-                                                                    .map(|m| m.name.clone())
-                                                                    .unwrap_or_else(|| "None".to_string()),
-                                                            )
-                                                            .show_ui(ui, |ui| {
-                                                                ui.style_mut().spacing.item_spacing = egui::vec2(8.0, 4.0);
-                                                                ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+                                                    egui::ComboBox::from_id_salt("project_work_model_combo")
+                                                        .width(200.0)
+                                                        .selected_text(
+                                                            state.ui_state.new_work_model
+                                                                .as_ref()
+                                                                .and_then(|model_id| state.supported_models.iter()
+                                                                    .find(|m| m.model_id == *model_id))
+                                                                .map(|m| m.name.clone())
+                                                                .unwrap_or_else(|| "None".to_string()),
+                                                        )
+                                                        .show_ui(ui, |ui| {
+                                                            // Add padding to dropdown items
+                                                            ui.style_mut().spacing.item_spacing = egui::vec2(8.0, 4.0);
+                                                            ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
-                                                                let none_response = ui.selectable_value(&mut state.ui_state.new_work_model, None, "None");
-                                                                if none_response.hovered() {
+                                                            let none_response = ui.selectable_value(&mut state.ui_state.new_work_model, None, "None");
+                                                            if none_response.hovered() {
+                                                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                            }
+
+                                                            for model in &state.supported_models {
+                                                                let model_response = ui.selectable_value(
+                                                                    &mut state.ui_state.new_work_model,
+                                                                    Some(model.model_id.clone()),
+                                                                    &model.name,
+                                                                );
+                                                                if model_response.hovered() {
                                                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                                 }
-
-                                                                for model in &state.supported_models {
-                                                                    let model_response = ui.selectable_value(
-                                                                        &mut state.ui_state.new_work_model,
-                                                                        Some(model.model_id.clone()),
-                                                                        &model.name,
-                                                                    );
-                                                                    if model_response.hovered() {
-                                                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                                                    }
-                                                                }
-                                                            });
-                                                    }
-                                                });
+                                                            }
+                                                        });
+                                                }
                                             });
 
                                             ui.add_space(12.0);
