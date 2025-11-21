@@ -212,7 +212,7 @@ impl Sidebar {
         } else {
             egui::Sense::hover()
         };
-        let (rect, response) = ui.allocate_exact_size(egui::vec2(available_width, 24.0), sense);
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(available_width, 32.0), sense);
 
         // Change cursor to pointer on hover only if enabled
         if enabled && response.hovered() {
@@ -232,7 +232,7 @@ impl Sidebar {
         ui.painter().rect_filled(rect, 0.0, bg_color);
 
         // Draw text (non-selectable) using Ubuntu Light
-        let text_pos = rect.min + egui::vec2(8.0, 4.0);
+        let text_pos = rect.min + egui::vec2(8.0, 8.0);
         let font_id = egui::FontId::new(
             14.0,
             egui::FontFamily::Name("ui_light".into()), // Ubuntu Light

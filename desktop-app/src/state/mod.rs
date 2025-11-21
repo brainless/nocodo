@@ -236,10 +236,8 @@ pub struct AppState {
 
 impl AppState {
     /// Check if user is authenticated (connected to server AND logged in)
-    /// We determine authentication by checking if projects have been successfully loaded,
-    /// which only happens after successful login/register
     pub fn is_authenticated(&self) -> bool {
-        self.connection_state == ConnectionState::Connected && !self.projects.is_empty()
+        self.connection_state == ConnectionState::Connected
     }
 }
 

@@ -2,6 +2,9 @@ use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
 use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static READ_FILE_PARSE_ERROR_LOGGED: AtomicBool = AtomicBool::new(false);
 
 pub struct WorkPage;
 
@@ -509,7 +512,9 @@ impl crate::pages::Page for WorkPage {
                                                                                                     requests.push(read_file_req);
                                                                                                 }
                                                                                                 Err(e) => {
-                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse ReadFileRequest");
+                                                                                                    if !READ_FILE_PARSE_ERROR_LOGGED.swap(true, Ordering::Relaxed) {
+                                                                                                        tracing::warn!(error = %e, arguments = %args, "Failed to parse ReadFileRequest");
+                                                                                                    }
                                                                                                 }
                                                                                             }
                                                                                         }
