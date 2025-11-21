@@ -135,9 +135,7 @@ pub fn get_working_directory_for_branch(project_path: &Path, branch_name: &str) 
                                 let found_branch = line.strip_prefix("ref: refs/heads/").unwrap_or("");
                                 if found_branch == branch_name {
                                     // Found the worktree for this branch
-                                    let parent_path = worktree_path.parent()
-                                        .ok_or_else(|| AppError::Internal("Invalid worktree path".to_string()))?;
-                                    let full_path = parent_path.to_str()
+                                    let full_path = worktree_path.to_str()
                                         .ok_or_else(|| AppError::Internal("Invalid UTF-8 in path".to_string()))?
                                         .to_string();
                                     tracing::info!("Found worktree for branch '{}': {}", branch_name, full_path);
