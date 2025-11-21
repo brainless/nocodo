@@ -176,6 +176,7 @@ impl ProjectDetailPage {
             }
             state.ui_state.selected_file_path = None;
             state.ui_state.expanded_folders.clear();
+            state.ui_state.current_directory_path = None;
             state.loading_file_list = false;
             state.loading_file_content = false;
         }
@@ -185,16 +186,17 @@ impl ProjectDetailPage {
             let file_list_result = state.file_list_result.lock().unwrap();
             if file_list_result.is_none() && !state.loading_file_list {
                 drop(file_list_result);
-                self.load_file_list(state, None);
+                let current_path = state.ui_state.current_directory_path.clone();
+                self.load_file_list(state, current_path.as_deref());
             }
         }
 
         // Two-column layout with independent scroll
         let available_size = ui.available_size_before_wrap();
-        let left_column_width = 400.0;
+        let left_column_width = 320.0;
 
         ui.horizontal(|ui| {
-            // First column (400px wide) with file tree
+            // First column (320px wide) with file tree
             ui.allocate_ui_with_layout(
                 egui::vec2(left_column_width, available_size.y),
                 egui::Layout::top_down(egui::Align::LEFT),
@@ -241,7 +243,17 @@ impl ProjectDetailPage {
                 },
             );
 
-            ui.add_space(16.0);
+            // Add 1px vertical separator
+            let separator_rect = egui::Rect::from_min_size(
+                ui.cursor().min,
+                egui::vec2(1.0, available_size.y)
+            );
+            ui.painter().rect_filled(
+                separator_rect,
+                0.0,
+                ui.style().visuals.widgets.noninteractive.bg_stroke.color
+            );
+            ui.add_space(1.0);
 
             // Second column (remaining width) with file content
             ui.allocate_ui_with_layout(
@@ -261,55 +273,64 @@ impl ProjectDetailPage {
                         .auto_shrink(false)
                         .show(ui, |ui| {
                             ui.add_space(8.0);
+                            
+                            // Add 8px left/right inner spacing
+                            ui.horizontal(|ui| {
+                                ui.add_space(8.0);
+                                ui.vertical(|ui| {
 
-                            if let Some(path) = &state.ui_state.selected_file_path {
-                                if state.loading_file_content {
-                                    ui.vertical_centered(|ui| {
-                                        ui.label(WidgetText::status("Loading file content..."));
-                                        ui.add(egui::Spinner::new());
-                                    });
-                                } else {
-                                    let file_content_result =
-                                        state.file_content_result.lock().unwrap();
-                                    if let Some(result) = file_content_result.as_ref() {
-                                        match result {
-                                            Ok(content_response) => {
-                                                let content = content_response.content.clone();
-                                                drop(file_content_result);
+                                if let Some(path) = &state.ui_state.selected_file_path {
+                                    if state.loading_file_content {
+                                        ui.vertical_centered(|ui| {
+                                            ui.label(WidgetText::status("Loading file content..."));
+                                            ui.add(egui::Spinner::new());
+                                        });
+                                    } else {
+                                        let file_content_result =
+                                            state.file_content_result.lock().unwrap();
+                                        if let Some(result) = file_content_result.as_ref() {
+                                            match result {
+                                                Ok(content_response) => {
+                                                    let content = content_response.content.clone();
+                                                    drop(file_content_result);
 
-                                                // Check if this is a markdown file
-                                                let is_markdown = path.ends_with(".md");
+                                                    // Check if this is a markdown file
+                                                    let is_markdown = path.ends_with(".md");
 
-                                                if is_markdown {
-                                                    // Render markdown with styling
-                                                    MarkdownRenderer::render(ui, &content);
-                                                } else {
-                                                    // Show other files in a monospace font
-                                                    ui.add(
-                                                        egui::TextEdit::multiline(
-                                                            &mut content.as_str(),
-                                                        )
-                                                        .desired_width(ui.available_width())
-                                                        .desired_rows(30)
-                                                        .font(egui::TextStyle::Monospace)
-                                                        .interactive(false),
-                                                    );
+                                                    if is_markdown {
+                                                        // Render markdown with styling
+                                                        MarkdownRenderer::render(ui, &content);
+                                                    } else {
+                                                        // Show other files in a monospace font
+                                                        ui.add(
+                                                            egui::TextEdit::multiline(
+                                                                &mut content.as_str(),
+                                                            )
+                                                            .desired_width(ui.available_width())
+                                                            .desired_rows(30)
+                                                            .font(egui::TextStyle::Monospace)
+                                                            .interactive(false),
+                                                        );
+                                                    }
                                                 }
-                                            }
-                                            Err(e) => {
-                                                ui.label(WidgetText::error(format!(
-                                                    "Error loading file: {}",
-                                                    e
-                                                )));
+                                                Err(e) => {
+                                                    ui.label(WidgetText::error(format!(
+                                                        "Error loading file: {}",
+                                                        e
+                                                    )));
+                                                }
                                             }
                                         }
                                     }
+                                } else {
+                                    ui.vertical_centered(|ui| {
+                                        ui.label(WidgetText::status("No file selected"));
+                                    });
                                 }
-                            } else {
-                                ui.vertical_centered(|ui| {
-                                    ui.label(WidgetText::status("No file selected"));
+                                ui.add_space(8.0);
                                 });
-                            }
+                                ui.add_space(8.0);
+                            });
                         });
                 },
             );
@@ -323,6 +344,39 @@ impl ProjectDetailPage {
         files: &[manager_models::FileInfo],
         _prefix: &str,
     ) {
+        // Show "Go up.." if not in root directory
+        if state.ui_state.current_directory_path.is_some() {
+            let available_width = ui.available_width();
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(available_width, 24.0),
+                egui::Sense::click(),
+            );
+
+            // Change cursor to pointer on hover
+            if response.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+
+            // Add hover background (same as sidebar)
+            if response.hovered() {
+                ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+            }
+
+            // Draw "Go up.." text
+            let text_pos = rect.min + egui::vec2(16.0, 4.0);
+            ui.painter().text(
+                text_pos,
+                egui::Align2::LEFT_TOP,
+                "⬆ Go up..",
+                egui::FontId::new(14.0, egui::FontFamily::Proportional),
+                ui.style().visuals.text_color()
+            );
+
+            if response.clicked() {
+                self.go_up_directory(state);
+            }
+        }
+
         let mut directories = Vec::new();
         let mut regular_files = Vec::new();
 
@@ -345,22 +399,37 @@ impl ProjectDetailPage {
 
             let is_expanded = state.ui_state.expanded_folders.contains(&full_path);
 
-            ui.horizontal(|ui| {
-                // Add 2 spaces for hierarchy
-                ui.label("  ");
+            let available_width = ui.available_width();
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(available_width, 24.0),
+                egui::Sense::click(),
+            );
 
-                // Folder icon and expand/collapse button
-                let icon = if is_expanded { "📂" } else { "📁" };
-                if ui.button(format!("{} {}", icon, directory.name)).clicked() {
-                    if is_expanded {
-                        state.ui_state.expanded_folders.remove(&full_path);
-                    } else {
-                        state.ui_state.expanded_folders.insert(full_path.clone());
-                        // Load contents of this directory
-                        self.load_file_list(state, Some(&full_path));
-                    }
-                }
-            });
+            // Change cursor to pointer on hover
+            if response.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+
+            // Add hover background (same as sidebar)
+            if response.hovered() {
+                ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+            }
+
+            // Draw folder icon and name
+            let icon = if is_expanded { "📂" } else { "📁" };
+            let text_pos = rect.min + egui::vec2(16.0, 4.0);
+            ui.painter().text(
+                text_pos,
+                egui::Align2::LEFT_TOP,
+                format!("{} {}", icon, directory.name),
+                egui::FontId::new(14.0, egui::FontFamily::Proportional),
+                ui.style().visuals.text_color()
+            );
+
+            if response.clicked() {
+                // Navigate into directory
+                self.navigate_into_directory(state, &full_path);
+            }
 
             // If expanded, render children (we'd need to have loaded them)
             if is_expanded {
@@ -377,21 +446,37 @@ impl ProjectDetailPage {
             // Use the path directly from the API response, which is already relative to project root
             let full_path = file.path.clone();
 
-            ui.horizontal(|ui| {
-                // Add 2 spaces for hierarchy
-                ui.label("  ");
+            let available_width = ui.available_width();
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(available_width, 24.0),
+                egui::Sense::click(),
+            );
 
-                // File icon and name
-                let icon = self.get_file_icon(&file.name);
-                let _is_selected = state.ui_state.selected_file_path.as_ref() == Some(&full_path);
+            // Change cursor to pointer on hover
+            if response.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
 
-                let button_text = WidgetText::button(format!("{} {}", icon, file.name));
+            // Add hover background (same as sidebar)
+            if response.hovered() {
+                ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+            }
 
-                if ui.button(button_text).clicked() {
-                    state.ui_state.selected_file_path = Some(full_path.clone());
-                    self.load_file_content(state, &full_path);
-                }
-            });
+            // Draw file icon and name
+            let icon = self.get_file_icon(&file.name);
+            let text_pos = rect.min + egui::vec2(16.0, 4.0);
+            ui.painter().text(
+                text_pos,
+                egui::Align2::LEFT_TOP,
+                format!("{} {}", icon, file.name),
+                egui::FontId::new(14.0, egui::FontFamily::Proportional),
+                ui.style().visuals.text_color()
+            );
+
+            if response.clicked() {
+                state.ui_state.selected_file_path = Some(full_path.clone());
+                self.load_file_content(state, &full_path);
+            }
         }
     }
 
@@ -468,6 +553,48 @@ impl ProjectDetailPage {
     }
 
 
+
+    fn navigate_into_directory(&self, state: &mut AppState, directory_path: &str) {
+        // Set current directory path
+        state.ui_state.current_directory_path = Some(directory_path.to_string());
+        
+        // Clear file list result to trigger reload
+        {
+            let mut file_list_result = state.file_list_result.lock().unwrap();
+            *file_list_result = None;
+        }
+        
+        // Load files for this directory
+        self.load_file_list(state, Some(directory_path));
+    }
+
+    fn go_up_directory(&self, state: &mut AppState) {
+        if let Some(current_path) = &state.ui_state.current_directory_path {
+            // Get parent directory
+            if let Some(parent_path) = std::path::Path::new(current_path).parent() {
+                let parent_path_str = parent_path.to_string_lossy().to_string();
+                if parent_path_str.is_empty() {
+                    // We're going back to root
+                    state.ui_state.current_directory_path = None;
+                } else {
+                    state.ui_state.current_directory_path = Some(parent_path_str);
+                }
+            } else {
+                // No parent, go to root
+                state.ui_state.current_directory_path = None;
+            }
+            
+            // Clear file list result to trigger reload
+            {
+                let mut file_list_result = state.file_list_result.lock().unwrap();
+                *file_list_result = None;
+            }
+            
+            // Load files for the parent directory
+            let current_path = state.ui_state.current_directory_path.clone();
+            self.load_file_list(state, current_path.as_deref());
+        }
+    }
 
     fn refresh_project_details(&self, state: &mut AppState) {
         let api_service = crate::services::ApiService::new();
