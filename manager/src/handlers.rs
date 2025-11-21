@@ -2,28 +2,30 @@ use crate::auth;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
+use crate::git;
 use crate::llm_agent::LlmAgent;
 use crate::llm_client::LlmProvider;
 use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, ApiKeyConfig, CreateAiSessionRequest,
-    CreateProjectRequest, CreateTeamRequest, FileContentResponse, FileCreateRequest, FileInfo,
-    FileListRequest, FileListResponse, FileResponse, FileType, FileUpdateRequest,
-    LlmAgentToolCallListResponse, Permission, Project, ProjectListResponse, ProjectResponse,
-    ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest, UpdateTeamRequest,
-    UpdateUserRequest, User, UserResponse, WorkListResponse, WorkMessageResponse, WorkResponse,
+    CreateProjectRequest, CreateTeamRequest, CreateWorkRequest, FileContentResponse,
+    FileCreateRequest, FileInfo, FileListRequest, FileListResponse, FileResponse, FileType,
+    FileUpdateRequest, GitBranchListResponse, LlmAgentToolCallListResponse, Permission, Project,
+    ProjectListResponse, ProjectResponse, ServerStatus, SettingsResponse, Team, UpdateApiKeysRequest,
+    UpdateTeamRequest, UpdateUserRequest, User, UserResponse, WorkListResponse,
+    WorkMessageResponse, WorkResponse,
 };
+use manager_models::{GitBranch, SearchQuery, TeamListResponse};
 use crate::templates::{ProjectTemplate, TemplateManager};
 use crate::websocket::WebSocketBroadcaster;
 use actix_web::{web, HttpMessage, HttpResponse, Result};
 use handlebars::Handlebars;
-use manager_models::{CreateWorkRequest, SearchQuery, TeamListResponse};
 use nocodo_github_actions::{
     nocodo::WorkflowService, ExecuteCommandRequest, ExecuteCommandResponse, ScanWorkflowsRequest,
 };
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -686,43 +688,77 @@ fn apply_project_template(
 }
 
 fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
+    use git2::{Repository, Signature, Time};
+    
     // Initialize git repository
-    let output = Command::new("git")
-        .arg("init")
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| AppError::Internal(format!("Failed to run git init: {e}")))?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        tracing::warn!("Git init failed: {}", error);
-        // Don't fail the entire project creation if git init fails
-        return Ok(());
-    }
+    let repo = match Repository::init(project_path) {
+        Ok(repo) => repo,
+        Err(e) => {
+            tracing::warn!("Failed to initialize git repository: {}", e);
+            // Don't fail the entire project creation if git init fails
+            return Ok(());
+        }
+    };
 
     // Add all files to git
-    let output = Command::new("git")
-        .args(["add", "."])
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| AppError::Internal(format!("Failed to run git add: {e}")))?;
+    let mut index = match repo.index() {
+        Ok(index) => index,
+        Err(e) => {
+            tracing::warn!("Failed to get git index: {}", e);
+            return Ok(());
+        }
+    };
 
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        tracing::warn!("Git add failed: {}", error);
+    // Add all files in the directory
+    if let Err(e) = index.add_all(["."].iter(), git2::IndexAddOption::DEFAULT, None) {
+        tracing::warn!("Failed to add files to git index: {}", e);
         return Ok(());
     }
 
-    // Create initial commit
-    let output = Command::new("git")
-        .args(["commit", "-m", "Initial commit from nocodo"])
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| AppError::Internal(format!("Failed to run git commit: {e}")))?;
+    // Write the index to get a tree
+    let tree_id = match index.write_tree() {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::warn!("Failed to write git tree: {}", e);
+            return Ok(());
+        }
+    };
 
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        tracing::warn!("Git commit failed: {}", error);
+    let tree = match repo.find_tree(tree_id) {
+        Ok(tree) => tree,
+        Err(e) => {
+            tracing::warn!("Failed to find git tree: {}", e);
+            return Ok(());
+        }
+    };
+
+    // Create a signature for the commit
+    let time = Time::new(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+        0,
+    );
+    
+    let signature = match Signature::new("nocodo", "nocodo@localhost", &time) {
+        Ok(sig) => sig,
+        Err(e) => {
+            tracing::warn!("Failed to create git signature: {}", e);
+            return Ok(());
+        }
+    };
+
+    // Create initial commit
+    if let Err(e) = repo.commit(
+        Some("HEAD"), // Update HEAD to point to this commit
+        &signature,   // Author
+        &signature,   // Committer (same as author)
+        "Initial commit from nocodo",
+        &tree,
+        &[], // No parents for initial commit
+    ) {
+        tracing::warn!("Failed to create initial git commit: {}", e);
         return Ok(());
     }
 
@@ -1557,6 +1593,28 @@ pub async fn create_work(
         .map_err(|e| AppError::Internal(format!("Failed to get timestamp: {e}")))?
         .as_secs() as i64;
 
+    // Resolve working_directory from git_branch if provided
+    let working_directory = if let (Some(git_branch), Some(project_id)) = (&work_req.git_branch, work_req.project_id) {
+        // Get project to find project path
+        let project = data.database.get_project_by_id(project_id)?;
+        let project_path = std::path::Path::new(&project.path);
+
+        // Resolve the working directory for the given branch
+        match crate::git::get_working_directory_for_branch(project_path, git_branch) {
+            Ok(path) => Some(path),
+            Err(e) => {
+                tracing::warn!("Failed to resolve working directory for branch '{}': {}. Using project path.", git_branch, e);
+                Some(project.path.clone())
+            }
+        }
+    } else if let Some(project_id) = work_req.project_id {
+        // No git_branch specified, use project path as working_directory
+        let project = data.database.get_project_by_id(project_id)?;
+        Some(project.path.clone())
+    } else {
+        None
+    };
+
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
         title: work_req.title.clone(),
@@ -1565,6 +1623,8 @@ pub async fn create_work(
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
+        git_branch: work_req.git_branch.clone(),
+        working_directory,
     };
 
     // Get user ID from request
@@ -1993,6 +2053,40 @@ pub async fn get_command_executions(
 }
 
 /// Get settings information including API key configuration
+// Git-related handlers
+
+pub async fn list_worktree_branches(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let project_id = path.into_inner();
+
+    tracing::debug!("Fetching worktree branches for project_id: {}", project_id);
+
+    // Get project to verify it exists and get path
+    let project = data.database.get_project_by_id(project_id)?;
+    tracing::debug!("Project path: {}", project.path);
+    let project_path = std::path::Path::new(&project.path);
+
+    // Get branches with worktrees
+    let branch_names = git::list_local_branches_with_worktrees(project_path)?;
+    tracing::debug!("Got {} branch names from git", branch_names.len());
+
+    // Convert string branches to GitBranch objects
+    let branches: Vec<GitBranch> = branch_names
+        .into_iter()
+        .map(|name| GitBranch {
+            name: name.clone(),
+            is_worktree: true, // These are all worktree branches by definition
+            path: None, // Could be enhanced to include actual worktree path if needed
+        })
+        .collect();
+
+    tracing::debug!("Returning {} branches in response", branches.len());
+    let response = GitBranchListResponse { branches };
+    Ok(HttpResponse::Ok().json(response))
+}
+
 pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     // Use the in-memory config to get latest settings
     let config = data

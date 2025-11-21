@@ -19,9 +19,8 @@ pub enum Page {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ProjectDetailTab {
     #[default]
-    Dashboard,
+    Work,
     Files,
-    Components,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +30,7 @@ pub struct UiState {
     pub show_new_work_dialog: bool,
     pub new_work_title: String,
     pub new_work_project_id: Option<i64>,
+    pub new_work_branch: Option<String>,
     pub new_work_model: Option<String>,
     pub connection_error: Option<String>,
     pub connected_host: Option<String>,
@@ -66,6 +66,12 @@ pub struct UiState {
     /// Flag to trigger servers list refresh after successful SSH connection
     #[serde(skip)]
     pub servers_refresh_needed: Arc<std::sync::Mutex<bool>>,
+    /// Flag to indicate if we're adding a new server (vs connecting to existing)
+    #[serde(skip)]
+    pub is_adding_new_server: bool,
+    /// Flag to trigger navigation to Board after successful authentication
+    #[serde(skip)]
+    pub should_navigate_after_auth: bool,
 }
 
 impl Default for UiState {
@@ -76,6 +82,7 @@ impl Default for UiState {
             show_new_work_dialog: false,
             new_work_title: String::new(),
             new_work_project_id: None,
+            new_work_branch: None,
             new_work_model: None,
             connection_error: None,
             connected_host: None,
@@ -99,6 +106,8 @@ impl Default for UiState {
             pending_users_refresh: false,
             pending_teams_refresh: false,
             servers_refresh_needed: Arc::new(std::sync::Mutex::new(false)),
+            is_adding_new_server: false,
+            should_navigate_after_auth: false,
         }
     }
 }

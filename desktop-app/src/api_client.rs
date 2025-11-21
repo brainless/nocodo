@@ -250,6 +250,36 @@ impl ApiClient {
         Ok(models_response.models)
     }
 
+    pub async fn get_worktree_branches(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<String>, ApiError> {
+        let url = format!("{}/api/projects/{}/git/worktree-branches", self.base_url, project_id);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let branches_response: manager_models::GitBranchListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        // Extract just the branch names from the GitBranch structs
+        let branch_names: Vec<String> = branches_response.branches
+            .into_iter()
+            .map(|branch| branch.name)
+            .collect();
+
+        Ok(branch_names)
+    }
+
     pub async fn health_check(&self) -> Result<ServerStatus, ApiError> {
         let url = format!("{}/api/health", self.base_url);
         let response = self

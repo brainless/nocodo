@@ -4,6 +4,7 @@ mod bash_permissions;
 mod config;
 mod database;
 mod error;
+mod git;
 mod handlers;
 mod llm_agent;
 mod llm_client;
@@ -169,6 +170,15 @@ async fn main() -> AppResult<()> {
                                                         .with_resource_id("id"),
                                                 ))
                                                 .route(web::delete().to(handlers::delete_project)),
+                                        )
+                                        // Git endpoints
+                                        .service(
+                                            web::scope("/git")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("project", "read")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route("/worktree-branches", web::get().to(handlers::list_worktree_branches)),
                                         ),
                                 ),
                         )

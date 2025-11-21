@@ -46,6 +46,7 @@ urlencoding = "2.1"
 futures-util = "0.3"
 grep = "0.4"
 regex = "1.10"
+git2 = "0.19"
 codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch" }
 codex-core = { git = "https://github.com/openai/codex", package = "codex-core" }
 codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening" }

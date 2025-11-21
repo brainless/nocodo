@@ -137,7 +137,6 @@ impl eframe::App for DesktopApp {
             // Handle ProjectDetail page specially since it needs the project_id
             // We don't store it in the HashMap since each instance needs a different project_id
             if let UiPage::ProjectDetail(project_id) = current_page {
-                tracing::info!("Rendering ProjectDetail page for project_id={}", project_id);
                 let mut detail_page = ProjectDetailPage::new(project_id);
                 detail_page.ui(ctx, ui, &mut self.state);
             } else if let Some(page) = self.pages.get_mut(&current_page) {
