@@ -28,9 +28,12 @@ impl crate::pages::Page for ServersPage {
         // Local server section
         ui.heading("Local server:");
 
-        if ui.button("Refresh Local Server Status").clicked() {
-            self.check_local_server(state);
-        }
+        ui.scope(|ui| {
+            ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+            if ui.button("Refresh Local Server Status").clicked() {
+                self.check_local_server(state);
+            }
+        });
 
         if state.ui_state.checking_local_server {
             ui.horizontal(|ui| {
@@ -104,60 +107,170 @@ impl crate::pages::Page for ServersPage {
         if state.servers.is_empty() {
             ui.label("No servers saved");
         } else {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                egui_extras::TableBuilder::new(ui)
-                    .column(egui_extras::Column::remainder().at_least(200.0)) // Server column
-                    .column(egui_extras::Column::auto()) // Port column
-                    .column(egui_extras::Column::remainder().at_least(250.0)) // Key column
-                    .column(egui_extras::Column::auto()) // Connect button column
-                    .header(20.0, |mut header| {
-                        header.col(|ui| {
-                            ui.strong("Server");
-                        });
-                        header.col(|ui| {
-                            ui.strong("Port");
-                        });
-                        header.col(|ui| {
-                            ui.strong("SSH Key");
-                        });
-                        header.col(|ui| {
-                            ui.strong("");
-                        });
-                    })
-                    .body(|mut body| {
-                        for server in &state.servers {
-                            body.row(18.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.label(format!("{}@{}", server.user, server.host));
+            // Use darker border color from visuals
+            let border_color = ui.visuals().widgets.noninteractive.bg_stroke.color;
+
+            // Wrap table in a Frame with a stroke for outer border
+            egui::Frame::NONE
+                .stroke(egui::Stroke::new(1.0, border_color))
+                .show(ui, |ui| {
+                    let scroll_output = egui::ScrollArea::vertical().show(ui, |ui| {
+                        // Track cell positions for drawing borders
+                        let mut cell_rects: Vec<Vec<egui::Rect>> = Vec::new();
+
+                        egui_extras::TableBuilder::new(ui)
+                            .column(egui_extras::Column::remainder().at_least(200.0)) // Server column
+                            .column(egui_extras::Column::auto()) // Port column
+                            .column(egui_extras::Column::remainder().at_least(250.0)) // Key column
+                            .column(egui_extras::Column::auto()) // Connect button column
+                            .header(20.0, |mut header| {
+                                let mut header_rects = Vec::new();
+                                header.col(|ui| {
+                                    header_rects.push(ui.max_rect());
+                                    ui.strong("Server");
                                 });
-                                row.col(|ui| {
-                                    ui.label(format!("{}", server.port));
+                                header.col(|ui| {
+                                    header_rects.push(ui.max_rect());
+                                    ui.strong("Port");
                                 });
-                                row.col(|ui| {
-                                    if let Some(key_path) = &server.key_path {
-                                        ui.label(key_path);
-                                    } else {
-                                        ui.label(
-                                            egui::RichText::new("Default")
-                                                .color(ui.style().visuals.weak_text_color()),
+                                header.col(|ui| {
+                                    header_rects.push(ui.max_rect());
+                                    ui.strong("SSH Key");
+                                });
+                                header.col(|ui| {
+                                    header_rects.push(ui.max_rect());
+                                    ui.strong("");
+                                });
+                                cell_rects.push(header_rects);
+                            })
+                            .body(|mut body| {
+                                for server in &state.servers {
+                                    body.row(18.0, |mut row| {
+                                        let mut row_rects = Vec::new();
+                                        row.col(|ui| {
+                                            row_rects.push(ui.max_rect());
+                                            ui.label(format!("{}@{}", server.user, server.host));
+                                        });
+                                        row.col(|ui| {
+                                            row_rects.push(ui.max_rect());
+                                            ui.label(format!("{}", server.port));
+                                        });
+                                        row.col(|ui| {
+                                            row_rects.push(ui.max_rect());
+                                            if let Some(key_path) = &server.key_path {
+                                                ui.label(key_path);
+                                            } else {
+                                                ui.label(
+                                                    egui::RichText::new("Default")
+                                                        .color(ui.style().visuals.weak_text_color()),
+                                                );
+                                            }
+                                        });
+                                        row.col(|ui| {
+                                            row_rects.push(ui.max_rect());
+                                            ui.scope(|ui| {
+                                                ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+                                                if ui.button("Connect").clicked() {
+                                                    state.config.ssh.server = server.host.clone();
+                                                    state.config.ssh.username = server.user.clone();
+                                                    state.config.ssh.port = server.port;
+                                                    state.config.ssh.ssh_key_path =
+                                                        server.key_path.clone().unwrap_or_default();
+                                                    state.ui_state.is_adding_new_server = false;
+                                                    state.ui_state.show_connection_dialog = true;
+                                                }
+                                            });
+                                        });
+                                        cell_rects.push(row_rects);
+                                    });
+                                }
+                            });
+
+                        cell_rects
+                    });
+
+                    // Draw internal borders (between rows and columns)
+                    let cell_rects = scroll_output.inner;
+                    let painter = ui.painter();
+                    let border_stroke = egui::Stroke::new(1.0, border_color);
+
+                    if !cell_rects.is_empty() {
+                        // Draw horizontal lines between rows
+                        for row_cells in &cell_rects {
+                            if let Some(first_cell) = row_cells.first() {
+                                let y = first_cell.top();
+                                if let (Some(left_cell), Some(right_cell)) = (row_cells.first(), row_cells.last()) {
+                                    painter.hline(
+                                        egui::Rangef::new(left_cell.left(), right_cell.right()),
+                                        y,
+                                        border_stroke
+                                    );
+                                }
+                            }
+                        }
+
+                        // Draw bottom border of last row
+                        if let Some(last_row) = cell_rects.last() {
+                            if let Some(first_cell) = last_row.first() {
+                                let y = first_cell.bottom();
+                                if let (Some(left_cell), Some(right_cell)) = (last_row.first(), last_row.last()) {
+                                    painter.hline(
+                                        egui::Rangef::new(left_cell.left(), right_cell.right()),
+                                        y,
+                                        border_stroke
+                                    );
+                                }
+                            }
+                        }
+
+                        // Draw vertical lines between columns
+                        if let Some(first_row) = cell_rects.first() {
+                            for cell in first_row {
+                                let x = cell.left();
+                                if let (Some(top_row), Some(bottom_row)) = (cell_rects.first(), cell_rects.last()) {
+                                    if let (Some(top_cell), Some(bottom_cell)) = (top_row.first(), bottom_row.first()) {
+                                        painter.vline(
+                                            x,
+                                            egui::Rangef::new(top_cell.top(), bottom_cell.bottom()),
+                                            border_stroke
                                         );
                                     }
-                                });
-                                row.col(|ui| {
-                                    if ui.button("Connect").clicked() {
-                                        state.config.ssh.server = server.host.clone();
-                                        state.config.ssh.username = server.user.clone();
-                                        state.config.ssh.port = server.port;
-                                        state.config.ssh.ssh_key_path =
-                                            server.key_path.clone().unwrap_or_default();
-                                        state.ui_state.show_connection_dialog = true;
+                                }
+                            }
+
+                            // Draw rightmost vertical line
+                            if let Some(last_cell) = first_row.last() {
+                                let x = last_cell.right();
+                                if let (Some(top_row), Some(bottom_row)) = (cell_rects.first(), cell_rects.last()) {
+                                    if let (Some(top_cell), Some(bottom_cell)) = (top_row.first(), bottom_row.first()) {
+                                        painter.vline(
+                                            x,
+                                            egui::Rangef::new(top_cell.top(), bottom_cell.bottom()),
+                                            border_stroke
+                                        );
                                     }
-                                });
-                            });
+                                }
+                            }
                         }
-                    });
-            });
+                    }
+                });
         }
+
+        ui.add_space(10.0);
+
+        // Add New Server button
+        ui.scope(|ui| {
+            ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+            if ui.button("+ New Server").clicked() {
+                // Clear the form fields and set defaults
+                state.config.ssh.server = String::new();
+                state.config.ssh.username = String::new();
+                state.config.ssh.port = 22;
+                state.config.ssh.ssh_key_path = crate::ssh::get_default_ssh_key_path();
+                state.ui_state.is_adding_new_server = true;
+                state.ui_state.show_connection_dialog = true;
+            }
+        });
     }
 }
 
