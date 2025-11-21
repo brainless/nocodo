@@ -835,4 +835,74 @@ impl ApiService {
                 .collect();
         }
     }
+
+    pub fn refresh_current_user_teams(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_current_user_teams = true;
+            state.current_user_teams_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.current_user_teams_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.get_current_user_teams().await;
+                    let mut teams_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *teams_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut teams_result = result_clone.lock().unwrap();
+                    *teams_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn add_authorized_ssh_key(&self, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.adding_ssh_key = true;
+            state.add_ssh_key_result = Arc::new(std::sync::Mutex::new(None));
+            state.ssh_key_message = None;
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.add_ssh_key_result);
+            let public_key = state.ssh_public_key_input.clone();
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.add_authorized_ssh_key(public_key).await;
+                    let mut add_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *add_result = Some(result.map(|r| r.message).map_err(|e| e.to_string()));
+                } else {
+                    let mut add_result = result_clone.lock().unwrap();
+                    *add_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
 }

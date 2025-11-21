@@ -205,6 +205,61 @@ impl crate::pages::Page for SettingsPage {
                         }
                     });
 
+                    // Show Authorized SSH Keys section only for Super Admins
+                    // Debug: show current user teams count
+                    ui.label(format!(
+                        "Debug: current_user_teams count = {}, loading = {}",
+                        state.current_user_teams.len(),
+                        state.loading_current_user_teams
+                    ));
+                    for team in &state.current_user_teams {
+                        ui.label(format!("  Team: {}", team.name));
+                    }
+
+                    let is_super_admin = state
+                        .current_user_teams
+                        .iter()
+                        .any(|t| t.name == "Super Admins");
+
+                    if is_super_admin {
+                        ui.add_space(20.0);
+                        ui.heading("Authorized SSH Keys");
+
+                        ui.horizontal(|ui| {
+                            ui.label("Public Key:");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut state.ssh_public_key_input)
+                                    .hint_text("ssh-ed25519 AAAA... user@host")
+                                    .desired_width(400.0),
+                            );
+                        });
+
+                        ui.horizontal(|ui| {
+                            let add_button = ui.add_enabled(
+                                !state.ssh_public_key_input.trim().is_empty()
+                                    && !state.adding_ssh_key,
+                                egui::Button::new("Add Key to this server"),
+                            );
+
+                            if add_button.clicked() {
+                                self.add_ssh_key(state);
+                            }
+
+                            if state.adding_ssh_key {
+                                ui.add(egui::Spinner::new());
+                            }
+                        });
+
+                        // Show result message if any
+                        if let Some(message) = &state.ssh_key_message {
+                            if message.contains("success") || message.contains("already exists") {
+                                ui.colored_label(egui::Color32::GREEN, message);
+                            } else {
+                                ui.colored_label(egui::Color32::RED, message);
+                            }
+                        }
+                    }
+
                     if ui.button("Refresh Settings").clicked() {
                         self.refresh_settings(state);
                     }
@@ -255,5 +310,12 @@ impl SettingsPage {
     fn refresh_settings(&self, state: &mut AppState) {
         let api_service = crate::services::ApiService::new();
         api_service.refresh_settings(state);
+        // Also refresh current user teams to determine visibility of SSH keys section
+        api_service.refresh_current_user_teams(state);
+    }
+
+    fn add_ssh_key(&self, state: &mut AppState) {
+        let api_service = crate::services::ApiService::new();
+        api_service.add_authorized_ssh_key(state);
     }
 }

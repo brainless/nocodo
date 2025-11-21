@@ -321,8 +321,17 @@ async fn main() -> AppResult<()> {
                                             PermissionRequirement::new("settings", "write"),
                                         ))
                                         .route(web::post().to(handlers::set_projects_default_path)),
+                                )
+                                .service(
+                                    web::resource("/authorized-ssh-keys")
+                                        .wrap(PermissionMiddleware::new(
+                                            PermissionRequirement::new("settings", "write"),
+                                        ))
+                                        .route(web::post().to(handlers::add_authorized_ssh_key)),
                                 ),
                         )
+                        // Current user endpoint (get teams for current logged-in user)
+                        .route("/me/teams", web::get().to(handlers::get_current_user_teams))
                         .service(
                             web::resource("/models")
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(

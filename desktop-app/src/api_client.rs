@@ -734,6 +734,57 @@ impl ApiClient {
 
         Ok(permission_items)
     }
+
+    /// Get the current user's teams
+    pub async fn get_current_user_teams(
+        &self,
+    ) -> Result<Vec<manager_models::TeamItem>, ApiError> {
+        let url = format!("{}/api/me/teams", self.base_url);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let teams_response: manager_models::CurrentUserTeamsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(teams_response.teams)
+    }
+
+    /// Add an authorized SSH key to the server
+    pub async fn add_authorized_ssh_key(
+        &self,
+        public_key: String,
+    ) -> Result<manager_models::AddAuthorizedSshKeyResponse, ApiError> {
+        let url = format!("{}/api/settings/authorized-ssh-keys", self.base_url);
+        let payload = manager_models::AddAuthorizedSshKeyRequest { public_key };
+
+        let req = self.client().post(&url).json(&payload);
+        let req = self.add_auth_header(req);
+        let response = req
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: manager_models::AddAuthorizedSshKeyResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

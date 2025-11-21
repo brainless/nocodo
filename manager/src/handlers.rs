@@ -2391,6 +2391,153 @@ pub async fn set_projects_default_path(
     })))
 }
 
+/// Add an authorized SSH key to the current user's ~/.ssh/authorized_keys
+/// Only available to users in "Super Admins" team
+pub async fn add_authorized_ssh_key(
+    data: web::Data<AppState>,
+    request: web::Json<manager_models::AddAuthorizedSshKeyRequest>,
+    http_req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let req = request.into_inner();
+    let public_key = req.public_key.trim();
+
+    // Get user from request
+    let user_info = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .cloned()
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    // Check if user belongs to "Super Admins" team
+    let teams = data.database.get_user_teams(user_info.id)?;
+    let is_super_admin = teams.iter().any(|t| t.name == "Super Admins");
+    if !is_super_admin {
+        return Err(AppError::Forbidden(
+            "Only Super Admins can add authorized SSH keys".to_string(),
+        ));
+    }
+
+    // Validate that it's a public key (not a private key)
+    if public_key.contains("PRIVATE KEY") {
+        return Err(AppError::InvalidRequest(
+            "This appears to be a private key. Please provide the public key instead.".to_string(),
+        ));
+    }
+
+    // Basic validation: public keys typically start with ssh-rsa, ssh-ed25519, ecdsa-sha2, etc.
+    let valid_prefixes = ["ssh-rsa", "ssh-ed25519", "ecdsa-sha2-", "ssh-dss", "sk-ssh-"];
+    if !valid_prefixes.iter().any(|prefix| public_key.starts_with(prefix)) {
+        return Err(AppError::InvalidRequest(
+            "Invalid SSH public key format. Key should start with ssh-rsa, ssh-ed25519, ecdsa-sha2-*, etc.".to_string(),
+        ));
+    }
+
+    // Get home directory
+    let home_dir = home::home_dir()
+        .ok_or_else(|| AppError::Internal("Cannot determine home directory".to_string()))?;
+
+    let ssh_dir = home_dir.join(".ssh");
+    let authorized_keys_path = ssh_dir.join("authorized_keys");
+
+    // Ensure .ssh directory exists with proper permissions
+    if !ssh_dir.exists() {
+        std::fs::create_dir_all(&ssh_dir)
+            .map_err(|e| AppError::Internal(format!("Failed to create .ssh directory: {}", e)))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&ssh_dir, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| AppError::Internal(format!("Failed to set .ssh permissions: {}", e)))?;
+        }
+    }
+
+    // Read existing authorized_keys if it exists
+    let existing_content = if authorized_keys_path.exists() {
+        std::fs::read_to_string(&authorized_keys_path)
+            .map_err(|e| AppError::Internal(format!("Failed to read authorized_keys: {}", e)))?
+    } else {
+        String::new()
+    };
+
+    // Check if key already exists (compare the key part, ignoring comments)
+    let key_parts: Vec<&str> = public_key.split_whitespace().collect();
+    if key_parts.len() < 2 {
+        return Err(AppError::InvalidRequest(
+            "Invalid SSH public key format".to_string(),
+        ));
+    }
+    let key_type = key_parts[0];
+    let key_data = key_parts[1];
+
+    for line in existing_content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let existing_parts: Vec<&str> = line.split_whitespace().collect();
+        if existing_parts.len() >= 2 && existing_parts[0] == key_type && existing_parts[1] == key_data {
+            return Ok(HttpResponse::Ok().json(manager_models::AddAuthorizedSshKeyResponse {
+                success: true,
+                message: "Key already exists in authorized_keys".to_string(),
+            }));
+        }
+    }
+
+    // Append the key
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&authorized_keys_path)
+        .map_err(|e| AppError::Internal(format!("Failed to open authorized_keys: {}", e)))?;
+
+    use std::io::Write;
+    // Add newline before if file doesn't end with one
+    if !existing_content.is_empty() && !existing_content.ends_with('\n') {
+        writeln!(file)
+            .map_err(|e| AppError::Internal(format!("Failed to write to authorized_keys: {}", e)))?;
+    }
+    writeln!(file, "{}", public_key)
+        .map_err(|e| AppError::Internal(format!("Failed to write to authorized_keys: {}", e)))?;
+
+    // Set proper permissions on authorized_keys
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&authorized_keys_path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| AppError::Internal(format!("Failed to set authorized_keys permissions: {}", e)))?;
+    }
+
+    tracing::info!("SSH key added to authorized_keys by user {}", user_info.id);
+
+    Ok(HttpResponse::Ok().json(manager_models::AddAuthorizedSshKeyResponse {
+        success: true,
+        message: "SSH key added successfully".to_string(),
+    }))
+}
+
+/// Get the current user's teams
+pub async fn get_current_user_teams(
+    data: web::Data<AppState>,
+    http_req: actix_web::HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    let user_info = http_req
+        .extensions()
+        .get::<crate::models::UserInfo>()
+        .cloned()
+        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+
+    let teams = data.database.get_user_teams(user_info.id)?;
+    let team_items: Vec<manager_models::TeamItem> = teams
+        .into_iter()
+        .map(|t| manager_models::TeamItem {
+            id: t.id,
+            name: t.name,
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(manager_models::CurrentUserTeamsResponse { teams: team_items }))
+}
+
 /// Scan projects default path and save as Project entities
 pub async fn scan_projects(
     data: web::Data<AppState>,

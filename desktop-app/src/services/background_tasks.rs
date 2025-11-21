@@ -40,6 +40,8 @@ impl BackgroundTasks {
         self.check_update_user_result(state);
         self.check_update_team_result(state);
         self.check_login_result(state);
+        self.check_current_user_teams_result(state);
+        self.check_add_ssh_key_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -56,19 +58,24 @@ impl BackgroundTasks {
                 Ok(server) => {
                     tracing::info!("Connection successful to {}", server);
                     state.connection_state = ConnectionState::Connected;
-                    state.ui_state.connected_host = Some(server);
+                    state.ui_state.connected_host = Some(server.clone());
                     state.ui_state.connection_error = None;
                     state.models_fetch_attempted = false; // Reset to allow fetching models
+
+                    // Automatically show auth dialog after successful SSH connection
+                    // (unless already authenticated)
+                    let should_show_auth = state.auth_state.jwt_token.is_none();
+                    if should_show_auth {
+                        tracing::info!("SSH connection successful to {}, showing auth dialog", server);
+                        // Directly set the flag on the ui_state instead of using connection_manager
+                        state.ui_state.show_auth_dialog = true;
+                    }
 
                     // Don't navigate yet - wait for authentication (projects load) to complete
                     // Navigation will happen in check_projects_result after successful auth
 
-                    // Refresh data after connecting
-                    let api_service = crate::services::ApiService::new();
-                    api_service.refresh_settings(state);
-                    api_service.refresh_projects(state);
-                    api_service.refresh_works(state);
-                    api_service.refresh_supported_models(state);
+                    // Note: Don't refresh data here - all API calls require auth
+                    // They will be called after successful login in check_login_result
                 }
                 Err(error) => {
                     tracing::error!("Connection failed: {}", error);
@@ -582,8 +589,12 @@ impl BackgroundTasks {
     }
 
     fn check_login_result(&self, state: &mut AppState) {
-        let mut result = state.login_result.lock().unwrap();
-        if let Some(res) = result.take() {
+        let result_opt = {
+            let mut result = state.login_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
             match res {
                 Ok(login_response) => {
                     // Update auth_state with login info
@@ -591,10 +602,57 @@ impl BackgroundTasks {
                     state.auth_state.user_id = Some(login_response.user.id);
                     state.auth_state.username = Some(login_response.user.username);
                     tracing::info!("Auth state updated after successful login");
+
+                    // Now that we're authenticated, fetch all data that requires auth
+                    self.api_service.refresh_settings(state);
+                    self.api_service.refresh_projects(state);
+                    self.api_service.refresh_works(state);
+                    self.api_service.refresh_supported_models(state);
+                    self.api_service.refresh_current_user_teams(state);
                 }
                 Err(e) => {
                     tracing::error!("Login failed: {}", e);
                     state.ui_state.connection_error = Some(format!("Login failed: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_current_user_teams_result(&self, state: &mut AppState) {
+        let result_opt = {
+            let mut result = state.current_user_teams_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
+            state.loading_current_user_teams = false;
+            match res {
+                Ok(teams) => {
+                    state.current_user_teams = teams;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to load current user teams: {}", e);
+                    // Don't show error to user, just silently fail - the section won't show
+                }
+            }
+        }
+    }
+
+    fn check_add_ssh_key_result(&self, state: &mut AppState) {
+        let result_opt = {
+            let mut result = state.add_ssh_key_result.lock().unwrap();
+            result.take()
+        };
+
+        if let Some(res) = result_opt {
+            state.adding_ssh_key = false;
+            match res {
+                Ok(message) => {
+                    state.ssh_key_message = Some(message);
+                    state.ssh_public_key_input.clear();
+                }
+                Err(e) => {
+                    state.ssh_key_message = Some(format!("Error: {}", e));
                 }
             }
         }

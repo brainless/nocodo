@@ -117,6 +117,19 @@ pub struct AppState {
     pub anthropic_api_key_input: String,
     pub api_keys_modified: bool,
 
+    // SSH keys state
+    pub ssh_public_key_input: String,
+    pub adding_ssh_key: bool,
+    #[serde(skip)]
+    pub add_ssh_key_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
+    pub ssh_key_message: Option<String>,
+
+    // Current user teams
+    pub current_user_teams: Vec<manager_models::TeamItem>,
+    pub loading_current_user_teams: bool,
+    #[serde(skip)]
+    pub current_user_teams_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamItem>, String>>>>,
+
     // UI Reference state
     pub ui_reference_card_titles: Vec<String>,
     pub ui_reference_form_text: String,
@@ -291,6 +304,13 @@ impl Default for AppState {
             openai_api_key_input: String::new(),
             anthropic_api_key_input: String::new(),
             api_keys_modified: false,
+            ssh_public_key_input: String::new(),
+            adding_ssh_key: false,
+            add_ssh_key_result: Arc::new(std::sync::Mutex::new(None)),
+            ssh_key_message: None,
+            current_user_teams: Vec::new(),
+            loading_current_user_teams: false,
+            current_user_teams_result: Arc::new(std::sync::Mutex::new(None)),
             ui_reference_card_titles: Vec::new(),
             ui_reference_form_text: String::new(),
             ui_reference_form_dropdown: None,

@@ -1010,3 +1010,22 @@ pub struct GitBranch {
 pub struct GitBranchListResponse {
     pub branches: Vec<GitBranch>,
 }
+
+/// Request to add an authorized SSH key to the server
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddAuthorizedSshKeyRequest {
+    pub public_key: String,
+}
+
+/// Response for adding an authorized SSH key
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddAuthorizedSshKeyResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+/// Response containing user's teams (for current user)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurrentUserTeamsResponse {
+    pub teams: Vec<TeamItem>,
+}
