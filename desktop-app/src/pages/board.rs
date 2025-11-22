@@ -348,9 +348,6 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Use vertical layout to stack scroll area and reply form
-                                            let available_width = ui.available_width();
-
                                             // Calculate reply form height dynamically based on textarea content
                                             let reply_form_height = {
                                                 // Calculate actual textarea height based on content
@@ -364,12 +361,16 @@ impl crate::pages::Page for WorkPage {
                                                 1.0 + 8.0 + 20.0 + 4.0 + actual_textarea_height + 8.0 + 25.0 + 10.0
                                             };
 
-                                            let available_height = ui.available_height() - reply_form_height;
+                                            // Calculate scroll area height - this is what remains after reply form
+                                            let total_available_height = ui.available_height();
+                                            let scroll_area_height = total_available_height - reply_form_height;
+                                            let available_width = ui.available_width();
 
+                                            // Constrain scroll area to calculated height
                                             let mut scroll_area = egui::ScrollArea::vertical()
                                                 .id_salt("work_messages_scroll")
                                                 .auto_shrink(false)
-                                                .max_height(available_height)
+                                                .max_height(scroll_area_height.max(100.0)) // Minimum 100px
                                                 .max_width(available_width);
 
                                             // Reset scroll to top if a new work item was selected
@@ -874,10 +875,8 @@ impl crate::pages::Page for WorkPage {
                                             ui.add_space(8.0);
 
                                             // Use bottom-up layout so textarea expands upward
-                                            ui.allocate_ui_with_layout(
-                                                egui::vec2(ui.available_width(), ui.available_height()),
-                                                egui::Layout::bottom_up(egui::Align::LEFT),
-                                                |ui| {
+                                            // Allocate only the space we actually need (not all remaining space)
+                                            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                                                     // Send button at the bottom
                                                     ui.horizontal(|ui| {
                                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -912,8 +911,7 @@ impl crate::pages::Page for WorkPage {
                                                     ui.horizontal(|ui| {
                                                         ui.label("Continue conversation:");
                                                     });
-                                                },
-                                            );
+                                            });
                                         }
                                     }
                                     ConnectionState::Error(error) => {
