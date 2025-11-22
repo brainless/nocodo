@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse};
+use manager_models::{ReadFileRequest, ToolRequest, ToolResponse};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static READ_FILE_PARSE_ERROR_LOGGED: AtomicBool = AtomicBool::new(false);
@@ -404,94 +404,7 @@ impl crate::pages::Page for WorkPage {
                                                                 });
                                                         }
                                                         DisplayMessage::AiOutput(output) => {
-                                                            // Check if this is a list_files tool request using proper Rust types
-                                                            let list_files_requests = if output.role.as_deref() == Some("assistant") {
-                                                                // Try multiple parsing approaches for robustness
-                                                                let mut requests = Vec::new();
-
-                                                                // 1. Try to parse as structured JSON with tool_calls (standard format)
-                                                                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
-                                                                    // Look for tool_calls array in the structured response
-                                                                    if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
-                                                                        for tool_call in tool_calls {
-                                                                            if let Some(function) = tool_call.get("function") {
-                                                                                if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
-                                                                                    if name == "list_files" {
-                                                                                        if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
-                                                                                            // Use proper Rust type for parsing ListFilesRequest
-                                                                                            match serde_json::from_str::<ListFilesRequest>(args) {
-                                                                                                Ok(list_files_req) => {
-                                                                                                    requests.push(list_files_req);
-                                                                                                }
-                                                                                                Err(e) => {
-                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse ListFilesRequest");
-                                                                                                }
-                                                                                            }
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-
-                                                                // 2. Try to parse as direct ToolRequest (fallback format)
-                                                                if requests.is_empty() {
-                                                                    if let Ok(ToolRequest::ListFiles(list_files_req)) = serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        requests.push(list_files_req);
-                                                                    }
-                                                                }
-
-                                                                if !requests.is_empty() {
-                                                                    Some(requests)
-                                                                } else {
-                                                                    None
-                                                                }
-                                                            } else {
-                                                                None
-                                                            };
-
-                                                            if let Some(ref requests) = list_files_requests {
-                                                                // Display each list_files tool request in full width box with no rounded corners
-                                                                for req in requests {
-                                                                    let mut description = format!("List files: {}", req.path);
-
-                                                                    // Add optional parameters to the description
-                                                                    let mut options = Vec::new();
-                                                                    if req.recursive.unwrap_or(false) {
-                                                                        options.push("recursive".to_string());
-                                                                    }
-                                                                    if req.include_hidden.unwrap_or(false) {
-                                                                        options.push("include hidden".to_string());
-                                                                    }
-                                                                    if let Some(max_files) = req.max_files {
-                                                                        options.push(format!("max: {}", max_files));
-                                                                    }
-
-                                                                    if !options.is_empty() {
-                                                                        description.push_str(&format!(" ({})", options.join(", ")));
-                                                                    }
-
-                                                                    // Use the same styling as User box but full width with no rounded corners
-                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
-
-                                                                    egui::Frame::NONE
-                                                                        .fill(bg_color)
-                                                                        .corner_radius(0.0)
-                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
-                                                                        .show(ui, |ui| {
-                                                                            ui.set_width(ui.available_width());
-                                                                            ui.vertical(|ui| {
-                                                                                ui.horizontal(|ui| {
-                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
-                                                                                    ui.label(egui::RichText::new("📁").size(16.0));
-                                                                                    ui.label(egui::RichText::new(description).size(12.0).strong());
-                                                                                });
-                                                                            });
-                                                                        });
-                                                                    ui.add_space(4.0);
-                                                                }
-                                                            }
+                                                            // Don't display list_files tool requests - only show responses
 
                                                             // Check if this is a read_file tool request using proper Rust types
                                                             let read_file_requests = if output.role.as_deref() == Some("assistant") {
@@ -580,13 +493,13 @@ impl crate::pages::Page for WorkPage {
                                                                     if let Some(content) = wrapped_response.get("content") {
                                                                         // Try to parse the content as ToolResponse
                                                                         if let Ok(ToolResponse::ListFiles(list_files_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
-                                                                                // Always show list_files responses expanded for compact UI
-                                                                                let is_expanded = true;
+                                                                                // Check if this response is expanded
+                                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
 
                                                                                 // Use the same styling as tool request box
                                                                                 let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
 
-                                                                                let _response = egui::Frame::NONE
+                                                                                let response = egui::Frame::NONE
                                                                                     .fill(bg_color)
                                                                                     .corner_radius(0.0)
                                                                                     .inner_margin(egui::Margin::symmetric(12, 6))
@@ -594,9 +507,7 @@ impl crate::pages::Page for WorkPage {
                                                                                         ui.set_width(ui.available_width());
                                                                                         ui.vertical(|ui| {
                                                                                             // Header row - clickable
-                                                                                            ui.horizontal(|ui| {
-                                                                                                ui.label(egui::RichText::new("🤖").size(16.0));
-                                                                                                ui.label(egui::RichText::new("📁").size(16.0));
+                                                                                            let header_response = ui.horizontal(|ui| {
                                                                                                 let arrow = if is_expanded { "▼" } else { "▶" };
                                                                                                 ui.label(egui::RichText::new(arrow).size(12.0));
                                                                                                 ui.label(egui::RichText::new(format!(
@@ -604,7 +515,7 @@ impl crate::pages::Page for WorkPage {
                                                                                                     list_files_response.total_files,
                                                                                                     list_files_response.current_path
                                                                                                 )).size(12.0).strong());
-                                                                                            });
+                                                                                            }).response;
 
                                                                                             // Show file list if expanded
                                                                                             if is_expanded {
@@ -628,11 +539,25 @@ impl crate::pages::Page for WorkPage {
                                                                                                     );
                                                                                                 }
                                                                                             }
-                                                                                        });
+
+                                                                                            header_response
+                                                                                        }).inner
                                                                                     })
                                                                                     .response;
 
-                                                                                // List_files responses are always shown expanded - no click behavior needed
+                                                                                // Handle click to toggle expansion
+                                                                                if response.interact(egui::Sense::click()).clicked() {
+                                                                                    if is_expanded {
+                                                                                        state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                                    } else {
+                                                                                        state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                                    }
+                                                                                }
+
+                                                                                // Change cursor to pointer on hover
+                                                                                if response.hovered() {
+                                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                                }
 
                                                                                 ui.add_space(4.0);
                                                                         }
@@ -641,7 +566,7 @@ impl crate::pages::Page for WorkPage {
                                                             }
 
                                                             // Show regular AI response if not a tool request or tool response
-                                                            if list_files_requests.is_none() && read_file_requests.is_none() && output.role.as_deref() != Some("tool") {
+                                                            if read_file_requests.is_none() && output.role.as_deref() != Some("tool") {
                                                                 // Regular AI response message
                                                                 let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 
