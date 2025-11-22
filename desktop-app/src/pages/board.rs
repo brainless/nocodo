@@ -363,23 +363,25 @@ impl crate::pages::Page for WorkPage {
 
                                             // Calculate scroll area height - this is what remains after reply form
                                             let total_available_height = ui.available_height();
-                                            let scroll_area_height = total_available_height - reply_form_height;
+                                            let scroll_area_height = (total_available_height - reply_form_height).max(100.0); // Minimum 100px
                                             let available_width = ui.available_width();
 
-                                            // Constrain scroll area to calculated height
-                                            let mut scroll_area = egui::ScrollArea::vertical()
-                                                .id_salt("work_messages_scroll")
-                                                .auto_shrink(false)
-                                                .max_height(scroll_area_height.max(100.0)) // Minimum 100px
-                                                .max_width(available_width);
+                                            // Explicitly allocate space for scroll area so it doesn't overlap with reply form
+                                            ui.allocate_ui_with_layout(
+                                                egui::vec2(available_width, scroll_area_height),
+                                                egui::Layout::top_down(egui::Align::LEFT),
+                                                |ui| {
+                                                    let mut scroll_area = egui::ScrollArea::vertical()
+                                                        .id_salt("work_messages_scroll")
+                                                        .auto_shrink(false);
 
-                                            // Reset scroll to top if a new work item was selected
-                                            if state.ui_state.reset_work_details_scroll {
-                                                scroll_area = scroll_area.vertical_scroll_offset(0.0);
-                                                state.ui_state.reset_work_details_scroll = false;
-                                            }
+                                                    // Reset scroll to top if a new work item was selected
+                                                    if state.ui_state.reset_work_details_scroll {
+                                                        scroll_area = scroll_area.vertical_scroll_offset(0.0);
+                                                        state.ui_state.reset_work_details_scroll = false;
+                                                    }
 
-                                            scroll_area.show(ui, |ui| {
+                                                    scroll_area.show(ui, |ui| {
                                                 ui.add_space(8.0);
 
                                                 // Combine and sort all messages by timestamp
@@ -869,6 +871,8 @@ impl crate::pages::Page for WorkPage {
                                                     ui.add_space(8.0);
                                                 }
                                             });
+                                                },
+                                            );
 
                                             // Message continuation input (outside scroll area)
                                             ui.separator();
