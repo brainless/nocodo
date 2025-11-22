@@ -580,13 +580,13 @@ impl crate::pages::Page for WorkPage {
                                                                     if let Some(content) = wrapped_response.get("content") {
                                                                         // Try to parse the content as ToolResponse
                                                                         if let Ok(ToolResponse::ListFiles(list_files_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
-                                                                                // Check if this tool response is expanded (use output.id)
-                                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
+                                                                                // Always show list_files responses expanded for compact UI
+                                                                                let is_expanded = true;
 
                                                                                 // Use the same styling as tool request box
                                                                                 let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
 
-                                                                                let response = egui::Frame::NONE
+                                                                                let _response = egui::Frame::NONE
                                                                                     .fill(bg_color)
                                                                                     .corner_radius(0.0)
                                                                                     .inner_margin(egui::Margin::symmetric(12, 6))
@@ -632,19 +632,7 @@ impl crate::pages::Page for WorkPage {
                                                                                     })
                                                                                     .response;
 
-                                                                                // Make the widget clickable to toggle expansion
-                                                                                if response.interact(egui::Sense::click()).clicked() {
-                                                                                    if is_expanded {
-                                                                                        state.ui_state.expanded_tool_calls.remove(&output.id);
-                                                                                    } else {
-                                                                                        state.ui_state.expanded_tool_calls.insert(output.id);
-                                                                                    }
-                                                                                }
-
-                                                                                // Change cursor to pointer on hover
-                                                                                if response.hovered() {
-                                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                                                                }
+                                                                                // List_files responses are always shown expanded - no click behavior needed
 
                                                                                 ui.add_space(4.0);
                                                                         }
