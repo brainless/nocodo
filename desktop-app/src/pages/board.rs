@@ -860,37 +860,47 @@ impl crate::pages::Page for WorkPage {
                                             ui.separator();
                                             ui.add_space(8.0);
 
-                                            ui.horizontal(|ui| {
-                                                ui.label("Continue conversation:");
-                                            });
+                                            // Use bottom-up layout so textarea expands upward
+                                            ui.allocate_ui_with_layout(
+                                                egui::vec2(ui.available_width(), ui.available_height()),
+                                                egui::Layout::bottom_up(egui::Align::LEFT),
+                                                |ui| {
+                                                    // Send button at the bottom
+                                                    ui.horizontal(|ui| {
+                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
+                                                                && !state.sending_message;
 
-                                            ui.add_space(4.0);
+                                                            if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
+                                                                let api_service = crate::services::ApiService::new();
+                                                                api_service.send_message_to_work(selected_work_id, state);
+                                                            }
 
-                                            let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
-                                                .desired_width(ui.available_width())
-                                                .desired_rows(3)
-                                                .hint_text("Type your message here...");
+                                                            if state.sending_message {
+                                                                ui.add(egui::Spinner::new());
+                                                                ui.label("Sending...");
+                                                            }
+                                                        });
+                                                    });
 
-                                            ui.add(text_edit);
+                                                    ui.add_space(8.0);
 
-                                            ui.add_space(8.0);
+                                                    // Textarea above the button
+                                                    let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
+                                                        .desired_width(ui.available_width())
+                                                        .desired_rows(3)
+                                                        .hint_text("Type your message here...");
 
-                                            ui.horizontal(|ui| {
-                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                    let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
-                                                        && !state.sending_message;
+                                                    ui.add(text_edit);
 
-                                                    if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
-                                                        let api_service = crate::services::ApiService::new();
-                                                        api_service.send_message_to_work(selected_work_id, state);
-                                                    }
+                                                    ui.add_space(4.0);
 
-                                                    if state.sending_message {
-                                                        ui.add(egui::Spinner::new());
-                                                        ui.label("Sending...");
-                                                    }
-                                                });
-                                            });
+                                                    // Label at the top
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Continue conversation:");
+                                                    });
+                                                },
+                                            );
                                         }
                                     }
                                     ConnectionState::Error(error) => {
