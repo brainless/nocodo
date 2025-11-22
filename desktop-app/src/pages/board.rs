@@ -605,36 +605,8 @@ impl crate::pages::Page for WorkPage {
                                                                 None
                                                             };
 
-                                                            if let Some(ref requests) = read_file_requests {
-                                                                // Display each read_file tool request in full width box with no rounded corners
-                                                                for req in requests {
-                                                                    let mut description = format!("Read file: {}", req.path);
-
-                                                                    // Add optional parameters to the description
-                                                                    if let Some(max_size) = req.max_size {
-                                                                        description.push_str(&format!(" (max size: {} bytes)", max_size));
-                                                                    }
-
-                                                                    // Use the same styling as list_files box but full width with no rounded corners
-                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
-
-                                                                    egui::Frame::NONE
-                                                                        .fill(bg_color)
-                                                                        .corner_radius(0.0)
-                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
-                                                                        .show(ui, |ui| {
-                                                                            ui.set_width(ui.available_width());
-                                                                            ui.vertical(|ui| {
-                                                                                ui.horizontal(|ui| {
-                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
-                                                                                    ui.label(egui::RichText::new("📄").size(16.0));
-                                                                                    ui.label(egui::RichText::new(description).size(12.0).strong());
-                                                                                });
-                                                                            });
-                                                                        });
-                                                                    ui.add_space(4.0);
-                                                                }
-                                                            }
+                                                            // Don't display read_file tool requests - only show responses
+                                                            // The "text" field is already extracted and displayed separately above
 
                                                             // Show tool responses (from ai_session_outputs with role='tool')
                                                             // Check if this output is a tool response
