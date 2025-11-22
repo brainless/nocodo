@@ -348,10 +348,23 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Reserve space for reply form at bottom (approximately 120px)
-                                            let reply_form_height = 120.0;
-                                            let available_height = ui.available_height() - reply_form_height;
+                                            // Use vertical layout to stack scroll area and reply form
                                             let available_width = ui.available_width();
+
+                                            // Calculate reply form height dynamically based on textarea content
+                                            let reply_form_height = {
+                                                // Calculate actual textarea height based on content
+                                                let num_lines = state.ui_state.continue_message_input.lines().count().max(3);
+                                                let line_height = ui.text_style_height(&egui::TextStyle::Body);
+                                                let actual_textarea_height = (num_lines as f32) * line_height;
+
+                                                // Total height with actual textarea size:
+                                                // Separator (1) + spacing (8) + label height (~20) + spacing (4) +
+                                                // textarea height + spacing (8) + button height (~25) + extra padding (10)
+                                                1.0 + 8.0 + 20.0 + 4.0 + actual_textarea_height + 8.0 + 25.0 + 10.0
+                                            };
+
+                                            let available_height = ui.available_height() - reply_form_height;
 
                                             let mut scroll_area = egui::ScrollArea::vertical()
                                                 .id_salt("work_messages_scroll")
