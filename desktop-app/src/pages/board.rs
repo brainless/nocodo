@@ -301,6 +301,19 @@ impl crate::pages::Page for WorkPage {
                                             ui.label(&project.name);
                                         }
                                     }
+
+                                    // Add toggle button at the far right
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        let button_text = if state.ui_state.show_tool_widgets {
+                                            "Hide tools"
+                                        } else {
+                                            "Show tools"
+                                        };
+
+                                        if ui.button(button_text).clicked() {
+                                            state.ui_state.show_tool_widgets = !state.ui_state.show_tool_widgets;
+                                        }
+                                    });
                                 });
 
                                 ui.separator();
@@ -493,7 +506,8 @@ impl crate::pages::Page for WorkPage {
                                                             };
 
                                                             if let Some(ref requests) = bash_requests {
-                                                                for req in requests {
+                                                                if state.ui_state.show_tool_widgets {
+                                                                    for req in requests {
                                                                     // Check if this bash request is expanded
                                                                     let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
 
@@ -554,6 +568,7 @@ impl crate::pages::Page for WorkPage {
                                                                     }
 
                                                                     ui.add_space(4.0);
+                                                                    }
                                                                 }
                                                             }
 
@@ -610,7 +625,7 @@ impl crate::pages::Page for WorkPage {
 
                                                             // Show tool responses (from ai_session_outputs with role='tool')
                                                             // Check if this output is a tool response
-                                                            if output.role.as_deref() == Some("tool") {
+                                                            if output.role.as_deref() == Some("tool") && state.ui_state.show_tool_widgets {
                                                                 // Parse the tool response - it's wrapped in {"content": <ToolResponse>, "tool_use_id": "..."}
                                                                 if let Ok(wrapped_response) = serde_json::from_str::<serde_json::Value>(&output.content) {
                                                                     if let Some(content) = wrapped_response.get("content") {

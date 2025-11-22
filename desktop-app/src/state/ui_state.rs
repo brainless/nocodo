@@ -42,6 +42,8 @@ pub struct UiState {
     /// Set of expanded tool call IDs (for collapsible tool response widgets)
     #[serde(skip)]
     pub expanded_tool_calls: std::collections::HashSet<i64>,
+    /// Flag to show/hide tool widgets in work details
+    pub show_tool_widgets: bool,
 
     /// File management state for project detail page
     pub selected_file_path: Option<String>,
@@ -93,6 +95,7 @@ impl Default for UiState {
             ui_reference_form_dropdown: None,
             ui_reference_readme_content: String::new(),
             expanded_tool_calls: std::collections::HashSet::new(),
+            show_tool_widgets: false,
 
             selected_file_path: None,
             expanded_folders: std::collections::HashSet::new(),
