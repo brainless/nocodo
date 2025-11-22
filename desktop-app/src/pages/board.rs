@@ -875,47 +875,49 @@ impl crate::pages::Page for WorkPage {
                                             );
 
                                             // Message continuation input (outside scroll area)
-                                            ui.separator();
-                                            ui.add_space(8.0);
+                                            // Use a frame with top border instead of separator so it moves with the form
+                                            egui::Frame::NONE
+                                                .stroke(egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color))
+                                                .inner_margin(egui::Margin::symmetric(0, 8))
+                                                .show(ui, |ui| {
+                                                    // Use bottom-up layout so textarea expands upward
+                                                    ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                                                        // Send button at the bottom
+                                                        ui.horizontal(|ui| {
+                                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
+                                                                    && !state.sending_message;
 
-                                            // Use bottom-up layout so textarea expands upward
-                                            // Allocate only the space we actually need (not all remaining space)
-                                            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                                                    // Send button at the bottom
-                                                    ui.horizontal(|ui| {
-                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                            let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
-                                                                && !state.sending_message;
+                                                                if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
+                                                                    let api_service = crate::services::ApiService::new();
+                                                                    api_service.send_message_to_work(selected_work_id, state);
+                                                                }
 
-                                                            if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
-                                                                let api_service = crate::services::ApiService::new();
-                                                                api_service.send_message_to_work(selected_work_id, state);
-                                                            }
+                                                                if state.sending_message {
+                                                                    ui.add(egui::Spinner::new());
+                                                                    ui.label("Sending...");
+                                                                }
+                                                            });
+                                                        });
 
-                                                            if state.sending_message {
-                                                                ui.add(egui::Spinner::new());
-                                                                ui.label("Sending...");
-                                                            }
+                                                        ui.add_space(8.0);
+
+                                                        // Textarea above the button
+                                                        let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
+                                                            .desired_width(ui.available_width())
+                                                            .desired_rows(3)
+                                                            .hint_text("Type your message here...");
+
+                                                        ui.add(text_edit);
+
+                                                        ui.add_space(4.0);
+
+                                                        // Label at the top
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Continue conversation:");
                                                         });
                                                     });
-
-                                                    ui.add_space(8.0);
-
-                                                    // Textarea above the button
-                                                    let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
-                                                        .desired_width(ui.available_width())
-                                                        .desired_rows(3)
-                                                        .hint_text("Type your message here...");
-
-                                                    ui.add(text_edit);
-
-                                                    ui.add_space(4.0);
-
-                                                    // Label at the top
-                                                    ui.horizontal(|ui| {
-                                                        ui.label("Continue conversation:");
-                                                    });
-                                            });
+                                                });
                                         }
                                     }
                                     ConnectionState::Error(error) => {
