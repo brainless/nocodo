@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{ReadFileRequest, ToolRequest, ToolResponse};
+use manager_models::{BashRequest, ReadFileRequest, ToolRequest, ToolResponse};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static READ_FILE_PARSE_ERROR_LOGGED: AtomicBool = AtomicBool::new(false);
@@ -406,6 +406,157 @@ impl crate::pages::Page for WorkPage {
                                                         DisplayMessage::AiOutput(output) => {
                                                             // Don't display list_files tool requests - only show responses
 
+                                                            // Extract and display any "text" field from assistant messages (separate from tool calls)
+                                                            let assistant_text = if output.role.as_deref() == Some("assistant") {
+                                                                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    assistant_data.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            } else {
+                                                                None
+                                                            };
+
+                                                            if let Some(ref text) = assistant_text {
+                                                                if !text.trim().is_empty() {
+                                                                    // Show assistant text message
+                                                                    let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
+
+                                                                    egui::Frame::NONE
+                                                                        .fill(bg_color)
+                                                                        .corner_radius(8.0)
+                                                                        .inner_margin(egui::Margin::same(12))
+                                                                        .show(ui, |ui| {
+                                                                            ui.vertical(|ui| {
+                                                                                ui.horizontal(|ui| {
+                                                                                    let label = if let Some(model) = &output.model {
+                                                                                        format!("AI - {}", model)
+                                                                                    } else {
+                                                                                        "AI".to_string()
+                                                                                    };
+                                                                                    ui.label(egui::RichText::new(label).size(12.0).strong());
+                                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                                        let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
+                                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                                                                                            .unwrap_or_else(|| "Unknown".to_string());
+                                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                                    });
+                                                                                });
+                                                                                ui.add_space(4.0);
+                                                                                ui.label(text.as_str());
+                                                                            });
+                                                                        });
+                                                                    ui.add_space(8.0);
+                                                                }
+                                                            }
+
+                                                            // Check if this is a bash tool request
+                                                            let bash_requests = if output.role.as_deref() == Some("assistant") {
+                                                                let mut requests = Vec::new();
+
+                                                                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
+                                                                        for tool_call in tool_calls {
+                                                                            if let Some(function) = tool_call.get("function") {
+                                                                                if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
+                                                                                    if name == "bash" {
+                                                                                        if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
+                                                                                            match serde_json::from_str::<BashRequest>(args) {
+                                                                                                Ok(bash_req) => {
+                                                                                                    requests.push(bash_req);
+                                                                                                }
+                                                                                                Err(e) => {
+                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse BashRequest");
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                if requests.is_empty() {
+                                                                    if let Ok(ToolRequest::Bash(bash_req)) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        requests.push(bash_req);
+                                                                    }
+                                                                }
+
+                                                                if !requests.is_empty() {
+                                                                    Some(requests)
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            } else {
+                                                                None
+                                                            };
+
+                                                            if let Some(ref requests) = bash_requests {
+                                                                for req in requests {
+                                                                    // Check if this bash request is expanded
+                                                                    let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
+
+                                                                    // Truncate command to first 100 characters for collapsed view
+                                                                    let truncated_command = if req.command.len() > 100 {
+                                                                        format!("{}...", &req.command[..100])
+                                                                    } else {
+                                                                        req.command.clone()
+                                                                    };
+
+                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                    let response = egui::Frame::NONE
+                                                                        .fill(bg_color)
+                                                                        .corner_radius(0.0)
+                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                        .show(ui, |ui| {
+                                                                            ui.set_width(ui.available_width());
+                                                                            ui.vertical(|ui| {
+                                                                                // Header row - clickable
+                                                                                let header_response = ui.horizontal(|ui| {
+                                                                                    let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                    ui.label(egui::RichText::new(arrow).size(12.0));
+                                                                                    ui.label(egui::RichText::new(if is_expanded {
+                                                                                        &req.command
+                                                                                    } else {
+                                                                                        &truncated_command
+                                                                                    }).size(12.0).strong().family(egui::FontFamily::Monospace));
+                                                                                }).response;
+
+                                                                                // Show description if expanded and it exists
+                                                                                if is_expanded {
+                                                                                    if let Some(desc) = &req.description {
+                                                                                        if !desc.trim().is_empty() {
+                                                                                            ui.add_space(4.0);
+                                                                                            ui.label(egui::RichText::new(desc).size(11.0).color(ui.style().visuals.weak_text_color()));
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                header_response
+                                                                            }).inner
+                                                                        })
+                                                                        .response;
+
+                                                                    // Handle click to toggle expansion
+                                                                    if response.interact(egui::Sense::click()).clicked() {
+                                                                        if is_expanded {
+                                                                            state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                        } else {
+                                                                            state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                        }
+                                                                    }
+
+                                                                    // Change cursor to pointer on hover
+                                                                    if response.hovered() {
+                                                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                    }
+
+                                                                    ui.add_space(4.0);
+                                                                }
+                                                            }
+
                                                             // Check if this is a read_file tool request using proper Rust types
                                                             let read_file_requests = if output.role.as_deref() == Some("assistant") {
                                                                 // Try multiple parsing approaches for robustness
@@ -561,12 +712,128 @@ impl crate::pages::Page for WorkPage {
 
                                                                                 ui.add_space(4.0);
                                                                         }
+
+                                                                        // Handle bash tool response
+                                                                        if let Ok(ToolResponse::Bash(bash_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
+                                                                                // Check if this response is expanded
+                                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
+
+                                                                                // Truncate command to first 100 characters for collapsed view
+                                                                                let truncated_command = if bash_response.command.len() > 100 {
+                                                                                    format!("{}...", &bash_response.command[..100])
+                                                                                } else {
+                                                                                    bash_response.command.clone()
+                                                                                };
+
+                                                                                let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                                let response = egui::Frame::NONE
+                                                                                    .fill(bg_color)
+                                                                                    .corner_radius(0.0)
+                                                                                    .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                                    .show(ui, |ui| {
+                                                                                        ui.set_width(ui.available_width());
+                                                                                        ui.vertical(|ui| {
+                                                                                            // Header row - clickable
+                                                                                            let header_response = ui.horizontal(|ui| {
+                                                                                                let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                                ui.label(egui::RichText::new(arrow).size(12.0));
+
+                                                                                                // Show exit code indicator
+                                                                                                let (indicator, color) = if bash_response.exit_code == 0 {
+                                                                                                    ("✓", egui::Color32::from_rgb(0, 200, 0))
+                                                                                                } else {
+                                                                                                    ("✗", egui::Color32::from_rgb(200, 0, 0))
+                                                                                                };
+                                                                                                ui.label(egui::RichText::new(indicator).size(12.0).color(color));
+
+                                                                                                ui.label(egui::RichText::new(if is_expanded {
+                                                                                                    &bash_response.command
+                                                                                                } else {
+                                                                                                    &truncated_command
+                                                                                                }).size(12.0).strong().family(egui::FontFamily::Monospace));
+                                                                                            }).response;
+
+                                                                                            // Show output if expanded
+                                                                                            if is_expanded {
+                                                                                                ui.add_space(8.0);
+                                                                                                ui.separator();
+                                                                                                ui.add_space(4.0);
+
+                                                                                                // Show stdout if not empty
+                                                                                                if !bash_response.stdout.trim().is_empty() {
+                                                                                                    ui.label(egui::RichText::new("stdout:").size(11.0).strong());
+                                                                                                    ui.add_space(2.0);
+                                                                                                    egui::ScrollArea::vertical()
+                                                                                                        .max_height(200.0)
+                                                                                                        .show(ui, |ui| {
+                                                                                                            ui.label(egui::RichText::new(&bash_response.stdout)
+                                                                                                                .size(10.0)
+                                                                                                                .family(egui::FontFamily::Monospace));
+                                                                                                        });
+                                                                                                    ui.add_space(4.0);
+                                                                                                }
+
+                                                                                                // Show stderr if not empty
+                                                                                                if !bash_response.stderr.trim().is_empty() {
+                                                                                                    ui.label(egui::RichText::new("stderr:").size(11.0).strong().color(egui::Color32::from_rgb(200, 0, 0)));
+                                                                                                    ui.add_space(2.0);
+                                                                                                    egui::ScrollArea::vertical()
+                                                                                                        .max_height(200.0)
+                                                                                                        .show(ui, |ui| {
+                                                                                                            ui.label(egui::RichText::new(&bash_response.stderr)
+                                                                                                                .size(10.0)
+                                                                                                                .family(egui::FontFamily::Monospace)
+                                                                                                                .color(egui::Color32::from_rgb(200, 0, 0)));
+                                                                                                        });
+                                                                                                    ui.add_space(4.0);
+                                                                                                }
+
+                                                                                                // Show execution details
+                                                                                                ui.horizontal(|ui| {
+                                                                                                    ui.label(egui::RichText::new(format!("Exit code: {}", bash_response.exit_code))
+                                                                                                        .size(10.0)
+                                                                                                        .color(ui.style().visuals.weak_text_color()));
+                                                                                                    ui.label(egui::RichText::new(format!("Time: {:.2}s", bash_response.execution_time_secs))
+                                                                                                        .size(10.0)
+                                                                                                        .color(ui.style().visuals.weak_text_color()));
+                                                                                                    if bash_response.timed_out {
+                                                                                                        ui.label(egui::RichText::new("⚠ Timed out")
+                                                                                                            .size(10.0)
+                                                                                                            .color(egui::Color32::from_rgb(255, 165, 0)));
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+
+                                                                                            header_response
+                                                                                        }).inner
+                                                                                    })
+                                                                                    .response;
+
+                                                                                // Handle click to toggle expansion
+                                                                                if response.interact(egui::Sense::click()).clicked() {
+                                                                                    if is_expanded {
+                                                                                        state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                                    } else {
+                                                                                        state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                                    }
+                                                                                }
+
+                                                                                // Change cursor to pointer on hover
+                                                                                if response.hovered() {
+                                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                                }
+
+                                                                                ui.add_space(4.0);
+                                                                        }
                                                                     }
                                                                 }
                                                             }
 
                                                             // Show regular AI response if not a tool request or tool response
-                                                            if read_file_requests.is_none() && output.role.as_deref() != Some("tool") {
+                                                            // Skip if we already showed assistant text, bash request, read_file request, or this is a tool response
+                                                            let skip_regular_response = assistant_text.is_some() || bash_requests.is_some() || read_file_requests.is_some() || output.role.as_deref() == Some("tool");
+                                                            if !skip_regular_response {
                                                                 // Regular AI response message
                                                                 let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 
