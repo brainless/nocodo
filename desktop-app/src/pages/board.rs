@@ -348,40 +348,18 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Calculate reply form height dynamically based on textarea content
-                                            let reply_form_height = {
-                                                // Calculate actual textarea height based on content
-                                                let num_lines = state.ui_state.continue_message_input.lines().count().max(3);
-                                                let line_height = ui.text_style_height(&egui::TextStyle::Body);
-                                                let actual_textarea_height = (num_lines as f32) * line_height;
+                                            // Use remaining space for scroll area, with auto_shrink to prevent overlap
+                                            let mut scroll_area = egui::ScrollArea::vertical()
+                                                .id_salt("work_messages_scroll")
+                                                .auto_shrink([false, true]); // Don't shrink horizontally, shrink vertically to fit
 
-                                                // Total height with actual textarea size:
-                                                // Separator (1) + spacing (8) + label height (~20) + spacing (4) +
-                                                // textarea height + spacing (8) + button height (~25) + extra padding (10)
-                                                1.0 + 8.0 + 20.0 + 4.0 + actual_textarea_height + 8.0 + 25.0 + 10.0
-                                            };
+                                            // Reset scroll to top if a new work item was selected
+                                            if state.ui_state.reset_work_details_scroll {
+                                                scroll_area = scroll_area.vertical_scroll_offset(0.0);
+                                                state.ui_state.reset_work_details_scroll = false;
+                                            }
 
-                                            // Calculate scroll area height - this is what remains after reply form
-                                            let total_available_height = ui.available_height();
-                                            let scroll_area_height = (total_available_height - reply_form_height).max(100.0); // Minimum 100px
-                                            let available_width = ui.available_width();
-
-                                            // Explicitly allocate space for scroll area so it doesn't overlap with reply form
-                                            ui.allocate_ui_with_layout(
-                                                egui::vec2(available_width, scroll_area_height),
-                                                egui::Layout::top_down(egui::Align::LEFT),
-                                                |ui| {
-                                                    let mut scroll_area = egui::ScrollArea::vertical()
-                                                        .id_salt("work_messages_scroll")
-                                                        .auto_shrink(false);
-
-                                                    // Reset scroll to top if a new work item was selected
-                                                    if state.ui_state.reset_work_details_scroll {
-                                                        scroll_area = scroll_area.vertical_scroll_offset(0.0);
-                                                        state.ui_state.reset_work_details_scroll = false;
-                                                    }
-
-                                                    scroll_area.show(ui, |ui| {
+                                            scroll_area.show(ui, |ui| {
                                                 ui.add_space(8.0);
 
                                                 // Combine and sort all messages by timestamp
@@ -407,6 +385,9 @@ impl crate::pages::Page for WorkPage {
                                                 all_messages.sort_by_key(|(timestamp, _)| *timestamp);
 
                                                 for (_timestamp, message) in &all_messages {
+                                                    // Track if we rendered anything for this message to decide on spacing
+                                                    let mut rendered_something = false;
+
                                                     match message {
                                                         DisplayMessage::WorkMessage(msg) => {
                                                             // User message
@@ -431,6 +412,7 @@ impl crate::pages::Page for WorkPage {
                                                                         ui.label(&msg.content);
                                                                     });
                                                                 });
+                                                            rendered_something = true;
                                                         }
                                                         DisplayMessage::AiOutput(output) => {
                                                             // Don't display list_files tool requests - only show responses
@@ -475,7 +457,7 @@ impl crate::pages::Page for WorkPage {
                                                                                 ui.label(text.as_str());
                                                                             });
                                                                         });
-                                                                    ui.add_space(8.0);
+                                                                    rendered_something = true;
                                                                 }
                                                             }
 
@@ -523,6 +505,7 @@ impl crate::pages::Page for WorkPage {
 
                                                             if let Some(ref requests) = bash_requests {
                                                                 if state.ui_state.show_tool_widgets {
+                                                                    rendered_something = true;
                                                                     for req in requests {
                                                                     // Check if this bash request is expanded
                                                                     let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
@@ -582,8 +565,6 @@ impl crate::pages::Page for WorkPage {
                                                                     if response.hovered() {
                                                                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                                     }
-
-                                                                    ui.add_space(4.0);
                                                                     }
                                                                 }
                                                             }
@@ -642,6 +623,7 @@ impl crate::pages::Page for WorkPage {
                                                             // Show tool responses (from ai_session_outputs with role='tool')
                                                             // Check if this output is a tool response
                                                             if output.role.as_deref() == Some("tool") && state.ui_state.show_tool_widgets {
+                                                                rendered_something = true;
                                                                 // Parse the tool response - it's wrapped in {"content": <ToolResponse>, "tool_use_id": "..."}
                                                                 if let Ok(wrapped_response) = serde_json::from_str::<serde_json::Value>(&output.content) {
                                                                     if let Some(content) = wrapped_response.get("content") {
@@ -712,8 +694,6 @@ impl crate::pages::Page for WorkPage {
                                                                                 if response.hovered() {
                                                                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                                                 }
-
-                                                                                ui.add_space(4.0);
                                                                         }
 
                                                                         // Handle bash tool response
@@ -826,8 +806,6 @@ impl crate::pages::Page for WorkPage {
                                                                                 if response.hovered() {
                                                                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                                                 }
-
-                                                                                ui.add_space(4.0);
                                                                         }
                                                                     }
                                                                 }
@@ -865,14 +843,17 @@ impl crate::pages::Page for WorkPage {
                                                                             ui.label(&output.content);
                                                                         });
                                                                     });
+                                                                rendered_something = true;
                                                             }
                                                         }
                                                     }
-                                                    ui.add_space(8.0);
+
+                                                    // Only add spacing if we actually rendered something
+                                                    if rendered_something {
+                                                        ui.add_space(8.0);
+                                                    }
                                                 }
                                             });
-                                                },
-                                            );
 
                                             // Message continuation input (outside scroll area)
                                             // Use a frame with top border instead of separator so it moves with the form
