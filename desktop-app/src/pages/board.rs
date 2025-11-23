@@ -348,10 +348,24 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Use remaining space for scroll area, with auto_shrink to prevent overlap
+                                            // Calculate space dynamically: form takes what it needs, messages get the rest
+                                            let available_height = ui.available_height();
+
+                                            // Estimate minimum form height based on current textarea content
+                                            // Base form: label (20) + spacing (4) + button row (30) + frame margins (16) + spacing (8) = 78px
+                                            // Plus textarea height based on number of lines in continue_message_input
+                                            let text_lines = state.ui_state.continue_message_input.lines().count().max(3);
+                                            let estimated_textarea_height = (text_lines as f32 * 20.0).max(65.0); // ~20px per line, min 65px for 3 rows
+                                            let estimated_form_height = 78.0 + estimated_textarea_height;
+
+                                            // Calculate max height for message history
+                                            let max_messages_height = (available_height - estimated_form_height).max(100.0);
+
+                                            // Render message history with calculated max height
                                             let mut scroll_area = egui::ScrollArea::vertical()
                                                 .id_salt("work_messages_scroll")
-                                                .auto_shrink([false, true]); // Don't shrink horizontally, shrink vertically to fit
+                                                .max_height(max_messages_height)
+                                                .auto_shrink([false, false]); // Don't shrink to prevent overlap
 
                                             // Reset scroll to top if a new work item was selected
                                             if state.ui_state.reset_work_details_scroll {
