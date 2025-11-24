@@ -1,4 +1,4 @@
-use crate::content_renderer::MarkdownRenderer;
+use crate::components::markdown_renderer::MarkdownRenderer;
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::ui_text::{ContentText, WidgetText};

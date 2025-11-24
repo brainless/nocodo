@@ -1,7 +1,8 @@
+use crate::components::message_renderer::{AiMessageRenderer, UserMessageRenderer};
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{ListFilesRequest, ReadFileRequest, ToolRequest, ToolResponse};
+use manager_models::{BashRequest, ReadFileRequest, ToolRequest, ToolResponse};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static READ_FILE_PARSE_ERROR_LOGGED: AtomicBool = AtomicBool::new(false);
@@ -301,6 +302,19 @@ impl crate::pages::Page for WorkPage {
                                             ui.label(&project.name);
                                         }
                                     }
+
+                                    // Add toggle button at the far right
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        let button_text = if state.ui_state.show_tool_widgets {
+                                            "Hide tools"
+                                        } else {
+                                            "Show tools"
+                                        };
+
+                                        if ui.button(button_text).clicked() {
+                                            state.ui_state.show_tool_widgets = !state.ui_state.show_tool_widgets;
+                                        }
+                                    });
                                 });
 
                                 ui.separator();
@@ -335,16 +349,24 @@ impl crate::pages::Page for WorkPage {
                                                 }
                                             });
                                         } else {
-                                            // Reserve space for reply form at bottom (approximately 120px)
-                                            let reply_form_height = 120.0;
-                                            let available_height = ui.available_height() - reply_form_height;
-                                            let available_width = ui.available_width();
+                                            // Calculate space dynamically: form takes what it needs, messages get the rest
+                                            let available_height = ui.available_height();
 
+                                            // Estimate minimum form height based on current textarea content
+                                            // Base form: label (20) + spacing (4) + button row (30) + frame margins (16) + spacing (8) = 78px
+                                            // Plus textarea height based on number of lines in continue_message_input
+                                            let text_lines = state.ui_state.continue_message_input.lines().count().max(3);
+                                            let estimated_textarea_height = (text_lines as f32 * 20.0).max(65.0); // ~20px per line, min 65px for 3 rows
+                                            let estimated_form_height = 78.0 + estimated_textarea_height;
+
+                                            // Calculate max height for message history
+                                            let max_messages_height = (available_height - estimated_form_height).max(100.0);
+
+                                            // Render message history with calculated max height
                                             let mut scroll_area = egui::ScrollArea::vertical()
                                                 .id_salt("work_messages_scroll")
-                                                .auto_shrink(false)
-                                                .max_height(available_height)
-                                                .max_width(available_width);
+                                                .max_height(max_messages_height)
+                                                .auto_shrink([false, false]); // Don't shrink to prevent overlap
 
                                             // Reset scroll to top if a new work item was selected
                                             if state.ui_state.reset_work_details_scroll {
@@ -378,53 +400,54 @@ impl crate::pages::Page for WorkPage {
                                                 all_messages.sort_by_key(|(timestamp, _)| *timestamp);
 
                                                 for (_timestamp, message) in &all_messages {
-                                                    match message {
+                                                    // Track if we rendered anything for this message to decide on spacing
+                                                    let mut rendered_something = false;
+
+match message {
                                                         DisplayMessage::WorkMessage(msg) => {
                                                             // User message
-                                                            let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
-
-                                                            egui::Frame::NONE
-                                                                .fill(bg_color)
-                                                                .corner_radius(8.0)
-                                                                .inner_margin(egui::Margin::same(12))
-                                                                .show(ui, |ui| {
-                                                                    ui.vertical(|ui| {
-                                                                        ui.horizontal(|ui| {
-                                                                            ui.label(egui::RichText::new("User").size(12.0).strong());
-                                                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                                let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
-                                                                                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                                    .unwrap_or_else(|| "Unknown".to_string());
-                                                                                ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                            });
-                                                                        });
-                                                                        ui.add_space(4.0);
-                                                                        ui.label(&msg.content);
-                                                                    });
-                                                                });
+                                                            UserMessageRenderer::render(ui, &msg.content, msg.created_at);
+                                                            rendered_something = true;
                                                         }
                                                         DisplayMessage::AiOutput(output) => {
-                                                            // Check if this is a list_files tool request using proper Rust types
-                                                            let list_files_requests = if output.role.as_deref() == Some("assistant") {
-                                                                // Try multiple parsing approaches for robustness
+                                                            // Don't display list_files tool requests - only show responses
+
+                                                            // Extract and display any "text" field from assistant messages (separate from tool calls)
+                                                            let assistant_text = if output.role.as_deref() == Some("assistant") {
+                                                                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
+                                                                    assistant_data.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            } else {
+                                                                None
+                                                            };
+
+if let Some(ref text) = assistant_text {
+                                                                if !text.trim().is_empty() {
+                                                                    // Show assistant text message
+                                                                    AiMessageRenderer::render_text(ui, text.as_str(), output.model.as_deref(), output.created_at);
+                                                                    rendered_something = true;
+                                                                }
+                                                            }
+
+                                                            // Check if this is a bash tool request
+                                                            let bash_requests = if output.role.as_deref() == Some("assistant") {
                                                                 let mut requests = Vec::new();
 
-                                                                // 1. Try to parse as structured JSON with tool_calls (standard format)
                                                                 if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(&output.content) {
-                                                                    // Look for tool_calls array in the structured response
                                                                     if let Some(tool_calls) = assistant_data.get("tool_calls").and_then(|tc| tc.as_array()) {
                                                                         for tool_call in tool_calls {
                                                                             if let Some(function) = tool_call.get("function") {
                                                                                 if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
-                                                                                    if name == "list_files" {
+                                                                                    if name == "bash" {
                                                                                         if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
-                                                                                            // Use proper Rust type for parsing ListFilesRequest
-                                                                                            match serde_json::from_str::<ListFilesRequest>(args) {
-                                                                                                Ok(list_files_req) => {
-                                                                                                    requests.push(list_files_req);
+                                                                                            match serde_json::from_str::<BashRequest>(args) {
+                                                                                                Ok(bash_req) => {
+                                                                                                    requests.push(bash_req);
                                                                                                 }
                                                                                                 Err(e) => {
-                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse ListFilesRequest");
+                                                                                                    tracing::warn!(error = %e, arguments = %args, "Failed to parse BashRequest");
                                                                                                 }
                                                                                             }
                                                                                         }
@@ -435,10 +458,9 @@ impl crate::pages::Page for WorkPage {
                                                                     }
                                                                 }
 
-                                                                // 2. Try to parse as direct ToolRequest (fallback format)
                                                                 if requests.is_empty() {
-                                                                    if let Ok(ToolRequest::ListFiles(list_files_req)) = serde_json::from_str::<ToolRequest>(&output.content) {
-                                                                        requests.push(list_files_req);
+                                                                    if let Ok(ToolRequest::Bash(bash_req)) = serde_json::from_str::<ToolRequest>(&output.content) {
+                                                                        requests.push(bash_req);
                                                                     }
                                                                 }
 
@@ -451,45 +473,69 @@ impl crate::pages::Page for WorkPage {
                                                                 None
                                                             };
 
-                                                            if let Some(ref requests) = list_files_requests {
-                                                                // Display each list_files tool request in full width box with no rounded corners
-                                                                for req in requests {
-                                                                    let mut description = format!("List files: {}", req.path);
+                                                            if let Some(ref requests) = bash_requests {
+                                                                if state.ui_state.show_tool_widgets {
+                                                                    rendered_something = true;
+                                                                    for req in requests {
+                                                                    // Check if this bash request is expanded
+                                                                    let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
 
-                                                                    // Add optional parameters to the description
-                                                                    let mut options = Vec::new();
-                                                                    if req.recursive.unwrap_or(false) {
-                                                                        options.push("recursive".to_string());
-                                                                    }
-                                                                    if req.include_hidden.unwrap_or(false) {
-                                                                        options.push("include hidden".to_string());
-                                                                    }
-                                                                    if let Some(max_files) = req.max_files {
-                                                                        options.push(format!("max: {}", max_files));
-                                                                    }
+                                                                    // Truncate command to first 100 characters for collapsed view
+                                                                    let truncated_command = if req.command.len() > 100 {
+                                                                        format!("{}...", &req.command[..100])
+                                                                    } else {
+                                                                        req.command.clone()
+                                                                    };
 
-                                                                    if !options.is_empty() {
-                                                                        description.push_str(&format!(" ({})", options.join(", ")));
-                                                                    }
-
-                                                                    // Use the same styling as User box but full width with no rounded corners
                                                                     let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
 
-                                                                    egui::Frame::NONE
+                                                                    let response = egui::Frame::NONE
                                                                         .fill(bg_color)
                                                                         .corner_radius(0.0)
                                                                         .inner_margin(egui::Margin::symmetric(12, 6))
                                                                         .show(ui, |ui| {
                                                                             ui.set_width(ui.available_width());
                                                                             ui.vertical(|ui| {
-                                                                                ui.horizontal(|ui| {
-                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
-                                                                                    ui.label(egui::RichText::new("📁").size(16.0));
-                                                                                    ui.label(egui::RichText::new(description).size(12.0).strong());
-                                                                                });
-                                                                            });
-                                                                        });
-                                                                    ui.add_space(4.0);
+                                                                                // Header row - clickable
+                                                                                let header_response = ui.horizontal(|ui| {
+                                                                                    let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                    ui.label(egui::RichText::new(arrow).size(12.0));
+                                                                                    ui.label(egui::RichText::new(if is_expanded {
+                                                                                        &req.command
+                                                                                    } else {
+                                                                                        &truncated_command
+                                                                                    }).size(12.0).strong().family(egui::FontFamily::Monospace));
+                                                                                }).response;
+
+                                                                                // Show description if expanded and it exists
+                                                                                if is_expanded {
+                                                                                    if let Some(desc) = &req.description {
+                                                                                        if !desc.trim().is_empty() {
+                                                                                            ui.add_space(4.0);
+                                                                                            ui.label(egui::RichText::new(desc).size(11.0).color(ui.style().visuals.weak_text_color()));
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                header_response
+                                                                            }).inner
+                                                                        })
+                                                                        .response;
+
+                                                                    // Handle click to toggle expansion
+                                                                    if response.interact(egui::Sense::click()).clicked() {
+                                                                        if is_expanded {
+                                                                            state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                        } else {
+                                                                            state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                        }
+                                                                    }
+
+                                                                    // Change cursor to pointer on hover
+                                                                    if response.hovered() {
+                                                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                    }
+                                                                    }
                                                                 }
                                                             }
 
@@ -541,46 +587,19 @@ impl crate::pages::Page for WorkPage {
                                                                 None
                                                             };
 
-                                                            if let Some(ref requests) = read_file_requests {
-                                                                // Display each read_file tool request in full width box with no rounded corners
-                                                                for req in requests {
-                                                                    let mut description = format!("Read file: {}", req.path);
-
-                                                                    // Add optional parameters to the description
-                                                                    if let Some(max_size) = req.max_size {
-                                                                        description.push_str(&format!(" (max size: {} bytes)", max_size));
-                                                                    }
-
-                                                                    // Use the same styling as list_files box but full width with no rounded corners
-                                                                    let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
-
-                                                                    egui::Frame::NONE
-                                                                        .fill(bg_color)
-                                                                        .corner_radius(0.0)
-                                                                        .inner_margin(egui::Margin::symmetric(12, 6))
-                                                                        .show(ui, |ui| {
-                                                                            ui.set_width(ui.available_width());
-                                                                            ui.vertical(|ui| {
-                                                                                ui.horizontal(|ui| {
-                                                                                    ui.label(egui::RichText::new("🤖").size(16.0));
-                                                                                    ui.label(egui::RichText::new("📄").size(16.0));
-                                                                                    ui.label(egui::RichText::new(description).size(12.0).strong());
-                                                                                });
-                                                                            });
-                                                                        });
-                                                                    ui.add_space(4.0);
-                                                                }
-                                                            }
+                                                            // Don't display read_file tool requests - only show responses
+                                                            // The "text" field is already extracted and displayed separately above
 
                                                             // Show tool responses (from ai_session_outputs with role='tool')
                                                             // Check if this output is a tool response
-                                                            if output.role.as_deref() == Some("tool") {
+                                                            if output.role.as_deref() == Some("tool") && state.ui_state.show_tool_widgets {
+                                                                rendered_something = true;
                                                                 // Parse the tool response - it's wrapped in {"content": <ToolResponse>, "tool_use_id": "..."}
                                                                 if let Ok(wrapped_response) = serde_json::from_str::<serde_json::Value>(&output.content) {
                                                                     if let Some(content) = wrapped_response.get("content") {
                                                                         // Try to parse the content as ToolResponse
                                                                         if let Ok(ToolResponse::ListFiles(list_files_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
-                                                                                // Check if this tool response is expanded (use output.id)
+                                                                                // Check if this response is expanded
                                                                                 let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
 
                                                                                 // Use the same styling as tool request box
@@ -594,9 +613,7 @@ impl crate::pages::Page for WorkPage {
                                                                                         ui.set_width(ui.available_width());
                                                                                         ui.vertical(|ui| {
                                                                                             // Header row - clickable
-                                                                                            ui.horizontal(|ui| {
-                                                                                                ui.label(egui::RichText::new("🤖").size(16.0));
-                                                                                                ui.label(egui::RichText::new("📁").size(16.0));
+                                                                                            let header_response = ui.horizontal(|ui| {
                                                                                                 let arrow = if is_expanded { "▼" } else { "▶" };
                                                                                                 ui.label(egui::RichText::new(arrow).size(12.0));
                                                                                                 ui.label(egui::RichText::new(format!(
@@ -604,7 +621,7 @@ impl crate::pages::Page for WorkPage {
                                                                                                     list_files_response.total_files,
                                                                                                     list_files_response.current_path
                                                                                                 )).size(12.0).strong());
-                                                                                            });
+                                                                                            }).response;
 
                                                                                             // Show file list if expanded
                                                                                             if is_expanded {
@@ -628,11 +645,13 @@ impl crate::pages::Page for WorkPage {
                                                                                                     );
                                                                                                 }
                                                                                             }
-                                                                                        });
+
+                                                                                            header_response
+                                                                                        }).inner
                                                                                     })
                                                                                     .response;
 
-                                                                                // Make the widget clickable to toggle expansion
+                                                                                // Handle click to toggle expansion
                                                                                 if response.interact(egui::Sense::click()).clicked() {
                                                                                     if is_expanded {
                                                                                         state.ui_state.expanded_tool_calls.remove(&output.id);
@@ -645,85 +664,191 @@ impl crate::pages::Page for WorkPage {
                                                                                 if response.hovered() {
                                                                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                                                                 }
+                                                                        }
 
-                                                                                ui.add_space(4.0);
+                                                                        // Handle bash tool response
+                                                                        if let Ok(ToolResponse::Bash(bash_response)) = serde_json::from_value::<ToolResponse>(content.clone()) {
+                                                                                // Check if this response is expanded
+                                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&output.id);
+
+                                                                                // Truncate command to first 100 characters for collapsed view
+                                                                                let truncated_command = if bash_response.command.len() > 100 {
+                                                                                    format!("{}...", &bash_response.command[..100])
+                                                                                } else {
+                                                                                    bash_response.command.clone()
+                                                                                };
+
+                                                                                let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                                let response = egui::Frame::NONE
+                                                                                    .fill(bg_color)
+                                                                                    .corner_radius(0.0)
+                                                                                    .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                                    .show(ui, |ui| {
+                                                                                        ui.set_width(ui.available_width());
+                                                                                        ui.vertical(|ui| {
+                                                                                            // Header row - clickable
+                                                                                            let header_response = ui.horizontal(|ui| {
+                                                                                                let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                                ui.label(egui::RichText::new(arrow).size(12.0));
+
+                                                                                                // Show exit code indicator
+                                                                                                let (indicator, color) = if bash_response.exit_code == 0 {
+                                                                                                    ("✓", egui::Color32::from_rgb(0, 200, 0))
+                                                                                                } else {
+                                                                                                    ("✗", egui::Color32::from_rgb(200, 0, 0))
+                                                                                                };
+                                                                                                ui.label(egui::RichText::new(indicator).size(12.0).color(color));
+
+                                                                                                ui.label(egui::RichText::new(if is_expanded {
+                                                                                                    &bash_response.command
+                                                                                                } else {
+                                                                                                    &truncated_command
+                                                                                                }).size(12.0).strong().family(egui::FontFamily::Monospace));
+                                                                                            }).response;
+
+                                                                                            // Show output if expanded
+                                                                                            if is_expanded {
+                                                                                                ui.add_space(8.0);
+                                                                                                ui.separator();
+                                                                                                ui.add_space(4.0);
+
+                                                                                                // Show stdout if not empty
+                                                                                                if !bash_response.stdout.trim().is_empty() {
+                                                                                                    ui.label(egui::RichText::new("stdout:").size(11.0).strong());
+                                                                                                    ui.add_space(2.0);
+                                                                                                    egui::ScrollArea::vertical()
+                                                                                                        .max_height(200.0)
+                                                                                                        .show(ui, |ui| {
+                                                                                                            ui.label(egui::RichText::new(&bash_response.stdout)
+                                                                                                                .size(10.0)
+                                                                                                                .family(egui::FontFamily::Monospace));
+                                                                                                        });
+                                                                                                    ui.add_space(4.0);
+                                                                                                }
+
+                                                                                                // Show stderr if not empty
+                                                                                                if !bash_response.stderr.trim().is_empty() {
+                                                                                                    ui.label(egui::RichText::new("stderr:").size(11.0).strong().color(egui::Color32::from_rgb(200, 0, 0)));
+                                                                                                    ui.add_space(2.0);
+                                                                                                    egui::ScrollArea::vertical()
+                                                                                                        .max_height(200.0)
+                                                                                                        .show(ui, |ui| {
+                                                                                                            ui.label(egui::RichText::new(&bash_response.stderr)
+                                                                                                                .size(10.0)
+                                                                                                                .family(egui::FontFamily::Monospace)
+                                                                                                                .color(egui::Color32::from_rgb(200, 0, 0)));
+                                                                                                        });
+                                                                                                    ui.add_space(4.0);
+                                                                                                }
+
+                                                                                                // Show execution details
+                                                                                                ui.horizontal(|ui| {
+                                                                                                    ui.label(egui::RichText::new(format!("Exit code: {}", bash_response.exit_code))
+                                                                                                        .size(10.0)
+                                                                                                        .color(ui.style().visuals.weak_text_color()));
+                                                                                                    ui.label(egui::RichText::new(format!("Time: {:.2}s", bash_response.execution_time_secs))
+                                                                                                        .size(10.0)
+                                                                                                        .color(ui.style().visuals.weak_text_color()));
+                                                                                                    if bash_response.timed_out {
+                                                                                                        ui.label(egui::RichText::new("⚠ Timed out")
+                                                                                                            .size(10.0)
+                                                                                                            .color(egui::Color32::from_rgb(255, 165, 0)));
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+
+                                                                                            header_response
+                                                                                        }).inner
+                                                                                    })
+                                                                                    .response;
+
+                                                                                // Handle click to toggle expansion
+                                                                                if response.interact(egui::Sense::click()).clicked() {
+                                                                                    if is_expanded {
+                                                                                        state.ui_state.expanded_tool_calls.remove(&output.id);
+                                                                                    } else {
+                                                                                        state.ui_state.expanded_tool_calls.insert(output.id);
+                                                                                    }
+                                                                                }
+
+                                                                                // Change cursor to pointer on hover
+                                                                                if response.hovered() {
+                                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                                }
                                                                         }
                                                                     }
                                                                 }
                                                             }
 
                                                             // Show regular AI response if not a tool request or tool response
-                                                            if list_files_requests.is_none() && read_file_requests.is_none() && output.role.as_deref() != Some("tool") {
+                                                            // Skip if we already showed assistant text, bash request, read_file request, or this is a tool response
+                                                            let skip_regular_response = assistant_text.is_some() || bash_requests.is_some() || read_file_requests.is_some() || output.role.as_deref() == Some("tool");
+if !skip_regular_response {
                                                                 // Regular AI response message
-                                                                let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
-
-                                                                egui::Frame::NONE
-                                                                    .fill(bg_color)
-                                                                    .corner_radius(8.0)
-                                                                    .inner_margin(egui::Margin::same(12))
-                                                                    .show(ui, |ui| {
-                                                                        ui.vertical(|ui| {
-                                                                            ui.horizontal(|ui| {
-                                                                                // Determine label based on role and model
-                                                                                let label = match (output.role.as_deref(), output.model.as_deref()) {
-                                                                                    (Some("tool"), _) => "nocodo".to_string(),
-                                                                                    (Some("assistant"), Some(model)) => format!("AI - {}", model),
-                                                                                    _ => "AI".to_string(),
-                                                                                };
-                                                                                ui.label(egui::RichText::new(label).size(12.0).strong());
-                                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                                    let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
-                                                                                        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                                        .unwrap_or_else(|| "Unknown".to_string());
-                                                                                    ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                                });
-                                                                            });
-                                                                            ui.add_space(4.0);
-                                                                            ui.label(&output.content);
-                                                                        });
-                                                                    });
+                                                                AiMessageRenderer::render_response(
+                                                                    ui, 
+                                                                    &output.content, 
+                                                                    output.role.as_deref().unwrap_or("assistant"),
+                                                                    output.model.as_deref(),
+                                                                    output.created_at
+                                                                );
+                                                                rendered_something = true;
                                                             }
                                                         }
                                                     }
-                                                    ui.add_space(8.0);
+
+                                                    // Only add spacing if we actually rendered something
+                                                    if rendered_something {
+                                                        ui.add_space(8.0);
+                                                    }
                                                 }
                                             });
 
                                             // Message continuation input (outside scroll area)
-                                            ui.separator();
-                                            ui.add_space(8.0);
+                                            // Use a frame with top border instead of separator so it moves with the form
+                                            egui::Frame::NONE
+                                                .stroke(egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color))
+                                                .inner_margin(egui::Margin::symmetric(0, 8))
+                                                .show(ui, |ui| {
+                                                    // Use bottom-up layout so textarea expands upward
+                                                    ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                                                        // Send button at the bottom
+                                                        ui.horizontal(|ui| {
+                                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
+                                                                    && !state.sending_message;
 
-                                            ui.horizontal(|ui| {
-                                                ui.label("Continue conversation:");
-                                            });
+                                                                if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
+                                                                    let api_service = crate::services::ApiService::new();
+                                                                    api_service.send_message_to_work(selected_work_id, state);
+                                                                }
 
-                                            ui.add_space(4.0);
+                                                                if state.sending_message {
+                                                                    ui.add(egui::Spinner::new());
+                                                                    ui.label("Sending...");
+                                                                }
+                                                            });
+                                                        });
 
-                                            let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
-                                                .desired_width(ui.available_width())
-                                                .desired_rows(3)
-                                                .hint_text("Type your message here...");
+                                                        ui.add_space(8.0);
 
-                                            ui.add(text_edit);
+                                                        // Textarea above the button
+                                                        let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
+                                                            .desired_width(ui.available_width())
+                                                            .desired_rows(3)
+                                                            .hint_text("Type your message here...");
 
-                                            ui.add_space(8.0);
+                                                        ui.add(text_edit);
 
-                                            ui.horizontal(|ui| {
-                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                    let send_enabled = !state.ui_state.continue_message_input.trim().is_empty()
-                                                        && !state.sending_message;
+                                                        ui.add_space(4.0);
 
-                                                    if ui.add_enabled(send_enabled, egui::Button::new("Send")).clicked() {
-                                                        let api_service = crate::services::ApiService::new();
-                                                        api_service.send_message_to_work(selected_work_id, state);
-                                                    }
-
-                                                    if state.sending_message {
-                                                        ui.add(egui::Spinner::new());
-                                                        ui.label("Sending...");
-                                                    }
+                                                        // Label at the top
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Continue conversation:");
+                                                        });
+                                                    });
                                                 });
-                                            });
                                         }
                                     }
                                     ConnectionState::Error(error) => {
