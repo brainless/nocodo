@@ -1,3 +1,4 @@
+use crate::components::message_renderer::{AiMessageRenderer, UserMessageRenderer};
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
@@ -402,30 +403,10 @@ impl crate::pages::Page for WorkPage {
                                                     // Track if we rendered anything for this message to decide on spacing
                                                     let mut rendered_something = false;
 
-                                                    match message {
+match message {
                                                         DisplayMessage::WorkMessage(msg) => {
                                                             // User message
-                                                            let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
-
-                                                            egui::Frame::NONE
-                                                                .fill(bg_color)
-                                                                .corner_radius(8.0)
-                                                                .inner_margin(egui::Margin::same(12))
-                                                                .show(ui, |ui| {
-                                                                    ui.vertical(|ui| {
-                                                                        ui.horizontal(|ui| {
-                                                                            ui.label(egui::RichText::new("User").size(12.0).strong());
-                                                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                                let datetime = chrono::DateTime::from_timestamp(msg.created_at, 0)
-                                                                                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                                    .unwrap_or_else(|| "Unknown".to_string());
-                                                                                ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                            });
-                                                                        });
-                                                                        ui.add_space(4.0);
-                                                                        ui.label(&msg.content);
-                                                                    });
-                                                                });
+                                                            UserMessageRenderer::render(ui, &msg.content, msg.created_at);
                                                             rendered_something = true;
                                                         }
                                                         DisplayMessage::AiOutput(output) => {
@@ -442,35 +423,10 @@ impl crate::pages::Page for WorkPage {
                                                                 None
                                                             };
 
-                                                            if let Some(ref text) = assistant_text {
+if let Some(ref text) = assistant_text {
                                                                 if !text.trim().is_empty() {
                                                                     // Show assistant text message
-                                                                    let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
-
-                                                                    egui::Frame::NONE
-                                                                        .fill(bg_color)
-                                                                        .corner_radius(8.0)
-                                                                        .inner_margin(egui::Margin::same(12))
-                                                                        .show(ui, |ui| {
-                                                                            ui.vertical(|ui| {
-                                                                                ui.horizontal(|ui| {
-                                                                                    let label = if let Some(model) = &output.model {
-                                                                                        format!("AI - {}", model)
-                                                                                    } else {
-                                                                                        "AI".to_string()
-                                                                                    };
-                                                                                    ui.label(egui::RichText::new(label).size(12.0).strong());
-                                                                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                                        let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
-                                                                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                                            .unwrap_or_else(|| "Unknown".to_string());
-                                                                                        ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                                    });
-                                                                                });
-                                                                                ui.add_space(4.0);
-                                                                                ui.label(text.as_str());
-                                                                            });
-                                                                        });
+                                                                    AiMessageRenderer::render_text(ui, text.as_str(), output.model.as_deref(), output.created_at);
                                                                     rendered_something = true;
                                                                 }
                                                             }
@@ -828,35 +784,15 @@ impl crate::pages::Page for WorkPage {
                                                             // Show regular AI response if not a tool request or tool response
                                                             // Skip if we already showed assistant text, bash request, read_file request, or this is a tool response
                                                             let skip_regular_response = assistant_text.is_some() || bash_requests.is_some() || read_file_requests.is_some() || output.role.as_deref() == Some("tool");
-                                                            if !skip_regular_response {
+if !skip_regular_response {
                                                                 // Regular AI response message
-                                                                let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
-
-                                                                egui::Frame::NONE
-                                                                    .fill(bg_color)
-                                                                    .corner_radius(8.0)
-                                                                    .inner_margin(egui::Margin::same(12))
-                                                                    .show(ui, |ui| {
-                                                                        ui.vertical(|ui| {
-                                                                            ui.horizontal(|ui| {
-                                                                                // Determine label based on role and model
-                                                                                let label = match (output.role.as_deref(), output.model.as_deref()) {
-                                                                                    (Some("tool"), _) => "nocodo".to_string(),
-                                                                                    (Some("assistant"), Some(model)) => format!("AI - {}", model),
-                                                                                    _ => "AI".to_string(),
-                                                                                };
-                                                                                ui.label(egui::RichText::new(label).size(12.0).strong());
-                                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                                                    let datetime = chrono::DateTime::from_timestamp(output.created_at, 0)
-                                                                                        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                                                                        .unwrap_or_else(|| "Unknown".to_string());
-                                                                                    ui.label(egui::RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
-                                                                                });
-                                                                            });
-                                                                            ui.add_space(4.0);
-                                                                            ui.label(&output.content);
-                                                                        });
-                                                                    });
+                                                                AiMessageRenderer::render_response(
+                                                                    ui, 
+                                                                    &output.content, 
+                                                                    output.role.as_deref().unwrap_or("assistant"),
+                                                                    output.model.as_deref(),
+                                                                    output.created_at
+                                                                );
                                                                 rendered_something = true;
                                                             }
                                                         }
