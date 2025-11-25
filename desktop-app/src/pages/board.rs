@@ -1,6 +1,7 @@
 use crate::components::message_renderer::{AiMessageRenderer, UserMessageRenderer};
 use crate::state::AppState;
 use crate::state::ConnectionState;
+use crate::state::ui_state::Page as UiPage;
 use egui::{Context, Ui};
 use manager_models::{BashRequest, ReadFileRequest, ToolRequest, ToolResponse};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -299,8 +300,33 @@ impl crate::pages::Page for WorkPage {
                                         if let Some(project) = state.projects.iter().find(|p| p.id == project_id) {
                                             ui.separator();
                                             ui.label("Project:");
-                                            ui.label(&project.name);
+                                            
+                                            // Make project name clickable to navigate to project detail
+                                            let project_label_response = ui.label(
+                                                egui::RichText::new(&project.name)
+                                                    .color(egui::Color32::from_rgb(0, 120, 215)) // Blue color for link
+                                                    .underline()
+                                            );
+                                            
+                                            // Change cursor to pointer on hover
+                                            if project_label_response.hovered() {
+                                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                            }
+                                            
+                                            // Navigate to project detail on click
+                                            if project_label_response.interact(egui::Sense::click()).clicked() {
+                                                state.ui_state.current_page = UiPage::ProjectDetail(project_id);
+                                                // Set pending refresh for project details
+                                                state.pending_project_details_refresh = Some(project_id);
+                                            }
                                         }
+                                    }
+                                    
+                                    // Add branch information if present
+                                    if let Some(git_branch) = &work.git_branch {
+                                        ui.separator();
+                                        ui.label("Branch:");
+                                        ui.label(git_branch);
                                     }
 
                                     // Add toggle button at the far right
