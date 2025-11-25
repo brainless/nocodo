@@ -151,6 +151,7 @@ async fn test_llm_e2e_saleor() {
         model: Some(model.clone()),
         auto_start: true, // Auto-start creates work, message, and AI session
         tool_name: Some("llm-agent".to_string()),
+        git_branch: None,
     };
 
     let req = test::TestRequest::post()
@@ -469,6 +470,7 @@ async fn test_llm_multiple_scenarios() {
             model: Some(model),
             auto_start: true,
             tool_name: Some("llm-agent".to_string()),
+            git_branch: None,
         };
 
         let req = test::TestRequest::post()
