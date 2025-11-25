@@ -239,7 +239,7 @@ impl LlmAgent {
         }
 
         // Create tool definitions for native tool calling
-        let tools = Some(self.create_native_tool_definitions());
+        let tools = Some(self.create_native_tool_definitions(&session.provider));
 
         // Determine temperature based on provider
         // GLM API has issues with floating point precision, so omit it to use API default
@@ -926,7 +926,7 @@ impl LlmAgent {
             }
 
             // Create tool definitions for native tool calling in follow-up
-            let tools = Some(self.create_native_tool_definitions());
+            let tools = Some(self.create_native_tool_definitions(&session.provider));
 
             // Omit temperature for zAI/GLM to avoid floating point precision issues
             let temperature = if session.provider.to_lowercase() == "zai" {
@@ -1308,11 +1308,13 @@ impl LlmAgent {
     }
 
     /// Create native tool definitions for supported providers
-    fn create_native_tool_definitions(&self) -> Vec<crate::llm_client::ToolDefinition> {
+    fn create_native_tool_definitions(&self, provider: &str) -> Vec<crate::llm_client::ToolDefinition> {
         use crate::models::{
             ApplyPatchRequest, BashRequest, GrepRequest, ListFilesRequest, ReadFileRequest,
             WriteFileRequest,
         };
+        use crate::schema_provider::get_schema_provider;
+        use schemars::schema_for;
 
         // Support progressive testing via environment variable:
         // ENABLE_TOOLS=none - No tools (tests basic chat)
@@ -1323,8 +1325,26 @@ impl LlmAgent {
 
         tracing::info!(
             enable_tools = %enable_tools,
-            "Creating native tool definitions with ENABLE_TOOLS={}", enable_tools
+            provider = %provider,
+            "Creating native tool definitions with ENABLE_TOOLS={} for provider={}",
+            enable_tools, provider
         );
+
+        // Get the schema provider for this LLM provider
+        let schema_provider = get_schema_provider(provider);
+
+        // Helper closure to generate tool definition with provider-specific schema
+        let make_tool = |name: &str, description: &str, schema: schemars::schema::RootSchema| {
+            let customized_schema = schema_provider.customize_schema(schema.schema.into());
+            crate::llm_client::ToolDefinition {
+                r#type: "function".to_string(),
+                function: crate::llm_client::FunctionDefinition {
+                    name: name.to_string(),
+                    description: description.to_string(),
+                    parameters: serde_json::to_value(customized_schema).unwrap_or_default(),
+                },
+            }
+        };
 
         match enable_tools.as_str() {
             "none" => {
@@ -1333,37 +1353,25 @@ impl LlmAgent {
             }
             "list_files" => {
                 tracing::info!("ENABLE_TOOLS=list_files: Returning ONLY list_files tool");
-                vec![crate::llm_client::ToolDefinition {
-                    r#type: "function".to_string(),
-                    function: crate::llm_client::FunctionDefinition {
-                        name: "list_files".to_string(),
-                        description: "List files and directories in a given path".to_string(),
-                        parameters: serde_json::to_value(ListFilesRequest::example_schema())
-                            .unwrap_or_default(),
-                    },
-                }]
+                vec![make_tool(
+                    "list_files",
+                    "List files and directories in a given path",
+                    schema_for!(ListFilesRequest),
+                )]
             }
             "list_read" => {
                 tracing::info!("ENABLE_TOOLS=list_read: Returning list_files + read_file tools");
                 vec![
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "list_files".to_string(),
-                            description: "List files and directories in a given path".to_string(),
-                            parameters: serde_json::to_value(ListFilesRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "read_file".to_string(),
-                            description: "Read the contents of a file".to_string(),
-                            parameters: serde_json::to_value(ReadFileRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
+                    make_tool(
+                        "list_files",
+                        "List files and directories in a given path",
+                        schema_for!(ListFilesRequest),
+                    ),
+                    make_tool(
+                        "read_file",
+                        "Read the contents of a file",
+                        schema_for!(ReadFileRequest),
+                    ),
                 ]
             }
             _ => {
@@ -1373,60 +1381,36 @@ impl LlmAgent {
                     enable_tools
                 );
                 vec![
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "list_files".to_string(),
-                            description: "List files and directories in a given path".to_string(),
-                            parameters: serde_json::to_value(ListFilesRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "read_file".to_string(),
-                            description: "Read the contents of a file".to_string(),
-                            parameters: serde_json::to_value(ReadFileRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "write_file".to_string(),
-                            description: "Write or modify a file".to_string(),
-                            parameters: serde_json::to_value(WriteFileRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "grep".to_string(),
-                            description: "Search for patterns in files using grep".to_string(),
-                            parameters: serde_json::to_value(GrepRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "apply_patch".to_string(),
-                            description: "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format".to_string(),
-                            parameters: serde_json::to_value(ApplyPatchRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
-                    crate::llm_client::ToolDefinition {
-                        r#type: "function".to_string(),
-                        function: crate::llm_client::FunctionDefinition {
-                            name: "bash".to_string(),
-                            description: "Execute bash commands with timeout and permission checking".to_string(),
-                            parameters: serde_json::to_value(BashRequest::example_schema())
-                                .unwrap_or_default(),
-                        },
-                    },
+                    make_tool(
+                        "list_files",
+                        "List files and directories in a given path",
+                        schema_for!(ListFilesRequest),
+                    ),
+                    make_tool(
+                        "read_file",
+                        "Read the contents of a file",
+                        schema_for!(ReadFileRequest),
+                    ),
+                    make_tool(
+                        "write_file",
+                        "Write or modify a file. Supports two modes: 1) Full write with 'content' parameter, 2) Search & replace with 'search' and 'replace' parameters",
+                        schema_for!(WriteFileRequest),
+                    ),
+                    make_tool(
+                        "grep",
+                        "Search for patterns in files using grep",
+                        schema_for!(GrepRequest),
+                    ),
+                    make_tool(
+                        "apply_patch",
+                        "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format",
+                        schema_for!(ApplyPatchRequest),
+                    ),
+                    make_tool(
+                        "bash",
+                        "Execute bash commands with timeout and permission checking",
+                        schema_for!(BashRequest),
+                    ),
                 ]
             }
         }

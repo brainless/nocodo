@@ -1,4 +1,5 @@
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // Re-export shared models from manager-models
@@ -293,14 +294,21 @@ pub enum ToolRequest {
     Bash(BashRequest),
 }
 
-/// List files tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// List files and directories in a given path
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListFilesRequest {
+    /// The directory path to list files from
     pub path: String,
+
+    /// Whether to list files recursively
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recursive: Option<bool>,
+
+    /// Whether to include hidden files (starting with .)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_hidden: Option<bool>,
+
+    /// Maximum number of files to return (default: 1000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_files: Option<u32>,
 }
@@ -337,10 +345,13 @@ impl ListFilesRequest {
     }
 }
 
-/// Read file tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Read the contents of a file
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReadFileRequest {
+    /// The file path to read
     pub path: String,
+
+    /// Maximum number of bytes to read (default: 10000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_size: Option<u64>,
 }
@@ -367,23 +378,62 @@ impl ReadFileRequest {
     }
 }
 
-/// Write file tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Write or modify a file with various operations
+///
+/// Supports two modes:
+/// 1. Full write: Provide `path` and `content` to write/overwrite file
+/// 2. Search & replace: Provide `path`, `search`, and `replace` to modify existing content
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteFileRequest {
+    /// The file path to write to
     pub path: String,
-    pub content: String,
-    pub create_dirs: Option<bool>,
+
+    /// Full content to write (required for full write, omit for search-replace)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub append: Option<bool>,
+    pub content: Option<String>,
+
+    /// Text to search for (for search-and-replace operations)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
+
+    /// Text to replace the search text with
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replace: Option<String>,
+
+    /// Whether to create parent directories if they don't exist
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_dirs: Option<bool>,
+
+    /// Whether to append to the file instead of overwriting
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub append: Option<bool>,
+
+    /// Whether to create the file if it doesn't exist
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create_if_not_exists: Option<bool>,
 }
 
 impl WriteFileRequest {
+    /// Validate that either content OR (search + replace) is provided
+    pub fn validate(&self) -> anyhow::Result<()> {
+        match (&self.content, &self.search, &self.replace) {
+            (Some(_), None, None) => Ok(()),  // Full write mode
+            (None, Some(_), Some(_)) => Ok(()),  // Search-replace mode
+            (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
+                anyhow::bail!("Cannot provide both 'content' and 'search'/'replace'. Use either full write OR search-replace mode.")
+            }
+            (None, Some(_), None) => {
+                anyhow::bail!("Search-replace mode requires both 'search' and 'replace' parameters")
+            }
+            (None, None, Some(_)) => {
+                anyhow::bail!("Search-replace mode requires both 'search' and 'replace' parameters")
+            }
+            (None, None, None) => {
+                anyhow::bail!("Must provide either 'content' (for full write) OR both 'search' and 'replace' (for search-replace)")
+            }
+        }
+    }
+
     /// Generate example JSON schema for this request type
     pub fn example_schema() -> serde_json::Value {
         serde_json::json!({
@@ -427,23 +477,40 @@ impl WriteFileRequest {
     }
 }
 
-/// Grep search tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Search for patterns in files using grep
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GrepRequest {
+    /// The regex pattern to search for
     pub pattern: String,
+
+    /// The directory path to search in (default: current directory)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+
+    /// File pattern to include in search (e.g., '*.rs')
     pub include_pattern: Option<String>,
+
+    /// File pattern to exclude from search
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exclude_pattern: Option<String>,
+
+    /// Whether to search recursively (default: true)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recursive: Option<bool>,
+
+    /// Whether the search is case sensitive (default: false)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub case_sensitive: Option<bool>,
+
+    /// Whether to include line numbers in results (default: true)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_line_numbers: Option<bool>,
+
+    /// Maximum number of results to return (default: 100)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_results: Option<u32>,
+
+    /// Maximum number of files to search through (default: 1000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_files_searched: Option<u32>,
 }
@@ -503,9 +570,32 @@ impl GrepRequest {
     }
 }
 
-/// Apply patch tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Apply a patch to create, modify, delete, or move multiple files
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ApplyPatchRequest {
+    /// The patch content in unified diff format
+    ///
+    /// Format:
+    /// ```
+    /// *** Begin Patch
+    /// *** Add File: path/to/new.txt
+    /// +line content
+    /// *** Update File: path/to/existing.txt
+    /// @@ optional context
+    /// -old line
+    /// +new line
+    /// *** Delete File: path/to/remove.txt
+    /// *** End Patch
+    /// ```
+    ///
+    /// Supports:
+    /// - Add File: Create new files with + prefixed lines
+    /// - Update File: Modify files with diff hunks (- for removed, + for added)
+    /// - Delete File: Remove files
+    /// - Move to: Rename files (after Update File header)
+    /// - @@ context headers for targeting specific code blocks
+    ///
+    /// All file paths must be relative to the project root.
     pub patch: String,
 }
 
@@ -1114,14 +1204,21 @@ impl Default for BashLoggingConfig {
     }
 }
 
-/// Bash tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Execute bash commands with timeout and permission checking
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BashRequest {
+    /// The bash command to execute
     pub command: String,
+
+    /// Working directory for command execution (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_dir: Option<String>,
+
+    /// Timeout in seconds (optional, uses default if not specified)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout_secs: Option<u64>,
+
+    /// Human-readable description of what the command does (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }

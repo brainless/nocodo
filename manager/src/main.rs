@@ -12,6 +12,7 @@ mod llm_providers;
 mod middleware;
 mod models;
 mod permissions;
+mod schema_provider;
 mod socket;
 mod templates;
 mod tools;

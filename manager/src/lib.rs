@@ -12,6 +12,7 @@ pub mod llm_providers;
 pub mod middleware;
 pub mod models;
 pub mod permissions;
+pub mod schema_provider;
 pub mod socket;
 pub mod templates;
 pub mod tools;
