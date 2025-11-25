@@ -199,20 +199,24 @@ impl DesktopApp {
             [],
         );
 
-        // Create favorites table
+        // Drop and recreate favorites table with server support
+        let _ = db.execute("DROP TABLE IF EXISTS favorites", []);
         db.execute(
-            "CREATE TABLE IF NOT EXISTS favorites (
+            "CREATE TABLE favorites (
                 id INTEGER PRIMARY KEY,
                 entity_type TEXT NOT NULL,
                 entity_id INTEGER NOT NULL,
+                server_host TEXT NOT NULL,
+                server_user TEXT NOT NULL,
+                server_port INTEGER NOT NULL,
                 created_at INTEGER NOT NULL,
-                UNIQUE(entity_type, entity_id)
+                UNIQUE(entity_type, entity_id, server_host, server_user, server_port)
             )",
             [],
         )
         .expect("Could not create favorites table");
         db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id)",
+            "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id, server_host, server_user, server_port)",
             [],
         )
         .expect("Could not create favorites index");
@@ -238,21 +242,27 @@ impl DesktopApp {
         // Load favorites
         {
             let mut stmt = db
-                .prepare("SELECT entity_type, entity_id FROM favorites")
+                .prepare("SELECT entity_type, entity_id, server_host, server_user, server_port FROM favorites")
                 .expect("Could not prepare favorites statement");
             let favorites_iter = stmt
                 .query_map([], |row| {
                     let entity_type: String = row.get(0)?;
                     let entity_id: i64 = row.get(1)?;
-                    Ok((entity_type, entity_id))
+                    let server_host: String = row.get(2)?;
+                    let server_user: String = row.get(3)?;
+                    let server_port: u16 = row.get(4)?;
+                    Ok((entity_type, entity_id, server_host, server_user, server_port))
                 })
                 .expect("Could not query favorites");
 
-            for (entity_type, entity_id) in favorites_iter.flatten() {
+            for (entity_type, entity_id, server_host, server_user, server_port) in favorites_iter.flatten() {
                 if entity_type == "project" {
-                    app.state.favorite_projects.insert(entity_id);
+                    let favorite_key = (server_host, server_user, server_port, entity_id);
+                    tracing::debug!("Loaded favorite from DB: {:?}", favorite_key);
+                    app.state.favorite_projects.insert(favorite_key);
                 }
             }
+            tracing::debug!("Total favorites loaded: {}", app.state.favorite_projects.len());
         }
 
         app.state.db = Some(db);

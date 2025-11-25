@@ -60,61 +60,69 @@ impl Sidebar {
                     }
 
                     // Favorite projects section
-                    if !state.favorite_projects.is_empty() && is_authenticated {
+                    tracing::debug!("Sidebar check: favorites_count={}, authenticated={}, server_info={:?}", 
+                        state.favorite_projects.len(), is_authenticated, state.current_server_info);
+                    if !state.favorite_projects.is_empty() && is_authenticated && state.current_server_info.is_some() {
                         ui.add_space(4.0);
 
-                        // Show favorite projects
-                        for project in &state.projects {
-                            if state.favorite_projects.contains(&project.id) {
-                                let available_width = ui.available_width();
-                                let (rect, response) = ui.allocate_exact_size(
-                                    egui::vec2(available_width, 24.0),
-                                    egui::Sense::click(),
-                                );
+                        // Show favorite projects for current server
+                        if let Some((server_host, server_user, server_port)) = &state.current_server_info {
+                            tracing::debug!("Checking favorites for server: {:?}", (server_host, server_user, server_port));
+                            for project in &state.projects {
+                                let favorite_key = &(server_host.clone(), server_user.clone(), *server_port, project.id);
+                                let is_favorite = state.favorite_projects.contains(favorite_key);
+                                if is_favorite {
+                                    tracing::debug!("Showing favorite project: {} ({})", project.name, project.id);
+                                    let available_width = ui.available_width();
+                                    let (rect, response) = ui.allocate_exact_size(
+                                        egui::vec2(available_width, 24.0),
+                                        egui::Sense::click(),
+                                    );
 
-                                // Change cursor to pointer on hover
-                                if response.hovered() {
-                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                }
+                                    // Change cursor to pointer on hover
+                                    if response.hovered() {
+                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                    }
 
-                                // Check if this project is the currently selected one
-                                let is_selected = matches!(
-                                    current_page,
-                                    UiPage::ProjectDetail(id) if *id == project.id
-                                );
+                                    // Check if this project is the currently selected one
+                                    let is_selected = matches!(
+                                        current_page,
+                                        UiPage::ProjectDetail(id) if *id == project.id
+                                    );
 
-                                // Determine background color based on state
-                                let bg_color = if is_selected {
-                                    selected_bg
-                                } else if response.hovered() {
-                                    hover_bg
-                                } else {
-                                    sidebar_bg
-                                };
+                                    // Determine background color based on state
+                                    let bg_color = if is_selected {
+                                        selected_bg
+                                    } else if response.hovered() {
+                                        hover_bg
+                                    } else {
+                                        sidebar_bg
+                                    };
 
-                                // Draw background with same border radius as sidebar_link (0.0)
-                                ui.painter().rect_filled(rect, 0.0, bg_color);
+                                    // Draw background with same border radius as sidebar_link (0.0)
+                                    ui.painter().rect_filled(rect, 0.0, bg_color);
 
-                                // Draw text - project names are user content, use Inter (Proportional)
-                                let text_pos = rect.min + egui::vec2(12.0, 4.0);
-                                let font_id = egui::FontId::new(
-                                    14.0,
-                                    egui::FontFamily::Proportional, // Inter for user content
-                                );
-                                ui.painter().text(
-                                    text_pos,
-                                    egui::Align2::LEFT_TOP,
-                                    &project.name,
-                                    font_id,
-                                    ui.style().visuals.text_color(),
-                                );
+                                    // Draw text - project names are user content, use Inter (Proportional)
+                                    let text_pos = rect.min + egui::vec2(12.0, 4.0);
+                                    let font_id = egui::FontId::new(
+                                        14.0,
+                                        egui::FontFamily::Proportional, // Inter for user content
+                                    );
+                                    ui.painter().text(
+                                        text_pos,
+                                        egui::Align2::LEFT_TOP,
+                                        &project.name,
+                                        font_id,
+                                        ui.style().visuals.text_color(),
+                                    );
 
-                                // Handle click
-                                if response.clicked() {
-                                    new_page = Some(UiPage::ProjectDetail(project.id));
-                                    state.pending_project_details_refresh = Some(project.id);
-                                }
+                                    // Handle click
+                                    if response.clicked() {
+                                        new_page = Some(UiPage::ProjectDetail(project.id));
+                                        state.pending_project_details_refresh = Some(project.id);
+                                    }
                             }
+                        }
                         }
                         ui.add_space(4.0);
                     }

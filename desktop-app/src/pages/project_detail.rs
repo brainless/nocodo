@@ -35,7 +35,7 @@ impl crate::pages::Page for ProjectDetailPage {
             ui.add_space(10.0);
 
             // Star button - Ubuntu SemiBold with color
-            let is_favorite = self.is_project_favorite(state);
+            let is_favorite = self.is_project_favorite_sync(state);
             let star_text = if is_favorite { "⭐ Star" } else { "☆ Star" };
             let star_color = if is_favorite {
                 egui::Color32::YELLOW
@@ -51,7 +51,7 @@ impl crate::pages::Page for ProjectDetailPage {
                 )
                 .clicked()
             {
-                self.toggle_project_favorite(state);
+                self.toggle_project_favorite_sync(state);
             }
         });
 
@@ -149,15 +149,54 @@ impl crate::pages::Page for ProjectDetailPage {
 }
 
 impl ProjectDetailPage {
-    fn is_project_favorite(&self, state: &AppState) -> bool {
-        state.favorite_projects.contains(&self.project_id)
+    fn is_project_favorite_sync(&self, state: &AppState) -> bool {
+        // Check if project is favorite for current server
+        if let Some((server_host, server_user, server_port)) = &state.current_server_info {
+            let favorite_key = &(server_host.clone(), server_user.clone(), *server_port, self.project_id);
+            let is_fav = state.favorite_projects.contains(favorite_key);
+            tracing::debug!("Checking favorite for project {}: server_info={:?}, key={:?}, is_favorite={}", self.project_id, (server_host, server_user, server_port), favorite_key, is_fav);
+            is_fav
+        } else {
+            tracing::debug!("No current_server_info when checking favorite for project {}", self.project_id);
+            false
+        }
     }
 
-    fn toggle_project_favorite(&self, state: &mut AppState) {
-        if state.favorite_projects.contains(&self.project_id) {
-            state.favorite_projects.remove(&self.project_id);
+    fn toggle_project_favorite_sync(&self, state: &mut AppState) {
+        tracing::debug!("Toggle favorite clicked for project {}", self.project_id);
+        if let Some((server_host, server_user, server_port)) = &state.current_server_info {
+            let favorite_key = (server_host.clone(), server_user.clone(), *server_port, self.project_id);
+            let was_favorite = state.favorite_projects.contains(&favorite_key);
+            
+            tracing::debug!("Current favorite status: {} for key {:?}", was_favorite, favorite_key);
+            
+            if was_favorite {
+                // Remove favorite
+                state.favorite_projects.remove(&favorite_key);
+                tracing::debug!("Removed favorite for project {}", self.project_id);
+                // Remove from database
+                if let Some(db) = &state.db {
+                    let result = db.execute(
+                        "DELETE FROM favorites WHERE entity_type = 'project' AND entity_id = ? AND server_host = ? AND server_user = ? AND server_port = ?",
+                        [&self.project_id.to_string(), server_host, server_user, &server_port.to_string()],
+                    );
+                    tracing::debug!("DB delete result: {:?}", result);
+                }
+            } else {
+                // Add favorite
+                state.favorite_projects.insert(favorite_key.clone());
+                tracing::debug!("Added favorite for project {}", self.project_id);
+                // Add to database
+                if let Some(db) = &state.db {
+                    let result = db.execute(
+                        "INSERT INTO favorites (entity_type, entity_id, server_host, server_user, server_port, created_at) VALUES ('project', ?, ?, ?, ?, ?)",
+                        [&self.project_id.to_string(), server_host, server_user, &server_port.to_string(), &std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string()],
+                    );
+                    tracing::debug!("DB insert result: {:?}", result);
+                }
+            }
         } else {
-            state.favorite_projects.insert(self.project_id);
+            tracing::debug!("No current_server_info when toggling favorite for project {}", self.project_id);
         }
     }
 

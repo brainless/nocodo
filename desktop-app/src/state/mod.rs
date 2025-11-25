@@ -105,8 +105,11 @@ pub struct AppState {
     pub update_team_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
     pub updating_team: bool,
 
-    // Favorite state
-    pub favorite_projects: std::collections::HashSet<i64>,
+    // Favorite state - stores (server_host, server_user, server_port, project_id) tuples
+    pub favorite_projects: std::collections::HashSet<(String, String, u16, i64)>,
+
+    // Current server connection info for favorites
+    pub current_server_info: Option<(String, String, u16)>,
 
     // Projects default path state
     pub projects_default_path_modified: bool,
@@ -299,6 +302,7 @@ impl Default for AppState {
             update_team_result: Arc::new(std::sync::Mutex::new(None)),
             updating_team: false,
             favorite_projects: std::collections::HashSet::new(),
+            current_server_info: None,
             projects_default_path_modified: false,
             xai_api_key_input: String::new(),
             openai_api_key_input: String::new(),
