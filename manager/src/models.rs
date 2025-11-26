@@ -313,37 +313,7 @@ pub struct ListFilesRequest {
     pub max_files: Option<u32>,
 }
 
-impl ListFilesRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The directory path to list files from"
-                },
-                "recursive": {
-                    "type": "boolean",
-                    "description": "Whether to list files recursively",
-                    "default": false
-                },
-                "include_hidden": {
-                    "type": "boolean",
-                    "description": "Whether to include hidden files",
-                    "default": false
-                },
-                "max_files": {
-                    "type": "number",
-                    "description": "Maximum number of files to return (default: 1000)",
-                    "default": 1000
-                }
-            },
-            "required": ["path", "recursive", "include_hidden", "max_files"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Read the contents of a file
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -356,27 +326,7 @@ pub struct ReadFileRequest {
     pub max_size: Option<u64>,
 }
 
-impl ReadFileRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to read"
-                },
-                "max_size": {
-                    "type": "number",
-                    "description": "Maximum number of bytes to read",
-                    "default": 10000
-                }
-            },
-            "required": ["path", "max_size"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Write or modify a file with various operations
 ///
@@ -434,47 +384,7 @@ impl WriteFileRequest {
         }
     }
 
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to write to"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The content to write to the file"
-                },
-                "create_dirs": {
-                    "type": "boolean",
-                    "description": "Whether to create parent directories if they don't exist",
-                    "default": false
-                },
-                "append": {
-                    "type": "boolean",
-                    "description": "Whether to append to the file instead of overwriting",
-                    "default": false
-                },
-                "search": {
-                    "type": "string",
-                    "description": "Text to search for (for search and replace operations)"
-                },
-                "replace": {
-                    "type": "string",
-                    "description": "Text to replace the search text with"
-                },
-                "create_if_not_exists": {
-                    "type": "boolean",
-                    "description": "Whether to create the file if it doesn't exist",
-                    "default": false
-                }
-            },
-            "required": ["path", "content", "create_dirs", "append", "search", "replace", "create_if_not_exists"],
-            "additionalProperties": false
-        })
-    }
+
 }
 
 /// Search for patterns in files using grep
@@ -515,60 +425,7 @@ pub struct GrepRequest {
     pub max_files_searched: Option<u32>,
 }
 
-impl GrepRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "The regex pattern to search for"
-                },
-                "path": {
-                    "type": "string",
-                    "description": "The directory path to search in",
-                    "default": "."
-                },
-                "include_pattern": {
-                    "type": "string",
-                    "description": "File pattern to include in search (e.g., '*.rs')"
-                },
-                "exclude_pattern": {
-                    "type": "string",
-                    "description": "File pattern to exclude from search"
-                },
-                "recursive": {
-                    "type": "boolean",
-                    "description": "Whether to search recursively",
-                    "default": true
-                },
-                "case_sensitive": {
-                    "type": "boolean",
-                    "description": "Whether the search is case sensitive",
-                    "default": false
-                },
-                "include_line_numbers": {
-                    "type": "boolean",
-                    "description": "Whether to include line numbers in results",
-                    "default": true
-                },
-                "max_results": {
-                    "type": "number",
-                    "description": "Maximum number of results to return",
-                    "default": 100
-                },
-                "max_files_searched": {
-                    "type": "number",
-                    "description": "Maximum number of files to search through",
-                    "default": 1000
-                }
-            },
-            "required": ["pattern", "path", "include_pattern", "exclude_pattern", "recursive", "case_sensitive", "include_line_numbers", "max_results", "max_files_searched"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Apply a patch to create, modify, delete, or move multiple files
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -599,22 +456,7 @@ pub struct ApplyPatchRequest {
     pub patch: String,
 }
 
-impl ApplyPatchRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "patch": {
-                    "type": "string",
-                    "description": "The patch content in the format:\n*** Begin Patch\n*** Add File: path/to/new.txt\n+line content\n*** Update File: path/to/existing.txt\n@@ optional context\n-old line\n+new line\n*** Delete File: path/to/remove.txt\n*** End Patch\n\nSupports:\n- Add File: Create new files with + prefixed lines\n- Update File: Modify files with diff hunks (- for removed, + for added)\n- Delete File: Remove files\n- Move to: Rename files (after Update File header)\n- @@ context headers for targeting specific code blocks\n\nAll file paths must be relative to the project root."
-                }
-            },
-            "required": ["patch"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1223,37 +1065,7 @@ pub struct BashRequest {
     pub description: Option<String>,
 }
 
-impl BashRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "description": "The bash command to execute"
-                },
-                "working_dir": {
-                    "type": "string",
-                    "description": "Working directory for command execution (optional)",
-                    "default": null
-                },
-                "timeout_secs": {
-                    "type": "number",
-                    "description": "Timeout in seconds (optional, uses default if not specified)",
-                    "default": null
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Human-readable description of what the command does (optional)",
-                    "default": null
-                }
-            },
-            "required": ["command"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Bash tool response
 #[derive(Debug, Clone, Serialize, Deserialize)]

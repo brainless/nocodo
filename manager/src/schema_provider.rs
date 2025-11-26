@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 /// - Anthropic Claude, GLM, and others respect accurate required/optional distinction
 pub trait SchemaProvider {
     /// Provider name for logging
+    #[allow(dead_code)]
     fn name(&self) -> &str;
 
     /// Whether this provider requires all fields to be marked as required
