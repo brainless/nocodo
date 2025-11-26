@@ -100,7 +100,7 @@ cd ..
 # Commit version bump
 echo -e "${YELLOW}Committing version bump...${NC}"
 git add "$CARGO_TOML" "Cargo.lock"
-git commit -m "chore(manager): bump version to $NEW_VERSION [skip ci]"
+git commit -m "chore(manager): bump version to $NEW_VERSION"
 
 # Create and push tag
 echo -e "${YELLOW}Creating tag $TAG_NAME...${NC}"
