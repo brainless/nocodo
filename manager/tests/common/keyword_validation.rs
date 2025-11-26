@@ -180,8 +180,8 @@ impl KeywordValidator {
 impl LlmTestScenario {
     /// Create a tech stack analysis test for Saleor
     pub fn tech_stack_analysis_saleor() -> Self {
-        // Load prompt from TOML file - fixed path relative to manager directory
-        let prompts_path = std::path::Path::new("prompts/default.toml");
+        // Load prompt from TOML file - path relative to project root
+        let prompts_path = std::path::Path::new("manager/prompts/default.toml");
         let prompt = PromptsConfig::load_from_file(prompts_path)
             .map(|config| config.tech_stack_analysis.prompt)
             .unwrap_or_else(|_| {
@@ -309,8 +309,8 @@ mod tests {
 
     #[test]
     fn test_prompts_config_loading() {
-        // Fixed path relative to manager directory
-        let prompts_path = std::path::Path::new("prompts/default.toml");
+        // Path relative to project root
+        let prompts_path = std::path::Path::new("manager/prompts/default.toml");
         let result = PromptsConfig::load_from_file(prompts_path);
 
         // Should be able to load the TOML file

@@ -65,6 +65,8 @@ impl TestDataGenerator {
             status: "active".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
+            git_branch: None,
+            working_directory: None,
         }
     }
 

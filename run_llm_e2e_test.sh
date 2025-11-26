@@ -219,18 +219,15 @@ echo "🚀 Using Provider: ${PROVIDER:-None}"
 echo "🤖 Using Model: ${MODEL:-default}"
 echo ""
 
-# Navigate to manager directory
-cd manager
-
 echo "🏗️  Building project..."
-cargo build --test llm_e2e_real_test
+cargo build --manifest-path manager/Cargo.toml --test llm_e2e_real_test
 
 echo ""
 echo "🧪 Running comprehensive LLM E2E test with Saleor repository..."
 echo ""
 
 # Run the validation tests (always working)
-cargo test --test llm_e2e_real_test test_llm_e2e_saleor \
+cargo test --manifest-path manager/Cargo.toml --test llm_e2e_real_test test_llm_e2e_saleor \
     -- --test-threads=1 --nocapture
 
 echo ""
