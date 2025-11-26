@@ -394,7 +394,7 @@ impl LlmAgent {
                 );
             }
 
-            self.process_native_tool_calls(session_id, &accumulated_tool_calls)
+            self.process_native_tool_calls(session_id, &accumulated_tool_calls, 0)
                 .await?;
 
             tracing::info!(
@@ -402,9 +402,15 @@ impl LlmAgent {
                 "Completed processing native tool calls"
             );
         } else {
-            tracing::debug!(
+            tracing::info!(
                 session_id = %session_id,
-                "No tool calls found in response"
+                response_length = %assistant_response.len(),
+                response_preview = %if assistant_response.len() > 100 {
+                    format!("{}...", &assistant_response[..100])
+                } else {
+                    assistant_response.clone()
+                },
+                "No tool calls found in initial response - stored plain text response"
             );
         }
 
@@ -450,6 +456,7 @@ impl LlmAgent {
         &self,
         session_id: i64,
         tool_calls: &[crate::llm_client::LlmToolCall],
+        depth: u32,
     ) -> Result<()> {
         // Get session info for provider-specific handling
         let session = self.db.get_llm_agent_session(session_id)?;
@@ -760,6 +767,7 @@ impl LlmAgent {
         tracing::error!(  // Use error to ensure it's visible
             session_id = %session_id,
             tool_calls_count = %tool_calls.len(),
+            current_depth = %depth,
             "FOLLOW_UP_DEBUG: About to call follow_up_with_llm_with_depth after processing {} tool calls - REACHED END OF PROCESS_NATIVE_TOOL_CALLS",
             tool_calls.len()
         );
@@ -767,10 +775,12 @@ impl LlmAgent {
         // Add extra debug to see if follow-up is enabled/available
         tracing::warn!(
             session_id = %session_id,
+            current_depth = %depth,
+            next_depth = %(depth + 1),
             "FOLLOW_UP_DEBUG: Checking if follow-up calls are enabled and agent is available"
         );
 
-        match self.follow_up_with_llm_with_depth(session_id, 1).await {
+        match self.follow_up_with_llm_with_depth(session_id, depth + 1).await {
             Ok(response) => {
                 tracing::warn!(  // Use warn to make it more visible
                     session_id = %session_id,
@@ -909,12 +919,12 @@ impl LlmAgent {
 
             // CLAUDE_DEBUG: Log the exact conversation sent to Claude for debugging
             if session.provider == "anthropic" {
-                tracing::info!(
+                tracing::debug!(
                     session_id = %session_id,
                     "CLAUDE_DEBUG: Follow-up conversation history for Claude:"
                 );
                 for (i, msg) in messages.iter().enumerate() {
-                    tracing::info!(
+                    tracing::debug!(
                         session_id = %session_id,
                         message_index = %i,
                         role = %msg.role,
@@ -1011,14 +1021,21 @@ impl LlmAgent {
                 tracing::info!(
                     session_id = %session_id,
                     tool_calls_count = %follow_up_tool_calls.len(),
+                    current_depth = %depth,
                     "Processing native tool calls from follow-up response"
                 );
-                self.process_native_tool_calls(session_id, &follow_up_tool_calls)
+                self.process_native_tool_calls(session_id, &follow_up_tool_calls, depth)
                     .await?;
             } else {
-                tracing::debug!(
+                tracing::info!(
                     session_id = %session_id,
-                    "No tool calls found in follow-up response"
+                    response_length = %assistant_response.len(),
+                    response_preview = %if assistant_response.len() > 100 {
+                        format!("{}...", &assistant_response[..100])
+                    } else {
+                        assistant_response.clone()
+                    },
+                    "No tool calls found in follow-up response - stored plain text response"
                 );
             }
 
