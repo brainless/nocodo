@@ -259,6 +259,79 @@ impl AppState {
     pub fn is_authenticated(&self) -> bool {
         self.connection_state == ConnectionState::Connected && self.auth_state.jwt_token.is_some()
     }
+
+    /// Load favorites from database for the current server connection
+    pub fn load_favorites_for_current_server(&mut self) {
+        if let Some((server_host, server_user, server_port)) = &self.current_server_info {
+            if let Some(db) = &self.db {
+                // Clear existing favorites
+                self.favorite_projects.clear();
+
+                tracing::info!(
+                    "DB SELECT params: server_host='{}', server_user='{}', server_port={}",
+                    server_host, server_user, server_port
+                );
+
+                // First, check how many total favorites exist
+                if let Ok(total_count) = db.query_row("SELECT COUNT(*) FROM favorites", [], |row| row.get::<_, i64>(0)) {
+                    tracing::info!("Total favorites in database: {}", total_count);
+                }
+
+                // Check how many match our query
+                if let Ok(mut stmt) = db.prepare("SELECT COUNT(*) FROM favorites WHERE server_host = ? AND server_user = ? AND server_port = ?") {
+                    if let Ok(matching_count) = stmt.query_row(
+                        rusqlite::params![server_host, server_user, server_port],
+                        |row| row.get::<_, i64>(0)
+                    ) {
+                        tracing::info!("Matching favorites for this server: {}", matching_count);
+                    }
+                }
+
+                // Load favorites for this specific server
+                let mut stmt = db
+                    .prepare("SELECT entity_type, entity_id, server_host, server_user, server_port FROM favorites WHERE server_host = ? AND server_user = ? AND server_port = ?")
+                    .expect("Could not prepare favorites statement");
+
+                let favorites_iter = stmt
+                    .query_map(
+                        rusqlite::params![server_host, server_user, server_port],
+                        |row| {
+                            let entity_type: String = row.get(0)?;
+                            let entity_id: i64 = row.get(1)?;
+                            let db_server_host: String = row.get(2)?;
+                            let db_server_user: String = row.get(3)?;
+                            let db_server_port: i64 = row.get(4)?;
+                            Ok((entity_type, entity_id, db_server_host, db_server_user, db_server_port))
+                        },
+                    )
+                    .expect("Could not query favorites");
+
+                for (entity_type, entity_id, db_server_host, db_server_user, db_server_port) in favorites_iter.flatten() {
+                    tracing::info!(
+                        "Row from DB: entity_type='{}', entity_id={}, server_host='{}', server_user='{}', server_port={}",
+                        entity_type, entity_id, db_server_host, db_server_user, db_server_port
+                    );
+                    if entity_type == "project" {
+                        let favorite_key = (server_host.clone(), server_user.clone(), *server_port, entity_id);
+                        tracing::info!("Loaded favorite from DB for current server: project_id={}", entity_id);
+                        self.favorite_projects.insert(favorite_key);
+                    }
+                }
+
+                tracing::info!(
+                    "Total favorites loaded for {}@{}:{}: {}",
+                    server_user,
+                    server_host,
+                    server_port,
+                    self.favorite_projects.len()
+                );
+            } else {
+                tracing::warn!("Cannot load favorites: database not available");
+            }
+        } else {
+            tracing::debug!("Cannot load favorites: no current_server_info set");
+        }
+    }
 }
 
 impl Default for AppState {

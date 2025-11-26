@@ -199,10 +199,9 @@ impl DesktopApp {
             [],
         );
 
-        // Drop and recreate favorites table with server support
-        let _ = db.execute("DROP TABLE IF EXISTS favorites", []);
+        // Create favorites table with server support
         db.execute(
-            "CREATE TABLE favorites (
+            "CREATE TABLE IF NOT EXISTS favorites (
                 id INTEGER PRIMARY KEY,
                 entity_type TEXT NOT NULL,
                 entity_id INTEGER NOT NULL,
@@ -239,31 +238,9 @@ impl DesktopApp {
             app.state.servers = server_iter.filter_map(|s| s.ok()).collect();
         }
 
-        // Load favorites
-        {
-            let mut stmt = db
-                .prepare("SELECT entity_type, entity_id, server_host, server_user, server_port FROM favorites")
-                .expect("Could not prepare favorites statement");
-            let favorites_iter = stmt
-                .query_map([], |row| {
-                    let entity_type: String = row.get(0)?;
-                    let entity_id: i64 = row.get(1)?;
-                    let server_host: String = row.get(2)?;
-                    let server_user: String = row.get(3)?;
-                    let server_port: u16 = row.get(4)?;
-                    Ok((entity_type, entity_id, server_host, server_user, server_port))
-                })
-                .expect("Could not query favorites");
-
-            for (entity_type, entity_id, server_host, server_user, server_port) in favorites_iter.flatten() {
-                if entity_type == "project" {
-                    let favorite_key = (server_host, server_user, server_port, entity_id);
-                    tracing::debug!("Loaded favorite from DB: {:?}", favorite_key);
-                    app.state.favorite_projects.insert(favorite_key);
-                }
-            }
-            tracing::debug!("Total favorites loaded: {}", app.state.favorite_projects.len());
-        }
+        // Don't load favorites at startup - they will be loaded after successful connection and auth
+        // This ensures favorites are only loaded when we have a server context
+        tracing::info!("Favorites will be loaded after successful server connection and authentication");
 
         app.state.db = Some(db);
 

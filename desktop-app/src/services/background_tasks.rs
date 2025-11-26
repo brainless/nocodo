@@ -61,7 +61,8 @@ impl BackgroundTasks {
                     state.ui_state.connected_host = Some(server.clone());
                     state.ui_state.connection_error = None;
                     state.current_server_info = Some((server.clone(), username.clone(), port));
-                    tracing::debug!("Set current_server_info for SSH connection: {:?}", state.current_server_info);
+                    tracing::info!("Set current_server_info for SSH connection: {:?}", state.current_server_info);
+                    tracing::info!("Favorites in memory: {:?}", state.favorite_projects);
                     state.models_fetch_attempted = false; // Reset to allow fetching models
 
                     // Automatically show auth dialog after successful SSH connection
@@ -604,6 +605,9 @@ impl BackgroundTasks {
                     state.auth_state.user_id = Some(login_response.user.id);
                     state.auth_state.username = Some(login_response.user.username);
                     tracing::info!("Auth state updated after successful login");
+
+                    // Load favorites for the current server (must be done after current_server_info is set)
+                    state.load_favorites_for_current_server();
 
                     // Now that we're authenticated, fetch all data that requires auth
                     self.api_service.refresh_settings(state);

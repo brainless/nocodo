@@ -32,8 +32,12 @@ impl ApiService {
                 state.connection_state = crate::state::ConnectionState::Connected;
                 state.ui_state.connected_host = Some("localhost".to_string());
                 state.current_server_info = Some(("localhost".to_string(), "local".to_string(), 8081));
-                tracing::debug!("Set current_server_info for local connection: {:?}", state.current_server_info);
+                tracing::info!("Set current_server_info for local connection: {:?}", state.current_server_info);
                 state.models_fetch_attempted = false;
+
+                // Load favorites for local server (no separate auth needed for local)
+                state.load_favorites_for_current_server();
+
                 Ok(())
             }
             Err(e) => Err(format!("Failed to connect to local manager: {}", e)),

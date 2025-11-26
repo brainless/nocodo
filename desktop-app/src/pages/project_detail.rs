@@ -152,9 +152,18 @@ impl ProjectDetailPage {
     fn is_project_favorite_sync(&self, state: &AppState) -> bool {
         // Check if project is favorite for current server
         if let Some((server_host, server_user, server_port)) = &state.current_server_info {
-            let favorite_key = &(server_host.clone(), server_user.clone(), *server_port, self.project_id);
-            state.favorite_projects.contains(favorite_key)
+            let favorite_key = (server_host.clone(), server_user.clone(), *server_port, self.project_id);
+            let is_favorite = state.favorite_projects.contains(&favorite_key);
+            tracing::trace!(
+                "Checking favorite for project {}: key={:?}, is_favorite={}, total_favorites={}",
+                self.project_id,
+                favorite_key,
+                is_favorite,
+                state.favorite_projects.len()
+            );
+            is_favorite
         } else {
+            tracing::trace!("No current_server_info set when checking favorite for project {}", self.project_id);
             false
         }
     }
@@ -189,11 +198,27 @@ impl ProjectDetailPage {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_secs() as i64;
+
+                    tracing::info!(
+                        "DB INSERT params: entity_type='project', entity_id={}, server_host='{}', server_user='{}', server_port={}",
+                        self.project_id, server_host, server_user, server_port
+                    );
+
                     let result = db.execute(
                         "INSERT INTO favorites (entity_type, entity_id, server_host, server_user, server_port, created_at) VALUES ('project', ?, ?, ?, ?, ?)",
                         rusqlite::params![self.project_id, server_host, server_user, server_port, created_at],
                     );
-                    tracing::debug!("DB insert result: {:?}", result);
+                    tracing::info!("DB insert result: {:?}", result);
+
+                    // Verify insert by reading back
+                    if let Ok(mut stmt) = db.prepare("SELECT COUNT(*) FROM favorites WHERE entity_type = 'project' AND entity_id = ? AND server_host = ? AND server_user = ? AND server_port = ?") {
+                        if let Ok(count) = stmt.query_row(
+                            rusqlite::params![self.project_id, server_host, server_user, server_port],
+                            |row| row.get::<_, i64>(0)
+                        ) {
+                            tracing::info!("Verification: Found {} matching rows after insert", count);
+                        }
+                    }
                 }
             }
         } else {
