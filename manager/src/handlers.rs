@@ -1315,7 +1315,12 @@ pub async fn create_ai_session(
     // Generate project context if work is associated with a project
     let project_context = if let Some(project_id) = work.project_id {
         let project = data.database.get_project_by_id(project_id)?;
-        Some(format!("Project: {}\nPath: {}", project.name, project.path))
+        // Use work's working_directory if available, otherwise fall back to project.path
+        let working_path = work.working_directory
+            .as_ref()
+            .map(|wd| wd.as_str())
+            .unwrap_or(&project.path);
+        Some(format!("Project: {}\nPath: {}", project.name, working_path))
     } else {
         None
     };
@@ -1669,13 +1674,18 @@ pub async fn create_work(
             .tool_name
             .unwrap_or_else(|| "llm-agent".to_string());
 
-        // Generate project context if work is associated with a project
-        let project_context = if let Some(project_id) = work.project_id {
-            let project = data.database.get_project_by_id(project_id)?;
-            Some(format!("Project: {}\nPath: {}", project.name, project.path))
-        } else {
-            None
-        };
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(project_id) = work.project_id {
+        let project = data.database.get_project_by_id(project_id)?;
+        // Use work's working_directory if available, otherwise fall back to project.path
+        let working_path = work.working_directory
+            .as_ref()
+            .map(|wd| wd.as_str())
+            .unwrap_or(&project.path);
+        Some(format!("Project: {}\nPath: {}", project.name, working_path))
+    } else {
+        None
+    };
 
         // Create AI session record
         let session = crate::models::AiSession::new(
@@ -1832,16 +1842,21 @@ pub async fn add_message_to_work(
     let work = data.database.get_work_by_id(work_id)?;
     let tool_name = "llm-agent".to_string();
 
-    // Generate project context if work is associated with a project
-    let project_context = if let Some(project_id) = work.project_id {
-        let project = data.database.get_project_by_id(project_id)?;
-        Some(format!("Project: {}\nPath: {}", project.name, project.path))
-    } else {
-        None
-    };
+        // Generate project context if work is associated with a project
+        let project_context = if let Some(project_id) = work.project_id {
+            let project = data.database.get_project_by_id(project_id)?;
+            // Use work's working_directory if available, otherwise fall back to project.path
+            let working_path = work.working_directory
+                .as_ref()
+                .map(|wd| wd.as_str())
+                .unwrap_or(&project.path);
+            Some(format!("Project: {}\nPath: {}", project.name, working_path))
+        } else {
+            None
+        };
 
-    // Create AI session record
-    let session = crate::models::AiSession::new(
+        // Create AI session record
+        let session = crate::models::AiSession::new(
         work_id,
         message_id,
         tool_name.clone(),
