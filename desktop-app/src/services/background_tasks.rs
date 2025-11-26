@@ -55,11 +55,13 @@ impl BackgroundTasks {
 
         if let Some(res) = result_opt {
             match res {
-                Ok(server) => {
-                    tracing::info!("Connection successful to {}", server);
+                Ok((server, username, port)) => {
+                    tracing::info!("Connection successful to {}@{}:{}", username, server, port);
                     state.connection_state = ConnectionState::Connected;
                     state.ui_state.connected_host = Some(server.clone());
                     state.ui_state.connection_error = None;
+                    state.current_server_info = Some((server.clone(), username.clone(), port));
+                    tracing::debug!("Set current_server_info for SSH connection: {:?}", state.current_server_info);
                     state.models_fetch_attempted = false; // Reset to allow fetching models
 
                     // Automatically show auth dialog after successful SSH connection

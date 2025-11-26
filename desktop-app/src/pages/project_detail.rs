@@ -153,11 +153,8 @@ impl ProjectDetailPage {
         // Check if project is favorite for current server
         if let Some((server_host, server_user, server_port)) = &state.current_server_info {
             let favorite_key = &(server_host.clone(), server_user.clone(), *server_port, self.project_id);
-            let is_fav = state.favorite_projects.contains(favorite_key);
-            tracing::debug!("Checking favorite for project {}: server_info={:?}, key={:?}, is_favorite={}", self.project_id, (server_host, server_user, server_port), favorite_key, is_fav);
-            is_fav
+            state.favorite_projects.contains(favorite_key)
         } else {
-            tracing::debug!("No current_server_info when checking favorite for project {}", self.project_id);
             false
         }
     }

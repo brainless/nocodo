@@ -245,7 +245,7 @@ pub struct AppState {
     #[serde(skip)]
     pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
     #[serde(skip)]
-    pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
+    pub connection_result: Arc<std::sync::Mutex<Option<Result<(String, String, u16), String>>>>,
     #[serde(skip)]
     pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
     #[serde(skip)]

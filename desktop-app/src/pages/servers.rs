@@ -80,6 +80,8 @@ impl crate::pages::Page for ServersPage {
 
                     state.connection_state = ConnectionState::Connected;
                     state.ui_state.connected_host = Some("localhost".to_string());
+                    state.current_server_info = Some(("localhost".to_string(), "local".to_string(), 8081));
+                    tracing::debug!("Set current_server_info for local connection: {:?}", state.current_server_info);
                     state.models_fetch_attempted = false; // Reset to allow fetching models on new connection
                                                           // Refresh data after connecting
                     self.refresh_projects(state);

@@ -144,10 +144,6 @@ impl ConnectionDialog {
         let connection_manager = Arc::clone(&state.connection_manager);
         let result_arc = Arc::clone(&state.connection_result);
 
-        // Get current server info flag
-        let current_server_info = Arc::new(std::sync::Mutex::new(None));
-        let current_server_info_flag = Arc::clone(&current_server_info);
-
         // Get a flag to signal when to refresh servers list
         let servers_refresh_needed = Arc::new(std::sync::Mutex::new(false));
         let servers_refresh_flag = Arc::clone(&servers_refresh_needed);
@@ -168,11 +164,6 @@ impl ConnectionDialog {
             {
                 Ok(_) => {
                     tracing::info!("SSH tunnel established successfully");
-
-                    // Update current server info flag
-                    if let Ok(mut current_server_info) = current_server_info_flag.lock() {
-                        *current_server_info = Some((server.clone(), username.clone(), port));
-                    }
 
                     // Save server to database if not already saved
                     // We need to do this here because SSH has successfully connected
@@ -233,7 +224,7 @@ impl ConnectionDialog {
                                     server
                                 );
                                 let mut result = result_arc.lock().unwrap();
-                                *result = Some(Ok(server.clone()));
+                                *result = Some(Ok((server.clone(), username.clone(), port)));
                             }
                             Err(e) => {
                                 tracing::error!("Failed to reach API through tunnel: {}", e);
@@ -256,18 +247,6 @@ impl ConnectionDialog {
                 }
             }
         });
-
-        // Update current server info in AppState if connection succeeded
-        if let Ok(server_info) = current_server_info.lock() {
-            if let Some((host, user, port)) = server_info.as_ref() {
-                state.current_server_info = Some((host.clone(), user.clone(), *port));
-                tracing::debug!("Set current_server_info to: {:?}", state.current_server_info);
-            } else {
-                tracing::debug!("No server_info available when trying to set current_server_info");
-            }
-        } else {
-            tracing::debug!("Failed to lock server_info when trying to set current_server_info");
-        }
 
         // Store the refresh flag in the state so we can check it in the UI loop
         state.ui_state.servers_refresh_needed = servers_refresh_needed;
