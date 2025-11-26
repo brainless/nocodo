@@ -1849,8 +1849,8 @@ impl Database {
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, content, created_at 
-             FROM llm_agent_messages WHERE session_id = ? ORDER BY created_at ASC",
+            "SELECT id, session_id, role, content, created_at
+             FROM llm_agent_messages WHERE session_id = ? ORDER BY id ASC",
         )?;
 
         let message_iter = stmt.query_map([session_id], |row| {

@@ -832,9 +832,81 @@ impl LlmAgent {
                     session_id = %session_id,
                     current_depth = %depth,
                     max_depth = %MAX_RECURSION_DEPTH,
-                    "Follow-up recursion depth limit reached, stopping processing"
+                    "Follow-up recursion depth limit reached - requesting final response from LLM"
                 );
-                return Ok("Maximum recursion depth reached.".to_string());
+
+                // Make one final call to LLM to get a summary/conclusion based on gathered information
+                // Use tool_choice: None to prevent more tool calls
+                let history = self.db.get_llm_agent_messages(session_id)?;
+                let session = self.db.get_llm_agent_session(session_id)?;
+
+                let temperature = if session.provider.to_lowercase() == "zai" {
+                    None
+                } else {
+                    Some(0.3)
+                };
+
+                let config = LlmProviderConfig {
+                    provider: session.provider.clone(),
+                    model: session.model.clone(),
+                    api_key: self.get_api_key(&session.provider)?,
+                    base_url: self.get_base_url(&session.provider),
+                    max_tokens: Some(4000),
+                    temperature,
+                };
+
+                let llm_client = create_llm_client(config)?;
+                let mut messages = self.reconstruct_conversation_for_followup(&history, session_id)?;
+
+                // Add a final user message asking for the answer based on gathered information
+                messages.push(LlmMessage {
+                    role: "user".to_string(),
+                    content: Some("Based on all the information you've gathered from the files, please provide your final answer to the original question. Do not make any more tool calls - just provide your analysis based on what you've learned.".to_string()),
+                    tool_calls: None,
+                    function_call: None,
+                    tool_call_id: None,
+                });
+
+                let request = LlmCompletionRequest {
+                    model: session.model.clone(),
+                    messages,
+                    max_tokens: Some(4000),
+                    temperature,
+                    stream: Some(false),
+                    tools: None, // Don't provide tools to prevent more tool calls
+                    tool_choice: None, // Explicitly disable tool usage
+                    functions: None,
+                    function_call: None,
+                };
+
+                let response = llm_client.complete(request).await?;
+                let final_response = response
+                    .choices
+                    .first()
+                    .and_then(|choice| choice.message.as_ref())
+                    .and_then(|message| message.content.clone())
+                    .unwrap_or_default();
+
+                let cleaned_response = self.clean_assistant_response(&final_response);
+
+                // Broadcast and store the final response
+                self.ws
+                    .broadcast_llm_agent_chunk(session_id, cleaned_response.clone())
+                    .await;
+
+                self.db.create_llm_agent_message(
+                    session_id,
+                    "assistant",
+                    cleaned_response.clone(),
+                )?;
+
+                tracing::info!(
+                    session_id = %session_id,
+                    response_length = %cleaned_response.len(),
+                    "Final response obtained at max recursion depth"
+                );
+
+                return Ok(cleaned_response);
             }
             tracing::info!(
                 session_id = %session_id,
@@ -1214,17 +1286,46 @@ impl LlmAgent {
                         let tool_calls = if let Some(tool_calls_array) =
                             assistant_data.get("tool_calls").and_then(|v| v.as_array())
                         {
+                            tracing::info!(
+                                session_id = %session_id,
+                                tool_calls_count = %tool_calls_array.len(),
+                                "RECONSTRUCT_DEBUG: Found tool_calls array in assistant message"
+                            );
                             let mut calls = Vec::new();
-                            for tool_call_value in tool_calls_array {
-                                if let Ok(tool_call) =
-                                    serde_json::from_value::<crate::llm_client::LlmToolCall>(
-                                        tool_call_value.clone(),
-                                    )
-                                {
-                                    calls.push(tool_call);
+                            for (idx, tool_call_value) in tool_calls_array.iter().enumerate() {
+                                tracing::info!(
+                                    session_id = %session_id,
+                                    tool_call_index = %idx,
+                                    tool_call_json = %tool_call_value.to_string(),
+                                    "RECONSTRUCT_DEBUG: Attempting to deserialize tool call"
+                                );
+                                match serde_json::from_value::<crate::llm_client::LlmToolCall>(
+                                    tool_call_value.clone(),
+                                ) {
+                                    Ok(tool_call) => {
+                                        tracing::info!(
+                                            session_id = %session_id,
+                                            tool_call_index = %idx,
+                                            tool_call_id = %tool_call.id,
+                                            "RECONSTRUCT_DEBUG: Successfully deserialized tool call"
+                                        );
+                                        calls.push(tool_call);
+                                    }
+                                    Err(e) => {
+                                        tracing::error!(
+                                            session_id = %session_id,
+                                            tool_call_index = %idx,
+                                            error = %e,
+                                            "RECONSTRUCT_DEBUG: Failed to deserialize tool call"
+                                        );
+                                    }
                                 }
                             }
                             if calls.is_empty() {
+                                tracing::warn!(
+                                    session_id = %session_id,
+                                    "RECONSTRUCT_DEBUG: No tool calls successfully deserialized!"
+                                );
                                 None
                             } else {
                                 Some(calls)
