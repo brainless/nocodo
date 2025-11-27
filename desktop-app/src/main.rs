@@ -39,16 +39,31 @@ fn main() -> eframe::Result {
     //      - russh::* (the SSH library logs)
     //      - nocodo_desktop_app::ssh (our SSH module logs)
     //
+    // 3. RUST_HTTP_CLIENT_LOGS: Controls HTTP client logging (custom env var)
+    //    By default, HTTP client logs are DISABLED to reduce noise.
+    //    Set this to a log level to enable HTTP client logs:
+    //
+    //    Examples:
+    //      RUST_HTTP_CLIENT_LOGS=debug  - Show detailed HTTP client logs
+    //      RUST_HTTP_CLIENT_LOGS=info   - Show HTTP client info logs
+    //      RUST_HTTP_CLIENT_LOGS=warn   - Show only HTTP client warnings and errors
+    //
+    //    This affects:
+    //      - hyper_util::client::legacy (the hyper HTTP client logs)
+    //
     // Usage Examples:
     // ---------------
     // Linux/macOS:
     //   RUST_LOG=debug RUST_SSH_CLIENT_LOGS=info cargo run
+    //   RUST_LOG=debug RUST_HTTP_CLIENT_LOGS=debug cargo run
     //
     // Windows PowerShell:
     //   $env:RUST_LOG="debug"; $env:RUST_SSH_CLIENT_LOGS="info"; cargo run
+    //   $env:RUST_LOG="debug"; $env:RUST_HTTP_CLIENT_LOGS="debug"; cargo run
     //
     // Windows Command Prompt:
     //   set RUST_LOG=debug && set RUST_SSH_CLIENT_LOGS=info && cargo run
+    //   set RUST_LOG=debug && set RUST_HTTP_CLIENT_LOGS=debug && cargo run
     // ============================================================================
 
     use tracing_subscriber::{fmt, EnvFilter};
@@ -77,6 +92,26 @@ fn main() -> eframe::Result {
         // Disable SSH logs by default
         env_filter = env_filter.add_directive("russh=off".parse().unwrap());
         env_filter = env_filter.add_directive("nocodo_desktop_app::ssh=off".parse().unwrap());
+    }
+
+    // Check RUST_HTTP_CLIENT_LOGS for HTTP client log level
+    let http_log_level = std::env::var("RUST_HTTP_CLIENT_LOGS")
+        .ok()
+        .and_then(|v| {
+            let level = v.trim().to_lowercase();
+            match level.as_str() {
+                "trace" | "debug" | "info" | "warn" | "error" => Some(level),
+                _ => None,
+            }
+        });
+
+    // Apply HTTP client log level directives
+    if let Some(level) = http_log_level {
+        // Enable hyper_util logs at specified level
+        env_filter = env_filter.add_directive(format!("hyper_util::client::legacy={}", level).parse().unwrap());
+    } else {
+        // Disable HTTP client logs by default
+        env_filter = env_filter.add_directive("hyper_util::client::legacy=off".parse().unwrap());
     }
 
     fmt()
