@@ -135,6 +135,41 @@ set RUST_SSH_CLIENT_LOGS=info && cargo run --manifest-path desktop-app/Cargo.tom
 
 **Note:** Without this environment variable, all SSH-related logs (both `russh::*` and `nocodo_desktop_app::ssh`) are completely filtered out, regardless of `RUST_LOG` setting.
 
+### HTTP Client Debug Logs
+
+By default, HTTP client logs (from the `hyper_util::client::legacy` module) are disabled to reduce noise. To enable HTTP client logs, set the `RUST_HTTP_CLIENT_LOGS` environment variable to a log level:
+
+**Available log levels:** `trace`, `debug`, `info`, `warn`, `error`
+
+**Linux/macOS:**
+```bash
+# For detailed debug logs
+RUST_HTTP_CLIENT_LOGS=debug cargo run --manifest-path desktop-app/Cargo.toml
+
+# For info-level logs only
+RUST_HTTP_CLIENT_LOGS=info cargo run --manifest-path desktop-app/Cargo.toml
+```
+
+**Windows (PowerShell):**
+```powershell
+# For detailed debug logs
+$env:RUST_HTTP_CLIENT_LOGS="debug"; cargo run --manifest-path desktop-app/Cargo.toml
+
+# For info-level logs only
+$env:RUST_HTTP_CLIENT_LOGS="info"; cargo run --manifest-path desktop-app/Cargo.toml
+```
+
+**Windows (Command Prompt):**
+```cmd
+REM For detailed debug logs
+set RUST_HTTP_CLIENT_LOGS=debug && cargo run --manifest-path desktop-app/Cargo.toml
+
+REM For info-level logs only
+set RUST_HTTP_CLIENT_LOGS=info && cargo run --manifest-path desktop-app/Cargo.toml
+```
+
+**Note:** Without this environment variable, all HTTP client logs from `hyper_util::client::legacy` are completely filtered out, regardless of `RUST_LOG` setting.
+
 ## Components
 
 - **SSH Module** (`src/ssh.rs`): Handles SSH connection and port forwarding
