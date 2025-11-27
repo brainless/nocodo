@@ -1,6 +1,6 @@
 [package]
 name = "nocodo-desktop-app"
-version = "0.1.15"
+version = "0.1.17"
 edition = "2021"
 
 [dependencies]
@@ -34,7 +34,7 @@ toml = "0.9"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # System directories
 dirs = "6.0"

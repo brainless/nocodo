@@ -60,19 +60,15 @@ impl Sidebar {
                     }
 
                     // Favorite projects section
-                    tracing::debug!("Sidebar check: favorites_count={}, authenticated={}, server_info={:?}", 
-                        state.favorite_projects.len(), is_authenticated, state.current_server_info);
                     if !state.favorite_projects.is_empty() && is_authenticated && state.current_server_info.is_some() {
                         ui.add_space(4.0);
 
                         // Show favorite projects for current server
                         if let Some((server_host, server_user, server_port)) = &state.current_server_info {
-                            tracing::debug!("Checking favorites for server: {:?}", (server_host, server_user, server_port));
                             for project in &state.projects {
                                 let favorite_key = &(server_host.clone(), server_user.clone(), *server_port, project.id);
                                 let is_favorite = state.favorite_projects.contains(favorite_key);
                                 if is_favorite {
-                                    tracing::debug!("Showing favorite project: {} ({})", project.name, project.id);
                                     let available_width = ui.available_width();
                                     let (rect, response) = ui.allocate_exact_size(
                                         egui::vec2(available_width, 24.0),

@@ -93,6 +93,48 @@ cargo fmt --manifest-path desktop-app/Cargo.toml
 cargo clippy --manifest-path desktop-app/Cargo.toml
 ```
 
+### SSH Client Debug Logs
+
+By default, SSH client logs (from both our code and the `russh` library) are disabled to reduce noise, even when `RUST_LOG=debug` is set. To enable SSH connection and tunneling logs, set the `RUST_SSH_CLIENT_LOGS` environment variable to a log level:
+
+**Available log levels:** `trace`, `debug`, `info`, `warn`, `error`
+
+**Linux/macOS:**
+```bash
+# For detailed debug logs
+RUST_SSH_CLIENT_LOGS=debug cargo run --manifest-path desktop-app/Cargo.toml
+
+# For info-level logs only
+RUST_SSH_CLIENT_LOGS=info cargo run --manifest-path desktop-app/Cargo.toml
+```
+
+**Windows (PowerShell):**
+```powershell
+# For detailed debug logs
+$env:RUST_SSH_CLIENT_LOGS="debug"; cargo run --manifest-path desktop-app/Cargo.toml
+
+# For info-level logs only
+$env:RUST_SSH_CLIENT_LOGS="info"; cargo run --manifest-path desktop-app/Cargo.toml
+```
+
+**Windows (Command Prompt):**
+```cmd
+REM For detailed debug logs
+set RUST_SSH_CLIENT_LOGS=debug && cargo run --manifest-path desktop-app/Cargo.toml
+
+REM For info-level logs only
+set RUST_SSH_CLIENT_LOGS=info && cargo run --manifest-path desktop-app/Cargo.toml
+```
+
+**Log level details:**
+- `trace`: Most verbose - includes all SSH protocol messages
+- `debug`: Detailed connection and data transfer logs
+- `info`: Key events like connection established, authentication, tunnel ready
+- `warn`: Warnings about failed keys, connection issues
+- `error`: Only critical errors
+
+**Note:** Without this environment variable, all SSH-related logs (both `russh::*` and `nocodo_desktop_app::ssh`) are completely filtered out, regardless of `RUST_LOG` setting.
+
 ## Components
 
 - **SSH Module** (`src/ssh.rs`): Handles SSH connection and port forwarding

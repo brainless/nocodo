@@ -178,7 +178,7 @@ impl ProjectDetailPage {
                 if let Some(db) = &state.db {
                     let result = db.execute(
                         "DELETE FROM favorites WHERE entity_type = 'project' AND entity_id = ? AND server_host = ? AND server_user = ? AND server_port = ?",
-                        [&self.project_id.to_string(), server_host, server_user, &server_port.to_string()],
+                        rusqlite::params![self.project_id, server_host, server_user, server_port],
                     );
                     tracing::debug!("DB delete result: {:?}", result);
                 }
@@ -188,9 +188,13 @@ impl ProjectDetailPage {
                 tracing::debug!("Added favorite for project {}", self.project_id);
                 // Add to database
                 if let Some(db) = &state.db {
+                    let created_at = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64;
                     let result = db.execute(
                         "INSERT INTO favorites (entity_type, entity_id, server_host, server_user, server_port, created_at) VALUES ('project', ?, ?, ?, ?, ?)",
-                        [&self.project_id.to_string(), server_host, server_user, &server_port.to_string(), &std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string()],
+                        rusqlite::params![self.project_id, server_host, server_user, server_port, created_at],
                     );
                     tracing::debug!("DB insert result: {:?}", result);
                 }

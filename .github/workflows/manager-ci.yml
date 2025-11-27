@@ -32,6 +32,7 @@ jobs:
   # Fast compilation check
   check:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'bump version')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,6 +63,7 @@ jobs:
   # Code formatting verification
   format:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'bump version')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,6 +79,7 @@ jobs:
   # Linting with Clippy
   lint:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'bump version')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -105,6 +108,7 @@ jobs:
   # Unit and integration tests
   test:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'bump version')"
     strategy:
       matrix:
         rust-version: [stable, beta]
@@ -140,7 +144,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     # Run on schedule or when dependencies change
-    if: github.event_name == 'schedule' || contains(github.event.head_commit.modified, 'Cargo.toml') || contains(github.event.head_commit.modified, 'Cargo.lock')
+    if: "!contains(github.event.head_commit.message, 'bump version') && (github.event_name == 'schedule' || contains(github.event.head_commit.modified, 'Cargo.toml') || contains(github.event.head_commit.modified, 'Cargo.lock'))"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -157,6 +161,7 @@ jobs:
   # Build release binaries
   build:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'bump version')"
     needs: [check, format, lint, test]
     steps:
       - name: Checkout code
@@ -192,7 +197,7 @@ jobs:
 
   manager-tests:
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'manager/') || github.event_name == 'pull_request'
+    if: "!contains(github.event.head_commit.message, 'bump version') && (contains(github.event.head_commit.modified, 'manager/') || github.event_name == 'pull_request')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
