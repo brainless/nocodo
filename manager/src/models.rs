@@ -1125,3 +1125,170 @@ impl BashExecutionLog {
         }
     }
 }
+
+// Project Commands Models
+
+/// Project command that can be executed for development tasks
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct ProjectCommand {
+    pub id: String,
+    pub project_id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub command: String,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[allow(dead_code)]
+impl ProjectCommand {
+    pub fn new(
+        id: String,
+        project_id: i64,
+        name: String,
+        command: String,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id,
+            project_id,
+            name,
+            description: None,
+            command,
+            shell: None,
+            working_directory: None,
+            environment: None,
+            timeout_seconds: Some(120),
+            os_filter: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn update_timestamp(&mut self) {
+        self.updated_at = Utc::now().timestamp();
+    }
+}
+
+/// Request to create a new project command
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct CreateProjectCommandRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub command: String,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+}
+
+/// Request to update a project command
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct UpdateProjectCommandRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub command: Option<String>,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+}
+
+/// Request to execute a command
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct ExecuteProjectCommandRequest {
+    pub git_branch: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+}
+
+/// Execution result for a project command
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct ProjectCommandExecution {
+    pub id: i64,
+    pub command_id: String,
+    pub git_branch: Option<String>,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: u64,
+    pub executed_at: i64,
+    pub success: bool,
+}
+
+#[allow(dead_code)]
+impl ProjectCommandExecution {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        command_id: String,
+        git_branch: Option<String>,
+        exit_code: Option<i32>,
+        stdout: String,
+        stderr: String,
+        duration_ms: u64,
+        success: bool,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            command_id,
+            git_branch,
+            exit_code,
+            stdout,
+            stderr,
+            duration_ms,
+            executed_at: now,
+            success,
+        }
+    }
+}
+
+/// Response for project command list
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandListResponse {
+    pub commands: Vec<ProjectCommand>,
+}
+
+/// Response for single project command
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandResponse {
+    pub command: ProjectCommand,
+}
+
+/// Response for project command execution
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandExecutionResponse {
+    pub execution: ProjectCommandExecution,
+}
+
+/// Response for project command execution list
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandExecutionListResponse {
+    pub executions: Vec<ProjectCommandExecution>,
+}
+
+/// Query parameters for filtering project commands
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandFilterQuery {
+    pub search: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}

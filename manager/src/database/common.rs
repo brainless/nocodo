@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 pub type DbConnection = Arc<Mutex<Connection>>;
 
 pub struct Database {
-    connection: DbConnection,
+    pub(crate) connection: DbConnection,
 }
 
 impl Database {
@@ -35,11 +35,6 @@ impl Database {
         Ok(database)
     }
 
-    #[allow(dead_code)]
-    pub fn connection(&self) -> DbConnection {
-        Arc::clone(&self.connection)
-    }
-
     fn run_migrations(&self) -> AppResult<()> {
         let conn = self
             .connection
@@ -61,7 +56,7 @@ impl Database {
             [],
         )?;
 
-        // Create an index on the name for faster lookups
+        // Create an index on name for faster lookups
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)",
             [],
@@ -509,7 +504,7 @@ impl Database {
 
         if has_boolean_success || has_datetime_executed_at {
             tracing::info!("Migrating command_executions table schema");
-            // SQLite doesn't support ALTER COLUMN directly, so we need to recreate the table
+            // SQLite doesn't support ALTER COLUMN directly, so we need to recreate table
             conn.execute(
                 "CREATE TABLE command_executions_new (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -798,8 +793,66 @@ impl Database {
             }
         }
 
+        // Project commands tables
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_commands (
+                id TEXT PRIMARY KEY,
+                project_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                command TEXT NOT NULL,
+                shell TEXT,
+                working_directory TEXT,
+                environment TEXT, -- JSON object
+                timeout_seconds INTEGER DEFAULT 120,
+                os_filter TEXT, -- JSON array
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS project_command_executions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                command_id TEXT NOT NULL,
+                git_branch TEXT,  -- Which branch this was executed on
+                exit_code INTEGER,
+                stdout TEXT,
+                stderr TEXT,
+                duration_ms INTEGER NOT NULL,
+                executed_at INTEGER NOT NULL,
+                success INTEGER NOT NULL,
+                FOREIGN KEY (command_id) REFERENCES project_commands(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Indexes for performance
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_project_commands_project ON project_commands(project_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_project_command_executions_command ON project_command_executions(command_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_project_command_executions_time ON project_command_executions(executed_at)",
+            [],
+        )?;
+
         tracing::info!("Database migrations completed");
         Ok(())
+    }
+
+    // All other database methods
+    #[allow(dead_code)]
+    pub fn connection(&self) -> DbConnection {
+        Arc::clone(&self.connection)
     }
 
     pub fn get_all_projects(&self) -> AppResult<Vec<Project>> {
@@ -1344,9 +1397,9 @@ impl Database {
         let conn = self
             .connection
             .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")));
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let rows_affected = conn?.execute(
+        let rows_affected = conn.execute(
             "UPDATE works SET title = ?, project_id = ?, status = ?, updated_at = ? WHERE id = ?",
             params![
                 work.title,
@@ -1993,7 +2046,7 @@ impl Database {
                 r#"
                 INSERT OR REPLACE INTO workflow_commands
                 (id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path, project_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
                 rusqlite::params![
                     command.id,
@@ -2641,7 +2694,6 @@ impl Database {
 
     /// Get the parent project ID for a project (for permission inheritance)
 
-
     pub fn get_parent_project_id(&self, project_id: i64) -> AppResult<Option<i64>> {
         let conn = self
             .connection
@@ -2661,7 +2713,9 @@ impl Database {
             .flatten();
 
         Ok(parent_id)
-    }    // Team CRUD methods
+    }
+
+    // Team CRUD methods
 
     /// Create a new team
     pub fn create_team(&self, team: &crate::models::Team) -> AppResult<i64> {

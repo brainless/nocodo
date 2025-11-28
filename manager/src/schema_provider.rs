@@ -147,8 +147,8 @@ mod tests {
     fn test_anthropic_respects_optional() {
         let provider = AnthropicSchemaProvider;
         let schema = schema_for!(TestStruct);
-        let original_required_count = if let Schema::Object(ref obj) = schema.schema {
-            obj.object.as_ref().map(|o| o.required.len()).unwrap_or(0)
+        let original_required_count = if let Some(ref obj) = schema.schema.object {
+            obj.required.len()
         } else {
             0
         };
