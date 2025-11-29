@@ -36,6 +36,23 @@ Create new E2E test that validates LLM-enhanced command discovery:
 - Test skipped if `ANTHROPIC_API_KEY` not set (use `#[ignore]` or conditional skip)
 - Documented in test comments: "Requires ANTHROPIC_API_KEY env var"
 
+## Running the Test
+
+Use the existing test runner script with a new test type:
+
+```bash
+# Rule-based discovery only (existing)
+./run_llm_e2e_test.sh anthropic claude-3-5-sonnet-20241022 command_discovery
+
+# LLM-enhanced discovery (new)
+./run_llm_e2e_test.sh anthropic claude-3-5-sonnet-20241022 command_discovery_llm
+```
+
+**Note**:
+- The LLM-enhanced test may take 10-30 seconds due to API latency
+- Requires `ANTHROPIC_API_KEY` environment variable to be set
+- Test will be skipped if API key is not configured
+
 ## Reference
 - Existing test: `test_command_discovery_saleor` (rule-based)
 - Handler: `manager/src/handlers/project_commands.rs::discover_project_commands`
