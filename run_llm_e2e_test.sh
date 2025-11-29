@@ -27,10 +27,12 @@ if [[ $# -lt 2 ]]; then
     echo ""
     echo "Test types (optional):"
     echo "   - default: Runs existing tech stack analysis test (default)"
-    echo "   - command_discovery: Runs command discovery API test"
+    echo "   - command_discovery: Runs command discovery API test (rule-based)"
+    echo "   - command_discovery_llm: Runs LLM-enhanced command discovery test"
     echo ""
     echo "Example: $0 xai grok-code-fast-1"
     echo "Example: $0 xai grok-code-fast-1 command_discovery"
+    echo "Example: $0 anthropic claude-3-5-sonnet-20241022 command_discovery_llm"
     exit 1
 fi
 
@@ -234,7 +236,15 @@ else
 fi
 
 echo ""
-if [[ "$TEST_TYPE" == "command_discovery" ]]; then
+if [[ "$TEST_TYPE" == "command_discovery_llm" ]]; then
+    echo "🤖 Running LLM-enhanced command discovery E2E test with Saleor repository..."
+    echo "   ⚠️  This test requires LLM provider API key (any supported provider)"
+    echo "   ⏳ This test may take 10-30 seconds due to API latency"
+    echo ""
+    # Run the LLM-enhanced command discovery test
+    cargo test --manifest-path manager/Cargo.toml --test llm_e2e_command_discovery_test test_command_discovery_llm_enhanced_saleor \
+        -- --test-threads=1 --nocapture --ignored
+elif [[ "$TEST_TYPE" == "command_discovery" ]]; then
     echo "🧪 Running command discovery E2E test with Saleor repository..."
     echo ""
     # Run the command discovery test

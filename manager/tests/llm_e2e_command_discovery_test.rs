@@ -7,6 +7,7 @@ use actix_web::{test, web, App, HttpMessage};
 
 use crate::common::{
     keyword_validation::LlmTestScenario,
+    llm_config::LlmTestConfig,
     TestApp,
 };
 use nocodo_manager::handlers::project_commands::discover_project_commands;
@@ -223,6 +224,343 @@ async fn test_command_discovery_saleor() {
     println!("   ✅ Phase 2: Command discovery API successful");
     println!("   ✅ Phase 3: Response structure validation passed");
     println!("   📈 Discovered {} commands, stored {} commands", discovered_count, stored_count);
+
+    // Cleanup verification
+    println!("\n🧹 Cleanup verification:");
+    let projects = test_app
+        .db()
+        .get_all_projects()
+        .expect("Failed to get projects");
+    println!("   📁 Test projects created: {}", projects.len());
+
+    let works = test_app.db().get_all_works().expect("Failed to get works");
+    println!("   💼 Test work sessions: {}", works.len());
+
+    println!("   🗂️  Test files will be cleaned up automatically");
+}
+
+/// E2E test for LLM-enhanced command discovery API
+///
+/// This test validates:
+/// - LLM enhancement of discovered commands
+/// - Comparison between rule-based and LLM-enhanced results
+/// - Proper response structure with LLM reasoning
+/// - Requires LLM provider API key (any supported provider)
+#[actix_rt::test]
+#[ignore] // Requires API key - run with: cargo test -- --ignored
+async fn test_command_discovery_llm_enhanced_saleor() {
+    // Check for available LLM providers
+    let llm_config = LlmTestConfig::from_environment();
+    if !llm_config.has_available_providers() {
+        println!("⚠️  Skipping LLM-enhanced command discovery test - no API keys available");
+        println!("   Set GROK_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or ZAI_API_KEY to run this test");
+        return;
+    }
+
+    // Initialize logging to capture all logs in test output
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("nocodo_manager=debug".parse().unwrap())
+                .add_directive("nocodo_manager::command_discovery=info".parse().unwrap())
+                .add_directive("nocodo_manager::llm_agent=debug".parse().unwrap()),
+        )
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .try_init();
+
+    println!("\n🤖 LLM-Enhanced Command Discovery Test");
+    println!("=====================================");
+
+    let provider = llm_config
+        .get_default_provider()
+        .expect("No default provider available");
+
+    // Get requested model from environment or use first available model
+    let model = std::env::var("MODEL").unwrap_or_else(|_| provider.default_model().to_string());
+
+    // Validate that the requested model is available for this provider
+    if !provider.models.contains(&model) {
+        println!(
+            "❌ Error: Model '{}' not available for provider '{}'",
+            model, provider.name
+        );
+        println!("   Available models: {:?}", provider.models);
+        return;
+    }
+
+    println!("🚀 Running LLM-enhanced command discovery test with provider: {}", provider.name);
+    println!("   Model: {}", model);
+
+    // PHASE 1: Create isolated test environment
+    println!("\n📦 Phase 1: Setting up isolated test environment");
+    
+    // Create test app with LLM agent
+    println!("   🤖 Creating test app with LLM agent: {}", provider.name);
+    let test_app = TestApp::new_with_llm(provider).await;
+
+    // Verify isolation
+    assert!(test_app.test_config().test_id.starts_with("test-"));
+    assert!(test_app
+        .test_config()
+        .db_path()
+        .to_string_lossy()
+        .contains(&test_app.test_config().test_id));
+
+    println!(
+        "   ✅ Test isolation configured with ID: {}",
+        test_app.test_config().test_id
+    );
+
+    // PHASE 2: Set up project for command discovery
+    println!("\n🔧 Phase 2: Setting up project for command discovery");
+
+    // Create test scenario with project context (using Saleor like existing test)
+    let scenario = LlmTestScenario::tech_stack_analysis_saleor();
+
+    // Set up project context from scenario
+    let project_id = test_app
+        .create_project_from_scenario(&scenario.context)
+        .await
+        .expect("Failed to create project from scenario");
+
+    // Verify project was created
+    let projects = test_app.db().get_all_projects().unwrap();
+    println!("   📁 Found {} projects in database", projects.len());
+    for p in &projects {
+        println!("     - Project {}: {} (path: {})", p.id, p.name, p.path);
+    }
+    assert!(
+        projects.iter().any(|p| p.id == project_id),
+        "Project {} not found in database",
+        project_id
+    );
+
+    println!("   ✅ Project created from git repository: {}", scenario.context.git_repo);
+
+    // Create a test user in the database
+    let test_user = nocodo_manager::models::User {
+        id: 1,
+        name: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+        password_hash: "test_hash".to_string(),
+        is_active: true,
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+        role: None,
+        last_login_at: None,
+    };
+    test_app.db().create_user(&test_user).unwrap();
+    println!("   👤 Created test user with ID: {}", test_user.id);
+
+    // PHASE 3: Test rule-based discovery first (baseline)
+    println!("\n🔍 Phase 3: Testing rule-based discovery (baseline)");
+
+    let req_rule_based = test::TestRequest::post()
+        .uri(&format!("/api/projects/{}/commands/discover?use_llm=false", project_id))
+        .to_request();
+
+    // Add mock user authentication for testing
+    let mock_user = nocodo_manager::models::UserInfo {
+        id: 1,
+        username: "test_user".to_string(),
+        email: "test@example.com".to_string(),
+    };
+    req_rule_based.extensions_mut().insert(mock_user.clone());
+
+    let service = test::init_service(
+        App::new()
+            .app_data(test_app.app_state.clone())
+            .route("/api/projects/{id}/commands/discover", web::post().to(discover_project_commands))
+    ).await;
+
+    let resp_rule_based = test::call_service(&service, req_rule_based).await;
+
+    // Debug: Print the response status
+    let status_rule_based = resp_rule_based.status();
+    println!("   📡 Rule-based response status: {}", status_rule_based);
+    
+    // If not successful, print response body for debugging
+    if !status_rule_based.is_success() {
+        let body = test::read_body(resp_rule_based).await;
+        let body_str = String::from_utf8_lossy(&body);
+        println!("   ❌ Rule-based response body: {}", body_str);
+        panic!("Rule-based command discovery API call failed with status: {}", status_rule_based);
+    }
+
+    let body_rule_based: serde_json::Value = test::read_body_json(resp_rule_based).await;
+    println!("   ✅ Rule-based command discovery API call successful");
+
+    // Validate rule-based response structure
+    assert!(body_rule_based.get("commands").is_some(), "Rule-based response missing 'commands' field");
+    assert!(body_rule_based.get("project_types").is_some(), "Rule-based response missing 'project_types' field");
+    assert!(body_rule_based.get("discovered_count").is_some(), "Rule-based response missing 'discovered_count' field");
+    assert!(body_rule_based.get("stored_count").is_some(), "Rule-based response missing 'stored_count' field");
+
+    let rule_based_commands = body_rule_based["commands"].as_array().expect("Commands should be an array");
+    let rule_based_count = body_rule_based["discovered_count"].as_u64().expect("discovered_count should be a number");
+
+    println!("   📊 Rule-based Results:");
+    println!("      • Discovered commands: {}", rule_based_count);
+
+    // Validate that we discovered some commands
+    assert!(
+        rule_based_count > 0,
+        "Should have discovered at least one command for Saleor project"
+    );
+
+    // PHASE 4: Test LLM-enhanced discovery
+    println!("\n🤖 Phase 4: Testing LLM-enhanced discovery");
+    println!("   ⏳ This may take 10-30 seconds due to API latency...");
+
+    let req_llm = test::TestRequest::post()
+        .uri(&format!("/api/projects/{}/commands/discover?use_llm=true", project_id))
+        .to_request();
+
+    req_llm.extensions_mut().insert(mock_user.clone());
+
+    let resp_llm = test::call_service(&service, req_llm).await;
+
+    // Debug: Print the response status
+    let status_llm = resp_llm.status();
+    println!("   📡 LLM-enhanced response status: {}", status_llm);
+    
+    // If not successful, print response body for debugging
+    if !status_llm.is_success() {
+        let body = test::read_body(resp_llm).await;
+        let body_str = String::from_utf8_lossy(&body);
+        println!("   ❌ LLM-enhanced response body: {}", body_str);
+        panic!("LLM-enhanced command discovery API call failed with status: {}", status_llm);
+    }
+
+    let body_llm: serde_json::Value = test::read_body_json(resp_llm).await;
+    println!("   ✅ LLM-enhanced command discovery API call successful");
+
+    // Validate LLM-enhanced response structure
+    assert!(body_llm.get("commands").is_some(), "LLM response missing 'commands' field");
+    assert!(body_llm.get("project_types").is_some(), "LLM response missing 'project_types' field");
+    assert!(body_llm.get("discovered_count").is_some(), "LLM response missing 'discovered_count' field");
+    assert!(body_llm.get("stored_count").is_some(), "LLM response missing 'stored_count' field");
+    assert!(body_llm.get("llm_used").is_some(), "LLM response missing 'llm_used' field");
+    assert!(body_llm.get("reasoning").is_some(), "LLM response missing 'reasoning' field");
+
+    let llm_commands = body_llm["commands"].as_array().expect("Commands should be an array");
+    let llm_count = body_llm["discovered_count"].as_u64().expect("discovered_count should be a number");
+    let llm_used = body_llm["llm_used"].as_bool().expect("llm_used should be a boolean");
+    let reasoning = body_llm["reasoning"].as_str().expect("reasoning should be a string");
+
+    println!("   📊 LLM-enhanced Results:");
+    println!("      • Discovered commands: {}", llm_count);
+    println!("      • LLM used: {}", llm_used);
+    println!("      • Reasoning length: {} chars", reasoning.len());
+
+    // PHASE 5: Validate LLM-specific requirements
+    println!("\n🧪 Phase 5: Validating LLM enhancement");
+
+    // Check if LLM agent was available in the test app
+    let llm_agent_available = test_app.app_state.llm_agent.is_some();
+    
+    if !llm_agent_available {
+        println!("   ⚠️  LLM agent not available in test app - skipping LLM-specific validations");
+        println!("   📝 This is expected if no API key is configured");
+        return;
+    }
+
+    // Assert LLM was actually used
+    assert!(
+        llm_used,
+        "LLM should have been used for enhancement (llm_used: true expected)"
+    );
+
+    // Assert reasoning field contains meaningful content
+    assert!(
+        !reasoning.is_empty(),
+        "Reasoning field should not be empty when LLM is used"
+    );
+    assert!(
+        reasoning.len() > 50,
+        "Reasoning should be substantial (more than 50 characters), got: {} chars",
+        reasoning.len()
+    );
+
+    // Print a snippet of reasoning for verification
+    let reasoning_preview = if reasoning.len() > 200 {
+        format!("{}...", &reasoning[..200])
+    } else {
+        reasoning.to_string()
+    };
+    println!("      • Reasoning preview: \"{}\"", reasoning_preview);
+
+    // Compare command counts between rule-based and LLM-enhanced
+    println!("   📈 Comparison:");
+    println!("      • Rule-based commands: {}", rule_based_count);
+    println!("      • LLM-enhanced commands: {}", llm_count);
+    
+    let count_diff = llm_count as i64 - rule_based_count as i64;
+    if count_diff != 0 {
+        let sign = if count_diff > 0 { "+" } else { "" };
+        println!("      • Difference: {}{} commands", sign, count_diff);
+    } else {
+        println!("      • Same number of commands");
+    }
+
+    // Validate that commands have enhanced descriptions
+    let mut enhanced_descriptions_found = 0;
+    let mut basic_descriptions_found = 0;
+
+    for command in llm_commands {
+        let cmd_obj = command.as_object().expect("Command should be an object");
+        
+        // Validate required fields
+        assert!(cmd_obj.contains_key("id"), "Command missing 'id' field");
+        assert!(cmd_obj.contains_key("name"), "Command missing 'name' field");
+        assert!(cmd_obj.contains_key("command"), "Command missing 'command' field");
+        assert!(cmd_obj.contains_key("description"), "Command missing 'description' field");
+
+        let name = cmd_obj["name"].as_str().expect("Command name should be a string");
+        let description = cmd_obj["description"].as_str().expect("Command description should be a string");
+
+        // Check if description is enhanced (not just "Run X script")
+        if description.len() > 20 && !description.starts_with("Run ") && !description.contains("script") {
+            enhanced_descriptions_found += 1;
+        } else {
+            basic_descriptions_found += 1;
+        }
+
+        println!("      • {}: {}", name, description);
+    }
+
+    println!("   📝 Description Analysis:");
+    println!("      • Enhanced descriptions: {}", enhanced_descriptions_found);
+    println!("      • Basic descriptions: {}", basic_descriptions_found);
+
+    // Assert that we have some enhanced descriptions (LLM should improve at least some)
+    assert!(
+        enhanced_descriptions_found > 0,
+        "LLM should have enhanced at least some command descriptions"
+    );
+
+    // Verify commands were stored in database
+    let stored_commands = test_app.db().get_project_commands(project_id).unwrap();
+    assert!(
+        stored_commands.len() >= llm_count as usize,
+        "Database should contain at least {} commands, found {}",
+        llm_count,
+        stored_commands.len()
+    );
+
+    println!("   ✅ Commands successfully stored in database");
+
+    println!("\n🎉 LLM-Enhanced Command Discovery Test Complete!");
+    println!("   ✅ Phase 1: Test isolation infrastructure working");
+    println!("   ✅ Phase 2: Project setup successful");
+    println!("   ✅ Phase 3: Rule-based baseline established");
+    println!("   ✅ Phase 4: LLM enhancement successful");
+    println!("   ✅ Phase 5: LLM-specific validations passed");
+    println!("   📈 Rule-based: {} commands, LLM-enhanced: {} commands", rule_based_count, llm_count);
+    println!("   🧠 LLM reasoning provided ({} chars)", reasoning.len());
+    println!("   📝 Enhanced descriptions: {}", enhanced_descriptions_found);
 
     // Cleanup verification
     println!("\n🧹 Cleanup verification:");
