@@ -739,25 +739,28 @@ commands:
 
 ## Migration Path
 
-### Phase 1: Core Infrastructure (Week 1-2)
-- [ ] Database schema
-- [ ] Models and types
-- [ ] Basic CRUD operations
+### Phase 1: Core Infrastructure (Week 1-2) ✅ COMPLETE
+- [x] Database schema
+- [x] Models and types
+- [x] Basic CRUD operations
 
-### Phase 2: Discovery Engine (Week 2-3)
-- [ ] CommandDiscovery implementation
-- [ ] Tech stack detection
-- [ ] Config file parsing
+### Phase 2: Discovery Engine (Week 2-3) ✅ COMPLETE
+- [x] CommandDiscovery implementation
+- [x] Tech stack detection (Node.js, Rust, Python, Go, Java)
+- [x] Config file parsing (package.json, Cargo.toml, pyproject.toml, go.mod, pom.xml, Makefile)
+- [x] Discovery API endpoint implementation (basic version without LLM)
+- [x] Command management API endpoints (CRUD operations)
+- [x] Command execution API endpoint
 
 ### Phase 3: LLM Integration (Week 3-4)
-- [ ] Discovery API endpoint implementation
-- [ ] LLM session management for discovery
-- [ ] Prompt engineering and testing
+- [ ] Enhanced LLM session management for discovery
+- [ ] Prompt engineering and testing with LLM
+- [ ] Integration with existing LlmAgent for intelligent discovery
 
 ### Phase 4: API & UI (Week 4-5)
-- [ ] Command management API endpoints
-- [ ] WebSocket updates for execution
+- [ ] WebSocket updates for execution status
 - [ ] Desktop app UI integration
+- [ ] Real-time command output streaming
 
 ### Phase 5: Polish & Testing (Week 5-6)
 - [ ] Security audit

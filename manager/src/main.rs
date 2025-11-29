@@ -1,6 +1,7 @@
 mod auth;
 mod bash_executor;
 mod bash_permissions;
+mod command_discovery;
 mod config;
 mod database;
 mod error;
@@ -180,6 +181,60 @@ async fn main() -> AppResult<()> {
                                                         .with_resource_id("id"),
                                                 ))
                                                 .route("/worktree-branches", web::get().to(handlers::list_worktree_branches)),
+                                        )
+                                        // Project commands endpoints
+                                        .service(
+                                            web::scope("/commands")
+                                                .wrap(PermissionMiddleware::new(
+                                                    PermissionRequirement::new("project", "read")
+                                                        .with_resource_id("id"),
+                                                ))
+                                                .route("", web::get().to(handlers::project_commands::get_project_commands))
+                                                .service(
+                                                    web::resource("")
+                                                        .wrap(PermissionMiddleware::new(
+                                                            PermissionRequirement::new("project", "write")
+                                                                .with_resource_id("id"),
+                                                        ))
+                                                        .route(web::post().to(handlers::project_commands::create_project_command)),
+                                                )
+                                                .service(
+                                                    web::resource("/discover")
+                                                        .wrap(PermissionMiddleware::new(
+                                                            PermissionRequirement::new("project", "write")
+                                                                .with_resource_id("id"),
+                                                        ))
+                                                        .route(web::post().to(handlers::project_commands::discover_project_commands)),
+                                                )
+                                                .service(
+                                                    web::scope("/{cmd_id}")
+                                                        .wrap(PermissionMiddleware::new(
+                                                            PermissionRequirement::new("project", "read")
+                                                                .with_resource_id("id"),
+                                                        ))
+                                                        .route("", web::get().to(handlers::project_commands::get_project_command))
+                                                        .service(
+                                                            web::resource("")
+                                                                .wrap(PermissionMiddleware::new(
+                                                                    PermissionRequirement::new("project", "write")
+                                                                        .with_resource_id("id"),
+                                                                ))
+                                                                .route(web::put().to(handlers::project_commands::update_project_command))
+                                                                .route(web::delete().to(handlers::project_commands::delete_project_command)),
+                                                        )
+                                                        .service(
+                                                            web::resource("/execute")
+                                                                .wrap(PermissionMiddleware::new(
+                                                                    PermissionRequirement::new("project", "write")
+                                                                        .with_resource_id("id"),
+                                                                ))
+                                                                .route(web::post().to(handlers::project_commands::execute_project_command)),
+                                                        )
+                                                        .route(
+                                                            "/executions",
+                                                            web::get().to(handlers::project_commands::get_command_executions),
+                                                        ),
+                                                ),
                                         ),
                                 ),
                         )
