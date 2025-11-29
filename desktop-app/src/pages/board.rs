@@ -408,6 +408,7 @@ impl crate::pages::Page for WorkPage {
                                                 enum DisplayMessage {
                                                     WorkMessage(manager_models::WorkMessage),
                                                     AiOutput(manager_models::AiSessionOutput),
+                                                    ToolCall(manager_models::LlmAgentToolCall),
                                                 }
 
                                                 let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
@@ -420,6 +421,11 @@ impl crate::pages::Page for WorkPage {
                                                 // Add AI session outputs (AI responses)
                                                 for output in &state.ai_session_outputs {
                                                     all_messages.push((output.created_at, DisplayMessage::AiOutput(output.clone())));
+                                                }
+
+                                                // Add AI tool calls
+                                                for tool_call in &state.ai_tool_calls {
+                                                    all_messages.push((tool_call.created_at, DisplayMessage::ToolCall(tool_call.clone())));
                                                 }
 
                                                 // Sort by timestamp
@@ -819,6 +825,162 @@ if !skip_regular_response {
                                                                     output.model.as_deref(),
                                                                     output.created_at
                                                                 );
+                                                                rendered_something = true;
+                                                            }
+                                                        }
+                                                        DisplayMessage::ToolCall(tool_call) => {
+                                                            // Only show tool calls when show_tool_widgets is enabled
+                                                            if state.ui_state.show_tool_widgets {
+                                                                // Render tool call widget
+                                                                let is_expanded = state.ui_state.expanded_tool_calls.contains(&tool_call.id);
+
+                                                                // Generate summary based on tool type
+                                                                let summary = match tool_call.tool_name.as_str() {
+                                                                    "list_files" => {
+                                                                        if let Some(ref response) = tool_call.response {
+                                                                            if let Ok(ToolResponse::ListFiles(list_response)) = serde_json::from_value::<ToolResponse>(response.clone()) {
+                                                                                format!("Listed {} files in {}", list_response.total_files, list_response.current_path)
+                                                                            } else {
+                                                                                "list_files".to_string()
+                                                                            }
+                                                                        } else {
+                                                                            "list_files (pending)".to_string()
+                                                                        }
+                                                                    }
+                                                                    "read_file" => {
+                                                                        if let Ok(req) = serde_json::from_value::<ReadFileRequest>(tool_call.request.clone()) {
+                                                                            let filename = std::path::Path::new(&req.path)
+                                                                                .file_name()
+                                                                                .and_then(|n| n.to_str())
+                                                                                .unwrap_or(&req.path);
+                                                                            if let Some(ref response) = tool_call.response {
+                                                                                if let Ok(ToolResponse::ReadFile(read_response)) = serde_json::from_value::<ToolResponse>(response.clone()) {
+                                                                                    let size_kb = read_response.content.len() / 1024;
+                                                                                    format!("Read {} ({} KB)", filename, size_kb.max(1))
+                                                                                } else {
+                                                                                    format!("Read {}", filename)
+                                                                                }
+                                                                            } else {
+                                                                                format!("read_file {} (pending)", filename)
+                                                                            }
+                                                                        } else {
+                                                                            "read_file".to_string()
+                                                                        }
+                                                                    }
+                                                                    "write_file" => {
+                                                                        if let Ok(req) = serde_json::from_value::<manager_models::WriteFileRequest>(tool_call.request.clone()) {
+                                                                            let filename = std::path::Path::new(&req.path)
+                                                                                .file_name()
+                                                                                .and_then(|n| n.to_str())
+                                                                                .unwrap_or(&req.path);
+                                                                            let lines = req.content.lines().count();
+                                                                            format!("Wrote {} ({} lines)", filename, lines)
+                                                                        } else {
+                                                                            "write_file".to_string()
+                                                                        }
+                                                                    }
+                                                                    "grep" => {
+                                                                        if let Ok(req) = serde_json::from_value::<manager_models::GrepRequest>(tool_call.request.clone()) {
+                                                                            if let Some(ref response) = tool_call.response {
+                                                                                if let Ok(ToolResponse::Grep(grep_response)) = serde_json::from_value::<ToolResponse>(response.clone()) {
+                                                                                    format!("Found {} matches for \"{}\"", grep_response.total_matches, req.pattern)
+                                                                                } else {
+                                                                                    format!("grep \"{}\"", req.pattern)
+                                                                                }
+                                                                            } else {
+                                                                                format!("grep \"{}\" (pending)", req.pattern)
+                                                                            }
+                                                                        } else {
+                                                                            "grep".to_string()
+                                                                        }
+                                                                    }
+                                                                    "apply_patch" => {
+                                                                        "Applied patch".to_string()
+                                                                    }
+                                                                    "bash" => {
+                                                                        if let Ok(req) = serde_json::from_value::<BashRequest>(tool_call.request.clone()) {
+                                                                            let truncated = if req.command.len() > 100 {
+                                                                                format!("{}...", &req.command[..100])
+                                                                            } else {
+                                                                                req.command.clone()
+                                                                            };
+                                                                            truncated
+                                                                        } else {
+                                                                            "bash".to_string()
+                                                                        }
+                                                                    }
+                                                                    _ => tool_call.tool_name.clone()
+                                                                };
+
+                                                                let bg_color = ui.style().visuals.widgets.inactive.bg_fill;
+
+                                                                let response = egui::Frame::NONE
+                                                                    .fill(bg_color)
+                                                                    .corner_radius(0.0)
+                                                                    .inner_margin(egui::Margin::symmetric(12, 6))
+                                                                    .show(ui, |ui| {
+                                                                        ui.set_width(ui.available_width());
+                                                                        ui.vertical(|ui| {
+                                                                            // Header row - clickable
+                                                                            let header_response = ui.horizontal(|ui| {
+                                                                                let arrow = if is_expanded { "▼" } else { "▶" };
+                                                                                ui.label(egui::RichText::new(arrow).size(12.0));
+                                                                                ui.label(egui::RichText::new(&summary).size(12.0).strong());
+                                                                            }).response;
+
+                                                                            // Show expanded content if expanded
+                                                                            if is_expanded {
+                                                                                ui.add_space(4.0);
+
+                                                                                // Show request
+                                                                                ui.label(egui::RichText::new("Request:").size(11.0).strong());
+                                                                                let request_json = serde_json::to_string_pretty(&tool_call.request)
+                                                                                    .unwrap_or_else(|_| "Failed to serialize".to_string());
+                                                                                ui.label(egui::RichText::new(request_json).size(10.0).family(egui::FontFamily::Monospace));
+
+                                                                                ui.add_space(4.0);
+
+                                                                                // Show response if available
+                                                                                if let Some(ref response_data) = tool_call.response {
+                                                                                    ui.label(egui::RichText::new("Response:").size(11.0).strong());
+                                                                                    let response_json = serde_json::to_string_pretty(response_data)
+                                                                                        .unwrap_or_else(|_| "Failed to serialize".to_string());
+                                                                                    ui.label(egui::RichText::new(response_json).size(10.0).family(egui::FontFamily::Monospace));
+                                                                                } else {
+                                                                                    ui.label(egui::RichText::new("Status: Pending").size(11.0).color(ui.style().visuals.weak_text_color()));
+                                                                                }
+
+                                                                                ui.add_space(4.0);
+
+                                                                                // Show execution metadata
+                                                                                ui.horizontal(|ui| {
+                                                                                    ui.label(egui::RichText::new(format!("Status: {}", tool_call.status)).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                                    if let Some(exec_time) = tool_call.execution_time_ms {
+                                                                                        ui.label(egui::RichText::new(format!(" | {}ms", exec_time)).size(10.0).color(ui.style().visuals.weak_text_color()));
+                                                                                    }
+                                                                                });
+                                                                            }
+
+                                                                            header_response
+                                                                        }).inner
+                                                                    })
+                                                                    .response;
+
+                                                                // Handle click to toggle expansion
+                                                                if response.interact(egui::Sense::click()).clicked() {
+                                                                    if is_expanded {
+                                                                        state.ui_state.expanded_tool_calls.remove(&tool_call.id);
+                                                                    } else {
+                                                                        state.ui_state.expanded_tool_calls.insert(tool_call.id);
+                                                                    }
+                                                                }
+
+                                                                // Change cursor to pointer on hover
+                                                                if response.hovered() {
+                                                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                                }
+
+                                                                ui.add_space(4.0);
                                                                 rendered_something = true;
                                                             }
                                                         }
