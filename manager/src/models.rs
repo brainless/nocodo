@@ -1292,3 +1292,15 @@ pub struct ProjectCommandFilterQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
+
+/// Query parameters for command discovery
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct DiscoveryOptionsQuery {
+    /// Whether to use LLM for enhanced discovery (default: true)
+    pub use_llm: Option<bool>,
+    /// LLM provider to use (default: from config)
+    pub llm_provider: Option<String>,
+    /// LLM model to use (default: from config)
+    pub llm_model: Option<String>,
+}

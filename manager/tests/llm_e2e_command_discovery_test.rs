@@ -107,7 +107,7 @@ async fn test_command_discovery_saleor() {
 
     let service = test::init_service(
         App::new()
-            .app_data(web::Data::new(test_app.database.database.clone()))
+            .app_data(test_app.app_state.clone())
             .route("/api/projects/{id}/commands/discover", web::post().to(discover_project_commands))
     ).await;
 

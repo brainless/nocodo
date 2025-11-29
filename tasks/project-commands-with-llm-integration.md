@@ -752,10 +752,12 @@ commands:
 - [x] Command management API endpoints (CRUD operations)
 - [x] Command execution API endpoint
 
-### Phase 3: LLM Integration (Week 3-4)
-- [ ] Enhanced LLM session management for discovery
-- [ ] Prompt engineering and testing with LLM
-- [ ] Integration with existing LlmAgent for intelligent discovery
+### Phase 3: LLM Integration (Week 3-4) ✅ COMPLETE
+- [x] Enhanced LLM session management for discovery
+- [x] Prompt engineering and testing with LLM
+- [x] Integration with existing LlmAgent for intelligent discovery
+- [x] Hybrid discovery strategy (rule-based + LLM)
+- [x] Query parameter support for enabling/disabling LLM (`use_llm=true|false`)
 
 ### Phase 4: API & UI (Week 4-5)
 - [ ] WebSocket updates for execution status
