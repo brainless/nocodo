@@ -26,11 +26,11 @@ impl super::Database {
             .transpose()
             .map_err(|e| AppError::Internal(format!("Failed to serialize os_filter: {}", e)))?;
 
-        conn.execute(
+conn.execute(
             r#"
             INSERT INTO project_commands
             (id, project_id, name, description, command, shell, working_directory, environment, timeout_seconds, os_filter, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             params![
                 command.id,

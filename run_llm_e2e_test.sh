@@ -20,17 +20,23 @@ echo ""
 if [[ $# -lt 2 ]]; then
     echo "❌ Error: Both provider and model are required"
     echo ""
-    echo "Usage: $0 <provider_id> <model_id>"
+    echo "Usage: $0 <provider_id> <model_id> [test_type]"
     echo ""
     echo "Valid providers and models are defined in manager/src/llm_providers/"
     echo "   Provider and model validation is handled by the Rust test code"
     echo ""
+    echo "Test types (optional):"
+    echo "   - default: Runs existing tech stack analysis test (default)"
+    echo "   - command_discovery: Runs command discovery API test"
+    echo ""
     echo "Example: $0 xai grok-code-fast-1"
+    echo "Example: $0 xai grok-code-fast-1 command_discovery"
     exit 1
 fi
 
 PROVIDER="$1"
 MODEL="$2"
+TEST_TYPE="${3:-default}"
 
 # Note: Provider and model validation is now handled by the Rust test code
 # which reads directly from the actual provider implementations
@@ -217,18 +223,30 @@ echo ""
 echo "🔧 Available LLM Providers: ${AVAILABLE_PROVIDERS[*]:-None}"
 echo "🚀 Using Provider: ${PROVIDER:-None}"
 echo "🤖 Using Model: ${MODEL:-default}"
+echo "🧪 Test Type: ${TEST_TYPE}"
 echo ""
 
 echo "🏗️  Building project..."
-cargo build --manifest-path manager/Cargo.toml --test llm_e2e_real_test
+if [[ "$TEST_TYPE" == "command_discovery" ]]; then
+    cargo build --manifest-path manager/Cargo.toml --test llm_e2e_command_discovery_test
+else
+    cargo build --manifest-path manager/Cargo.toml --test llm_e2e_real_test
+fi
 
 echo ""
-echo "🧪 Running comprehensive LLM E2E test with Saleor repository..."
-echo ""
-
-# Run the validation tests (always working)
-cargo test --manifest-path manager/Cargo.toml --test llm_e2e_real_test test_llm_e2e_saleor \
-    -- --test-threads=1 --nocapture
+if [[ "$TEST_TYPE" == "command_discovery" ]]; then
+    echo "🧪 Running command discovery E2E test with Saleor repository..."
+    echo ""
+    # Run the command discovery test
+    cargo test --manifest-path manager/Cargo.toml --test llm_e2e_command_discovery_test test_command_discovery_saleor \
+        -- --test-threads=1 --nocapture
+else
+    echo "🧪 Running comprehensive LLM E2E test with Saleor repository..."
+    echo ""
+    # Run the validation tests (always working)
+    cargo test --manifest-path manager/Cargo.toml --test llm_e2e_real_test test_llm_e2e_saleor \
+        -- --test-threads=1 --nocapture
+fi
 
 echo ""
 echo "🚀 The above tests demonstrate the core implementation:"
