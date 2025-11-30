@@ -233,6 +233,7 @@ pub struct FileInfo {
 pub struct FileListRequest {
     pub project_id: Option<i64>,
     pub path: Option<String>, // Relative path within project, defaults to root
+    pub git_branch: Option<String>, // Git branch/worktree to use, defaults to current branch
 }
 
 #[derive(Debug, Serialize, Deserialize)]

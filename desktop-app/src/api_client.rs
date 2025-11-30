@@ -395,11 +395,18 @@ impl ApiClient {
         &self,
         project_id: i64,
         path: Option<&str>,
+        git_branch: Option<&str>,
     ) -> Result<Vec<FileInfo>, ApiError> {
         let mut url = format!("{}/api/files?project_id={}", self.base_url, project_id);
         if let Some(path) = path {
             url.push_str(&format!("&path={}", urlencoding::encode(path)));
         }
+        if let Some(branch) = git_branch {
+            tracing::info!("Adding git_branch parameter: {}", branch);
+            url.push_str(&format!("&git_branch={}", urlencoding::encode(branch)));
+        }
+
+        tracing::info!("Fetching files from URL: {}", url);
 
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -424,13 +431,21 @@ impl ApiClient {
         &self,
         project_id: i64,
         path: &str,
+        git_branch: Option<&str>,
     ) -> Result<FileContentResponse, ApiError> {
-        let url = format!(
+        let mut url = format!(
             "{}/api/files/{}?project_id={}",
             self.base_url,
             urlencoding::encode(path),
             project_id
         );
+
+        if let Some(branch) = git_branch {
+            tracing::info!("Adding git_branch parameter for file content: {}", branch);
+            url.push_str(&format!("&git_branch={}", urlencoding::encode(branch)));
+        }
+
+        tracing::info!("Fetching file content from URL: {}", url);
 
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);

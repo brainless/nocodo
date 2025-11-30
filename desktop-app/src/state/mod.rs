@@ -67,6 +67,7 @@ pub struct AppState {
     pub settings: Option<manager_models::SettingsResponse>,
     pub supported_models: Vec<manager_models::SupportedModel>,
     pub worktree_branches: Vec<String>,
+    pub project_detail_worktree_branches: Vec<String>,
 
     // Users management
     pub users: Vec<manager_models::UserListItem>,
@@ -162,6 +163,10 @@ pub struct AppState {
         Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
+    pub project_detail_worktree_branches_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
     pub works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
@@ -193,6 +198,7 @@ pub struct AppState {
     pub loading_ai_session_outputs: bool,
     pub loading_ai_tool_calls: bool,
     pub loading_worktree_branches: bool,
+    pub loading_project_detail_worktree_branches: bool,
     #[serde(skip)]
     pub loading_settings: bool,
     #[serde(skip)]
@@ -202,6 +208,7 @@ pub struct AppState {
     #[serde(skip)]
     pub models_fetch_attempted: bool,
     pub worktree_branches_fetch_attempted: bool,
+    pub project_detail_worktree_branches_fetch_attempted: bool,
     #[serde(skip)]
     pub creating_work: bool,
     #[serde(skip)]
@@ -351,6 +358,7 @@ impl Default for AppState {
             settings: None,
             supported_models: Vec::new(),
             worktree_branches: Vec::new(),
+            project_detail_worktree_branches: Vec::new(),
             users: Vec::new(),
             filtered_users: Vec::new(),
             user_search_query: String::new(),
@@ -399,6 +407,7 @@ impl Default for AppState {
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
             worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
+            project_detail_worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
@@ -411,11 +420,13 @@ impl Default for AppState {
             loading_ai_session_outputs: false,
             loading_ai_tool_calls: false,
             loading_worktree_branches: false,
+            loading_project_detail_worktree_branches: false,
             loading_settings: false,
             loading_project_details: false,
             loading_supported_models: false,
             models_fetch_attempted: false,
             worktree_branches_fetch_attempted: false,
+            project_detail_worktree_branches_fetch_attempted: false,
             creating_work: false,
             updating_projects_path: false,
             scanning_projects: false,

@@ -19,6 +19,7 @@ impl BackgroundTasks {
         // Handle async task results
         self.check_projects_result(state);
         self.check_worktree_branches_result(state);
+        self.check_project_detail_worktree_branches_result(state);
         self.check_works_result(state);
         self.check_work_messages_result(state);
         self.check_ai_session_outputs_result(state);
@@ -138,6 +139,22 @@ impl BackgroundTasks {
                 Err(e) => {
                     state.ui_state.connection_error =
                         Some(format!("Failed to load worktree branches: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_project_detail_worktree_branches_result(&self, state: &mut AppState) {
+        let mut result = state.project_detail_worktree_branches_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_project_detail_worktree_branches = false;
+            match res {
+                Ok(branches) => {
+                    state.project_detail_worktree_branches = branches;
+                }
+                Err(e) => {
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to load project detail worktree branches: {}", e));
                 }
             }
         }

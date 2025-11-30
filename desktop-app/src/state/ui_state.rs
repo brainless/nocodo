@@ -50,6 +50,8 @@ pub struct UiState {
     pub expanded_folders: std::collections::HashSet<String>,
     /// Current directory path for file browser (None means root)
     pub current_directory_path: Option<String>,
+    /// Selected branch/worktree for project detail file browser (None means default)
+    pub project_detail_selected_branch: Option<String>,
     /// Message continuation input for work detail
     pub continue_message_input: String,
     /// Flags to trigger data refresh on page navigation
@@ -100,6 +102,7 @@ impl Default for UiState {
             selected_file_path: None,
             expanded_folders: std::collections::HashSet::new(),
             current_directory_path: None,
+            project_detail_selected_branch: None,
             continue_message_input: String::new(),
             pending_projects_refresh: false,
             pending_works_refresh: false,

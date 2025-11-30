@@ -79,10 +79,82 @@ impl crate::pages::Page for ProjectDetailPage {
                         ui.add(egui::Spinner::new());
                     });
                 } else if let Some(details) = &state.project_details {
+                    // Clone the project details to avoid borrow issues
+                    let project_name = details.project.name.clone();
+                    let project_path = details.project.path.clone();
+                    let project_description = details.project.description.clone();
+
                     // Project title - User content (Inter)
-                    ui.label(ContentText::title(&details.project.name));
+                    ui.label(ContentText::title(&project_name));
 
                     ui.add_space(4.0);
+
+                    // Branch selector
+                    ui.horizontal(|ui| {
+                        // Add label (egui horizontals center content vertically by default)
+                        ui.label(WidgetText::label("Branch:"));
+                        ui.add_space(4.0);
+
+                        // Load worktree branches if not already loaded
+                        if !state.project_detail_worktree_branches_fetch_attempted && !state.loading_project_detail_worktree_branches {
+                            let api_service = crate::services::ApiService::new();
+                            api_service.refresh_project_detail_worktree_branches(state, self.project_id);
+                        }
+
+                        if state.loading_project_detail_worktree_branches {
+                            ui.add(egui::Spinner::new());
+                        } else {
+                            // Set button padding for dropdown widget itself
+                            ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+
+                            let previous_branch = state.ui_state.project_detail_selected_branch.clone();
+                            egui::ComboBox::from_id_salt("project_detail_branch_combo")
+                                .width(200.0)
+                                .selected_text(
+                                    state.ui_state.project_detail_selected_branch
+                                        .clone()
+                                        .unwrap_or_else(|| "None".to_string()),
+                                )
+                                .show_ui(ui, |ui| {
+                                    // Add padding to dropdown items
+                                    ui.style_mut().spacing.item_spacing = egui::vec2(8.0, 4.0);
+                                    ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
+
+                                    let none_response = ui.selectable_value(&mut state.ui_state.project_detail_selected_branch, None, "None");
+                                    if none_response.hovered() {
+                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                    }
+
+                                    for branch in &state.project_detail_worktree_branches {
+                                        let branch_response = ui.selectable_value(
+                                            &mut state.ui_state.project_detail_selected_branch,
+                                            Some(branch.clone()),
+                                            branch,
+                                        );
+                                        if branch_response.hovered() {
+                                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                        }
+                                    }
+                                });
+
+                            // Reset file list when branch changes
+                            if previous_branch != state.ui_state.project_detail_selected_branch {
+                                {
+                                    let mut file_list_result = state.file_list_result.lock().unwrap();
+                                    *file_list_result = None;
+                                }
+                                {
+                                    let mut file_content_result = state.file_content_result.lock().unwrap();
+                                    *file_content_result = None;
+                                }
+                                state.ui_state.selected_file_path = None;
+                                state.ui_state.current_directory_path = None;
+                                state.loading_file_list = false;
+                            }
+                        }
+                    });
+
+                    ui.add_space(8.0);
 
                     // Files section heading
                     ui.heading(WidgetText::section_heading("Files"));
@@ -96,14 +168,14 @@ impl crate::pages::Page for ProjectDetailPage {
                         // User content - Inter
                         ui.label(ContentText::text(self.project_id.to_string()));
 
-                        ui.separator();
+                        // Only show path when no branch is selected (worktree path is not available in UI)
+                        if state.ui_state.project_detail_selected_branch.is_none() {
+                            ui.separator();
+                            ui.label(WidgetText::label("Path:"));
+                            ui.label(ContentText::text(&project_path));
+                        }
 
-                        // Labels - Ubuntu Light
-                        ui.label(WidgetText::label("Path:"));
-                        // User content - Inter
-                        ui.label(ContentText::text(&details.project.path));
-
-                        if let Some(description) = &details.project.description {
+                        if let Some(description) = &project_description {
                             ui.separator();
                             // Label - Ubuntu Light
                             ui.label(WidgetText::label("Description:"));
@@ -242,8 +314,12 @@ impl ProjectDetailPage {
             state.ui_state.selected_file_path = None;
             state.ui_state.expanded_folders.clear();
             state.ui_state.current_directory_path = None;
+            state.ui_state.project_detail_selected_branch = None;
+            state.project_detail_worktree_branches.clear();
+            state.project_detail_worktree_branches_fetch_attempted = false;
             state.loading_file_list = false;
             state.loading_file_content = false;
+            state.loading_project_detail_worktree_branches = false;
         }
 
         // Load file list if not already loaded
@@ -574,12 +650,13 @@ impl ProjectDetailPage {
             let connection_manager = Arc::clone(&state.connection_manager);
             let project_id = self.project_id;
             let path = path.map(|p| p.to_string());
+            let git_branch = state.ui_state.project_detail_selected_branch.clone();
             let file_list_result_clone = Arc::clone(&state.file_list_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.list_files(project_id, path.as_deref()).await;
+                    let result = api_client.list_files(project_id, path.as_deref(), git_branch.as_deref()).await;
                     let mut file_list_result = file_list_result_clone.lock().unwrap();
                     *file_list_result = Some(result.map_err(|e| e.to_string()));
                 } else {
@@ -601,12 +678,13 @@ impl ProjectDetailPage {
             let connection_manager = Arc::clone(&state.connection_manager);
             let project_id = self.project_id;
             let path = path.to_string();
+            let git_branch = state.ui_state.project_detail_selected_branch.clone();
             let file_content_result_clone = Arc::clone(&state.file_content_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.get_file_content(project_id, &path).await;
+                    let result = api_client.get_file_content(project_id, &path, git_branch.as_deref()).await;
                     let mut file_content_result = file_content_result_clone.lock().unwrap();
                     *file_content_result = Some(result.map_err(|e| e.to_string()));
                 } else {
