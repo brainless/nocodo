@@ -7,7 +7,7 @@ use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
     ProjectCommand, ProjectCommandExecution, ProjectCommandExecutionListResponse,
-    ProjectCommandExecutionResponse, ProjectCommandFilterQuery, ProjectCommandListResponse,
+    ProjectCommandExecutionResponse, ProjectCommandFilterQuery,
     ProjectCommandResponse, UpdateProjectCommandRequest,
 };
 use actix_web::{web, HttpResponse, Result};
@@ -55,7 +55,7 @@ pub async fn get_project_commands(
         commands.truncate(limit as usize);
     }
 
-    Ok(HttpResponse::Ok().json(ProjectCommandListResponse { commands }))
+    Ok(HttpResponse::Ok().json(commands))
 }
 
 /// GET /api/projects/{id}/commands/{cmd_id}
@@ -81,47 +81,73 @@ pub async fn get_project_command(
 }
 
 /// POST /api/projects/{id}/commands
-/// Create a new command
+/// Create new command(s) - accepts either a single command or array of commands
 pub async fn create_project_command(
     project_id: web::Path<i64>,
-    request: web::Json<CreateProjectCommandRequest>,
+    request: web::Json<serde_json::Value>,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
-    info!("Creating command for project {}", project_id);
 
     // Verify project exists
     data.database.get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
-    // Validate request
-    if request.name.is_empty() {
-        return Err(AppError::InvalidRequest("Command name is required".into()));
-    }
-    if request.command.is_empty() {
-        return Err(AppError::InvalidRequest("Command is required".into()));
-    }
-
-    let now = Utc::now().timestamp();
-    let command = ProjectCommand {
-        id: Uuid::new_v4().to_string(),
-        project_id,
-        name: request.name.clone(),
-        description: request.description.clone(),
-        command: request.command.clone(),
-        shell: request.shell.clone(),
-        working_directory: request.working_directory.clone(),
-        environment: request.environment.clone(),
-        timeout_seconds: request.timeout_seconds,
-        os_filter: request.os_filter.clone(),
-        created_at: now,
-        updated_at: now,
+    // Handle both single command and array of commands
+    let commands_json = if request.is_array() {
+        request.clone()
+    } else {
+        serde_json::json!([request.clone()])
     };
 
-    data.database.create_project_command(&command)?;
+    let requests: Vec<CreateProjectCommandRequest> = serde_json::from_value(commands_json)
+        .map_err(|e| {
+            error!("Failed to deserialize command request(s): {}", e);
+            AppError::InvalidRequest(format!("Invalid command data: {}", e))
+        })?;
 
-    info!("Created command {} for project {}", command.id, project_id);
-    Ok(HttpResponse::Created().json(ProjectCommandResponse { command }))
+    if requests.is_empty() {
+        return Err(AppError::InvalidRequest("At least one command is required".into()));
+    }
+
+    info!("Creating {} command(s) for project {}", requests.len(), project_id);
+
+    let mut created_commands = Vec::new();
+    let now = Utc::now().timestamp();
+
+    for request in requests {
+        // Validate request
+        if request.name.is_empty() {
+            error!("Command creation failed: name is empty");
+            return Err(AppError::InvalidRequest("Command name is required".into()));
+        }
+        if request.command.is_empty() {
+            error!("Command creation failed: command is empty");
+            return Err(AppError::InvalidRequest("Command is required".into()));
+        }
+
+        let command = ProjectCommand {
+            id: Uuid::new_v4().to_string(),
+            project_id,
+            name: request.name.clone(),
+            description: request.description.clone(),
+            command: request.command.clone(),
+            shell: request.shell.clone(),
+            working_directory: request.working_directory.clone(),
+            environment: request.environment.clone(),
+            timeout_seconds: request.timeout_seconds,
+            os_filter: request.os_filter.clone(),
+            created_at: now,
+            updated_at: now,
+        };
+
+        data.database.create_project_command(&command)?;
+        info!("Created command {} for project {}", command.id, project_id);
+        created_commands.push(command);
+    }
+
+    // Return array of created commands
+    Ok(HttpResponse::Created().json(created_commands))
 }
 
 /// PUT /api/projects/{id}/commands/{cmd_id}
