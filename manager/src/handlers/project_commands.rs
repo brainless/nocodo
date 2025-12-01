@@ -22,16 +22,16 @@ use uuid::Uuid;
 pub async fn get_project_commands(
     project_id: web::Path<i64>,
     query: web::Query<ProjectCommandFilterQuery>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
     info!("Getting commands for project {}", project_id);
 
     // Verify project exists
-    db.get_project_by_id(project_id)
+    data.database.get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
-    let mut commands = db.get_project_commands(project_id)?;
+    let mut commands = data.database.get_project_commands(project_id)?;
 
     // Apply search filter if provided
     if let Some(search) = &query.search {
@@ -62,12 +62,12 @@ pub async fn get_project_commands(
 /// Get a specific command
 pub async fn get_project_command(
     path: web::Path<(i64, String)>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let (project_id, command_id) = path.into_inner();
     info!("Getting command {} for project {}", command_id, project_id);
 
-    let command = db.get_project_command_by_id(&command_id)?;
+    let command = data.database.get_project_command_by_id(&command_id)?;
 
     // Verify command belongs to project
     if command.project_id != project_id {
@@ -85,13 +85,13 @@ pub async fn get_project_command(
 pub async fn create_project_command(
     project_id: web::Path<i64>,
     request: web::Json<CreateProjectCommandRequest>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
     info!("Creating command for project {}", project_id);
 
     // Verify project exists
-    db.get_project_by_id(project_id)
+    data.database.get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
     // Validate request
@@ -118,7 +118,7 @@ pub async fn create_project_command(
         updated_at: now,
     };
 
-    db.create_project_command(&command)?;
+    data.database.create_project_command(&command)?;
 
     info!("Created command {} for project {}", command.id, project_id);
     Ok(HttpResponse::Created().json(ProjectCommandResponse { command }))
@@ -129,12 +129,12 @@ pub async fn create_project_command(
 pub async fn update_project_command(
     path: web::Path<(i64, String)>,
     request: web::Json<UpdateProjectCommandRequest>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let (project_id, command_id) = path.into_inner();
     info!("Updating command {} for project {}", command_id, project_id);
 
-    let mut command = db.get_project_command_by_id(&command_id)?;
+    let mut command = data.database.get_project_command_by_id(&command_id)?;
 
     // Verify command belongs to project
     if command.project_id != project_id {
@@ -178,7 +178,7 @@ pub async fn update_project_command(
 
     command.updated_at = Utc::now().timestamp();
 
-    db.update_project_command(&command)?;
+    data.database.update_project_command(&command)?;
 
     info!("Updated command {} for project {}", command_id, project_id);
     Ok(HttpResponse::Ok().json(ProjectCommandResponse { command }))
@@ -188,12 +188,12 @@ pub async fn update_project_command(
 /// Delete a command
 pub async fn delete_project_command(
     path: web::Path<(i64, String)>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let (project_id, command_id) = path.into_inner();
     info!("Deleting command {} for project {}", command_id, project_id);
 
-    let command = db.get_project_command_by_id(&command_id)?;
+    let command = data.database.get_project_command_by_id(&command_id)?;
 
     // Verify command belongs to project
     if command.project_id != project_id {
@@ -203,7 +203,7 @@ pub async fn delete_project_command(
         )));
     }
 
-    db.delete_project_command(&command_id)?;
+    data.database.delete_project_command(&command_id)?;
 
     info!("Deleted command {} for project {}", command_id, project_id);
     Ok(HttpResponse::NoContent().finish())
@@ -214,7 +214,7 @@ pub async fn delete_project_command(
 pub async fn execute_project_command(
     path: web::Path<(i64, String)>,
     request: web::Json<ExecuteProjectCommandRequest>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let (project_id, command_id) = path.into_inner();
     info!(
@@ -223,7 +223,7 @@ pub async fn execute_project_command(
     );
 
     // Get command
-    let command = db.get_project_command_by_id(&command_id)?;
+    let command = data.database.get_project_command_by_id(&command_id)?;
 
     // Verify command belongs to project
     if command.project_id != project_id {
@@ -234,7 +234,7 @@ pub async fn execute_project_command(
     }
 
     // Get project to determine execution path
-    let project = db
+    let project = data.database
         .get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
@@ -344,7 +344,7 @@ pub async fn execute_project_command(
         success,
     );
 
-    let execution_id = db.create_project_command_execution(&execution)?;
+    let execution_id = data.database.create_project_command_execution(&execution)?;
 
     // Return execution with the assigned ID
     let mut execution = execution;
@@ -358,7 +358,7 @@ pub async fn execute_project_command(
 pub async fn get_command_executions(
     path: web::Path<(i64, String)>,
     query: web::Query<ProjectCommandFilterQuery>,
-    db: web::Data<Arc<Database>>,
+    data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let (project_id, command_id) = path.into_inner();
     info!(
@@ -367,7 +367,7 @@ pub async fn get_command_executions(
     );
 
     // Verify command exists and belongs to project
-    let command = db.get_project_command_by_id(&command_id)?;
+    let command = data.database.get_project_command_by_id(&command_id)?;
 
     if command.project_id != project_id {
         return Err(AppError::NotFound(format!(
@@ -377,7 +377,7 @@ pub async fn get_command_executions(
     }
 
     let limit = query.limit.unwrap_or(50);
-    let executions = db.get_project_command_executions(&command_id, limit)?;
+    let executions = data.database.get_project_command_executions(&command_id, limit)?;
 
     Ok(HttpResponse::Ok().json(ProjectCommandExecutionListResponse { executions }))
 }
