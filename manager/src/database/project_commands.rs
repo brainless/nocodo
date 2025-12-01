@@ -5,6 +5,68 @@ use rusqlite::{params, OptionalExtension};
 /// Project Commands database methods
 #[allow(dead_code)]
 impl super::Database {
+    /// Check if a command already exists for a project (by command string)
+    pub fn command_exists(&self, project_id: i64, command_str: &str) -> AppResult<Option<ProjectCommand>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let command = conn
+            .query_row(
+                r#"
+                SELECT id, project_id, name, description, command, shell, working_directory, environment, timeout_seconds, os_filter, created_at, updated_at
+                FROM project_commands
+                WHERE project_id = ? AND command = ?
+                "#,
+                params![project_id, command_str],
+                |row| {
+                    let environment: Option<String> = row.get(7)?;
+                    let environment_parsed = environment.as_ref()
+                        .map(|env_json| serde_json::from_str(env_json))
+                        .transpose()
+                        .map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                7,
+                                rusqlite::types::Type::Text,
+                                Box::new(e),
+                            )
+                        })?;
+
+                    let timeout_seconds: Option<i64> = row.get(8)?;
+                    let os_filter: Option<String> = row.get(9)?;
+                    let os_filter_parsed = os_filter.as_ref()
+                        .map(|os_json| serde_json::from_str(os_json))
+                        .transpose()
+                        .map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                9,
+                                rusqlite::types::Type::Text,
+                                Box::new(e),
+                            )
+                        })?;
+
+                    Ok(ProjectCommand {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        name: row.get(2)?,
+                        description: row.get(3)?,
+                        command: row.get(4)?,
+                        shell: row.get(5)?,
+                        working_directory: row.get(6)?,
+                        environment: environment_parsed,
+                        timeout_seconds: timeout_seconds.map(|v| v as u64),
+                        os_filter: os_filter_parsed,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        Ok(command)
+    }
+
     /// Create a new project command
     pub fn create_project_command(&self, command: &ProjectCommand) -> AppResult<()> {
         let conn = self

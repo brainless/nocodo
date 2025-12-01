@@ -126,6 +126,16 @@ pub async fn create_project_command(
             return Err(AppError::InvalidRequest("Command is required".into()));
         }
 
+        // Check if command already exists for this project
+        if let Some(existing_command) = data.database.command_exists(project_id, &request.command)? {
+            info!(
+                "Command '{}' already exists for project {} with id {}, skipping creation",
+                request.command, project_id, existing_command.id
+            );
+            created_commands.push(existing_command);
+            continue;
+        }
+
         let command = ProjectCommand {
             id: Uuid::new_v4().to_string(),
             project_id,
@@ -484,35 +494,33 @@ pub async fn discover_project_commands(
         (rule_based_response.commands.clone(), rule_based_response.reasoning.clone())
     };
 
-    // Store discovered commands in database
-    let mut stored_commands = Vec::new();
-    for suggested in &final_commands {
-        let command = suggested.to_project_command(project_id);
-        match data.database.create_project_command(&command) {
-            Ok(_) => {
-                stored_commands.push(command);
-                info!("Stored discovered command: {}", suggested.name);
-            }
-            Err(e) => {
-                error!("Failed to store command {}: {}", suggested.name, e);
-            }
-        }
-    }
-
     info!(
-        "Discovered and stored {} commands for project {}",
-        stored_commands.len(),
+        "Discovered {} commands for project {}",
+        final_commands.len(),
         project_id
     );
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "commands": stored_commands,
-        "project_types": rule_based_response.project_types,
-        "reasoning": reasoning,
-        "discovered_count": final_commands.len(),
-        "stored_count": stored_commands.len(),
-        "llm_used": use_llm && data.llm_agent.is_some(),
-    })))
+    // Convert local SuggestedCommand to manager_models::SuggestedCommand
+    let commands_response: Vec<manager_models::SuggestedCommand> = final_commands
+        .iter()
+        .map(|cmd| manager_models::SuggestedCommand {
+            name: cmd.name.clone(),
+            description: cmd.description.clone(),
+            command: cmd.command.clone(),
+            shell: cmd.shell.clone(),
+            working_directory: cmd.working_directory.clone(),
+            environment: cmd.environment.clone(),
+            timeout_seconds: cmd.timeout_seconds,
+            os_filter: cmd.os_filter.clone(),
+        })
+        .collect();
+
+    // Return suggested commands (not stored yet - user will select which ones to save)
+    Ok(HttpResponse::Ok().json(manager_models::DiscoverCommandsResponse {
+        commands: commands_response,
+        project_types: rule_based_response.project_types,
+        reasoning,
+    }))
 }
 
 /// Enhance command discovery using LLM

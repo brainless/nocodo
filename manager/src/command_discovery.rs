@@ -1,11 +1,9 @@
 use crate::error::AppResult;
-use crate::models::ProjectCommand;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, info};
-use uuid::Uuid;
 
 /// Types of projects supported
 #[derive(Debug, Clone, PartialEq)]
@@ -52,26 +50,6 @@ pub struct SuggestedCommand {
     pub environment: Option<HashMap<String, String>>,
     pub timeout_seconds: Option<u64>,
     pub os_filter: Option<Vec<String>>,
-}
-
-impl SuggestedCommand {
-    pub fn to_project_command(&self, project_id: i64) -> ProjectCommand {
-        let now = chrono::Utc::now().timestamp();
-        ProjectCommand {
-            id: Uuid::new_v4().to_string(),
-            project_id,
-            name: self.name.clone(),
-            description: self.description.clone(),
-            command: self.command.clone(),
-            shell: self.shell.clone(),
-            working_directory: self.working_directory.clone(),
-            environment: self.environment.clone(),
-            timeout_seconds: self.timeout_seconds,
-            os_filter: self.os_filter.clone(),
-            created_at: now,
-            updated_at: now,
-        }
-    }
 }
 
 /// Response from command discovery

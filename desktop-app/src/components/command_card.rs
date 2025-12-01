@@ -52,15 +52,19 @@ impl<'a> CommandCard<'a> {
 
     pub fn ui(self, ui: &mut Ui) -> Response {
         let card_height = if self.command.description.is_some() { 60.0 } else { 44.0 };
+        let available_width = ui.available_width();
 
-        let response = ui.allocate_ui(
-            egui::vec2(ui.available_width(), card_height),
+        let response = ui.allocate_ui_with_layout(
+            egui::vec2(available_width, card_height),
+            egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
+                ui.set_width(available_width);
                 egui::Frame::NONE
                     .fill(ui.style().visuals.widgets.inactive.bg_fill)
                     .corner_radius(6.0)
                     .inner_margin(egui::Margin::symmetric(12, 8))
                     .show(ui, |ui| {
+                        ui.set_width(available_width - 24.0); // Account for inner margin
                         ui.vertical(|ui| {
                             // Command name - Inter Medium (user content)
                             ui.label(ContentText::title(&self.command.name));
