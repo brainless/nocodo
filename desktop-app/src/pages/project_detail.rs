@@ -1010,7 +1010,7 @@ impl ProjectDetailPage {
         } else {
             if ui.button(WidgetText::button("Start Discovery")).clicked() {
                 let api_service = crate::services::ApiService::new();
-                api_service.discover_project_commands(self.project_id, Some(true), state);
+                api_service.discover_project_commands(self.project_id, Some(false), state);
             }
         }
 
