@@ -800,6 +800,121 @@ impl ApiClient {
 
         Ok(result)
     }
+
+    /// Discover commands for a project using LLM detection
+    pub async fn discover_project_commands(
+        &self,
+        project_id: i64,
+        use_llm: Option<bool>,
+    ) -> Result<manager_models::DiscoverCommandsResponse, ApiError> {
+        let mut url = format!("{}/api/projects/{}/commands/discover", self.base_url, project_id);
+
+        if let Some(use_llm_val) = use_llm {
+            url.push_str(&format!("?use_llm={}", use_llm_val));
+        }
+
+        let request = self.client().post(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: manager_models::DiscoverCommandsResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    /// List all saved commands for a project
+    pub async fn list_project_commands(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<manager_models::ProjectCommand>, ApiError> {
+        let url = format!("{}/api/projects/{}/commands", self.base_url, project_id);
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Vec<manager_models::ProjectCommand> = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    /// Save/create project commands (bulk)
+    pub async fn create_project_commands(
+        &self,
+        project_id: i64,
+        commands: Vec<manager_models::ProjectCommand>,
+    ) -> Result<Vec<manager_models::ProjectCommand>, ApiError> {
+        let url = format!("{}/api/projects/{}/commands", self.base_url, project_id);
+        let req = self.client().post(&url).json(&commands);
+        let req = self.add_auth_header(req);
+        let response = req
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: Vec<manager_models::ProjectCommand> = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    /// Execute a specific command
+    pub async fn execute_project_command(
+        &self,
+        project_id: i64,
+        command_id: &str,
+        git_branch: Option<&str>,
+    ) -> Result<serde_json::Value, ApiError> {
+        let url = format!("{}/api/projects/{}/commands/{}/execute",
+            self.base_url, project_id, command_id);
+
+        let body = serde_json::json!({
+            "git_branch": git_branch,
+        });
+
+        let req = self.client().post(&url).json(&body);
+        let req = self.add_auth_header(req);
+        let response = req
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

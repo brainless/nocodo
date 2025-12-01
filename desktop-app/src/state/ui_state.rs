@@ -16,6 +16,13 @@ pub enum Page {
     UiTwoColumnMainContent,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum ProjectDetailTab {
+    #[default]
+    Commands,
+    Files,
+}
+
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,8 +59,16 @@ pub struct UiState {
     pub current_directory_path: Option<String>,
     /// Selected branch/worktree for project detail file browser (None means default)
     pub project_detail_selected_branch: Option<String>,
+    /// Available worktree branches for the project
+    pub project_detail_worktree_branches: Vec<String>,
+    /// Selected tab in project detail page
+    pub project_detail_selected_tab: ProjectDetailTab,
     /// Message continuation input for work detail
     pub continue_message_input: String,
+    /// Command discovery state
+    pub project_detail_command_discovery_results: Option<manager_models::DiscoverCommandsResponse>,
+    pub project_detail_command_selected_items: std::collections::HashSet<String>,
+    pub project_detail_show_discovery_form: bool,
     /// Flags to trigger data refresh on page navigation
     #[serde(skip)]
     pub pending_projects_refresh: bool,
@@ -103,7 +118,12 @@ impl Default for UiState {
             expanded_folders: std::collections::HashSet::new(),
             current_directory_path: None,
             project_detail_selected_branch: None,
+            project_detail_worktree_branches: Vec::new(),
+            project_detail_selected_tab: ProjectDetailTab::default(),
             continue_message_input: String::new(),
+            project_detail_command_discovery_results: None,
+            project_detail_command_selected_items: std::collections::HashSet::new(),
+            project_detail_show_discovery_form: false,
             pending_projects_refresh: false,
             pending_works_refresh: false,
             pending_users_refresh: false,

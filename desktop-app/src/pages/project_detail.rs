@@ -1,5 +1,5 @@
 use crate::components::markdown_renderer::MarkdownRenderer;
-use crate::state::ui_state::Page as UiPage;
+use crate::state::ui_state::{Page as UiPage, ProjectDetailTab};
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use crate::ui_text::{ContentText, WidgetText};
@@ -83,6 +83,9 @@ impl crate::pages::Page for ProjectDetailPage {
                     let project_name = details.project.name.clone();
                     let project_path = details.project.path.clone();
                     let project_description = details.project.description.clone();
+                    
+                    // Update state for this page after cloning needed data
+                    self.update_state(state);
 
                     // Project title - User content (Inter)
                     ui.label(ContentText::title(&project_name));
@@ -156,40 +159,69 @@ impl crate::pages::Page for ProjectDetailPage {
 
                     ui.add_space(8.0);
 
-                    // Files section heading
-                    ui.heading(WidgetText::section_heading("Files"));
-
-                    ui.separator();
-
-                    // Project metadata - always visible
+                    // Tab bar
                     ui.horizontal(|ui| {
-                        // ID - Ubuntu Light
-                        ui.label(WidgetText::label("ID:"));
-                        // User content - Inter
-                        ui.label(ContentText::text(self.project_id.to_string()));
-
-                        // Only show path when no branch is selected (worktree path is not available in UI)
-                        if state.ui_state.project_detail_selected_branch.is_none() {
-                            ui.separator();
-                            ui.label(WidgetText::label("Path:"));
-                            ui.label(ContentText::text(&project_path));
+                        // Commands tab
+                        if ui.selectable_label(
+                            state.ui_state.project_detail_selected_tab == ProjectDetailTab::Commands,
+                            "Commands"
+                        ).clicked() {
+                            state.ui_state.project_detail_selected_tab = ProjectDetailTab::Commands;
                         }
 
-                        if let Some(description) = &project_description {
-                            ui.separator();
-                            // Label - Ubuntu Light
-                            ui.label(WidgetText::label("Description:"));
-                            // User content - Inter
-                            ui.label(ContentText::text(description));
+                        ui.add_space(8.0);
+
+                        // Files tab
+                        if ui.selectable_label(
+                            state.ui_state.project_detail_selected_tab == ProjectDetailTab::Files,
+                            "Files"
+                        ).clicked() {
+                            state.ui_state.project_detail_selected_tab = ProjectDetailTab::Files;
                         }
                     });
 
                     ui.add_space(8.0);
 
-                    // Files content
-                    self.show_files_tab(ctx, ui, state);
+                    ui.separator();
 
-                    ui.add_space(8.0);
+                    // Tab content
+                    match state.ui_state.project_detail_selected_tab {
+                        ProjectDetailTab::Commands => {
+                            // Commands tab with two-column layout
+                            self.show_commands_tab(ctx, ui, state);
+                        }
+                        ProjectDetailTab::Files => {
+                            // Project metadata - always visible (only for Files tab)
+                            ui.horizontal(|ui| {
+                                // ID - Ubuntu Light
+                                ui.label(WidgetText::label("ID:"));
+                                // User content - Inter
+                                ui.label(ContentText::text(self.project_id.to_string()));
+
+                                // Only show path when no branch is selected (worktree path is not available in UI)
+                                if state.ui_state.project_detail_selected_branch.is_none() {
+                                    ui.separator();
+                                    ui.label(WidgetText::label("Path:"));
+                                    ui.label(ContentText::text(&project_path));
+                                }
+
+                                if let Some(description) = &project_description {
+                                    ui.separator();
+                                    // Label - Ubuntu Light
+                                    ui.label(WidgetText::label("Description:"));
+                                    // User content - Inter
+                                    ui.label(ContentText::text(description));
+                                }
+                            });
+
+                            ui.add_space(8.0);
+
+                            // Files content
+                            self.show_files_tab(ctx, ui, state);
+
+                            ui.add_space(8.0);
+                        }
+                    }
 
                     // Button - Ubuntu SemiBold
                     if ui.button(WidgetText::button("Refresh")).clicked() {
@@ -369,7 +401,7 @@ impl ProjectDetailPage {
                                                 self.render_file_tree(ui, state, &files_clone, "");
                                             }
                                         }
-                                        Err(e) => {
+                    Err(e) => {
                                             let e_clone = e.clone();
                                             drop(file_list_result);
                                             ui.label(WidgetText::error(format!(
@@ -454,7 +486,7 @@ impl ProjectDetailPage {
                                                         );
                                                     }
                                                 }
-                                                Err(e) => {
+                    Err(e) => {
                                                     ui.label(WidgetText::error(format!(
                                                         "Error loading file: {}",
                                                         e
@@ -739,8 +771,354 @@ impl ProjectDetailPage {
         }
     }
 
+    fn update_state(&mut self, state: &mut AppState) {
+        // Check if we've switched to a different project and need to clear state
+        if state.current_file_browser_project_id != Some(self.project_id) {
+            // Clear command state when switching projects
+            state.project_detail_saved_commands.clear();
+            state.project_detail_commands_fetch_attempted = false;
+            state.loading_project_detail_commands = false;
+            state.ui_state.project_detail_command_discovery_results = None;
+            state.ui_state.project_detail_command_selected_items.clear();
+            state.ui_state.project_detail_show_discovery_form = false;
+            state.loading_command_discovery = false;
+        }
+
+        // Load saved commands if not already loaded
+        if !state.project_detail_commands_fetch_attempted && !state.loading_project_detail_commands {
+            let api_service = crate::services::ApiService::new();
+            api_service.list_project_commands(self.project_id, state);
+        }
+
+        // Check for command list results
+        {
+            let commands_result = state.project_detail_saved_commands_result.lock().unwrap();
+            if let Some(result) = commands_result.as_ref() {
+                match result {
+                    Ok(commands) => {
+                        state.project_detail_saved_commands = commands.clone();
+                        state.loading_project_detail_commands = false;
+                    }
+                    Err(_e) => {
+                        state.loading_project_detail_commands = false;
+                        // Error will be shown in UI
+                    }
+                }
+                // Clear the result to avoid reprocessing
+                drop(commands_result);
+                let mut commands_result = state.project_detail_saved_commands_result.lock().unwrap();
+                *commands_result = None;
+            }
+        }
+
+        // Check for discovery results
+        {
+            let discovery_result = state.command_discovery_result.lock().unwrap();
+            if let Some(result) = discovery_result.as_ref() {
+                match result {
+                    Ok(discovery) => {
+                        state.ui_state.project_detail_command_discovery_results = Some(discovery.clone());
+                        state.loading_command_discovery = false;
+                    }
+                    Err(_e) => {
+                        state.loading_command_discovery = false;
+                        // Error will be shown in UI
+                    }
+                }
+                // Clear the result to avoid reprocessing
+                drop(discovery_result);
+                let mut discovery_result = state.command_discovery_result.lock().unwrap();
+                *discovery_result = None;
+            }
+        }
+
+        // Check for worktree branches results
+        {
+            let branches_result = state.project_detail_worktree_branches_result.lock().unwrap();
+            if let Some(result) = branches_result.as_ref() {
+                match result {
+                    Ok(branches) => {
+                        state.ui_state.project_detail_worktree_branches = branches.clone();
+                        state.loading_project_detail_worktree_branches = false;
+                    }
+                    Err(_e) => {
+                        state.loading_project_detail_worktree_branches = false;
+                        // Error will be shown in UI
+                    }
+                }
+                // Clear the result to avoid reprocessing
+                drop(branches_result);
+                let mut branches_result = state.project_detail_worktree_branches_result.lock().unwrap();
+                *branches_result = None;
+            }
+        }
+
+        // Update current file browser project ID
+        state.current_file_browser_project_id = Some(self.project_id);
+    }
+
+    fn show_discover_cta(&self, ui: &mut Ui, state: &mut AppState) {
+        // Gray color scheme for CTA button
+        let (bg_color, border_color) = if ui.rect_contains_pointer(ui.max_rect()) {
+            (
+                egui::Color32::from_rgb(220, 220, 220), // Lighter gray on hover
+                egui::Color32::from_rgb(160, 160, 160), // Medium gray border on hover
+            )
+        } else {
+            (
+                egui::Color32::from_rgb(200, 200, 200), // Light gray
+                egui::Color32::from_rgb(180, 180, 180), // Darker gray border
+            )
+        };
+        let text_color = egui::Color32::from_rgb(40, 40, 40); // Dark gray text
+
+        let response = egui::Frame::NONE
+            .fill(bg_color)
+            .stroke(egui::Stroke::new(1.0, border_color))
+            .corner_radius(8.0)
+            .inner_margin(egui::Margin::same(12))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.vertical_centered(|ui| {
+                    ui.label(
+                        egui::RichText::new("Discover commands")
+                            .size(16.0)
+                            .family(egui::FontFamily::Name("ui_semibold".into()))
+                            .color(text_color),
+                    );
+                });
+            })
+            .response;
+
+        // Change cursor to pointer on hover
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        if response.interact(egui::Sense::click()).clicked() {
+            state.ui_state.project_detail_show_discovery_form = true;
+        }
+    }
+
+    fn show_saved_commands_list(&self, ui: &mut Ui, state: &mut AppState) {
+        // Ubuntu SemiBold for section heading
+        ui.heading(WidgetText::section_heading("Saved Commands"));
+
+        egui::ScrollArea::vertical()
+            .id_salt("saved_commands_scroll")
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                ui.add_space(8.0);
+
+                if state.loading_project_detail_commands {
+                    ui.vertical_centered(|ui| {
+                        ui.label(WidgetText::status("Loading commands..."));
+                        ui.add(egui::Spinner::new());
+                    });
+                } else if state.project_detail_saved_commands.is_empty() {
+                    ui.label(WidgetText::status("No saved commands"));
+                } else {
+                    for command in &state.project_detail_saved_commands {
+                        let command_name = &command.name;
+                        let command_desc = command.description.as_deref();
+
+                        let available_width = ui.available_width();
+                        let (rect, response) = ui.allocate_exact_size(
+                            egui::vec2(available_width, 32.0),
+                            egui::Sense::click(),
+                        );
+
+                        // Change cursor to pointer on hover
+                        if response.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+
+                        // Add hover background
+                        if response.hovered() {
+                            ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+                        }
+
+                        // Draw command name and description
+                        let text_pos = rect.min + egui::vec2(8.0, 4.0);
+                        ui.painter().text(
+                            text_pos,
+                            egui::Align2::LEFT_TOP,
+                            command_name,
+                            egui::FontId::new(14.0, egui::FontFamily::Proportional),
+                            ui.style().visuals.text_color()
+                        );
+
+                        if let Some(desc) = command_desc {
+                            let desc_pos = rect.min + egui::vec2(8.0, 18.0);
+                            ui.painter().text(
+                                desc_pos,
+                                egui::Align2::LEFT_TOP,
+                                desc,
+                                egui::FontId::new(12.0, egui::FontFamily::Proportional),
+                                ui.style().visuals.text_color()
+                            );
+                        }
+
+                        if response.clicked() {
+                            // For now, just show discovery form - in future show command details
+                            state.ui_state.project_detail_show_discovery_form = true;
+                        }
+                    }
+                }
+            });
+    }
+
+    fn show_discovery_form(&self, ui: &mut Ui, state: &mut AppState) {
+        // Ubuntu SemiBold for section heading
+        ui.heading(WidgetText::section_heading("Command Discovery"));
+
+        ui.add_space(8.0);
+
+        // Start Discovery button
+        if state.loading_command_discovery {
+            ui.vertical_centered(|ui| {
+                ui.label(WidgetText::status("Discovering commands..."));
+                ui.add(egui::Spinner::new());
+            });
+        } else {
+            if ui.button(WidgetText::button("Start Discovery")).clicked() {
+                let api_service = crate::services::ApiService::new();
+                api_service.discover_project_commands(self.project_id, Some(true), state);
+            }
+        }
+
+        ui.add_space(16.0);
+
+        // Show discovered commands
+        if let Some(results) = state.ui_state.project_detail_command_discovery_results.clone() {
+            ui.heading(WidgetText::section_heading("Discovered Commands"));
+            
+            egui::ScrollArea::vertical()
+                .id_salt("discovered_commands_scroll")
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    ui.add_space(8.0);
+
+                    for command in &results.commands {
+                        let command_name = &command.name;
+                        let command_desc = command.description.as_deref();
+
+                        // Checkbox for selection
+                        ui.horizontal(|ui| {
+                            let mut is_selected = state.ui_state.project_detail_command_selected_items
+                                .contains(command_name);
+
+                            if ui.checkbox(&mut is_selected, "").changed() {
+                                if is_selected {
+                                    state.ui_state.project_detail_command_selected_items.insert(command_name.to_string());
+                                } else {
+                                    state.ui_state.project_detail_command_selected_items.remove(command_name);
+                                }
+                            }
+
+                            // Command name
+                            ui.label(command_name);
+                        });
+
+                        // Command description
+                        if let Some(desc) = command_desc {
+                            ui.label(desc);
+                        }
+
+                        ui.add_space(8.0);
+                    }
+
+                    // Save selected commands button
+                    if !state.ui_state.project_detail_command_selected_items.is_empty() {
+                        ui.add_space(16.0);
+                        if ui.button(WidgetText::button("Save selected commands")).clicked() {
+                            // Filter selected commands from discovery results
+                            let selected_items = state.ui_state.project_detail_command_selected_items.clone();
+                            let selected_commands: Vec<manager_models::ProjectCommand> = results.commands
+                                .iter()
+                                .filter(|cmd| selected_items.contains(&cmd.name))
+                                .map(|cmd| cmd.to_project_command(self.project_id))
+                                .collect();
+
+                            let api_service = crate::services::ApiService::new();
+                            api_service.create_project_commands(self.project_id, selected_commands, state);
+                        }
+                    }
+                });
+        } else {
+            ui.label(WidgetText::status("No commands discovered"));
+        }
+    }
+
+    fn show_command_details_placeholder(&self, ui: &mut Ui, _state: &mut AppState) {
+        // Ubuntu SemiBold for section heading
+        ui.heading(WidgetText::section_heading("Command Details"));
+
+        ui.add_space(8.0);
+
+        ui.vertical_centered(|ui| {
+            ui.label(WidgetText::status("Select a command or discover new commands"));
+        });
+    }
+
     fn refresh_project_details(&self, state: &mut AppState) {
         let api_service = crate::services::ApiService::new();
         api_service.refresh_project_details(self.project_id, state);
+    }
+
+    fn show_commands_tab(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
+        // Two-column layout for commands
+        let available_width = ui.available_width();
+        let left_column_width = available_width * 0.4; // 40% for saved commands
+        let right_column_width = available_width * 0.6; // 60% for discovery/details
+
+        // LEFT COLUMN (saved commands)
+        ui.allocate_ui_with_layout(
+            egui::vec2(left_column_width, ui.available_height()),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                // Saved commands section
+                ui.heading(WidgetText::section_heading("Saved Commands"));
+                ui.add_space(8.0);
+
+                if state.loading_project_detail_commands {
+                    ui.vertical_centered(|ui| {
+                        ui.label(WidgetText::status("Loading commands..."));
+                        ui.add(egui::Spinner::new());
+                    });
+                } else if state.project_detail_saved_commands.is_empty() {
+                    self.show_discover_cta(ui, state);
+                } else {
+                    self.show_saved_commands_list(ui, state);
+                }
+            },
+        );
+
+        // Add separator
+        ui.add_space(10.0);
+        let separator_rect = egui::Rect::from_min_size(
+            ui.cursor().min,
+            egui::vec2(1.0, ui.available_height())
+        );
+        ui.painter().rect_filled(
+            separator_rect,
+            0.0,
+            ui.style().visuals.widgets.noninteractive.bg_stroke.color
+        );
+        ui.add_space(10.0);
+
+        // RIGHT COLUMN (discovery or command details)
+        ui.allocate_ui_with_layout(
+            egui::vec2(right_column_width, ui.available_height()),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                // Show discovery form or command details
+                if state.ui_state.project_detail_show_discovery_form {
+                    self.show_discovery_form(ui, state);
+                } else {
+                    self.show_command_details_placeholder(ui, state);
+                }
+            },
+        );
     }
 }

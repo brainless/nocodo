@@ -95,7 +95,7 @@ pub struct ProjectListResponse {
     pub projects: Vec<Project>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDetailsResponse {
     pub project: Project,
     pub components: Vec<ProjectComponent>,
@@ -1086,4 +1086,64 @@ pub struct AddAuthorizedSshKeyResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurrentUserTeamsResponse {
     pub teams: Vec<TeamItem>,
+}
+
+// ============ Project Commands ============
+
+/// A project command that can be executed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectCommand {
+    pub id: String,
+    pub project_id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub command: String,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// A suggested command discovered from the project
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuggestedCommand {
+    pub name: String,
+    pub description: Option<String>,
+    pub command: String,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+}
+
+impl SuggestedCommand {
+    pub fn to_project_command(&self, project_id: i64) -> ProjectCommand {
+        let now = chrono::Utc::now().timestamp();
+        ProjectCommand {
+            id: uuid::Uuid::new_v4().to_string(),
+            project_id,
+            name: self.name.clone(),
+            description: self.description.clone(),
+            command: self.command.clone(),
+            shell: self.shell.clone(),
+            working_directory: self.working_directory.clone(),
+            environment: self.environment.clone(),
+            timeout_seconds: self.timeout_seconds,
+            os_filter: self.os_filter.clone(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+/// Response from command discovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoverCommandsResponse {
+    pub commands: Vec<SuggestedCommand>,
+    pub project_types: Vec<String>,
+    pub reasoning: Option<String>,
 }

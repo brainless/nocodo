@@ -69,6 +69,9 @@ pub struct AppState {
     pub worktree_branches: Vec<String>,
     pub project_detail_worktree_branches: Vec<String>,
 
+    // Command management state
+    pub project_detail_saved_commands: Vec<manager_models::ProjectCommand>,
+
     // Users management
     pub users: Vec<manager_models::UserListItem>,
     pub filtered_users: Vec<manager_models::UserListItem>,
@@ -144,15 +147,14 @@ pub struct AppState {
     #[serde(skip)]
     pub connection_manager: Arc<crate::connection_manager::ConnectionManager>,
     #[serde(skip)]
-    pub pending_project_details_refresh: Option<i64>,
-    #[serde(skip)]
-    #[allow(clippy::type_complexity)]
-    pub settings_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
-    #[serde(skip)]
-    #[allow(clippy::type_complexity)]
     pub project_details_result:
         Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
+    #[serde(skip)]
+    pub create_commands_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
+    #[serde(skip)]
+    pub execute_command_result:
+        Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub projects_result:
@@ -163,8 +165,8 @@ pub struct AppState {
         Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub project_detail_worktree_branches_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    pub settings_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
@@ -199,6 +201,10 @@ pub struct AppState {
     pub loading_ai_tool_calls: bool,
     pub loading_worktree_branches: bool,
     pub loading_project_detail_worktree_branches: bool,
+    pub loading_project_detail_commands: bool,
+    pub project_detail_commands_fetch_attempted: bool,
+    pub loading_command_discovery: bool,
+    pub executing_command_id: Option<String>,
     #[serde(skip)]
     pub loading_settings: bool,
     #[serde(skip)]
@@ -259,6 +265,20 @@ pub struct AppState {
     #[allow(clippy::type_complexity)]
     pub login_result:
         Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
+    #[serde(skip)]
+    pub pending_project_details_refresh: Option<i64>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub project_detail_worktree_branches_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub project_detail_saved_commands_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub command_discovery_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>>,
 }
 
 impl AppState {
@@ -359,6 +379,9 @@ impl Default for AppState {
             supported_models: Vec::new(),
             worktree_branches: Vec::new(),
             project_detail_worktree_branches: Vec::new(),
+
+            // Command management state
+            project_detail_saved_commands: Vec::new(),
             users: Vec::new(),
             filtered_users: Vec::new(),
             user_search_query: String::new(),
@@ -408,6 +431,10 @@ impl Default for AppState {
             works_result: Arc::new(std::sync::Mutex::new(None)),
             worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
             project_detail_worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
+            project_detail_saved_commands_result: Arc::new(std::sync::Mutex::new(None)),
+            command_discovery_result: Arc::new(std::sync::Mutex::new(None)),
+            create_commands_result: Arc::new(std::sync::Mutex::new(None)),
+            execute_command_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
@@ -421,6 +448,10 @@ impl Default for AppState {
             loading_ai_tool_calls: false,
             loading_worktree_branches: false,
             loading_project_detail_worktree_branches: false,
+            loading_project_detail_commands: false,
+            project_detail_commands_fetch_attempted: false,
+            loading_command_discovery: false,
+            executing_command_id: None,
             loading_settings: false,
             loading_project_details: false,
             loading_supported_models: false,
