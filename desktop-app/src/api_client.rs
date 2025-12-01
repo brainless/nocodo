@@ -883,6 +883,39 @@ impl ApiClient {
         Ok(result)
     }
 
+    /// Get execution history for a specific command
+    pub async fn get_command_executions(
+        &self,
+        project_id: i64,
+        command_id: &str,
+        limit: Option<i64>,
+    ) -> Result<Vec<manager_models::ProjectCommandExecution>, ApiError> {
+        let mut url = format!("{}/api/projects/{}/commands/{}/executions",
+            self.base_url, project_id, command_id);
+        
+        if let Some(limit) = limit {
+            url.push_str(&format!("?limit={}", limit));
+        }
+
+        let request = self.client().get(&url);
+        let request = self.add_auth_header(request);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::HttpStatus(response.status()));
+        }
+
+        let result: manager_models::ProjectCommandExecutionListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(result.executions)
+    }
+
     /// Execute a specific command
     pub async fn execute_project_command(
         &self,

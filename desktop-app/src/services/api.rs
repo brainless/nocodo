@@ -1085,4 +1085,39 @@ impl ApiService {
             });
         }
     }
+
+    pub fn get_command_executions(&self, project_id: i64, command_id: &str, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_command_executions = true;
+            state.command_executions_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let command_id = command_id.to_string();
+            let result_clone = Arc::clone(&state.command_executions_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.get_command_executions(project_id, &command_id, Some(10)).await;
+                    let mut executions_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *executions_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut executions_result = result_clone.lock().unwrap();
+                    *executions_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
 }

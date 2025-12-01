@@ -152,9 +152,13 @@ pub struct AppState {
     #[serde(skip)]
     pub create_commands_result:
         Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
-    #[serde(skip)]
-    pub execute_command_result:
-        Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
+            #[serde(skip)]
+            pub execute_command_result:
+                Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
+            #[serde(skip)]
+            #[allow(clippy::type_complexity)]
+            pub command_executions_result:
+                Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommandExecution>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub projects_result:
@@ -204,6 +208,7 @@ pub struct AppState {
     pub loading_project_detail_commands: bool,
     pub project_detail_commands_fetch_attempted: bool,
     pub loading_command_discovery: bool,
+    pub loading_command_executions: bool,
     pub executing_command_id: Option<String>,
     #[serde(skip)]
     pub loading_settings: bool,
@@ -435,6 +440,7 @@ impl Default for AppState {
             command_discovery_result: Arc::new(std::sync::Mutex::new(None)),
             create_commands_result: Arc::new(std::sync::Mutex::new(None)),
             execute_command_result: Arc::new(std::sync::Mutex::new(None)),
+            command_executions_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
@@ -451,6 +457,7 @@ impl Default for AppState {
             loading_project_detail_commands: false,
             project_detail_commands_fetch_attempted: false,
             loading_command_discovery: false,
+            loading_command_executions: false,
             executing_command_id: None,
             loading_settings: false,
             loading_project_details: false,

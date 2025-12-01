@@ -1,4 +1,4 @@
-use crate::components::markdown_renderer::MarkdownRenderer;
+use crate::components::{command_card::CommandCard, markdown_renderer::MarkdownRenderer};
 use crate::state::ui_state::{Page as UiPage, ProjectDetailTab};
 use crate::state::AppState;
 use crate::state::ConnectionState;
@@ -166,7 +166,14 @@ impl crate::pages::Page for ProjectDetailPage {
                             state.ui_state.project_detail_selected_tab == ProjectDetailTab::Commands,
                             "Commands"
                         ).clicked() {
+                            let was_previously_on_files = state.ui_state.project_detail_selected_tab == ProjectDetailTab::Files;
                             state.ui_state.project_detail_selected_tab = ProjectDetailTab::Commands;
+                            
+                            // Refresh commands list when tab is opened (especially from Files tab)
+                            if was_previously_on_files {
+                                state.project_detail_commands_fetch_attempted = false;
+                                state.loading_project_detail_commands = false;
+                            }
                         }
 
                         ui.add_space(8.0);
@@ -783,6 +790,9 @@ impl ProjectDetailPage {
             state.ui_state.project_detail_command_selected_items.clear();
             state.ui_state.project_detail_show_discovery_form = false;
             state.loading_command_discovery = false;
+            state.ui_state.project_detail_selected_command_id = None;
+            state.ui_state.project_detail_command_executions.clear();
+            state.loading_command_executions = false;
         }
 
         // Load saved commands if not already loaded
@@ -856,6 +866,27 @@ impl ProjectDetailPage {
                 drop(create_result);
                 let mut create_result = state.create_commands_result.lock().unwrap();
                 *create_result = None;
+            }
+        }
+
+        // Check for command execution results
+        {
+            let execution_result = state.command_executions_result.lock().unwrap();
+            if let Some(result) = execution_result.as_ref() {
+                match result {
+                    Ok(executions) => {
+                        state.ui_state.project_detail_command_executions = executions.clone();
+                        state.loading_command_executions = false;
+                    }
+                    Err(_e) => {
+                        state.loading_command_executions = false;
+                        // Error will be shown in UI
+                    }
+                }
+                // Clear the result to avoid reprocessing
+                drop(execution_result);
+                let mut execution_result = state.command_executions_result.lock().unwrap();
+                *execution_result = None;
             }
         }
 
@@ -936,50 +967,29 @@ impl ProjectDetailPage {
         } else if state.project_detail_saved_commands.is_empty() {
             ui.label(WidgetText::status("No saved commands"));
         } else {
-            for command in &state.project_detail_saved_commands {
-                let command_name = &command.name;
-                let command_desc = command.description.as_deref();
+            // Clone commands to avoid borrow issues
+            let commands = state.project_detail_saved_commands.clone();
+            for command in &commands {
+                let command_id = command.id.clone();
 
-                let available_width = ui.available_width();
-                let (rect, response) = ui.allocate_exact_size(
-                    egui::vec2(available_width, 32.0),
-                    egui::Sense::click(),
-                );
+                // Get last execution time for this command
+                let last_executed_at = state.ui_state.project_detail_command_executions
+                    .iter()
+                    .find(|exec| exec.command_id == command_id)
+                    .map(|exec| exec.executed_at);
 
-                // Change cursor to pointer on hover
-                if response.hovered() {
-                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                }
-
-                // Add hover background
-                if response.hovered() {
-                    ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
-                }
-
-                // Draw command name and description
-                let text_pos = rect.min + egui::vec2(8.0, 4.0);
-                ui.painter().text(
-                    text_pos,
-                    egui::Align2::LEFT_TOP,
-                    command_name,
-                    egui::FontId::new(14.0, egui::FontFamily::Proportional),
-                    ui.style().visuals.text_color()
-                );
-
-                if let Some(desc) = command_desc {
-                    let desc_pos = rect.min + egui::vec2(8.0, 18.0);
-                    ui.painter().text(
-                        desc_pos,
-                        egui::Align2::LEFT_TOP,
-                        desc,
-                        egui::FontId::new(12.0, egui::FontFamily::Proportional),
-                        ui.style().visuals.text_color()
-                    );
-                }
+                let response = CommandCard::new(command)
+                    .last_executed_at(last_executed_at)
+                    .ui(ui);
 
                 if response.clicked() {
-                    // For now, just show discovery form - in future show command details
-                    state.ui_state.project_detail_show_discovery_form = true;
+                    // Select this command and hide discovery form
+                    state.ui_state.project_detail_selected_command_id = Some(command_id.clone());
+                    state.ui_state.project_detail_show_discovery_form = false;
+                    
+                    // Load execution history for this command
+                    let api_service = crate::services::ApiService::new();
+                    api_service.get_command_executions(self.project_id, &command_id, state);
                 }
             }
         }
@@ -1067,6 +1077,153 @@ impl ProjectDetailPage {
         }
     }
 
+    fn show_command_details(&self, ui: &mut Ui, state: &mut AppState, command_id: &str) {
+        // Ubuntu SemiBold for section heading
+        ui.heading(WidgetText::section_heading("Command Details"));
+
+        ui.add_space(8.0);
+
+        // Find the command details
+        if let Some(command) = state.project_detail_saved_commands
+            .iter()
+            .find(|cmd| cmd.id == command_id) {
+            
+            // Command name and description
+            ui.label(ContentText::title(&command.name));
+            
+            if let Some(description) = &command.description {
+                ui.add_space(4.0);
+                ui.label(ContentText::description(ui, description));
+            }
+
+            ui.add_space(12.0);
+
+            // Command details
+            ui.label(WidgetText::section_heading("Command"));
+            ui.add_space(4.0);
+            ui.label(ContentText::code_inline(&command.command));
+
+            if let Some(working_dir) = &command.working_directory {
+                ui.add_space(8.0);
+                ui.label(WidgetText::label("Working Directory:"));
+                ui.label(ContentText::text(working_dir));
+            }
+
+            if let Some(shell) = &command.shell {
+                ui.add_space(8.0);
+                ui.label(WidgetText::label("Shell:"));
+                ui.label(ContentText::text(shell));
+            }
+
+            ui.add_space(16.0);
+
+            // Execution history
+            ui.heading(WidgetText::section_heading("Execution History"));
+            ui.add_space(8.0);
+
+            if state.loading_command_executions {
+                ui.vertical_centered(|ui| {
+                    ui.label(WidgetText::status("Loading execution history..."));
+                    ui.add(egui::Spinner::new());
+                });
+            } else if state.ui_state.project_detail_command_executions.is_empty() {
+                ui.label(WidgetText::status("No execution history"));
+            } else {
+                egui::ScrollArea::vertical()
+                    .id_salt("command_executions_scroll")
+                    .auto_shrink(false)
+                    .show(ui, |ui| {
+                        for execution in &state.ui_state.project_detail_command_executions {
+                            self.show_execution_entry(ui, execution);
+                        }
+                    });
+            }
+
+            ui.add_space(16.0);
+
+            // Execute button
+            let selected_branch = state.ui_state.project_detail_selected_branch.clone();
+            if ui.button(WidgetText::button("Execute Command")).clicked() {
+                let api_service = crate::services::ApiService::new();
+                api_service.execute_project_command(
+                    self.project_id, 
+                    command_id, 
+                    selected_branch.as_deref(),
+                    state
+                );
+            }
+        } else {
+            ui.label(WidgetText::error("Command not found"));
+        }
+    }
+
+    fn show_execution_entry(&self, ui: &mut Ui, execution: &manager_models::ProjectCommandExecution) {
+        let executed_at = chrono::DateTime::from_timestamp(execution.executed_at, 0)
+            .unwrap_or_else(|| chrono::Utc::now());
+        let formatted_time = executed_at.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        // Execution header
+        ui.horizontal(|ui| {
+            ui.label(WidgetText::label(&formatted_time));
+            
+            // Status indicator
+            let status_text = if execution.success {
+                WidgetText::success("✓ Success")
+            } else {
+                WidgetText::error("✗ Failed")
+            };
+            ui.label(status_text);
+
+            // Duration
+            let duration_text = if execution.duration_ms < 1000 {
+                format!("{}ms", execution.duration_ms)
+            } else {
+                format!("{:.1}s", execution.duration_ms as f64 / 1000.0)
+            };
+            ui.label(WidgetText::muted(&duration_text));
+        });
+
+        // Exit code
+        if let Some(exit_code) = execution.exit_code {
+            ui.label(WidgetText::muted(&format!("Exit code: {}", exit_code)));
+        }
+
+        // Git branch if present
+        if let Some(branch) = &execution.git_branch {
+            ui.label(WidgetText::muted(&format!("Branch: {}", branch)));
+        }
+
+        // Output
+        if !execution.stdout.is_empty() {
+            ui.add_space(4.0);
+            ui.label(WidgetText::label("Output:"));
+            ui.add(
+                egui::TextEdit::multiline(&mut execution.stdout.as_str())
+                    .desired_width(ui.available_width())
+                    .desired_rows(6)
+                    .font(egui::TextStyle::Monospace)
+                    .interactive(false),
+            );
+        }
+
+        // Error output
+        if !execution.stderr.is_empty() {
+            ui.add_space(4.0);
+            ui.label(WidgetText::error("Error:"));
+            ui.add(
+                egui::TextEdit::multiline(&mut execution.stderr.as_str())
+                    .desired_width(ui.available_width())
+                    .desired_rows(4)
+                    .font(egui::TextStyle::Monospace)
+                    .interactive(false),
+            );
+        }
+
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(8.0);
+    }
+
     fn show_command_details_placeholder(&self, ui: &mut Ui, _state: &mut AppState) {
         // Ubuntu SemiBold for section heading
         ui.heading(WidgetText::section_heading("Command Details"));
@@ -1099,7 +1256,18 @@ impl ProjectDetailPage {
                 egui::Layout::top_down(egui::Align::LEFT),
                 |ui| {
                     // Saved commands section
-                    ui.heading(WidgetText::section_heading("Saved Commands"));
+                    ui.horizontal(|ui| {
+                        ui.heading(WidgetText::section_heading("Saved Commands"));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(WidgetText::button("Refresh")).clicked() {
+                                // Refresh commands list
+                                state.project_detail_commands_fetch_attempted = false;
+                                state.loading_project_detail_commands = false;
+                                let api_service = crate::services::ApiService::new();
+                                api_service.list_project_commands(self.project_id, state);
+                            }
+                        });
+                    });
 
                     egui::ScrollArea::vertical()
                         .id_salt("commands_left_column_scroll")
@@ -1134,6 +1302,8 @@ impl ProjectDetailPage {
                     // Show discovery form or command details
                     if state.ui_state.project_detail_show_discovery_form {
                         self.show_discovery_form(ui, state);
+                    } else if let Some(selected_command_id) = state.ui_state.project_detail_selected_command_id.clone() {
+                        self.show_command_details(ui, state, &selected_command_id);
                     } else {
                         self.show_command_details_placeholder(ui, state);
                     }

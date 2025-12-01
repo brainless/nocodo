@@ -1147,3 +1147,23 @@ pub struct DiscoverCommandsResponse {
     pub project_types: Vec<String>,
     pub reasoning: Option<String>,
 }
+
+/// Execution record for a project command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectCommandExecution {
+    pub id: i64,
+    pub command_id: String,
+    pub git_branch: Option<String>,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: u64,
+    pub executed_at: i64,
+    pub success: bool,
+}
+
+/// Response containing list of command executions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectCommandExecutionListResponse {
+    pub executions: Vec<ProjectCommandExecution>,
+}
