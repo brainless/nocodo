@@ -3,6 +3,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::handlers::main_handlers::AppState;
 use crate::llm_agent::LlmAgent;
+use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
     ProjectCommand, ProjectCommandExecution, ProjectCommandExecutionListResponse,
@@ -511,7 +512,7 @@ async fn enhance_discovery_with_llm(
     let model = query
         .llm_model
         .clone()
-        .unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string());
+        .unwrap_or_else(|| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
 
     info!(
         "Creating LLM session for discovery with provider: {}, model: {}",

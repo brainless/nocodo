@@ -5,6 +5,7 @@ use crate::error::AppError;
 use crate::git;
 use crate::llm_agent::LlmAgent;
 use crate::llm_client::LlmProvider;
+use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
@@ -1426,7 +1427,7 @@ pub async fn create_ai_session(
                 let provider =
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                 let model = std::env::var("MODEL")
-                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
                 (provider, model)
             };
 
@@ -1942,7 +1943,7 @@ pub async fn add_message_to_work(
                 let provider =
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                 let model = std::env::var("MODEL")
-                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
                 (provider, model)
             };
 
@@ -2798,7 +2799,7 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
             tracing::info!("Anthropic API key is configured, creating provider");
             let anthropic_config = LlmProviderConfig {
                 provider: "anthropic".to_string(),
-                model: "claude-3-opus-20240229".to_string(), // Default model for checking
+                model: CLAUDE_SONNET_4_5_MODEL_ID.to_string(), // Default model for checking
                 api_key: api_key_config.anthropic_api_key.as_ref().unwrap().clone(),
                 base_url: None,
                 max_tokens: Some(1000),
