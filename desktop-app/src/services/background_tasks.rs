@@ -150,9 +150,15 @@ impl BackgroundTasks {
             state.loading_project_detail_worktree_branches = false;
             match res {
                 Ok(branches) => {
-                    state.project_detail_worktree_branches = branches;
+                    tracing::info!(
+                        "[BackgroundTasks] Received branches result: count={}, branches={:?}",
+                        branches.len(),
+                        branches
+                    );
+                    state.ui_state.project_detail_worktree_branches = branches;
                 }
                 Err(e) => {
+                    tracing::error!("[BackgroundTasks] Failed to load project detail worktree branches: {}", e);
                     state.ui_state.connection_error =
                         Some(format!("Failed to load project detail worktree branches: {}", e));
                 }

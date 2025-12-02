@@ -98,8 +98,17 @@ impl crate::pages::Page for ProjectDetailPage {
                         ui.label(WidgetText::label("Branch:"));
                         ui.add_space(4.0);
 
+                        tracing::debug!(
+                            "[ProjectDetail] Branch selector for project_id={}, fetch_attempted={}, loading={}, branches_count={}",
+                            self.project_id,
+                            state.project_detail_worktree_branches_fetch_attempted,
+                            state.loading_project_detail_worktree_branches,
+                            state.ui_state.project_detail_worktree_branches.len()
+                        );
+
                         // Load worktree branches if not already loaded
                         if !state.project_detail_worktree_branches_fetch_attempted && !state.loading_project_detail_worktree_branches {
+                            tracing::info!("[ProjectDetail] Fetching branches for project_id={}", self.project_id);
                             let api_service = crate::services::ApiService::new();
                             api_service.refresh_project_detail_worktree_branches(state, self.project_id);
                         }
@@ -111,6 +120,13 @@ impl crate::pages::Page for ProjectDetailPage {
                             ui.style_mut().spacing.button_padding = egui::vec2(8.0, 6.0);
 
                             let previous_branch = state.ui_state.project_detail_selected_branch.clone();
+
+                            tracing::debug!(
+                                "[ProjectDetail] Rendering branch ComboBox: selected={:?}, available_branches={:?}",
+                                state.ui_state.project_detail_selected_branch,
+                                state.ui_state.project_detail_worktree_branches
+                            );
+
                             egui::ComboBox::from_id_salt("project_detail_branch_combo")
                                 .width(200.0)
                                 .selected_text(
@@ -128,7 +144,7 @@ impl crate::pages::Page for ProjectDetailPage {
                                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                     }
 
-                                    for branch in &state.project_detail_worktree_branches {
+                                    for branch in &state.ui_state.project_detail_worktree_branches {
                                         let branch_response = ui.selectable_value(
                                             &mut state.ui_state.project_detail_selected_branch,
                                             Some(branch.clone()),
@@ -339,28 +355,7 @@ impl ProjectDetailPage {
     }
 
     fn show_files_tab(&mut self, _ctx: &Context, ui: &mut Ui, state: &mut AppState) {
-        // Check if we've switched to a different project and need to clear state
-        if state.current_file_browser_project_id != Some(self.project_id) {
-            // Clear file browser state when switching projects
-            state.current_file_browser_project_id = Some(self.project_id);
-            {
-                let mut file_list_result = state.file_list_result.lock().unwrap();
-                *file_list_result = None;
-            }
-            {
-                let mut file_content_result = state.file_content_result.lock().unwrap();
-                *file_content_result = None;
-            }
-            state.ui_state.selected_file_path = None;
-            state.ui_state.expanded_folders.clear();
-            state.ui_state.current_directory_path = None;
-            state.ui_state.project_detail_selected_branch = None;
-            state.project_detail_worktree_branches.clear();
-            state.project_detail_worktree_branches_fetch_attempted = false;
-            state.loading_file_list = false;
-            state.loading_file_content = false;
-            state.loading_project_detail_worktree_branches = false;
-        }
+        // Note: State clearing for project switches now happens in update_state() method
 
         // Load file list if not already loaded
         {
@@ -780,8 +775,17 @@ impl ProjectDetailPage {
     }
 
     fn update_state(&mut self, state: &mut AppState) {
-        // Check if we've switched to a different project and need to clear state
+        // Check if we've switched to a different project and need to clear ALL project-specific state
         if state.current_file_browser_project_id != Some(self.project_id) {
+            tracing::info!(
+                "[ProjectDetail::update_state] Switching from project {:?} to project {}",
+                state.current_file_browser_project_id,
+                self.project_id
+            );
+
+            // Update the current project ID tracker
+            state.current_file_browser_project_id = Some(self.project_id);
+
             // Clear command state when switching projects
             state.project_detail_saved_commands.clear();
             state.project_detail_commands_fetch_attempted = false;
@@ -793,6 +797,30 @@ impl ProjectDetailPage {
             state.ui_state.project_detail_selected_command_id = None;
             state.ui_state.project_detail_command_executions.clear();
             state.loading_command_executions = false;
+
+            // Clear file browser state when switching projects
+            {
+                let mut file_list_result = state.file_list_result.lock().unwrap();
+                *file_list_result = None;
+            }
+            {
+                let mut file_content_result = state.file_content_result.lock().unwrap();
+                *file_content_result = None;
+            }
+            state.ui_state.selected_file_path = None;
+            state.ui_state.expanded_folders.clear();
+            state.ui_state.current_directory_path = None;
+            state.loading_file_list = false;
+            state.loading_file_content = false;
+
+            // Clear branch state when switching projects
+            state.ui_state.project_detail_selected_branch = None;
+            state.ui_state.project_detail_worktree_branches.clear();
+            state.project_detail_worktree_branches_fetch_attempted = false;
+            state.loading_project_detail_worktree_branches = false;
+            state.project_detail_worktree_branches_project_id = Some(self.project_id);
+
+            tracing::info!("[ProjectDetail::update_state] All state cleared for new project {}", self.project_id);
         }
 
         // Load saved commands if not already loaded
@@ -896,10 +924,16 @@ impl ProjectDetailPage {
             if let Some(result) = branches_result.as_ref() {
                 match result {
                     Ok(branches) => {
+                        tracing::info!(
+                            "[ProjectDetail::update_state] Received branches result: count={}, branches={:?}",
+                            branches.len(),
+                            branches
+                        );
                         state.ui_state.project_detail_worktree_branches = branches.clone();
                         state.loading_project_detail_worktree_branches = false;
                     }
-                    Err(_e) => {
+                    Err(e) => {
+                        tracing::error!("[ProjectDetail::update_state] Failed to load branches: {}", e);
                         state.loading_project_detail_worktree_branches = false;
                         // Error will be shown in UI
                     }
@@ -910,9 +944,6 @@ impl ProjectDetailPage {
                 *branches_result = None;
             }
         }
-
-        // Update current file browser project ID
-        state.current_file_browser_project_id = Some(self.project_id);
     }
 
     fn show_discover_cta(&self, ui: &mut Ui, state: &mut AppState) {

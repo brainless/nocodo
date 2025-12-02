@@ -67,7 +67,6 @@ pub struct AppState {
     pub settings: Option<manager_models::SettingsResponse>,
     pub supported_models: Vec<manager_models::SupportedModel>,
     pub worktree_branches: Vec<String>,
-    pub project_detail_worktree_branches: Vec<String>,
 
     // Command management state
     pub project_detail_saved_commands: Vec<manager_models::ProjectCommand>,
@@ -220,6 +219,7 @@ pub struct AppState {
     pub models_fetch_attempted: bool,
     pub worktree_branches_fetch_attempted: bool,
     pub project_detail_worktree_branches_fetch_attempted: bool,
+    pub project_detail_worktree_branches_project_id: Option<i64>,
     #[serde(skip)]
     pub creating_work: bool,
     #[serde(skip)]
@@ -383,7 +383,6 @@ impl Default for AppState {
             settings: None,
             supported_models: Vec::new(),
             worktree_branches: Vec::new(),
-            project_detail_worktree_branches: Vec::new(),
 
             // Command management state
             project_detail_saved_commands: Vec::new(),
@@ -465,6 +464,7 @@ impl Default for AppState {
             models_fetch_attempted: false,
             worktree_branches_fetch_attempted: false,
             project_detail_worktree_branches_fetch_attempted: false,
+            project_detail_worktree_branches_project_id: None,
             creating_work: false,
             updating_projects_path: false,
             scanning_projects: false,
