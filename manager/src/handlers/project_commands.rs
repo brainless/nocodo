@@ -6,9 +6,9 @@ use crate::llm_agent::LlmAgent;
 use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
-    ProjectCommand, ProjectCommandExecution, ProjectCommandExecutionListResponse,
-    ProjectCommandExecutionResponse, ProjectCommandFilterQuery,
-    ProjectCommandResponse, UpdateProjectCommandRequest,
+    MessageAuthorType, MessageContentType, ProjectCommand, ProjectCommandExecution,
+    ProjectCommandExecutionListResponse, ProjectCommandExecutionResponse, ProjectCommandFilterQuery,
+    ProjectCommandResponse, UpdateProjectCommandRequest, Work, WorkMessage,
 };
 use actix_web::{web, HttpResponse, Result};
 use chrono::Utc;
@@ -526,17 +526,13 @@ pub async fn discover_project_commands(
 /// Enhance command discovery using LLM
 async fn enhance_discovery_with_llm(
     llm_agent: &LlmAgent,
-    _db: &Arc<Database>,
+    db: &Arc<Database>,
     project_id: i64,
     project_path: &std::path::Path,
     rule_based_commands: Vec<SuggestedCommand>,
     query: &DiscoveryOptionsQuery,
 ) -> Result<(Vec<SuggestedCommand>, String), AppError> {
     info!("Starting LLM-enhanced discovery for project {}", project_id);
-
-    // Create a temporary work session for discovery
-    // (We need a work_id to create an LLM session, so we'll use project_id as a placeholder)
-    let work_id = project_id; // Using project_id as work_id for discovery sessions
 
     // Get LLM provider and model from query or use defaults
     let provider = query
@@ -547,6 +543,36 @@ async fn enhance_discovery_with_llm(
         .llm_model
         .clone()
         .unwrap_or_else(|| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
+
+    // Create a Work item for command discovery
+    let work = Work {
+        id: 0,
+        title: format!("Command Discovery for Project {}", project_id),
+        project_id: Some(project_id),
+        model: Some(model.clone()),
+        status: "active".to_string(),
+        created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
+        git_branch: None,
+        working_directory: Some(project_path.to_string_lossy().to_string()),
+    };
+
+    let work_id = db.create_work(&work)
+        .map_err(|e| AppError::Internal(format!("Failed to create work item: {}", e)))?;
+
+    info!("Created work item {} for command discovery", work_id);
+
+    // Add initial user message to Work
+    db.create_work_message(&WorkMessage {
+        id: 0,
+        work_id,
+        content: "Discovering commands for this project...".to_string(),
+        content_type: MessageContentType::Text,
+        author_type: MessageAuthorType::User,
+        author_id: Some("system".to_string()),
+        sequence_order: 0,
+        created_at: chrono::Utc::now().timestamp(),
+    }).map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
 
     info!(
         "Creating LLM session for discovery with provider: {}, model: {}",
