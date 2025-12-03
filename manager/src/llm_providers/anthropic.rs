@@ -8,6 +8,11 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+// Model ID constants
+pub const CLAUDE_OPUS_4_1_MODEL_ID: &str = "claude-opus-4-1-20250805";
+pub const CLAUDE_SONNET_4_5_MODEL_ID: &str = "claude-sonnet-4-5-20250929";
+pub const CLAUDE_HAIKU_4_5_MODEL_ID: &str = "claude-haiku-4-5-20251001";
+
 /// Anthropic provider implementation
 pub struct AnthropicProvider {
     #[allow(dead_code)]
@@ -130,7 +135,7 @@ impl Default for ClaudeOpus41Model {
 
 impl LlmModel for ClaudeOpus41Model {
     fn id(&self) -> &str {
-        "claude-opus-4-1-20250805"
+        CLAUDE_OPUS_4_1_MODEL_ID
     }
 
     fn name(&self) -> &str {
@@ -223,7 +228,7 @@ impl Default for ClaudeSonnet45Model {
 
 impl LlmModel for ClaudeSonnet45Model {
     fn id(&self) -> &str {
-        "claude-sonnet-4-5-20250929"
+        CLAUDE_SONNET_4_5_MODEL_ID
     }
 
     fn name(&self) -> &str {
@@ -316,7 +321,7 @@ impl Default for ClaudeHaiku45Model {
 
 impl LlmModel for ClaudeHaiku45Model {
     fn id(&self) -> &str {
-        "claude-haiku-4-5-20251001"
+        CLAUDE_HAIKU_4_5_MODEL_ID
     }
 
     fn name(&self) -> &str {

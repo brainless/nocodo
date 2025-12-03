@@ -68,6 +68,9 @@ pub struct AppState {
     pub supported_models: Vec<manager_models::SupportedModel>,
     pub worktree_branches: Vec<String>,
 
+    // Command management state
+    pub project_detail_saved_commands: Vec<manager_models::ProjectCommand>,
+
     // Users management
     pub users: Vec<manager_models::UserListItem>,
     pub filtered_users: Vec<manager_models::UserListItem>,
@@ -105,8 +108,11 @@ pub struct AppState {
     pub update_team_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
     pub updating_team: bool,
 
-    // Favorite state
-    pub favorite_projects: std::collections::HashSet<i64>,
+    // Favorite state - stores (server_host, server_user, server_port, project_id) tuples
+    pub favorite_projects: std::collections::HashSet<(String, String, u16, i64)>,
+
+    // Current server connection info for favorites
+    pub current_server_info: Option<(String, String, u16)>,
 
     // Projects default path state
     pub projects_default_path_modified: bool,
@@ -140,15 +146,18 @@ pub struct AppState {
     #[serde(skip)]
     pub connection_manager: Arc<crate::connection_manager::ConnectionManager>,
     #[serde(skip)]
-    pub pending_project_details_refresh: Option<i64>,
-    #[serde(skip)]
-    #[allow(clippy::type_complexity)]
-    pub settings_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
-    #[serde(skip)]
-    #[allow(clippy::type_complexity)]
     pub project_details_result:
         Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
+    #[serde(skip)]
+    pub create_commands_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
+            #[serde(skip)]
+            pub execute_command_result:
+                Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
+            #[serde(skip)]
+            #[allow(clippy::type_complexity)]
+            pub command_executions_result:
+                Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommandExecution>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub projects_result:
@@ -157,6 +166,10 @@ pub struct AppState {
     #[allow(clippy::type_complexity)]
     pub worktree_branches_result:
         Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub settings_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
@@ -190,6 +203,12 @@ pub struct AppState {
     pub loading_ai_session_outputs: bool,
     pub loading_ai_tool_calls: bool,
     pub loading_worktree_branches: bool,
+    pub loading_project_detail_worktree_branches: bool,
+    pub loading_project_detail_commands: bool,
+    pub project_detail_commands_fetch_attempted: bool,
+    pub loading_command_discovery: bool,
+    pub loading_command_executions: bool,
+    pub executing_command_id: Option<String>,
     #[serde(skip)]
     pub loading_settings: bool,
     #[serde(skip)]
@@ -199,6 +218,8 @@ pub struct AppState {
     #[serde(skip)]
     pub models_fetch_attempted: bool,
     pub worktree_branches_fetch_attempted: bool,
+    pub project_detail_worktree_branches_fetch_attempted: bool,
+    pub project_detail_worktree_branches_project_id: Option<i64>,
     #[serde(skip)]
     pub creating_work: bool,
     #[serde(skip)]
@@ -242,19 +263,106 @@ pub struct AppState {
     #[serde(skip)]
     pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
     #[serde(skip)]
-    pub connection_result: Arc<std::sync::Mutex<Option<Result<String, String>>>>,
+    pub connection_result: Arc<std::sync::Mutex<Option<Result<(String, String, u16), String>>>>,
     #[serde(skip)]
     pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub login_result:
         Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
+    #[serde(skip)]
+    pub pending_project_details_refresh: Option<i64>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub project_detail_worktree_branches_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub project_detail_saved_commands_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub command_discovery_result:
+        Arc<std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>>,
 }
 
 impl AppState {
     /// Check if user is authenticated (connected to server AND logged in)
     pub fn is_authenticated(&self) -> bool {
         self.connection_state == ConnectionState::Connected && self.auth_state.jwt_token.is_some()
+    }
+
+    /// Load favorites from database for the current server connection
+    pub fn load_favorites_for_current_server(&mut self) {
+        if let Some((server_host, server_user, server_port)) = &self.current_server_info {
+            if let Some(db) = &self.db {
+                // Clear existing favorites
+                self.favorite_projects.clear();
+
+                tracing::info!(
+                    "DB SELECT params: server_host='{}', server_user='{}', server_port={}",
+                    server_host, server_user, server_port
+                );
+
+                // First, check how many total favorites exist
+                if let Ok(total_count) = db.query_row("SELECT COUNT(*) FROM favorites", [], |row| row.get::<_, i64>(0)) {
+                    tracing::info!("Total favorites in database: {}", total_count);
+                }
+
+                // Check how many match our query
+                if let Ok(mut stmt) = db.prepare("SELECT COUNT(*) FROM favorites WHERE server_host = ? AND server_user = ? AND server_port = ?") {
+                    if let Ok(matching_count) = stmt.query_row(
+                        rusqlite::params![server_host, server_user, server_port],
+                        |row| row.get::<_, i64>(0)
+                    ) {
+                        tracing::info!("Matching favorites for this server: {}", matching_count);
+                    }
+                }
+
+                // Load favorites for this specific server
+                let mut stmt = db
+                    .prepare("SELECT entity_type, entity_id, server_host, server_user, server_port FROM favorites WHERE server_host = ? AND server_user = ? AND server_port = ?")
+                    .expect("Could not prepare favorites statement");
+
+                let favorites_iter = stmt
+                    .query_map(
+                        rusqlite::params![server_host, server_user, server_port],
+                        |row| {
+                            let entity_type: String = row.get(0)?;
+                            let entity_id: i64 = row.get(1)?;
+                            let db_server_host: String = row.get(2)?;
+                            let db_server_user: String = row.get(3)?;
+                            let db_server_port: i64 = row.get(4)?;
+                            Ok((entity_type, entity_id, db_server_host, db_server_user, db_server_port))
+                        },
+                    )
+                    .expect("Could not query favorites");
+
+                for (entity_type, entity_id, db_server_host, db_server_user, db_server_port) in favorites_iter.flatten() {
+                    tracing::info!(
+                        "Row from DB: entity_type='{}', entity_id={}, server_host='{}', server_user='{}', server_port={}",
+                        entity_type, entity_id, db_server_host, db_server_user, db_server_port
+                    );
+                    if entity_type == "project" {
+                        let favorite_key = (server_host.clone(), server_user.clone(), *server_port, entity_id);
+                        tracing::info!("Loaded favorite from DB for current server: project_id={}", entity_id);
+                        self.favorite_projects.insert(favorite_key);
+                    }
+                }
+
+                tracing::info!(
+                    "Total favorites loaded for {}@{}:{}: {}",
+                    server_user,
+                    server_host,
+                    server_port,
+                    self.favorite_projects.len()
+                );
+            } else {
+                tracing::warn!("Cannot load favorites: database not available");
+            }
+        } else {
+            tracing::debug!("Cannot load favorites: no current_server_info set");
+        }
     }
 }
 
@@ -275,6 +383,9 @@ impl Default for AppState {
             settings: None,
             supported_models: Vec::new(),
             worktree_branches: Vec::new(),
+
+            // Command management state
+            project_detail_saved_commands: Vec::new(),
             users: Vec::new(),
             filtered_users: Vec::new(),
             user_search_query: String::new(),
@@ -299,6 +410,7 @@ impl Default for AppState {
             update_team_result: Arc::new(std::sync::Mutex::new(None)),
             updating_team: false,
             favorite_projects: std::collections::HashSet::new(),
+            current_server_info: None,
             projects_default_path_modified: false,
             xai_api_key_input: String::new(),
             openai_api_key_input: String::new(),
@@ -322,6 +434,12 @@ impl Default for AppState {
             projects_result: Arc::new(std::sync::Mutex::new(None)),
             works_result: Arc::new(std::sync::Mutex::new(None)),
             worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
+            project_detail_worktree_branches_result: Arc::new(std::sync::Mutex::new(None)),
+            project_detail_saved_commands_result: Arc::new(std::sync::Mutex::new(None)),
+            command_discovery_result: Arc::new(std::sync::Mutex::new(None)),
+            create_commands_result: Arc::new(std::sync::Mutex::new(None)),
+            execute_command_result: Arc::new(std::sync::Mutex::new(None)),
+            command_executions_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
             ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
@@ -334,11 +452,19 @@ impl Default for AppState {
             loading_ai_session_outputs: false,
             loading_ai_tool_calls: false,
             loading_worktree_branches: false,
+            loading_project_detail_worktree_branches: false,
+            loading_project_detail_commands: false,
+            project_detail_commands_fetch_attempted: false,
+            loading_command_discovery: false,
+            loading_command_executions: false,
+            executing_command_id: None,
             loading_settings: false,
             loading_project_details: false,
             loading_supported_models: false,
             models_fetch_attempted: false,
             worktree_branches_fetch_attempted: false,
+            project_detail_worktree_branches_fetch_attempted: false,
+            project_detail_worktree_branches_project_id: None,
             creating_work: false,
             updating_projects_path: false,
             scanning_projects: false,

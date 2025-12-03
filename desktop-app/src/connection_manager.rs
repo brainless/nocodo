@@ -409,6 +409,18 @@ impl ConnectionManager {
         }
     }
 
+    /// Get detailed connection information for favorites
+    pub async fn get_connection_details(&self) -> Option<(String, String, u16)> {
+        match self.connection_type.read().await.as_ref()? {
+            ConnectionType::Ssh { server, username, port, .. } => {
+                Some((server.clone(), username.clone(), *port))
+            }
+            ConnectionType::Local { .. } => {
+                Some(("localhost".to_string(), "local".to_string(), 22))
+            }
+        }
+    }
+
     /// Login with username, password, and SSH fingerprint
     pub async fn login(
         &self,

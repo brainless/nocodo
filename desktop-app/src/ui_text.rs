@@ -155,6 +155,16 @@ impl WidgetText {
             .family(AppFonts::ui_font_semibold())
             .size(20.0)
     }
+
+    /// Muted text (small, Light, weak color)
+    ///
+    /// Example: `ui.label(WidgetText::muted("Last: 2h ago"))`
+    pub fn muted(text: impl Into<String>) -> RichText {
+        RichText::new(text)
+            .family(AppFonts::ui_font_light())
+            .size(11.0)
+            .color(Color32::from_gray(120))
+    }
 }
 
 /// User Content Text Helpers

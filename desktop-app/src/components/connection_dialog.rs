@@ -224,7 +224,7 @@ impl ConnectionDialog {
                                     server
                                 );
                                 let mut result = result_arc.lock().unwrap();
-                                *result = Some(Ok(server.clone()));
+                                *result = Some(Ok((server.clone(), username.clone(), port)));
                             }
                             Err(e) => {
                                 tracing::error!("Failed to reach API through tunnel: {}", e);

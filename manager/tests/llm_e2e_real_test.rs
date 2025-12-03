@@ -26,11 +26,12 @@ use nocodo_manager::models::{
 #[actix_rt::test]
 async fn test_llm_e2e_saleor() {
     // Initialize logging to capture all logs in test output
-    // This will show DEBUG logs from GLM adapter and ERROR logs from unified_client
+    // This will show INFO logs from llm_agent and ERROR logs from specific adapters
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive("nocodo_manager=debug".parse().unwrap())
+                .add_directive("nocodo_manager::llm_agent=info".parse().unwrap()) // Reduce verbosity of llm_agent
                 .add_directive(
                     "nocodo_manager::llm_client::adapters::glm_chat_completions=error"
                         .parse()
@@ -138,7 +139,7 @@ async fn test_llm_e2e_saleor() {
 
     // Read work title from prompts configuration
     let work_title = crate::common::keyword_validation::PromptsConfig::load_from_file(
-        std::path::Path::new("prompts/default.toml"),
+        std::path::Path::new("manager/prompts/default.toml"),
     )
     .map(|config| config.tech_stack_analysis.prompt.clone())
     .unwrap_or_else(|_| "Tech Stack Analysis".to_string());
@@ -409,11 +410,12 @@ async fn test_llm_e2e_saleor() {
 #[actix_rt::test]
 async fn test_llm_multiple_scenarios() {
     // Initialize logging to capture all logs in test output
-    // This will show DEBUG logs from GLM adapter and ERROR logs from unified_client
+    // This will show INFO logs from llm_agent and ERROR logs from specific adapters
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive("nocodo_manager=debug".parse().unwrap())
+                .add_directive("nocodo_manager::llm_agent=info".parse().unwrap()) // Reduce verbosity of llm_agent
                 .add_directive(
                     "nocodo_manager::llm_client::adapters::glm_chat_completions=error"
                         .parse()

@@ -31,7 +31,13 @@ impl ApiService {
             Ok(_) => {
                 state.connection_state = crate::state::ConnectionState::Connected;
                 state.ui_state.connected_host = Some("localhost".to_string());
+                state.current_server_info = Some(("localhost".to_string(), "local".to_string(), 8081));
+                tracing::info!("Set current_server_info for local connection: {:?}", state.current_server_info);
                 state.models_fetch_attempted = false;
+
+                // Load favorites for local server (no separate auth needed for local)
+                state.load_favorites_for_current_server();
+
                 Ok(())
             }
             Err(e) => Err(format!("Failed to connect to local manager: {}", e)),
@@ -81,6 +87,41 @@ impl ApiService {
 
             let connection_manager = Arc::clone(&state.connection_manager);
             let result_clone = Arc::clone(&state.worktree_branches_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.get_worktree_branches(project_id).await;
+                    let mut branches_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *branches_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut branches_result = result_clone.lock().unwrap();
+                    *branches_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn refresh_project_detail_worktree_branches(&self, state: &mut AppState, project_id: i64) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_project_detail_worktree_branches = true;
+            state.project_detail_worktree_branches_fetch_attempted = true;
+            state.project_detail_worktree_branches_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.project_detail_worktree_branches_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
@@ -901,6 +942,180 @@ impl ApiService {
                 } else {
                     let mut add_result = result_clone.lock().unwrap();
                     *add_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    // Command management methods
+    pub fn discover_project_commands(&self, project_id: i64, use_llm: Option<bool>, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_command_discovery = true;
+            state.command_discovery_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone: Arc<std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>> = Arc::clone(&state.command_discovery_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.discover_project_commands(project_id, use_llm).await;
+                    let mut discovery_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *discovery_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut discovery_result = result_clone.lock().unwrap();
+                    *discovery_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn list_project_commands(&self, project_id: i64, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_project_detail_commands = true;
+            state.project_detail_commands_fetch_attempted = true;
+            state.project_detail_saved_commands_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>> = Arc::clone(&state.project_detail_saved_commands_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.list_project_commands(project_id).await;
+                    let mut commands_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *commands_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut commands_result = result_clone.lock().unwrap();
+                    *commands_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn create_project_commands(&self, project_id: i64, commands: Vec<manager_models::ProjectCommand>, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.create_commands_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.create_commands_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.create_project_commands(project_id, commands).await;
+                    let mut create_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *create_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut create_result = result_clone.lock().unwrap();
+                    *create_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn execute_project_command(&self, project_id: i64, command_id: &str, git_branch: Option<&str>, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.executing_command_id = Some(command_id.to_string());
+            state.execute_command_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let result_clone = Arc::clone(&state.execute_command_result);
+            let command_id = command_id.to_string();
+            let git_branch = git_branch.map(|s| s.to_string());
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.execute_project_command(project_id, &command_id, git_branch.as_deref()).await;
+                    let mut execute_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *execute_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut execute_result = result_clone.lock().unwrap();
+                    *execute_result = Some(Err("Not connected".to_string()));
+                }
+            });
+        }
+    }
+
+    pub fn get_command_executions(&self, project_id: i64, command_id: &str, state: &mut AppState) {
+        if state.connection_state == crate::state::ConnectionState::Connected {
+            state.loading_command_executions = true;
+            state.command_executions_result = Arc::new(std::sync::Mutex::new(None));
+
+            let connection_manager = Arc::clone(&state.connection_manager);
+            let command_id = command_id.to_string();
+            let result_clone = Arc::clone(&state.command_executions_result);
+
+            tokio::spawn(async move {
+                if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                    let api_client = api_client_arc.read().await;
+                    let result = api_client.get_command_executions(project_id, &command_id, Some(10)).await;
+                    let mut executions_result = result_clone.lock().unwrap();
+
+                    // Check for 401 Unauthorized and set auth required flag
+                    if let Err(ref e) = result {
+                        if e.is_unauthorized() {
+                            if let Ok(mut auth_required) =
+                                connection_manager.get_auth_required_flag().lock()
+                            {
+                                *auth_required = true;
+                            }
+                        }
+                    }
+
+                    *executions_result = Some(result.map_err(|e| e.to_string()));
+                } else {
+                    let mut executions_result = result_clone.lock().unwrap();
+                    *executions_result = Some(Err("Not connected".to_string()));
                 }
             });
         }

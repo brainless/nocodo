@@ -1,4 +1,5 @@
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // Re-export shared models from manager-models
@@ -232,6 +233,7 @@ pub struct FileInfo {
 pub struct FileListRequest {
     pub project_id: Option<i64>,
     pub path: Option<String>, // Relative path within project, defaults to root
+    pub git_branch: Option<String>, // Git branch/worktree to use, defaults to current branch
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -293,238 +295,169 @@ pub enum ToolRequest {
     Bash(BashRequest),
 }
 
-/// List files tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// List files and directories in a given path
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListFilesRequest {
+    /// The directory path to list files from
     pub path: String,
+
+    /// Whether to list files recursively
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recursive: Option<bool>,
+
+    /// Whether to include hidden files (starting with .)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_hidden: Option<bool>,
+
+    /// Maximum number of files to return (default: 1000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_files: Option<u32>,
 }
 
-impl ListFilesRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The directory path to list files from"
-                },
-                "recursive": {
-                    "type": "boolean",
-                    "description": "Whether to list files recursively",
-                    "default": false
-                },
-                "include_hidden": {
-                    "type": "boolean",
-                    "description": "Whether to include hidden files",
-                    "default": false
-                },
-                "max_files": {
-                    "type": "number",
-                    "description": "Maximum number of files to return (default: 1000)",
-                    "default": 1000
-                }
-            },
-            "required": ["path", "recursive", "include_hidden", "max_files"],
-            "additionalProperties": false
-        })
-    }
-}
 
-/// Read file tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+/// Read the contents of a file
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReadFileRequest {
+    /// The file path to read
     pub path: String,
+
+    /// Maximum number of bytes to read (default: 10000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_size: Option<u64>,
 }
 
-impl ReadFileRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to read"
-                },
-                "max_size": {
-                    "type": "number",
-                    "description": "Maximum number of bytes to read",
-                    "default": 10000
-                }
-            },
-            "required": ["path", "max_size"],
-            "additionalProperties": false
-        })
-    }
-}
 
-/// Write file tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+/// Write or modify a file with various operations
+///
+/// Supports two modes:
+/// 1. Full write: Provide `path` and `content` to write/overwrite file
+/// 2. Search & replace: Provide `path`, `search`, and `replace` to modify existing content
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteFileRequest {
+    /// The file path to write to
     pub path: String,
-    pub content: String,
-    pub create_dirs: Option<bool>,
+
+    /// Full content to write (required for full write, omit for search-replace)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub append: Option<bool>,
+    pub content: Option<String>,
+
+    /// Text to search for (for search-and-replace operations)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
+
+    /// Text to replace the search text with
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replace: Option<String>,
+
+    /// Whether to create parent directories if they don't exist
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_dirs: Option<bool>,
+
+    /// Whether to append to the file instead of overwriting
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub append: Option<bool>,
+
+    /// Whether to create the file if it doesn't exist
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create_if_not_exists: Option<bool>,
 }
 
 impl WriteFileRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to write to"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The content to write to the file"
-                },
-                "create_dirs": {
-                    "type": "boolean",
-                    "description": "Whether to create parent directories if they don't exist",
-                    "default": false
-                },
-                "append": {
-                    "type": "boolean",
-                    "description": "Whether to append to the file instead of overwriting",
-                    "default": false
-                },
-                "search": {
-                    "type": "string",
-                    "description": "Text to search for (for search and replace operations)"
-                },
-                "replace": {
-                    "type": "string",
-                    "description": "Text to replace the search text with"
-                },
-                "create_if_not_exists": {
-                    "type": "boolean",
-                    "description": "Whether to create the file if it doesn't exist",
-                    "default": false
-                }
-            },
-            "required": ["path", "content", "create_dirs", "append", "search", "replace", "create_if_not_exists"],
-            "additionalProperties": false
-        })
+    /// Validate that either content OR (search + replace) is provided
+    pub fn validate(&self) -> anyhow::Result<()> {
+        match (&self.content, &self.search, &self.replace) {
+            (Some(_), None, None) => Ok(()),  // Full write mode
+            (None, Some(_), Some(_)) => Ok(()),  // Search-replace mode
+            (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
+                anyhow::bail!("Cannot provide both 'content' and 'search'/'replace'. Use either full write OR search-replace mode.")
+            }
+            (None, Some(_), None) => {
+                anyhow::bail!("Search-replace mode requires both 'search' and 'replace' parameters")
+            }
+            (None, None, Some(_)) => {
+                anyhow::bail!("Search-replace mode requires both 'search' and 'replace' parameters")
+            }
+            (None, None, None) => {
+                anyhow::bail!("Must provide either 'content' (for full write) OR both 'search' and 'replace' (for search-replace)")
+            }
+        }
     }
+
+
 }
 
-/// Grep search tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Search for patterns in files using grep
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GrepRequest {
+    /// The regex pattern to search for
     pub pattern: String,
+
+    /// The directory path to search in (default: current directory)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+
+    /// File pattern to include in search (e.g., '*.rs')
     pub include_pattern: Option<String>,
+
+    /// File pattern to exclude from search
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exclude_pattern: Option<String>,
+
+    /// Whether to search recursively (default: true)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recursive: Option<bool>,
+
+    /// Whether the search is case sensitive (default: false)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub case_sensitive: Option<bool>,
+
+    /// Whether to include line numbers in results (default: true)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_line_numbers: Option<bool>,
+
+    /// Maximum number of results to return (default: 100)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_results: Option<u32>,
+
+    /// Maximum number of files to search through (default: 1000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_files_searched: Option<u32>,
 }
 
-impl GrepRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "The regex pattern to search for"
-                },
-                "path": {
-                    "type": "string",
-                    "description": "The directory path to search in",
-                    "default": "."
-                },
-                "include_pattern": {
-                    "type": "string",
-                    "description": "File pattern to include in search (e.g., '*.rs')"
-                },
-                "exclude_pattern": {
-                    "type": "string",
-                    "description": "File pattern to exclude from search"
-                },
-                "recursive": {
-                    "type": "boolean",
-                    "description": "Whether to search recursively",
-                    "default": true
-                },
-                "case_sensitive": {
-                    "type": "boolean",
-                    "description": "Whether the search is case sensitive",
-                    "default": false
-                },
-                "include_line_numbers": {
-                    "type": "boolean",
-                    "description": "Whether to include line numbers in results",
-                    "default": true
-                },
-                "max_results": {
-                    "type": "number",
-                    "description": "Maximum number of results to return",
-                    "default": 100
-                },
-                "max_files_searched": {
-                    "type": "number",
-                    "description": "Maximum number of files to search through",
-                    "default": 1000
-                }
-            },
-            "required": ["pattern", "path", "include_pattern", "exclude_pattern", "recursive", "case_sensitive", "include_line_numbers", "max_results", "max_files_searched"],
-            "additionalProperties": false
-        })
-    }
-}
 
-/// Apply patch tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+/// Apply a patch to create, modify, delete, or move multiple files
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ApplyPatchRequest {
+    /// The patch content in unified diff format
+    ///
+    /// Format:
+    /// ```
+    /// *** Begin Patch
+    /// *** Add File: path/to/new.txt
+    /// +line content
+    /// *** Update File: path/to/existing.txt
+    /// @@ optional context
+    /// -old line
+    /// +new line
+    /// *** Delete File: path/to/remove.txt
+    /// *** End Patch
+    /// ```
+    ///
+    /// Supports:
+    /// - Add File: Create new files with + prefixed lines
+    /// - Update File: Modify files with diff hunks (- for removed, + for added)
+    /// - Delete File: Remove files
+    /// - Move to: Rename files (after Update File header)
+    /// - @@ context headers for targeting specific code blocks
+    ///
+    /// All file paths must be relative to the project root.
     pub patch: String,
 }
 
-impl ApplyPatchRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "patch": {
-                    "type": "string",
-                    "description": "The patch content in the format:\n*** Begin Patch\n*** Add File: path/to/new.txt\n+line content\n*** Update File: path/to/existing.txt\n@@ optional context\n-old line\n+new line\n*** Delete File: path/to/remove.txt\n*** End Patch\n\nSupports:\n- Add File: Create new files with + prefixed lines\n- Update File: Modify files with diff hunks (- for removed, + for added)\n- Delete File: Remove files\n- Move to: Rename files (after Update File header)\n- @@ context headers for targeting specific code blocks\n\nAll file paths must be relative to the project root."
-                }
-            },
-            "required": ["patch"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1114,49 +1047,26 @@ impl Default for BashLoggingConfig {
     }
 }
 
-/// Bash tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Execute bash commands with timeout and permission checking
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BashRequest {
+    /// The bash command to execute
     pub command: String,
+
+    /// Working directory for command execution (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_dir: Option<String>,
+
+    /// Timeout in seconds (optional, uses default if not specified)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout_secs: Option<u64>,
+
+    /// Human-readable description of what the command does (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
-impl BashRequest {
-    /// Generate example JSON schema for this request type
-    pub fn example_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "description": "The bash command to execute"
-                },
-                "working_dir": {
-                    "type": "string",
-                    "description": "Working directory for command execution (optional)",
-                    "default": null
-                },
-                "timeout_secs": {
-                    "type": "number",
-                    "description": "Timeout in seconds (optional, uses default if not specified)",
-                    "default": null
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Human-readable description of what the command does (optional)",
-                    "default": null
-                }
-            },
-            "required": ["command"],
-            "additionalProperties": false
-        })
-    }
-}
+
 
 /// Bash tool response
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1215,4 +1125,183 @@ impl BashExecutionLog {
             created_at: now,
         }
     }
+}
+
+// Project Commands Models
+
+/// Project command that can be executed for development tasks
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct ProjectCommand {
+    pub id: String,
+    pub project_id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub command: String,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[allow(dead_code)]
+impl ProjectCommand {
+    pub fn new(
+        id: String,
+        project_id: i64,
+        name: String,
+        command: String,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id,
+            project_id,
+            name,
+            description: None,
+            command,
+            shell: None,
+            working_directory: None,
+            environment: None,
+            timeout_seconds: Some(120),
+            os_filter: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn update_timestamp(&mut self) {
+        self.updated_at = Utc::now().timestamp();
+    }
+}
+
+/// Request to create a new project command
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct CreateProjectCommandRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub command: String,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+}
+
+/// Request to update a project command
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct UpdateProjectCommandRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub command: Option<String>,
+    pub shell: Option<String>,
+    pub working_directory: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+    pub os_filter: Option<Vec<String>>,
+}
+
+/// Request to execute a command
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct ExecuteProjectCommandRequest {
+    pub git_branch: Option<String>,
+    pub environment: Option<std::collections::HashMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
+}
+
+/// Execution result for a project command
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
+pub struct ProjectCommandExecution {
+    pub id: i64,
+    pub command_id: String,
+    pub git_branch: Option<String>,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: u64,
+    pub executed_at: i64,
+    pub success: bool,
+}
+
+#[allow(dead_code)]
+impl ProjectCommandExecution {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        command_id: String,
+        git_branch: Option<String>,
+        exit_code: Option<i32>,
+        stdout: String,
+        stderr: String,
+        duration_ms: u64,
+        success: bool,
+    ) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            command_id,
+            git_branch,
+            exit_code,
+            stdout,
+            stderr,
+            duration_ms,
+            executed_at: now,
+            success,
+        }
+    }
+}
+
+/// Response for project command list
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandListResponse {
+    pub commands: Vec<ProjectCommand>,
+}
+
+/// Response for single project command
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandResponse {
+    pub command: ProjectCommand,
+}
+
+/// Response for project command execution
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandExecutionResponse {
+    pub execution: ProjectCommandExecution,
+}
+
+/// Response for project command execution list
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandExecutionListResponse {
+    pub executions: Vec<ProjectCommandExecution>,
+}
+
+/// Query parameters for filtering project commands
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ProjectCommandFilterQuery {
+    pub search: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// Query parameters for command discovery
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct DiscoveryOptionsQuery {
+    /// Whether to use LLM for enhanced discovery (default: true)
+    pub use_llm: Option<bool>,
+    /// LLM provider to use (default: from config)
+    pub llm_provider: Option<String>,
+    /// LLM model to use (default: from config)
+    pub llm_model: Option<String>,
 }

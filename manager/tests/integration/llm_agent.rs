@@ -216,7 +216,7 @@ async fn test_llm_agent_session_with_work_context() {
     }
 
     // Create LLM agent session
-    let session = TestDataGenerator::create_llm_agent_session(&work.id, "anthropic", "claude-3-opus");
+    let session = TestDataGenerator::create_llm_agent_session(&work.id, "anthropic", nocodo_manager::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID);
     test_app.db().create_llm_agent_session(&session).unwrap();
 
     // Verify session is linked to work
@@ -336,7 +336,7 @@ Be helpful, patient, and encouraging to developers of all skill levels."#;
     let session_request = CreateLlmAgentSessionRequest {
         work_id: work.id.clone(),
         provider: "anthropic".to_string(),
-        model: "claude-3-opus".to_string(),
+        model: nocodo_manager::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID.to_string(),
         system_prompt: Some(detailed_prompt.to_string()),
     };
 

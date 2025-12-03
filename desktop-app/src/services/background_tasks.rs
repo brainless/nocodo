@@ -19,6 +19,7 @@ impl BackgroundTasks {
         // Handle async task results
         self.check_projects_result(state);
         self.check_worktree_branches_result(state);
+        self.check_project_detail_worktree_branches_result(state);
         self.check_works_result(state);
         self.check_work_messages_result(state);
         self.check_ai_session_outputs_result(state);
@@ -55,11 +56,14 @@ impl BackgroundTasks {
 
         if let Some(res) = result_opt {
             match res {
-                Ok(server) => {
-                    tracing::info!("Connection successful to {}", server);
+                Ok((server, username, port)) => {
+                    tracing::info!("Connection successful to {}@{}:{}", username, server, port);
                     state.connection_state = ConnectionState::Connected;
                     state.ui_state.connected_host = Some(server.clone());
                     state.ui_state.connection_error = None;
+                    state.current_server_info = Some((server.clone(), username.clone(), port));
+                    tracing::info!("Set current_server_info for SSH connection: {:?}", state.current_server_info);
+                    tracing::info!("Favorites in memory: {:?}", state.favorite_projects);
                     state.models_fetch_attempted = false; // Reset to allow fetching models
 
                     // Automatically show auth dialog after successful SSH connection
@@ -135,6 +139,28 @@ impl BackgroundTasks {
                 Err(e) => {
                     state.ui_state.connection_error =
                         Some(format!("Failed to load worktree branches: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_project_detail_worktree_branches_result(&self, state: &mut AppState) {
+        let mut result = state.project_detail_worktree_branches_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_project_detail_worktree_branches = false;
+            match res {
+                Ok(branches) => {
+                    tracing::info!(
+                        "[BackgroundTasks] Received branches result: count={}, branches={:?}",
+                        branches.len(),
+                        branches
+                    );
+                    state.ui_state.project_detail_worktree_branches = branches;
+                }
+                Err(e) => {
+                    tracing::error!("[BackgroundTasks] Failed to load project detail worktree branches: {}", e);
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to load project detail worktree branches: {}", e));
                 }
             }
         }
@@ -602,6 +628,9 @@ impl BackgroundTasks {
                     state.auth_state.user_id = Some(login_response.user.id);
                     state.auth_state.username = Some(login_response.user.username);
                     tracing::info!("Auth state updated after successful login");
+
+                    // Load favorites for the current server (must be done after current_server_info is set)
+                    state.load_favorites_for_current_server();
 
                     // Now that we're authenticated, fetch all data that requires auth
                     self.api_service.refresh_settings(state);

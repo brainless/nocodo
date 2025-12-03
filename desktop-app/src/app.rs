@@ -199,20 +199,23 @@ impl DesktopApp {
             [],
         );
 
-        // Create favorites table
+        // Create favorites table with server support
         db.execute(
             "CREATE TABLE IF NOT EXISTS favorites (
                 id INTEGER PRIMARY KEY,
                 entity_type TEXT NOT NULL,
                 entity_id INTEGER NOT NULL,
+                server_host TEXT NOT NULL,
+                server_user TEXT NOT NULL,
+                server_port INTEGER NOT NULL,
                 created_at INTEGER NOT NULL,
-                UNIQUE(entity_type, entity_id)
+                UNIQUE(entity_type, entity_id, server_host, server_user, server_port)
             )",
             [],
         )
         .expect("Could not create favorites table");
         db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id)",
+            "CREATE INDEX IF NOT EXISTS idx_favorites_entity ON favorites (entity_type, entity_id, server_host, server_user, server_port)",
             [],
         )
         .expect("Could not create favorites index");
@@ -235,25 +238,9 @@ impl DesktopApp {
             app.state.servers = server_iter.filter_map(|s| s.ok()).collect();
         }
 
-        // Load favorites
-        {
-            let mut stmt = db
-                .prepare("SELECT entity_type, entity_id FROM favorites")
-                .expect("Could not prepare favorites statement");
-            let favorites_iter = stmt
-                .query_map([], |row| {
-                    let entity_type: String = row.get(0)?;
-                    let entity_id: i64 = row.get(1)?;
-                    Ok((entity_type, entity_id))
-                })
-                .expect("Could not query favorites");
-
-            for (entity_type, entity_id) in favorites_iter.flatten() {
-                if entity_type == "project" {
-                    app.state.favorite_projects.insert(entity_id);
-                }
-            }
-        }
+        // Don't load favorites at startup - they will be loaded after successful connection and auth
+        // This ensures favorites are only loaded when we have a server context
+        tracing::info!("Favorites will be loaded after successful server connection and authentication");
 
         app.state.db = Some(db);
 

@@ -262,6 +262,15 @@ impl ToolExecutor {
 
     /// Write file content
     async fn write_file(&self, request: WriteFileRequest) -> Result<ToolResponse> {
+        // Validate request parameters
+        if let Err(e) = request.validate() {
+            return Ok(ToolResponse::Error(ToolErrorResponse {
+                tool: "write_file".to_string(),
+                error: "ValidationError".to_string(),
+                message: e.to_string(),
+            }));
+        }
+
         let target_path = self.validate_and_resolve_path(&request.path)?;
 
         // Check if file exists for metadata
@@ -319,7 +328,8 @@ impl ToolExecutor {
                 }));
             }
         } else {
-            request.content
+            // Full write mode - content must be present (validated earlier)
+            request.content.expect("content should be present for full write mode")
         };
 
         let bytes_written = if request.append.unwrap_or(false) && file_exists {
@@ -1580,7 +1590,7 @@ mod tests {
 
         let request = WriteFileRequest {
             path: "test.txt".to_string(),
-            content: "Hello World".to_string(),
+            content: Some("Hello World".to_string()),
             create_dirs: None,
             append: None,
             search: None,
@@ -1618,7 +1628,7 @@ mod tests {
 
         let request = WriteFileRequest {
             path: "test.txt".to_string(),
-            content: "".to_string(), // Not used in search/replace
+            content: None, // Not used in search/replace
             create_dirs: None,
             append: None,
             search: Some("old".to_string()),
