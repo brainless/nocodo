@@ -562,11 +562,14 @@ async fn enhance_discovery_with_llm(
 
     info!("Created work item {} for command discovery", work_id);
 
-    // Add initial user message to Work
+    // Create the actual user message that will be sent to LLM
+    let user_message = create_discovery_user_message(project_path, &rule_based_commands);
+
+    // Add the exact user prompt to Work
     db.create_work_message(&WorkMessage {
         id: 0,
         work_id,
-        content: "Discovering commands for this project...".to_string(),
+        content: user_message.clone(),
         content_type: MessageContentType::Text,
         author_type: MessageAuthorType::User,
         author_id: Some("system".to_string()),
@@ -590,8 +593,37 @@ async fn enhance_discovery_with_llm(
 
     info!("LLM session created: {}", session.id);
 
-    // Send discovery request
-    let user_message = create_discovery_user_message(project_path, &rule_based_commands);
+    // Also create an AI session entry for desktop app compatibility
+    // First create a work message to get message_id
+    let work_message = crate::models::WorkMessage {
+        id: 0,
+        work_id,
+        content: "LLM is analyzing the project and enhancing command discovery...".to_string(),
+        content_type: crate::models::MessageContentType::Text,
+        author_type: crate::models::MessageAuthorType::User,
+        author_id: Some("system".to_string()),
+        sequence_order: 1,
+        created_at: chrono::Utc::now().timestamp(),
+    };
+
+    let work_message_id = db.create_work_message(&work_message)
+        .map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
+
+    let ai_session = crate::models::AiSession {
+        id: 0,
+        work_id,
+        message_id: work_message_id,
+        tool_name: "llm-agent".to_string(),
+        status: "started".to_string(),
+        project_context: Some(format!("Project: {}\nPath: {}", project_id, project_path.display())),
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+    };
+
+    let ai_session_id = db.create_ai_session(&ai_session)
+        .map_err(|e| AppError::Internal(format!("Failed to create AI session: {}", e)))?;
+
+    info!("AI session created: {} for LLM session: {}", ai_session_id, session.id);
 
     info!("Sending discovery request to LLM");
     let llm_response = llm_agent

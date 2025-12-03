@@ -793,6 +793,7 @@ impl ProjectDetailPage {
             state.ui_state.project_detail_command_discovery_results = None;
             state.ui_state.project_detail_command_selected_items.clear();
             state.ui_state.project_detail_show_discovery_form = false;
+            state.ui_state.project_detail_use_llm_discovery = false;
             state.loading_command_discovery = false;
             state.ui_state.project_detail_selected_command_id = None;
             state.ui_state.project_detail_command_executions.clear();
@@ -884,6 +885,7 @@ impl ProjectDetailPage {
                         state.ui_state.project_detail_command_discovery_results = None;
                         state.ui_state.project_detail_command_selected_items.clear();
                         state.ui_state.project_detail_show_discovery_form = false;
+                        state.ui_state.project_detail_use_llm_discovery = false;
                         state.loading_command_discovery = false;
                     }
                     Err(_e) => {
@@ -1032,17 +1034,26 @@ impl ProjectDetailPage {
 
         ui.add_space(8.0);
 
+        // LLM Discovery checkbox
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut state.ui_state.project_detail_use_llm_discovery, "Enable LLM-based discovery");
+        });
+
+        ui.add_space(8.0);
+
         // Start Discovery button
         if state.loading_command_discovery {
             ui.vertical_centered(|ui| {
                 ui.label(WidgetText::status("Discovering commands..."));
                 ui.add(egui::Spinner::new());
             });
-        } else {
-            if ui.button(WidgetText::button("Start Discovery")).clicked() {
-                let api_service = crate::services::ApiService::new();
-                api_service.discover_project_commands(self.project_id, Some(false), state);
-            }
+        } else if ui.button(WidgetText::button("Start Discovery")).clicked() {
+            let api_service = crate::services::ApiService::new();
+            api_service.discover_project_commands(
+                self.project_id, 
+                Some(state.ui_state.project_detail_use_llm_discovery), 
+                state
+            );
         }
 
         ui.add_space(16.0);

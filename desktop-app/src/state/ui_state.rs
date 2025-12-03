@@ -69,6 +69,7 @@ pub struct UiState {
     pub project_detail_command_discovery_results: Option<manager_models::DiscoverCommandsResponse>,
     pub project_detail_command_selected_items: std::collections::HashSet<String>,
     pub project_detail_show_discovery_form: bool,
+    pub project_detail_use_llm_discovery: bool,
     /// Command details state
     pub project_detail_selected_command_id: Option<String>,
     pub project_detail_command_executions: Vec<manager_models::ProjectCommandExecution>,
@@ -127,6 +128,7 @@ impl Default for UiState {
             project_detail_command_discovery_results: None,
             project_detail_command_selected_items: std::collections::HashSet::new(),
             project_detail_show_discovery_form: false,
+            project_detail_use_llm_discovery: false,
             project_detail_selected_command_id: None,
             project_detail_command_executions: Vec::new(),
             pending_projects_refresh: false,
