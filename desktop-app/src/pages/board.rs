@@ -834,6 +834,12 @@ if !skip_regular_response {
                                                         ui.add_space(8.0);
 
                                                         // Textarea above the button
+                                                        // Set font size for the textarea
+                                                        ui.style_mut().text_styles.insert(
+                                                            egui::TextStyle::Body,
+                                                            egui::FontId::new(16.0, egui::FontFamily::Proportional),
+                                                        );
+
                                                         let text_edit = egui::TextEdit::multiline(&mut state.ui_state.continue_message_input)
                                                             .desired_width(ui.available_width())
                                                             .desired_rows(3)
@@ -900,7 +906,7 @@ if !skip_regular_response {
                                                     // Set larger font size for the text area
                                                     ui.style_mut().text_styles.insert(
                                                         egui::TextStyle::Body,
-                                                        egui::FontId::new(15.0, egui::FontFamily::Proportional),
+                                                        egui::FontId::new(16.0, egui::FontFamily::Proportional),
                                                     );
 
                                                     ui.add(
