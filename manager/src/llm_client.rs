@@ -1,3 +1,6 @@
+use crate::llm_providers::anthropic::{
+    CLAUDE_HAIKU_4_5_MODEL_ID, CLAUDE_OPUS_4_1_MODEL_ID, CLAUDE_SONNET_4_5_MODEL_ID,
+};
 use crate::models::LlmProviderConfig;
 use anyhow::Result;
 use async_stream::try_stream;
@@ -2076,19 +2079,19 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
         // Reject legacy Claude 3.x models with helpful error
         ("anthropic" | "claude", model) if is_legacy_claude_model(model) => Err(anyhow::anyhow!(
             "Legacy Claude model '{}' is not supported. Please use one of the current models:\n\
-                 - claude-sonnet-4-5-20250929 (or alias: claude-sonnet-4-5)\n\
-                 - claude-haiku-4-5-20251001 (or alias: claude-haiku-4-5)\n\
-                 - claude-opus-4-1-20250805 (or alias: claude-opus-4-1)",
-            model
+                 - {} (or alias: claude-sonnet-4-5)\n\
+                 - {} (or alias: claude-haiku-4-5)\n\
+                 - {} (or alias: claude-opus-4-1)",
+            model, CLAUDE_SONNET_4_5_MODEL_ID, CLAUDE_HAIKU_4_5_MODEL_ID, CLAUDE_OPUS_4_1_MODEL_ID
         )),
 
         // Unknown Claude model
         ("anthropic" | "claude", model) => Err(anyhow::anyhow!(
             "Unknown Claude model '{}'. Supported models:\n\
-                 - claude-sonnet-4-5-20250929 (or alias: claude-sonnet-4-5)\n\
-                 - claude-haiku-4-5-20251001 (or alias: claude-haiku-4-5)\n\
-                 - claude-opus-4-1-20250805 (or alias: claude-opus-4-1)",
-            model
+                 - {} (or alias: claude-sonnet-4-5)\n\
+                 - {} (or alias: claude-haiku-4-5)\n\
+                 - {} (or alias: claude-opus-4-1)",
+            model, CLAUDE_SONNET_4_5_MODEL_ID, CLAUDE_HAIKU_4_5_MODEL_ID, CLAUDE_OPUS_4_1_MODEL_ID
         )),
 
         // GPT-5 and GPT-5-Codex - use Responses API adapter
@@ -2125,15 +2128,12 @@ pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>
 
 /// Helper function to check if a model is Claude 4.5 or 4.1
 fn is_claude_45_or_41(model: &str) -> bool {
-    matches!(
-        model,
-        "claude-sonnet-4-5-20250929"
-            | "claude-sonnet-4-5"
-            | "claude-haiku-4-5-20251001"
-            | "claude-haiku-4-5"
-            | "claude-opus-4-1-20250805"
-            | "claude-opus-4-1"
-    )
+    model == CLAUDE_SONNET_4_5_MODEL_ID
+        || model == "claude-sonnet-4-5"
+        || model == CLAUDE_HAIKU_4_5_MODEL_ID
+        || model == "claude-haiku-4-5"
+        || model == CLAUDE_OPUS_4_1_MODEL_ID
+        || model == "claude-opus-4-1"
 }
 
 /// Helper function to check if a model is a legacy Claude model

@@ -5,6 +5,7 @@ use crate::error::AppError;
 use crate::git;
 use crate::llm_agent::LlmAgent;
 use crate::llm_client::LlmProvider;
+use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
@@ -875,6 +876,9 @@ pub async fn list_files(
 ) -> Result<HttpResponse, AppError> {
     let request = query.into_inner();
 
+    tracing::info!("list_files called with project_id: {:?}, path: {:?}, git_branch: {:?}",
+        request.project_id, request.path, request.git_branch);
+
     // Get the project to determine the base path
     let project = if let Some(project_id) = &request.project_id {
         data.database.get_project_by_id(*project_id)?
@@ -884,7 +888,21 @@ pub async fn list_files(
         ));
     };
 
-    let project_path = Path::new(&project.path);
+    // Determine the base path - use worktree path if git_branch is specified
+    let project_path = if let Some(ref git_branch) = request.git_branch {
+        tracing::info!("Switching to branch '{}' for project at: {}", git_branch, project.path);
+        // Get worktree path for the specified branch
+        let worktree_path = crate::git::get_working_directory_for_branch(
+            Path::new(&project.path),
+            git_branch
+        )?;
+        tracing::info!("Using worktree path: {}", worktree_path);
+        Path::new(&worktree_path).to_path_buf()
+    } else {
+        tracing::info!("No branch specified, using default project path: {}", project.path);
+        Path::new(&project.path).to_path_buf()
+    };
+
     let relative_path = request.path.as_deref().unwrap_or("");
     let full_path = project_path.join(relative_path);
 
@@ -1112,9 +1130,28 @@ pub async fn get_file_content(
         .parse::<i64>()
         .map_err(|_| AppError::InvalidRequest("Invalid project_id".to_string()))?;
 
+    let git_branch = query.get("git_branch").map(|s| s.as_str());
+
+    tracing::info!("get_file_content called for project_id: {}, path: {}, git_branch: {:?}",
+        project_id, file_path, git_branch);
+
     // Get the project to determine the base path
     let project = data.database.get_project_by_id(project_id)?;
-    let project_path = Path::new(&project.path);
+
+    // Determine the base path - use worktree path if git_branch is specified
+    let project_path = if let Some(branch) = git_branch {
+        tracing::info!("Switching to branch '{}' for file content in project: {}", branch, project.path);
+        let worktree_path = crate::git::get_working_directory_for_branch(
+            Path::new(&project.path),
+            branch
+        )?;
+        tracing::info!("Using worktree path for file content: {}", worktree_path);
+        Path::new(&worktree_path).to_path_buf()
+    } else {
+        tracing::info!("No branch specified for file content, using default project path: {}", project.path);
+        Path::new(&project.path).to_path_buf()
+    };
+
     let full_path = project_path.join(&file_path);
 
     // Security check: ensure the path is within the project directory
@@ -1315,7 +1352,12 @@ pub async fn create_ai_session(
     // Generate project context if work is associated with a project
     let project_context = if let Some(project_id) = work.project_id {
         let project = data.database.get_project_by_id(project_id)?;
-        Some(format!("Project: {}\nPath: {}", project.name, project.path))
+        // Use work's working_directory if available, otherwise fall back to project.path
+        let working_path = work.working_directory
+            .as_ref()
+            .map(|wd| wd.as_str())
+            .unwrap_or(&project.path);
+        Some(format!("Project: {}\nPath: {}", project.name, working_path))
     } else {
         None
     };
@@ -1385,7 +1427,7 @@ pub async fn create_ai_session(
                 let provider =
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                 let model = std::env::var("MODEL")
-                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
                 (provider, model)
             };
 
@@ -1669,13 +1711,18 @@ pub async fn create_work(
             .tool_name
             .unwrap_or_else(|| "llm-agent".to_string());
 
-        // Generate project context if work is associated with a project
-        let project_context = if let Some(project_id) = work.project_id {
-            let project = data.database.get_project_by_id(project_id)?;
-            Some(format!("Project: {}\nPath: {}", project.name, project.path))
-        } else {
-            None
-        };
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(project_id) = work.project_id {
+        let project = data.database.get_project_by_id(project_id)?;
+        // Use work's working_directory if available, otherwise fall back to project.path
+        let working_path = work.working_directory
+            .as_ref()
+            .map(|wd| wd.as_str())
+            .unwrap_or(&project.path);
+        Some(format!("Project: {}\nPath: {}", project.name, working_path))
+    } else {
+        None
+    };
 
         // Create AI session record
         let session = crate::models::AiSession::new(
@@ -1832,16 +1879,21 @@ pub async fn add_message_to_work(
     let work = data.database.get_work_by_id(work_id)?;
     let tool_name = "llm-agent".to_string();
 
-    // Generate project context if work is associated with a project
-    let project_context = if let Some(project_id) = work.project_id {
-        let project = data.database.get_project_by_id(project_id)?;
-        Some(format!("Project: {}\nPath: {}", project.name, project.path))
-    } else {
-        None
-    };
+        // Generate project context if work is associated with a project
+        let project_context = if let Some(project_id) = work.project_id {
+            let project = data.database.get_project_by_id(project_id)?;
+            // Use work's working_directory if available, otherwise fall back to project.path
+            let working_path = work.working_directory
+                .as_ref()
+                .map(|wd| wd.as_str())
+                .unwrap_or(&project.path);
+            Some(format!("Project: {}\nPath: {}", project.name, working_path))
+        } else {
+            None
+        };
 
-    // Create AI session record
-    let session = crate::models::AiSession::new(
+        // Create AI session record
+        let session = crate::models::AiSession::new(
         work_id,
         message_id,
         tool_name.clone(),
@@ -1891,7 +1943,7 @@ pub async fn add_message_to_work(
                 let provider =
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                 let model = std::env::var("MODEL")
-                    .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());
+                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
                 (provider, model)
             };
 
@@ -2747,7 +2799,7 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
             tracing::info!("Anthropic API key is configured, creating provider");
             let anthropic_config = LlmProviderConfig {
                 provider: "anthropic".to_string(),
-                model: "claude-3-opus-20240229".to_string(), // Default model for checking
+                model: CLAUDE_SONNET_4_5_MODEL_ID.to_string(), // Default model for checking
                 api_key: api_key_config.anthropic_api_key.as_ref().unwrap().clone(),
                 base_url: None,
                 max_tokens: Some(1000),

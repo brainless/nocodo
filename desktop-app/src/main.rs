@@ -4,7 +4,119 @@
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
-    tracing_subscriber::fmt::init();
+    // ============================================================================
+    // LOGGING CONFIGURATION
+    // ============================================================================
+    // This application uses tracing for logging with custom SSH log filtering.
+    //
+    // Environment Variables:
+    // ----------------------
+    // 1. RUST_LOG: Controls general application logging (standard Rust env var)
+    //    Examples:
+    //      RUST_LOG=debug     - Enable debug logs for all modules
+    //      RUST_LOG=info      - Enable info logs for all modules (default)
+    //      RUST_LOG=nocodo_desktop_app=debug - Debug logs only for this app
+    //
+    // 2. RUST_SSH_CLIENT_LOGS: Controls SSH-specific logging (custom env var)
+    //    By default, SSH logs are DISABLED to reduce noise, even when RUST_LOG=debug.
+    //    Set this to a log level to enable SSH logs:
+    //
+    //    Available levels: trace, debug, info, warn, error
+    //
+    //    Examples:
+    //      RUST_SSH_CLIENT_LOGS=debug  - Show detailed SSH connection and data transfer logs
+    //      RUST_SSH_CLIENT_LOGS=info   - Show only key SSH events (connection, auth, tunnel ready)
+    //      RUST_SSH_CLIENT_LOGS=warn   - Show only SSH warnings and errors
+    //
+    //    What gets logged at each level:
+    //      - trace: All SSH protocol messages (very verbose)
+    //      - debug: Connection details, data transfer, channel operations
+    //      - info:  Key events (connecting, authenticating, tunnel established)
+    //      - warn:  Failed key attempts, connection issues
+    //      - error: Critical SSH errors only
+    //
+    //    This affects both:
+    //      - russh::* (the SSH library logs)
+    //      - nocodo_desktop_app::ssh (our SSH module logs)
+    //
+    // 3. RUST_HTTP_CLIENT_LOGS: Controls HTTP client logging (custom env var)
+    //    By default, HTTP client logs are DISABLED to reduce noise.
+    //    Set this to a log level to enable HTTP client logs:
+    //
+    //    Examples:
+    //      RUST_HTTP_CLIENT_LOGS=debug  - Show detailed HTTP client logs
+    //      RUST_HTTP_CLIENT_LOGS=info   - Show HTTP client info logs
+    //      RUST_HTTP_CLIENT_LOGS=warn   - Show only HTTP client warnings and errors
+    //
+    //    This affects:
+    //      - hyper_util::client::legacy (the hyper HTTP client logs)
+    //
+    // Usage Examples:
+    // ---------------
+    // Linux/macOS:
+    //   RUST_LOG=debug RUST_SSH_CLIENT_LOGS=info cargo run
+    //   RUST_LOG=debug RUST_HTTP_CLIENT_LOGS=debug cargo run
+    //
+    // Windows PowerShell:
+    //   $env:RUST_LOG="debug"; $env:RUST_SSH_CLIENT_LOGS="info"; cargo run
+    //   $env:RUST_LOG="debug"; $env:RUST_HTTP_CLIENT_LOGS="debug"; cargo run
+    //
+    // Windows Command Prompt:
+    //   set RUST_LOG=debug && set RUST_SSH_CLIENT_LOGS=info && cargo run
+    //   set RUST_LOG=debug && set RUST_HTTP_CLIENT_LOGS=debug && cargo run
+    // ============================================================================
+
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    // Build filter from RUST_LOG
+    let mut env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+
+    // Check RUST_SSH_CLIENT_LOGS for SSH-specific log level
+    let ssh_log_level = std::env::var("RUST_SSH_CLIENT_LOGS")
+        .ok()
+        .and_then(|v| {
+            let level = v.trim().to_lowercase();
+            match level.as_str() {
+                "trace" | "debug" | "info" | "warn" | "error" => Some(level),
+                _ => None,
+            }
+        });
+
+    // Apply SSH log level directives
+    if let Some(level) = ssh_log_level {
+        // Enable russh logs at specified level
+        env_filter = env_filter.add_directive(format!("russh={}", level).parse().unwrap());
+        env_filter = env_filter.add_directive(format!("nocodo_desktop_app::ssh={}", level).parse().unwrap());
+    } else {
+        // Disable SSH logs by default
+        env_filter = env_filter.add_directive("russh=off".parse().unwrap());
+        env_filter = env_filter.add_directive("nocodo_desktop_app::ssh=off".parse().unwrap());
+    }
+
+    // Check RUST_HTTP_CLIENT_LOGS for HTTP client log level
+    let http_log_level = std::env::var("RUST_HTTP_CLIENT_LOGS")
+        .ok()
+        .and_then(|v| {
+            let level = v.trim().to_lowercase();
+            match level.as_str() {
+                "trace" | "debug" | "info" | "warn" | "error" => Some(level),
+                _ => None,
+            }
+        });
+
+    // Apply HTTP client log level directives
+    if let Some(level) = http_log_level {
+        // Enable hyper_util logs at specified level
+        env_filter = env_filter.add_directive(format!("hyper_util::client::legacy={}", level).parse().unwrap());
+    } else {
+        // Disable HTTP client logs by default
+        env_filter = env_filter.add_directive("hyper_util::client::legacy=off".parse().unwrap());
+    }
+
+    fmt()
+        .with_env_filter(env_filter)
+        .init();
 
     // Check for CLI test mode
     let args: Vec<String> = std::env::args().collect();
