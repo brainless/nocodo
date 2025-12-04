@@ -10,8 +10,8 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
 ---
 
 <Layout
-    title="nocodo - Collaborative coding agent for teams"
-    description="Collaborative coding agent that empowers everyone in your team to contribute to software development using AI assistance."
+    title="nocodo - AI-powered business operations platform"
+    description="Run your business with open source software. AI helps every team member operate business systems, manage data, and handle IT operations."
 >
     <!-- Hero Section -->
     <section
@@ -56,19 +56,17 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                 <p
                     class="text-2xl sm:text-3xl lg:text-4xl text-text-secondary max-w-4xl mx-auto mb-6 leading-tight font-light"
                 >
-                    Collaborative coding agent for businesses
+                    AI-powered business operations platform
                 </p>
 
                 <p
                     class="text-lg sm:text-xl text-text-tertiary max-w-3xl mx-auto mb-12"
                 >
-                    From solo founders to large enterprises
+                    Run your business with open source software. AI helps every team member operate systems, access data, and manage IT operations.
                 </p>
 
                 <!-- CTA -->
-                <div
-                    class="flex flex-col sm:flex-row gap-4 justify-center items-center"
-                >
+                <div class="flex justify-center">
                     <a
                         href="https://github.com/brainless/nocodo"
                         class="inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
@@ -95,151 +93,218 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
         </div>
     </section>
 
-    <!-- Hero Screenshot -->
+    <!-- Hero Screenshot - User will update -->
     <Section background="primary" paddingY="sm">
         <div class="relative">
             <img
                 src={heroScreenshot.src}
-                alt="nocodo Desktop app connected over SSH, showing past prompts"
-                title="Desktop app showing past prompts, current prompt, on connected manager instance"
+                alt="nocodo in action"
+                title="nocodo platform"
                 class="w-full rounded-lg shadow-2xl border border-border-primary"
             />
         </div>
-        <div class="mt-4 text-center">
-            <p class="text-sm text-text-muted">
-                ⚠️ Under active development - the desktop app shows tool call
-                outputs as raw JSON, a better UI will come soon
-            </p>
-        </div>
     </Section>
 
-    <!-- Problem Statement Section -->
+    <!-- What is nocodo Section -->
     <Section background="secondary" containerWidth="5xl">
-        <SectionHeader title="The Challenge" />
+        <SectionHeader title="What is nocodo?" />
 
         <Card class="p-8 sm:p-12">
             <p
                 class="text-xl sm:text-2xl text-text-secondary leading-relaxed mb-6"
             >
-                Collaborating with coding agents in a team is not easy.
+                Run your business with open source software instead of expensive SaaS subscriptions.
             </p>
             <p class="text-lg sm:text-xl text-text-secondary leading-relaxed">
-                As LLMs become better at coding, we want to empower more people
-                within a business to share ideas, report bugs, and work with
-                LLMs to contribute to the software that runs their business.
+                Unlike coding agents focused on generating code, nocodo helps you deploy, integrate, and manage the software your business needs. With AI as your guide, discover the right open source tools, integrate with existing systems, and give every team member unified access to business data and operations.
             </p>
         </Card>
     </Section>
 
-    <!-- Solution Section -->
+    <!-- Core Capabilities Section -->
     <Section background="primary">
         <SectionHeader
-            title="The nocodo Approach"
-            subtitle="A hybrid solution combining cloud-based agents with native desktop access"
+            title="Core Capabilities"
+            subtitle="Everything your business needs to operate with open source"
         />
 
-        <div class="grid lg:grid-cols-2 gap-8">
-            <!-- Manager (Cloud) -->
-            <Card
-                variant="gradient"
-                class="hover:border-accent-emerald/50 transition-all duration-300"
-            >
-                <div class="flex items-center mb-6">
-                    <div
-                        class="w-12 h-12 bg-accent-emerald/10 rounded-lg flex items-center justify-center mr-4"
-                    >
-                        <svg
-                            class="w-6 h-6 text-accent-emerald"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
-                            ></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-2xl font-bold text-text-primary">
-                        nocodo Manager
-                    </h3>
-                </div>
-                <p class="text-text-secondary mb-6 leading-relaxed">
-                    Cloud-based daemon running on your own infrastructure
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Team Onboarding & AI Assistance
+                </h3>
+                <p class="text-text-tertiary">
+                    AI helps new members learn systems and workflows. Every team member gets a personal AI assistant for daily work.
                 </p>
-                <ul class="space-y-3 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>AI coding agent integrated with LLMs</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Full development environment management</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Supports all major languages and frameworks</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span
-                            >Database, cache, and message queue integration</span
-                        >
-                    </li>
-                </ul>
             </Card>
 
-            <!-- Desktop App -->
-            <Card
-                variant="gradient"
-                class="hover:border-accent-cyan/50 transition-all duration-300"
-            >
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Open Source Stack Management
+                </h3>
+                <p class="text-text-tertiary">
+                    Discover, clone, install, and configure business applications via Git. Command discovery and execution for any software.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Unified Data Access
+                </h3>
+                <p class="text-text-tertiary">
+                    Connect emails, CRM, databases, and SaaS tools in one place. AI-powered analytics across your entire business.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    IT Operations Automation
+                </h3>
+                <p class="text-text-tertiary">
+                    Database backups, Git-based deployments, software updates, and infrastructure management.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    SaaS Integration
+                </h3>
+                <p class="text-text-tertiary">
+                    Integrate existing SaaS tools via APIs. Combine open source and commercial software to reduce vendor lock-in.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Business-Wide Collaboration
+                </h3>
+                <p class="text-text-tertiary">
+                    Shared access to systems, AI-guided onboarding, unified data visibility, and role-based access control.
+                </p>
+            </Card>
+        </div>
+
+    </Section>
+
+    <!-- Who Uses nocodo -->
+    <Section background="secondary">
+        <SectionHeader title="Who Uses nocodo?" subtitle="Designed for everyone in your business" />
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Sales Teams
+                </h3>
+                <p class="text-text-tertiary">
+                    Access CRM data and customer analytics with AI assistance
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Support Teams
+                </h3>
+                <p class="text-text-tertiary">
+                    Manage tickets and customer information across all systems
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Operations
+                </h3>
+                <p class="text-text-tertiary">
+                    Run backups, deployments, and system maintenance
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    New Hires
+                </h3>
+                <p class="text-text-tertiary">
+                    Get onboarded with AI guidance and faster time to productivity
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Managers
+                </h3>
+                <p class="text-text-tertiary">
+                    Gain visibility across all business systems and data
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-lg font-bold text-text-primary mb-2">
+                    Developers
+                </h3>
+                <p class="text-text-tertiary">
+                    When custom code is actually needed
+                </p>
+            </Card>
+        </div>
+    </Section>
+
+    <!-- Business Use Cases -->
+    <Section background="primary">
+        <SectionHeader title="Business Use Cases" />
+
+        <div class="space-y-6">
+            <Card class="p-6">
+                <h3 class="text-xl font-bold text-text-primary mb-3">
+                    Onboarding New Team Members
+                </h3>
+                <p class="text-text-secondary">
+                    AI teaches them your systems and workflows. Guided access to relevant data and tools. Faster time to productivity.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-xl font-bold text-text-primary mb-3">
+                    Daily Business Operations
+                </h3>
+                <p class="text-text-secondary">
+                    Sales reps query CRM and analytics. Support teams access customer data across systems. Admin tasks automated with AI assistance.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-xl font-bold text-text-primary mb-3">
+                    Cross-System Data Analysis
+                </h3>
+                <p class="text-text-secondary">
+                    Combine data from emails, CRM, databases, and SaaS tools. AI helps answer business questions across all your data without switching between tools.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-xl font-bold text-text-primary mb-3">
+                    IT Operations & Maintenance
+                </h3>
+                <p class="text-text-secondary">
+                    Automated backups and monitoring. Software updates managed by AI. Infrastructure changes tracked in Git.
+                </p>
+            </Card>
+
+            <Card class="p-6">
+                <h3 class="text-xl font-bold text-text-primary mb-3">
+                    Building with Open Source
+                </h3>
+                <p class="text-text-secondary">
+                    Reduce SaaS costs with open source alternatives. Maintain control of your data and infrastructure. Customize software to your exact needs.
+                </p>
+            </Card>
+        </div>
+    </Section>
+
+    <!-- How It Works -->
+    <Section background="secondary">
+        <SectionHeader title="How It Works" />
+
+        <div class="grid lg:grid-cols-2 gap-8">
+            <Card class="p-8">
                 <div class="flex items-center mb-6">
                     <div
                         class="w-12 h-12 bg-accent-cyan/10 rounded-lg flex items-center justify-center mr-4"
@@ -262,8 +327,8 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                         Desktop App
                     </h3>
                 </div>
-                <p class="text-text-secondary mb-6 leading-relaxed">
-                    Native cross-platform client for secure team collaboration
+                <p class="text-text-secondary mb-4 leading-relaxed">
+                    Your personal AI assistant
                 </p>
                 <ul class="space-y-3 text-text-secondary">
                     <li class="flex items-start">
@@ -279,7 +344,7 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                                 stroke-width="2"
                                 d="M5 13l4 4L19 7"></path>
                         </svg>
-                        <span>Secure SSH connection to manager</span>
+                        <span>Secure access to all business systems</span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -294,7 +359,7 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                                 stroke-width="2"
                                 d="M5 13l4 4L19 7"></path>
                         </svg>
-                        <span>Join multiple teams easily</span>
+                        <span>AI guides you through operations</span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -309,11 +374,41 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                                 stroke-width="2"
                                 d="M5 13l4 4L19 7"></path>
                         </svg>
-                        <span>Integrated project management and tasks</span>
+                        <span>Native app for every team member</span>
                     </li>
+                </ul>
+            </Card>
+
+            <Card class="p-8">
+                <div class="flex items-center mb-6">
+                    <div
+                        class="w-12 h-12 bg-accent-emerald/10 rounded-lg flex items-center justify-center mr-4"
+                    >
+                        <svg
+                            class="w-6 h-6 text-accent-emerald"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
+                            ></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-text-primary">
+                        Manager
+                    </h3>
+                </div>
+                <p class="text-text-secondary mb-4 leading-relaxed">
+                    Your business software hub
+                </p>
+                <ul class="space-y-3 text-text-secondary">
                     <li class="flex items-start">
                         <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -324,364 +419,40 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                                 stroke-width="2"
                                 d="M5 13l4 4L19 7"></path>
                         </svg>
-                        <span>Review generated code and demos</span>
+                        <span>Runs on your infrastructure (cloud or on-premise)</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Manages all open source software installations</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg
+                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Git-based for version control and reproducibility</span>
                     </li>
                 </ul>
             </Card>
-        </div>
-
-        <!-- Connection Screenshots -->
-        <div class="mt-12 space-y-8">
-            <div class="relative">
-                <img
-                    src={connectionScreenshot.src}
-                    alt="nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH"
-                    title="Connect to nocodo manager running locally or remote over SSH"
-                    class="w-full rounded-lg border border-border-primary shadow-2xl"
-                />
-            </div>
-            <div class="relative">
-                <img
-                    src={lanConnectScreenshot.src}
-                    alt="nocodo Desktop app, connecting to my other computer in LAN over SSH"
-                    title="Connecting to my other computer in LAN over SSH"
-                    class="w-full rounded-lg border border-border-primary shadow-2xl"
-                />
-            </div>
-        </div>
-
-        <div class="mt-12 text-center">
-            <p class="text-text-tertiary text-lg">Mobile apps coming soon</p>
-        </div>
-    </Section>
-
-    <!-- How It Works -->
-    <Section background="secondary">
-        <SectionHeader title="How It Works" />
-
-        <div class="space-y-8">
-            <!-- Step 1 -->
-            <Card class="p-8">
-                <div class="flex items-start">
-                    <div
-                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
-                    >
-                        1
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-text-primary mb-3">
-                            Deploy Manager on Your Infrastructure
-                        </h3>
-                        <p class="text-text-secondary leading-relaxed">
-                            Run nocodo manager on any Linux server -
-                            DigitalOcean, Scaleway, Linode, Vultr, AWS, GCP, or
-                            your own hardware. Bring your own API keys for
-                            OpenAI, Anthropic, or other LLM providers.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-
-            <!-- Step 2 -->
-            <Card class="p-8">
-                <div class="flex items-start">
-                    <div
-                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
-                    >
-                        2
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-text-primary mb-3">
-                            Team Members Connect via Desktop App
-                        </h3>
-                        <p class="text-text-secondary leading-relaxed">
-                            Everyone on the team installs the desktop app and
-                            connects securely via SSH. Users can join multiple
-                            teams, making it easy to contribute to projects
-                            across different organizations.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-
-            <!-- Step 3 -->
-            <Card class="p-8">
-                <div class="flex items-start">
-                    <div
-                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
-                    >
-                        3
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-text-primary mb-3">
-                            Collaborate, Create, and Deploy
-                        </h3>
-                        <p class="text-text-secondary leading-relaxed">
-                            Share ideas, create tasks, discuss with AI to
-                            generate solutions. The coding agent analyzes your
-                            codebase and will soon write code autonomously.
-                            Review and test deployed demos directly in the app.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-        </div>
-    </Section>
-
-    <!-- What's Included -->
-    <Section background="primary">
-        <SectionHeader title="What's Included" />
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    AI Coding Agent
-                </h3>
-                <p class="text-text-tertiary">
-                    Uses LLMs to analyze codebases, soon able to write code
-                    autonomously
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Project Management
-                </h3>
-                <p class="text-text-tertiary">
-                    Tasks, ideas, and discussions integrated in one place
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Team Collaboration
-                </h3>
-                <p class="text-text-tertiary">
-                    Everyone can share ideas and contribute to software
-                    development
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Multi-Team Support
-                </h3>
-                <p class="text-text-tertiary">
-                    Join and contribute to multiple organizations seamlessly
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Your Infrastructure
-                </h3>
-                <p class="text-text-tertiary">
-                    Use your own cloud servers and AI provider API keys
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Full Dev Environment
-                </h3>
-                <p class="text-text-tertiary">
-                    Manages languages, frameworks, databases, cache, message
-                    queues
-                </p>
-            </Card>
-        </div>
-    </Section>
-
-    <!-- Future Plans -->
-    <Section background="secondary">
-        <SectionHeader
-            title="What's Coming"
-            subtitle="Our roadmap for the future"
-        />
-
-        <div class="grid md:grid-cols-2 gap-8">
-            <!-- Near-term -->
-            <Card class="p-8">
-                <h3 class="text-2xl font-bold text-text-primary mb-6">
-                    Near-Term
-                </h3>
-                <ul class="space-y-4 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Automatic Git worktree per task</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Task dependency resolution</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Parallel or serial agent execution</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Build and launch demo URLs</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>GitHub/GitLab integration</span>
-                    </li>
-                </ul>
-            </Card>
-
-            <!-- Long-term -->
-            <Card class="p-8">
-                <h3 class="text-2xl font-bold text-text-primary mb-6">
-                    Long-Term
-                </h3>
-                <ul class="space-y-4 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Mobile apps for iOS and Android</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Mobile emulator testing in desktop app</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>nocodo-managed cloud infrastructure</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Full-stack app deployment automation</span>
-                    </li>
-                </ul>
-            </Card>
-        </div>
-
-        <div
-            class="mt-12 bg-gradient-to-r from-accent-emerald/10 to-accent-cyan/10 rounded-2xl p-8 border border-accent-emerald/20"
-        >
-            <div class="text-center">
-                <h3 class="text-2xl font-bold text-text-primary mb-4">
-                    Pricing
-                </h3>
-                <p class="text-text-secondary mb-4">
-                    Team collaboration will be a paid feature:
-                </p>
-                <div
-                    class="flex flex-col sm:flex-row gap-4 justify-center items-center text-text-secondary"
-                >
-                    <div
-                        class="bg-bg-secondary rounded-lg px-6 py-3 border border-border-primary"
-                    >
-                        <span class="font-semibold">Up to 100 members:</span> $99/year
-                    </div>
-                    <div
-                        class="bg-bg-secondary rounded-lg px-6 py-3 border border-border-primary"
-                    >
-                        <span class="font-semibold">Unlimited members:</span> $1,999/year
-                    </div>
-                </div>
-                <p class="text-text-tertiary mt-4 text-sm">
-                    Demo URL sharing is always free
-                </p>
-            </div>
         </div>
     </Section>
 
@@ -789,52 +560,6 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
         </div>
     </Section>
 
-    <!-- Built with Agents -->
-    <Section background="secondary">
-        <SectionHeader
-            title="Built with Agents"
-            subtitle="nocodo is itself built with coding agents"
-        />
-
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="text-center">
-                <Card class="p-8">
-                    <h3 class="text-xl font-bold text-text-primary mb-4">
-                        Manager
-                    </h3>
-                    <p class="text-text-tertiary mb-4">Actix Web • SQLite</p>
-                    <p class="text-sm text-text-muted">
-                        API daemon for cloud deployment
-                    </p>
-                </Card>
-            </div>
-
-            <div class="text-center">
-                <Card class="p-8">
-                    <h3 class="text-xl font-bold text-text-primary mb-4">
-                        Desktop App
-                    </h3>
-                    <p class="text-text-tertiary mb-4">egui/eframe</p>
-                    <p class="text-sm text-text-muted">
-                        Cross-platform native GUI
-                    </p>
-                </Card>
-            </div>
-
-            <div class="text-center">
-                <Card class="p-8">
-                    <h3 class="text-xl font-bold text-text-primary mb-4">
-                        Communication
-                    </h3>
-                    <p class="text-text-tertiary mb-4">SSH • HTTP/WebSocket</p>
-                    <p class="text-sm text-text-muted">
-                        Secure encrypted tunnel
-                    </p>
-                </Card>
-            </div>
-        </div>
-    </Section>
-
     <!-- CTA Section -->
     <section
         class="py-24 bg-gradient-to-b from-bg-primary to-bg-secondary text-text-primary"
@@ -843,7 +568,7 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
             <h2
                 class="text-4xl sm:text-5xl font-bold mb-6 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent"
             >
-                Join the Journey
+                Ready to Transform Your Business Operations?
             </h2>
             <p class="text-xl text-text-secondary mb-12 max-w-2xl mx-auto">
                 nocodo is under active development. Star the project on GitHub
@@ -867,8 +592,7 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                 Star on GitHub
             </a>
             <p class="text-text-muted mt-8 text-sm">
-                Privacy-focused • No vendor lock-in • Works for teams of all
-                sizes
+                Privacy-focused • No vendor lock-in • Built for businesses of all sizes
             </p>
         </div>
     </section>
@@ -883,8 +607,8 @@ import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png
                 Himalayan village in India.
             </p>
             <p class="text-text-tertiary mt-2">
-                I am building nocodo to help teams of all sizes collaborate on
-                software development with AI assistance.
+                I am building nocodo to help businesses operate and scale using open source software,
+                with AI assisting every team member in their daily work.
             </p>
         </div>
     </section>
