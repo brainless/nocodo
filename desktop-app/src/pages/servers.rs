@@ -84,13 +84,18 @@ impl crate::pages::Page for ServersPage {
                     tracing::info!("Set current_server_info for local connection: {:?}", state.current_server_info);
                     state.models_fetch_attempted = false; // Reset to allow fetching models on new connection
 
-                    // Load favorites for local server (no separate auth needed for local)
-                    state.load_favorites_for_current_server();
-
-                    // Refresh data after connecting
-                    self.refresh_projects(state);
-                    self.refresh_works(state);
-                    self.refresh_settings(state);
+                    // Check if we need to show auth dialog
+                    let should_show_auth = state.auth_state.jwt_token.is_none();
+                    if should_show_auth {
+                        tracing::info!("Local connection successful, showing auth dialog");
+                        state.ui_state.show_auth_dialog = true;
+                    } else {
+                        // Already authenticated, load data
+                        state.load_favorites_for_current_server();
+                        self.refresh_projects(state);
+                        self.refresh_works(state);
+                        self.refresh_settings(state);
+                    }
                 }
 
                 // Change cursor to pointer on hover

@@ -136,18 +136,33 @@ impl AuthDialog {
             return;
         }
 
-        // Calculate SSH fingerprint
-        let ssh_fingerprint = match crate::ssh::calculate_ssh_fingerprint(
-            if state.config.ssh.ssh_key_path.is_empty() {
-                None
-            } else {
-                Some(&state.config.ssh.ssh_key_path)
-            },
-        ) {
-            Ok(fingerprint) => fingerprint,
-            Err(e) => {
-                self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
-                return;
+        // Determine fingerprint based on connection type
+        // For local connections, use machine fingerprint; for SSH, use SSH key fingerprint
+        let is_local_connection = state.ui_state.connected_host.as_deref() == Some("localhost");
+
+        let ssh_fingerprint = if is_local_connection {
+            // Local connection - use machine-specific fingerprint
+            match crate::ssh::generate_local_fingerprint() {
+                Ok(fingerprint) => fingerprint,
+                Err(e) => {
+                    self.error_message = Some(format!("Failed to generate machine fingerprint: {}", e));
+                    return;
+                }
+            }
+        } else {
+            // SSH connection - use SSH key fingerprint
+            match crate::ssh::calculate_ssh_fingerprint(
+                if state.config.ssh.ssh_key_path.is_empty() {
+                    None
+                } else {
+                    Some(&state.config.ssh.ssh_key_path)
+                },
+            ) {
+                Ok(fingerprint) => fingerprint,
+                Err(e) => {
+                    self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
+                    return;
+                }
             }
         };
 
@@ -236,33 +251,52 @@ impl AuthDialog {
             return;
         }
 
-        // Calculate SSH fingerprint and read public key
-        let ssh_fingerprint = match crate::ssh::calculate_ssh_fingerprint(
-            if state.config.ssh.ssh_key_path.is_empty() {
-                None
-            } else {
-                Some(&state.config.ssh.ssh_key_path)
-            },
-        ) {
-            Ok(fingerprint) => fingerprint,
-            Err(e) => {
-                self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
-                return;
-            }
-        };
+        // Determine fingerprint and public key based on connection type
+        let is_local_connection = state.ui_state.connected_host.as_deref() == Some("localhost");
 
-        let ssh_public_key =
-            match crate::ssh::read_ssh_public_key(if state.config.ssh.ssh_key_path.is_empty() {
-                None
-            } else {
-                Some(&state.config.ssh.ssh_key_path)
-            }) {
-                Ok(public_key) => public_key,
+        let (ssh_fingerprint, ssh_public_key) = if is_local_connection {
+            // Local connection - use machine fingerprint and placeholder public key
+            let fingerprint = match crate::ssh::generate_local_fingerprint() {
+                Ok(fp) => fp,
+                Err(e) => {
+                    self.error_message = Some(format!("Failed to generate machine fingerprint: {}", e));
+                    return;
+                }
+            };
+            // Use fingerprint as the public key for local connections
+            (fingerprint.clone(), fingerprint)
+        } else {
+            // SSH connection - use SSH key fingerprint and public key
+            let fingerprint = match crate::ssh::calculate_ssh_fingerprint(
+                if state.config.ssh.ssh_key_path.is_empty() {
+                    None
+                } else {
+                    Some(&state.config.ssh.ssh_key_path)
+                },
+            ) {
+                Ok(fp) => fp,
+                Err(e) => {
+                    self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
+                    return;
+                }
+            };
+
+            let public_key = match crate::ssh::read_ssh_public_key(
+                if state.config.ssh.ssh_key_path.is_empty() {
+                    None
+                } else {
+                    Some(&state.config.ssh.ssh_key_path)
+                },
+            ) {
+                Ok(pk) => pk,
                 Err(e) => {
                     self.error_message = Some(format!("Failed to read SSH public key: {}", e));
                     return;
                 }
             };
+
+            (fingerprint, public_key)
+        };
 
         let username = self.username.clone();
         let password = self.password.clone();

@@ -418,6 +418,47 @@ pub fn calculate_ssh_fingerprint(key_path: Option<&str>) -> Result<String, SshEr
     Ok(format!("SHA256:{}", base64_hash))
 }
 
+/// Generate a machine-specific fingerprint for local connections (when SSH is not used)
+/// Uses hostname + username to create a stable identifier
+/// Returns a string like "LOCAL:base64hash"
+pub fn generate_local_fingerprint() -> Result<String, SshError> {
+    use std::process::Command;
+
+    // Get hostname
+    let hostname = if cfg!(target_os = "windows") {
+        Command::new("hostname")
+            .output()
+            .ok()
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .unwrap_or_else(|| "unknown-host".to_string())
+    } else {
+        Command::new("hostname")
+            .output()
+            .ok()
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .unwrap_or_else(|| "unknown-host".to_string())
+    };
+
+    // Get username
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "unknown-user".to_string());
+
+    // Combine hostname + username to create a unique identifier for this machine
+    let machine_id = format!("{}@{}", username.trim(), hostname.trim());
+
+    // Calculate SHA256 hash
+    let mut hasher = Sha256::new();
+    hasher.update(machine_id.as_bytes());
+    let hash = hasher.finalize();
+
+    // Encode to base64
+    let base64_hash = general_purpose::STANDARD.encode(hash);
+
+    // Format as "LOCAL:base64hash" to distinguish from SSH fingerprints
+    Ok(format!("LOCAL:{}", base64_hash))
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum SshError {
     #[error("Connection failed: {0}")]
