@@ -62,9 +62,9 @@ manager-models = { path = "../manager-models" }
 argon2 = { version = "0.5", features = ["std"] }
 jsonwebtoken = "9"
 sha2 = "0.10"
+rand = "0.9"
 
 [dev-dependencies]
 actix-rt = "2.9"
-rand = "0.9"
 tempfile = "3.12"
 tokio-test = "0.4"
