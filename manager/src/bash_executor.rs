@@ -222,11 +222,11 @@ impl BashExecutorTrait for BashExecutor {
     fn execute_with_cwd(
         &self,
         command: &str,
-        working_dir: &std::path::PathBuf,
+        working_dir: &std::path::Path,
         timeout_secs: Option<u64>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<manager_tools::BashExecutionResult>> + Send + '_>> {
         let command = command.to_string();
-        let working_dir = working_dir.clone();
+        let working_dir = working_dir.to_path_buf();
         let executor = self.clone();
         Box::pin(async move {
             executor.execute_with_cwd(&command, &working_dir, timeout_secs).await
