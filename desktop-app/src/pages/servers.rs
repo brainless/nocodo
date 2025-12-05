@@ -44,31 +44,9 @@ impl crate::pages::Page for ServersPage {
             // Show grid with localhost entry
             ui.label("Local nocodo manager is running:");
 
-            let card_width = 300.0;
-            let card_height = 60.0;
-
-            ui.horizontal_wrapped(|ui| {
-                let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
-                    egui::Frame::NONE
-                        .fill(ui.style().visuals.widgets.inactive.bg_fill)
-                        .corner_radius(8.0)
-                        .inner_margin(egui::Margin::same(12))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new("localhost").size(14.0).strong());
-                                    ui.label(
-                                        egui::RichText::new("No key required")
-                                            .size(12.0)
-                                            .color(ui.style().visuals.weak_text_color()),
-                                    );
-                                });
-                            });
-                        });
-                });
-
-                // Make the card clickable
-                if response.response.interact(egui::Sense::click()).clicked() {
+            ui.scope(|ui| {
+                ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+                if ui.button("Connect Local").clicked() {
                     // Connect directly to local server without SSH via connection manager
                     let connection_manager = Arc::clone(&state.connection_manager);
                     tokio::spawn(async move {
@@ -96,11 +74,6 @@ impl crate::pages::Page for ServersPage {
                         self.refresh_works(state);
                         self.refresh_settings(state);
                     }
-                }
-
-                // Change cursor to pointer on hover
-                if response.response.hovered() {
-                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
             });
         } else {
