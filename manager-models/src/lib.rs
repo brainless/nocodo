@@ -1048,6 +1048,23 @@ pub struct User {
     pub last_login_at: Option<i64>,
 }
 
+impl User {
+    pub fn new(name: String, email: String, password_hash: String) -> Self {
+        let now = chrono::Utc::now().timestamp();
+        Self {
+            id: 0, // Will be set by database AUTOINCREMENT
+            name,
+            email,
+            role: None,
+            password_hash,
+            is_active: true,
+            created_at: now,
+            updated_at: now,
+            last_login_at: None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UserWithTeams {
     pub user: User,
