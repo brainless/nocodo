@@ -1,122 +1,173 @@
 # nocodo
-
-**AI-powered business operations platform**
+**Open Source Operations for Growing Businesses**
 
 🚀 [**nocodo.com →**](https://nocodo.com)
 
 > ⚠️ **Under Active Development** - nocodo is actively developed. If you ⭐ star and 👀 watch this repository, it would mean a lot to me.
 
-Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help businesses operate and scale using open source software, with AI assisting every team member in their daily work.
+Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I help businesses replace expensive SaaS subscriptions with open source alternatives—without the DevOps headaches.
 
-## What is nocodo?
+## The Problem
 
-nocodo is a business operations platform that helps you run your business with open source software instead of expensive SaaS subscriptions. Unlike coding agents focused on generating code, nocodo focuses on deploying, integrating, and managing the software your business needs to operate.
+Your company is spending $5,000-$20,000/month on SaaS tools. You know open source alternatives exist, but:
+- Setting them up takes weeks of engineering time
+- Maintaining them requires DevOps expertise
+- Your team doesn't know which tools to choose
+- Moving data from existing systems is complex
 
-With AI as your guide, nocodo helps you discover the right open source tools, integrate them with your existing systems, and gives every team member unified access to business data and operations.
+## How We Help
 
-## Core Capabilities
+We offer three ways to work together, depending on where you are:
 
-### Team Onboarding & AI Assistance
-- AI helps new team members learn your systems and workflows
-- Every team member gets a personal AI assistant for their daily work
-- Guided operations across all business software
+### 🚀 Stage 1: Migration Sprints
+**Replace one expensive SaaS tool with its open source alternative**
 
-### Open Source Stack Management
-- Discover and evaluate open source software for your needs
-- Clone, install, and configure business applications via Git
-- Manage updates and maintenance across your software stack
-- Command discovery and execution for any installed software
+**What you get:**
+- Tool selection and architecture design
+- Complete deployment and configuration  
+- Data migration from your existing system
+- Team training (5 hours)
+- 30-day support
+- Full documentation
 
-### Unified Data Access
-- Connect all your business data in one place
-- Access emails, CRM, databases, and SaaS tools together
-- AI-powered analytics across your entire business
-- Break down data silos between systems
+**Investment:** $2,500 per migration (one-time)
 
-### IT Operations Automation
-- Database backups and recovery
-- Git-based deployments and version control
-- Software updates and maintenance
-- Infrastructure management
+**Common migrations we do:**
+- Customer Support: Intercom/Zendesk → Chatwoot
+- CRM: HubSpot/Salesforce → Twenty CRM  
+- Analytics: Mixpanel/Amplitude → Metabase/Posthog
+- Community: Circle/Mighty Networks → Discourse
+- Privacy Analytics: Google Analytics → Plausible
+- Project Management: Asana/Monday → Plane
+- Documentation: Notion/Confluence → Outline
 
-### SaaS Integration
-- Integrate existing SaaS tools via APIs
-- Combine open source and commercial software
-- Reduce vendor lock-in by having alternatives ready
+**Typical ROI:** 5-12 month payback, then $200-$1,000/month savings per tool
 
-## Who Uses nocodo?
+### 🎯 Stage 2: Fractional CTO
+**Ongoing technical partner for your entire open source stack**
 
-nocodo is designed for everyone in your business, not just developers:
+**What you get:**
+- Up to 10 hours/month of technical guidance
+- Monthly strategy call  
+- Tool selection and architecture advice
+- Deployment and migration support
+- Troubleshooting and optimization
+- Emergency support (4-hour response)
+- AI-assisted collaboration via nocodo
 
-- **Sales teams** accessing CRM data and customer analytics
-- **Support teams** managing tickets and customer information
-- **Operations** running backups, deployments, and system maintenance
-- **New hires** getting onboarded with AI guidance
-- **Managers** gaining visibility across all business systems
-- **Developers** when custom code is actually needed
+**Investment:** $1,500/month
 
-## How Does It Work?
+**Perfect for:**
+- Companies running 3+ open source tools
+- Teams scaling their self-hosted infrastructure  
+- Businesses wanting to reduce SaaS costs strategically
+- Companies needing occasional technical expertise without a full-time hire
 
-nocodo consists of two components:
+### 🛠️ Stage 3: nocodo Platform
+**Self-service management of your open source stack** (Coming Soon)
 
-**Desktop App** - Your personal AI assistant
-- Secure access to all business systems
-- AI guides you through operations
-- Native app for every team member
+Once you're comfortable managing your tools, graduate to the nocodo platform:
+- AI-powered operations assistant
+- Unified access to all your business software
+- Automated backups, updates, and monitoring
+- Team collaboration and onboarding
+- Git-based deployment management
 
-**Manager** - Your business software hub
-- Runs on your infrastructure (cloud or on-premise)
-- Manages all open source software installations
-- Handles integrations and data connections
-- Git-based for version control and reproducibility
+**Investment:** $99-$299/month (launching Q2 2025)
 
-## Business Use Cases
+## Why Work With Us?
 
-**Onboarding New Team Members**
-- AI teaches them your systems and workflows
-- Guided access to relevant data and tools
-- Faster time to productivity
+**Experience:** We've deployed and managed dozens of open source tools for businesses like yours
 
-**Daily Business Operations**
-- Sales reps query CRM and analytics
-- Support teams access customer data across systems
-- Admin tasks automated with AI assistance
+**Cost Savings:** Most clients save $30K-$100K/year by switching from SaaS to open source
 
-**Cross-System Data Analysis**
-- Combine data from emails, CRM, databases, and SaaS tools
-- AI helps answer business questions across all your data
-- No more switching between multiple tools
+**No Lock-in:** Everything runs on your infrastructure. Leave anytime.
 
-**IT Operations & Maintenance**
-- Automated backups and monitoring
-- Software updates managed by AI
-- Infrastructure changes tracked in Git
+**AI-Assisted:** We use AI to accelerate deployments and reduce costs, passing savings to you
 
-**Building with Open Source**
-- Reduce SaaS costs with open source alternatives
-- Maintain control of your data and infrastructure
-- Customize software to your exact needs
+**Remote-First:** Based in India, working with companies globally
 
-## Team Collaboration
+## Common Technology Stack We Deploy
 
-nocodo enables true business-wide collaboration:
+**CRM & Sales:**
+- Twenty CRM - Modern, open source CRM
+- Odoo CRM - Full-featured enterprise CRM
 
-- **Shared Access**: Everyone accesses the same business systems and data
-- **AI-Guided Onboarding**: New members learn systems with AI assistance
-- **Unified Data Visibility**: Break down silos between departments
-- **Multi-Team Support**: Different departments can have separate environments
-- **Role-Based Access**: Control who sees and does what
+**Analytics & BI:**
+- Metabase - Business intelligence and analytics
+- Posthog - Product analytics
+- Plausible - Privacy-friendly web analytics
 
-## Privacy & Control
+**Customer Support:**
+- Chatwoot - Customer communication platform
+- Discourse - Community forums
 
-- **Your infrastructure, your choice**: Deploy on any cloud provider or on-premise
-- **Bring your own AI**: Use your own API keys for OpenAI, Anthropic, or other LLM providers
-- **Complete data ownership**: All business data stays on your infrastructure
-- **No vendor lock-in**: Switch providers or move to different software anytime
-- **Open source focused**: Build on software you can audit and control
+**Content & Marketing:**
+- Strapi / Tina CMS - Headless CMS for websites
+- Listmonk - Email marketing
+- Postiz - Social media scheduling
+
+**Operations:**
+- Plane / Taiga - Project management
+- Mattermost - Team communication
+- Outline - Documentation wiki
+
+**Plus:** Data pipelines (Airbyte), workflow automation (n8n), and custom integrations
+
+## How We're Different
+
+**Not a typical consultancy:** We've built nocodo, a platform that automates much of the deployment and management work. This means:
+- Faster deployments (days, not weeks)
+- Lower costs (AI does the heavy lifting)
+- Better documentation (everything templated)
+- Proven playbooks (we've done this many times)
+
+**Not just developers:** We understand business operations, not just code. We help you choose the right tools for your workflows, not just deploy whatever you ask for.
+
+## Getting Started
+
+**Ready to reduce your SaaS costs?**
+
+1. **Book a free 30-minute consultation** → [Calendar link]
+2. We'll review your current stack and identify opportunities
+3. Start with a Migration Sprint or go straight to Fractional CTO
+
+**Not ready yet?** 
+- ⭐ Star this repo to follow our journey
+- 📧 Join our newsletter for open source tips and case studies
+- 💬 Email: [your email]
+
+## FAQ
+
+**Q: Do I need technical skills to work with you?**  
+A: No. We handle all the technical work. You just need to provide access to your systems and make business decisions about which tools to use.
+
+**Q: Where does the software run?**  
+A: On your infrastructure—AWS, DigitalOcean, Hetzner, or any cloud provider you prefer. You maintain full control and ownership.
+
+**Q: What if something breaks?**  
+A: Migration Sprint includes 30 days of support. Fractional CTO clients get 4-hour emergency response time.
+
+**Q: Can you migrate our data?**  
+A: Yes, data migration is included in all Migration Sprints.
+
+**Q: How long does a migration take?**  
+A: Most migrations complete in 1-2 weeks from kickoff to team training.
+
+**Q: Do you work with companies outside India?**  
+A: Yes! We work with companies globally. Our async-first approach works across any timezone.
+
+## About nocodo
+
+nocodo started as an internal tool we built to help us deploy and manage open source software faster for our clients. We're now developing it into a product that will let technical teams manage their own open source stacks with AI assistance.
+
+**Technical Details:**
+- Git-based deployment management
+- AI-powered operations assistant  
+- Unified data access across all business software
+- Team collaboration and onboarding tools
+- Automated backups, updates, and monitoring
 
 ---
 
-**🚀 Ready to transform how your business operates?** [**Get Started →**](https://nocodo.com)
-
-Privacy-focused • No vendor lock-in • Built for businesses of all sizes
+**Privacy-focused • No vendor lock-in • Built for businesses ready to own their software**
