@@ -1,0 +1,29 @@
+[package]
+name = "manager-tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Tool execution utilities for nocodo manager"
+
+[lib]
+name = "manager_tools"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+base64 = "0.22"
+walkdir = "2.5"
+regex = "1.10"
+thiserror = { workspace = true }
+codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch" }
+codex-core = { git = "https://github.com/openai/codex", package = "codex-core" }
+manager-models = { path = "../manager-models" }
+
+[dev-dependencies]
+tempfile = "3.12"
+tokio-test = "0.4"

@@ -4148,9 +4148,29 @@ name = "manager-models"
 version = "0.1.12"
 dependencies = [
  "chrono",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "uuid",
+]
+
+[[package]]
+name = "manager-tools"
+version = "0.1.12"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "codex-apply-patch",
+ "codex-core",
+ "manager-models",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "walkdir",
 ]
 
 [[package]]
@@ -4456,6 +4476,7 @@ dependencies = [
  "home",
  "jsonwebtoken",
  "manager-models",
+ "manager-tools",
  "nocodo-github-actions",
  "rand 0.9.2",
  "regex",

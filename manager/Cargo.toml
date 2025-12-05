@@ -57,6 +57,7 @@ glob = "0.3"
 schemars = { version = "0.8", features = ["preserve_order"] }
 nocodo-github-actions = { path = "../nocodo-github-actions", features = ["nocodo-integration"] }
 manager-models = { path = "../manager-models" }
+manager-tools = { path = "../manager-tools" }
 
 # Authentication and security
 argon2 = { version = "0.5", features = ["std"] }

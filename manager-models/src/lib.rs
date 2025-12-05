@@ -1,4 +1,5 @@
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // Shared models for nocodo manager and desktop-app
@@ -406,12 +407,14 @@ pub enum ToolRequest {
     WriteFile(WriteFileRequest),
     #[serde(rename = "grep")]
     Grep(GrepRequest),
+    #[serde(rename = "apply_patch")]
+    ApplyPatch(ApplyPatchRequest),
     #[serde(rename = "bash")]
     Bash(BashRequest),
 }
 
 /// List files tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListFilesRequest {
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -454,7 +457,7 @@ impl ListFilesRequest {
 }
 
 /// Read file tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReadFileRequest {
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -483,17 +486,32 @@ impl ReadFileRequest {
 }
 
 /// Write file tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteFileRequest {
+    /// The file path to write to
     pub path: String,
-    pub content: String,
+
+    /// Full content to write (required for full write, omit for search-replace)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+
+    /// Whether to create parent directories if they don't exist
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub create_dirs: Option<bool>,
+
+    /// Whether to append to file instead of overwriting
     #[serde(skip_serializing_if = "Option::is_none")]
     pub append: Option<bool>,
+
+    /// Text to search for (for search-and-replace operations)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
+
+    /// Text to replace the search text with
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replace: Option<String>,
+
+    /// Whether to create file if it doesn't exist
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create_if_not_exists: Option<bool>,
 }
@@ -510,7 +528,7 @@ impl WriteFileRequest {
                 },
                 "content": {
                     "type": "string",
-                    "description": "The content to write to the file"
+                    "description": "The content to write to file"
                 },
                 "create_dirs": {
                     "type": "boolean",
@@ -519,7 +537,7 @@ impl WriteFileRequest {
                 },
                 "append": {
                     "type": "boolean",
-                    "description": "Whether to append to the file instead of overwriting",
+                    "description": "Whether to append to file instead of overwriting",
                     "default": false
                 },
                 "search": {
@@ -528,21 +546,32 @@ impl WriteFileRequest {
                 },
                 "replace": {
                     "type": "string",
-                    "description": "Text to replace the search text with"
+                    "description": "Text to replace to search text with"
                 },
                 "create_if_not_exists": {
                     "type": "boolean",
-                    "description": "Whether to create the file if it doesn't exist",
+                    "description": "Whether to create file if it doesn't exist",
                     "default": false
                 }
             },
-            "required": ["path", "content"]
+            "required": ["path"]
         })
+    }
+
+    /// Validate request parameters
+    pub fn validate(&self) -> Result<(), String> {
+        if self.content.is_none() && (self.search.is_none() || self.replace.is_none()) {
+            return Err("Either 'content' must be provided, or both 'search' and 'replace' must be provided".to_string());
+        }
+        if self.search.is_some() != self.replace.is_some() {
+            return Err("Both 'search' and 'replace' must be provided together".to_string());
+        }
+        Ok(())
     }
 }
 
 /// Grep search tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GrepRequest {
     pub pattern: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -558,6 +587,8 @@ pub struct GrepRequest {
     pub include_line_numbers: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_results: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_files_searched: Option<u32>,
 }
 
 impl GrepRequest {
@@ -590,7 +621,7 @@ impl GrepRequest {
                 },
                 "case_sensitive": {
                     "type": "boolean",
-                    "description": "Whether the search is case sensitive",
+                    "description": "Whether to search is case sensitive",
                     "default": false
                 },
                 "include_line_numbers": {
@@ -602,6 +633,11 @@ impl GrepRequest {
                     "type": "number",
                     "description": "Maximum number of results to return",
                     "default": 100
+                },
+                "max_files_searched": {
+                    "type": "number",
+                    "description": "Maximum number of files to search",
+                    "default": 1000
                 }
             },
             "required": ["pattern"]
@@ -610,7 +646,7 @@ impl GrepRequest {
 }
 
 /// Bash command execution tool request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BashRequest {
     pub command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -650,6 +686,56 @@ impl BashRequest {
     }
 }
 
+/// Apply a patch to create, modify, delete, or move multiple files
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ApplyPatchRequest {
+    /// The patch content in unified diff format
+    ///
+    /// Format:
+    /// ```
+    /// *** Begin Patch
+    /// *** Add File: path/to/new.txt
+    /// +line content
+    /// *** Update File: path/to/existing.txt
+    /// @@ optional context
+    /// -old line
+    /// +new line
+    /// *** Delete File: path/to/remove.txt
+    /// *** End Patch
+    /// ```
+    ///
+    /// Supports:
+    /// - Add File: Create new files with + prefixed lines
+    /// - Update File: Modify files with diff hunks (- for removed, + for added)
+    /// - Delete File: Remove files
+    /// - Move to: Rename files (after Update File header)
+    /// - @@ context headers for targeting specific code blocks
+    ///
+    /// All file paths must be relative to project root.
+    pub patch: String,
+}
+
+/// Apply patch file change
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchFileChange {
+    pub path: String,
+    pub operation: String, // "add", "update", "delete", "move"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_path: Option<String>, // For move operations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unified_diff: Option<String>, // For update operations
+}
+
+/// Apply patch tool response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplyPatchResponse {
+    pub success: bool,
+    pub files_changed: Vec<ApplyPatchFileChange>,
+    pub total_additions: usize,
+    pub total_deletions: usize,
+    pub message: String,
+}
+
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -662,6 +748,8 @@ pub enum ToolResponse {
     WriteFile(WriteFileResponse),
     #[serde(rename = "grep")]
     Grep(GrepResponse),
+    #[serde(rename = "apply_patch")]
+    ApplyPatch(ApplyPatchResponse),
     #[serde(rename = "bash")]
     Bash(BashResponse),
     #[serde(rename = "error")]

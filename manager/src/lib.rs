@@ -16,7 +16,6 @@ pub mod permissions;
 pub mod schema_provider;
 pub mod socket;
 pub mod templates;
-pub mod tools;
 pub mod websocket;
 
 #[cfg(test)]

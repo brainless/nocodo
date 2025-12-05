@@ -16,7 +16,6 @@ mod permissions;
 mod schema_provider;
 mod socket;
 mod templates;
-mod tools;
 mod websocket;
 
 use actix::Actor;
