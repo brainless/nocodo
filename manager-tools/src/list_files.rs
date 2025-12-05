@@ -161,11 +161,34 @@ fn validate_and_resolve_path(base_path: &PathBuf, path: &str) -> Result<PathBuf>
     // Canonicalize the path to resolve any remaining relative components
     let canonical_path = match target_path.canonicalize() {
         Ok(path) => path,
-        Err(_) => target_path, // Fallback to non-canonical path if it doesn't exist
+        Err(_) => {
+            // If file doesn't exist, try to canonicalize parent directory
+            // and reconstruct the path to handle symlink issues on macOS
+            if let Some(parent) = target_path.parent() {
+                match parent.canonicalize() {
+                    Ok(canonical_parent) => {
+                        if let Some(filename) = target_path.file_name() {
+                            canonical_parent.join(filename)
+                        } else {
+                            target_path
+                        }
+                    }
+                    Err(_) => target_path,
+                }
+            } else {
+                target_path
+            }
+        }
+    };
+
+    // Also canonicalize the base path for comparison (handles symlinks on macOS)
+    let canonical_base = match base_path.canonicalize() {
+        Ok(path) => path,
+        Err(_) => base_path.clone(), // Fallback to non-canonical base path
     };
 
     // Security check: ensure the path is within the base directory
-    if !canonical_path.starts_with(base_path) {
+    if !canonical_path.starts_with(&canonical_base) {
         return Err(ToolError::InvalidPath(format!(
             "Path '{}' resolves to location outside the allowed directory",
             path

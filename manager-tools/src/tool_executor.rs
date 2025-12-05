@@ -77,4 +77,57 @@ impl ToolExecutor {
 
         Ok(response_value)
     }
+
+    /// Convert glob pattern to regex pattern
+    pub fn glob_to_regex(glob: &str) -> String {
+        let mut regex = String::new();
+        let chars: Vec<char> = glob.chars().collect();
+        let mut i = 0;
+
+        // Add start anchor if pattern doesn't start with *
+        if !glob.starts_with('*') {
+            regex.push('^');
+        }
+
+        while i < chars.len() {
+            match chars[i] {
+                '*' => {
+                    if i + 1 < chars.len() && chars[i + 1] == '*' {
+                        // ** pattern - match any number of directories
+                        regex.push_str(".*");
+                        i += 2;
+                    } else {
+                        // * pattern - match any characters except /
+                        regex.push_str("[^/]*");
+                        i += 1;
+                    }
+                }
+                '?' => {
+                    // ? pattern - match any single character except /
+                    regex.push_str("[^/]");
+                    i += 1;
+                }
+                '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
+                    // Escape regex special characters
+                    regex.push('\\');
+                    regex.push(chars[i]);
+                    i += 1;
+                }
+                c => {
+                    regex.push(c);
+                    i += 1;
+                }
+            }
+        }
+
+        // Add end anchor if pattern doesn't end with *
+        if !glob.ends_with('*') {
+            regex.push('$');
+        }
+
+        regex
+    }
+
+
 }
+

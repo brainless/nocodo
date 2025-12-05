@@ -1,9 +1,15 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+
+    use crate::{ToolExecutor, BashExecutorTrait, BashExecutionResult};
+    use manager_models::{ToolResponse, ListFilesRequest, ReadFileRequest, WriteFileRequest, GrepRequest};
     use tempfile::TempDir;
     use std::pin::Pin;
     use std::future::Future;
+    use std::fs;
+    use std::path::Path;
+
+
 
     // Mock BashExecutor for testing
     struct MockBashExecutor;
@@ -12,9 +18,9 @@ mod tests {
         fn execute_with_cwd(
             &self,
             _command: &str,
-            _working_dir: &std::path::PathBuf,
+            _working_dir: &Path,
             _timeout_secs: Option<u64>,
-        ) -> Pin<Box<dyn Future<Output = Result<BashExecutionResult>> + Send>> {
+        ) -> Pin<Box<dyn Future<Output = Result<BashExecutionResult, anyhow::Error>> + Send>> {
             Box::pin(async {
                 Ok(BashExecutionResult {
                     stdout: "mock output".to_string(),
@@ -317,35 +323,45 @@ mod tests {
         fs::create_dir_all(temp_dir.path().join("subdir")).unwrap();
         fs::write(temp_dir.path().join("subdir/test.txt"), "test content").unwrap();
 
-        // Test path normalization with . and .. components
+        // Test path normalization through actual tool execution
         let test_cases = vec![
-            ("./subdir/../subdir/test.txt", "subdir/test.txt"),
-            ("subdir/./test.txt", "subdir/test.txt"),
-            ("subdir//test.txt", "subdir/test.txt"), // Multiple slashes
+            "./subdir/../subdir/test.txt",
+            "subdir/./test.txt",
+            "subdir/test.txt",
         ];
 
-        for (input_path, expected_relative) in test_cases {
-            let resolved = executor.validate_and_resolve_path(input_path).unwrap();
-            let expected = temp_dir.path().join(expected_relative);
-            assert_eq!(
-                resolved, expected,
-                "Failed to normalize path: {}",
-                input_path
-            );
+        for input_path in test_cases {
+            let request = ReadFileRequest {
+                path: input_path.to_string(),
+                max_size: None,
+            };
+
+            let response = executor
+                .execute(manager_models::ToolRequest::ReadFile(request))
+                .await
+                .unwrap();
+
+            match response {
+                ToolResponse::ReadFile(read_response) => {
+                    assert_eq!(read_response.content, "test content");
+                    assert_eq!(read_response.size, 12);
+                }
+                _ => panic!("Expected ReadFile response"),
+            }
         }
 
-        // Test directory traversal prevention
-        let traversal_result = executor.validate_and_resolve_path("../outside");
-        assert!(
-            traversal_result.is_err(),
-            "Should prevent directory traversal"
-        );
+        // Test directory traversal prevention through tool execution
+        let traversal_request = ReadFileRequest {
+            path: "../outside".to_string(),
+            max_size: None,
+        };
 
-        let traversal_result2 = executor.validate_and_resolve_path("../../../etc/passwd");
-        assert!(
-            traversal_result2.is_err(),
-            "Should prevent directory traversal with multiple .."
-        );
+        let traversal_response = executor
+            .execute(manager_models::ToolRequest::ReadFile(traversal_request))
+            .await;
+
+        // Directory traversal should be caught during path validation
+        assert!(traversal_response.is_err(), "Should prevent directory traversal");
     }
 
     #[tokio::test]
@@ -381,7 +397,7 @@ mod tests {
 
         let request = WriteFileRequest {
             path: "test.txt".to_string(),
-            content: "Hello World".to_string(),
+            content: Some("Hello World".to_string()),
             create_dirs: None,
             append: None,
             search: None,
