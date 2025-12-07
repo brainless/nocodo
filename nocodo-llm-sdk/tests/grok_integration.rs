@@ -33,7 +33,10 @@ async fn test_grok_real_api_call() {
     assert_eq!(response.object, "chat.completion");
     assert!(!response.choices.is_empty());
     assert!(!response.choices[0].message.content.is_empty());
-    assert!(response.choices[0].message.content.contains("Hello, World!"));
+    assert!(response.choices[0]
+        .message
+        .content
+        .contains("Hello, World!"));
 }
 
 #[tokio::test]
@@ -51,7 +54,7 @@ async fn test_grok_invalid_api_key() {
     assert!(response.is_err());
     // Should be an authentication error
     match response.unwrap_err() {
-        nocodo_llm_sdk::error::LlmError::Authentication { .. } => {},
+        nocodo_llm_sdk::error::LlmError::Authentication { .. } => {}
         other => panic!("Expected authentication error, got: {:?}", other),
     }
 }

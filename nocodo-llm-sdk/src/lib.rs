@@ -45,10 +45,32 @@
 //!     Ok(())
 //! }
 //! ```
+//!
+//! ## GLM Example
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::glm::GlmClient;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = GlmClient::new("your-cerebras-api-key")?;
+//!     let response = client
+//!         .message_builder()
+//!         .model("zai-glm-4.6")
+//!         .max_tokens(1024)
+//!         .user_message("Hello, GLM!")
+//!         .send()
+//!         .await?;
+//!
+//!     println!("Response: {}", response.choices[0].message.content);
+//!     Ok(())
+//! }
+//! ```
 
 pub mod claude;
 pub mod client;
 pub mod error;
+pub mod glm;
 pub mod grok;
 pub mod types;
 
@@ -57,6 +79,10 @@ mod tests {
     use crate::claude::{
         client::ClaudeClient,
         types::{ClaudeContentBlock, ClaudeMessage, ClaudeRole},
+    };
+    use crate::glm::{
+        client::GlmClient,
+        types::{GlmMessage, GlmRole},
     };
     use crate::grok::{
         client::GrokClient,
@@ -127,6 +153,38 @@ mod tests {
     fn test_grok_message_creation() {
         let message = GrokMessage::user("Hello");
         assert_eq!(message.role, GrokRole::User);
+        assert_eq!(message.content, "Hello");
+    }
+
+    #[test]
+    fn test_glm_client_creation() {
+        let client = GlmClient::new("test-key");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_glm_client_creation_empty_key() {
+        let client = GlmClient::new("");
+        assert!(client.is_err());
+    }
+
+    #[test]
+    fn test_glm_message_builder() {
+        let client = GlmClient::new("test-key").unwrap();
+        let _builder = client
+            .message_builder()
+            .model("zai-glm-4.6")
+            .max_tokens(100)
+            .user_message("Hello");
+
+        // The builder should be created successfully
+        assert!(true); // Builder creation succeeded
+    }
+
+    #[test]
+    fn test_glm_message_creation() {
+        let message = GlmMessage::user("Hello");
+        assert_eq!(message.role, GlmRole::User);
         assert_eq!(message.content, "Hello");
     }
 }

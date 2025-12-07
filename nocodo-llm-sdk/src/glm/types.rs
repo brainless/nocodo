@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-/// Grok chat completion request (OpenAI-compatible)
+/// GLM chat completion request (Cerebras/OpenAI-compatible)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokChatCompletionRequest {
+pub struct GlmChatCompletionRequest {
     /// The model to use for generation
     pub model: String,
     /// Input messages
-    pub messages: Vec<GrokMessage>,
+    pub messages: Vec<GlmMessage>,
     /// Maximum number of tokens to generate
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
-    /// Temperature for randomness (0.0 to 2.0)
+    pub max_completion_tokens: Option<u32>,
+    /// Temperature for randomness (0.0 to 1.5)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     /// Top-p sampling parameter
@@ -22,21 +22,24 @@ pub struct GrokChatCompletionRequest {
     /// Whether to stream the response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
+    /// Seed for deterministic sampling
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i32>,
 }
 
-/// A message in the Grok conversation
+/// A message in the GLM conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokMessage {
+pub struct GlmMessage {
     /// Role of the message sender
-    pub role: GrokRole,
+    pub role: GlmRole,
     /// Content of the message
     pub content: String,
 }
 
-/// Role of a Grok message
+/// Role of a GLM message
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum GrokRole {
+pub enum GlmRole {
     /// System message
     System,
     /// User message
@@ -45,9 +48,9 @@ pub enum GrokRole {
     Assistant,
 }
 
-/// Grok chat completion response (OpenAI-compatible)
+/// GLM chat completion response (Cerebras/OpenAI-compatible)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokChatCompletionResponse {
+pub struct GlmChatCompletionResponse {
     /// Unique identifier for the response
     pub id: String,
     /// Object type (always "chat.completion")
@@ -57,18 +60,18 @@ pub struct GrokChatCompletionResponse {
     /// Model used for generation
     pub model: String,
     /// Completion choices
-    pub choices: Vec<GrokChoice>,
+    pub choices: Vec<GlmChoice>,
     /// Token usage information
-    pub usage: GrokUsage,
+    pub usage: GlmUsage,
 }
 
 /// A completion choice
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokChoice {
+pub struct GlmChoice {
     /// Index of the choice
     pub index: u32,
     /// The message content
-    pub message: GrokMessage,
+    pub message: GlmMessage,
     /// Reason why generation stopped
     #[serde(rename = "finish_reason")]
     pub finish_reason: Option<String>,
@@ -76,7 +79,7 @@ pub struct GrokChoice {
 
 /// Token usage information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokUsage {
+pub struct GlmUsage {
     /// Number of prompt tokens
     #[serde(rename = "prompt_tokens")]
     pub prompt_tokens: u32,
@@ -88,16 +91,16 @@ pub struct GrokUsage {
     pub total_tokens: u32,
 }
 
-/// Grok API error response
+/// GLM API error response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokErrorResponse {
+pub struct GlmErrorResponse {
     /// Error details
-    pub error: GrokError,
+    pub error: GlmError,
 }
 
-/// Grok API error details
+/// GLM API error details
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrokError {
+pub struct GlmError {
     /// Error message
     pub message: String,
     /// Error type
@@ -108,9 +111,9 @@ pub struct GrokError {
     pub code: Option<String>,
 }
 
-impl GrokMessage {
+impl GlmMessage {
     /// Create a new text message
-    pub fn new<S: Into<String>>(role: GrokRole, content: S) -> Self {
+    pub fn new<S: Into<String>>(role: GlmRole, content: S) -> Self {
         Self {
             role,
             content: content.into(),
@@ -119,16 +122,16 @@ impl GrokMessage {
 
     /// Create a system message
     pub fn system<S: Into<String>>(content: S) -> Self {
-        Self::new(GrokRole::System, content)
+        Self::new(GlmRole::System, content)
     }
 
     /// Create a user message
     pub fn user<S: Into<String>>(content: S) -> Self {
-        Self::new(GrokRole::User, content)
+        Self::new(GlmRole::User, content)
     }
 
     /// Create an assistant message
     pub fn assistant<S: Into<String>>(content: S) -> Self {
-        Self::new(GrokRole::Assistant, content)
+        Self::new(GlmRole::Assistant, content)
     }
 }

@@ -1,35 +1,37 @@
 use crate::{
     error::LlmError,
-    grok::{
-        client::GrokClient,
-        types::{GrokChatCompletionRequest, GrokMessage, GrokRole},
+    glm::{
+        client::GlmClient,
+        types::{GlmChatCompletionRequest, GlmMessage, GlmRole},
     },
 };
 
-/// Builder for creating Grok chat completion requests
-pub struct GrokMessageBuilder<'a> {
-    client: &'a GrokClient,
+/// Builder for creating GLM chat completion requests
+pub struct GlmMessageBuilder<'a> {
+    client: &'a GlmClient,
     model: Option<String>,
-    max_tokens: Option<u32>,
-    messages: Vec<GrokMessage>,
+    max_completion_tokens: Option<u32>,
+    messages: Vec<GlmMessage>,
     temperature: Option<f32>,
     top_p: Option<f32>,
     stop: Option<Vec<String>>,
     stream: Option<bool>,
+    seed: Option<i32>,
 }
 
-impl<'a> GrokMessageBuilder<'a> {
+impl<'a> GlmMessageBuilder<'a> {
     /// Create a new message builder
-    pub fn new(client: &'a GrokClient) -> Self {
+    pub fn new(client: &'a GlmClient) -> Self {
         Self {
             client,
             model: None,
-            max_tokens: None,
+            max_completion_tokens: None,
             messages: Vec::new(),
             temperature: None,
             top_p: None,
             stop: None,
             stream: None,
+            seed: None,
         }
     }
 
@@ -41,7 +43,7 @@ impl<'a> GrokMessageBuilder<'a> {
 
     /// Set the maximum number of tokens to generate
     pub fn max_tokens(mut self, max_tokens: u32) -> Self {
-        self.max_tokens = Some(max_tokens);
+        self.max_completion_tokens = Some(max_tokens);
         self
     }
 
@@ -52,17 +54,17 @@ impl<'a> GrokMessageBuilder<'a> {
     pub fn message(mut self, role: impl Into<String>, content: impl Into<String>) -> Self {
         let role_str = role.into();
         let role = match role_str.as_str() {
-            "system" => GrokRole::System,
-            "user" => GrokRole::User,
-            "assistant" => GrokRole::Assistant,
+            "system" => GlmRole::System,
+            "user" => GlmRole::User,
+            "assistant" => GlmRole::Assistant,
             _ => {
                 // Log warning and default to User role instead of panicking
                 tracing::warn!("Invalid role '{}', defaulting to 'user'", role_str);
-                GrokRole::User
+                GlmRole::User
             }
         };
 
-        self.messages.push(GrokMessage::new(role, content));
+        self.messages.push(GlmMessage::new(role, content));
         self
     }
 
@@ -105,27 +107,34 @@ impl<'a> GrokMessageBuilder<'a> {
         self
     }
 
+    /// Set seed for deterministic sampling
+    pub fn seed(mut self, seed: i32) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
     /// Send the request and get the response
-    pub async fn send(self) -> Result<crate::grok::types::GrokChatCompletionResponse, LlmError> {
-        let request = GrokChatCompletionRequest {
+    pub async fn send(self) -> Result<crate::glm::types::GlmChatCompletionResponse, LlmError> {
+        let request = GlmChatCompletionRequest {
             model: self
                 .model
                 .ok_or_else(|| LlmError::invalid_request("Model must be specified"))?,
             messages: self.messages,
-            max_tokens: self.max_tokens,
+            max_completion_tokens: self.max_completion_tokens,
             temperature: self.temperature,
             top_p: self.top_p,
             stop: self.stop,
             stream: self.stream,
+            seed: self.seed,
         };
 
         self.client.create_chat_completion(request).await
     }
 }
 
-impl GrokClient {
+impl GlmClient {
     /// Start building a chat completion request
-    pub fn message_builder(&self) -> GrokMessageBuilder<'_> {
-        GrokMessageBuilder::new(self)
+    pub fn message_builder(&self) -> GlmMessageBuilder<'_> {
+        GlmMessageBuilder::new(self)
     }
 }

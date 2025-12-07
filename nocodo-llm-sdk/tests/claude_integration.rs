@@ -30,7 +30,10 @@ async fn test_real_api_call() {
 
     assert!(response.is_ok());
     let response = response.unwrap();
-    assert_eq!(response.role, nocodo_llm_sdk::claude::types::ClaudeRole::Assistant);
+    assert_eq!(
+        response.role,
+        nocodo_llm_sdk::claude::types::ClaudeRole::Assistant
+    );
     assert!(!response.content.is_empty());
     match &response.content[0] {
         nocodo_llm_sdk::claude::types::ClaudeContentBlock::Text { text } => {
@@ -54,7 +57,7 @@ async fn test_invalid_api_key() {
     assert!(response.is_err());
     // Should be an authentication error
     match response.unwrap_err() {
-        nocodo_llm_sdk::error::LlmError::Authentication { .. } => {},
+        nocodo_llm_sdk::error::LlmError::Authentication { .. } => {}
         _ => panic!("Expected authentication error"),
     }
 }

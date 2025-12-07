@@ -10,6 +10,7 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Comprehensive error handling**: Detailed error types with context
 - **Claude support**: Full Messages API implementation
 - **Grok support**: xAI Grok integration with OpenAI-compatible API
+- **GLM support**: Cerebras GLM models with OpenAI-compatible API
 - **Extensible**: Designed for easy addition of other LLM providers
 
 ## Installation
@@ -69,6 +70,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     println!("Grok: {}", response.choices[0].message.content);
+    println!(
+        "Usage: {} input tokens, {} output tokens",
+        response.usage.prompt_tokens, response.usage.completion_tokens
+    );
+    Ok(())
+}
+```
+
+### GLM (Cerebras)
+
+```rust
+use nocodo_llm_sdk::glm::GlmClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create client with your Cerebras API key
+    let client = GlmClient::new("your-cerebras-api-key")?;
+
+    // Build and send a message
+    let response = client
+        .message_builder()
+        .model("zai-glm-4.6")
+        .max_tokens(1024)
+        .user_message("Explain quantum computing in simple terms.")
+        .send()
+        .await?;
+
+    println!("GLM: {}", response.choices[0].message.content);
     println!(
         "Usage: {} input tokens, {} output tokens",
         response.usage.prompt_tokens, response.usage.completion_tokens
@@ -160,7 +189,13 @@ match client
 - `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
 - `message_builder() -> GrokMessageBuilder`: Start building a message request
 
-### MessageBuilder (Claude & Grok)
+### GlmClient
+
+- `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
+- `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
+- `message_builder() -> GlmMessageBuilder`: Start building a message request
+
+### MessageBuilder (Claude, Grok & GLM)
 
 - `model(model: impl Into<String>) -> Self`: Set the model
 - `max_tokens(tokens: u32) -> Self`: Set maximum tokens
@@ -203,6 +238,9 @@ ANTHROPIC_API_KEY=your-key-here cargo test --test claude_integration -- --ignore
 
 # Grok integration tests
 XAI_API_KEY=your-key-here cargo test --test grok_integration -- --ignored
+
+# GLM integration tests
+CEREBRAS_API_KEY=your-key-here cargo test --test glm_integration -- --ignored
 ```
 
 ## Examples
@@ -211,6 +249,7 @@ See the `examples/` directory for complete working examples:
 
 - `simple_completion.rs`: Basic Claude usage
 - `grok_completion.rs`: Basic Grok usage
+- `glm_completion.rs`: Basic GLM usage
 - More examples coming in future versions
 
 ## Development
@@ -223,6 +262,8 @@ This SDK is in active development. v0.1 provides Claude and Grok support with a 
   - Models: claude-sonnet-4-5, claude-opus-4-5, etc.
 - **Grok** (xAI): OpenAI-compatible API
   - Models: grok-code-fast-1 (optimized for coding tasks)
+- **GLM** (Cerebras): OpenAI-compatible API
+  - Models: zai-glm-4.6 (GLM 4.6 model)
 
 ### Future Plans (v0.2+)
 
