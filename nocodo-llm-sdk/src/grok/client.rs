@@ -80,7 +80,12 @@ impl GrokClient {
             if let Ok(error_response) = serde_json::from_str::<GrokErrorResponse>(&error_text) {
                 match status {
                     reqwest::StatusCode::BAD_REQUEST => {
-                        Err(LlmError::invalid_request(error_response.error.message))
+                        // xAI returns 400 for invalid API keys with "Incorrect API key" in the message
+                        if error_response.error.message.to_lowercase().contains("api key") {
+                            Err(LlmError::authentication(error_response.error.message))
+                        } else {
+                            Err(LlmError::invalid_request(error_response.error.message))
+                        }
                     }
                     reqwest::StatusCode::UNAUTHORIZED => {
                         Err(LlmError::authentication(error_response.error.message))
@@ -108,7 +113,14 @@ impl GrokClient {
             } else {
                 // Fallback for non-standard error responses
                 match status {
-                    reqwest::StatusCode::BAD_REQUEST => Err(LlmError::invalid_request(error_text)),
+                    reqwest::StatusCode::BAD_REQUEST => {
+                        // Check if error text contains API key related error
+                        if error_text.to_lowercase().contains("api key") {
+                            Err(LlmError::authentication(error_text))
+                        } else {
+                            Err(LlmError::invalid_request(error_text))
+                        }
+                    }
                     reqwest::StatusCode::UNAUTHORIZED => Err(LlmError::authentication(error_text)),
                     reqwest::StatusCode::FORBIDDEN => Err(LlmError::authentication(error_text)),
                     reqwest::StatusCode::NOT_FOUND => Err(LlmError::api_error(404, error_text)),

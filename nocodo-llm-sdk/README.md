@@ -1,6 +1,6 @@
 # Nocodo LLM SDK
 
-A general-purpose LLM SDK for Rust, starting with Claude (Anthropic) support.
+A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 
 ## Features
 
@@ -9,6 +9,7 @@ A general-purpose LLM SDK for Rust, starting with Claude (Anthropic) support.
 - **Ergonomic**: Builder pattern for easy request construction
 - **Comprehensive error handling**: Detailed error types with context
 - **Claude support**: Full Messages API implementation
+- **Grok support**: xAI Grok integration with OpenAI-compatible API
 - **Extensible**: Designed for easy addition of other LLM providers
 
 ## Installation
@@ -23,6 +24,8 @@ nocodo-llm-sdk = "0.1"
 ```
 
 ## Quick Start
+
+### Claude (Anthropic)
 
 ```rust
 use nocodo_llm_sdk::claude::ClaudeClient;
@@ -46,9 +49,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Grok (xAI)
+
+```rust
+use nocodo_llm_sdk::grok::GrokClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create client with your xAI API key
+    let client = GrokClient::new("your-xai-api-key")?;
+
+    // Build and send a message
+    let response = client
+        .message_builder()
+        .model("grok-code-fast-1")
+        .max_tokens(1024)
+        .user_message("Write a Rust function to reverse a string.")
+        .send()
+        .await?;
+
+    println!("Grok: {}", response.choices[0].message.content);
+    println!(
+        "Usage: {} input tokens, {} output tokens",
+        response.usage.prompt_tokens, response.usage.completion_tokens
+    );
+    Ok(())
+}
+```
+
 ## Advanced Usage
 
-### Conversation with Multiple Messages
+### Claude: Conversation with Multiple Messages
 
 ```rust
 let response = client
@@ -63,7 +94,7 @@ let response = client
     .await?;
 ```
 
-### Custom Parameters
+### Claude: Custom Parameters
 
 ```rust
 let response = client
@@ -74,6 +105,21 @@ let response = client
     .top_p(0.9)
     .system("You are an expert programmer.")
     .user_message("Write a Rust function to calculate fibonacci numbers.")
+    .send()
+    .await?;
+```
+
+### Grok: Multi-turn Conversation
+
+```rust
+let response = client
+    .message_builder()
+    .model("grok-code-fast-1")
+    .max_tokens(1024)
+    .system_message("You are an expert Rust developer.")
+    .user_message("What's the best way to handle errors in Rust?")
+    .assistant_message("The best way is to use Result<T, E> for recoverable errors and panic! for unrecoverable errors.")
+    .user_message("Can you show me an example?")
     .send()
     .await?;
 ```
@@ -106,20 +152,28 @@ match client
 
 - `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
 - `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
-- `message_builder() -> MessageBuilder`: Start building a message request
+- `message_builder() -> ClaudeMessageBuilder`: Start building a message request
 
-### MessageBuilder
+### GrokClient
+
+- `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
+- `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
+- `message_builder() -> GrokMessageBuilder`: Start building a message request
+
+### MessageBuilder (Claude & Grok)
 
 - `model(model: impl Into<String>) -> Self`: Set the model
 - `max_tokens(tokens: u32) -> Self`: Set maximum tokens
 - `message(role: impl Into<String>, content: impl Into<String>) -> Self`: Add a message
 - `user_message(content: impl Into<String>) -> Self`: Add a user message
 - `assistant_message(content: impl Into<String>) -> Self`: Add an assistant message
-- `system(content: impl Into<String>) -> Self`: Set system prompt
-- `temperature(temp: f32) -> Self`: Set temperature
-- `top_p(top_p: f32) -> Self`: Set top-p
+- `system_message(content: impl Into<String>) -> Self`: Add a system message
+- `temperature(temp: f32) -> Self`: Set temperature (0.0-2.0)
+- `top_p(top_p: f32) -> Self`: Set top-p sampling
 - `stop_sequences(sequences: Vec<String>) -> Self`: Set stop sequences
-- `send() -> Result<ClaudeMessageResponse>`: Send the request
+- `send() -> Result<Response>`: Send the request
+
+Note: Claude also supports `system()` for system prompts, while Grok uses `system_message()`.
 
 ## Error Types
 
@@ -141,29 +195,41 @@ cargo test
 
 ### Integration Tests
 
-Integration tests require a valid Anthropic API key:
+Integration tests require valid API keys:
 
 ```bash
-ANTHROPIC_API_KEY=your-key-here cargo test --test integration
+# Claude integration tests
+ANTHROPIC_API_KEY=your-key-here cargo test --test claude_integration -- --ignored
+
+# Grok integration tests
+XAI_API_KEY=your-key-here cargo test --test grok_integration -- --ignored
 ```
 
 ## Examples
 
 See the `examples/` directory for complete working examples:
 
-- `simple_completion.rs`: Basic usage
+- `simple_completion.rs`: Basic Claude usage
+- `grok_completion.rs`: Basic Grok usage
 - More examples coming in future versions
 
 ## Development
 
-This SDK is in active development. v0.1 focuses on Claude support with a clean, standalone API.
+This SDK is in active development. v0.1 provides Claude and Grok support with a clean, standalone API.
+
+### Supported Providers
+
+- **Claude** (Anthropic): Full Messages API implementation
+  - Models: claude-sonnet-4-5, claude-opus-4-5, etc.
+- **Grok** (xAI): OpenAI-compatible API
+  - Models: grok-code-fast-1 (optimized for coding tasks)
 
 ### Future Plans (v0.2+)
 
-- Multi-provider support (OpenAI, xAI, etc.)
+- OpenAI support
 - Streaming responses
 - Tool use / function calling
-- Advanced features
+- Advanced features (vision, extended thinking)
 
 ## License
 

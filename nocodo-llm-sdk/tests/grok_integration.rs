@@ -52,6 +52,6 @@ async fn test_grok_invalid_api_key() {
     // Should be an authentication error
     match response.unwrap_err() {
         nocodo_llm_sdk::error::LlmError::Authentication { .. } => {},
-        _ => panic!("Expected authentication error"),
+        other => panic!("Expected authentication error, got: {:?}", other),
     }
 }
