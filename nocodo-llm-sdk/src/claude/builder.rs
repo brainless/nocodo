@@ -46,12 +46,20 @@ impl<'a> MessageBuilder<'a> {
     }
 
     /// Add a message to the conversation
+    ///
+    /// Note: Only "user" and "assistant" roles are valid for messages.
+    /// System messages should be set using the `system()` method instead.
+    /// Invalid roles will be treated as "user" by default.
     pub fn message(mut self, role: impl Into<String>, content: impl Into<String>) -> Self {
         let role_str = role.into();
         let role = match role_str.as_str() {
             "user" => ClaudeRole::User,
             "assistant" => ClaudeRole::Assistant,
-            _ => panic!("Invalid role: {}", role_str),
+            _ => {
+                // Log warning and default to User role instead of panicking
+                tracing::warn!("Invalid role '{}', defaulting to 'user'", role_str);
+                ClaudeRole::User
+            }
         };
 
         let content = vec![ClaudeContentBlock::Text {
