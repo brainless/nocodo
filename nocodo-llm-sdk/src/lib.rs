@@ -24,10 +24,32 @@
 //!     Ok(())
 //! }
 //! ```
+//!
+//! ## Grok Example
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::grok::GrokClient;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = GrokClient::new("your-xai-api-key")?;
+//!     let response = client
+//!         .message_builder()
+//!         .model("grok-code-fast-1")
+//!         .max_tokens(1024)
+//!         .user_message("Hello, Grok!")
+//!         .send()
+//!         .await?;
+//!
+//!     println!("Response: {}", response.choices[0].message.content);
+//!     Ok(())
+//! }
+//! ```
 
 pub mod claude;
 pub mod client;
 pub mod error;
+pub mod grok;
 pub mod types;
 
 #[cfg(test)]
@@ -35,6 +57,10 @@ mod tests {
     use crate::claude::{
         client::ClaudeClient,
         types::{ClaudeContentBlock, ClaudeMessage, ClaudeRole},
+    };
+    use crate::grok::{
+        client::GrokClient,
+        types::{GrokMessage, GrokRole},
     };
 
     #[test]
@@ -50,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn test_message_builder() {
+    fn test_claude_message_builder() {
         let client = ClaudeClient::new("test-key").unwrap();
         let _builder = client
             .message_builder()
@@ -59,18 +85,48 @@ mod tests {
             .user_message("Hello");
 
         // The builder should be created successfully
-        // We can't test internal state since fields are private,
-        // but we can test that the builder exists
         assert!(true); // Builder creation succeeded
     }
 
     #[test]
-    fn test_message_creation() {
+    fn test_claude_message_creation() {
         let message = ClaudeMessage::text(ClaudeRole::User, "Hello");
         assert_eq!(message.role, ClaudeRole::User);
         assert_eq!(message.content.len(), 1);
         match &message.content[0] {
             ClaudeContentBlock::Text { text } => assert_eq!(text, "Hello"),
         }
+    }
+
+    #[test]
+    fn test_grok_client_creation() {
+        let client = GrokClient::new("test-key");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_grok_client_creation_empty_key() {
+        let client = GrokClient::new("");
+        assert!(client.is_err());
+    }
+
+    #[test]
+    fn test_grok_message_builder() {
+        let client = GrokClient::new("test-key").unwrap();
+        let _builder = client
+            .message_builder()
+            .model("grok-code-fast-1")
+            .max_tokens(100)
+            .user_message("Hello");
+
+        // The builder should be created successfully
+        assert!(true); // Builder creation succeeded
+    }
+
+    #[test]
+    fn test_grok_message_creation() {
+        let message = GrokMessage::user("Hello");
+        assert_eq!(message.role, GrokRole::User);
+        assert_eq!(message.content, "Hello");
     }
 }
