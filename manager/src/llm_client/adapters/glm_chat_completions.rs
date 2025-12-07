@@ -247,11 +247,20 @@ impl ProviderAdapter for GlmChatCompletionsAdapter {
     fn get_api_url(&self) -> String {
         // Support custom base_url for testing, otherwise use production
         if let Some(base_url) = &self.config.base_url {
-            format!(
-                "{}/paas/v4/chat/completions",
-                base_url.trim_end_matches('/')
-            )
-        } else {
+            // Check if base_url already contains the full endpoint path
+            if base_url.contains("/chat/completions") {
+                base_url.trim_end_matches('/').to_string()
+            } else {
+                // Append the correct path to base_url
+                // base_url could be:
+                // - https://api.z.ai/api/coding (for coding plan)
+                // - https://api.z.ai/api (for standard)
+                format!(
+                    "{}/paas/v4/chat/completions",
+                    base_url.trim_end_matches('/')
+                )
+            }
+         } else {
             "https://api.z.ai/api/paas/v4/chat/completions".to_string()
         }
     }
