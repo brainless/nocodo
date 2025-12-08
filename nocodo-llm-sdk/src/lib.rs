@@ -67,7 +67,7 @@
 //! }
 //! ```
 //!
-//! ## OpenAI Example
+//! ## OpenAI Chat Completions Example
 //!
 //! ```rust,no_run
 //! use nocodo_llm_sdk::openai::OpenAIClient;
@@ -77,13 +77,44 @@
 //!     let client = OpenAIClient::new("your-openai-api-key")?;
 //!     let response = client
 //!         .message_builder()
-//!         .model("gpt-5-codex")
+//!         .model("gpt-4o")
 //!         .max_completion_tokens(1024)
 //!         .user_message("Hello, GPT!")
 //!         .send()
 //!         .await?;
 //!
 //!     println!("Response: {}", response.choices[0].message.content);
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## OpenAI Responses API Example (GPT-5.1-Codex)
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::openai::OpenAIClient;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = OpenAIClient::new("your-openai-api-key")?;
+//!     let response = client
+//!         .response_builder()
+//!         .model("gpt-5.1-codex")
+//!         .input("Write a Python function to calculate fibonacci numbers")
+//!         .send()
+//!         .await?;
+//!
+//!     // Extract text from the response
+//!     for item in &response.output {
+//!         if item.item_type == "message" {
+//!             if let Some(content_blocks) = &item.content {
+//!                 for block in content_blocks {
+//!                     if block.content_type == "output_text" {
+//!                         println!("Response: {}", block.text);
+//!                     }
+//!                 }
+//!             }
+//!         }
+//!     }
 //!     Ok(())
 //! }
 //! ```

@@ -123,12 +123,18 @@ pub struct OpenAITopLogProb {
 /// Token usage information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIUsage {
-    /// Number of prompt tokens
+    /// Number of prompt tokens (Chat Completions API)
     #[serde(rename = "prompt_tokens")]
-    pub prompt_tokens: u32,
-    /// Number of completion tokens
+    pub prompt_tokens: Option<u32>,
+    /// Number of completion tokens (Chat Completions API)
     #[serde(rename = "completion_tokens")]
-    pub completion_tokens: u32,
+    pub completion_tokens: Option<u32>,
+    /// Number of input tokens (Responses API)
+    #[serde(rename = "input_tokens")]
+    pub input_tokens: Option<u32>,
+    /// Number of output tokens (Responses API)
+    #[serde(rename = "output_tokens")]
+    pub output_tokens: Option<u32>,
     /// Total number of tokens
     #[serde(rename = "total_tokens")]
     pub total_tokens: u32,
@@ -143,6 +149,86 @@ pub struct OpenAICompletionTokensDetails {
     /// Number of reasoning tokens (for GPT-5)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
+}
+
+/// OpenAI Responses API request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIResponseRequest {
+    /// The model to use for generation
+    pub model: String,
+    /// Input text for the response
+    pub input: String,
+    /// Whether to stream the response
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    /// ID of previous response to continue the conversation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_response_id: Option<String>,
+    /// Whether to run in background for long tasks
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<bool>,
+    /// How long to retain the prompt in cache
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_retention: Option<String>,
+}
+
+/// OpenAI Responses API response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIResponseResponse {
+    /// Unique identifier for the response
+    pub id: String,
+    /// Object type (always "response")
+    pub object: String,
+    /// Unix timestamp of creation
+    pub created_at: u64,
+    /// Status of the response
+    pub status: String,
+    /// Model used for generation
+    pub model: String,
+    /// Output items from the response
+    pub output: Vec<OpenAIOutputItem>,
+    /// Token usage information
+    pub usage: OpenAIUsage,
+    /// Background processing flag
+    #[serde(default)]
+    pub background: bool,
+}
+
+/// Output item in Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIOutputItem {
+    /// Unique identifier for the output item
+    pub id: String,
+    /// Type of the output item
+    #[serde(rename = "type")]
+    pub item_type: String,
+    /// Content of the output item (for message types)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<Vec<OpenAIContentBlock>>,
+    /// Role of the output item (for message types)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    /// Status of the output item (for message types)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Summary for reasoning types
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<Vec<serde_json::Value>>,
+}
+
+/// Content block in output item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIContentBlock {
+    /// Type of content
+    #[serde(rename = "type")]
+    pub content_type: String,
+    /// Annotations for the content
+    pub annotations: Vec<serde_json::Value>,
+    /// Log probabilities
+    #[serde(default)]
+    pub logprobs: Vec<serde_json::Value>,
+    /// Text content
+    pub text: String,
 }
 
 /// OpenAI API error response

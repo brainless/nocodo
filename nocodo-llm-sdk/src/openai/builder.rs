@@ -2,7 +2,7 @@ use crate::{
     error::LlmError,
     openai::{
         client::OpenAIClient,
-        types::{OpenAIChatCompletionRequest, OpenAIMessage, OpenAIRole},
+        types::{OpenAIChatCompletionRequest, OpenAIMessage, OpenAIRole, OpenAIResponseRequest},
     },
 };
 
@@ -147,9 +147,94 @@ impl<'a> OpenAIMessageBuilder<'a> {
     }
 }
 
+/// Builder for creating OpenAI Responses API requests
+pub struct OpenAIResponseBuilder<'a> {
+    client: &'a OpenAIClient,
+    model: Option<String>,
+    input: Option<String>,
+    stream: Option<bool>,
+    previous_response_id: Option<String>,
+    background: Option<bool>,
+    prompt_cache_retention: Option<String>,
+}
+
+impl<'a> OpenAIResponseBuilder<'a> {
+    /// Create a new response builder
+    pub fn new(client: &'a OpenAIClient) -> Self {
+        Self {
+            client,
+            model: None,
+            input: None,
+            stream: None,
+            previous_response_id: None,
+            background: None,
+            prompt_cache_retention: None,
+        }
+    }
+
+    /// Set the model to use
+    pub fn model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+
+    /// Set the input text for the response
+    pub fn input(mut self, input: impl Into<String>) -> Self {
+        self.input = Some(input.into());
+        self
+    }
+
+    /// Enable streaming
+    pub fn stream(mut self, stream: bool) -> Self {
+        self.stream = Some(stream);
+        self
+    }
+
+    /// Set previous response ID for conversation continuation
+    pub fn previous_response_id(mut self, id: impl Into<String>) -> Self {
+        self.previous_response_id = Some(id.into());
+        self
+    }
+
+    /// Enable background processing for long tasks
+    pub fn background(mut self, background: bool) -> Self {
+        self.background = Some(background);
+        self
+    }
+
+    /// Set prompt cache retention
+    pub fn prompt_cache_retention(mut self, retention: impl Into<String>) -> Self {
+        self.prompt_cache_retention = Some(retention.into());
+        self
+    }
+
+    /// Send the request and get the response
+    pub async fn send(self) -> Result<crate::openai::types::OpenAIResponseResponse, LlmError> {
+        let request = OpenAIResponseRequest {
+            model: self
+                .model
+                .ok_or_else(|| LlmError::invalid_request("Model must be specified"))?,
+            input: self
+                .input
+                .ok_or_else(|| LlmError::invalid_request("Input must be specified"))?,
+            stream: self.stream,
+            previous_response_id: self.previous_response_id,
+            background: self.background,
+            prompt_cache_retention: self.prompt_cache_retention,
+        };
+
+        self.client.create_response(request).await
+    }
+}
+
 impl OpenAIClient {
     /// Start building a chat completion request
     pub fn message_builder(&self) -> OpenAIMessageBuilder<'_> {
         OpenAIMessageBuilder::new(self)
+    }
+
+    /// Start building a responses API request
+    pub fn response_builder(&self) -> OpenAIResponseBuilder<'_> {
+        OpenAIResponseBuilder::new(self)
     }
 }
