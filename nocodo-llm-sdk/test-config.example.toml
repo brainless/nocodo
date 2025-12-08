@@ -1,0 +1,10 @@
+# Example test configuration
+# Copy to test-config.toml and add your API keys
+
+[api_keys]
+# ANTHROPIC_API_KEY = "sk-ant-..."
+# OPENAI_API_KEY = "sk-..."
+# XAI_API_KEY = "xai-..."
+# CEREBRAS_API_KEY = "csk-..."
+
+# Zen tests require no API keys (free models)

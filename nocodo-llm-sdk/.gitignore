@@ -1,0 +1,8 @@
+# Test configuration with API keys (keep private)
+test-config.toml
+
+# Binary build outputs from test runner
+/bin/**/*.exe
+/bin/**/*.dll
+/bin/**/*.so
+/bin/**/*.dylib
