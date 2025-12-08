@@ -15,11 +15,16 @@ Create a `test-config.toml` file with your API keys:
 
 ```toml
 [api_keys]
-ANTHROPIC_API_KEY = "sk-ant-..."
-OPENAI_API_KEY = "sk-..."
-XAI_API_KEY = "xai-..."
-CEREBRAS_API_KEY = "csk-..."
+anthropic_api_key = "sk-ant-..."
+openai_api_key = "sk-..."
+xai_api_key = "xai-..."
+cerebras_api_key = "csk-..."
 ```
+
+**Notes:**
+- Key names can be lowercase (will be converted to uppercase env vars automatically)
+- You can also use your existing `manager.toml` config file
+- Non-string values in `[api_keys]` section are ignored (e.g., booleans)
 
 See `test-config.example.toml` for a template.
 

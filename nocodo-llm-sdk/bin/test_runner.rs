@@ -6,7 +6,7 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct Config {
     #[serde(default)]
-    api_keys: HashMap<String, String>,
+    api_keys: HashMap<String, toml::Value>,
 }
 
 fn main() {
@@ -33,17 +33,24 @@ fn main() {
 
     for (test, key) in tests {
         if key.is_empty() || keys.contains_key(key) {
-            run_test(&["--test", test], &keys);
+            run_test(&["--test", test, "--", "--include-ignored"], &keys);
         }
     }
 }
 
 fn load_keys(path: &str) -> HashMap<String, String> {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|s| toml::from_str::<Config>(&s).ok())
-        .map(|c| c.api_keys)
-        .unwrap_or_default()
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    let config: Config = toml::from_str(&content).unwrap_or(Config {
+        api_keys: HashMap::new(),
+    });
+
+    // Convert lowercase keys to uppercase environment variable format
+    // Only include string values (API keys), skip booleans and other types
+    config
+        .api_keys
+        .into_iter()
+        .filter_map(|(k, v)| v.as_str().map(|s| (k.to_uppercase(), s.to_string())))
+        .collect()
 }
 
 fn run_test(args: &[&str], env_vars: &HashMap<String, String>) {
