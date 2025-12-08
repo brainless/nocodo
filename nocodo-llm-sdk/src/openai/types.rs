@@ -1,6 +1,89 @@
+//! OpenAI API types for both Chat Completions and Responses APIs.
+//!
+//! OpenAI provides two different APIs with different capabilities:
+//!
+//! ## Chat Completions API (Standard)
+//!
+//! The traditional OpenAI API for chat-based interactions.
+//!
+//! - **Endpoint:** `/v1/chat/completions`
+//! - **Models:** `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`, etc.
+//! - **Request Type:** [`OpenAIChatCompletionRequest`]
+//! - **Response Type:** [`OpenAIChatCompletionResponse`]
+//! - **Features:**
+//!   - Multi-turn conversations with message history
+//!   - Role-based messages (system, user, assistant, tool)
+//!   - Temperature, top-p, and stop sequences control
+//!   - Streaming support (via `stream` parameter)
+//!
+//! ### Example
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::openai::OpenAIClient;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let client = OpenAIClient::new("your-api-key")?;
+//! let response = client
+//!     .message_builder()
+//!     .model("gpt-4o")
+//!     .max_completion_tokens(1024)
+//!     .temperature(0.7)
+//!     .user_message("Hello!")
+//!     .send()
+//!     .await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Responses API (GPT-5.1+)
+//!
+//! The newer API designed for GPT-5.1+ models with extended reasoning capabilities.
+//!
+//! - **Endpoint:** `/v1/responses`
+//! - **Models:** `gpt-5.1-codex`, `gpt-5.1`, `gpt-5.1-*`
+//! - **Request Type:** [`OpenAIResponseRequest`]
+//! - **Response Type:** [`OpenAIResponseResponse`]
+//! - **Features:**
+//!   - Extended reasoning capabilities for complex tasks
+//!   - Background processing for long-running tasks
+//!   - Conversation continuation via `previous_response_id`
+//!   - Prompt caching for efficiency
+//!   - Reasoning traces in output items
+//!
+//! ### Example
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::openai::OpenAIClient;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let client = OpenAIClient::new("your-api-key")?;
+//! let response = client
+//!     .response_builder()
+//!     .model("gpt-5.1-codex")
+//!     .input("Write a Python function to calculate fibonacci")
+//!     .send()
+//!     .await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Automatic API Selection
+//!
+//! When using the [`crate::client::LlmClient`] trait, the SDK automatically routes
+//! requests to the appropriate API based on the model name:
+//!
+//! - Models starting with `gpt-5.1-codex` or `gpt-5.1` → Responses API
+//! - All other models → Chat Completions API
+//!
+//! See [`crate::openai::client::OpenAIClient`] for more details on automatic routing.
+
 use serde::{Deserialize, Serialize};
 
-/// OpenAI chat completion request
+/// OpenAI chat completion request for the Chat Completions API
+///
+/// Used with models like `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`, etc.
+///
+/// See module-level documentation for API selection guidance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIChatCompletionRequest {
     /// The model to use for generation

@@ -245,6 +245,28 @@ impl OpenAIClient {
 }
 
 impl crate::client::LlmClient for OpenAIClient {
+    /// Routes requests to the appropriate OpenAI API based on model:
+    ///
+    /// ## Responses API (`/v1/responses`)
+    /// Used for GPT-5.1+ models with extended reasoning capabilities:
+    /// - `gpt-5.1-codex` - Optimized for code generation with extended reasoning
+    /// - `gpt-5.1` - General reasoning model
+    /// - `gpt-5.1-*` - All GPT-5.1 variant models
+    ///
+    /// ## Chat Completions API (`/v1/chat/completions`)
+    /// Used for all other GPT models:
+    /// - `gpt-4o` - GPT-4 Optimized for general tasks
+    /// - `gpt-4-turbo` - Fast GPT-4 variant
+    /// - `gpt-3.5-turbo` - Legacy models
+    /// - All other GPT models
+    ///
+    /// ## API Differences
+    /// - **Responses API**: Supports extended reasoning, background processing, and conversation continuation
+    /// - **Chat Completions API**: Standard chat format with message history and role-based conversation
+    ///
+    /// Note: The Responses API is required for GPT-5.1 models to access
+    /// extended reasoning capabilities and background processing features.
+    /// When using the Responses API, all messages are concatenated into a single input string.
     async fn complete(
         &self,
         request: crate::types::CompletionRequest,
