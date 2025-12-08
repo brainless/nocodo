@@ -97,7 +97,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .send()
         .await?;
 
-    println!("GLM: {}", response.choices[0].message.content);
+    // GLM models may return both content and reasoning
+    println!("GLM: {}", response.choices[0].message.get_text());
     println!(
         "Usage: {} input tokens, {} output tokens",
         response.usage.prompt_tokens, response.usage.completion_tokens

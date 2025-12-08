@@ -33,7 +33,11 @@ pub struct GlmMessage {
     /// Role of the message sender
     pub role: GlmRole,
     /// Content of the message
-    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Reasoning content (for reasoning models like GLM)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 /// Role of a GLM message
@@ -116,7 +120,8 @@ impl GlmMessage {
     pub fn new<S: Into<String>>(role: GlmRole, content: S) -> Self {
         Self {
             role,
-            content: content.into(),
+            content: Some(content.into()),
+            reasoning: None,
         }
     }
 
@@ -133,5 +138,15 @@ impl GlmMessage {
     /// Create an assistant message
     pub fn assistant<S: Into<String>>(content: S) -> Self {
         Self::new(GlmRole::Assistant, content)
+    }
+
+    /// Get the text content, combining content and reasoning if both exist
+    pub fn get_text(&self) -> String {
+        match (&self.content, &self.reasoning) {
+            (Some(c), Some(r)) => format!("{}\n\nReasoning: {}", c, r),
+            (Some(c), None) => c.clone(),
+            (None, Some(r)) => r.clone(),
+            (None, None) => String::new(),
+        }
     }
 }

@@ -181,7 +181,11 @@ impl crate::client::LlmClient for GlmClient {
                     .collect::<Result<Vec<String>, LlmError>>()?
                     .join(""); // Join multiple text blocks
 
-                Ok(crate::glm::types::GlmMessage { role, content })
+                Ok(crate::glm::types::GlmMessage {
+                    role,
+                    content: Some(content),
+                    reasoning: None,
+                })
             })
             .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
 
@@ -205,7 +209,7 @@ impl crate::client::LlmClient for GlmClient {
 
         let choice = &glm_response.choices[0];
         let content = vec![crate::types::ContentBlock::Text {
-            text: choice.message.content.clone(),
+            text: choice.message.get_text(),
         }];
 
         let response = crate::types::CompletionResponse {

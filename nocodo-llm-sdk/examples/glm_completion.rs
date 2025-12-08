@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Print response
-    println!("GLM: {}", response.choices[0].message.content);
+    println!("GLM: {}", response.choices[0].message.get_text());
     println!(
         "Usage: {} input tokens, {} output tokens (total: {})",
         response.usage.prompt_tokens, response.usage.completion_tokens, response.usage.total_tokens

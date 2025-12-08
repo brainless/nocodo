@@ -185,6 +185,7 @@ mod tests {
     fn test_glm_message_creation() {
         let message = GlmMessage::user("Hello");
         assert_eq!(message.role, GlmRole::User);
-        assert_eq!(message.content, "Hello");
+        assert_eq!(message.content, Some("Hello".to_string()));
+        assert_eq!(message.get_text(), "Hello");
     }
 }
