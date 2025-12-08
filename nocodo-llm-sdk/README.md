@@ -11,6 +11,7 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Claude support**: Full Messages API implementation
 - **Grok support**: xAI Grok integration with OpenAI-compatible API
 - **GLM support**: Cerebras GLM models with OpenAI-compatible API
+- **OpenAI support**: GPT models including GPT-5 with Chat Completions API
 - **Extensible**: Designed for easy addition of other LLM providers
 
 ## Installation
@@ -107,6 +108,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### OpenAI (GPT-5)
+
+```rust
+use nocodo_llm_sdk::openai::OpenAIClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create client with your OpenAI API key
+    let client = OpenAIClient::new("your-openai-api-key")?;
+
+    // Build and send a message
+    let response = client
+        .message_builder()
+        .model("gpt-5.1")
+        .max_completion_tokens(1024)
+        .reasoning_effort("medium")  // For GPT-5 models
+        .user_message("Write a Python function to check if a number is prime.")
+        .send()
+        .await?;
+
+    println!("GPT: {}", response.choices[0].message.content);
+    println!(
+        "Usage: {} input tokens, {} output tokens",
+        response.usage.prompt_tokens, response.usage.completion_tokens
+    );
+    Ok(())
+}
+```
+
 ## Advanced Usage
 
 ### Claude: Conversation with Multiple Messages
@@ -195,6 +225,12 @@ match client
 - `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
 - `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
 - `message_builder() -> GlmMessageBuilder`: Start building a message request
+
+### OpenAIClient
+
+- `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
+- `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
+- `message_builder() -> OpenAIMessageBuilder`: Start building a message request
 
 ### MessageBuilder (Claude, Grok & GLM)
 

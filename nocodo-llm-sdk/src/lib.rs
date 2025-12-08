@@ -58,7 +58,28 @@
 //!         .message_builder()
 //!         .model("zai-glm-4.6")
 //!         .max_tokens(1024)
-//!         .user_message("Hello, GLM!")
+//!     .user_message("Hello, GLM!")
+//!     .send()
+//!     .await?;
+//!
+//!     println!("Response: {}", response.choices[0].message.get_text());
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## OpenAI Example
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::openai::OpenAIClient;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = OpenAIClient::new("your-openai-api-key")?;
+//!     let response = client
+//!         .message_builder()
+//!         .model("gpt-5-codex")
+//!         .max_completion_tokens(1024)
+//!         .user_message("Hello, GPT!")
 //!         .send()
 //!         .await?;
 //!
@@ -72,6 +93,7 @@ pub mod client;
 pub mod error;
 pub mod glm;
 pub mod grok;
+pub mod openai;
 pub mod types;
 
 #[cfg(test)]
@@ -87,6 +109,10 @@ mod tests {
     use crate::grok::{
         client::GrokClient,
         types::{GrokMessage, GrokRole},
+    };
+    use crate::openai::{
+        client::OpenAIClient,
+        types::{OpenAIMessage, OpenAIRole},
     };
 
     #[test]
@@ -187,5 +213,37 @@ mod tests {
         assert_eq!(message.role, GlmRole::User);
         assert_eq!(message.content, Some("Hello".to_string()));
         assert_eq!(message.get_text(), "Hello");
+    }
+
+    #[test]
+    fn test_openai_client_creation() {
+        let client = OpenAIClient::new("test-key");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_openai_client_creation_empty_key() {
+        let client = OpenAIClient::new("");
+        assert!(client.is_err());
+    }
+
+    #[test]
+    fn test_openai_message_builder() {
+        let client = OpenAIClient::new("test-key").unwrap();
+        let _builder = client
+            .message_builder()
+        .model("gpt-5.1")
+            .max_completion_tokens(100)
+            .user_message("Hello");
+
+        // The builder should be created successfully
+        assert!(true); // Builder creation succeeded
+    }
+
+    #[test]
+    fn test_openai_message_creation() {
+        let message = OpenAIMessage::user("Hello");
+        assert_eq!(message.role, OpenAIRole::User);
+        assert_eq!(message.content, "Hello");
     }
 }
