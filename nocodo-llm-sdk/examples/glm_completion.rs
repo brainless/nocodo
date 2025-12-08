@@ -1,4 +1,4 @@
-use nocodo_llm_sdk::glm::GlmClient;
+use nocodo_llm_sdk::CerebrasGlmClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("CEREBRAS_API_KEY environment variable must be set");
 
     // Create client
-    let client = GlmClient::new(api_key)?;
+    let client = CerebrasGlmClient::new(api_key)?;
 
     // Build and send request
     let response = client

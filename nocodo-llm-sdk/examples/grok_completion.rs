@@ -1,4 +1,4 @@
-use nocodo_llm_sdk::grok::GrokClient;
+use nocodo_llm_sdk::XaiGrokClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("XAI_API_KEY").expect("XAI_API_KEY environment variable must be set");
 
     // Create client
-    let client = GrokClient::new(api_key)?;
+    let client = XaiGrokClient::new(api_key)?;
 
     // Build and send request
     let response = client
