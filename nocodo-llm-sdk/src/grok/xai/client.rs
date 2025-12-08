@@ -2,18 +2,18 @@ use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
     error::LlmError,
-    glm::types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmErrorResponse},
+    grok::types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokErrorResponse},
 };
 
-/// GLM (Cerebras) LLM client
-pub struct GlmClient {
+/// xAI provider for Grok
+pub struct XaiGrokClient {
     api_key: String,
     base_url: String,
     http_client: reqwest::Client,
 }
 
-impl GlmClient {
-    /// Create a new GLM client with the given API key
+impl XaiGrokClient {
+    /// Create a new Grok client with the given API key
     pub fn new(api_key: impl Into<String>) -> Result<Self, LlmError> {
         let api_key = api_key.into();
         if api_key.is_empty() {
@@ -27,7 +27,7 @@ impl GlmClient {
 
         Ok(Self {
             api_key,
-            base_url: "https://api.cerebras.ai".to_string(),
+            base_url: "https://api.x.ai".to_string(),
             http_client,
         })
     }
@@ -38,11 +38,11 @@ impl GlmClient {
         self
     }
 
-    /// Create a chat completion using the GLM Chat Completions API
+    /// Create a chat completion using the Grok Chat Completions API
     pub async fn create_chat_completion(
         &self,
-        request: GlmChatCompletionRequest,
-    ) -> Result<GlmChatCompletionResponse, LlmError> {
+        request: GrokChatCompletionRequest,
+    ) -> Result<GrokChatCompletionResponse, LlmError> {
         let url = format!("{}/v1/chat/completions", self.base_url);
 
         let mut headers = HeaderMap::new();
@@ -65,32 +65,27 @@ impl GlmClient {
         let status = response.status();
 
         if status.is_success() {
-            let glm_response: GlmChatCompletionResponse = response
+            let grok_response: GrokChatCompletionResponse = response
                 .json()
                 .await
                 .map_err(|e| LlmError::internal(format!("Failed to parse response: {}", e)))?;
-            Ok(glm_response)
+            Ok(grok_response)
         } else {
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            // Try to parse as GLM error response
-            if let Ok(error_response) = serde_json::from_str::<GlmErrorResponse>(&error_text) {
+            // Try to parse as Grok error response
+            if let Ok(error_response) = serde_json::from_str::<GrokErrorResponse>(&error_text) {
                 match status {
                     reqwest::StatusCode::BAD_REQUEST => {
-                        // Check for API key related errors
+                        // xAI returns 400 for invalid API keys with "Incorrect API key" in the message
                         if error_response
                             .error
                             .message
                             .to_lowercase()
                             .contains("api key")
-                            || error_response
-                                .error
-                                .message
-                                .to_lowercase()
-                                .contains("authorization")
                         {
                             Err(LlmError::authentication(error_response.error.message))
                         } else {
@@ -125,9 +120,7 @@ impl GlmClient {
                 match status {
                     reqwest::StatusCode::BAD_REQUEST => {
                         // Check if error text contains API key related error
-                        if error_text.to_lowercase().contains("api key")
-                            || error_text.to_lowercase().contains("authorization")
-                        {
+                        if error_text.to_lowercase().contains("api key") {
                             Err(LlmError::authentication(error_text))
                         } else {
                             Err(LlmError::invalid_request(error_text))
@@ -152,20 +145,20 @@ impl GlmClient {
     }
 }
 
-impl crate::client::LlmClient for GlmClient {
+impl crate::client::LlmClient for XaiGrokClient {
     async fn complete(
         &self,
         request: crate::types::CompletionRequest,
     ) -> Result<crate::types::CompletionResponse, LlmError> {
-        // Convert generic request to GLM-specific request
-        let glm_messages = request
+        // Convert generic request to Grok-specific request
+        let grok_messages = request
             .messages
             .into_iter()
             .map(|msg| {
                 let role = match msg.role {
-                    crate::types::Role::User => crate::glm::types::GlmRole::User,
-                    crate::types::Role::Assistant => crate::glm::types::GlmRole::Assistant,
-                    crate::types::Role::System => crate::glm::types::GlmRole::System,
+                    crate::types::Role::User => crate::grok::types::GrokRole::User,
+                    crate::types::Role::Assistant => crate::grok::types::GrokRole::Assistant,
+                    crate::types::Role::System => crate::grok::types::GrokRole::System,
                 };
 
                 // For now, only support text content
@@ -181,47 +174,42 @@ impl crate::client::LlmClient for GlmClient {
                     .collect::<Result<Vec<String>, LlmError>>()?
                     .join(""); // Join multiple text blocks
 
-                Ok(crate::glm::types::GlmMessage {
-                    role,
-                    content: Some(content),
-                    reasoning: None,
-                })
+                Ok(crate::grok::types::GrokMessage { role, content })
             })
-            .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
+            .collect::<Result<Vec<crate::grok::types::GrokMessage>, LlmError>>()?;
 
-        let glm_request = crate::glm::types::GlmChatCompletionRequest {
+        let grok_request = crate::grok::types::GrokChatCompletionRequest {
             model: request.model,
-            messages: glm_messages,
-            max_completion_tokens: Some(request.max_tokens),
+            messages: grok_messages,
+            max_tokens: Some(request.max_tokens),
             temperature: request.temperature,
             top_p: request.top_p,
             stop: request.stop_sequences,
             stream: None, // Non-streaming for now
-            seed: None,
         };
 
         // Send request and convert response
-        let glm_response = self.create_chat_completion(glm_request).await?;
+        let grok_response = self.create_chat_completion(grok_request).await?;
 
-        if glm_response.choices.is_empty() {
+        if grok_response.choices.is_empty() {
             return Err(LlmError::internal("No completion choices returned"));
         }
 
-        let choice = &glm_response.choices[0];
+        let choice = &grok_response.choices[0];
         let content = vec![crate::types::ContentBlock::Text {
-            text: choice.message.get_text(),
+            text: choice.message.content.clone(),
         }];
 
         let response = crate::types::CompletionResponse {
             content,
             role: match choice.message.role {
-                crate::glm::types::GlmRole::User => crate::types::Role::User,
-                crate::glm::types::GlmRole::Assistant => crate::types::Role::Assistant,
-                crate::glm::types::GlmRole::System => crate::types::Role::System,
+                crate::grok::types::GrokRole::User => crate::types::Role::User,
+                crate::grok::types::GrokRole::Assistant => crate::types::Role::Assistant,
+                crate::grok::types::GrokRole::System => crate::types::Role::System,
             },
             usage: crate::types::Usage {
-                input_tokens: glm_response.usage.prompt_tokens,
-                output_tokens: glm_response.usage.completion_tokens,
+                input_tokens: grok_response.usage.prompt_tokens,
+                output_tokens: grok_response.usage.completion_tokens,
             },
             stop_reason: choice.finish_reason.clone(),
         };
@@ -230,10 +218,10 @@ impl crate::client::LlmClient for GlmClient {
     }
 
     fn provider_name(&self) -> &str {
-        "glm"
+        "grok"
     }
 
     fn model_name(&self) -> &str {
-        "zai-glm-4.6" // Default model
+        "grok-code-fast-1" // Default model
     }
 }

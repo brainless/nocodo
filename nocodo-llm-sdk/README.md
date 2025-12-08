@@ -9,9 +9,11 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Ergonomic**: Builder pattern for easy request construction
 - **Comprehensive error handling**: Detailed error types with context
 - **Claude support**: Full Messages API implementation
-- **Grok support**: xAI Grok integration with OpenAI-compatible API
+- **Grok support**: xAI and Zen (free) Grok integration with OpenAI-compatible API
 - **GLM support**: Cerebras GLM models with OpenAI-compatible API
+- **Zen provider**: Free access to select models during beta
 - **OpenAI support**: GPT models including GPT-5 with Chat Completions API
+- **Multi-provider**: Same models available from different providers
 - **Extensible**: Designed for easy addition of other LLM providers
 
 ## Installation
@@ -107,6 +109,74 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Multi-Provider Support
+
+nocodo-llm-sdk supports accessing the same models via different providers, giving you flexibility in cost, performance, and availability.
+
+### Grok Models
+
+Access Grok via different providers:
+
+#### Zen (Free)
+```rust
+use nocodo_llm_sdk::grok::zen::ZenGrokClient;
+
+// No API key required for free model!
+let client = ZenGrokClient::new()?;
+let response = client
+    .message_builder()
+    .model("grok-code")
+    .max_tokens(1024)
+    .user_message("Hello, Grok!")
+    .send()
+    .await?;
+
+println!("Response: {}", response.choices[0].message.content);
+```
+
+#### xAI (Paid)
+```rust
+use nocodo_llm_sdk::grok::xai::XaiGrokClient;
+
+let client = XaiGrokClient::new("your-xai-api-key")?;
+let response = client
+    .message_builder()
+    .model("grok-code-fast-1")
+    .max_tokens(1024)
+    .user_message("Hello, Grok!")
+    .send()
+    .await?;
+
+println!("Response: {}", response.choices[0].message.content);
+```
+
+### GLM 4.6 Models
+
+Access GLM 4.6 via different providers:
+
+#### Cerebras (Paid)
+```rust
+use nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient;
+
+let client = CerebrasGlmClient::new("your-cerebras-api-key")?;
+let response = client
+    .message_builder()
+    .model("zai-glm-4.6")
+    .max_tokens(1024)
+    .user_message("Hello, GLM!")
+    .send()
+    .await?;
+
+println!("Response: {}", response.choices[0].message.get_text());
+```
+
+### Provider Comparison
+
+| Model | Zen (OpenCode) | Native Provider |
+|-------|----------------|-----------------|
+| **Grok** | `grok-code` (free) | `grok-code-fast-1` (xAI, paid) |
+| **GLM 4.6** | `big-pickle` (free, limited time) | `zai-glm-4.6` (Cerebras, paid) |
 
 ### OpenAI (GPT-5)
 

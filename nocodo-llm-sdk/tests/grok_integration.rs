@@ -1,4 +1,4 @@
-use nocodo_llm_sdk::grok::client::GrokClient;
+use nocodo_llm_sdk::grok::xai::XaiGrokClient;
 
 // Integration tests require XAI_API_KEY environment variable
 // Run with: XAI_API_KEY=sk-... cargo test --test grok_integration -- --ignored
@@ -19,7 +19,7 @@ async fn test_grok_real_api_call() {
     skip_if_no_api_key();
     let api_key = get_api_key().unwrap();
 
-    let client = GrokClient::new(api_key).unwrap();
+    let client = XaiGrokClient::new(api_key).unwrap();
     let response = client
         .message_builder()
         .model("grok-code-fast-1")
@@ -42,7 +42,7 @@ async fn test_grok_real_api_call() {
 #[tokio::test]
 #[ignore] // Run manually with API key
 async fn test_grok_invalid_api_key() {
-    let client = GrokClient::new("invalid-key").unwrap();
+    let client = XaiGrokClient::new("invalid-key").unwrap();
     let response = client
         .message_builder()
         .model("grok-code-fast-1")

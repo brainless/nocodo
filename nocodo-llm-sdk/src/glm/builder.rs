@@ -1,14 +1,20 @@
 use crate::{
     error::LlmError,
     glm::{
-        client::GlmClient,
-        types::{GlmChatCompletionRequest, GlmMessage, GlmRole},
+        cerebras::CerebrasGlmClient,
+        zen::ZenGlmClient,
+        types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmRole},
     },
 };
 
+/// Trait for GLM clients
+pub trait GlmClientTrait {
+    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send;
+}
+
 /// Builder for creating GLM chat completion requests
-pub struct GlmMessageBuilder<'a> {
-    client: &'a GlmClient,
+pub struct GlmMessageBuilder<'a, T: GlmClientTrait> {
+    client: &'a T,
     model: Option<String>,
     max_completion_tokens: Option<u32>,
     messages: Vec<GlmMessage>,
@@ -19,9 +25,21 @@ pub struct GlmMessageBuilder<'a> {
     seed: Option<i32>,
 }
 
-impl<'a> GlmMessageBuilder<'a> {
+impl GlmClientTrait for CerebrasGlmClient {
+    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
+        self.create_chat_completion(request)
+    }
+}
+
+impl GlmClientTrait for ZenGlmClient {
+    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
+        self.create_chat_completion(request)
+    }
+}
+
+impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
     /// Create a new message builder
-    pub fn new(client: &'a GlmClient) -> Self {
+    pub fn new(client: &'a T) -> Self {
         Self {
             client,
             model: None,
@@ -132,9 +150,11 @@ impl<'a> GlmMessageBuilder<'a> {
     }
 }
 
-impl GlmClient {
+impl CerebrasGlmClient {
     /// Start building a chat completion request
-    pub fn message_builder(&self) -> GlmMessageBuilder<'_> {
+    pub fn message_builder(&self) -> GlmMessageBuilder<'_, CerebrasGlmClient> {
         GlmMessageBuilder::new(self)
     }
 }
+
+

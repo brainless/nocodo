@@ -127,6 +127,19 @@ pub mod grok;
 pub mod openai;
 pub mod types;
 
+// Provider-specific exports
+pub use grok::xai::XaiGrokClient;
+pub use grok::zen::ZenGrokClient;
+pub use glm::cerebras::CerebrasGlmClient;
+pub use glm::zen::ZenGlmClient;
+
+// Backwards compatibility aliases
+#[deprecated(since = "0.2.0", note = "Use XaiGrokClient explicitly")]
+pub use grok::xai::XaiGrokClient as GrokClient;
+
+#[deprecated(since = "0.2.0", note = "Use CerebrasGlmClient explicitly")]
+pub use glm::cerebras::CerebrasGlmClient as GlmClient;
+
 #[cfg(test)]
 mod tests {
     use crate::claude::{
@@ -134,11 +147,11 @@ mod tests {
         types::{ClaudeContentBlock, ClaudeMessage, ClaudeRole},
     };
     use crate::glm::{
-        client::GlmClient,
+        cerebras::CerebrasGlmClient,
         types::{GlmMessage, GlmRole},
     };
     use crate::grok::{
-        client::GrokClient,
+        xai::XaiGrokClient,
         types::{GrokMessage, GrokRole},
     };
     use crate::openai::{
@@ -182,20 +195,20 @@ mod tests {
     }
 
     #[test]
-    fn test_grok_client_creation() {
-        let client = GrokClient::new("test-key");
+    fn test_xai_grok_client_creation() {
+        let client = XaiGrokClient::new("test-key");
         assert!(client.is_ok());
     }
 
     #[test]
-    fn test_grok_client_creation_empty_key() {
-        let client = GrokClient::new("");
+    fn test_xai_grok_client_creation_empty_key() {
+        let client = XaiGrokClient::new("");
         assert!(client.is_err());
     }
 
     #[test]
-    fn test_grok_message_builder() {
-        let client = GrokClient::new("test-key").unwrap();
+    fn test_xai_grok_message_builder() {
+        let client = XaiGrokClient::new("test-key").unwrap();
         let _builder = client
             .message_builder()
             .model("grok-code-fast-1")
@@ -214,20 +227,20 @@ mod tests {
     }
 
     #[test]
-    fn test_glm_client_creation() {
-        let client = GlmClient::new("test-key");
+    fn test_cerebras_glm_client_creation() {
+        let client = CerebrasGlmClient::new("test-key");
         assert!(client.is_ok());
     }
 
     #[test]
-    fn test_glm_client_creation_empty_key() {
-        let client = GlmClient::new("");
+    fn test_cerebras_glm_client_creation_empty_key() {
+        let client = CerebrasGlmClient::new("");
         assert!(client.is_err());
     }
 
     #[test]
-    fn test_glm_message_builder() {
-        let client = GlmClient::new("test-key").unwrap();
+    fn test_cerebras_glm_message_builder() {
+        let client = CerebrasGlmClient::new("test-key").unwrap();
         let _builder = client
             .message_builder()
             .model("zai-glm-4.6")

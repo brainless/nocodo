@@ -15,7 +15,16 @@ tokio = { version = "1.0", features = ["full"] }
 thiserror = "1.0"
 anyhow = "1.0"
 tracing = "0.1"
+toml = { version = "0.8", optional = true }
 
 [dev-dependencies]
 mockito = "1.0"
 tokio-test = "0.4"
+
+[features]
+test-runner = ["toml"]
+
+[[bin]]
+name = "test-runner"
+path = "bin/test_runner.rs"
+required-features = ["test-runner"]

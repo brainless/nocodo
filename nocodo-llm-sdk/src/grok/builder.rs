@@ -1,14 +1,20 @@
 use crate::{
     error::LlmError,
     grok::{
-        client::GrokClient,
-        types::{GrokChatCompletionRequest, GrokMessage, GrokRole},
+        xai::XaiGrokClient,
+        zen::ZenGrokClient,
+        types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokRole},
     },
 };
 
+/// Trait for Grok clients
+pub trait GrokClientTrait {
+    fn create_chat_completion(&self, request: GrokChatCompletionRequest) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send;
+}
+
 /// Builder for creating Grok chat completion requests
-pub struct GrokMessageBuilder<'a> {
-    client: &'a GrokClient,
+pub struct GrokMessageBuilder<'a, T: GrokClientTrait> {
+    client: &'a T,
     model: Option<String>,
     max_tokens: Option<u32>,
     messages: Vec<GrokMessage>,
@@ -18,9 +24,21 @@ pub struct GrokMessageBuilder<'a> {
     stream: Option<bool>,
 }
 
-impl<'a> GrokMessageBuilder<'a> {
+impl GrokClientTrait for XaiGrokClient {
+    fn create_chat_completion(&self, request: GrokChatCompletionRequest) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send {
+        self.create_chat_completion(request)
+    }
+}
+
+impl GrokClientTrait for ZenGrokClient {
+    fn create_chat_completion(&self, request: GrokChatCompletionRequest) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send {
+        self.create_chat_completion(request)
+    }
+}
+
+impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
     /// Create a new message builder
-    pub fn new(client: &'a GrokClient) -> Self {
+    pub fn new(client: &'a T) -> Self {
         Self {
             client,
             model: None,
@@ -123,9 +141,11 @@ impl<'a> GrokMessageBuilder<'a> {
     }
 }
 
-impl GrokClient {
+impl XaiGrokClient {
     /// Start building a chat completion request
-    pub fn message_builder(&self) -> GrokMessageBuilder<'_> {
+    pub fn message_builder(&self) -> GrokMessageBuilder<'_, XaiGrokClient> {
         GrokMessageBuilder::new(self)
     }
 }
+
+

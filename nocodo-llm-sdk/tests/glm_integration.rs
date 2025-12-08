@@ -1,10 +1,10 @@
-use nocodo_llm_sdk::glm::{client::GlmClient, types::GlmChatCompletionRequest};
+use nocodo_llm_sdk::glm::{cerebras::CerebrasGlmClient, types::GlmChatCompletionRequest};
 
 #[tokio::test]
 #[ignore] // Requires CEREBRAS_API_KEY environment variable
 async fn test_glm_real_api_call() {
     let api_key = std::env::var("CEREBRAS_API_KEY").expect("CEREBRAS_API_KEY not set");
-    let client = GlmClient::new(api_key).unwrap();
+    let client = CerebrasGlmClient::new(api_key).unwrap();
 
     let request = GlmChatCompletionRequest {
         model: "zai-glm-4.6".to_string(),
@@ -41,7 +41,7 @@ async fn test_glm_real_api_call() {
 #[tokio::test]
 #[ignore] // Requires CEREBRAS_API_KEY environment variable
 async fn test_glm_invalid_api_key() {
-    let client = GlmClient::new("invalid-key").unwrap();
+    let client = CerebrasGlmClient::new("invalid-key").unwrap();
 
     let request = GlmChatCompletionRequest {
         model: "zai-glm-4.6".to_string(),
