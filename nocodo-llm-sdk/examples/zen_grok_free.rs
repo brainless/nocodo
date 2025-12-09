@@ -22,12 +22,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         messages: vec![GrokMessage {
             role: GrokRole::User,
             content: "Write a simple 'Hello, World!' program in Rust.".to_string(),
+            tool_calls: None,
+            tool_call_id: None,
         }],
         max_tokens: Some(500),
         temperature: Some(0.7),
         top_p: None,
         stop: None,
         stream: None,
+        tools: None,
+        tool_choice: None,
     };
 
     println!("Sending request to Zen Grok...");

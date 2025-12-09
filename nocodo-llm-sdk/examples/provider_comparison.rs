@@ -43,11 +43,15 @@ async fn test_grok_providers() -> Result<(), Box<dyn std::error::Error>> {
         messages: vec![GrokMessage {
             role: GrokRole::User,
             content: prompt.to_string(),
+            tool_calls: None,
+            tool_call_id: None,
         }],
         max_tokens: Some(50),
         temperature: None,
         top_p: None,
         stop: None,
+        tools: None,
+        tool_choice: None,
         stream: None,
     };
 
@@ -68,12 +72,16 @@ async fn test_grok_providers() -> Result<(), Box<dyn std::error::Error>> {
             messages: vec![GrokMessage {
                 role: GrokRole::User,
                 content: prompt.to_string(),
+                tool_calls: None,
+                tool_call_id: None,
             }],
             max_tokens: Some(50),
             temperature: None,
             top_p: None,
             stop: None,
             stream: None,
+            tools: None,
+            tool_choice: None,
         };
 
         match xai_client.create_chat_completion(request).await {
@@ -108,6 +116,8 @@ async fn test_glm_providers() -> Result<(), Box<dyn std::error::Error>> {
             stop: None,
             stream: None,
             seed: None,
+            tools: None,
+            tool_choice: None,
         };
 
         match cerebras_client.create_chat_completion(request).await {

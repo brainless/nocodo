@@ -1,10 +1,12 @@
 use crate::{
     error::LlmError,
     grok::{
+        tools::GrokToolFormat,
         xai::XaiGrokClient,
         zen::ZenGrokClient,
-        types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokRole},
+        types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokRole, GrokTool},
     },
+    tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
 
 /// Trait for Grok clients
@@ -22,6 +24,8 @@ pub struct GrokMessageBuilder<'a, T: GrokClientTrait> {
     top_p: Option<f32>,
     stop: Option<Vec<String>>,
     stream: Option<bool>,
+    tools: Option<Vec<GrokTool>>,
+    tool_choice: Option<serde_json::Value>,
 }
 
 impl GrokClientTrait for XaiGrokClient {
@@ -48,6 +52,8 @@ impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
             top_p: None,
             stop: None,
             stream: None,
+            tools: None,
+            tool_choice: None,
         }
     }
 
@@ -123,6 +129,36 @@ impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
         self
     }
 
+    /// Add a tool to the request
+    pub fn tool(mut self, tool: Tool) -> Self {
+        let tools = self.tools.get_or_insert_with(Vec::new);
+        tools.push(GrokToolFormat::to_provider_tool(&tool));
+        self
+    }
+
+    /// Add multiple tools to the request
+    pub fn tools(mut self, tools: Vec<Tool>) -> Self {
+        for tool in tools {
+            self = self.tool(tool);
+        }
+        self
+    }
+
+    /// Set tool choice strategy
+    pub fn tool_choice(mut self, choice: ToolChoice) -> Self {
+        self.tool_choice = Some(GrokToolFormat::to_provider_tool_choice(&choice));
+        self
+    }
+
+    /// Add a tool result to continue the conversation
+    pub fn tool_result(mut self, result: ToolResult) -> Self {
+        self.messages.push(GrokMessage::tool_result(
+            result.tool_call_id(),
+            result.content(),
+        ));
+        self
+    }
+
     /// Send the request and get the response
     pub async fn send(self) -> Result<crate::grok::types::GrokChatCompletionResponse, LlmError> {
         let request = GrokChatCompletionRequest {
@@ -135,6 +171,8 @@ impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
             top_p: self.top_p,
             stop: self.stop,
             stream: self.stream,
+            tools: self.tools,
+            tool_choice: self.tool_choice,
         };
 
         self.client.create_chat_completion(request).await

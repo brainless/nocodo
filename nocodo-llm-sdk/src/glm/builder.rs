@@ -2,9 +2,11 @@ use crate::{
     error::LlmError,
     glm::{
         cerebras::CerebrasGlmClient,
+        tools::GlmToolFormat,
         zen::ZenGlmClient,
-        types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmRole},
+        types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmRole, GlmTool},
     },
+    tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
 
 /// Trait for GLM clients
@@ -23,6 +25,8 @@ pub struct GlmMessageBuilder<'a, T: GlmClientTrait> {
     stop: Option<Vec<String>>,
     stream: Option<bool>,
     seed: Option<i32>,
+    tools: Option<Vec<GlmTool>>,
+    tool_choice: Option<serde_json::Value>,
 }
 
 impl GlmClientTrait for CerebrasGlmClient {
@@ -50,6 +54,8 @@ impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
             stop: None,
             stream: None,
             seed: None,
+            tools: None,
+            tool_choice: None,
         }
     }
 
@@ -131,6 +137,36 @@ impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
         self
     }
 
+    /// Add a tool to the request
+    pub fn tool(mut self, tool: Tool) -> Self {
+        let tools = self.tools.get_or_insert_with(Vec::new);
+        tools.push(GlmToolFormat::to_provider_tool(&tool));
+        self
+    }
+
+    /// Add multiple tools to the request
+    pub fn tools(mut self, tools: Vec<Tool>) -> Self {
+        for tool in tools {
+            self = self.tool(tool);
+        }
+        self
+    }
+
+    /// Set tool choice strategy
+    pub fn tool_choice(mut self, choice: ToolChoice) -> Self {
+        self.tool_choice = Some(GlmToolFormat::to_provider_tool_choice(&choice));
+        self
+    }
+
+    /// Add a tool result to continue the conversation
+    pub fn tool_result(mut self, result: ToolResult) -> Self {
+        self.messages.push(GlmMessage::tool_result(
+            result.tool_call_id(),
+            result.content(),
+        ));
+        self
+    }
+
     /// Send the request and get the response
     pub async fn send(self) -> Result<crate::glm::types::GlmChatCompletionResponse, LlmError> {
         let request = GlmChatCompletionRequest {
@@ -144,6 +180,8 @@ impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
             stop: self.stop,
             stream: self.stream,
             seed: self.seed,
+            tools: self.tools,
+            tool_choice: self.tool_choice,
         };
 
         self.client.create_chat_completion(request).await

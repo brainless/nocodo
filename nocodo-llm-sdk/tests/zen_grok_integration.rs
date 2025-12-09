@@ -13,12 +13,16 @@ async fn test_zen_grok_free_model() {
         messages: vec![GrokMessage {
             role: GrokRole::User,
             content: "What is 2+2? Answer in one word.".to_string(),
+            tool_calls: None,
+            tool_call_id: None,
         }],
         max_tokens: Some(50),
         temperature: Some(0.7),
         top_p: None,
         stop: None,
         stream: None,
+        tools: None,
+        tool_choice: None,
     };
 
     let response = client
@@ -50,12 +54,16 @@ async fn test_zen_grok_with_api_key() {
         messages: vec![GrokMessage {
             role: GrokRole::User,
             content: "Hello from Zen!".to_string(),
+            tool_calls: None,
+            tool_call_id: None,
         }],
         max_tokens: Some(100),
         temperature: None,
         top_p: None,
         stop: None,
         stream: None,
+        tools: None,
+        tool_choice: None,
     };
 
     let response = client

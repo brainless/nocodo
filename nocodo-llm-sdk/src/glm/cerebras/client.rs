@@ -152,6 +152,24 @@ impl CerebrasGlmClient {
     }
 }
 
+impl crate::glm::types::GlmChatCompletionResponse {
+    /// Extract tool calls from the response
+    pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
+        self.choices.first()?.message.tool_calls.as_ref().map(|calls| {
+            calls.iter().map(|call| {
+                let arguments: serde_json::Value = serde_json::from_str(&call.function.arguments)
+                    .unwrap_or(serde_json::Value::Null);
+
+                crate::tools::ToolCall::new(
+                    call.id.clone(),
+                    call.function.name.clone(),
+                    arguments,
+                )
+            }).collect()
+        })
+    }
+}
+
 impl crate::client::LlmClient for CerebrasGlmClient {
     async fn complete(
         &self,
@@ -185,6 +203,8 @@ impl crate::client::LlmClient for CerebrasGlmClient {
                     role,
                     content: Some(content),
                     reasoning: None,
+                    tool_calls: None,
+                    tool_call_id: None,
                 })
             })
             .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
@@ -198,6 +218,8 @@ impl crate::client::LlmClient for CerebrasGlmClient {
             stop: request.stop_sequences,
             stream: None, // Non-streaming for now
             seed: None,
+            tools: None, // No tools for generic LlmClient interface
+            tool_choice: None,
         };
 
         // Send request and convert response

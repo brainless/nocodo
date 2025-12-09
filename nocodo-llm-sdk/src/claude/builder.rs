@@ -1,9 +1,11 @@
 use crate::{
     claude::{
         client::ClaudeClient,
-        types::{ClaudeContentBlock, ClaudeMessage, ClaudeMessageRequest, ClaudeRole},
+        tools::ClaudeToolFormat,
+        types::{ClaudeContentBlock, ClaudeMessage, ClaudeMessageRequest, ClaudeRole, ClaudeTool},
     },
     error::LlmError,
+    tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
 
 /// Builder for creating Claude message requests
@@ -16,6 +18,8 @@ pub struct MessageBuilder<'a> {
     temperature: Option<f32>,
     top_p: Option<f32>,
     stop_sequences: Option<Vec<String>>,
+    tools: Option<Vec<ClaudeTool>>,
+    tool_choice: Option<serde_json::Value>,
 }
 
 impl<'a> MessageBuilder<'a> {
@@ -30,6 +34,8 @@ impl<'a> MessageBuilder<'a> {
             temperature: None,
             top_p: None,
             stop_sequences: None,
+            tools: None,
+            tool_choice: None,
         }
     }
 
@@ -104,6 +110,36 @@ impl<'a> MessageBuilder<'a> {
         self
     }
 
+    /// Add a tool to the request
+    pub fn tool(mut self, tool: Tool) -> Self {
+        let tools = self.tools.get_or_insert_with(Vec::new);
+        tools.push(ClaudeToolFormat::to_provider_tool(&tool));
+        self
+    }
+
+    /// Add multiple tools to the request
+    pub fn tools(mut self, tools: Vec<Tool>) -> Self {
+        for tool in tools {
+            self = self.tool(tool);
+        }
+        self
+    }
+
+    /// Set tool choice strategy
+    pub fn tool_choice(mut self, choice: ToolChoice) -> Self {
+        self.tool_choice = Some(ClaudeToolFormat::to_provider_tool_choice(&choice));
+        self
+    }
+
+    /// Add a tool result to continue the conversation
+    pub fn tool_result(mut self, result: ToolResult) -> Self {
+        // For Claude, tool results are added as user messages with tool_result content
+        // This is a simplified approach - in practice, Claude expects tool results in a specific format
+        let content = format!("Tool result for {}: {}", result.tool_call_id(), result.content());
+        self.messages.push(ClaudeMessage::user(content));
+        self
+    }
+
     /// Send the request and get the response
     pub async fn send(self) -> Result<crate::claude::types::ClaudeMessageResponse, LlmError> {
         let request = ClaudeMessageRequest {
@@ -118,6 +154,8 @@ impl<'a> MessageBuilder<'a> {
             temperature: self.temperature,
             top_p: self.top_p,
             stop_sequences: self.stop_sequences,
+            tools: self.tools,
+            tool_choice: self.tool_choice,
         };
 
         self.client.create_message(request).await

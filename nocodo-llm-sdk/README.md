@@ -8,6 +8,7 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Async-first**: Built with Tokio for high-performance async operations
 - **Ergonomic**: Builder pattern for easy request construction
 - **Comprehensive error handling**: Detailed error types with context
+- **Tool/Function Calling**: Type-safe tool calling with automatic JSON Schema generation
 - **Claude support**: Full Messages API implementation
 - **Grok support**: xAI and Zen (free) Grok integration with OpenAI-compatible API
 - **GLM support**: Cerebras GLM models with OpenAI-compatible API
@@ -276,6 +277,81 @@ match client
 }
 ```
 
+## Tool Calling (Function Calling)
+
+Enable LLMs to call external functions with type-safe parameter extraction.
+
+### Basic Example
+
+```rust
+use nocodo_llm_sdk::{openai::OpenAIClient, tools::Tool};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+// Define parameter schema
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+struct WeatherParams {
+    location: String,
+    unit: String,
+}
+
+// Create tool
+let tool = Tool::from_type::<WeatherParams>()
+    .name("get_weather")
+    .description("Get weather for a location")
+    .build();
+
+// Use tool
+let response = client
+    .message_builder()
+    .user_message("What's the weather in NYC?")
+    .tool(tool)
+    .send()
+    .await?;
+
+// Handle tool calls
+if let Some(calls) = response.tool_calls() {
+    for call in calls {
+        let params: WeatherParams = call.parse_arguments()?;
+        // Execute your function...
+    }
+}
+```
+
+### Advanced: Multi-Tool Agent
+
+```rust
+// Define multiple tools
+let search_tool = Tool::from_type::<SearchParams>()
+    .name("search")
+    .description("Search the knowledge base")
+    .build();
+
+let calc_tool = Tool::from_type::<CalculateParams>()
+    .name("calculate")
+    .description("Evaluate mathematical expressions")
+    .build();
+
+// Use multiple tools with parallel execution
+let response = client
+    .message_builder()
+    .user_message("Search for 'Rust' and calculate 123 * 456")
+    .tools(vec![search_tool, calc_tool])
+    .tool_choice(ToolChoice::Auto)
+    .parallel_tool_calls(true)
+    .send()
+    .await?;
+```
+
+See `examples/tool_calling_*.rs` for complete examples.
+
+### Tool Choice Options
+
+- `ToolChoice::Auto`: Let the model decide whether to use tools
+- `ToolChoice::Required`: Force the model to use at least one tool
+- `ToolChoice::None`: Disable tool use
+- `ToolChoice::Specific { name }`: Force a specific tool by name
+
 ## API Reference
 
 ### ClaudeClient
@@ -357,7 +433,8 @@ See the `examples/` directory for complete working examples:
 - `simple_completion.rs`: Basic Claude usage
 - `grok_completion.rs`: Basic Grok usage
 - `glm_completion.rs`: Basic GLM usage
-- More examples coming in future versions
+- `tool_calling_weather.rs`: Simple tool calling example
+- `tool_calling_agent.rs`: Multi-tool agent example
 
 ## Development
 
@@ -374,10 +451,9 @@ This SDK is in active development. v0.1 provides Claude and Grok support with a 
 
 ### Future Plans (v0.2+)
 
-- OpenAI support
 - Streaming responses
-- Tool use / function calling
 - Advanced features (vision, extended thinking)
+- Multi-language bindings (Python, Node.js)
 
 ## License
 

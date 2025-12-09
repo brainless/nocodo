@@ -17,6 +17,8 @@ async fn test_glm_real_api_call() {
         stop: None,
         stream: Some(false),
         seed: Some(42),
+        tools: None,
+        tool_choice: None,
     };
 
     let response = client.create_chat_completion(request).await;
@@ -52,6 +54,8 @@ async fn test_glm_invalid_api_key() {
         stop: None,
         stream: Some(false),
         seed: None,
+        tools: None,
+        tool_choice: None,
     };
 
     let response = client.create_chat_completion(request).await;

@@ -164,7 +164,12 @@ impl crate::client::LlmClient for ZenGrokClient {
                     .collect::<Result<Vec<String>, LlmError>>()?
                     .join(""); // Join multiple text blocks
 
-                Ok(crate::grok::types::GrokMessage { role, content })
+                Ok(crate::grok::types::GrokMessage {
+                    role,
+                    content,
+                    tool_calls: None,
+                    tool_call_id: None,
+                })
             })
             .collect::<Result<Vec<crate::grok::types::GrokMessage>, LlmError>>()?;
 
@@ -176,6 +181,8 @@ impl crate::client::LlmClient for ZenGrokClient {
             top_p: request.top_p,
             stop: request.stop_sequences,
             stream: None, // Non-streaming for now
+            tools: None, // No tools for generic LlmClient interface
+            tool_choice: None,
         };
 
         // Send request and convert response

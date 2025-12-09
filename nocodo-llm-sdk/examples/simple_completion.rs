@@ -23,6 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         nocodo_llm_sdk::claude::types::ClaudeContentBlock::Text { text } => {
             println!("Claude: {}", text);
         }
+        nocodo_llm_sdk::claude::types::ClaudeContentBlock::ToolUse { .. } => {
+            println!("Claude: [Tool use content]");
+        }
     }
     println!(
         "Usage: {} input tokens, {} output tokens",

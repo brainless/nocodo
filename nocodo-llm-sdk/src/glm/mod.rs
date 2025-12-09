@@ -1,9 +1,11 @@
 pub mod builder;
+pub mod tools;
 pub mod types;
 pub mod cerebras;
 pub mod zen;
 
 pub use builder::GlmMessageBuilder;
+pub use tools::GlmToolFormat;
 pub use types::*;
 
 // Re-export for convenience

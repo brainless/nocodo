@@ -77,6 +77,7 @@
 //!
 //! See [`crate::openai::client::OpenAIClient`] for more details on automatic routing.
 
+use schemars::schema::RootSchema;
 use serde::{Deserialize, Serialize};
 
 /// OpenAI chat completion request for the Chat Completions API
@@ -111,6 +112,15 @@ pub struct OpenAIChatCompletionRequest {
     /// Reasoning effort for GPT-5 models ("minimal", "low", "medium", "high")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
+    /// Available tools for the model to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<OpenAITool>>,
+    /// Tool choice strategy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
+    /// Whether to allow parallel tool calls
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
 }
 
 /// A message in the OpenAI conversation
@@ -120,6 +130,12 @@ pub struct OpenAIMessage {
     pub role: OpenAIRole,
     /// Content of the message
     pub content: String,
+    /// Tool calls made by the assistant
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<OpenAIToolCall>>,
+    /// Tool call ID for tool result messages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
 /// Role of an OpenAI message
@@ -337,12 +353,56 @@ pub struct OpenAIError {
     pub param: Option<String>,
 }
 
+/// OpenAI tool definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAITool {
+    /// Type of tool (always "function")
+    #[serde(rename = "type")]
+    pub r#type: String,
+    /// Function definition
+    pub function: OpenAIFunction,
+}
+
+/// OpenAI function definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIFunction {
+    /// Function name
+    pub name: String,
+    /// Function description
+    pub description: String,
+    /// Function parameters schema
+    pub parameters: RootSchema,
+}
+
+/// Tool call in OpenAI response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIToolCall {
+    /// Unique identifier for the tool call
+    pub id: String,
+    /// Type of tool call (always "function")
+    #[serde(rename = "type")]
+    pub r#type: String,
+    /// Function call details
+    pub function: OpenAIFunctionCall,
+}
+
+/// Function call details
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIFunctionCall {
+    /// Function name
+    pub name: String,
+    /// Function arguments as JSON string
+    pub arguments: String,
+}
+
 impl OpenAIMessage {
     /// Create a new text message
     pub fn new<S: Into<String>>(role: OpenAIRole, content: S) -> Self {
         Self {
             role,
             content: content.into(),
+            tool_calls: None,
+            tool_call_id: None,
         }
     }
 
@@ -364,5 +424,25 @@ impl OpenAIMessage {
     /// Create a tool message
     pub fn tool<S: Into<String>>(content: S) -> Self {
         Self::new(OpenAIRole::Tool, content)
+    }
+
+    /// Create an assistant message with tool calls
+    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<OpenAIToolCall>) -> Self {
+        Self {
+            role: OpenAIRole::Assistant,
+            content: content.into(),
+            tool_calls: Some(tool_calls),
+            tool_call_id: None,
+        }
+    }
+
+    /// Create a tool result message
+    pub fn tool_result<S: Into<String>>(tool_call_id: S, content: S) -> Self {
+        Self {
+            role: OpenAIRole::Tool,
+            content: content.into(),
+            tool_calls: None,
+            tool_call_id: Some(tool_call_id.into()),
+        }
     }
 }

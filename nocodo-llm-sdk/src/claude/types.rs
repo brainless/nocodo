@@ -1,3 +1,4 @@
+use schemars::schema::RootSchema;
 use serde::{Deserialize, Serialize};
 
 /// Claude message request for the Messages API
@@ -21,6 +22,12 @@ pub struct ClaudeMessageRequest {
     /// Custom stop sequences
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_sequences: Option<Vec<String>>,
+    /// Available tools for the model to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ClaudeTool>>,
+    /// Tool choice strategy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
 }
 
 /// A message in the Claude conversation
@@ -48,6 +55,16 @@ pub enum ClaudeRole {
 pub enum ClaudeContentBlock {
     /// Text content
     Text { text: String },
+    /// Tool use content
+    #[serde(rename = "tool_use")]
+    ToolUse {
+        /// Unique identifier for the tool call
+        id: String,
+        /// Tool name
+        name: String,
+        /// Tool input parameters
+        input: serde_json::Value,
+    },
 }
 
 /// Claude message response from the Messages API
@@ -79,6 +96,28 @@ pub struct ClaudeUsage {
     pub input_tokens: u32,
     /// Number of output tokens
     pub output_tokens: u32,
+}
+
+/// Claude tool definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeTool {
+    /// Tool name
+    pub name: String,
+    /// Tool description
+    pub description: String,
+    /// Tool input schema
+    pub input_schema: RootSchema,
+    /// Cache control (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_control: Option<CacheControl>,
+}
+
+/// Cache control for Claude tools
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheControl {
+    /// Cache type
+    #[serde(rename = "type")]
+    pub cache_type: String,
 }
 
 /// Claude API error response

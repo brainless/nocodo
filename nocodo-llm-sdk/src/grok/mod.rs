@@ -1,9 +1,11 @@
 pub mod builder;
+pub mod tools;
 pub mod types;
 pub mod xai;
 pub mod zen;
 
 pub use builder::GrokMessageBuilder;
+pub use tools::GrokToolFormat;
 pub use types::*;
 
 // Re-export for convenience

@@ -39,6 +39,21 @@ pub enum LlmError {
     /// Generic error for unexpected cases
     #[error("Internal error: {message}")]
     Internal { message: String },
+
+    /// Invalid tool schema
+    #[error("Invalid tool schema: {message}")]
+    InvalidToolSchema { message: String },
+
+    /// Failed to parse tool arguments
+    #[error("Failed to parse tool arguments for {tool_name}: {source}")]
+    ToolArgumentParse {
+        tool_name: String,
+        source: serde_json::Error,
+    },
+
+    /// Tool execution failed
+    #[error("Tool execution failed: {message}")]
+    ToolExecutionFailed { message: String },
 }
 
 impl LlmError {

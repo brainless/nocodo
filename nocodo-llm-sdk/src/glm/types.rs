@@ -25,6 +25,12 @@ pub struct GlmChatCompletionRequest {
     /// Seed for deterministic sampling
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i32>,
+    /// Available tools for the model to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<GlmTool>>,
+    /// Tool choice strategy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
 }
 
 /// A message in the GLM conversation
@@ -38,6 +44,12 @@ pub struct GlmMessage {
     /// Reasoning content (for reasoning models like GLM)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Tool calls made by the assistant
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<GlmToolCall>>,
+    /// Tool call ID for tool result messages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
 /// Role of a GLM message
@@ -110,10 +122,19 @@ pub struct GlmError {
     /// Error type
     #[serde(rename = "type")]
     pub error_type: String,
-    /// Error code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
 }
+
+/// GLM tool definition (OpenAI-compatible)
+pub type GlmTool = crate::openai::types::OpenAITool;
+
+/// GLM function definition (OpenAI-compatible)
+pub type GlmFunction = crate::openai::types::OpenAIFunction;
+
+/// Tool call in GLM response (OpenAI-compatible)
+pub type GlmToolCall = crate::openai::types::OpenAIToolCall;
+
+/// Function call details (OpenAI-compatible)
+pub type GlmFunctionCall = crate::openai::types::OpenAIFunctionCall;
 
 impl GlmMessage {
     /// Create a new text message
@@ -122,6 +143,8 @@ impl GlmMessage {
             role,
             content: Some(content.into()),
             reasoning: None,
+            tool_calls: None,
+            tool_call_id: None,
         }
     }
 
@@ -138,6 +161,28 @@ impl GlmMessage {
     /// Create an assistant message
     pub fn assistant<S: Into<String>>(content: S) -> Self {
         Self::new(GlmRole::Assistant, content)
+    }
+
+    /// Create an assistant message with tool calls
+    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<GlmToolCall>) -> Self {
+        Self {
+            role: GlmRole::Assistant,
+            content: Some(content.into()),
+            reasoning: None,
+            tool_calls: Some(tool_calls),
+            tool_call_id: None,
+        }
+    }
+
+    /// Create a tool result message
+    pub fn tool_result<S: Into<String>>(tool_call_id: S, content: S) -> Self {
+        Self {
+            role: GlmRole::Assistant, // GLM uses Assistant role for tool results
+            content: Some(content.into()),
+            reasoning: None,
+            tool_calls: None,
+            tool_call_id: Some(tool_call_id.into()),
+        }
     }
 
     /// Get the text content, combining content and reasoning if both exist

@@ -22,6 +22,12 @@ pub struct GrokChatCompletionRequest {
     /// Whether to stream the response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
+    /// Available tools for the model to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<GrokTool>>,
+    /// Tool choice strategy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
 }
 
 /// A message in the Grok conversation
@@ -31,6 +37,12 @@ pub struct GrokMessage {
     pub role: GrokRole,
     /// Content of the message
     pub content: String,
+    /// Tool calls made by the assistant
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<GrokToolCall>>,
+    /// Tool call ID for tool result messages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
 /// Role of a Grok message
@@ -103,10 +115,19 @@ pub struct GrokError {
     /// Error type
     #[serde(rename = "type")]
     pub error_type: String,
-    /// Error code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
 }
+
+/// Grok tool definition (OpenAI-compatible)
+pub type GrokTool = crate::openai::types::OpenAITool;
+
+/// Grok function definition (OpenAI-compatible)
+pub type GrokFunction = crate::openai::types::OpenAIFunction;
+
+/// Tool call in Grok response (OpenAI-compatible)
+pub type GrokToolCall = crate::openai::types::OpenAIToolCall;
+
+/// Function call details (OpenAI-compatible)
+pub type GrokFunctionCall = crate::openai::types::OpenAIFunctionCall;
 
 impl GrokMessage {
     /// Create a new text message
@@ -114,6 +135,8 @@ impl GrokMessage {
         Self {
             role,
             content: content.into(),
+            tool_calls: None,
+            tool_call_id: None,
         }
     }
 
@@ -130,5 +153,25 @@ impl GrokMessage {
     /// Create an assistant message
     pub fn assistant<S: Into<String>>(content: S) -> Self {
         Self::new(GrokRole::Assistant, content)
+    }
+
+    /// Create an assistant message with tool calls
+    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<GrokToolCall>) -> Self {
+        Self {
+            role: GrokRole::Assistant,
+            content: content.into(),
+            tool_calls: Some(tool_calls),
+            tool_call_id: None,
+        }
+    }
+
+    /// Create a tool result message
+    pub fn tool_result<S: Into<String>>(tool_call_id: S, content: S) -> Self {
+        Self {
+            role: GrokRole::Assistant, // Grok uses Assistant role for tool results
+            content: content.into(),
+            tool_calls: None,
+            tool_call_id: Some(tool_call_id.into()),
+        }
     }
 }

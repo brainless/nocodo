@@ -145,6 +145,24 @@ impl XaiGrokClient {
     }
 }
 
+impl crate::grok::types::GrokChatCompletionResponse {
+    /// Extract tool calls from the response
+    pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
+        self.choices.first()?.message.tool_calls.as_ref().map(|calls| {
+            calls.iter().map(|call| {
+                let arguments: serde_json::Value = serde_json::from_str(&call.function.arguments)
+                    .unwrap_or(serde_json::Value::Null);
+
+                crate::tools::ToolCall::new(
+                    call.id.clone(),
+                    call.function.name.clone(),
+                    arguments,
+                )
+            }).collect()
+        })
+    }
+}
+
 impl crate::client::LlmClient for XaiGrokClient {
     async fn complete(
         &self,
@@ -174,19 +192,26 @@ impl crate::client::LlmClient for XaiGrokClient {
                     .collect::<Result<Vec<String>, LlmError>>()?
                     .join(""); // Join multiple text blocks
 
-                Ok(crate::grok::types::GrokMessage { role, content })
+                Ok(crate::grok::types::GrokMessage {
+                    role,
+                    content,
+                    tool_calls: None,
+                    tool_call_id: None,
+                })
             })
             .collect::<Result<Vec<crate::grok::types::GrokMessage>, LlmError>>()?;
 
-        let grok_request = crate::grok::types::GrokChatCompletionRequest {
-            model: request.model,
-            messages: grok_messages,
-            max_tokens: Some(request.max_tokens),
-            temperature: request.temperature,
-            top_p: request.top_p,
-            stop: request.stop_sequences,
-            stream: None, // Non-streaming for now
-        };
+            let grok_request = crate::grok::types::GrokChatCompletionRequest {
+                model: request.model,
+                messages: grok_messages,
+                max_tokens: Some(request.max_tokens),
+                temperature: request.temperature,
+                top_p: request.top_p,
+                stop: request.stop_sequences,
+                stream: None, // Non-streaming for now
+                tools: None, // No tools for generic LlmClient interface
+                tool_choice: None,
+            };
 
         // Send request and convert response
         let grok_response = self.create_chat_completion(grok_request).await?;

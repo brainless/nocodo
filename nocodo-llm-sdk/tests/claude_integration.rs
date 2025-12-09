@@ -39,6 +39,9 @@ async fn test_real_api_call() {
         nocodo_llm_sdk::claude::types::ClaudeContentBlock::Text { text } => {
             assert!(text.contains("Hello, World!"));
         }
+        nocodo_llm_sdk::claude::types::ClaudeContentBlock::ToolUse { .. } => {
+            panic!("Unexpected tool use in test");
+        }
     }
 }
 

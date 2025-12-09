@@ -137,6 +137,32 @@ impl ClaudeClient {
     }
 }
 
+impl crate::claude::types::ClaudeMessageResponse {
+    /// Extract tool calls from the response
+    pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
+        let tool_calls: Vec<crate::tools::ToolCall> = self
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                crate::claude::types::ClaudeContentBlock::ToolUse { id, name, input } => {
+                    Some(crate::tools::ToolCall::new(
+                        id.clone(),
+                        name.clone(),
+                        input.clone(),
+                    ))
+                }
+                _ => None,
+            })
+            .collect();
+
+        if tool_calls.is_empty() {
+            None
+        } else {
+            Some(tool_calls)
+        }
+    }
+}
+
 impl crate::client::LlmClient for ClaudeClient {
     async fn complete(
         &self,
@@ -182,6 +208,8 @@ impl crate::client::LlmClient for ClaudeClient {
             temperature: request.temperature,
             top_p: request.top_p,
             stop_sequences: request.stop_sequences,
+            tools: None, // No tools for generic LlmClient interface
+            tool_choice: None,
         };
 
         // Send request and convert response
@@ -193,6 +221,13 @@ impl crate::client::LlmClient for ClaudeClient {
             .map(|block| match block {
                 crate::claude::types::ClaudeContentBlock::Text { text } => {
                     crate::types::ContentBlock::Text { text }
+                }
+                crate::claude::types::ClaudeContentBlock::ToolUse { .. } => {
+                    // For now, convert tool use to text representation
+                    // This is a temporary solution until the generic interface supports tools
+                    crate::types::ContentBlock::Text {
+                        text: "[Tool use content not supported in generic interface]".to_string(),
+                    }
                 }
             })
             .collect();

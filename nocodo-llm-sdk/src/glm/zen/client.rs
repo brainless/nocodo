@@ -169,6 +169,8 @@ impl crate::client::LlmClient for ZenGlmClient {
                     role,
                     content: Some(content),
                     reasoning: None,
+                    tool_calls: None,
+                    tool_call_id: None,
                 })
             })
             .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
@@ -182,6 +184,8 @@ impl crate::client::LlmClient for ZenGlmClient {
             stop: request.stop_sequences,
             stream: None, // Non-streaming for now
             seed: None,
+            tools: None, // No tools for generic LlmClient interface
+            tool_choice: None,
         };
 
         // Send request and convert response

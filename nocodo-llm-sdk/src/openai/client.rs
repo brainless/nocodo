@@ -244,6 +244,29 @@ impl OpenAIClient {
     }
 }
 
+impl crate::openai::types::OpenAIChatCompletionResponse {
+    /// Get the content of the first choice
+    pub fn content(&self) -> &str {
+        &self.choices.first().unwrap().message.content
+    }
+
+    /// Extract tool calls from the response
+    pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
+        self.choices.first()?.message.tool_calls.as_ref().map(|calls| {
+            calls.iter().map(|call| {
+                let arguments: serde_json::Value = serde_json::from_str(&call.function.arguments)
+                    .unwrap_or(serde_json::Value::Null);
+
+                crate::tools::ToolCall::new(
+                    call.id.clone(),
+                    call.function.name.clone(),
+                    arguments,
+                )
+            }).collect()
+        })
+    }
+}
+
 impl crate::client::LlmClient for OpenAIClient {
     /// Routes requests to the appropriate OpenAI API based on model:
     ///
@@ -361,7 +384,12 @@ impl crate::client::LlmClient for OpenAIClient {
                         .collect::<Result<Vec<String>, LlmError>>()?
                         .join(""); // Join multiple text blocks
 
-                    Ok(crate::openai::types::OpenAIMessage { role, content })
+                    Ok(crate::openai::types::OpenAIMessage {
+                        role,
+                        content,
+                        tool_calls: None,
+                        tool_call_id: None,
+                    })
                 })
                 .collect::<Result<Vec<crate::openai::types::OpenAIMessage>, LlmError>>()?;
 
@@ -375,6 +403,9 @@ impl crate::client::LlmClient for OpenAIClient {
                 stop: request.stop_sequences,
                 stream: None, // Non-streaming for now
                 reasoning_effort: None, // Default reasoning effort
+                tools: None, // No tools for generic LlmClient interface
+                tool_choice: None,
+                parallel_tool_calls: None,
             };
 
             // Send request and convert response

@@ -16,6 +16,7 @@ thiserror = "1.0"
 anyhow = "1.0"
 tracing = "0.1"
 toml = { version = "0.8", optional = true }
+schemars = { version = "0.8", features = ["preserve_order"] }
 
 [dev-dependencies]
 mockito = "1.0"
@@ -23,6 +24,7 @@ tokio-test = "0.4"
 
 [features]
 test-runner = ["toml"]
+ffi = []
 
 [[bin]]
 name = "test-runner"

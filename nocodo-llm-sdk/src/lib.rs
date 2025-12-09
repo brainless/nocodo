@@ -20,6 +20,7 @@
 //!
 //!     match &response.content[0] {
 //!         ClaudeContentBlock::Text { text } => println!("Response: {}", text),
+//!         ClaudeContentBlock::ToolUse { .. } => println!("Response: [Tool use]"),
 //!     }
 //!     Ok(())
 //! }
@@ -125,6 +126,7 @@ pub mod error;
 pub mod glm;
 pub mod grok;
 pub mod openai;
+pub mod tools;
 pub mod types;
 
 // Provider-specific exports
@@ -132,6 +134,9 @@ pub use grok::xai::XaiGrokClient;
 pub use grok::zen::ZenGrokClient;
 pub use glm::cerebras::CerebrasGlmClient;
 pub use glm::zen::ZenGlmClient;
+
+// Tool exports
+pub use tools::{Tool, ToolCall, ToolChoice, ToolResult};
 
 // Backwards compatibility aliases
 #[deprecated(since = "0.2.0", note = "Use XaiGrokClient explicitly")]
@@ -191,6 +196,7 @@ mod tests {
         assert_eq!(message.content.len(), 1);
         match &message.content[0] {
             ClaudeContentBlock::Text { text } => assert_eq!(text, "Hello"),
+            ClaudeContentBlock::ToolUse { .. } => panic!("Unexpected tool use in test"),
         }
     }
 
