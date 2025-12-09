@@ -12,7 +12,7 @@ async fn test_zen_grok_free_model() {
         model: "grok-code".to_string(),
         messages: vec![GrokMessage {
             role: GrokRole::User,
-            content: "What is 2+2? Answer in one word.".to_string(),
+            content: "Say 'Hello, World!' and nothing else.".to_string(),
             tool_calls: None,
             tool_call_id: None,
         }],
@@ -31,7 +31,7 @@ async fn test_zen_grok_free_model() {
         .expect("Failed to get response from Zen Grok");
 
     assert!(!response.choices.is_empty());
-    assert!(response.choices[0].message.content.contains("4"));
+    assert!(response.choices[0].message.content.contains("Hello"));
     assert_eq!(response.model, "grok-code");
     println!("Response: {:?}", response);
 }
@@ -53,7 +53,7 @@ async fn test_zen_grok_with_api_key() {
         model: "grok-code".to_string(),
         messages: vec![GrokMessage {
             role: GrokRole::User,
-            content: "Hello from Zen!".to_string(),
+            content: "Say 'Hello, World!' and nothing else.".to_string(),
             tool_calls: None,
             tool_call_id: None,
         }],
@@ -72,5 +72,6 @@ async fn test_zen_grok_with_api_key() {
         .expect("Failed to get response");
 
     assert!(!response.choices.is_empty());
+    assert!(response.choices[0].message.content.contains("Hello"));
     println!("Authenticated response: {:?}", response);
 }

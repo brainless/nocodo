@@ -10,7 +10,7 @@ async fn test_zen_glm_big_pickle_free_model() {
 
     let request = GlmChatCompletionRequest {
         model: "big-pickle".to_string(),
-        messages: vec![GlmMessage::user("What is 2+2? Answer in one word.")],
+        messages: vec![GlmMessage::user("Say 'Hello, World!' and nothing else.")],
         max_completion_tokens: Some(50),
         temperature: Some(0.7),
         top_p: None,
@@ -29,6 +29,11 @@ async fn test_zen_glm_big_pickle_free_model() {
     assert!(!response.choices.is_empty());
     let response_text = response.choices[0].message.get_text();
     assert!(!response_text.trim().is_empty());
+    assert!(
+        response_text.contains("Hello") || response_text.contains("hello"),
+        "Response should contain greeting: {}",
+        response_text
+    );
     println!("Big Pickle response: {:?}", response);
 }
 
@@ -47,7 +52,7 @@ async fn test_zen_glm_with_api_key() {
 
     let request = GlmChatCompletionRequest {
         model: "big-pickle".to_string(),
-        messages: vec![GlmMessage::user("Hello from Zen GLM!")],
+        messages: vec![GlmMessage::user("Say 'Hello, World!' and nothing else.")],
         max_completion_tokens: Some(100),
         temperature: None,
         top_p: None,
@@ -64,5 +69,11 @@ async fn test_zen_glm_with_api_key() {
         .expect("Failed to get response");
 
     assert!(!response.choices.is_empty());
+    let response_text = response.choices[0].message.get_text();
+    assert!(
+        response_text.contains("Hello") || response_text.contains("hello"),
+        "Response should contain greeting: {}",
+        response_text
+    );
     println!("Authenticated GLM response: {:?}", response);
 }
