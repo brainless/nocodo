@@ -9,9 +9,9 @@ use tempfile::tempdir;
 use nocodo_manager::{
     config::AppConfig,
     database::Database,
-    handlers::{create_ai_session, health_check, AppState},
+    handlers::{AppState, main_handlers::health_check, ai_session_handlers::create_ai_session},
     llm_agent::LlmAgent,
-    models::CreateLlmAgentSessionRequest,
+    models::{AddMessageRequest, MessageContentType, MessageAuthorType},
     websocket::{WebSocketBroadcaster, WebSocketServer},
 };
 
@@ -74,8 +74,8 @@ async fn test_simple_llm_e2e() {
             .app_data(app_state)
             .route("/api/health", web::get().to(health_check))
             .route(
-                "/work/{work_id}/llm-agent/sessions",
-                web::post().to(create_ai_session),
+                "/api/works/{work_id}/messages",
+                web::post().to(nocodo_manager::handlers::work_handlers::add_message_to_work),
             ),
     )
     .await;
@@ -118,21 +118,19 @@ async fn test_simple_llm_e2e() {
     )
     .unwrap();
 
-    // Test LLM session creation
-    println!("🤖 Creating LLM session");
-    let session_request = CreateLlmAgentSessionRequest {
-        provider: provider.name.clone(),
-        model: provider.default_model().to_string(),
-        system_prompt: Some(
-            "You are a helpful coding assistant. Analyze the tech stack and be concise."
-                .to_string(),
-        ),
+// Test adding a message to work (which auto-creates LLM session)
+    println!("🤖 Adding message to work (auto-creates LLM session)");
+    let message_request = AddMessageRequest {
+        content: "Analyze this tech stack and suggest improvements".to_string(),
+        content_type: MessageContentType::Text,
+        author_type: MessageAuthorType::User,
+        author_id: Some("test-user".to_string()),
     };
 
-    let uri = format!("/work/{}/llm-agent/sessions", work.id);
+    let uri = format!("/api/works/{}/messages", work.id);
     let req = test::TestRequest::post()
         .uri(&uri)
-        .set_json(&session_request)
+        .set_json(&message_request)
         .to_request();
 
     let resp = test::call_service(&app, req).await;

@@ -121,36 +121,36 @@ async fn main() -> AppResult<()> {
                 .service(
                     web::scope("/api")
                         // Public endpoints (no auth required)
-                        .route("/health", web::get().to(handlers::health_check))
-                        .route("/auth/login", web::post().to(handlers::login))
-                        .route("/auth/register", web::post().to(handlers::register))
+                        .route("/health", web::get().to(handlers::main_handlers::health_check))
+                        .route("/auth/login", web::post().to(handlers::user_handlers::login))
+                        .route("/auth/register", web::post().to(handlers::user_handlers::register))
                         // Protected endpoints with permission checks
                         .service(
                             web::scope("/projects")
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "project", "read",
                                 )))
-                                .route("", web::get().to(handlers::get_projects))
+                                .route("", web::get().to(handlers::project_handlers::get_projects))
                                 .service(
                                     web::resource("")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("project", "write"),
                                         ))
-                                        .route(web::post().to(handlers::create_project)),
+                                        .route(web::post().to(handlers::project_handlers::create_project)),
                                 )
                                 .service(
                                     web::resource("/add-existing")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("project", "write"),
                                         ))
-                                        .route(web::post().to(handlers::add_existing_project)),
+                                        .route(web::post().to(handlers::project_handlers::add_existing_project)),
                                 )
                                 .service(
                                     web::resource("/scan")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("project", "write"),
                                         ))
-                                        .route(web::post().to(handlers::scan_projects)),
+                                        .route(web::post().to(handlers::project_handlers::scan_projects)),
                                 )
                                 .service(
                                     web::scope("/{id}")
@@ -158,10 +158,10 @@ async fn main() -> AppResult<()> {
                                             PermissionRequirement::new("project", "read")
                                                 .with_resource_id("id"),
                                         ))
-                                        .route("", web::get().to(handlers::get_project))
+                                        .route("", web::get().to(handlers::project_handlers::get_project))
                                         .route(
                                             "/details",
-                                            web::get().to(handlers::get_project_details),
+                                            web::get().to(handlers::project_handlers::get_project_details),
                                         )
                                         .service(
                                             web::resource("")
@@ -169,7 +169,7 @@ async fn main() -> AppResult<()> {
                                                     PermissionRequirement::new("project", "delete")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route(web::delete().to(handlers::delete_project)),
+                                                .route(web::delete().to(handlers::project_handlers::delete_project)),
                                         )
                                         // Git endpoints
                                         .service(
@@ -178,7 +178,7 @@ async fn main() -> AppResult<()> {
                                                     PermissionRequirement::new("project", "read")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route("/worktree-branches", web::get().to(handlers::list_worktree_branches)),
+                                                .route("/worktree-branches", web::get().to(handlers::work_handlers::list_worktree_branches)),
                                         )
                                         // Project commands endpoints
                                         .service(
@@ -241,7 +241,7 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "project", "read",
                                 )))
-                                .route("", web::get().to(handlers::get_templates)),
+                                .route("", web::get().to(handlers::project_handlers::get_templates)),
                         )
                         // File operation endpoints
                         .service(
@@ -249,27 +249,27 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "project", "read",
                                 )))
-                                .route("", web::get().to(handlers::list_files))
+                                .route("", web::get().to(handlers::file_handlers::list_files))
                                 .service(
                                     web::resource("")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("project", "write"),
                                         ))
-                                        .route(web::post().to(handlers::create_file)),
+                                        .route(web::post().to(handlers::file_handlers::create_file)),
                                 )
                                 .service(
                                     web::scope("/{path:.*}")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("project", "read"),
                                         ))
-                                        .route("", web::get().to(handlers::get_file_content))
+                                        .route("", web::get().to(handlers::file_handlers::get_file_content))
                                         .service(
                                             web::resource("")
                                                 .wrap(PermissionMiddleware::new(
                                                     PermissionRequirement::new("project", "write"),
                                                 ))
-                                                .route(web::put().to(handlers::update_file))
-                                                .route(web::delete().to(handlers::delete_file)),
+                                                .route(web::put().to(handlers::file_handlers::update_file))
+                                                .route(web::delete().to(handlers::file_handlers::delete_file)),
                                         ),
                                 ),
                         )
@@ -279,13 +279,13 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "work", "read",
                                 )))
-                                .route("", web::get().to(handlers::list_works))
+                                .route("", web::get().to(handlers::work_handlers::list_works))
                                 .service(
                                     web::resource("")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("work", "write"),
                                         ))
-                                        .route(web::post().to(handlers::create_work)),
+                                        .route(web::post().to(handlers::work_handlers::create_work)),
                                 )
                                 .service(
                                     web::scope("/{id}")
@@ -293,22 +293,22 @@ async fn main() -> AppResult<()> {
                                             PermissionRequirement::new("work", "read")
                                                 .with_resource_id("id"),
                                         ))
-                                        .route("", web::get().to(handlers::get_work))
+                                        .route("", web::get().to(handlers::work_handlers::get_work))
                                         .route(
                                             "/messages",
-                                            web::get().to(handlers::get_work_messages),
+                                            web::get().to(handlers::work_handlers::get_work_messages),
                                         )
                                         .route(
                                             "/sessions",
-                                            web::get().to(handlers::list_ai_sessions),
+                                            web::get().to(handlers::ai_session_handlers::list_ai_sessions),
                                         )
                                         .route(
                                             "/outputs",
-                                            web::get().to(handlers::list_ai_session_outputs),
+                                            web::get().to(handlers::ai_session_handlers::list_ai_session_outputs),
                                         )
                                         .route(
                                             "/tool-calls",
-                                            web::get().to(handlers::list_ai_tool_calls),
+                                            web::get().to(handlers::ai_session_handlers::list_ai_tool_calls),
                                         )
                                         .service(
                                             web::resource("")
@@ -316,7 +316,7 @@ async fn main() -> AppResult<()> {
                                                     PermissionRequirement::new("work", "delete")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route(web::delete().to(handlers::delete_work)),
+                                                .route(web::delete().to(handlers::work_handlers::delete_work)),
                                         )
                                         .service(
                                             web::resource("/messages")
@@ -325,7 +325,7 @@ async fn main() -> AppResult<()> {
                                                         .with_resource_id("id"),
                                                 ))
                                                 .route(
-                                                    web::post().to(handlers::add_message_to_work),
+                                                    web::post().to(handlers::work_handlers::add_message_to_work),
                                                 ),
                                         ),
                                 ),
@@ -337,8 +337,8 @@ async fn main() -> AppResult<()> {
                                     PermissionRequirement::new("project", "read")
                                         .with_resource_id("id"),
                                 ))
-                                .route("/scan", web::post().to(handlers::scan_workflows))
-                                .route("/commands", web::get().to(handlers::get_workflow_commands))
+                                .route("/scan", web::post().to(handlers::work_handlers::scan_workflows))
+                                .route("/commands", web::get().to(handlers::work_handlers::get_workflow_commands))
                                 .service(
                                     web::scope("/commands/{command_id}")
                                         .wrap(PermissionMiddleware::new(
@@ -347,11 +347,11 @@ async fn main() -> AppResult<()> {
                                         ))
                                         .route(
                                             "/execute",
-                                            web::post().to(handlers::execute_workflow_command),
+                                            web::post().to(handlers::work_handlers::execute_workflow_command),
                                         )
                                         .route(
                                             "/executions",
-                                            web::get().to(handlers::get_command_executions),
+                                            web::get().to(handlers::work_handlers::get_command_executions),
                                         ),
                                 ),
                         )
@@ -361,37 +361,37 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "settings", "read",
                                 )))
-                                .route("", web::get().to(handlers::get_settings))
+                                .route("", web::get().to(handlers::main_handlers::get_settings))
                                 .service(
                                     web::resource("/api-keys")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("settings", "write"),
                                         ))
-                                        .route(web::post().to(handlers::update_api_keys)),
+                                        .route(web::post().to(handlers::main_handlers::update_api_keys)),
                                 )
                                 .service(
                                     web::resource("/projects-path")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("settings", "write"),
                                         ))
-                                        .route(web::post().to(handlers::set_projects_default_path)),
+                                        .route(web::post().to(handlers::project_handlers::set_projects_default_path)),
                                 )
                                 .service(
                                     web::resource("/authorized-ssh-keys")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("settings", "write"),
                                         ))
-                                        .route(web::post().to(handlers::add_authorized_ssh_key)),
+                                        .route(web::post().to(handlers::main_handlers::add_authorized_ssh_key)),
                                 ),
                         )
                         // Current user endpoint (get teams for current logged-in user)
-                        .route("/me/teams", web::get().to(handlers::get_current_user_teams))
+                        .route("/me/teams", web::get().to(handlers::team_handlers::get_current_user_teams))
                         .service(
                             web::resource("/models")
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "settings", "read",
                                 )))
-                                .route(web::get().to(handlers::get_supported_models)),
+                                .route(web::get().to(handlers::main_handlers::get_supported_models)),
                         )
                         // User management endpoints (admin only)
                         .service(
@@ -399,13 +399,13 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "user", "admin",
                                 )))
-                                .route("", web::get().to(handlers::list_users))
-                                .route("", web::post().to(handlers::create_user))
-                                .route("/{id}", web::get().to(handlers::get_user))
-                                .route("/{id}", web::patch().to(handlers::update_user))
-                                .route("/{id}", web::delete().to(handlers::delete_user))
-                                .route("/search", web::get().to(handlers::search_users))
-                                .route("/{id}/teams", web::get().to(handlers::get_user_teams)),
+                                .route("", web::get().to(handlers::user_handlers::list_users))
+                                .route("", web::post().to(handlers::user_handlers::create_user))
+                                .route("/{id}", web::get().to(handlers::user_handlers::get_user))
+                                .route("/{id}", web::patch().to(handlers::user_handlers::update_user))
+                                .route("/{id}", web::delete().to(handlers::user_handlers::delete_user))
+                                .route("/search", web::get().to(handlers::user_handlers::search_users))
+                                .route("/{id}/teams", web::get().to(handlers::user_handlers::get_user_teams)),
                         )
                         // Team management endpoints
                         .service(
@@ -413,13 +413,13 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "team", "read",
                                 )))
-                                .route("", web::get().to(handlers::list_teams))
+                                .route("", web::get().to(handlers::team_handlers::list_teams))
                                 .service(
                                     web::resource("")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("team", "write"),
                                         ))
-                                        .route(web::post().to(handlers::create_team)),
+                                        .route(web::post().to(handlers::team_handlers::create_team)),
                                 )
                                 .service(
                                     web::scope("/{id}")
@@ -427,14 +427,14 @@ async fn main() -> AppResult<()> {
                                             PermissionRequirement::new("team", "read")
                                                 .with_resource_id("id"),
                                         ))
-                                        .route("", web::get().to(handlers::get_team))
+                                        .route("", web::get().to(handlers::team_handlers::get_team))
                                         .route(
                                             "/members",
-                                            web::get().to(handlers::get_team_members),
+                                            web::get().to(handlers::team_handlers::get_team_members),
                                         )
                                         .route(
                                             "/permissions",
-                                            web::get().to(handlers::get_team_permissions),
+                                            web::get().to(handlers::team_handlers::get_team_permissions),
                                         )
                                         .service(
                                             web::resource("")
@@ -442,8 +442,8 @@ async fn main() -> AppResult<()> {
                                                     PermissionRequirement::new("team", "write")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route(web::put().to(handlers::update_team))
-                                                .route(web::delete().to(handlers::delete_team)),
+                                                .route(web::put().to(handlers::team_handlers::update_team))
+                                                .route(web::delete().to(handlers::team_handlers::delete_team)),
                                         )
                                         .service(
                                             web::resource("/members")
@@ -451,7 +451,7 @@ async fn main() -> AppResult<()> {
                                                     PermissionRequirement::new("team", "write")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route(web::post().to(handlers::add_team_member)),
+                                                .route(web::post().to(handlers::team_handlers::add_team_member)),
                                         )
                                         .service(
                                             web::scope("/members/{user_id}")
@@ -461,7 +461,7 @@ async fn main() -> AppResult<()> {
                                                 ))
                                                 .route(
                                                     "",
-                                                    web::delete().to(handlers::remove_team_member),
+                                                    web::delete().to(handlers::team_handlers::remove_team_member),
                                                 ),
                                         ),
                                 ),
@@ -472,14 +472,14 @@ async fn main() -> AppResult<()> {
                                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
                                     "team", "admin",
                                 )))
-                                .route("", web::get().to(handlers::list_permissions))
-                                .route("", web::post().to(handlers::create_permission))
+                                .route("", web::get().to(handlers::team_handlers::list_permissions))
+                                .route("", web::post().to(handlers::team_handlers::create_permission))
                                 .service(
                                     web::scope("/{id}")
                                         .wrap(PermissionMiddleware::new(
                                             PermissionRequirement::new("team", "admin"),
                                         ))
-                                        .route("", web::delete().to(handlers::delete_permission)),
+                                        .route("", web::delete().to(handlers::team_handlers::delete_permission)),
                                 ),
                         ),
                 )

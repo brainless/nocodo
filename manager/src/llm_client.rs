@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 
 // Re-export model constants from SDK for backward compatibility
-pub use nocodo_llm_sdk::claude::{HAIKU_4_5 as CLAUDE_HAIKU_4_5_MODEL_ID, OPUS_4_1 as CLAUDE_OPUS_4_1_MODEL_ID, SONNET_4_5 as CLAUDE_SONNET_4_5_MODEL_ID};
+pub use nocodo_llm_sdk::claude::SONNET_4_5 as CLAUDE_SONNET_4_5_MODEL_ID;
 
 /// LLM message structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -254,7 +254,9 @@ pub trait LlmClient: Send + Sync {
 
 /// SDK-based LLM client implementation
 pub struct SdkLlmClient {
+    #[allow(dead_code)]
     provider: String,
+    #[allow(dead_code)]
     model: String,
     inner: ClientType,
 }
@@ -647,10 +649,10 @@ impl LlmClient for SdkLlmClient {
                             tool_calls: None,
                         })
                         .collect(),
-                    usage: Some(LlmUsage {
-                        prompt_tokens: response.usage.prompt_tokens,
-                        completion_tokens: response.usage.completion_tokens,
-                        total_tokens: response.usage.total_tokens,
+                    usage: response.usage.as_ref().map(|u| LlmUsage {
+                        prompt_tokens: u.prompt_tokens,
+                        completion_tokens: u.completion_tokens,
+                        total_tokens: u.total_tokens,
                         reasoning_tokens: None,
                     }),
                 })
@@ -725,10 +727,10 @@ impl LlmClient for SdkLlmClient {
                             tool_calls: None,
                         })
                         .collect(),
-                    usage: Some(LlmUsage {
-                        prompt_tokens: response.usage.prompt_tokens,
-                        completion_tokens: response.usage.completion_tokens,
-                        total_tokens: response.usage.total_tokens,
+                    usage: response.usage.as_ref().map(|u| LlmUsage {
+                        prompt_tokens: u.prompt_tokens,
+                        completion_tokens: u.completion_tokens,
+                        total_tokens: u.total_tokens,
                         reasoning_tokens: None,
                     }),
                 })
@@ -802,10 +804,10 @@ impl LlmClient for SdkLlmClient {
                             tool_calls: None,
                         })
                         .collect(),
-                    usage: Some(LlmUsage {
-                        prompt_tokens: response.usage.prompt_tokens,
-                        completion_tokens: response.usage.completion_tokens,
-                        total_tokens: response.usage.total_tokens,
+                    usage: response.usage.as_ref().map(|u| LlmUsage {
+                        prompt_tokens: u.prompt_tokens,
+                        completion_tokens: u.completion_tokens,
+                        total_tokens: u.total_tokens,
                         reasoning_tokens: None,
                     }),
                 })
@@ -879,10 +881,10 @@ impl LlmClient for SdkLlmClient {
                             tool_calls: None,
                         })
                         .collect(),
-                    usage: Some(LlmUsage {
-                        prompt_tokens: response.usage.prompt_tokens,
-                        completion_tokens: response.usage.completion_tokens,
-                        total_tokens: response.usage.total_tokens,
+                    usage: response.usage.as_ref().map(|u| LlmUsage {
+                        prompt_tokens: u.prompt_tokens,
+                        completion_tokens: u.completion_tokens,
+                        total_tokens: u.total_tokens,
                         reasoning_tokens: None,
                     }),
                 })

@@ -10,6 +10,7 @@
 #![allow(unused_variables)]
 
 use actix_web::{test, web, App};
+use nocodo_manager::handlers::{main_handlers, user_handlers, team_handlers, project_handlers};
 
 use nocodo_manager::models::{
     AddTeamMemberRequest, CreatePermissionRequest, CreateTeamRequest, CreateUserRequest,
@@ -25,46 +26,46 @@ macro_rules! create_test_routes {
             // Health check
             .route(
                 "/api/health",
-                web::get().to(nocodo_manager::handlers::health_check),
+                web::get().to(main_handlers::health_check),
             )
             // Auth endpoints
             .route(
                 "/api/auth/login",
-                web::post().to(nocodo_manager::handlers::login),
+                web::post().to(user_handlers::login),
             )
             .route(
                 "/api/auth/register",
-                web::post().to(nocodo_manager::handlers::register),
+                web::post().to(user_handlers::register),
             )
             // Team management endpoints
             .service(
                 web::scope("/api/teams")
-                    .route("", web::get().to(nocodo_manager::handlers::list_teams))
+                    .route("", web::get().to(team_handlers::list_teams))
                     .service(
                         web::resource("")
-                            .route(web::post().to(nocodo_manager::handlers::create_team)),
+                            .route(web::post().to(team_handlers::create_team)),
                     )
                     .service(
                         web::scope("/{id}")
-                            .route("", web::get().to(nocodo_manager::handlers::get_team))
-                            .route("", web::put().to(nocodo_manager::handlers::update_team))
-                            .route("", web::delete().to(nocodo_manager::handlers::delete_team))
+                            .route("", web::get().to(team_handlers::get_team))
+                            .route("", web::put().to(team_handlers::update_team))
+                            .route("", web::delete().to(team_handlers::delete_team))
                             .route(
                                 "/members",
-                                web::get().to(nocodo_manager::handlers::get_team_members),
+                                web::get().to(team_handlers::get_team_members),
                             )
                             .route(
                                 "/permissions",
-                                web::get().to(nocodo_manager::handlers::get_team_permissions),
+                                web::get().to(team_handlers::get_team_permissions),
                             )
                             .service(
                                 web::resource("/members").route(
-                                    web::post().to(nocodo_manager::handlers::add_team_member),
+                                    web::post().to(team_handlers::add_team_member),
                                 ),
                             )
                             .service(web::scope("/members/{user_id}").route(
                                 "",
-                                web::delete().to(nocodo_manager::handlers::remove_team_member),
+                                web::delete().to(team_handlers::remove_team_member),
                             )),
                     ),
             )
@@ -73,43 +74,43 @@ macro_rules! create_test_routes {
                 web::scope("/api/permissions")
                     .route(
                         "",
-                        web::get().to(nocodo_manager::handlers::list_permissions),
+                        web::get().to(team_handlers::list_permissions),
                     )
                     .route(
                         "",
-                        web::post().to(nocodo_manager::handlers::create_permission),
+                        web::post().to(team_handlers::create_permission),
                     )
                     .service(web::scope("/{id}").route(
                         "",
-                        web::delete().to(nocodo_manager::handlers::delete_permission),
+                        web::delete().to(team_handlers::delete_permission),
                     )),
             )
             // User management endpoints
             .service(
                 web::scope("/api/users")
-                    .route("", web::get().to(nocodo_manager::handlers::list_users))
-                    .route("", web::post().to(nocodo_manager::handlers::create_user))
+                    .route("", web::get().to(user_handlers::list_users))
+                    .route("", web::post().to(user_handlers::create_user))
                     .service(
                         web::scope("/{id}")
-                            .route("", web::get().to(nocodo_manager::handlers::get_user))
-                            .route("", web::put().to(nocodo_manager::handlers::update_user))
-                            .route("", web::delete().to(nocodo_manager::handlers::delete_user)),
+                            .route("", web::get().to(user_handlers::get_user))
+                            .route("", web::put().to(user_handlers::update_user))
+                            .route("", web::delete().to(user_handlers::delete_user)),
                     ),
             )
             // Project endpoints for permission testing
             .service(
                 web::scope("/api/projects")
-                    .route("", web::get().to(nocodo_manager::handlers::get_projects))
+                    .route("", web::get().to(project_handlers::get_projects))
                     .service(
                         web::resource("")
-                            .route(web::post().to(nocodo_manager::handlers::create_project)),
+                            .route(web::post().to(project_handlers::create_project)),
                     )
                     .service(
                         web::scope("/{id}")
-                            .route("", web::get().to(nocodo_manager::handlers::get_project))
+                            .route("", web::get().to(project_handlers::get_project))
                             .route(
                                 "",
-                                web::delete().to(nocodo_manager::handlers::delete_project),
+                                web::delete().to(project_handlers::delete_project),
                             ),
                     ),
             )

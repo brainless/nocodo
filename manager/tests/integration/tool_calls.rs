@@ -2,7 +2,7 @@ use actix_web::{test, web};
 use serde_json::json;
 
 use nocodo_manager::models::{
-    CreateLlmAgentSessionRequest, LlmAgentToolCall,
+    CreateAiSessionRequest, LlmAgentToolCall,
 };
 
 use crate::common::{TestApp, TestDataGenerator};

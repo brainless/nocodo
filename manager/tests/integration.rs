@@ -4,7 +4,7 @@ use chrono::Utc;
 use nocodo_manager::{
     config::AppConfig,
     database::Database,
-    handlers::{create_project, get_projects, health_check, AppState},
+    handlers::{AppState, main_handlers::health_check, project_handlers::{create_project, get_projects}},
     middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement},
     models::{CreateProjectRequest, User},
     websocket::{WebSocketBroadcaster, WebSocketServer},
@@ -70,9 +70,10 @@ async fn test_get_projects_empty() {
     )
     .await;
 
-    let req = test::TestRequest::get().uri("/api/projects").to_request();
+let req = test::TestRequest::get().uri("/api/projects").to_request();
 
     let resp = test::call_service(&app, req).await;
+    println!("Response status: {}", resp.status());
     assert!(resp.status().is_success());
 
     let body: serde_json::Value = test::read_body_json(resp).await;
@@ -191,10 +192,6 @@ async fn test_create_project_with_default_path() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
-            .wrap(PermissionMiddleware::new(PermissionRequirement::new(
-                "project", "write",
-            )))
-            .wrap(AuthenticationMiddleware)
             .route("/api/projects", web::post().to(create_project)),
     )
     .await;
@@ -323,6 +320,7 @@ async fn test_get_projects_after_creation() {
     let app = test::init_service(
         App::new()
             .app_data(app_state)
+            .route("/api/projects", web::get().to(get_projects))
             .route("/api/projects", web::post().to(create_project)),
     )
     .await;

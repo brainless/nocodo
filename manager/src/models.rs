@@ -7,8 +7,7 @@ pub use manager_models::{
     AddMessageRequest, AiSession, AiSessionListResponse, AiSessionOutput,
     AiSessionOutputListResponse, AiSessionResponse, AiSessionResult, ApiKeyConfig,
     CreateAiSessionRequest, CreateWorkRequest, LlmAgentToolCall, LlmAgentToolCallListResponse,
-    MessageAuthorType, MessageContentType, SettingsResponse, SupportedModel,
-    SupportedModelsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage,
+    MessageAuthorType, MessageContentType, SettingsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage,
     WorkMessageListResponse, WorkMessageResponse, WorkResponse, WorkWithHistory,
     // Tool-related types
     ToolRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest,

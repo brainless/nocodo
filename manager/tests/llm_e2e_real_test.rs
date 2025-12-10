@@ -11,7 +11,7 @@ use crate::common::{
     llm_config::LlmTestConfig,
     TestApp,
 };
-use nocodo_manager::handlers;
+
 use nocodo_manager::models::{
     AddMessageRequest, CreateAiSessionRequest, CreateWorkRequest, MessageAuthorType,
     MessageContentType,
@@ -170,7 +170,7 @@ async fn test_llm_e2e_saleor() {
 
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
         "/api/work",
-        web::post().to(nocodo_manager::handlers::create_work),
+        web::post().to(nocodo_manager::handlers::work_handlers::create_work),
     ))
     .await;
     let resp = test::call_service(&service, req).await;
@@ -483,7 +483,7 @@ async fn test_llm_multiple_scenarios() {
         let service = test::init_service(
             App::new()
                 .app_data(test_app.app_state.clone())
-                .route("/work", web::post().to(handlers::create_work)),
+                .route("/work", web::post().to(nocodo_manager::handlers::work_handlers::create_work)),
         )
         .await;
         let resp = test::call_service(&service, req).await;
@@ -508,7 +508,7 @@ async fn test_llm_multiple_scenarios() {
 
         let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
             "/work/{work_id}/messages",
-            web::post().to(nocodo_manager::handlers::add_message_to_work),
+            web::post().to(nocodo_manager::handlers::work_handlers::add_message_to_work),
         ))
         .await;
         let resp = test::call_service(&service, req).await;
@@ -531,7 +531,7 @@ async fn test_llm_multiple_scenarios() {
 
         let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
             "/work/{work_id}/sessions",
-            web::post().to(nocodo_manager::handlers::create_ai_session),
+            web::post().to(nocodo_manager::handlers::ai_session_handlers::create_ai_session),
         ))
         .await;
         let resp = test::call_service(&service, req).await;
@@ -615,7 +615,7 @@ async fn get_ai_outputs_for_work(
 
     let service = test::init_service(App::new().app_data(test_app.app_state.clone()).route(
         "/api/work/{id}/outputs",
-        web::get().to(nocodo_manager::handlers::list_ai_session_outputs),
+        web::get().to(nocodo_manager::handlers::ai_session_handlers::list_ai_session_outputs),
     ))
     .await;
 

@@ -9,8 +9,14 @@ use crate::common::{TestApp, TestDataGenerator};
 async fn test_get_projects_empty() {
     let test_app = TestApp::new().await;
 
+    let service = test::init_service(
+        actix_web::App::new()
+            .app_data(test_app.app_state().clone())
+            .route("/api/projects", web::get().to(nocodo_manager::handlers::project_handlers::get_projects))
+    ).await;
+
     let req = test::TestRequest::get().uri("/api/projects").to_request();
-    let resp = test::call_service(&test_app.service(), req).await;
+    let resp = test::call_service(&service, req).await;
 
     assert!(resp.status().is_success());
 
@@ -33,12 +39,19 @@ async fn test_create_project_basic() {
         template: None,
     };
 
+    let service = test::init_service(
+        actix_web::App::new()
+            .app_data(test_app.app_state().clone())
+            .route("/api/projects", web::get().to(nocodo_manager::handlers::project_handlers::get_projects))
+            .route("/api/projects", web::post().to(nocodo_manager::handlers::project_handlers::create_project))
+    ).await;
+
     let req = test::TestRequest::post()
         .uri("/api/projects")
         .set_json(&create_request)
         .to_request();
 
-    let resp = test::call_service(&test_app.service(), req).await;
+    let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success());
     assert_eq!(resp.status(), 201);
 
