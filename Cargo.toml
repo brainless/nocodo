@@ -3,8 +3,9 @@ resolver = "2"
 members = [
     "manager",
     "manager-models",
+    "manager-tools",
     "nocodo-github-actions",
-    "desktop-app",
+    "desktop-app", "nocodo-llm-sdk",
 ]
 exclude = [
     "manager-web"

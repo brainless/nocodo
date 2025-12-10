@@ -3,7 +3,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::handlers::main_handlers::AppState;
 use crate::llm_agent::LlmAgent;
-use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
+use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
     MessageAuthorType, MessageContentType, ProjectCommand, ProjectCommandExecution,

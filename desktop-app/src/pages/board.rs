@@ -873,7 +873,7 @@ if !skip_regular_response {
                                                                                 .file_name()
                                                                                 .and_then(|n| n.to_str())
                                                                                 .unwrap_or(&req.path);
-                                                                            let lines = req.content.lines().count();
+                                                                            let lines = req.content.as_ref().map_or(0, |c| c.lines().count());
                                                                             format!("Wrote {} ({} lines)", filename, lines)
                                                                         } else {
                                                                             "write_file".to_string()

@@ -25,7 +25,6 @@ impl ApiService {
     }
 
     pub async fn connect_to_local_server(&self, state: &mut AppState) -> Result<(), String> {
-        // This will be implemented with actual API calls
         let connection_manager = Arc::clone(&state.connection_manager);
         match connection_manager.connect_local(8081).await {
             Ok(_) => {
@@ -35,8 +34,15 @@ impl ApiService {
                 tracing::info!("Set current_server_info for local connection: {:?}", state.current_server_info);
                 state.models_fetch_attempted = false;
 
-                // Load favorites for local server (no separate auth needed for local)
-                state.load_favorites_for_current_server();
+                // Check if we need to show auth dialog
+                let should_show_auth = state.auth_state.jwt_token.is_none();
+                if should_show_auth {
+                    tracing::info!("Local connection successful, showing auth dialog");
+                    state.ui_state.show_auth_dialog = true;
+                } else {
+                    // Already authenticated, load favorites
+                    state.load_favorites_for_current_server();
+                }
 
                 Ok(())
             }
@@ -623,7 +629,27 @@ impl ApiService {
     // Local server methods
     pub fn check_local_server(&self, state: &mut AppState) -> Result<(), String> {
         state.ui_state.checking_local_server = true;
-        // This will be implemented with actual API calls
+        state.local_server_check_result = Arc::new(std::sync::Mutex::new(None));
+
+        let result_clone = Arc::clone(&state.local_server_check_result);
+
+        tokio::spawn(async move {
+            // Try to connect to localhost:8081/api/health
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(3))
+                .build()
+                .unwrap();
+            let url = "http://localhost:8081/api/health";
+
+            let is_running = match client.get(url).send().await {
+                Ok(response) if response.status().is_success() => true,
+                _ => false,
+            };
+
+            let mut result = result_clone.lock().unwrap();
+            *result = Some(is_running);
+        });
+
         Ok(())
     }
 

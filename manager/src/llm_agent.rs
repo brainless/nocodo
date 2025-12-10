@@ -4,7 +4,7 @@ use crate::config::AppConfig;
 use crate::database::Database;
 use crate::llm_client::{create_llm_client, LlmCompletionRequest, LlmMessage};
 use crate::models::{LlmAgentSession, LlmAgentToolCall, LlmProviderConfig};
-use crate::tools::ToolExecutor;
+use manager_tools::ToolExecutor;
 use crate::websocket::WebSocketBroadcaster;
 use anyhow::Result;
 use std::boxed::Box;
@@ -18,6 +18,7 @@ pub struct LlmAgent {
     db: Arc<Database>,
     ws: Arc<WebSocketBroadcaster>,
     tool_executor: ToolExecutor,
+    bash_executor: BashExecutor,
     config: Arc<AppConfig>,
 }
 
@@ -35,10 +36,14 @@ impl LlmAgent {
         let bash_executor =
             BashExecutor::new(bash_permissions, 30).expect("Failed to initialize bash executor");
 
+        let tool_executor = ToolExecutor::new(project_path)
+            .with_bash_executor(Box::new(bash_executor.clone()));
+
         Self {
             db,
             ws,
-            tool_executor: ToolExecutor::new(project_path).with_bash_executor(bash_executor),
+            tool_executor,
+            bash_executor,
             config,
         }
     }
@@ -444,9 +449,7 @@ impl LlmAgent {
         };
 
         // Attach bash executor if available
-        if let Some(bash_executor) = self.tool_executor.bash_executor() {
-            executor = executor.with_bash_executor(bash_executor.clone());
-        }
+        executor = executor.with_bash_executor(Box::new(self.bash_executor.clone()));
 
         Ok(executor)
     }
@@ -667,6 +670,8 @@ impl LlmAgent {
 
             // Get project-specific tool executor
             let project_tool_executor = self.get_tool_executor_for_session(session_id).await?;
+
+            // Execute tool (types are now unified via manager-models re-export)
             let tool_response = project_tool_executor.execute(tool_request).await;
 
             // Update tool call with response

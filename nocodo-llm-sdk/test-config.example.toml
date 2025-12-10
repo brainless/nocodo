@@ -1,0 +1,15 @@
+# Example test configuration
+# Copy to test-config.toml and add your API keys
+#
+# Note: Keys can be in lowercase (will be converted to uppercase env vars)
+
+[api_keys]
+# anthropic_api_key = "sk-ant-..."
+# openai_api_key = "sk-..."
+# xai_api_key = "xai-..."
+# cerebras_api_key = "csk-..."
+
+# Zen tests require no API keys (free models)
+
+# Non-string values in [api_keys] are ignored
+# coding_plan = true  # This will be skipped

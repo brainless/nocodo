@@ -1,6 +1,7 @@
 use config::{Config, ConfigError, File};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use rand::Rng;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AuthConfig {
@@ -22,8 +23,10 @@ pub struct ApiKeysConfig {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
-    pub zai_api_key: Option<String>,   // NEW: zAI API key
-    pub zai_coding_plan: Option<bool>, // NEW: Use zAI Coding Plan endpoint
+    pub cerebras_api_key: Option<String>, // Cerebras API key for GLM
+    pub zai_api_key: Option<String>,      // zAI API key (legacy - same as cerebras_api_key)
+    pub zai_coding_plan: Option<bool>,    // Use zAI Coding Plan endpoint
+    pub zen_api_key: Option<String>,      // Zen API key (optional - free for basic models)
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -99,8 +102,10 @@ path = "/tmp/nocodo-manager.sock"
 # xai_api_key = "your-xai-key"
 # openai_api_key = "your-openai-key"
 # anthropic_api_key = "your-anthropic-key"
-# zai_api_key = "your-zai-key"
+# cerebras_api_key = "your-cerebras-key"  # For GLM via Cerebras
+# zai_api_key = "your-zai-key"  # Legacy - same as cerebras_api_key
 # zai_coding_plan = true  # Set to true if using GLM Coding Plan subscription
+# zen_api_key = "your-zen-key"  # Optional - Zen is free for basic models
 
 [projects]
 # default_path = "~/projects"
@@ -111,7 +116,7 @@ path = "/tmp/nocodo-manager.sock"
         }
 
         let builder = Config::builder()
-            .add_source(File::from(config_path))
+            .add_source(File::from(config_path.clone()))
             .build()?;
 
         let mut config: AppConfig = builder.try_deserialize()?;
@@ -122,6 +127,33 @@ path = "/tmp/nocodo-manager.sock"
                 let path_str = config.database.path.to_string_lossy();
                 let expanded = path_str.replacen("~", &home.to_string_lossy(), 1);
                 config.database.path = PathBuf::from(expanded);
+            }
+        }
+
+        // Check if JWT secret is missing and generate one if needed
+        let jwt_secret_missing = config
+            .auth
+            .as_ref()
+            .and_then(|a| a.jwt_secret.as_ref())
+            .is_none();
+
+        if jwt_secret_missing {
+            let new_secret = generate_jwt_secret();
+            tracing::info!("Generated new JWT secret for authentication");
+
+            // Initialize auth config if it doesn't exist
+            if config.auth.is_none() {
+                config.auth = Some(AuthConfig {
+                    jwt_secret: Some(new_secret.clone()),
+                });
+            } else if let Some(ref mut auth) = config.auth {
+                auth.jwt_secret = Some(new_secret.clone());
+            }
+
+            // Update the config file with the new JWT secret
+            if let Err(e) = update_config_file_with_jwt_secret(&config_path, &new_secret) {
+                tracing::warn!("Failed to save JWT secret to config file: {e}");
+                tracing::warn!("The JWT secret will be regenerated on next restart");
             }
         }
 
@@ -169,4 +201,62 @@ fn get_default_db_path() -> PathBuf {
     } else {
         PathBuf::from("manager.db")
     }
+}
+
+/// Generates a cryptographically secure random JWT secret
+/// Equivalent to `openssl rand -base64 48`
+fn generate_jwt_secret() -> String {
+    let mut rng = rand::rng();
+    let random_bytes: Vec<u8> = (0..48).map(|_| rng.random()).collect();
+    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &random_bytes)
+}
+
+/// Updates the config file with a newly generated JWT secret
+fn update_config_file_with_jwt_secret(
+    config_path: &Path,
+    jwt_secret: &str,
+) -> Result<(), std::io::Error> {
+    let content = std::fs::read_to_string(config_path)?;
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    let mut in_auth_section = false;
+    let mut secret_updated = false;
+
+    for i in 0..lines.len() {
+        let line = lines[i].trim();
+
+        // Check if we're entering the [auth] section
+        if line == "[auth]" {
+            in_auth_section = true;
+            continue;
+        }
+
+        // Check if we're leaving the [auth] section
+        if in_auth_section && line.starts_with('[') && line.ends_with(']') {
+            // If we didn't find jwt_secret in the auth section, add it before the next section
+            if !secret_updated {
+                lines.insert(i, format!("jwt_secret = \"{}\"", jwt_secret));
+                secret_updated = true;
+            }
+            break;
+        }
+
+        // If we're in the auth section and found a jwt_secret line (commented or not)
+        if in_auth_section && (line.starts_with("jwt_secret") || line.starts_with("# jwt_secret")) {
+            lines[i] = format!("jwt_secret = \"{}\"", jwt_secret);
+            secret_updated = true;
+            break;
+        }
+    }
+
+    // If we're still in auth section at the end of file and haven't updated the secret
+    if in_auth_section && !secret_updated {
+        lines.push(format!("jwt_secret = \"{}\"", jwt_secret));
+    }
+
+    // Write the updated content back to the file
+    let updated_content = lines.join("\n") + "\n";
+    std::fs::write(config_path, updated_content)?;
+
+    Ok(())
 }
