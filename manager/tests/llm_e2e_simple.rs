@@ -27,7 +27,7 @@ async fn test_simple_llm_e2e() {
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
         println!("⚠️  Skipping LLM E2E test - no API keys available");
-        println!("   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
+        println!("   Set XAI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
         return;
     }
 

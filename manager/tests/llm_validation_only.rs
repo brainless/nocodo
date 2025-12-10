@@ -283,19 +283,19 @@ fn test_fuzzy_keyword_matching() {
 fn test_llm_provider_detection() {
     println!("🔧 Testing LLM provider detection");
 
-    let grok_available = env::var("GROK_API_KEY").is_ok();
+    let xai_available = env::var("XAI_API_KEY").is_ok();
     let openai_available = env::var("OPENAI_API_KEY").is_ok();
     let anthropic_available = env::var("ANTHROPIC_API_KEY").is_ok();
 
     println!("Provider availability:");
-    println!("   Grok: {}", if grok_available { "✅" } else { "❌" });
+    println!("   xAI: {}", if xai_available { "✅" } else { "❌" });
     println!("   OpenAI: {}", if openai_available { "✅" } else { "❌" });
     println!(
         "   Anthropic: {}",
         if anthropic_available { "✅" } else { "❌" }
     );
 
-    let total_providers = [grok_available, openai_available, anthropic_available]
+    let total_providers = [xai_available, openai_available, anthropic_available]
         .iter()
         .filter(|&&x| x)
         .count();
@@ -307,7 +307,7 @@ fn test_llm_provider_detection() {
         );
     } else {
         println!("⚠️  No LLM providers available - set API keys to test real integration");
-        println!("   export GROK_API_KEY='your-key'");
+        println!("   export XAI_API_KEY='your-key'");
         println!("   export OPENAI_API_KEY='your-key'");
         println!("   export ANTHROPIC_API_KEY='your-key'");
     }
@@ -394,7 +394,7 @@ fn test_integration_summary() {
     println!("");
     println!("🚀 Ready for real LLM testing!");
     println!("   Set environment variables:");
-    println!("   - GROK_API_KEY='your-grok-key'");
+    println!("   - XAI_API_KEY='your-xai-key'");
     println!("   - OPENAI_API_KEY='your-openai-key'");
     println!("   - ANTHROPIC_API_KEY='your-anthropic-key'");
     println!("");

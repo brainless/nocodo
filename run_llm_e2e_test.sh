@@ -140,9 +140,9 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
 
     # Only set the API key for the selected provider to ensure test uses the right one
     if [[ "$PROVIDER" == "xai" ]] && grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
-        GROK_KEY=$(grep '^xai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
-        export GROK_API_KEY="$GROK_KEY"
-        echo "   ✅ Set GROK_API_KEY from config (selected provider)"
+        XAI_KEY=$(grep '^xai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+        export XAI_API_KEY="$XAI_KEY"
+        echo "   ✅ Set XAI_API_KEY from config (selected provider)"
     elif [[ "$PROVIDER" == "openai" ]] && grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
         OPENAI_KEY=$(grep '^openai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
         export OPENAI_API_KEY="$OPENAI_KEY"
@@ -166,9 +166,9 @@ if [[ ${#AVAILABLE_PROVIDERS[@]} -gt 0 ]]; then
         echo "   Available providers: ${AVAILABLE_PROVIDERS[*]}"
         # Fallback: set all available keys
         if grep -q '^xai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*xai_api_key' "$CONFIG_FILE"; then
-            GROK_KEY=$(grep '^xai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
-            export GROK_API_KEY="$GROK_KEY"
-            echo "   ✅ Set GROK_API_KEY from config (fallback)"
+            XAI_KEY=$(grep '^xai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')
+            export XAI_API_KEY="$XAI_KEY"
+            echo "   ✅ Set XAI_API_KEY from config (fallback)"
         fi
         if grep -q '^openai_api_key\s*=' "$CONFIG_FILE" && ! grep -q '^#.*openai_api_key' "$CONFIG_FILE"; then
             OPENAI_KEY=$(grep '^openai_api_key\s*=' "$CONFIG_FILE" | sed 's/.*= *"\?\([^"]*\)"\?/\1/')

@@ -52,7 +52,7 @@ async fn test_llm_e2e_saleor() {
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
         println!("⚠️  Skipping LLM E2E test - no API keys available");
-        println!("   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
+        println!("   Set XAI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
         return;
     }
 
@@ -435,7 +435,7 @@ async fn test_llm_multiple_scenarios() {
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
         println!("⚠️  Skipping multiple scenarios test - no API keys available");
-        println!("   Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
+        println!("   Set XAI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY to run this test");
         return;
     }
 

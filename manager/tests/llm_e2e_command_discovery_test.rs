@@ -253,7 +253,7 @@ async fn test_command_discovery_llm_enhanced_saleor() {
     let llm_config = LlmTestConfig::from_environment();
     if !llm_config.has_available_providers() {
         println!("⚠️  Skipping LLM-enhanced command discovery test - no API keys available");
-        println!("   Set GROK_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or ZAI_API_KEY to run this test");
+        println!("   Set XAI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or ZAI_API_KEY to run this test");
         return;
     }
 
