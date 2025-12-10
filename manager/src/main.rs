@@ -9,7 +9,6 @@ mod git;
 mod handlers;
 mod llm_agent;
 mod llm_client;
-mod llm_providers;
 mod middleware;
 mod models;
 mod permissions;

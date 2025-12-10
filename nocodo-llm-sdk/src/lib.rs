@@ -125,6 +125,7 @@ pub mod client;
 pub mod error;
 pub mod glm;
 pub mod grok;
+pub mod models;
 pub mod openai;
 pub mod tools;
 pub mod types;
@@ -137,6 +138,9 @@ pub use glm::zen::ZenGlmClient;
 
 // Tool exports
 pub use tools::{Tool, ToolCall, ToolChoice, ToolResult};
+
+// Model constants exports
+pub use models::*;
 
 // Backwards compatibility aliases
 #[deprecated(since = "0.2.0", note = "Use XaiGrokClient explicitly")]

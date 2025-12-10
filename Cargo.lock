@@ -4588,6 +4588,7 @@ dependencies = [
  "manager-models",
  "manager-tools",
  "nocodo-github-actions",
+ "nocodo-llm-sdk",
  "rand 0.9.2",
  "regex",
  "reqwest 0.12.24",

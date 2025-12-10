@@ -4,8 +4,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::git;
 use crate::llm_agent::LlmAgent;
-use crate::llm_client::LlmProvider;
-use crate::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID;
+use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::LlmProviderConfig;
 use crate::models::{
     AddExistingProjectRequest, AddMessageRequest, AiSessionListResponse, AiSessionOutput,
@@ -2738,205 +2737,128 @@ pub async fn get_supported_models(data: web::Data<AppState>) -> Result<HttpRespo
     tracing::info!("Checking for configured API keys in get_supported_models");
 
     // Check if API keys are configured and add enabled models
+    // TODO: Re-implement model listing using SDK
+    // For now, return hardcoded list of commonly used models
     if let Some(api_key_config) = api_key_config {
         tracing::info!("API keys config found, checking individual keys");
+
         // OpenAI models
         if api_key_config.openai_api_key.is_some()
             && !api_key_config.openai_api_key.as_ref().unwrap().is_empty()
         {
-            tracing::info!("OpenAI API key is configured, creating provider");
-            let openai_config = LlmProviderConfig {
-                provider: "openai".to_string(),
-                model: "gpt-4".to_string(), // Default model for checking
-                api_key: api_key_config.openai_api_key.as_ref().unwrap().clone(),
-                base_url: None,
-                max_tokens: Some(1000),
-                temperature: Some(0.7),
-            };
+            tracing::info!("OpenAI API key is configured");
+            let openai_models = vec![
+                (nocodo_llm_sdk::openai::GPT_4O, "GPT-4o", 128000),
+                (nocodo_llm_sdk::openai::GPT_4O_MINI, "GPT-4o Mini", 128000),
+                (nocodo_llm_sdk::openai::GPT_4_TURBO, "GPT-4 Turbo", 128000),
+                (nocodo_llm_sdk::openai::GPT_4, "GPT-4", 8192),
+                (nocodo_llm_sdk::openai::GPT_3_5_TURBO, "GPT-3.5 Turbo", 16385),
+                (nocodo_llm_sdk::openai::GPT_5_CODEX, "GPT-5 Codex", 200000),
+                (nocodo_llm_sdk::openai::GPT_5_1, "GPT-5.1", 200000),
+            ];
 
-            match crate::llm_providers::OpenAiProvider::new(openai_config) {
-                Ok(provider) => {
-                    tracing::info!("OpenAI provider created successfully");
-                    match provider.list_available_models().await {
-                        Ok(available_models) => {
-                            tracing::info!("Found {} OpenAI models", available_models.len());
-                            for model in available_models {
-                                models.push(crate::models::SupportedModel {
-                                    provider: "openai".to_string(),
-                                    model_id: model.id().to_string(),
-                                    name: model.name().to_string(),
-                                    context_length: model.context_length(),
-                                    supports_streaming: model.supports_streaming(),
-                                    supports_tool_calling: model.supports_tool_calling(),
-                                    supports_vision: model.supports_vision(),
-                                    supports_reasoning: model.supports_reasoning(),
-                                    input_cost_per_token: model.input_cost_per_token(),
-                                    output_cost_per_token: model.output_cost_per_token(),
-                                    default_temperature: model.default_temperature(),
-                                    default_max_tokens: model.default_max_tokens(),
-                                });
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to list OpenAI models: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to create OpenAI provider: {}", e);
-                }
+            for (model_id, name, context_length) in openai_models {
+                models.push(crate::models::SupportedModel {
+                    provider: "openai".to_string(),
+                    model_id: model_id.to_string(),
+                    name: name.to_string(),
+                    context_length,
+                    supports_streaming: true,
+                    supports_tool_calling: true,
+                    supports_vision: model_id.contains("4o") || model_id == "gpt-4-turbo",
+                    supports_reasoning: false,
+                    input_cost_per_token: None,
+                    output_cost_per_token: None,
+                    default_temperature: Some(0.7),
+                    default_max_tokens: Some(1000),
+                });
             }
         }
 
         // Anthropic models
         if api_key_config.anthropic_api_key.is_some()
-            && !api_key_config
-                .anthropic_api_key
-                .as_ref()
-                .unwrap()
-                .is_empty()
+            && !api_key_config.anthropic_api_key.as_ref().unwrap().is_empty()
         {
-            tracing::info!("Anthropic API key is configured, creating provider");
-            let anthropic_config = LlmProviderConfig {
-                provider: "anthropic".to_string(),
-                model: CLAUDE_SONNET_4_5_MODEL_ID.to_string(), // Default model for checking
-                api_key: api_key_config.anthropic_api_key.as_ref().unwrap().clone(),
-                base_url: None,
-                max_tokens: Some(1000),
-                temperature: Some(0.7),
-            };
+            tracing::info!("Anthropic API key is configured");
+            let anthropic_models = vec![
+                (nocodo_llm_sdk::claude::SONNET_4_5, "Claude Sonnet 4.5", 200000),
+                (nocodo_llm_sdk::claude::HAIKU_4_5, "Claude Haiku 4.5", 200000),
+                (nocodo_llm_sdk::claude::OPUS_4_5, "Claude Opus 4.5", 200000),
+                (nocodo_llm_sdk::claude::OPUS_4_1, "Claude Opus 4.1", 200000),
+            ];
 
-            match crate::llm_providers::AnthropicProvider::new(anthropic_config) {
-                Ok(provider) => {
-                    tracing::info!("Anthropic provider created successfully");
-                    match provider.list_available_models().await {
-                        Ok(available_models) => {
-                            tracing::info!("Found {} Anthropic models", available_models.len());
-                            for model in available_models {
-                                models.push(crate::models::SupportedModel {
-                                    provider: "anthropic".to_string(),
-                                    model_id: model.id().to_string(),
-                                    name: model.name().to_string(),
-                                    context_length: model.context_length(),
-                                    supports_streaming: model.supports_streaming(),
-                                    supports_tool_calling: model.supports_tool_calling(),
-                                    supports_vision: model.supports_vision(),
-                                    supports_reasoning: model.supports_reasoning(),
-                                    input_cost_per_token: model.input_cost_per_token(),
-                                    output_cost_per_token: model.output_cost_per_token(),
-                                    default_temperature: model.default_temperature(),
-                                    default_max_tokens: model.default_max_tokens(),
-                                });
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to list Anthropic models: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to create Anthropic provider: {}", e);
-                }
+            for (model_id, name, context_length) in anthropic_models {
+                models.push(crate::models::SupportedModel {
+                    provider: "anthropic".to_string(),
+                    model_id: model_id.to_string(),
+                    name: name.to_string(),
+                    context_length,
+                    supports_streaming: true,
+                    supports_tool_calling: true,
+                    supports_vision: true,
+                    supports_reasoning: false,
+                    input_cost_per_token: None,
+                    output_cost_per_token: None,
+                    default_temperature: Some(1.0),
+                    default_max_tokens: Some(1024),
+                });
             }
-        } else {
-            tracing::info!("Anthropic API key not configured");
         }
 
-        // xAI models
+        // xAI/Grok models
         if api_key_config.xai_api_key.is_some()
             && !api_key_config.xai_api_key.as_ref().unwrap().is_empty()
         {
-            tracing::info!("xAI API key is configured, creating provider");
-            let xai_config = LlmProviderConfig {
-                provider: "xai".to_string(),
-                model: "grok-code-fast-1".to_string(), // Default model for checking
-                api_key: api_key_config.xai_api_key.as_ref().unwrap().clone(),
-                base_url: Some("https://api.x.ai".to_string()),
-                max_tokens: Some(1000),
-                temperature: Some(0.7),
-            };
+            tracing::info!("xAI API key is configured");
+            let grok_models = vec![
+                (nocodo_llm_sdk::grok::BETA, "Grok Beta", 131072),
+                (nocodo_llm_sdk::grok::VISION_BETA, "Grok Vision Beta", 8192),
+                (nocodo_llm_sdk::grok::CODE_FAST_1, "Grok Code Fast 1", 131072),
+            ];
 
-            match crate::llm_providers::XaiProvider::new(xai_config) {
-                Ok(provider) => {
-                    tracing::info!("xAI provider created successfully");
-                    match provider.list_available_models().await {
-                        Ok(available_models) => {
-                            tracing::info!("Found {} xAI models", available_models.len());
-                            for model in available_models {
-                                models.push(crate::models::SupportedModel {
-                                    provider: "xai".to_string(),
-                                    model_id: model.id().to_string(),
-                                    name: model.name().to_string(),
-                                    context_length: model.context_length(),
-                                    supports_streaming: model.supports_streaming(),
-                                    supports_tool_calling: model.supports_tool_calling(),
-                                    supports_vision: model.supports_vision(),
-                                    supports_reasoning: model.supports_reasoning(),
-                                    input_cost_per_token: model.input_cost_per_token(),
-                                    output_cost_per_token: model.output_cost_per_token(),
-                                    default_temperature: model.default_temperature(),
-                                    default_max_tokens: model.default_max_tokens(),
-                                });
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to list xAI models: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to create xAI provider: {}", e);
-                }
+            for (model_id, name, context_length) in grok_models {
+                models.push(crate::models::SupportedModel {
+                    provider: "xai".to_string(),
+                    model_id: model_id.to_string(),
+                    name: name.to_string(),
+                    context_length,
+                    supports_streaming: true,
+                    supports_tool_calling: true,
+                    supports_vision: model_id.contains("vision"),
+                    supports_reasoning: false,
+                    input_cost_per_token: None,
+                    output_cost_per_token: None,
+                    default_temperature: Some(0.7),
+                    default_max_tokens: Some(1000),
+                });
             }
-        } else {
-            tracing::info!("xAI API key not configured");
         }
 
-        // zAI models
+        // zAI/GLM models
         if api_key_config.zai_api_key.is_some()
             && !api_key_config.zai_api_key.as_ref().unwrap().is_empty()
         {
-            tracing::info!("zAI API key is configured, creating provider");
-            let zai_config = LlmProviderConfig {
-                provider: "zai".to_string(),
-                model: "glm-4.6".to_string(), // Default model for checking
-                api_key: api_key_config.zai_api_key.as_ref().unwrap().clone(),
-                base_url: Some("https://api.z.ai".to_string()),
-                max_tokens: Some(1000),
-                temperature: Some(0.7),
-            };
+            tracing::info!("zAI API key is configured");
+            let glm_models = vec![
+                (nocodo_llm_sdk::glm::LLAMA_3_3_70B, "Llama 3.3 70B", 8192),
+                (nocodo_llm_sdk::glm::ZAI_GLM_4_6, "zAI GLM 4.6", 8192),
+            ];
 
-            match crate::llm_providers::ZaiProvider::new(zai_config) {
-                Ok(provider) => {
-                    tracing::info!("zAI provider created successfully");
-                    match provider.list_available_models().await {
-                        Ok(available_models) => {
-                            tracing::info!("Found {} zAI models", available_models.len());
-                            for model in available_models {
-                                models.push(crate::models::SupportedModel {
-                                    provider: "zai".to_string(),
-                                    model_id: model.id().to_string(),
-                                    name: model.name().to_string(),
-                                    context_length: model.context_length(),
-                                    supports_streaming: model.supports_streaming(),
-                                    supports_tool_calling: model.supports_tool_calling(),
-                                    supports_vision: model.supports_vision(),
-                                    supports_reasoning: model.supports_reasoning(),
-                                    input_cost_per_token: model.input_cost_per_token(),
-                                    output_cost_per_token: model.output_cost_per_token(),
-                                    default_temperature: model.default_temperature(),
-                                    default_max_tokens: model.default_max_tokens(),
-                                });
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to list zAI models: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to create zAI provider: {}", e);
-                }
+            for (model_id, name, context_length) in glm_models {
+                models.push(crate::models::SupportedModel {
+                    provider: "zai".to_string(),
+                    model_id: model_id.to_string(),
+                    name: name.to_string(),
+                    context_length,
+                    supports_streaming: true,
+                    supports_tool_calling: false,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    input_cost_per_token: None,
+                    output_cost_per_token: None,
+                    default_temperature: Some(0.7),
+                    default_max_tokens: Some(1000),
+                });
             }
         } else {
             tracing::info!("zAI API key not configured");

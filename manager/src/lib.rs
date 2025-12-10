@@ -9,7 +9,6 @@ pub mod git;
 pub mod handlers;
 pub mod llm_agent;
 pub mod llm_client;
-pub mod llm_providers;
 pub mod middleware;
 pub mod models;
 pub mod permissions;

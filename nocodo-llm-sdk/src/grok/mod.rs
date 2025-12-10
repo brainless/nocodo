@@ -15,3 +15,6 @@ pub use zen::*;
 // Type alias for backwards compatibility
 #[deprecated(since = "0.2.0", note = "Use xai::XaiGrokClient explicitly")]
 pub type GrokClient = xai::XaiGrokClient;
+
+// Re-export Grok model constants
+pub use crate::models::grok::*;

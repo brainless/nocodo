@@ -1,137 +1,13 @@
-use crate::llm_providers::anthropic::{
-    CLAUDE_HAIKU_4_5_MODEL_ID, CLAUDE_OPUS_4_1_MODEL_ID, CLAUDE_SONNET_4_5_MODEL_ID,
-};
 use crate::models::LlmProviderConfig;
+
 use anyhow::Result;
-use async_stream::try_stream;
 use async_trait::async_trait;
-use futures_util::{Stream, StreamExt};
+use futures_util::Stream;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::pin::Pin;
-use std::sync::Arc;
-use uuid::Uuid;
 
-// Module declarations for adapter pattern
-pub mod adapters;
-pub mod types;
-pub mod unified_client;
-
-pub use adapters::ProviderAdapter;
-pub use unified_client::UnifiedLlmClient;
-
-// Re-export types for backward compatibility
-pub use types::{
-    ContentItem, ResponseItem, ResponsesApiRequest, ResponsesApiResponse, ResponsesToolDefinition,
-};
-
-/// Provider type enumeration
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub enum ProviderType {
-    OpenAI,
-    Anthropic,
-    Grok,
-    Google,
-    Custom,
-}
-
-/// Model capabilities structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelCapabilities {
-    pub supports_streaming: bool,
-    pub supports_tool_calling: bool,
-    pub supports_vision: bool,
-    pub supports_reasoning: bool,
-    pub supports_json_mode: bool,
-}
-
-/// Model pricing information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelPricing {
-    pub input_cost_per_million_tokens: f64,
-    pub output_cost_per_million_tokens: f64,
-    pub reasoning_cost_per_million_tokens: Option<f64>,
-}
-
-/// LLM Model trait for model-specific information
-pub trait LlmModel: Send + Sync {
-    /// Model identity
-    fn id(&self) -> &str;
-    fn name(&self) -> &str;
-    #[allow(dead_code)]
-    fn provider_id(&self) -> &str;
-
-    /// Model specifications
-    fn context_length(&self) -> u32;
-    #[allow(dead_code)]
-    fn max_output_tokens(&self) -> Option<u32>;
-    fn supports_streaming(&self) -> bool;
-    fn supports_tool_calling(&self) -> bool;
-    fn supports_vision(&self) -> bool;
-    fn supports_reasoning(&self) -> bool;
-
-    /// Cost information (if available)
-    fn input_cost_per_token(&self) -> Option<f64>;
-    fn output_cost_per_token(&self) -> Option<f64>;
-
-    /// Model-specific defaults
-    fn default_temperature(&self) -> Option<f32>;
-    fn default_max_tokens(&self) -> Option<u32>;
-
-    /// Token counting (model-specific tokenization)
-    #[allow(dead_code)]
-    fn estimate_tokens(&self, text: &str) -> u32;
-}
-
-/// LLM Provider trait for high-level provider management
-#[async_trait]
-pub trait LlmProvider: Send + Sync {
-    /// Get provider information
-    #[allow(dead_code)]
-    fn id(&self) -> &str;
-    #[allow(dead_code)]
-    fn name(&self) -> &str;
-    #[allow(dead_code)]
-    fn provider_type(&self) -> ProviderType;
-
-    /// Provider capabilities
-    #[allow(dead_code)]
-    fn supports_streaming(&self) -> bool;
-    #[allow(dead_code)]
-    fn supports_tool_calling(&self) -> bool;
-    #[allow(dead_code)]
-    fn supports_vision(&self) -> bool;
-
-    /// Model management
-    async fn list_available_models(&self) -> Result<Vec<Arc<dyn LlmModel>>, anyhow::Error>;
-    #[allow(dead_code)]
-    fn get_model(&self, model_id: &str) -> Option<Arc<dyn LlmModel>>;
-
-    /// Connection testing
-    #[allow(dead_code)]
-    async fn test_connection(&self) -> Result<(), anyhow::Error>;
-
-    /// Create client for specific model
-    #[allow(dead_code)]
-    fn create_client(&self, model_id: &str) -> Result<Box<dyn LlmClient>, anyhow::Error>;
-}
-
-/// Provider error type
-#[derive(Debug, thiserror::Error)]
-#[allow(dead_code)]
-pub enum ProviderError {
-    #[error("Authentication failed: {0}")]
-    Authentication(String),
-    #[error("Network error: {0}")]
-    Network(#[from] reqwest::Error),
-    #[error("API error: {0}")]
-    Api(String),
-    #[error("Model not found: {0}")]
-    ModelNotFound(String),
-    #[error("Unsupported operation: {0}")]
-    UnsupportedOperation(String),
-}
+// Re-export model constants from SDK for backward compatibility
+pub use nocodo_llm_sdk::claude::{HAIKU_4_5 as CLAUDE_HAIKU_4_5_MODEL_ID, OPUS_4_1 as CLAUDE_OPUS_4_1_MODEL_ID, SONNET_4_5 as CLAUDE_SONNET_4_5_MODEL_ID};
 
 /// LLM message structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,7 +15,7 @@ pub struct LlmMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
-    // NEW: Tool calls in message (for assistant responses)
+    // Tool calls in message (for assistant responses)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<LlmToolCall>>,
     // Legacy OpenAI function call
@@ -158,7 +34,7 @@ pub struct LlmCompletionRequest {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub stream: Option<bool>,
-    // NEW: Tool/Function parameters for native tool calling support
+    // Tool/Function parameters for native tool calling support
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<ToolDefinition>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -216,30 +92,12 @@ pub struct LlmFunctionCall {
     pub arguments: String, // JSON string of arguments
 }
 
-/// Provider capabilities structure
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct ProviderCapabilities {
-    pub supports_native_tools: bool,
-    pub supports_legacy_functions: bool,
-    pub supports_streaming: bool,
-    pub supports_json_mode: bool,
-}
-
-/// Completion result with tool calls
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct CompletionResult {
-    pub response: LlmCompletionResponse,
-    pub tool_calls: Vec<LlmToolCall>,
-}
-
 /// LLM message delta for streaming
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmMessageDelta {
     pub role: Option<String>,
     pub content: Option<String>,
-    // NEW: Tool calls in streaming delta
+    // Tool calls in streaming delta
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<LlmToolCallDelta>>,
 }
@@ -267,6 +125,8 @@ pub struct LlmUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<u32>,
 }
 
 /// LLM completion chunk for streaming
@@ -286,7 +146,7 @@ pub struct LlmCompletionChunk {
 pub struct StreamChunk {
     pub content: String,
     pub is_finished: bool,
-    // NEW: Tool calls in streaming chunk
+    // Tool calls in streaming chunk
     pub tool_calls: Vec<LlmToolCall>,
 }
 
@@ -344,6 +204,14 @@ pub enum FunctionCall {
     Specific { name: String },
 }
 
+/// Completion result with tool calls
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct CompletionResult {
+    pub response: LlmCompletionResponse,
+    pub tool_calls: Vec<LlmToolCall>,
+}
+
 /// Abstract LLM client trait
 #[async_trait]
 pub trait LlmClient: Send + Sync {
@@ -384,1657 +252,477 @@ pub trait LlmClient: Send + Sync {
     fn model(&self) -> &str;
 }
 
-/// OpenAI-compatible LLM client
-pub struct OpenAiCompatibleClient {
-    client: reqwest::Client,
-    config: LlmProviderConfig,
-    model: Option<Arc<dyn LlmModel>>,
+/// SDK-based LLM client implementation
+pub struct SdkLlmClient {
+    provider: String,
+    model: String,
+    inner: ClientType,
 }
 
-impl OpenAiCompatibleClient {
-    pub fn new(config: LlmProviderConfig) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let model = None; // Will be set later if needed
-        Ok(Self {
-            client,
-            config,
-            model,
-        })
-    }
+enum ClientType {
+    OpenAI(nocodo_llm_sdk::openai::client::OpenAIClient),
+    Claude(nocodo_llm_sdk::claude::client::ClaudeClient),
+    Grok(nocodo_llm_sdk::grok::xai::XaiGrokClient),
+    Glm(nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient),
+}
 
-    #[allow(dead_code)]
-    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
-        self.model = Some(model);
-        self
-    }
+impl SdkLlmClient {
+    pub fn new(config: &LlmProviderConfig) -> Result<Self> {
+        let provider = config.provider.clone();
+        let model = config.model.clone();
 
-    fn get_api_url(&self) -> String {
-        // gpt-5-codex requires the v1/responses endpoint instead of v1/chat/completions
-        let endpoint = if self.config.model == "gpt-5-codex" {
-            "v1/responses"
-        } else {
-            "v1/chat/completions"
-        };
-
-        if let Some(base_url) = &self.config.base_url {
-            format!("{}/{}", base_url.trim_end_matches('/'), endpoint)
-        } else {
-            format!("https://api.openai.com/{}", endpoint)
-        }
-    }
-
-    /// Check if the provider supports native tool calling
-    fn supports_native_tools(&self) -> bool {
-        if let Some(model) = &self.model {
-            return model.supports_tool_calling();
-        }
-
-        // Fallback to old logic if no model is set
-        match self.config.provider.to_lowercase().as_str() {
+        let inner = match config.provider.to_lowercase().as_str() {
             "openai" => {
-                // OpenAI supports native tools for GPT-4 and newer models
-                self.config.model.to_lowercase().starts_with("gpt-4")
-                    || self.config.model.to_lowercase().contains("gpt-4")
+                let mut client = nocodo_llm_sdk::openai::client::OpenAIClient::new(&config.api_key)?;
+                if let Some(base_url) = &config.base_url {
+                    client = client.with_base_url(base_url);
+                }
+                ClientType::OpenAI(client)
             }
             "anthropic" | "claude" => {
-                // Anthropic supports native tools for Claude models
-                self.config.model.to_lowercase().contains("claude")
-                    || self.config.model.to_lowercase().contains("opus")
-                    || self.config.model.to_lowercase().contains("sonnet")
-                    || self.config.model.to_lowercase().contains("haiku")
+                let client = nocodo_llm_sdk::claude::client::ClaudeClient::new(&config.api_key)?;
+                ClientType::Claude(client)
             }
             "grok" | "xai" => {
-                // Grok Code Fast 1 and newer models support native function calling
-                self.config.model.to_lowercase().contains("grok-code-fast")
-                    || self.config.model.to_lowercase().contains("grok-2")
-                    || self.config.model.to_lowercase().contains("grok-3")
+                let client = nocodo_llm_sdk::grok::xai::XaiGrokClient::new(&config.api_key)?;
+                ClientType::Grok(client)
             }
-            _ => false,
-        }
-    }
-
-    /// Check if the provider supports legacy function calling
-    fn supports_legacy_functions(&self) -> bool {
-        match self.config.provider.to_lowercase().as_str() {
-            "openai" => {
-                // OpenAI supports legacy functions for older models
-                !self.supports_native_tools()
+            "zai" | "glm" => {
+                let client = nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient::new(&config.api_key)?;
+                ClientType::Glm(client)
             }
-            _ => false,
-        }
-    }
-
-    /// Get provider capabilities as a structured object
-    #[allow(dead_code)]
-    fn get_provider_capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities {
-            supports_native_tools: self.supports_native_tools(),
-            supports_legacy_functions: self.supports_legacy_functions(),
-            supports_streaming: true, // All current providers support streaming
-            supports_json_mode: matches!(self.config.provider.to_lowercase().as_str(), "openai"),
-        }
-    }
-
-    /// Extract tool calls from a completion response (internal method)
-    fn extract_tool_calls_from_response_internal(
-        &self,
-        response: &LlmCompletionResponse,
-    ) -> Vec<LlmToolCall> {
-        let mut tool_calls = Vec::new();
-        let mut message_tool_calls_count = 0;
-        let mut choice_tool_calls_count = 0;
-        let mut legacy_function_calls_count = 0;
-
-        for choice in &response.choices {
-            if let Some(message) = &choice.message {
-                // Check for tool calls in the message (OpenAI format)
-                if let Some(message_tool_calls) = &message.tool_calls {
-                    message_tool_calls_count += message_tool_calls.len();
-                    tool_calls.extend(message_tool_calls.clone());
-                    tracing::debug!(
-                        provider = %self.config.provider,
-                        choice_index = %choice.index,
-                        tool_calls_in_message = %message_tool_calls.len(),
-                        "Found tool calls in message (OpenAI format)"
-                    );
-                }
-
-                // Check for legacy function calls (older OpenAI models)
-                if let Some(function_call) = &message.function_call {
-                    legacy_function_calls_count += 1;
-                    tool_calls.push(LlmToolCall {
-                        id: format!("legacy-{}", Uuid::new_v4()),
-                        r#type: "function".to_string(),
-                        function: LlmToolCallFunction {
-                            name: function_call.name.clone(),
-                            arguments: function_call.arguments.clone(),
-                        },
-                    });
-                    tracing::debug!(
-                        provider = %self.config.provider,
-                        choice_index = %choice.index,
-                        function_name = %function_call.name,
-                        "Found legacy function call in message"
-                    );
-                }
-            }
-
-            // Check for tool calls at choice level (Anthropic format)
-            if let Some(choice_tool_calls) = &choice.tool_calls {
-                choice_tool_calls_count += choice_tool_calls.len();
-                tool_calls.extend(choice_tool_calls.clone());
-                tracing::debug!(
-                    provider = %self.config.provider,
-                    choice_index = %choice.index,
-                    tool_calls_in_choice = %choice_tool_calls.len(),
-                    "Found tool calls at choice level (Anthropic format)"
-                );
-            }
-        }
-
-        tracing::info!(
-            provider = %self.config.provider,
-            total_tool_calls = %tool_calls.len(),
-            message_tool_calls = %message_tool_calls_count,
-            choice_tool_calls = %choice_tool_calls_count,
-            legacy_function_calls = %legacy_function_calls_count,
-            "Extracted tool calls from completion response"
-        );
-
-        tool_calls
-    }
-
-    /// Prepare request for the specific provider by converting tools to appropriate format
-    fn prepare_request_for_provider(
-        &self,
-        mut request: LlmCompletionRequest,
-    ) -> LlmCompletionRequest {
-        // If no tools are specified, return as-is
-        if request.tools.is_none() && request.functions.is_none() {
-            return request;
-        }
-
-        if self.supports_native_tools() {
-            // Provider supports native tools - ensure tools are in the right format
-            match self.config.provider.to_lowercase().as_str() {
-                "anthropic" | "claude" => {
-                    // Anthropic uses similar format to OpenAI, but may have some differences
-                    // For now, we use the same format and can refine later if needed
-                    tracing::debug!(
-                        provider = %self.config.provider,
-                        "Using Anthropic native tool calling format"
-                    );
-                }
-                "openai" => {
-                    // OpenAI native tools format
-                    tracing::debug!(
-                        provider = %self.config.provider,
-                        "Using OpenAI native tool calling format"
-                    );
-                }
-                "grok" | "xai" => {
-                    // Grok uses OpenAI-compatible tool calling format
-                    tracing::debug!(
-                        provider = %self.config.provider,
-                        "Using Grok/xAI OpenAI-compatible tool calling format"
-                    );
-                }
-                _ => {
-                    tracing::debug!(
-                        provider = %self.config.provider,
-                        "Using generic native tool calling format"
-                    );
-                }
-            }
-        } else if self.supports_legacy_functions() {
-            // Convert tools to legacy functions format for older OpenAI models
-            if let Some(tools) = request.tools.take() {
-                let functions: Vec<FunctionDefinition> = tools
-                    .into_iter()
-                    .filter_map(|tool| {
-                        if tool.r#type == "function" {
-                            Some(tool.function)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                if !functions.is_empty() {
-                    request.functions = Some(functions);
-                    // Convert tool_choice to function_call if needed
-                    if let Some(tool_choice) = request.tool_choice.take() {
-                        match tool_choice {
-                            ToolChoice::None(_) => {
-                                request.function_call =
-                                    Some(FunctionCall::None("none".to_string()));
-                            }
-                            ToolChoice::Auto(_) => {
-                                request.function_call =
-                                    Some(FunctionCall::Auto("auto".to_string()));
-                            }
-                            ToolChoice::Required(_) => {
-                                request.function_call =
-                                    Some(FunctionCall::Required("required".to_string()));
-                            }
-                            ToolChoice::Specific { function, .. } => {
-                                request.function_call = Some(FunctionCall::Specific {
-                                    name: function.name,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            tracing::debug!(
-                provider = %self.config.provider,
-                "Converted tools to legacy function calling format"
-            );
-        } else {
-            // Provider doesn't support native tools - remove tools from request
-            // The LLM agent will fall back to JSON parsing in the system prompt
-            request.tools = None;
-            request.tool_choice = None;
-            request.functions = None;
-            request.function_call = None;
-
-            tracing::info!(
-                provider = %self.config.provider,
-                model = %self.config.model,
-                "Provider does not support native tools, falling back to JSON parsing. Tools removed from request."
-            );
-        }
-
-        request
-    }
-
-    #[allow(dead_code)]
-    async fn make_request(&self, request: LlmCompletionRequest) -> Result<reqwest::Response> {
-        let req = self
-            .client
-            .post(self.get_api_url())
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .header("Content-Type", "application/json")
-            .json(&request);
-
-        // Add custom headers for different providers
-        let provider_lower = self.config.provider.to_lowercase();
-        if provider_lower == "grok" || provider_lower == "xai" {
-            // xAI/Grok uses Bearer token authentication, no additional headers needed
-            // API documented at https://docs.x.ai/docs/api-reference
-            // OpenAI-compatible API, uses standard Authorization header only
-        }
-
-        Ok(req.send().await?)
-    }
-
-    /// Complete a request using the OpenAI Responses API (for gpt-5-codex)
-    async fn complete_with_responses_api(
-        &self,
-        request: LlmCompletionRequest,
-    ) -> Result<LlmCompletionResponse> {
-        let start_time = std::time::Instant::now();
-
-        // Convert LlmCompletionRequest to ResponsesApiRequest
-        let responses_request = self.convert_to_responses_request(request.clone())?;
-
-        // Log the request
-        let request_json = serde_json::to_string_pretty(&responses_request)
-            .unwrap_or_else(|_| "Failed to serialize request".to_string());
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            api_url = %self.get_api_url(),
-            raw_request = %request_json,
-            "Sending Responses API request"
-        );
-
-        // Make the request
-        let client = reqwest::Client::new();
-        let response = client
-            .post(self.get_api_url())
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .header("Content-Type", "application/json")
-            .header("OpenAI-Beta", "responses=experimental")
-            .json(&responses_request)
-            .send()
-            .await?;
-
-        let response_time = start_time.elapsed();
-        let status = response.status();
-
-        if !status.is_success() {
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-
-            tracing::error!(
-                provider = %self.config.provider,
-                model = %request.model,
-                status = %status,
-                response_time_ms = %response_time.as_millis(),
-                error = %error_text,
-                "Responses API request failed"
-            );
-
-            return Err(anyhow::anyhow!(
-                "Responses API error: {} - {}",
-                status,
-                error_text
-            ));
-        }
-
-        // Parse the response
-        let response_text = response.text().await?;
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            status = %status,
-            response_time_ms = %response_time.as_millis(),
-            raw_response = %response_text,
-            "Raw Responses API response received"
-        );
-
-        let responses_response: ResponsesApiResponse = match serde_json::from_str(&response_text) {
-            Ok(response) => response,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to parse Responses API response: {} - Response text length: {} - First 500 chars: {}",
-                    e,
-                    response_text.len(),
-                    &response_text[..response_text.len().min(500)]
-                );
-                return Err(e.into());
-            }
+            _ => anyhow::bail!("Unsupported provider: {}", config.provider),
         };
 
-        // Convert ResponsesApiResponse to LlmCompletionResponse
-        let llm_response = self.convert_from_responses_response(responses_response)?;
-
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            status = %status,
-            response_time_ms = %response_time.as_millis(),
-            completion_id = %llm_response.id,
-            output_count = %llm_response.choices.len(),
-            usage = ?llm_response.usage,
-            "Responses API request completed successfully"
-        );
-
-        Ok(llm_response)
-    }
-
-    /// Get Codex-specific instructions for gpt-5-codex
-    fn get_codex_instructions(&self, _request: &LlmCompletionRequest) -> String {
-        // Base Codex instructions for gpt-5-codex - shortened for API limits
-        r#"You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's computer.
-
-## General
-
-- The arguments to `shell` will be passed to execvp(). Most terminal commands should be prefixed with ["bash", "-lc"].
-- Always set the `workdir` param when using the shell function. Do not use `cd` unless absolutely necessary.
-- When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)
-
-## Editing constraints
-
-- Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.
-- Add succinct code comments that explain what is going on if code is not self-explanatory. You should not add comments like "Assigns the value to the variable", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out. Usage of these comments should be rare.
-
-## Plan tool
-
-When using the planning tool:
-- Skip using the planning tool for straightforward tasks (roughly the easiest 25%).
-- Do not make single-step plans.
-- When you made a plan, update it after having performed one of the sub-tasks that you shared on the plan.
-
-## Codex CLI harness, sandboxing, and approvals
-
-The Codex CLI harness supports different configurations for sandboxing and escalation approvals.
-
-Filesystem sandboxing defines which files can be read or written. Network sandboxing defines whether network can be accessed without approval. Approvals are your mechanism to get user consent to run shell commands without the sandbox.
-
-You will be told what filesystem sandboxing, network sandboxing, and approval mode are active. If you are not told about this, assume that you are running with workspace-write, network sandboxing enabled, and approval on-failure.
-
-## Presenting your work and final message
-
-You are producing plain text that will later be styled by the CLI. Be very concise; friendly coding teammate tone. Ask only when needed; suggest ideas; mirror the user's style.
-
-For code changes: Lead with a quick explanation of the change, and then give more details on the context. If there are natural next steps, suggest them at the end.
-
-File References: When referencing files, include the relevant start line and always follow the format: `file_path:line_number`."
-
-## General
-
-- The arguments to `shell` will be passed to execvp(). Most terminal commands should be prefixed with ["bash", "-lc"].
-- Always set the `workdir` param when using the shell function. Do not use `cd` unless absolutely necessary.
-- When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)
-
-## Editing constraints
-
-- Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.
-- Add succinct code comments that explain what is going on if code is not self-explanatory. You should not add comments like "Assigns the value to the variable", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out. Usage of these comments should be rare.
-- Try to use apply_patch for single file edits, but it is fine to explore other options to make the edit if it does not work well. Do not use apply_patch for changes that are auto-generated (i.e. generating package.json or running a lint or format command like gofmt) or when scripting is more efficient (such as search and replacing a string across a codebase).
-- You may be in a dirty git worktree.
-    * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.
-    * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.
-    * If the changes are in files you've touched recently, you should read carefully and understand how you can work with the changes rather than reverting them.
-    * If the changes are in unrelated files, just ignore them and don't revert them.
-- While you are working, you might notice unexpected changes that you didn't make. If this happens, STOP IMMEDIATELY and ask the user how they would like to proceed.
-- **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.
-
-## Plan tool
-
-When using the planning tool:
-- Skip using the planning tool for straightforward tasks (roughly the easiest 25%).
-- Do not make single-step plans.
-- When you made a plan, update it after having performed one of the sub-tasks that you shared on the plan.
-
-## Codex CLI harness, sandboxing, and approvals
-
-The Codex CLI harness supports several different configurations for sandboxing and escalation approvals that the user can choose from.
-
-Filesystem sandboxing defines which files can be read or written. The options for `sandbox_mode` are:
-- **read-only**: The sandbox only permits reading files.
-- **workspace-write**: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval.
-- **danger-full-access**: No filesystem sandboxing - all commands are permitted.
-
-Network sandboxing defines whether network can be accessed without approval. Options for `network_access` are:
-- **restricted**: Requires approval
-- **enabled**: No approval needed
-
-Approvals are your mechanism to get user consent to run shell commands without the sandbox. Possible configuration options for `approval_policy` are
-- **untrusted**: The harness will escalate most commands for user approval, apart from a limited allowlist of safe "read" commands.
-- **on-failure**: The harness will allow all commands to run in the sandbox (if enabled), and failures will be escalated to the user for approval to run again without the sandbox.
-- **on-request**: Commands will be run in the sandbox by default, and you can specify in your tool call if you want to escalate a command to run without sandboxing. (Note that this mode is not always available. If it is, you'll see parameters for it in the `shell` command description.)
-- **never**: This is a non-interactive mode where you may NEVER ask the user for approval to run commands. Instead, you must always persist and work around constraints to solve the task for the user. You MUST do your utmost best to finish the task and validate your work before yielding. If this mode is paired with `danger-full-access`, take advantage of it to deliver the best outcome for the user. Further, in this mode, your default testing philosophy is overridden: Even if you don't see local patterns for testing, you may add tests and scripts to validate your work. Just remove them before yielding.
-
-When you are running with `approval_policy == on-request`, and sandboxing enabled, here are scenarios where you'll need to request approval:
-- You need to run a command that writes to a directory that requires it (e.g. running tests that write to /var)
-- You need to run a GUI app (e.g., open/xdg-open/osascript) to open browsers or files.
-- You are running sandboxed and need to run a command that requires network access (e.g. installing packages)
-- If you run a command that is important to solving the user's query, but it fails because of sandboxing, rerun the command with approval. ALWAYS proceed to use the `with_escalated_permissions` and `justification` parameters - do not message the user before requesting approval for the command.
-- You are about to take a potentially destructive action such as an `rm` or `git reset` that the user did not explicitly ask for
-- (for all of these, you should weigh alternative paths that do not require approval)
-
-When `sandbox_mode` is set to read-only, you'll need to request approval for any command that isn't a read.
-
-You will be told what filesystem sandboxing, network sandboxing, and approval mode are active in a developer or user message. If you are not told about this, assume that you are running with workspace-write, network sandboxing enabled, and approval on-failure.
-
-Although they introduce friction to the user because your work is paused until the user responds, you should leverage them when necessary to accomplish important work. If the completing the task requires escalated permissions, Do not let these settings or the sandbox deter you from attempting to accomplish the user's task unless it is set to "never", in which case never ask for approvals.
-
-When requesting approval to execute a command that will require escalated privileges:
-  - Provide the `with_escalated_permissions` parameter with the boolean value true
-  - Include a short, 1 sentence explanation for why you need to enable `with_escalated_permissions` in the justification parameter
-
-## Special user requests
-
-- If the user makes a simple request (such as asking for the time) which you can fulfill by running a terminal command (such as `date`), you should do so.
-- If the user asks for a "review", default to a code review mindset: prioritise identifying bugs, risks, behavioural regressions, and missing tests. Findings must be the primary focus of the response - keep summaries or overviews brief and only after enumerating the issues. Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail. If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.
-
-## Presenting your work and final message
-
-You are producing plain text that will later be styled by the CLI. Follow these rules exactly. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value.
-
-- Default: be very concise; friendly coding teammate tone.
-- Ask only when needed; suggest ideas; mirror the user's style.
-- For substantial work, summarize clearly; follow final‑answer formatting.
-- Skip heavy formatting for simple confirmations.
-- Don't dump large files you've written; reference paths only.
-- No "save/copy this file" - User is on the same machine.
-- Offer logical next steps (tests, commits, build) briefly; add verify steps if you couldn't do something.
-- For code changes:
-  * Lead with a quick explanation of the change, and then give more details on the context covering where and why a change was made. Do not start this explanation with "summary", just jump right in.
-  * If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps.
-  * When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.
-- The user does not command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.
-
-### Final answer structure and style guidelines
-
-- Plain text; CLI handles styling. Use structure only when it helps scanability.
-- Headers: optional; short Title Case (1-3 words) wrapped in **…**; no blank line before the first header; add only if they truly help.
-- Bullets: use - ; merge related points; keep to one line when possible; 4–6 per list ordered by importance; keep phrasing consistent.
-- Monospace: backticks for commands/paths/env vars/code ids and inline examples; use for literal keyword bullets; never combine with **.
-- Code samples or multi-line snippets should be wrapped in fenced code blocks; include an info string as often as possible.
-- Structure: group related bullets; order sections general → specific → supporting; for subsections, start with a bolded keyword bullet, then items; match complexity to the task.
-- Tone: collaborative, concise, factual; present tense, active voice; self‑contained; no "above/below"; parallel wording.
-- Don'ts: no nested bullets/hierarchies; no ANSI codes; don't cram unrelated keywords; keep keyword lists short—wrap/reformat if long; avoid naming formatting styles in answers.
-- Adaptation: code explanations → precise, structured with code refs; simple tasks → lead with outcome; big changes → logical walkthrough + rationale + next actions; casual one-offs → plain sentences, no headers/bullets.
-- File References: When referencing files in your response, make sure to include the relevant start line and always follow the below rules:
-  * Use inline code to make file paths clickable.
-  * Each reference should have a stand alone path. Even if it's the same file.
-  * Accepted: absolute, workspace‑relative, a/ or b/ diff prefixes, or bare filename/suffix.
-  * Line/column (1‑based, optional): :line[:column] or #Lline[Ccolumn] (column defaults to 1).
-  * Do not use URIs like file://, vscode://, or https://.
-  * Do not provide range of lines
-  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\repo\project\main.rs:12:5"#.to_string()
-    }
-
-    /// Get standard instructions for other models
-    #[allow(dead_code)]
-    fn get_standard_instructions(&self, request: &LlmCompletionRequest) -> String {
-        let mut instructions = String::new();
-
-        for message in &request.messages {
-            if message.role == "system" {
-                if let Some(content) = &message.content {
-                    if !instructions.is_empty() {
-                        instructions.push('\n');
-                    }
-                    instructions.push_str(content);
-                }
-            }
-        }
-
-        instructions
-    }
-
-    /// Convert LlmCompletionRequest to ResponsesApiRequest
-    fn convert_to_responses_request(
-        &self,
-        request: LlmCompletionRequest,
-    ) -> Result<ResponsesApiRequest> {
-        // Extract instructions from system messages
-        let instructions = self.get_codex_instructions(&request);
-
-        // Convert messages to simple JSON format for input
-        let mut input = Vec::new();
-
-        for message in &request.messages {
-            match message.role.as_str() {
-                "system" => {
-                    // System messages are handled in instructions, skip here
-                    continue;
-                }
-                "user" => {
-                    if let Some(content) = &message.content {
-                        input.push(serde_json::json!({
-                            "role": "user",
-                            "content": content
-                        }));
-                    }
-                }
-                "assistant" => {
-                    let mut msg_obj = serde_json::json!({
-                        "role": "assistant"
-                    });
-
-                    // Add text content if present
-                    if let Some(text) = &message.content {
-                        msg_obj["content"] = serde_json::Value::String(text.clone());
-                    }
-
-                    // Add tool calls if present (for conversation history)
-                    if let Some(tool_calls) = &message.tool_calls {
-                        let tool_calls_json: Vec<serde_json::Value> = tool_calls
-                            .iter()
-                            .map(|tc| {
-                                serde_json::json!({
-                                    "id": tc.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tc.function.name,
-                                        "arguments": tc.function.arguments
-                                    }
-                                })
-                            })
-                            .collect();
-                        msg_obj["tool_calls"] = serde_json::Value::Array(tool_calls_json);
-                    }
-
-                    input.push(msg_obj);
-                }
-                "tool" => {
-                    // Tool results - add as user message with tool result
-                    if let Some(content) = &message.content {
-                        if let Some(tool_call_id) = &message.tool_call_id {
-                            input.push(serde_json::json!({
-                                "role": "tool",
-                                "content": content,
-                                "tool_call_id": tool_call_id
-                            }));
-                        } else {
-                            // Fallback: treat as user message
-                            input.push(serde_json::json!({
-                                "role": "user",
-                                "content": content
-                            }));
-                        }
-                    }
-                }
-                _ => {
-                    // Skip unknown roles
-                }
-            }
-        }
-
-        // Convert tools to ResponsesToolDefinition format
-        let tools = request.tools.as_ref().map(|tools| {
-            tools
-                .iter()
-                .map(|tool| {
-                    ResponsesToolDefinition {
-                        r#type: tool.r#type.clone(),
-                        name: tool.function.name.clone(),
-                        description: tool.function.description.clone(),
-                        strict: true, // Enable strict mode for better tool calling
-                        parameters: tool.function.parameters.clone(),
-                    }
-                })
-                .collect()
-        });
-
-        // Determine tool_choice
-        let tool_choice = if tools.is_some() {
-            match &request.tool_choice {
-                Some(ToolChoice::None(_)) => "none".to_string(),
-                Some(ToolChoice::Auto(_)) => "auto".to_string(),
-                Some(ToolChoice::Required(_)) => "required".to_string(),
-                Some(ToolChoice::Specific { .. }) => "required".to_string(), // For specific tools, use required
-                None => "auto".to_string(),
-            }
-        } else {
-            "none".to_string()
-        };
-
-        Ok(ResponsesApiRequest {
-            model: request.model,
-            instructions,
-            input,
-            tools,
-            tool_choice,
-            stream: request.stream.unwrap_or(false),
-        })
-    }
-
-    /// Convert ResponsesApiResponse to LlmCompletionResponse
-    fn convert_from_responses_response(
-        &self,
-        response: ResponsesApiResponse,
-    ) -> Result<LlmCompletionResponse> {
-        tracing::debug!(
-            "Converting Responses API response with {} output items",
-            response.output.len()
-        );
-        let mut content_text = String::new();
-        let mut tool_calls = Vec::new();
-
-        // Aggregate all text content and collect all tool calls
-        for item in &response.output {
-            match item {
-                ResponseItem::Message { content, .. } => {
-                    for content_item in content {
-                        if let ContentItem::OutputText { text, .. } = content_item {
-                            if !content_text.is_empty() {
-                                content_text.push('\n');
-                            }
-                            content_text.push_str(text);
-                        }
-                    }
-                }
-                ResponseItem::Reasoning { .. } => {
-                    // Reasoning items are internal to the model and don't contribute to the final response
-                    // Just skip them
-                }
-                ResponseItem::FunctionCall {
-                    name,
-                    arguments,
-                    call_id,
-                    ..
-                } => {
-                    tool_calls.push(LlmToolCall {
-                        id: call_id.clone(),
-                        r#type: "function".to_string(),
-                        function: LlmToolCallFunction {
-                            name: name.clone(),
-                            arguments: arguments.clone(),
-                        },
-                    });
-                }
-            }
-        }
-
-        // Create a single choice with all aggregated content
-        let choice = LlmChoice {
-            index: 0,
-            message: Some(LlmMessage {
-                role: "assistant".to_string(),
-                content: if content_text.is_empty() {
-                    None
-                } else {
-                    Some(content_text)
-                },
-                tool_calls: if tool_calls.is_empty() {
-                    None
-                } else {
-                    Some(tool_calls)
-                },
-                function_call: None,
-                tool_call_id: None,
-            }),
-            delta: None,
-            finish_reason: Some("stop".to_string()),
-            tool_calls: None, // Tool calls are in the message, not at choice level
-        };
-
-        Ok(LlmCompletionResponse {
-            id: response.id,
-            object: "response".to_string(),
-            created: 0, // Responses API doesn't provide this
-            model: response.model,
-            choices: vec![choice],
-            usage: response.usage.map(|u| LlmUsage {
-                prompt_tokens: u.input_tokens,
-                completion_tokens: u.output_tokens,
-                total_tokens: u.total_tokens,
-            }),
-        })
-    }
-}
-
-#[async_trait]
-impl LlmClient for OpenAiCompatibleClient {
-    async fn complete(&self, mut request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
-        // Check if this is a gpt-5-codex model that requires the responses API
-        if self.config.model == "gpt-5-codex" {
-            return self.complete_with_responses_api(request).await;
-        }
-
-        // Apply config defaults
-        if request.max_tokens.is_none() {
-            request.max_tokens = self.config.max_tokens;
-        }
-        if request.temperature.is_none() {
-            request.temperature = self.config.temperature;
-        }
-
-        let start_time = std::time::Instant::now();
-        let message_count = request.messages.len();
-        let total_input_tokens: usize = request
-            .messages
-            .iter()
-            .map(|m| m.content.as_ref().map(|c| c.len()).unwrap_or(0))
-            .sum();
-
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            message_count = %message_count,
-            estimated_input_tokens = %total_input_tokens,
-            max_tokens = ?request.max_tokens,
-            temperature = ?request.temperature,
-            has_tools = %request.tools.is_some(),
-            supports_native_tools = %self.supports_native_tools(),
-            supports_legacy_functions = %self.supports_legacy_functions(),
-            "Sending non-streaming completion request to LLM provider"
-        );
-
-        // Prepare request for the specific provider
-        let prepared_request = self.prepare_request_for_provider(request.clone());
-
-        // Log the raw request being sent to the LLM
-        let request_json = serde_json::to_string_pretty(&prepared_request)
-            .unwrap_or_else(|_| "Failed to serialize request".to_string());
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            api_url = %self.get_api_url(),
-            raw_request = %request_json,
-            "Raw LLM request being sent to provider"
-        );
-
-        let response = self.make_request(prepared_request).await?;
-
-        let response_time = start_time.elapsed();
-        let status = response.status();
-
-        if !status.is_success() {
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-
-            tracing::error!(
-                provider = %self.config.provider,
-                model = %request.model,
-                status = %status,
-                response_time_ms = %response_time.as_millis(),
-                error = %error_text,
-                "LLM API request failed"
-            );
-
-            return Err(anyhow::anyhow!(
-                "LLM API error: {} - {}",
-                status,
-                error_text
-            ));
-        }
-
-        // Get the raw response text first for logging
-        let response_text = response.text().await?;
-
-        // Log the raw response received from the LLM
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            status = %status,
-            response_time_ms = %response_time.as_millis(),
-            response_length = %response_text.len(),
-            raw_response = %response_text,
-            "Raw LLM response received from provider"
-        );
-
-        // Parse the response
-        let completion: LlmCompletionResponse = serde_json::from_str(&response_text)?;
-
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            status = %status,
-            response_time_ms = %response_time.as_millis(),
-            completion_id = %completion.id,
-            created = %completion.created,
-            choices_count = %completion.choices.len(),
-            usage = ?completion.usage,
-            "LLM API request completed successfully"
-        );
-
-        Ok(completion)
-    }
-
-    fn stream_complete(
-        &self,
-        mut request: LlmCompletionRequest,
-    ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>> {
-        request.stream = Some(true);
-
-        let start_time = std::time::Instant::now();
-        let client = self.client.clone();
-        let config = self.config.clone();
-        let api_url = self.get_api_url();
-
-        let message_count = request.messages.len();
-        let total_input_tokens = message_count * 10; // rough estimate
-
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            message_count = %message_count,
-            estimated_input_tokens = %total_input_tokens,
-            max_tokens = ?request.max_tokens,
-            temperature = ?request.temperature,
-            has_tools = %request.tools.is_some(),
-            "Sending streaming completion request to LLM provider"
-        );
-
-        // Prepare request for the specific provider
-        let prepared_request = self.prepare_request_for_provider(request.clone());
-
-        // Log the raw streaming request being sent to the LLM
-        let request_json = serde_json::to_string_pretty(&prepared_request)
-            .unwrap_or_else(|_| "Failed to serialize request".to_string());
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            api_url = %api_url,
-            raw_request = %request_json,
-            "Raw LLM streaming request being sent to provider"
-        );
-
-        Box::pin(try_stream! {
-            let req = client
-                .post(&api_url)
-                .header("Authorization", format!("Bearer {}", config.api_key))
-                .header("Content-Type", "application/json")
-                .json(&prepared_request);
-
-            // Add custom headers for different providers
-            let provider_lower = config.provider.to_lowercase();
-            if provider_lower == "grok" || provider_lower == "xai" {
-                // xAI/Grok uses Bearer token authentication, no additional headers needed
-                // API documented at https://docs.x.ai/docs/api-reference
-                // OpenAI-compatible API, uses standard Authorization header only
-            }
-
-            let response = req.send().await?;
-            let mut stream = response.bytes_stream();
-            let mut accumulated_tool_calls = Vec::new();
-
-            while let Some(chunk) = stream.next().await {
-                let chunk = chunk?;
-                let text = String::from_utf8_lossy(&chunk);
-
-                // Log raw streaming chunk
-                if !text.trim().is_empty() {
-                    tracing::debug!(
-                        provider = %config.provider,
-                        model = %request.model,
-                        chunk_size = %chunk.len(),
-                        raw_chunk = %text,
-                        "Raw streaming chunk received from provider"
-                    );
-                }
-
-                // Process SSE-style stream
-                for line in text.lines() {
-                    let line = line.trim();
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if data == "[DONE]" {
-                            let response_time = start_time.elapsed();
-                            tracing::info!(
-                                provider = %config.provider,
-                                model = %request.model,
-                                response_time_ms = %response_time.as_millis(),
-                                total_accumulated_tool_calls = %accumulated_tool_calls.len(),
-                                "Streaming LLM API request completed successfully"
-                            );
-                            // Only yield if we haven't already yielded the final chunk via finish_reason
-                            if accumulated_tool_calls.iter().any(|tc: &LlmToolCall| !tc.id.is_empty() || !tc.function.name.is_empty()) {
-                                yield StreamChunk {
-                                    content: String::new(),
-                                    is_finished: true,
-                                    tool_calls: accumulated_tool_calls,
-                                };
-                            } else {
-                                yield StreamChunk {
-                                    content: String::new(),
-                                    is_finished: true,
-                                    tool_calls: Vec::new(),
-                                };
-                            }
-                            return;
-                        }
-
-                        if let Ok(chunk_value) = serde_json::from_str::<Value>(data) {
-                            if let Some(choices) = chunk_value.get("choices").and_then(|v| v.as_array()) {
-                                if let Some(choice) = choices.first() {
-                                    let mut content = String::new();
-                                    let mut tool_calls_in_chunk = Vec::new();
-
-                                    // Check finish_reason to see if this is the final chunk
-                                    let finish_reason = choice.get("finish_reason").and_then(|v| v.as_str());
-                                    let is_finished = finish_reason.is_some();
-
-                                    // Handle tool calls at choice level (Anthropic/Grok format)
-                                    if let Some(choice_tool_calls) = choice.get("tool_calls").and_then(|v| v.as_array()) {
-                                        for tool_call_value in choice_tool_calls {
-                                            if let Ok(tool_call) = serde_json::from_value::<LlmToolCall>(tool_call_value.clone()) {
-                                                accumulated_tool_calls.push(tool_call.clone());
-                                                tool_calls_in_chunk.push(tool_call);
-                                            }
-                                        }
-                                        tracing::debug!(
-                                            provider = %config.provider,
-                                            tool_calls_at_choice_level = %choice_tool_calls.len(),
-                                            "Found tool calls at choice level"
-                                        );
-                                    }
-
-                                    // Handle streaming delta (OpenAI format)
-                                    if let Some(delta) = choice.get("delta") {
-                                        // Parse the delta as LlmMessageDelta to handle both content and tool calls
-                                        if let Ok(message_delta) = serde_json::from_value::<LlmMessageDelta>(delta.clone()) {
-                                            // Extract content
-                                            if let Some(delta_content) = message_delta.content {
-                                                content = delta_content;
-                                            }
-
-                                            // Extract and accumulate tool calls from delta
-                                            if let Some(delta_tool_calls) = message_delta.tool_calls {
-                                                for delta_tool_call in delta_tool_calls {
-                                                    // Convert streaming tool call delta to complete tool call
-                                                    let index = delta_tool_call.index;
-                                                    let index_usize = index as usize;
-
-                                                    // Ensure we have enough space in accumulated_tool_calls
-                                                    while accumulated_tool_calls.len() <= index_usize {
-                                                        accumulated_tool_calls.push(LlmToolCall {
-                                                            id: String::new(),
-                                                            r#type: "function".to_string(),
-                                                            function: LlmToolCallFunction {
-                                                                name: String::new(),
-                                                                arguments: String::new(),
-                                                            },
-                                                        });
-                                                    }
-
-                                                    // Update the tool call at this index
-                                                    if let Some(existing_tool_call) = accumulated_tool_calls.get_mut(index_usize) {
-                                                        // Update ID
-                                                        if let Some(id) = delta_tool_call.id {
-                                                            existing_tool_call.id = id;
-                                                        }
-
-                                                        // Update function name
-                                                        if let Some(function_delta) = delta_tool_call.function {
-                                                            if let Some(name) = function_delta.name {
-                                                                existing_tool_call.function.name = name;
-                                                            }
-                                                            if let Some(arguments) = function_delta.arguments {
-                                                                // Accumulate arguments (they come in pieces)
-                                                                existing_tool_call.function.arguments.push_str(&arguments);
-                                                            }
-                                                        }
-                                                    }
-
-                                                    // Add to chunk tool calls for immediate processing
-                                                    tool_calls_in_chunk.push(accumulated_tool_calls[index_usize].clone());
-                                                }
-                                            }
-                                        } else {
-                                            // Fallback: try to extract content directly if parsing as LlmMessageDelta fails
-                                            if let Some(content_str) = delta.get("content").and_then(|v| v.as_str()) {
-                                                content = content_str.to_string();
-                                            }
-                                        }
-                                    }
-
-                                    let response_time = start_time.elapsed();
-                                    tracing::debug!(
-                                        provider = %config.provider,
-                                        model = %request.model,
-                                        response_time_ms = %response_time.as_millis(),
-                                        chunk_length = %content.len(),
-                                        tool_calls_in_chunk = %tool_calls_in_chunk.len(),
-                                        total_accumulated_tool_calls = %accumulated_tool_calls.len(),
-                                        finish_reason = ?finish_reason,
-                                        is_finished = %is_finished,
-                                        content_preview = %if content.len() > 100 {
-                                            format!("{}...", &content[..100])
-                                        } else {
-                                            content.clone()
-                                        },
-                                        "Received streaming chunk"
-                                    );
-
-                                    yield StreamChunk {
-                                        content,
-                                        is_finished,
-                                        tool_calls: tool_calls_in_chunk,
-                                    };
-
-                                    // If this is the final chunk, we're done
-                                    if is_finished {
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    }
-
-    fn extract_tool_calls_from_response(
-        &self,
-        response: &LlmCompletionResponse,
-    ) -> Vec<LlmToolCall> {
-        self.extract_tool_calls_from_response_internal(response)
-    }
-
-    fn provider(&self) -> &str {
-        &self.config.provider
-    }
-
-    fn model(&self) -> &str {
-        if let Some(model) = &self.model {
-            return model.id();
-        }
-        &self.config.model
-    }
-}
-
-/// Claude-specific message content blocks
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum ClaudeContentBlock {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "tool_use")]
-    ToolUse {
-        id: String,
-        name: String,
-        input: serde_json::Value,
-    },
-    #[serde(rename = "tool_result")]
-    ToolResult {
-        tool_use_id: String,
-        content: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        is_error: Option<bool>,
-    },
-}
-
-/// Claude-specific message structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeMessage {
-    pub role: String,
-    pub content: Vec<ClaudeContentBlock>,
-}
-
-/// Claude API request structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeCompletionRequest {
-    pub model: String,
-    pub messages: Vec<ClaudeMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub system: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<ClaudeToolDefinition>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<ClaudeToolChoice>,
-}
-
-/// Claude tool definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeToolDefinition {
-    pub name: String,
-    pub description: String,
-    pub input_schema: serde_json::Value,
-}
-
-/// Claude tool choice
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum ClaudeToolChoice {
-    Auto { r#type: String },               // {"type": "auto"}
-    Any { r#type: String },                // {"type": "any"}
-    Tool { r#type: String, name: String }, // {"type": "tool", "name": "tool_name"}
-}
-
-/// Claude API response structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeCompletionResponse {
-    pub id: String,
-    pub r#type: String,
-    pub role: String,
-    pub content: Vec<ClaudeContentBlock>,
-    pub model: String,
-    pub stop_reason: Option<String>,
-    pub stop_sequence: Option<String>,
-    pub usage: ClaudeUsage,
-}
-
-/// Claude usage statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeUsage {
-    pub input_tokens: u32,
-    pub output_tokens: u32,
-}
-
-/// Claude LLM client
-pub struct ClaudeClient {
-    client: reqwest::Client,
-    config: LlmProviderConfig,
-    model: Option<Arc<dyn LlmModel>>,
-}
-
-impl ClaudeClient {
-    #[allow(dead_code)]
-    pub fn new(config: LlmProviderConfig) -> Result<Self> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()?;
-        let model = None; // Will be set later if needed
         Ok(Self {
-            client,
-            config,
+            provider,
             model,
+            inner,
         })
-    }
-
-    #[allow(dead_code)]
-    pub fn with_model(mut self, model: Arc<dyn LlmModel>) -> Self {
-        self.model = Some(model);
-        self
-    }
-
-    fn get_api_url(&self) -> String {
-        if let Some(base_url) = &self.config.base_url {
-            format!("{}/v1/messages", base_url.trim_end_matches('/'))
-        } else {
-            "https://api.anthropic.com/v1/messages".to_string()
-        }
-    }
-
-    /// Check if the provider supports native tool calling
-    fn supports_native_tools(&self) -> bool {
-        if let Some(model) = &self.model {
-            return model.supports_tool_calling();
-        }
-
-        // Fallback to old logic if no model is set
-        self.config.model.to_lowercase().contains("claude")
-            || self.config.model.to_lowercase().contains("opus")
-            || self.config.model.to_lowercase().contains("sonnet")
-            || self.config.model.to_lowercase().contains("haiku")
-    }
-
-    /// Convert LlmMessage to ClaudeMessage
-    fn convert_to_claude_message(&self, message: &LlmMessage) -> ClaudeMessage {
-        let content = if message.role == "tool" {
-            // Handle tool result messages - parse the stored tool result data
-            if let Some(content_str) = &message.content {
-                if let Ok(tool_result_data) = serde_json::from_str::<serde_json::Value>(content_str)
-                {
-                    // Check for tool result format (tool_use_id for Claude, tool_call_id for OpenAI-compatible)
-                    if let (Some(tool_use_id), Some(content_value)) = (
-                        tool_result_data
-                            .get("tool_use_id")
-                            .or_else(|| tool_result_data.get("tool_call_id"))
-                            .and_then(|v| v.as_str()),
-                        tool_result_data.get("content"),
-                    ) {
-                        // Convert the content value to a string
-                        let content_string = match content_value {
-                            serde_json::Value::String(s) => s.clone(),
-                            _ => content_value.to_string(),
-                        };
-
-                        return ClaudeMessage {
-                            role: "user".to_string(), // Tool results are sent as user messages in Claude
-                            content: vec![ClaudeContentBlock::ToolResult {
-                                tool_use_id: tool_use_id.to_string(),
-                                content: content_string,
-                                is_error: None,
-                            }],
-                        };
-                    }
-                    // If no tool_use_id, treat as simple tool result content
-                    else {
-                        return ClaudeMessage {
-                            role: "user".to_string(),
-                            content: vec![ClaudeContentBlock::Text {
-                                text: tool_result_data.to_string(),
-                            }],
-                        };
-                    }
-                }
-            }
-            // Fallback for malformed tool results
-            vec![ClaudeContentBlock::Text {
-                text: message.content.as_deref().unwrap_or("").to_string(),
-            }]
-        } else if message.role == "assistant" {
-            // Handle assistant messages - check if they contain structured tool call data
-            if let Some(content_str) = &message.content {
-                // Try to parse as structured tool call data first
-                if let Ok(assistant_data) = serde_json::from_str::<serde_json::Value>(content_str) {
-                    if let (Some(text), Some(tool_calls_array)) = (
-                        assistant_data.get("text").and_then(|v| v.as_str()),
-                        assistant_data.get("tool_calls").and_then(|v| v.as_array()),
-                    ) {
-                        // Build content blocks with text + tool_use blocks
-                        let mut content_blocks = vec![];
-
-                        // Add text block if present
-                        if !text.trim().is_empty() {
-                            content_blocks.push(ClaudeContentBlock::Text {
-                                text: text.to_string(),
-                            });
-                        }
-
-                        // Add tool_use blocks
-                        for tool_call in tool_calls_array {
-                            if let (Some(id), Some(name), Some(args_str)) = (
-                                tool_call.get("id").and_then(|v| v.as_str()),
-                                tool_call
-                                    .get("function")
-                                    .and_then(|f| f.get("name"))
-                                    .and_then(|v| v.as_str()),
-                                tool_call
-                                    .get("function")
-                                    .and_then(|f| f.get("arguments"))
-                                    .and_then(|v| v.as_str()),
-                            ) {
-                                if let Ok(input) =
-                                    serde_json::from_str::<serde_json::Value>(args_str)
-                                {
-                                    content_blocks.push(ClaudeContentBlock::ToolUse {
-                                        id: id.to_string(),
-                                        name: name.to_string(),
-                                        input,
-                                    });
-                                }
-                            }
-                        }
-
-                        return ClaudeMessage {
-                            role: message.role.clone(),
-                            content: content_blocks,
-                        };
-                    }
-                }
-                // Fallback to text content
-                vec![ClaudeContentBlock::Text {
-                    text: content_str.clone(),
-                }]
-            } else {
-                vec![]
-            }
-        } else if let Some(content_str) = &message.content {
-            vec![ClaudeContentBlock::Text {
-                text: content_str.clone(),
-            }]
-        } else if let Some(tool_calls) = &message.tool_calls {
-            // Convert tool calls to tool_result blocks (this seems wrong, but keeping for compatibility)
-            tool_calls
-                .iter()
-                .map(|tool_call| ClaudeContentBlock::ToolResult {
-                    tool_use_id: tool_call.id.clone(),
-                    content: format!(
-                        "Tool call: {} with args {}",
-                        tool_call.function.name, tool_call.function.arguments
-                    ),
-                    is_error: None,
-                })
-                .collect()
-        } else {
-            vec![]
-        };
-
-        ClaudeMessage {
-            role: message.role.clone(),
-            content,
-        }
-    }
-
-    /// Convert LlmCompletionRequest to ClaudeCompletionRequest
-    fn convert_request(&self, request: LlmCompletionRequest) -> ClaudeCompletionRequest {
-        // Separate system messages from regular messages
-        let mut system_content = String::new();
-        let mut regular_messages = Vec::new();
-
-        for message in &request.messages {
-            if message.role == "system" {
-                if let Some(content) = &message.content {
-                    if !system_content.is_empty() {
-                        system_content.push('\n');
-                    }
-                    system_content.push_str(content);
-                }
-            } else {
-                regular_messages.push(self.convert_to_claude_message(message));
-            }
-        }
-
-        let tools = if self.supports_native_tools() && request.tools.is_some() {
-            Some(
-                request
-                    .tools
-                    .unwrap()
-                    .into_iter()
-                    .map(|tool| ClaudeToolDefinition {
-                        name: tool.function.name,
-                        description: tool.function.description,
-                        input_schema: tool.function.parameters,
-                    })
-                    .collect(),
-            )
-        } else {
-            None
-        };
-
-        let tool_choice = if self.supports_native_tools() && request.tool_choice.is_some() {
-            match request.tool_choice.unwrap() {
-                ToolChoice::Auto(_) => Some(ClaudeToolChoice::Auto {
-                    r#type: "auto".to_string(),
-                }),
-                ToolChoice::Required(_) => Some(ClaudeToolChoice::Any {
-                    r#type: "any".to_string(),
-                }),
-                ToolChoice::Specific { function, .. } => Some(ClaudeToolChoice::Tool {
-                    r#type: "tool".to_string(),
-                    name: function.name,
-                }),
-                ToolChoice::None(_) => None,
-            }
-        } else {
-            None
-        };
-
-        ClaudeCompletionRequest {
-            model: request.model,
-            messages: regular_messages,
-            max_tokens: request.max_tokens,
-            temperature: request.temperature,
-            system: if system_content.is_empty() {
-                None
-            } else {
-                Some(system_content)
-            },
-            tools,
-            tool_choice,
-        }
-    }
-
-    /// Convert ClaudeCompletionResponse to LlmCompletionResponse
-    fn convert_response(&self, response: ClaudeCompletionResponse) -> LlmCompletionResponse {
-        // Extract text content and tool calls from Claude content blocks
-        let mut content = String::new();
-        let mut tool_calls = Vec::new();
-
-        for block in response.content {
-            match block {
-                ClaudeContentBlock::Text { text } => {
-                    content.push_str(&text);
-                }
-                ClaudeContentBlock::ToolUse { id, name, input } => {
-                    tool_calls.push(LlmToolCall {
-                        id,
-                        r#type: "function".to_string(),
-                        function: LlmToolCallFunction {
-                            name,
-                            arguments: serde_json::to_string(&input).unwrap_or_default(),
-                        },
-                    });
-                }
-                ClaudeContentBlock::ToolResult { .. } => {
-                    // Tool results are handled in the message conversion
-                }
-            }
-        }
-
-        LlmCompletionResponse {
-            id: response.id,
-            object: "chat.completion".to_string(), // Mimic OpenAI format
-            created: 0,                            // Claude doesn't provide this
-            model: response.model,
-            choices: vec![LlmChoice {
-                index: 0,
-                message: Some(LlmMessage {
-                    role: "assistant".to_string(),
-                    content: if content.is_empty() {
-                        None
-                    } else {
-                        Some(content)
-                    },
-                    tool_calls: if tool_calls.is_empty() {
-                        None
-                    } else {
-                        Some(tool_calls)
-                    },
-                    function_call: None,
-                    tool_call_id: None,
-                }),
-                delta: None,
-                finish_reason: response.stop_reason.map(|reason| match reason.as_str() {
-                    "end_turn" => "stop".to_string(),
-                    "max_tokens" => "length".to_string(),
-                    "stop_sequence" => "stop".to_string(),
-                    "tool_use" => "tool_calls".to_string(),
-                    _ => "stop".to_string(),
-                }),
-                tool_calls: None, // Claude puts tool calls in the message, not at choice level
-            }],
-            usage: Some(LlmUsage {
-                prompt_tokens: response.usage.input_tokens,
-                completion_tokens: response.usage.output_tokens,
-                total_tokens: response.usage.input_tokens + response.usage.output_tokens,
-            }),
-        }
     }
 }
 
 #[async_trait]
-impl LlmClient for ClaudeClient {
+impl LlmClient for SdkLlmClient {
     async fn complete(&self, request: LlmCompletionRequest) -> Result<LlmCompletionResponse> {
-        // Apply config defaults
-        let mut request = request;
-        if request.max_tokens.is_none() {
-            request.max_tokens = self.config.max_tokens;
-        }
-        if request.temperature.is_none() {
-            request.temperature = self.config.temperature;
-        }
+        let created = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
 
-        let start_time = std::time::Instant::now();
-        let message_count = request.messages.len();
-        let total_input_tokens: usize = request
-            .messages
-            .iter()
-            .map(|m| m.content.as_ref().map(|c| c.len()).unwrap_or(0))
-            .sum();
+        match &self.inner {
+            ClientType::OpenAI(client) => {
+                // Check if this is a gpt-5-codex model (uses Responses API)
+                if request.model.contains("gpt-5") && request.model.contains("codex") {
+                    // Use response_builder() instead of message_builder()
+                    let mut builder = client.response_builder().model(&request.model);
 
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            message_count = %message_count,
-            estimated_input_tokens = %total_input_tokens,
-            max_tokens = ?request.max_tokens,
-            temperature = ?request.temperature,
-            has_tools = %request.tools.is_some(),
-            "Sending Claude completion request"
-        );
+                    // Responses API uses "input" instead of messages
+                    let input_text = request
+                        .messages
+                        .iter()
+                        .filter_map(|m| m.content.as_ref())
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\n");
 
-        // Convert to Claude format
-        let claude_request = self.convert_request(request.clone());
+                    builder = builder.input(&input_text);
 
-        // Log the raw request
-        let request_json = serde_json::to_string_pretty(&claude_request)
-            .unwrap_or_else(|_| "Failed to serialize request".to_string());
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            api_url = %self.get_api_url(),
-            raw_request = %request_json,
-            "Raw Claude request being sent"
-        );
+                    let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        // Make the request
-        let response = self
-            .client
-            .post(self.get_api_url())
-            .header("x-api-key", &self.config.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("Content-Type", "application/json")
-            .json(&claude_request)
-            .send()
-            .await?;
+                    // Convert Responses API response to manager format
+                    // Extract text from output items
+                    let content = response
+                        .output
+                        .iter()
+                        .filter(|item| item.item_type == "message")
+                        .filter_map(|item| item.content.as_ref())
+                        .flat_map(|blocks| blocks.iter())
+                        .filter(|block| block.content_type == "output_text")
+                        .map(|block| block.text.clone())
+                        .collect::<Vec<_>>()
+                        .join("\n");
 
-        let response_time = start_time.elapsed();
-        let status = response.status();
+                    return Ok(LlmCompletionResponse {
+                        id: response.id,
+                        object: "response".to_string(),
+                        created,
+                        model: request.model.clone(),
+                        choices: vec![LlmChoice {
+                            index: 0,
+                            message: Some(LlmMessage {
+                                role: "assistant".to_string(),
+                                content: Some(content),
+                                tool_calls: None,
+                                function_call: None,
+                                tool_call_id: None,
+                            }),
+                            delta: None,
+                            finish_reason: Some("stop".to_string()),
+                            tool_calls: None,
+                        }],
+                        usage: Some(LlmUsage {
+                            prompt_tokens: response.usage.input_tokens.unwrap_or(0),
+                            completion_tokens: response.usage.output_tokens.unwrap_or(0),
+                            total_tokens: response.usage.total_tokens,
+                            reasoning_tokens: None,
+                        }),
+                    });
+                }
 
-        if !status.is_success() {
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
+                // Regular chat completions
+                let mut builder = client.message_builder().model(&request.model);
 
-            tracing::error!(
-                provider = %self.config.provider,
-                model = %request.model,
-                status = %status,
-                response_time_ms = %response_time.as_millis(),
-                error = %error_text,
-                "Claude API request failed"
-            );
+                // Add max_tokens
+                if let Some(max_tokens) = request.max_tokens {
+                    builder = builder.max_completion_tokens(max_tokens);
+                }
 
-            return Err(anyhow::anyhow!(
-                "Claude API error: {} - {}",
-                status,
-                error_text
-            ));
-        }
+                // Add temperature
+                if let Some(temp) = request.temperature {
+                    builder = builder.temperature(temp);
+                }
 
-        // Parse response
-        let response_text = response.text().await?;
+                // Add messages
+                for msg in &request.messages {
+                    match msg.role.as_str() {
+                        "system" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.system_message(content);
+                            }
+                        }
+                        "user" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.user_message(content);
+                            }
+                        }
+                        "assistant" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.assistant_message(content);
+                            }
+                            // TODO: Handle tool calls in assistant messages
+                        }
+                        "tool" => {
+                            // TODO: Handle tool result messages
+                        }
+                        _ => {}
+                    }
+                }
 
-        // Log raw response for debugging
-        tracing::debug!(
-            provider = %self.config.provider,
-            model = %request.model,
-            status = %status,
-            response_time_ms = %response_time.as_millis(),
-            raw_response = %response_text,
-            "Raw Claude API response received"
-        );
+                // Add tools if present
+                if let Some(_tools) = &request.tools {
+                    // TODO: Convert manager tool format to SDK format
+                    // Use builder.add_tool() method
+                }
 
-        // Check if response contains an error
-        if let Ok(error_response) = serde_json::from_str::<serde_json::Value>(&response_text) {
-            if let Some(error) = error_response.get("error") {
-                tracing::error!(
-                    provider = %self.config.provider,
-                    model = %request.model,
-                    status = %status,
-                    response_time_ms = %response_time.as_millis(),
-                    error = %error,
-                    raw_response = %response_text,
-                    "Claude API returned error in response body"
-                );
-                return Err(anyhow::anyhow!("Claude API error: {}", error));
+                // Send request
+                let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                // Convert SDK response to manager format
+                Ok(LlmCompletionResponse {
+                    id: response.id,
+                    object: "chat.completion".to_string(),
+                    created,
+                    model: response.model,
+                    choices: response
+                        .choices
+                        .into_iter()
+                        .enumerate()
+                        .map(|(idx, choice)| LlmChoice {
+                            index: idx as u32,
+                            message: Some(LlmMessage {
+                                role: match choice.message.role {
+                                    nocodo_llm_sdk::openai::types::OpenAIRole::System => {
+                                        "system".to_string()
+                                    }
+                                    nocodo_llm_sdk::openai::types::OpenAIRole::User => {
+                                        "user".to_string()
+                                    }
+                                    nocodo_llm_sdk::openai::types::OpenAIRole::Assistant => {
+                                        "assistant".to_string()
+                                    }
+                                    nocodo_llm_sdk::openai::types::OpenAIRole::Tool => {
+                                        "tool".to_string()
+                                    }
+                                },
+                                content: Some(choice.message.content),
+                                tool_calls: choice.message.tool_calls.map(|tcs| {
+                                    tcs.into_iter()
+                                        .map(|tc| LlmToolCall {
+                                            id: tc.id,
+                                            r#type: tc.r#type,
+                                            function: LlmToolCallFunction {
+                                                name: tc.function.name,
+                                                arguments: tc.function.arguments,
+                                            },
+                                        })
+                                        .collect()
+                                }),
+                                function_call: None,
+                                tool_call_id: None,
+                            }),
+                            delta: None,
+                            finish_reason: choice.finish_reason,
+                            tool_calls: None,
+                        })
+                        .collect(),
+                    usage: Some(LlmUsage {
+                        prompt_tokens: response.usage.prompt_tokens.unwrap_or(0),
+                        completion_tokens: response.usage.completion_tokens.unwrap_or(0),
+                        total_tokens: response.usage.total_tokens,
+                        reasoning_tokens: None,
+                    }),
+                })
+            }
+
+            ClientType::Claude(client) => {
+                // Build Claude request using SDK builder
+                let mut builder = client.message_builder().model(&request.model);
+
+                // Add max_tokens (required for Claude)
+                let max_tokens = request.max_tokens.unwrap_or(1024);
+                builder = builder.max_tokens(max_tokens);
+
+                // Add temperature
+                if let Some(temp) = request.temperature {
+                    builder = builder.temperature(temp);
+                }
+
+                // Add messages (Claude doesn't support system in messages array)
+                for msg in &request.messages {
+                    match msg.role.as_str() {
+                        "system" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.system(content);
+                            }
+                        }
+                        "user" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.user_message(content);
+                            }
+                        }
+                        "assistant" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.assistant_message(content);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Add tools if present
+                if let Some(_tools) = &request.tools {
+                    // TODO: Convert manager tool format to SDK format
+                }
+
+                // Send request
+                let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                // Convert SDK response to manager format
+                let content_text = response
+                    .content
+                    .iter()
+                    .filter_map(|block| match block {
+                        nocodo_llm_sdk::claude::types::ClaudeContentBlock::Text { text } => {
+                            Some(text.clone())
+                        }
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                Ok(LlmCompletionResponse {
+                    id: response.id,
+                    object: "message".to_string(),
+                    created,
+                    model: response.model,
+                    choices: vec![LlmChoice {
+                        index: 0,
+                        message: Some(LlmMessage {
+                            role: "assistant".to_string(),
+                            content: Some(content_text),
+                            tool_calls: None, // TODO: Extract tool uses from content blocks
+                            function_call: None,
+                            tool_call_id: None,
+                        }),
+                        delta: None,
+                        finish_reason: response.stop_reason,
+                        tool_calls: None,
+                    }],
+                    usage: Some(LlmUsage {
+                        prompt_tokens: response.usage.input_tokens,
+                        completion_tokens: response.usage.output_tokens,
+                        total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+                        reasoning_tokens: None,
+                    }),
+                })
+            }
+
+            ClientType::Grok(client) => {
+                // Similar to OpenAI implementation
+                let mut builder = client.message_builder().model(&request.model);
+
+                if let Some(max_tokens) = request.max_tokens {
+                    builder = builder.max_tokens(max_tokens);
+                }
+
+                if let Some(temp) = request.temperature {
+                    builder = builder.temperature(temp);
+                }
+
+                for msg in &request.messages {
+                    match msg.role.as_str() {
+                        "system" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.system_message(content);
+                            }
+                        }
+                        "user" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.user_message(content);
+                            }
+                        }
+                        "assistant" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.assistant_message(content);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                // Convert response (similar to OpenAI)
+                Ok(LlmCompletionResponse {
+                    id: response.id,
+                    object: "chat.completion".to_string(),
+                    created,
+                    model: response.model,
+                    choices: response
+                        .choices
+                        .into_iter()
+                        .enumerate()
+                        .map(|(idx, choice)| LlmChoice {
+                            index: idx as u32,
+                            message: Some(LlmMessage {
+                                role: match choice.message.role {
+                                    nocodo_llm_sdk::grok::types::GrokRole::System => {
+                                        "system".to_string()
+                                    }
+                                    nocodo_llm_sdk::grok::types::GrokRole::User => {
+                                        "user".to_string()
+                                    }
+                                    nocodo_llm_sdk::grok::types::GrokRole::Assistant => {
+                                        "assistant".to_string()
+                                    }
+                                },
+                                content: Some(choice.message.content),
+                                tool_calls: None, // TODO: Handle tool calls
+                                function_call: None,
+                                tool_call_id: None,
+                            }),
+                            delta: None,
+                            finish_reason: choice.finish_reason,
+                            tool_calls: None,
+                        })
+                        .collect(),
+                    usage: Some(LlmUsage {
+                        prompt_tokens: response.usage.prompt_tokens,
+                        completion_tokens: response.usage.completion_tokens,
+                        total_tokens: response.usage.total_tokens,
+                        reasoning_tokens: None,
+                    }),
+                })
+            }
+
+            ClientType::Glm(client) => {
+                // Similar to OpenAI/Grok implementation
+                let mut builder = client.message_builder().model(&request.model);
+
+                if let Some(max_tokens) = request.max_tokens {
+                    builder = builder.max_tokens(max_tokens);
+                }
+
+                if let Some(temp) = request.temperature {
+                    builder = builder.temperature(temp);
+                }
+
+                for msg in &request.messages {
+                    match msg.role.as_str() {
+                        "system" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.system_message(content);
+                            }
+                        }
+                        "user" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.user_message(content);
+                            }
+                        }
+                        "assistant" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.assistant_message(content);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                // Convert response
+                Ok(LlmCompletionResponse {
+                    id: response.id,
+                    object: "chat.completion".to_string(),
+                    created,
+                    model: response.model,
+                    choices: response
+                        .choices
+                        .into_iter()
+                        .enumerate()
+                        .map(|(idx, choice)| LlmChoice {
+                            index: idx as u32,
+                            message: Some(LlmMessage {
+                                role: match choice.message.role {
+                                    nocodo_llm_sdk::glm::types::GlmRole::System => {
+                                        "system".to_string()
+                                    }
+                                    nocodo_llm_sdk::glm::types::GlmRole::User => {
+                                        "user".to_string()
+                                    }
+                                    nocodo_llm_sdk::glm::types::GlmRole::Assistant => {
+                                        "assistant".to_string()
+                                    }
+                                },
+                                content: choice.message.content,
+                                tool_calls: None, // TODO: Handle tool calls
+                                function_call: None,
+                                tool_call_id: None,
+                            }),
+                            delta: None,
+                            finish_reason: choice.finish_reason,
+                            tool_calls: None,
+                        })
+                        .collect(),
+                    usage: Some(LlmUsage {
+                        prompt_tokens: response.usage.prompt_tokens,
+                        completion_tokens: response.usage.completion_tokens,
+                        total_tokens: response.usage.total_tokens,
+                        reasoning_tokens: None,
+                    }),
+                })
             }
         }
-
-        let claude_response: ClaudeCompletionResponse = match serde_json::from_str(&response_text) {
-            Ok(response) => response,
-            Err(e) => {
-                tracing::error!(
-                    provider = %self.config.provider,
-                    model = %request.model,
-                    status = %status,
-                    response_time_ms = %response_time.as_millis(),
-                    parse_error = %e,
-                    raw_response = %response_text,
-                    "Failed to parse Claude API response"
-                );
-                return Err(anyhow::anyhow!(
-                    "Failed to parse Claude API response: {} - Response: {}",
-                    e,
-                    response_text
-                ));
-            }
-        };
-
-        tracing::info!(
-            provider = %self.config.provider,
-            model = %request.model,
-            status = %status,
-            response_time_ms = %response_time.as_millis(),
-            completion_id = %claude_response.id,
-            usage = ?claude_response.usage,
-            "Claude API request completed successfully"
-        );
-
-        // Convert back to standard format
-        let llm_response = self.convert_response(claude_response);
-        Ok(llm_response)
     }
 
     fn stream_complete(
         &self,
         _request: LlmCompletionRequest,
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>> {
-        // TODO: Implement streaming for Claude
-        // For now, return an error stream
+        // Streaming not implemented yet - return error stream
         Box::pin(futures_util::stream::once(async {
-            Err(anyhow::anyhow!("Claude streaming not yet implemented"))
+            Err(anyhow::anyhow!("Streaming not yet implemented in SDK wrapper"))
         }))
     }
 
@@ -2042,106 +730,26 @@ impl LlmClient for ClaudeClient {
         &self,
         response: &LlmCompletionResponse,
     ) -> Vec<LlmToolCall> {
-        // Tool calls are already extracted in convert_response
         response
             .choices
             .first()
-            .and_then(|choice| choice.message.as_ref())
-            .and_then(|message| message.tool_calls.clone())
+            .and_then(|c| c.message.as_ref())
+            .and_then(|m| m.tool_calls.clone())
             .unwrap_or_default()
     }
 
     fn provider(&self) -> &str {
-        &self.config.provider
+        &self.provider
     }
 
     fn model(&self) -> &str {
-        if let Some(model) = &self.model {
-            return model.id();
-        }
-        &self.config.model
+        &self.model
     }
 }
 
-/// Factory function to create LLM clients
-/// This uses the adapter pattern for Claude 4.5/4.1 models
+/// Create an LLM client using the SDK
 pub fn create_llm_client(config: LlmProviderConfig) -> Result<Box<dyn LlmClient>> {
-    match (
-        config.provider.to_lowercase().as_str(),
-        config.model.as_str(),
-    ) {
-        // Claude 4.5/4.1 models - current generation (use adapter)
-        ("anthropic" | "claude", model) if is_claude_45_or_41(model) => {
-            let adapter = Box::new(adapters::ClaudeMessagesAdapter::new(config.clone())?);
-            Ok(Box::new(UnifiedLlmClient::new(adapter, config)?))
-        }
-
-        // Reject legacy Claude 3.x models with helpful error
-        ("anthropic" | "claude", model) if is_legacy_claude_model(model) => Err(anyhow::anyhow!(
-            "Legacy Claude model '{}' is not supported. Please use one of the current models:\n\
-                 - {} (or alias: claude-sonnet-4-5)\n\
-                 - {} (or alias: claude-haiku-4-5)\n\
-                 - {} (or alias: claude-opus-4-1)",
-            model, CLAUDE_SONNET_4_5_MODEL_ID, CLAUDE_HAIKU_4_5_MODEL_ID, CLAUDE_OPUS_4_1_MODEL_ID
-        )),
-
-        // Unknown Claude model
-        ("anthropic" | "claude", model) => Err(anyhow::anyhow!(
-            "Unknown Claude model '{}'. Supported models:\n\
-                 - {} (or alias: claude-sonnet-4-5)\n\
-                 - {} (or alias: claude-haiku-4-5)\n\
-                 - {} (or alias: claude-opus-4-1)",
-            model, CLAUDE_SONNET_4_5_MODEL_ID, CLAUDE_HAIKU_4_5_MODEL_ID, CLAUDE_OPUS_4_1_MODEL_ID
-        )),
-
-        // GPT-5 and GPT-5-Codex - use Responses API adapter
-        ("openai", "gpt-5") | ("openai", "gpt-5-codex") => {
-            let adapter = Box::new(adapters::ResponsesApiAdapter::new(config.clone())?);
-            Ok(Box::new(UnifiedLlmClient::new(adapter, config)?))
-        }
-
-        // Other OpenAI models (GPT-4, etc.) - use existing client for now
-        ("openai", _) => {
-            let client = OpenAiCompatibleClient::new(config)?;
-            Ok(Box::new(client))
-        }
-
-        // Grok, xAI - use existing client for now
-        ("grok" | "xai", _) => {
-            let client = OpenAiCompatibleClient::new(config)?;
-            Ok(Box::new(client))
-        }
-
-        // zAI GLM models - NEW
-        ("zai" | "glm", _) => {
-            let adapter = Box::new(adapters::GlmChatCompletionsAdapter::new(config.clone())?);
-            Ok(Box::new(UnifiedLlmClient::new(adapter, config)?))
-        }
-
-        // Unsupported provider
-        _ => Err(anyhow::anyhow!(
-            "Unsupported LLM provider: {}",
-            config.provider
-        )),
-    }
-}
-
-/// Helper function to check if a model is Claude 4.5 or 4.1
-fn is_claude_45_or_41(model: &str) -> bool {
-    model == CLAUDE_SONNET_4_5_MODEL_ID
-        || model == "claude-sonnet-4-5"
-        || model == CLAUDE_HAIKU_4_5_MODEL_ID
-        || model == "claude-haiku-4-5"
-        || model == CLAUDE_OPUS_4_1_MODEL_ID
-        || model == "claude-opus-4-1"
-}
-
-/// Helper function to check if a model is a legacy Claude model
-fn is_legacy_claude_model(model: &str) -> bool {
-    model.starts_with("claude-3-")
-        || model == "claude-sonnet-4-20250514"
-        || model == "claude-opus-4-20250514"
-        || model == "claude-3-7-sonnet-20250219"
+    Ok(Box::new(SdkLlmClient::new(&config)?))
 }
 
 /// Factory function to create LLM clients with model information
@@ -2150,117 +758,4 @@ pub fn create_llm_client_with_model(config: LlmProviderConfig) -> Result<Box<dyn
     // For now, just use the regular create_llm_client
     // TODO: Implement proper model-aware client creation
     create_llm_client(config)
-}
-
-/// Factory function to create LLM providers
-#[allow(dead_code)]
-pub fn create_llm_provider(config: LlmProviderConfig) -> Result<Box<dyn LlmProvider>> {
-    match config.provider.to_lowercase().as_str() {
-        "openai" => {
-            let provider = crate::llm_providers::OpenAiProvider::new(config)?;
-            Ok(Box::new(provider))
-        }
-        "anthropic" | "claude" => {
-            let provider = crate::llm_providers::AnthropicProvider::new(config)?;
-            Ok(Box::new(provider))
-        }
-        "xai" | "grok" => {
-            let provider = crate::llm_providers::XaiProvider::new(config)?;
-            Ok(Box::new(provider))
-        }
-        _ => Err(anyhow::anyhow!(
-            "Unsupported LLM provider: {}",
-            config.provider
-        )),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_grok_supports_native_tools() {
-        let config = LlmProviderConfig {
-            provider: "grok".to_string(),
-            model: "grok-code-fast-1".to_string(),
-            api_key: "test".to_string(),
-            base_url: Some("https://api.x.ai".to_string()),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-        };
-
-        let client = OpenAiCompatibleClient::new(config).unwrap();
-
-        // Test that grok-code-fast-1 supports native tools
-        assert!(client.supports_native_tools());
-
-        // Test case insensitive
-        let config_upper = LlmProviderConfig {
-            provider: "GROK".to_string(),
-            model: "grok-code-fast-1".to_string(),
-            api_key: "test".to_string(),
-            base_url: Some("https://api.x.ai".to_string()),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-        };
-
-        let client_upper = OpenAiCompatibleClient::new(config_upper).unwrap();
-        assert!(client_upper.supports_native_tools());
-
-        // Test that older grok models don't support native tools
-        let config_old = LlmProviderConfig {
-            provider: "grok".to_string(),
-            model: "grok-1".to_string(),
-            api_key: "test".to_string(),
-            base_url: Some("https://api.x.ai".to_string()),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-        };
-
-        let client_old = OpenAiCompatibleClient::new(config_old).unwrap();
-        assert!(!client_old.supports_native_tools());
-    }
-
-    #[test]
-    fn test_xai_supports_native_tools() {
-        // Test xAI provider with grok-code-fast-1
-        let config_xai = LlmProviderConfig {
-            provider: "xai".to_string(),
-            model: "grok-code-fast-1".to_string(),
-            api_key: "test".to_string(),
-            base_url: Some("https://api.x.ai".to_string()),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-        };
-
-        let client_xai = OpenAiCompatibleClient::new(config_xai).unwrap();
-        assert!(client_xai.supports_native_tools());
-
-        // Test case insensitive
-        let config_xai_upper = LlmProviderConfig {
-            provider: "XAI".to_string(),
-            model: "grok-code-fast-1".to_string(),
-            api_key: "test".to_string(),
-            base_url: Some("https://api.x.ai".to_string()),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-        };
-
-        let client_xai_upper = OpenAiCompatibleClient::new(config_xai_upper).unwrap();
-        assert!(client_xai_upper.supports_native_tools());
-
-        // Test that older grok models don't support native tools
-        let config_xai_old = LlmProviderConfig {
-            provider: "xai".to_string(),
-            model: "grok-1".to_string(),
-            api_key: "test".to_string(),
-            base_url: Some("https://api.x.ai".to_string()),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-        };
-
-        let client_xai_old = OpenAiCompatibleClient::new(config_xai_old).unwrap();
-        assert!(!client_xai_old.supports_native_tools());
-    }
 }

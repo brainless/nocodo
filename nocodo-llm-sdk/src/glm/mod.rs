@@ -15,3 +15,6 @@ pub use zen::*;
 // Type alias for backwards compatibility
 #[deprecated(since = "0.2.0", note = "Use cerebras::CerebrasGlmClient explicitly")]
 pub type GlmClient = cerebras::CerebrasGlmClient;
+
+// Re-export GLM model constants
+pub use crate::models::glm::*;
