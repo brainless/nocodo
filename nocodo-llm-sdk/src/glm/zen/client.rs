@@ -208,8 +208,8 @@ impl crate::client::LlmClient for ZenGlmClient {
                 crate::glm::types::GlmRole::System => crate::types::Role::System,
             },
             usage: crate::types::Usage {
-                input_tokens: glm_response.usage.prompt_tokens,
-                output_tokens: glm_response.usage.completion_tokens,
+                input_tokens: glm_response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
+                output_tokens: glm_response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
         };

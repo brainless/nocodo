@@ -62,16 +62,18 @@ pub enum GrokRole {
 pub struct GrokChatCompletionResponse {
     /// Unique identifier for the response
     pub id: String,
-    /// Object type (always "chat.completion")
-    pub object: String,
+    /// Object type (usually "chat.completion", optional for some providers like Zen)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<String>,
     /// Unix timestamp of creation
     pub created: u64,
     /// Model used for generation
     pub model: String,
     /// Completion choices
     pub choices: Vec<GrokChoice>,
-    /// Token usage information
-    pub usage: GrokUsage,
+    /// Token usage information (optional for some providers like Zen)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<GrokUsage>,
 }
 
 /// A completion choice

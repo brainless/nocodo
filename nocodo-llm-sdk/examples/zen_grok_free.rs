@@ -42,9 +42,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Content:\n{}", response.choices[0].message.content);
 
     println!("\n=== Token Usage ===");
-    println!("Prompt tokens: {}", response.usage.prompt_tokens);
-    println!("Completion tokens: {}", response.usage.completion_tokens);
-    println!("Total tokens: {}", response.usage.total_tokens);
+    if let Some(usage) = &response.usage {
+        println!("Prompt tokens: {}", usage.prompt_tokens);
+        println!("Completion tokens: {}", usage.completion_tokens);
+        println!("Total tokens: {}", usage.total_tokens);
+    } else {
+        println!("(Usage information not available)");
+    }
 
     Ok(())
 }

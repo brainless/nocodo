@@ -29,6 +29,7 @@ fn main() {
         ("glm_integration", "CEREBRAS_API_KEY"),
         ("zen_grok_integration", ""),
         ("zen_glm_integration", ""),
+        ("tool_calling_integration", ""), // Runs for all available providers
     ];
 
     for (test, key) in tests {

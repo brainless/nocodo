@@ -28,7 +28,7 @@ async fn test_glm_real_api_call() {
     assert!(response.is_ok());
     let response = response.unwrap();
 
-    assert_eq!(response.object, "chat.completion");
+    assert_eq!(response.object, Some("chat.completion".to_string()));
     assert!(!response.choices.is_empty());
     let message_text = response.choices[0].message.get_text();
     assert!(!message_text.is_empty());
