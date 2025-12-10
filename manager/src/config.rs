@@ -23,8 +23,10 @@ pub struct ApiKeysConfig {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
-    pub zai_api_key: Option<String>,   // NEW: zAI API key
-    pub zai_coding_plan: Option<bool>, // NEW: Use zAI Coding Plan endpoint
+    pub cerebras_api_key: Option<String>, // Cerebras API key for GLM
+    pub zai_api_key: Option<String>,      // zAI API key (legacy - same as cerebras_api_key)
+    pub zai_coding_plan: Option<bool>,    // Use zAI Coding Plan endpoint
+    pub zen_api_key: Option<String>,      // Zen API key (optional - free for basic models)
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -100,8 +102,10 @@ path = "/tmp/nocodo-manager.sock"
 # xai_api_key = "your-xai-key"
 # openai_api_key = "your-openai-key"
 # anthropic_api_key = "your-anthropic-key"
-# zai_api_key = "your-zai-key"
+# cerebras_api_key = "your-cerebras-key"  # For GLM via Cerebras
+# zai_api_key = "your-zai-key"  # Legacy - same as cerebras_api_key
 # zai_coding_plan = true  # Set to true if using GLM Coding Plan subscription
+# zen_api_key = "your-zen-key"  # Optional - Zen is free for basic models
 
 [projects]
 # default_path = "~/projects"

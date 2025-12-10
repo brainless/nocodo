@@ -2277,8 +2277,10 @@ pub async fn update_api_keys(
             xai_api_key: None,
             openai_api_key: None,
             anthropic_api_key: None,
+            cerebras_api_key: None,
             zai_api_key: None,
             zai_coding_plan: None,
+            zen_api_key: None,
         });
     }
 

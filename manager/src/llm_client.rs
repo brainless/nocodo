@@ -264,6 +264,8 @@ enum ClientType {
     Claude(nocodo_llm_sdk::claude::client::ClaudeClient),
     Grok(nocodo_llm_sdk::grok::xai::XaiGrokClient),
     Glm(nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient),
+    ZenGrok(nocodo_llm_sdk::grok::zen::ZenGrokClient),
+    ZenGlm(nocodo_llm_sdk::glm::zen::ZenGlmClient),
 }
 
 impl SdkLlmClient {
@@ -287,9 +289,27 @@ impl SdkLlmClient {
                 let client = nocodo_llm_sdk::grok::xai::XaiGrokClient::new(&config.api_key)?;
                 ClientType::Grok(client)
             }
-            "zai" | "glm" => {
+            "cerebras" | "zai" | "glm" => {
                 let client = nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient::new(&config.api_key)?;
                 ClientType::Glm(client)
+            }
+            "zen-grok" | "zengrok" => {
+                // Zen Grok is free, but can optionally use API key for paid models
+                let client = if config.api_key.is_empty() {
+                    nocodo_llm_sdk::grok::zen::ZenGrokClient::new()?
+                } else {
+                    nocodo_llm_sdk::grok::zen::ZenGrokClient::with_api_key(&config.api_key)?
+                };
+                ClientType::ZenGrok(client)
+            }
+            "zen-glm" | "zenglm" | "zen" => {
+                // Zen GLM is free, but can optionally use API key for paid models
+                let client = if config.api_key.is_empty() {
+                    nocodo_llm_sdk::glm::zen::ZenGlmClient::new()?
+                } else {
+                    nocodo_llm_sdk::glm::zen::ZenGlmClient::with_api_key(&config.api_key)?
+                };
+                ClientType::ZenGlm(client)
             }
             _ => anyhow::bail!("Unsupported provider: {}", config.provider),
         };
@@ -697,6 +717,160 @@ impl LlmClient for SdkLlmClient {
                                 },
                                 content: choice.message.content,
                                 tool_calls: None, // TODO: Handle tool calls
+                                function_call: None,
+                                tool_call_id: None,
+                            }),
+                            delta: None,
+                            finish_reason: choice.finish_reason,
+                            tool_calls: None,
+                        })
+                        .collect(),
+                    usage: Some(LlmUsage {
+                        prompt_tokens: response.usage.prompt_tokens,
+                        completion_tokens: response.usage.completion_tokens,
+                        total_tokens: response.usage.total_tokens,
+                        reasoning_tokens: None,
+                    }),
+                })
+            }
+
+            ClientType::ZenGrok(client) => {
+                // Zen Grok uses same API as regular Grok (Chat Completions)
+                let mut builder = client.message_builder().model(&request.model);
+
+                if let Some(max_tokens) = request.max_tokens {
+                    builder = builder.max_tokens(max_tokens);
+                }
+
+                if let Some(temp) = request.temperature {
+                    builder = builder.temperature(temp);
+                }
+
+                for msg in &request.messages {
+                    match msg.role.as_str() {
+                        "system" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.system_message(content);
+                            }
+                        }
+                        "user" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.user_message(content);
+                            }
+                        }
+                        "assistant" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.assistant_message(content);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                Ok(LlmCompletionResponse {
+                    id: response.id,
+                    object: "chat.completion".to_string(),
+                    created,
+                    model: response.model,
+                    choices: response
+                        .choices
+                        .into_iter()
+                        .enumerate()
+                        .map(|(idx, choice)| LlmChoice {
+                            index: idx as u32,
+                            message: Some(LlmMessage {
+                                role: match choice.message.role {
+                                    nocodo_llm_sdk::grok::types::GrokRole::System => {
+                                        "system".to_string()
+                                    }
+                                    nocodo_llm_sdk::grok::types::GrokRole::User => {
+                                        "user".to_string()
+                                    }
+                                    nocodo_llm_sdk::grok::types::GrokRole::Assistant => {
+                                        "assistant".to_string()
+                                    }
+                                },
+                                content: Some(choice.message.content),
+                                tool_calls: None,
+                                function_call: None,
+                                tool_call_id: None,
+                            }),
+                            delta: None,
+                            finish_reason: choice.finish_reason,
+                            tool_calls: None,
+                        })
+                        .collect(),
+                    usage: Some(LlmUsage {
+                        prompt_tokens: response.usage.prompt_tokens,
+                        completion_tokens: response.usage.completion_tokens,
+                        total_tokens: response.usage.total_tokens,
+                        reasoning_tokens: None,
+                    }),
+                })
+            }
+
+            ClientType::ZenGlm(client) => {
+                // Zen GLM uses same API as regular GLM (Chat Completions)
+                let mut builder = client.message_builder().model(&request.model);
+
+                if let Some(max_tokens) = request.max_tokens {
+                    builder = builder.max_tokens(max_tokens);
+                }
+
+                if let Some(temp) = request.temperature {
+                    builder = builder.temperature(temp);
+                }
+
+                for msg in &request.messages {
+                    match msg.role.as_str() {
+                        "system" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.system_message(content);
+                            }
+                        }
+                        "user" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.user_message(content);
+                            }
+                        }
+                        "assistant" => {
+                            if let Some(content) = &msg.content {
+                                builder = builder.assistant_message(content);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                let response = builder.send().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                Ok(LlmCompletionResponse {
+                    id: response.id,
+                    object: "chat.completion".to_string(),
+                    created,
+                    model: response.model,
+                    choices: response
+                        .choices
+                        .into_iter()
+                        .enumerate()
+                        .map(|(idx, choice)| LlmChoice {
+                            index: idx as u32,
+                            message: Some(LlmMessage {
+                                role: match choice.message.role {
+                                    nocodo_llm_sdk::glm::types::GlmRole::System => {
+                                        "system".to_string()
+                                    }
+                                    nocodo_llm_sdk::glm::types::GlmRole::User => {
+                                        "user".to_string()
+                                    }
+                                    nocodo_llm_sdk::glm::types::GlmRole::Assistant => {
+                                        "assistant".to_string()
+                                    }
+                                },
+                                content: choice.message.content,
+                                tool_calls: None,
                                 function_call: None,
                                 tool_call_id: None,
                             }),
