@@ -2066,58 +2066,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_workflow_commands(
-        &self,
-        project_id: i64,
-    ) -> AppResult<Vec<nocodo_github_actions::WorkflowCommand>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            r#"
-            SELECT id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path
-            FROM workflow_commands
-            WHERE project_id = ?
-            ORDER BY workflow_name, job_name
-            "#,
-        )?;
-
-        let command_iter = stmt.query_map([project_id], |row| {
-            let environment: Option<String> = row.get("environment")?;
-            let environment_parsed = if let Some(env_json) = environment {
-                Some(serde_json::from_str(&env_json).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        0,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })?)
-            } else {
-                None
-            };
-
-            Ok(nocodo_github_actions::WorkflowCommand {
-                id: row.get("id")?,
-                workflow_name: row.get("workflow_name")?,
-                job_name: row.get("job_name")?,
-                step_name: row.get("step_name")?,
-                command: row.get("command")?,
-                shell: row.get("shell")?,
-                working_directory: row.get("working_directory")?,
-                environment: environment_parsed,
-                file_path: row.get("file_path")?,
-            })
-        })?;
-
-        let mut commands = Vec::new();
-        for command in command_iter {
-            commands.push(command?);
-        }
-
-        Ok(commands)
-    }
+    
 
     #[allow(dead_code)]
     pub fn store_command_execution(
@@ -2149,44 +2098,7 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn get_command_executions(
-        &self,
-        command_id: i64,
-    ) -> AppResult<Vec<nocodo_github_actions::CommandExecution>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            r#"
-            SELECT command_id, exit_code, stdout, stderr, duration_ms, executed_at, success
-            FROM command_executions
-            WHERE command_id = ?
-            ORDER BY executed_at DESC
-            "#,
-        )?;
-
-        let execution_iter = stmt.query_map([command_id], |row| {
-            Ok(nocodo_github_actions::CommandExecution {
-                command_id: row.get("command_id")?,
-                exit_code: row.get("exit_code")?,
-                stdout: row.get("stdout")?,
-                stderr: row.get("stderr")?,
-                duration_ms: row.get::<_, i64>("duration_ms")? as u64,
-                executed_at: chrono::DateTime::from_timestamp(row.get::<_, i64>("executed_at")?, 0)
-                    .unwrap_or_else(chrono::Utc::now),
-                success: row.get::<_, i64>("success")? != 0,
-            })
-        })?;
-
-        let mut executions = Vec::new();
-        for execution in execution_iter {
-            executions.push(execution?);
-        }
-
-        Ok(executions)
-    }
+    
 
     // User authentication methods
 
@@ -2356,44 +2268,7 @@ impl Database {
         Ok(key_id)
     }
 
-    pub fn get_ssh_key_by_fingerprint(
-        &self,
-        fingerprint: &str,
-    ) -> AppResult<crate::models::UserSshKey> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let key = conn
-            .query_row(
-                "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
-                 FROM user_ssh_keys WHERE fingerprint = ? AND is_active = 1",
-                [fingerprint],
-                |row| {
-                    Ok(crate::models::UserSshKey {
-                        id: row.get(0)?,
-                        user_id: row.get(1)?,
-                        key_type: row.get(2)?,
-                        fingerprint: row.get(3)?,
-                        public_key_data: row.get(4)?,
-                        label: row.get(5)?,
-                        is_active: row.get::<_, i64>(6)? != 0,
-                        created_at: row.get(7)?,
-                        last_used_at: row.get(8)?,
-                    })
-                },
-            )
-            .optional()?;
-
-        match key {
-            Some(key) => Ok(key),
-            None => Err(AppError::NotFound(format!(
-                "SSH key not found or inactive: {}",
-                fingerprint
-            ))),
-        }
-    }
+    
 
     #[allow(dead_code)]
     pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
@@ -2425,22 +2300,7 @@ impl Database {
         keys.map_err(AppError::from)
     }
 
-    pub fn update_ssh_key_last_used(&self, key_id: i64) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let now = chrono::Utc::now().timestamp();
-
-        conn.execute(
-            "UPDATE user_ssh_keys SET last_used_at = ? WHERE id = ?",
-            params![now, key_id],
-        )?;
-
-        tracing::debug!("Updated SSH key last_used_at: {}", key_id);
-        Ok(())
-    }
+    
 
     // User management methods
 
@@ -2794,31 +2654,7 @@ impl Database {
         teams.map_err(AppError::from)
     }
 
-    /// Get a team by name
-    pub fn get_team_by_name(&self, name: &str) -> AppResult<crate::models::Team> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let team = conn.query_row(
-            "SELECT id, name, description, created_by, created_at, updated_at
-             FROM teams WHERE name = ?",
-            [name],
-            |row| {
-                Ok(crate::models::Team {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    created_by: row.get(3)?,
-                    created_at: row.get(4)?,
-                    updated_at: row.get(5)?,
-                })
-            },
-        )?;
-
-        Ok(team)
-    }
+    
 
     /// Update a team
     pub fn update_team(

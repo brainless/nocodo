@@ -140,68 +140,7 @@ pub async fn update_api_keys(
     })))
 }
 
-pub async fn set_projects_default_path(
-    data: web::Data<AppState>,
-    request: web::Json<serde_json::Value>,
-    _req: actix_web::HttpRequest,
-) -> Result<HttpResponse, AppError> {
-    let req = request.into_inner();
 
-    // Get the default path from request
-    let default_path = req.get("path")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Invalid path parameter".to_string())
-        })?;
-
-    // Expand ~ to home directory
-    let expanded_path = if default_path.starts_with("~/") {
-        if let Some(home) = home::home_dir() {
-            default_path.replacen('~', &home.to_string_lossy(), 1)
-        } else {
-            default_path.to_string()
-        }
-    } else {
-        default_path.to_string()
-    };
-
-    // Update config
-    let mut config = data.config.write().map_err(|e| {
-        AppError::Internal(format!("Failed to acquire config write lock: {}", e))
-    })?;
-
-    if let Some(ref mut projects) = config.projects {
-        projects.default_path = Some(expanded_path.clone());
-    } else {
-        config.projects = Some(crate::config::ProjectsConfig {
-            default_path: Some(expanded_path.clone()),
-        });
-    }
-
-    // Clone config for serialization
-    let config_clone = config.clone();
-
-    // Save config to file
-    let toml_string = toml::to_string(&config_clone).map_err(|e| {
-        AppError::Internal(format!("Failed to serialize config: {}", e))
-    })?;
-
-    let config_path = if let Some(home) = home::home_dir() {
-        home.join(".config/nocodo/manager.toml")
-    } else {
-        std::path::PathBuf::from("manager.toml")
-    };
-
-    std::fs::write(&config_path, toml_string)
-        .map_err(|e| AppError::Internal(format!("Failed to write config file: {}", e)))?;
-
-    tracing::info!("Set projects default path to: {}", expanded_path);
-
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "success": true,
-        "path": expanded_path
-    })))
-}
 
 pub async fn add_authorized_ssh_key(
     _data: web::Data<AppState>,

@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 // Re-export shared models from manager-models
 pub use manager_models::{
     AddMessageRequest, AiSession, AiSessionListResponse, AiSessionOutput,
-    AiSessionOutputListResponse, AiSessionResponse, AiSessionResult, ApiKeyConfig,
-    CreateAiSessionRequest, CreateWorkRequest, LlmAgentToolCall, LlmAgentToolCallListResponse,
+    AiSessionOutputListResponse, AiSessionResult, ApiKeyConfig,
+    CreateWorkRequest, LlmAgentToolCall, LlmAgentToolCallListResponse,
     MessageAuthorType, MessageContentType, SettingsResponse, UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage,
     WorkMessageListResponse, WorkMessageResponse, WorkResponse, WorkWithHistory,
     // Tool-related types
@@ -72,18 +72,7 @@ pub struct GitBranchListResponse {
     pub branches: Vec<manager_models::GitBranch>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
-    pub ssh_fingerprint: String, // SHA256 fingerprint from client
-}
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoginResponse {
-    pub token: String,
-    pub user: UserInfo,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
