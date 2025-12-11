@@ -8,6 +8,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 
 /// Hash a password using Argon2id with OWASP recommended parameters
+#[allow(dead_code)]
 pub fn hash_password(password: &str) -> AppResult<String> {
     use argon2::password_hash::rand_core::OsRng;
     let salt = SaltString::generate(&mut OsRng);
@@ -27,6 +28,7 @@ pub fn hash_password(password: &str) -> AppResult<String> {
 }
 
 /// Verify a password against an Argon2id hash
+#[allow(dead_code)]
 pub fn verify_password(password: &str, password_hash: &str) -> AppResult<bool> {
     let parsed_hash = PasswordHash::new(password_hash)
         .map_err(|e| AppError::Internal(format!("Failed to parse password hash: {}", e)))?;
@@ -51,6 +53,7 @@ pub struct Claims {
 
 impl Claims {
     /// Create new claims with default expiration (24 hours)
+    #[allow(dead_code)]
     pub fn new(user_id: i64, username: String, ssh_fingerprint: Option<String>) -> Self {
         let now = Utc::now().timestamp();
         let exp = now + (24 * 60 * 60); // 24 hours from now
@@ -86,6 +89,7 @@ impl Claims {
 }
 
 /// Generate a JWT token from claims
+#[allow(dead_code)]
 pub fn generate_token(claims: &Claims, secret: &str) -> AppResult<String> {
     let token = encode(
         &Header::default(),
@@ -98,6 +102,7 @@ pub fn generate_token(claims: &Claims, secret: &str) -> AppResult<String> {
 }
 
 /// Validate and decode a JWT token
+#[allow(dead_code)]
 pub fn validate_token(token: &str, secret: &str) -> AppResult<Claims> {
     let token_data = decode::<Claims>(
         token,

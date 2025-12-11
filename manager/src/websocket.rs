@@ -113,6 +113,7 @@ pub struct WebSocketConnection {
 }
 
 impl WebSocketConnection {
+    #[allow(dead_code)]
     pub fn new(server: Addr<WebSocketServer>) -> Self {
         Self {
             client_id: format!("client_{}", chrono::Utc::now().timestamp_millis()),
@@ -338,6 +339,7 @@ impl Handler<WebSocketMessage> for WebSocketConnection {
 }
 
 /// WebSocket endpoint handler
+#[allow(dead_code)]
 pub async fn websocket_handler(
     req: HttpRequest,
     stream: web::Payload,
@@ -356,6 +358,7 @@ pub async fn websocket_handler(
 }
 
 /// AI session WebSocket endpoint handler
+#[allow(dead_code)]
 pub async fn ai_session_websocket_handler(
     req: HttpRequest,
     stream: web::Payload,

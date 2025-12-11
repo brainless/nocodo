@@ -4,7 +4,7 @@
 //! allowing both the main server and test servers to use the same routing setup.
 
 use actix_web::web;
-use crate::handlers::{main_handlers, project_handlers, work_handlers, user_handlers, team_handlers, file_handlers, ai_session_handlers, project_commands};
+use crate::handlers::{main_handlers, project_handlers, work_handlers, user_handlers, team_handlers, file_handlers, project_commands};
 use crate::middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement};
 
 /// Configures all application routes for the given scope.
@@ -193,18 +193,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                             "/messages",
                             web::get().to(work_handlers::get_work_messages),
                         )
-                        .route(
-                            "/sessions",
-                            web::get().to(ai_session_handlers::list_ai_sessions),
-                        )
-                        .route(
-                            "/outputs",
-                            web::get().to(ai_session_handlers::list_ai_session_outputs),
-                        )
-                        .route(
-                            "/tool-calls",
-                            web::get().to(ai_session_handlers::list_ai_tool_calls),
-                        )
+
                         .service(
                             web::resource("")
                                 .wrap(PermissionMiddleware::new(

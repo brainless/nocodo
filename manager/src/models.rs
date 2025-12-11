@@ -68,13 +68,13 @@ impl UserSshKey {
 // Git-related models
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct GitBranchListResponse {
     pub branches: Vec<manager_models::GitBranch>,
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct UserInfo {
     pub id: i64,
     pub username: String,
@@ -93,6 +93,7 @@ pub struct Project {
 }
 
 impl Project {
+    #[allow(dead_code)]
     pub fn new(name: String, path: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
@@ -106,7 +107,6 @@ impl Project {
         }
     }
 
-    #[allow(dead_code)]
     #[allow(dead_code)]
     pub fn update_timestamp(&mut self) {
         self.updated_at = Utc::now().timestamp();
@@ -127,12 +127,14 @@ pub struct ProjectComponent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ProjectDetailsResponse {
     pub project: Project,
     pub components: Vec<ProjectComponent>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CreateProjectRequest {
     pub name: String,
     pub path: Option<String>,
@@ -142,27 +144,33 @@ pub struct CreateProjectRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ProjectResponse {
     pub project: Project,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ProjectListResponse {
     pub projects: Vec<Project>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ServerStatus {
     pub status: String,
     pub version: String,
     pub uptime: u64,
 }
 
+
+
 // AiSession, CreateAiSessionRequest, AiSessionResponse, AiSessionListResponse,
 // AiSessionOutput, AiSessionResult, AiSessionOutputListResponse
 // are now re-exported from manager-models (see top of file)
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct AddExistingProjectRequest {
     pub name: String,
     pub path: String, // Required - must be existing directory
@@ -170,9 +178,12 @@ pub struct AddExistingProjectRequest {
     pub parent_id: Option<i64>,
 }
 
+
+
 // File operation models (FileType and FileInfo are re-exported from manager-models)
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileListRequest {
     pub project_id: Option<i64>,
     pub path: Option<String>, // Relative path within project, defaults to root
@@ -180,6 +191,7 @@ pub struct FileListRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileListResponse {
     pub files: Vec<FileInfo>, // List of files and directories
     pub current_path: String, // Current directory being listed
@@ -189,6 +201,7 @@ pub struct FileListResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileCreateRequest {
     pub project_id: i64,
     pub path: String,            // Relative path within project
@@ -197,12 +210,14 @@ pub struct FileCreateRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileUpdateRequest {
     pub project_id: i64,
     pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileContentResponse {
     pub path: String,
     pub content: String,
@@ -210,6 +225,7 @@ pub struct FileContentResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileResponse {
     pub file: FileInfo,
 }
@@ -267,6 +283,8 @@ impl BashExecutionLog {
     }
 }
 
+
+
 // User and Team management models (types not in manager-models)
 
 /// Team - groups of users that share permissions
@@ -281,6 +299,7 @@ pub struct Team {
 }
 
 impl Team {
+    #[allow(dead_code)]
     pub fn new(name: String, description: Option<String>, created_by: i64) -> Self {
         let now = Utc::now().timestamp();
         Self {
@@ -323,6 +342,8 @@ impl TeamMember {
     }
 }
 
+
+
 /// Permission - access rules assigned to teams
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Permission {
@@ -336,6 +357,7 @@ pub struct Permission {
 }
 
 impl Permission {
+    #[allow(dead_code)]
     pub fn new(
         team_id: i64,
         resource_type: String,
@@ -356,6 +378,8 @@ impl Permission {
     }
 }
 
+
+
 /// Resource ownership - tracks who created/owns resources
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceOwnership {
@@ -367,6 +391,7 @@ pub struct ResourceOwnership {
 }
 
 impl ResourceOwnership {
+    #[allow(dead_code)]
     pub fn new(resource_type: String, resource_id: i64, owner_id: i64) -> Self {
         let now = Utc::now().timestamp();
         Self {
@@ -379,9 +404,12 @@ impl ResourceOwnership {
     }
 }
 
+
+
 // User and Team management request models
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CreateUserRequest {
     pub username: String,
     pub email: Option<String>,
@@ -393,17 +421,20 @@ pub struct CreateUserRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CreateTeamRequest {
     pub name: String,
     pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct AddTeamMemberRequest {
     pub user_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CreatePermissionRequest {
     pub team_id: i64,
     pub resource_type: String,

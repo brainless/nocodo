@@ -11,6 +11,28 @@ use crate::error::AppResult;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+/// Convert Action to string for database storage
+fn action_to_string(action: &Action) -> &'static str {
+    match action {
+        Action::Read => "read",
+        Action::Write => "write",
+        Action::Delete => "delete",
+        Action::Admin => "admin",
+    }
+}
+
+/// Convert ResourceType to string for database storage
+fn resource_type_to_string(resource_type: &ResourceType) -> &'static str {
+    match resource_type {
+        ResourceType::Project => "project",
+        ResourceType::Work => "work",
+        ResourceType::Settings => "settings",
+        ResourceType::User => "user",
+        ResourceType::Team => "team",
+        ResourceType::AiSession => "ai_session",
+    }
+}
+
 /// Actions that can be performed on resources
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -36,16 +58,6 @@ impl FromStr for Action {
 }
 
 impl Action {
-    /// Convert action to string for database storage
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Action::Read => "read",
-            Action::Write => "write",
-            Action::Delete => "delete",
-            Action::Admin => "admin",
-        }
-    }
-
     /// Parse action from string
     pub fn parse(s: &str) -> Option<Self> {
         s.parse().ok()
@@ -94,18 +106,6 @@ impl FromStr for ResourceType {
 }
 
 impl ResourceType {
-    /// Convert resource type to string for database storage
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ResourceType::Project => "project",
-            ResourceType::Work => "work",
-            ResourceType::Settings => "settings",
-            ResourceType::User => "user",
-            ResourceType::Team => "team",
-            ResourceType::AiSession => "ai_session",
-        }
-    }
-
     /// Parse resource type from string
     pub fn parse(s: &str) -> Option<Self> {
         s.parse().ok()
@@ -128,7 +128,7 @@ pub async fn check_permission(
 ) -> AppResult<bool> {
     // 1. Check ownership (automatic read/write/delete)
     if let Some(rid) = resource_id {
-        if db.is_owner(user_id, resource_type.as_str(), rid)? {
+        if db.is_owner(user_id, resource_type_to_string(&resource_type), rid)? {
             // Owners get read, write, delete but NOT admin
             if matches!(action, Action::Read | Action::Write | Action::Delete) {
                 return Ok(true);
@@ -173,9 +173,9 @@ async fn has_team_permission(
     for team in teams {
         if db.team_has_permission(
             team.id,
-            resource_type.as_str(),
+            resource_type_to_string(&resource_type),
             resource_id,
-            action.as_str(),
+            action_to_string(&action),
         )? {
             return Ok(true);
         }

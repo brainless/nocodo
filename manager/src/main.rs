@@ -10,6 +10,7 @@ mod llm_client;
 mod middleware;
 mod models;
 mod permissions;
+mod routes;
 mod schema_provider;
 mod socket;
 mod templates;
@@ -24,7 +25,7 @@ use error::AppResult;
 use handlers::AppState;
 use llm_agent::LlmAgent;
 
-use nocodo_manager::routes::configure_routes;
+use crate::routes::configure_routes;
 use socket::SocketServer;
 use std::path::PathBuf;
 use std::sync::Arc;

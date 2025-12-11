@@ -9,6 +9,7 @@ use std::path::Path;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+#[allow(dead_code)]
 pub async fn list_files(
     data: web::Data<AppState>,
     query: web::Query<FileListRequest>,
@@ -146,6 +147,7 @@ pub async fn list_files(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[allow(dead_code)]
 pub async fn create_file(
     data: web::Data<AppState>,
     request: web::Json<FileCreateRequest>,
@@ -254,6 +256,7 @@ pub async fn create_file(
     Ok(HttpResponse::Created().json(response))
 }
 
+#[allow(dead_code)]
 pub async fn get_file_content(
     data: web::Data<AppState>,
     path_param: web::Path<String>,
@@ -335,6 +338,7 @@ pub async fn get_file_content(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[allow(dead_code)]
 pub async fn update_file(
     data: web::Data<AppState>,
     path_param: web::Path<String>,
@@ -394,6 +398,7 @@ pub async fn update_file(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[allow(dead_code)]
 pub async fn delete_file(
     data: web::Data<AppState>,
     path_param: web::Path<String>,

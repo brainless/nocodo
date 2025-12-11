@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::main_handlers::AppState;
 use crate::error::AppError;
 use crate::models::{CreateTeamRequest, Permission, Team, UpdateTeamRequest};
