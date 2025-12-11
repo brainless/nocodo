@@ -33,12 +33,6 @@ pub enum AppError {
 
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
-
-    #[error("Authentication failed: {0}")]
-    AuthenticationFailed(String),
-
-    #[error("Forbidden: {0}")]
-    Forbidden(String),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,10 +53,7 @@ impl ResponseError for AppError {
                 HttpResponse::NotFound().json(error_response)
             }
             AppError::InvalidRequest(_) => HttpResponse::BadRequest().json(error_response),
-            AppError::Unauthorized(_) | AppError::AuthenticationFailed(_) => {
-                HttpResponse::Unauthorized().json(error_response)
-            }
-            AppError::Forbidden(_) => HttpResponse::Forbidden().json(error_response),
+            AppError::Unauthorized(_) => HttpResponse::Unauthorized().json(error_response),
             AppError::Database(_)
             | AppError::Config(_)
             | AppError::Io(_)
@@ -86,8 +77,6 @@ impl AppError {
             AppError::LlmAgent(_) => "llm_agent_error".to_string(),
             AppError::Git(_) => "git_error".to_string(),
             AppError::Unauthorized(_) => "unauthorized".to_string(),
-            AppError::AuthenticationFailed(_) => "authentication_failed".to_string(),
-            AppError::Forbidden(_) => "forbidden".to_string(),
         }
     }
 }

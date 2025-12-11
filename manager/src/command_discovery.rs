@@ -7,6 +7,7 @@ use tracing::{debug, info};
 
 /// Types of projects supported
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum ProjectType {
     NodeJs { manager: PackageManager },
     Rust,
@@ -18,6 +19,7 @@ pub enum ProjectType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum PackageManager {
     Npm,
     Yarn,
@@ -26,6 +28,7 @@ pub enum PackageManager {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum PythonTool {
     Pip,
     Poetry,
@@ -34,6 +37,7 @@ pub enum PythonTool {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum JavaBuildTool {
     Maven,
     Gradle,
@@ -41,6 +45,7 @@ pub enum JavaBuildTool {
 
 /// A suggested command discovered from the project
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct SuggestedCommand {
     pub name: String,
     pub description: Option<String>,
@@ -54,6 +59,7 @@ pub struct SuggestedCommand {
 
 /// Response from command discovery
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct DiscoverCommandsResponse {
     pub commands: Vec<SuggestedCommand>,
     pub project_types: Vec<String>,
@@ -61,12 +67,14 @@ pub struct DiscoverCommandsResponse {
 }
 
 /// Main command discovery engine
+#[allow(dead_code)]
 pub struct CommandDiscovery {
     project_path: PathBuf,
     #[allow(dead_code)]
     project_id: i64,
 }
 
+#[allow(dead_code)]
 impl CommandDiscovery {
     pub fn new(project_path: PathBuf, project_id: i64) -> Self {
         Self {
@@ -772,7 +780,7 @@ impl CommandDiscovery {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
 
     #[tokio::test]
     async fn test_detect_nodejs_project() {

@@ -3,6 +3,7 @@ use crate::models::{
     AiSession, AiSessionResult, LlmAgentMessage, LlmAgentSession, LlmAgentToolCall, Project,
     ProjectComponent,
 };
+
 use crate::permissions::Action;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ pub struct Database {
     pub(crate) connection: DbConnection,
 }
 
+#[allow(dead_code)]
 impl Database {
     pub fn new(db_path: &PathBuf) -> AppResult<Self> {
         // Ensure the database directory exists
@@ -917,6 +919,7 @@ impl Database {
         Ok(project)
     }
 
+    #[allow(dead_code)]
     pub fn get_project_by_path(&self, path: &str) -> AppResult<Project> {
         let conn = self
             .connection
@@ -950,6 +953,7 @@ impl Database {
         Ok(project)
     }
 
+    #[allow(dead_code)]
     pub fn create_project(&self, project: &Project) -> AppResult<i64> {
         let conn = self
             .connection
@@ -982,32 +986,6 @@ impl Database {
     }
 
     #[allow(dead_code)]
-    pub fn update_project(&self, project: &Project) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let rows_affected = conn.execute(
-            "UPDATE projects SET name = ?, path = ?, description = ?, parent_id = ?, updated_at = ? WHERE id = ?",
-            params![
-                project.name,
-                project.path,
-                project.description,
-                project.parent_id,
-                project.updated_at,
-                project.id
-            ],
-        )?;
-
-        if rows_affected == 0 {
-            return Err(AppError::ProjectNotFound(project.id.to_string()));
-        }
-
-        tracing::info!("Updated project: {} ({})", project.name, project.id);
-        Ok(())
-    }
-
     pub fn delete_project(&self, id: i64) -> AppResult<()> {
         let conn = self
             .connection
@@ -1040,6 +1018,7 @@ impl Database {
     }
 
     // Project components methods
+    #[allow(dead_code)]
     pub fn get_components_for_project(&self, project_id: i64) -> AppResult<Vec<ProjectComponent>> {
         let conn = self
             .connection
@@ -1106,66 +1085,6 @@ impl Database {
             session.tool_name
         );
         Ok(session_id)
-    }
-
-    pub fn get_ai_session_by_id(&self, id: i64) -> AppResult<AiSession> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, work_id, message_id, tool_name, status, project_context, started_at, ended_at
-             FROM ai_sessions WHERE id = ?"
-        )?;
-
-        let session = stmt
-            .query_row([id], |row| {
-                Ok(AiSession {
-                    id: row.get(0)?,
-                    work_id: row.get(1)?,
-                    message_id: row.get(2)?,
-                    tool_name: row.get(3)?,
-                    status: row.get(4)?,
-                    project_context: row.get(5)?,
-                    started_at: row.get(6)?,
-                    ended_at: row.get(7)?,
-                })
-            })
-            .map_err(|e| match e {
-                rusqlite::Error::QueryReturnedNoRows => {
-                    AppError::Internal(format!("AI session not found: {}", id))
-                }
-                _ => AppError::Database(e),
-            })?;
-
-        Ok(session)
-    }
-
-    pub fn update_ai_session(&self, session: &AiSession) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let rows_affected = conn.execute(
-            "UPDATE ai_sessions SET status = ?, ended_at = ? WHERE id = ?",
-            params![session.status, session.ended_at, session.id],
-        )?;
-
-        if rows_affected == 0 {
-            return Err(AppError::Internal(format!(
-                "AI session not found: {}",
-                session.id
-            )));
-        }
-
-        tracing::info!(
-            "Updated AI session: {} status to {}",
-            session.id,
-            session.status
-        );
-        Ok(())
     }
 
     pub fn get_all_ai_sessions(&self) -> AppResult<Vec<AiSession>> {
@@ -1237,26 +1156,6 @@ impl Database {
         Ok(sessions)
     }
 
-    // Store one-shot AI output content for a session
-    pub fn create_ai_session_output(&self, session_id: i64, content: &str) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        conn.execute(
-            "INSERT INTO ai_session_outputs (session_id, content, created_at) VALUES (?, ?, strftime('%s','now'))",
-            params![session_id, content],
-        )?;
-
-        tracing::info!(
-            "Recorded AI output for session: {} ({} bytes)",
-            session_id,
-            content.len()
-        );
-        Ok(())
-    }
-
     pub fn list_ai_session_outputs(
         &self,
         session_id: i64,
@@ -1294,6 +1193,129 @@ impl Database {
         Ok(outputs)
     }
 
+
+
+
+
+    #[allow(dead_code)]
+    pub fn update_project(&self, project: &Project) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let rows_affected = conn.execute(
+            "UPDATE projects SET name = ?, path = ?, description = ?, parent_id = ?, updated_at = ? WHERE id = ?",
+            params![
+                project.name,
+                project.path,
+                project.description,
+                project.parent_id,
+                project.updated_at,
+                project.id
+            ],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(AppError::ProjectNotFound(project.id.to_string()));
+        }
+
+        tracing::info!("Updated project: {} ({})", project.name, project.id);
+        Ok(())
+    }
+
+
+
+
+
+
+
+    pub fn get_ai_session_by_id(&self, id: i64) -> AppResult<AiSession> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, work_id, message_id, tool_name, status, project_context, started_at, ended_at
+             FROM ai_sessions WHERE id = ?"
+        )?;
+
+        let session = stmt
+            .query_row([id], |row| {
+                Ok(AiSession {
+                    id: row.get(0)?,
+                    work_id: row.get(1)?,
+                    message_id: row.get(2)?,
+                    tool_name: row.get(3)?,
+                    status: row.get(4)?,
+                    project_context: row.get(5)?,
+                    started_at: row.get(6)?,
+                    ended_at: row.get(7)?,
+                })
+            })
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    AppError::Internal(format!("AI session not found: {}", id))
+                }
+                _ => AppError::Database(e),
+            })?;
+
+        Ok(session)
+    }
+
+    pub fn update_ai_session(&self, session: &AiSession) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let rows_affected = conn.execute(
+            "UPDATE ai_sessions SET status = ?, ended_at = ? WHERE id = ?",
+            params![session.status, session.ended_at, session.id],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(AppError::Internal(format!(
+                "AI session not found: {}",
+                session.id
+            )));
+        }
+
+        tracing::info!(
+            "Updated AI session: {} status to {}",
+            session.id,
+            session.status
+        );
+        Ok(())
+    }
+
+
+
+
+
+    // Store one-shot AI output content for a session
+    pub fn create_ai_session_output(&self, session_id: i64, content: &str) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO ai_session_outputs (session_id, content, created_at) VALUES (?, ?, strftime('%s','now'))",
+            params![session_id, content],
+        )?;
+
+        tracing::info!(
+            "Recorded AI output for session: {} ({} bytes)",
+            session_id,
+            content.len()
+        );
+        Ok(())
+    }
+
+
+
     // Work management methods
     pub fn create_work(&self, work: &crate::models::Work) -> AppResult<i64> {
         let conn = self
@@ -1324,100 +1346,6 @@ impl Database {
         Ok(work_id)
     }
 
-    pub fn get_work_by_id(&self, id: i64) -> AppResult<crate::models::Work> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory
-             FROM works WHERE id = ?",
-        )?;
-
-        let work = stmt
-            .query_row([id], |row| {
-                Ok(crate::models::Work {
-                    id: row.get(0)?,
-                    title: row.get(1)?,
-                    project_id: row.get(2)?,
-                    model: row.get(3)?,
-                    status: row.get(4)?,
-                    created_at: row.get(5)?,
-                    updated_at: row.get(6)?,
-                    git_branch: row.get(7)?,
-                    working_directory: row.get(8)?,
-                })
-            })
-            .map_err(|e| match e {
-                rusqlite::Error::QueryReturnedNoRows => {
-                    AppError::Internal(format!("Work not found: {id}"))
-                }
-                _ => AppError::Database(e),
-            })?;
-
-        Ok(work)
-    }
-
-    pub fn get_all_works(&self) -> AppResult<Vec<crate::models::Work>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory
-             FROM works ORDER BY created_at DESC",
-        )?;
-
-        let work_iter = stmt.query_map([], |row| {
-            Ok(crate::models::Work {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                project_id: row.get(2)?,
-                model: row.get(3)?,
-                status: row.get(4)?,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
-                git_branch: row.get(7)?,
-                working_directory: row.get(8)?,
-            })
-        })?;
-
-        let mut works = Vec::new();
-        for work in work_iter {
-            works.push(work?);
-        }
-
-        Ok(works)
-    }
-
-    #[allow(dead_code)]
-    pub fn update_work(&self, work: &crate::models::Work) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let rows_affected = conn.execute(
-            "UPDATE works SET title = ?, project_id = ?, status = ?, updated_at = ? WHERE id = ?",
-            params![
-                work.title,
-                work.project_id,
-                work.status,
-                work.updated_at,
-                work.id
-            ],
-        )?;
-
-        if rows_affected == 0 {
-            return Err(AppError::Internal(format!("Work not found: {}", work.id)));
-        }
-
-        tracing::info!("Updated work: {} ({})", work.title, work.id);
-        Ok(())
-    }
-
     pub fn delete_work(&self, id: i64) -> AppResult<()> {
         let conn = self
             .connection
@@ -1446,7 +1374,6 @@ impl Database {
         Ok(())
     }
 
-    // Work message management methods
     /// Create work with initial message in a single transaction
     pub fn create_work_with_message(
         &self,
@@ -1559,6 +1486,121 @@ impl Database {
         Ok(message_id)
     }
 
+    pub fn get_next_message_sequence(&self, work_id: i64) -> AppResult<i32> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT COALESCE(MAX(sequence_order), -1) + 1 FROM work_messages WHERE work_id = ?",
+        )?;
+
+        let sequence: i32 = stmt.query_row([work_id], |row| row.get(0))?;
+        Ok(sequence)
+    }
+
+    pub fn get_work_by_id(&self, id: i64) -> AppResult<crate::models::Work> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory
+             FROM works WHERE id = ?",
+        )?;
+
+        let work = stmt
+            .query_row([id], |row| {
+                Ok(crate::models::Work {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    project_id: row.get(2)?,
+                    model: row.get(3)?,
+                    status: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
+                    git_branch: row.get(7)?,
+                    working_directory: row.get(8)?,
+                })
+            })
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    AppError::Internal(format!("Work not found: {id}"))
+                }
+                _ => AppError::Database(e),
+            })?;
+
+        Ok(work)
+    }
+
+    pub fn get_all_works(&self) -> AppResult<Vec<crate::models::Work>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, title, project_id, model, status, created_at, updated_at, git_branch, working_directory
+             FROM works ORDER BY created_at DESC",
+        )?;
+
+        let work_iter = stmt.query_map([], |row| {
+            Ok(crate::models::Work {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                project_id: row.get(2)?,
+                model: row.get(3)?,
+                status: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                git_branch: row.get(7)?,
+                working_directory: row.get(8)?,
+            })
+        })?;
+
+        let mut works = Vec::new();
+        for work in work_iter {
+            works.push(work?);
+        }
+
+        Ok(works)
+    }
+
+    #[allow(dead_code)]
+    pub fn update_work(&self, work: &crate::models::Work) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let rows_affected = conn.execute(
+            "UPDATE works SET title = ?, project_id = ?, status = ?, updated_at = ? WHERE id = ?",
+            params![
+                work.title,
+                work.project_id,
+                work.status,
+                work.updated_at,
+                work.id
+            ],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(AppError::Internal(format!("Work not found: {}", work.id)));
+        }
+
+        tracing::info!("Updated work: {} ({})", work.title, work.id);
+        Ok(())
+    }
+
+
+
+    // Work message management methods
+
+
+
+
     pub fn get_work_messages(&self, work_id: i64) -> AppResult<Vec<crate::models::WorkMessage>> {
         let conn = self
             .connection
@@ -1625,19 +1667,7 @@ impl Database {
         })
     }
 
-    pub fn get_next_message_sequence(&self, work_id: i64) -> AppResult<i32> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let mut stmt = conn.prepare(
-            "SELECT COALESCE(MAX(sequence_order), -1) + 1 FROM work_messages WHERE work_id = ?",
-        )?;
-
-        let sequence: i32 = stmt.query_row([work_id], |row| row.get(0))?;
-        Ok(sequence)
-    }
 
     // AI Session Result methods
     #[allow(dead_code)]
@@ -1734,38 +1764,7 @@ impl Database {
 
     // LLM Agent Methods
 
-    pub fn create_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<i64> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if session.id == 0 {
-            None
-        } else {
-            Some(session.id)
-        };
-
-        conn.execute(
-            "INSERT INTO llm_agent_sessions (id, work_id, provider, model, status, system_prompt, started_at, ended_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            params![
-                id_param,
-                session.work_id,
-                session.provider,
-                session.model,
-                session.status,
-                session.system_prompt,
-                session.started_at,
-                session.ended_at,
-            ],
-        )?;
-
-        let session_id = conn.last_insert_rowid();
-
-        tracing::info!("Created LLM agent session: {}", session_id);
-        Ok(session_id)
-    }
 
     pub fn get_llm_agent_session(&self, session_id: i64) -> AppResult<LlmAgentSession> {
         let conn = self
@@ -1802,17 +1801,23 @@ impl Database {
         }
     }
 
-    pub fn update_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<()> {
+    pub fn create_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
+        let id_param = if session.id == 0 {
+            None
+        } else {
+            Some(session.id)
+        };
+
         conn.execute(
-            "UPDATE llm_agent_sessions 
-             SET work_id = ?, provider = ?, model = ?, status = ?, system_prompt = ?, started_at = ?, ended_at = ? 
-             WHERE id = ?",
+            "INSERT INTO llm_agent_sessions (id, work_id, provider, model, status, system_prompt, started_at, ended_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
+                id_param,
                 session.work_id,
                 session.provider,
                 session.model,
@@ -1820,12 +1825,13 @@ impl Database {
                 session.system_prompt,
                 session.started_at,
                 session.ended_at,
-                session.id,
             ],
         )?;
 
-        tracing::info!("Updated LLM agent session: {}", session.id);
-        Ok(())
+        let session_id = conn.last_insert_rowid();
+
+        tracing::info!("Created LLM agent session: {}", session_id);
+        Ok(session_id)
     }
 
     pub fn get_llm_agent_sessions_by_work(&self, work_id: i64) -> AppResult<Vec<LlmAgentSession>> {
@@ -1867,6 +1873,36 @@ impl Database {
             ))),
         }
     }
+
+    pub fn update_llm_agent_session(&self, session: &LlmAgentSession) -> AppResult<()> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        conn.execute(
+            "UPDATE llm_agent_sessions 
+             SET work_id = ?, provider = ?, model = ?, status = ?, system_prompt = ?, started_at = ?, ended_at = ? 
+             WHERE id = ?",
+            params![
+                session.work_id,
+                session.provider,
+                session.model,
+                session.status,
+                session.system_prompt,
+                session.started_at,
+                session.ended_at,
+                session.id,
+            ],
+        )?;
+
+        tracing::info!("Updated LLM agent session: {}", session.id);
+        Ok(())
+    }
+
+
+
+
 
     pub fn create_llm_agent_message(
         &self,
@@ -2066,58 +2102,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_workflow_commands(
-        &self,
-        project_id: i64,
-    ) -> AppResult<Vec<nocodo_github_actions::WorkflowCommand>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            r#"
-            SELECT id, workflow_name, job_name, step_name, command, shell, working_directory, environment, file_path
-            FROM workflow_commands
-            WHERE project_id = ?
-            ORDER BY workflow_name, job_name
-            "#,
-        )?;
-
-        let command_iter = stmt.query_map([project_id], |row| {
-            let environment: Option<String> = row.get("environment")?;
-            let environment_parsed = if let Some(env_json) = environment {
-                Some(serde_json::from_str(&env_json).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        0,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })?)
-            } else {
-                None
-            };
-
-            Ok(nocodo_github_actions::WorkflowCommand {
-                id: row.get("id")?,
-                workflow_name: row.get("workflow_name")?,
-                job_name: row.get("job_name")?,
-                step_name: row.get("step_name")?,
-                command: row.get("command")?,
-                shell: row.get("shell")?,
-                working_directory: row.get("working_directory")?,
-                environment: environment_parsed,
-                file_path: row.get("file_path")?,
-            })
-        })?;
-
-        let mut commands = Vec::new();
-        for command in command_iter {
-            commands.push(command?);
-        }
-
-        Ok(commands)
-    }
+    
 
     #[allow(dead_code)]
     pub fn store_command_execution(
@@ -2149,46 +2134,49 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn get_command_executions(
-        &self,
-        command_id: i64,
-    ) -> AppResult<Vec<nocodo_github_actions::CommandExecution>> {
+    
+
+    // User authentication methods
+
+
+
+
+
+
+
+    #[allow(dead_code)]
+    pub fn get_user_by_email(&self, email: &str) -> AppResult<crate::models::User> {
         let conn = self
             .connection
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let mut stmt = conn.prepare(
-            r#"
-            SELECT command_id, exit_code, stdout, stderr, duration_ms, executed_at, success
-            FROM command_executions
-            WHERE command_id = ?
-            ORDER BY executed_at DESC
-            "#,
-        )?;
+        let user = conn
+            .query_row(
+                "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
+                 FROM users WHERE email = ?",
+                [email],
+                |row| {
+                    Ok(crate::models::User {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        email: row.get(2)?,
+                        role: row.get(3)?,
+                        password_hash: row.get(4)?,
+                        is_active: row.get::<_, i64>(5)? != 0,
+                        created_at: row.get(6)?,
+                        updated_at: row.get(7)?,
+                        last_login_at: row.get(8)?,
+                    })
+                },
+            )
+            .optional()?;
 
-        let execution_iter = stmt.query_map([command_id], |row| {
-            Ok(nocodo_github_actions::CommandExecution {
-                command_id: row.get("command_id")?,
-                exit_code: row.get("exit_code")?,
-                stdout: row.get("stdout")?,
-                stderr: row.get("stderr")?,
-                duration_ms: row.get::<_, i64>("duration_ms")? as u64,
-                executed_at: chrono::DateTime::from_timestamp(row.get::<_, i64>("executed_at")?, 0)
-                    .unwrap_or_else(chrono::Utc::now),
-                success: row.get::<_, i64>("success")? != 0,
-            })
-        })?;
-
-        let mut executions = Vec::new();
-        for execution in execution_iter {
-            executions.push(execution?);
+        match user {
+            Some(user) => Ok(user),
+            None => Err(AppError::NotFound(format!("User not found: {}", email))),
         }
-
-        Ok(executions)
     }
-
-    // User authentication methods
 
     pub fn create_user(&self, user: &crate::models::User) -> AppResult<i64> {
         let conn = self
@@ -2284,165 +2272,6 @@ impl Database {
             None => Err(AppError::NotFound(format!("User not found: {}", name))),
         }
     }
-
-    #[allow(dead_code)]
-    pub fn get_user_by_email(&self, email: &str) -> AppResult<crate::models::User> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let user = conn
-            .query_row(
-                "SELECT id, name, email, role, password_hash, is_active, created_at, updated_at, last_login_at
-                 FROM users WHERE email = ?",
-                [email],
-                |row| {
-                    Ok(crate::models::User {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        email: row.get(2)?,
-                        role: row.get(3)?,
-                        password_hash: row.get(4)?,
-                        is_active: row.get::<_, i64>(5)? != 0,
-                        created_at: row.get(6)?,
-                        updated_at: row.get(7)?,
-                        last_login_at: row.get(8)?,
-                    })
-                },
-            )
-            .optional()?;
-
-        match user {
-            Some(user) => Ok(user),
-            None => Err(AppError::NotFound(format!("User not found: {}", email))),
-        }
-    }
-
-    // SSH key methods
-
-    #[allow(dead_code)]
-    pub fn create_ssh_key(&self, key: &crate::models::UserSshKey) -> AppResult<i64> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let id_param = if key.id == 0 { None } else { Some(key.id) };
-
-        conn.execute(
-            "INSERT INTO user_ssh_keys (id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            params![
-                id_param,
-                key.user_id,
-                key.key_type,
-                key.fingerprint,
-                key.public_key_data,
-                key.label,
-                if key.is_active { 1 } else { 0 },
-                key.created_at,
-                key.last_used_at,
-            ],
-        )?;
-
-        let key_id = conn.last_insert_rowid();
-        tracing::info!(
-            "Created SSH key for user {}: {} ({})",
-            key.user_id,
-            key.fingerprint,
-            key_id
-        );
-        Ok(key_id)
-    }
-
-    pub fn get_ssh_key_by_fingerprint(
-        &self,
-        fingerprint: &str,
-    ) -> AppResult<crate::models::UserSshKey> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let key = conn
-            .query_row(
-                "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
-                 FROM user_ssh_keys WHERE fingerprint = ? AND is_active = 1",
-                [fingerprint],
-                |row| {
-                    Ok(crate::models::UserSshKey {
-                        id: row.get(0)?,
-                        user_id: row.get(1)?,
-                        key_type: row.get(2)?,
-                        fingerprint: row.get(3)?,
-                        public_key_data: row.get(4)?,
-                        label: row.get(5)?,
-                        is_active: row.get::<_, i64>(6)? != 0,
-                        created_at: row.get(7)?,
-                        last_used_at: row.get(8)?,
-                    })
-                },
-            )
-            .optional()?;
-
-        match key {
-            Some(key) => Ok(key),
-            None => Err(AppError::NotFound(format!(
-                "SSH key not found or inactive: {}",
-                fingerprint
-            ))),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let mut stmt = conn.prepare(
-            "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
-             FROM user_ssh_keys WHERE user_id = ? ORDER BY created_at DESC",
-        )?;
-
-        let key_iter = stmt.query_map([user_id], |row| {
-            Ok(crate::models::UserSshKey {
-                id: row.get(0)?,
-                user_id: row.get(1)?,
-                key_type: row.get(2)?,
-                fingerprint: row.get(3)?,
-                public_key_data: row.get(4)?,
-                label: row.get(5)?,
-                is_active: row.get::<_, i64>(6)? != 0,
-                created_at: row.get(7)?,
-                last_used_at: row.get(8)?,
-            })
-        })?;
-
-        let keys: Result<Vec<_>, _> = key_iter.collect();
-        keys.map_err(AppError::from)
-    }
-
-    pub fn update_ssh_key_last_used(&self, key_id: i64) -> AppResult<()> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let now = chrono::Utc::now().timestamp();
-
-        conn.execute(
-            "UPDATE user_ssh_keys SET last_used_at = ? WHERE id = ?",
-            params![now, key_id],
-        )?;
-
-        tracing::debug!("Updated SSH key last_used_at: {}", key_id);
-        Ok(())
-    }
-
-    // User management methods
 
     pub fn get_all_users(&self) -> AppResult<Vec<crate::models::User>> {
         let conn = self
@@ -2571,6 +2400,89 @@ impl Database {
         Ok(())
     }
 
+    // SSH key methods
+
+    #[allow(dead_code)]
+    pub fn create_ssh_key(&self, key: &crate::models::UserSshKey) -> AppResult<i64> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let id_param = if key.id == 0 { None } else { Some(key.id) };
+
+        conn.execute(
+            "INSERT INTO user_ssh_keys (id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id_param,
+                key.user_id,
+                key.key_type,
+                key.fingerprint,
+                key.public_key_data,
+                key.label,
+                if key.is_active { 1 } else { 0 },
+                key.created_at,
+                key.last_used_at,
+            ],
+        )?;
+
+        let key_id = conn.last_insert_rowid();
+        tracing::info!(
+            "Created SSH key for user {}: {} ({})",
+            key.user_id,
+            key.fingerprint,
+            key_id
+        );
+        Ok(key_id)
+    }
+
+    
+
+    #[allow(dead_code)]
+    pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
+        let conn = self
+            .connection
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, key_type, fingerprint, public_key_data, label, is_active, created_at, last_used_at
+             FROM user_ssh_keys WHERE user_id = ? ORDER BY created_at DESC",
+        )?;
+
+        let key_iter = stmt.query_map([user_id], |row| {
+            Ok(crate::models::UserSshKey {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                key_type: row.get(2)?,
+                fingerprint: row.get(3)?,
+                public_key_data: row.get(4)?,
+                label: row.get(5)?,
+                is_active: row.get::<_, i64>(6)? != 0,
+                created_at: row.get(7)?,
+                last_used_at: row.get(8)?,
+            })
+        })?;
+
+        let keys: Result<Vec<_>, _> = key_iter.collect();
+        keys.map_err(AppError::from)
+    }
+
+    
+
+    // User management methods
+
+
+
+
+
+
+
+
+
+
+
     // Permission management methods
 
     pub fn get_all_permissions(&self) -> AppResult<Vec<crate::models::Permission>> {
@@ -2693,7 +2605,6 @@ impl Database {
     }
 
     /// Get the parent project ID for a project (for permission inheritance)
-
     pub fn get_parent_project_id(&self, project_id: i64) -> AppResult<Option<i64>> {
         let conn = self
             .connection
@@ -2714,6 +2625,18 @@ impl Database {
 
         Ok(parent_id)
     }
+
+
+
+    // Permission system methods (Phase 2: Permission Checking)
+
+
+
+
+
+
+
+
 
     // Team CRUD methods
 
@@ -2794,32 +2717,6 @@ impl Database {
         teams.map_err(AppError::from)
     }
 
-    /// Get a team by name
-    pub fn get_team_by_name(&self, name: &str) -> AppResult<crate::models::Team> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
-
-        let team = conn.query_row(
-            "SELECT id, name, description, created_by, created_at, updated_at
-             FROM teams WHERE name = ?",
-            [name],
-            |row| {
-                Ok(crate::models::Team {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    created_by: row.get(3)?,
-                    created_at: row.get(4)?,
-                    updated_at: row.get(5)?,
-                })
-            },
-        )?;
-
-        Ok(team)
-    }
-
     /// Update a team
     pub fn update_team(
         &self,
@@ -2850,6 +2747,16 @@ impl Database {
         tracing::info!("Updated team {}", team_id);
         Ok(())
     }
+
+
+
+
+
+
+
+    
+
+
 
     /// Delete a team
     pub fn delete_team(&self, team_id: i64) -> AppResult<()> {

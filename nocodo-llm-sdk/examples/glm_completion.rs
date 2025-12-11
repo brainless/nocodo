@@ -20,10 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Print response
     println!("GLM: {}", response.choices[0].message.get_text());
-    println!(
-        "Usage: {} input tokens, {} output tokens (total: {})",
-        response.usage.prompt_tokens, response.usage.completion_tokens, response.usage.total_tokens
-    );
+    if let Some(usage) = &response.usage {
+        println!(
+            "Usage: {} input tokens, {} output tokens (total: {})",
+            usage.prompt_tokens, usage.completion_tokens, usage.total_tokens
+        );
+    }
     println!("Finish reason: {:?}", response.choices[0].finish_reason);
 
     Ok(())

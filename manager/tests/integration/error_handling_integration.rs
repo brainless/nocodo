@@ -2,8 +2,7 @@ use actix_web::{test, web};
 use serde_json::json;
 
 use nocodo_manager::models::{
-    CreateProjectRequest, CreateWorkRequest, CreateAiSessionRequest,
-    CreateLlmAgentSessionRequest, FileCreateRequest, FileUpdateRequest,
+    CreateProjectRequest, CreateWorkRequest, CreateAiSessionRequest, FileCreateRequest, FileUpdateRequest,
 };
 
 use crate::common::{TestApp, TestDataGenerator};
@@ -97,7 +96,7 @@ async fn test_integrated_error_handling_workflow() {
     assert_eq!(resp.status(), 400);
 
     // Test 4: Invalid LLM agent session
-    let invalid_llm_req = CreateLlmAgentSessionRequest {
+    let invalid_llm_req = CreateAiSessionRequest {
         work_id: "non-existent-work".to_string(),
         provider: "openai".to_string(),
         model: "gpt-4".to_string(),

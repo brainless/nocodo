@@ -1,35 +1,20 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::bash_executor::BashExecutor;
+    use crate::bash_permissions::{BashPermissions, PermissionRule};
     use tempfile::TempDir;
-    use std::path::PathBuf;
-    use tokio_test;
 
     #[tokio::test]
     async fn test_bash_executor_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
+        let executor = BashExecutor::new(BashPermissions::default(), 30).unwrap();
         
-        let executor = BashExecutor::new(
-            project_path.clone(),
-            BashPermissions::default(),
-            30,
-        );
-        
-        assert_eq!(executor.project_path, project_path);
-        assert_eq!(executor.default_timeout_secs, 30);
+        // Test that executor was created successfully
+        assert!(executor.get_permissions().is_command_allowed("echo test"));
     }
 
     #[tokio::test]
     async fn test_bash_executor_simple_command() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
         
         let result = executor.execute("echo 'Hello, World!'", Some(5)).await;
         
@@ -42,14 +27,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_command_with_stderr() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
         
         // This command writes to stderr
         let result = executor.execute("echo 'Error message' >&2", Some(5)).await;
@@ -63,14 +41,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_nonexistent_command() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
         
         let result = executor.execute("nonexistent_command_12345", Some(5)).await;
         
@@ -82,50 +53,38 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_timeout() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("sleep*").unwrap()]);
+        let executor = BashExecutor::new(permissions, 10).unwrap();
         
         // This command should run longer than the timeout
         let result = executor.execute("sleep 10", Some(2)).await;
         
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), BashExecutorError::Timeout(_)));
+        assert!(result.is_ok());
+        let execution_result = result.unwrap();
+        assert!(execution_result.timed_out);
+        assert_eq!(execution_result.exit_code, 124);
     }
 
     #[tokio::test]
     async fn test_bash_executor_permission_denied() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
         
         // This command should be blocked by permissions
         let result = executor.execute("rm -rf /", Some(5)).await;
         
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), BashExecutorError::PermissionDenied(_)));
+        assert!(result.unwrap_err().to_string().contains("denied"));
     }
 
     #[tokio::test]
     async fn test_bash_executor_working_directory() {
         let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
         
-        let executor = BashExecutor::new(
-            project_path.clone(),
-            BashPermissions::default(),
-            10,
-        );
+        let permissions = BashPermissions::new(vec![
+            PermissionRule::allow("ls*").unwrap(),
+            PermissionRule::allow("test*").unwrap(),
+        ]);
+        let executor = BashExecutor::new(permissions, 10).unwrap();
         
         // Create a test file in the project directory
         let test_file = temp_dir.path().join("test_file.txt");
@@ -143,13 +102,9 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_git_commands() {
         let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
         
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("git*").unwrap()]);
+        let executor = BashExecutor::new(permissions, 10).unwrap();
         
         // Initialize git repository
         let init_result = executor.execute("git init", Some(5)).await;
@@ -172,14 +127,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_cargo_commands() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let permissions = BashPermissions::new(vec![
+            PermissionRule::allow("cargo*").unwrap(),
+            PermissionRule::allow("ls*").unwrap(),
+        ]);
+        let executor = BashExecutor::new(permissions, 10).unwrap();
         
         // Initialize a minimal Rust project
         let init_result = executor.execute("cargo init --bin test_project", Some(10)).await;
@@ -196,28 +148,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_permissions_get_set() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let mut executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let mut executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
         
         // Get initial permissions
         let initial_perms = executor.get_permissions();
         assert!(initial_perms.is_command_allowed("git status"));
         
         // Update permissions to block git
-        let mut new_perms = BashPermissions::default();
-        let deny_git_rule = PermissionRule {
-            pattern: glob::Pattern::new("git*").unwrap(),
-            allow: false,
-            description: "Block git commands".to_string(),
-        };
-        new_perms.add_rule(deny_git_rule);
-        
+        let new_perms = BashPermissions::new(vec![PermissionRule::deny("git*").unwrap()]);
         executor.update_permissions(new_perms);
         
         // Check that git is now blocked
@@ -227,32 +165,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_default_timeout() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            5, // 5 second default timeout
-        );
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("sleep*").unwrap()]);
+        let executor = BashExecutor::new(permissions, 5).unwrap(); // 5 second default timeout
         
         // Test with default timeout (should use the 5 second default)
         let result = executor.execute("sleep 10", None).await;
         
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), BashExecutorError::Timeout(_)));
+        assert!(result.is_ok());
+        let execution_result = result.unwrap();
+        assert!(execution_result.timed_out);
+        assert_eq!(execution_result.exit_code, 124);
     }
 
     #[tokio::test]
     async fn test_bash_executor_complex_command() {
         let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
         
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let permissions = BashPermissions::new(vec![
+            PermissionRule::allow("cat*").unwrap(),
+            PermissionRule::allow("grep*").unwrap(),
+            PermissionRule::allow("wc*").unwrap(),
+        ]);
+        let executor = BashExecutor::new(permissions, 10).unwrap();
         
         // Create a test file
         let test_file = temp_dir.path().join("test.txt");
@@ -269,14 +203,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_environment_variables() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_path = temp_dir.path().to_string_lossy().to_string();
-        
-        let executor = BashExecutor::new(
-            project_path,
-            BashPermissions::default(),
-            10,
-        );
+        let executor = BashExecutor::new(BashPermissions::default(), 10).unwrap();
         
         // Test environment variable usage
         let result = executor.execute("echo $HOME", Some(5)).await;

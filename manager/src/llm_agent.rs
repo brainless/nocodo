@@ -1,5 +1,5 @@
-use crate::bash_executor::BashExecutor;
-use crate::bash_permissions::BashPermissions;
+use manager_tools::bash_executor::BashExecutor;
+use manager_tools::bash_permissions::BashPermissions;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::llm_client::{create_llm_client, LlmCompletionRequest, LlmMessage};
@@ -811,11 +811,7 @@ impl LlmAgent {
         Ok(())
     }
 
-    /// Follow up with LLM after tool execution
-    #[allow(dead_code)]
-    async fn follow_up_with_llm(&self, session_id: i64) -> Result<String> {
-        self.follow_up_with_llm_with_depth(session_id, 0).await
-    }
+
 
     /// Follow up with LLM after tool execution with recursion depth tracking
     fn follow_up_with_llm_with_depth<'a>(
@@ -1217,29 +1213,7 @@ impl LlmAgent {
         }
     }
 
-    /// Fail a session
-    #[allow(dead_code)]
-    pub async fn fail_session(&self, session_id: i64) -> Result<()> {
-        tracing::info!(
-            session_id = %session_id,
-            "Failing LLM agent session"
-        );
 
-        let mut session = self.db.get_llm_agent_session(session_id)?;
-        let old_status = session.status.clone();
-        session.fail();
-        self.db.update_llm_agent_session(&session)?;
-
-        tracing::warn!(
-            session_id = %session_id,
-            work_id = %session.work_id,
-            old_status = %old_status,
-            new_status = %session.status,
-            "LLM agent session failed"
-        );
-
-        Ok(())
-    }
 
     /// Reconstruct conversation history for follow-up LLM calls with proper tool call handling
     fn reconstruct_conversation_for_followup(

@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 /// GET /api/projects/{id}/commands
 /// List all commands for a project
+#[allow(dead_code)]
 pub async fn get_project_commands(
     project_id: web::Path<i64>,
     query: web::Query<ProjectCommandFilterQuery>,
@@ -60,6 +61,7 @@ pub async fn get_project_commands(
 
 /// GET /api/projects/{id}/commands/{cmd_id}
 /// Get a specific command
+#[allow(dead_code)]
 pub async fn get_project_command(
     path: web::Path<(i64, String)>,
     data: web::Data<AppState>,
@@ -82,6 +84,7 @@ pub async fn get_project_command(
 
 /// POST /api/projects/{id}/commands
 /// Create new command(s) - accepts either a single command or array of commands
+#[allow(dead_code)]
 pub async fn create_project_command(
     project_id: web::Path<i64>,
     request: web::Json<serde_json::Value>,
@@ -162,6 +165,7 @@ pub async fn create_project_command(
 
 /// PUT /api/projects/{id}/commands/{cmd_id}
 /// Update a command
+#[allow(dead_code)]
 pub async fn update_project_command(
     path: web::Path<(i64, String)>,
     request: web::Json<UpdateProjectCommandRequest>,
@@ -222,6 +226,7 @@ pub async fn update_project_command(
 
 /// DELETE /api/projects/{id}/commands/{cmd_id}
 /// Delete a command
+#[allow(dead_code)]
 pub async fn delete_project_command(
     path: web::Path<(i64, String)>,
     data: web::Data<AppState>,
@@ -247,6 +252,7 @@ pub async fn delete_project_command(
 
 /// POST /api/projects/{id}/commands/{cmd_id}/execute
 /// Execute a command
+#[allow(dead_code)]
 pub async fn execute_project_command(
     path: web::Path<(i64, String)>,
     request: web::Json<ExecuteProjectCommandRequest>,
@@ -391,6 +397,7 @@ pub async fn execute_project_command(
 
 /// GET /api/projects/{id}/commands/{cmd_id}/executions
 /// Get execution history for a command
+#[allow(dead_code)]
 pub async fn get_command_executions(
     path: web::Path<(i64, String)>,
     query: web::Query<ProjectCommandFilterQuery>,
@@ -420,6 +427,7 @@ pub async fn get_command_executions(
 
 /// POST /api/projects/{id}/commands/discover
 /// Discover commands for a project using hybrid rule-based + LLM approach
+#[allow(dead_code)]
 pub async fn discover_project_commands(
     project_id: web::Path<i64>,
     query: web::Query<DiscoveryOptionsQuery>,
@@ -524,6 +532,7 @@ pub async fn discover_project_commands(
 }
 
 /// Enhance command discovery using LLM
+#[allow(dead_code)]
 async fn enhance_discovery_with_llm(
     llm_agent: &LlmAgent,
     db: &Arc<Database>,
@@ -645,6 +654,7 @@ async fn enhance_discovery_with_llm(
 }
 
 /// Create system prompt for LLM discovery
+#[allow(dead_code)]
 fn create_discovery_system_prompt(
     project_path: &std::path::Path,
     rule_based_commands: &[SuggestedCommand],
@@ -694,6 +704,7 @@ Be thorough but concise. Focus on commands that developers will actually use."#,
 }
 
 /// Create user message for LLM discovery request
+#[allow(dead_code)]
 fn create_discovery_user_message(
     project_path: &std::path::Path,
     rule_based_commands: &[SuggestedCommand],
@@ -727,6 +738,7 @@ Please provide your enhanced command discovery results."#,
 }
 
 /// Parse LLM response to extract enhanced commands
+#[allow(dead_code)]
 fn parse_llm_discovery_response(
     llm_response: &str,
     fallback_commands: &[SuggestedCommand],

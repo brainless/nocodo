@@ -30,7 +30,7 @@ async fn test_grok_real_api_call() {
 
     assert!(response.is_ok());
     let response = response.unwrap();
-    assert_eq!(response.object, "chat.completion");
+    assert_eq!(response.object, Some("chat.completion".to_string()));
     assert!(!response.choices.is_empty());
     assert!(!response.choices[0].message.content.is_empty());
     assert!(response.choices[0]

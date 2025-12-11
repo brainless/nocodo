@@ -9,6 +9,7 @@
 #![allow(clippy::needless_borrow)]
 
 use actix_web::{test, web, App};
+use nocodo_manager::handlers::{user_handlers, team_handlers};
 use std::time::Instant;
 
 use nocodo_manager::models::{
@@ -24,30 +25,30 @@ macro_rules! create_perf_test_routes {
             // Auth endpoints
             .route(
                 "/api/auth/register",
-                web::post().to(nocodo_manager::handlers::register),
+                web::post().to(user_handlers::register),
             )
             // Team management endpoints
             .service(
                 web::scope("/api/teams")
-                    .route("", web::get().to(nocodo_manager::handlers::list_teams))
+                    .route("", web::get().to(team_handlers::list_teams))
                     .service(
                         web::resource("")
-                            .route(web::post().to(nocodo_manager::handlers::create_team)),
+                            .route(web::post().to(team_handlers::create_team)),
                     )
                     .service(
                         web::scope("/{id}")
-                            .route("", web::get().to(nocodo_manager::handlers::get_team))
+                            .route("", web::get().to(team_handlers::get_team))
                             .route(
                                 "/members",
-                                web::get().to(nocodo_manager::handlers::get_team_members),
+                                web::get().to(team_handlers::get_team_members),
                             )
                             .route(
                                 "/permissions",
-                                web::get().to(nocodo_manager::handlers::get_team_permissions),
+                                web::get().to(team_handlers::get_team_permissions),
                             )
                             .service(
                                 web::resource("/members").route(
-                                    web::post().to(nocodo_manager::handlers::add_team_member),
+                                    web::post().to(team_handlers::add_team_member),
                                 ),
                             ),
                     ),
@@ -55,7 +56,7 @@ macro_rules! create_perf_test_routes {
             // Permission management endpoints
             .service(web::scope("/api/permissions").route(
                 "",
-                web::post().to(nocodo_manager::handlers::create_permission),
+                web::post().to(team_handlers::create_permission),
             ))
     };
 }

@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::bash_permissions::{BashPermissions, PermissionRule, PermissionAction};
     use tempfile::TempDir;
-    use std::path::PathBuf;
 
     #[test]
     fn test_permission_rule_creation() {

@@ -2,7 +2,7 @@ use actix_web::{test, web};
 use serde_json::json;
 
 use nocodo_manager::models::{
-    CreateAiSessionRequest, CreateLlmAgentSessionRequest, LlmAgentSession,
+    CreateAiSessionRequest, LlmAgentSession,
     MessageAuthorType, MessageContentType,
 };
 
@@ -19,7 +19,7 @@ async fn test_create_llm_agent_session() {
     let work = TestDataGenerator::create_work(Some("LLM Agent Work"), Some(&project.id));
     test_app.db().create_work(&work).unwrap();
 
-    let session_request = CreateLlmAgentSessionRequest {
+    let session_request = CreateAiSessionRequest {
         work_id: work.id.clone(),
         provider: "openai".to_string(),
         model: "gpt-4".to_string(),
@@ -333,7 +333,7 @@ Always provide:
 
 Be helpful, patient, and encouraging to developers of all skill levels."#;
 
-    let session_request = CreateLlmAgentSessionRequest {
+    let session_request = CreateAiSessionRequest {
         work_id: work.id.clone(),
         provider: "anthropic".to_string(),
         model: nocodo_manager::llm_providers::anthropic::CLAUDE_SONNET_4_5_MODEL_ID.to_string(),
@@ -419,7 +419,7 @@ async fn test_llm_agent_session_error_handling() {
     let test_app = TestApp::new().await;
 
     // Test: Create session with non-existent work
-    let invalid_request = CreateLlmAgentSessionRequest {
+    let invalid_request = CreateAiSessionRequest {
         work_id: "non-existent-work".to_string(),
         provider: "openai".to_string(),
         model: "gpt-4".to_string(),

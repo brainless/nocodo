@@ -15,7 +15,7 @@ pub struct LlmTestConfig {
 pub struct LlmProviderTestConfig {
     pub name: String,        // "grok", "openai", "anthropic"
     pub models: Vec<String>, // ["grok-code-fast-1", "gpt-4", "claude-3"]
-    pub api_key_env: String, // "GROK_API_KEY", "OPENAI_API_KEY"
+    pub api_key_env: String, // "XAI_API_KEY", "OPENAI_API_KEY"
     pub enabled: bool,       // Skip if API key not available
     pub test_prompts: LlmTestPrompts,
 }
@@ -57,7 +57,7 @@ impl LlmTestConfig {
         let forced_model = env::var("MODEL").ok();
 
         // Auto-detect available API keys and validate against actual providers
-        if env::var("GROK_API_KEY").is_ok() || env::var("XAI_API_KEY").is_ok() {
+        if env::var("XAI_API_KEY").is_ok() {
             let name = forced_provider.as_deref().unwrap_or("xai");
             if let Some(provider_config) =
                 LlmProviderTestConfig::xai_with_validation(name, forced_model.as_deref())
@@ -113,7 +113,7 @@ impl LlmProviderTestConfig {
     /// Create xAI provider configuration with validation
     pub fn xai_with_validation(name: &str, requested_model: Option<&str>) -> Option<Self> {
         // Check if API key is available
-        if env::var("GROK_API_KEY").is_err() && env::var("XAI_API_KEY").is_err() {
+        if env::var("XAI_API_KEY").is_err() {
             return None;
         }
 
@@ -132,7 +132,7 @@ impl LlmProviderTestConfig {
         Some(Self {
             name: name.to_string(),
             models: available_models,
-            api_key_env: "GROK_API_KEY".to_string(),
+            api_key_env: "XAI_API_KEY".to_string(),
             enabled: true,
             test_prompts: LlmTestPrompts::default(),
         })
@@ -143,7 +143,7 @@ impl LlmProviderTestConfig {
         Self::xai_with_validation(name, None).unwrap_or_else(|| Self {
             name: name.to_string(),
             models: vec!["grok-code-fast-1".to_string()],
-            api_key_env: "GROK_API_KEY".to_string(),
+            api_key_env: "XAI_API_KEY".to_string(),
             enabled: false,
             test_prompts: LlmTestPrompts::default(),
         })
@@ -364,6 +364,7 @@ impl LlmProviderTestConfig {
                 } else {
                     None
                 },
+                cerebras_api_key: None, // Not used in tests
                 zai_api_key: if self.name == "zai" {
                     api_key.clone()
                 } else {
@@ -377,6 +378,7 @@ impl LlmProviderTestConfig {
                 } else {
                     None
                 },
+                zen_api_key: None, // Not used in tests
             }),
             projects: None,
         }
@@ -401,7 +403,7 @@ mod tests {
     fn test_provider_configurations() {
         let grok = LlmProviderTestConfig::grok();
         assert_eq!(grok.name, "grok");
-        assert_eq!(grok.api_key_env, "GROK_API_KEY");
+        assert_eq!(grok.api_key_env, "XAI_API_KEY");
         assert!(grok.models.contains(&"grok-code-fast-1".to_string()));
 
         let openai = LlmProviderTestConfig::openai();

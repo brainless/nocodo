@@ -69,16 +69,18 @@ pub enum GlmRole {
 pub struct GlmChatCompletionResponse {
     /// Unique identifier for the response
     pub id: String,
-    /// Object type (always "chat.completion")
-    pub object: String,
+    /// Object type (usually "chat.completion", optional for some providers like Zen)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<String>,
     /// Unix timestamp of creation
     pub created: u64,
     /// Model used for generation
     pub model: String,
     /// Completion choices
     pub choices: Vec<GlmChoice>,
-    /// Token usage information
-    pub usage: GlmUsage,
+    /// Token usage information (optional for some providers)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<GlmUsage>,
 }
 
 /// A completion choice

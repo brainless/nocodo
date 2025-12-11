@@ -4,8 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use nocodo_manager::models::{
-    CreateProjectRequest, CreateWorkRequest, CreateAiSessionRequest,
-    CreateLlmAgentSessionRequest, FileCreateRequest, FileUpdateRequest,
+    CreateProjectRequest, CreateWorkRequest, CreateAiSessionRequest, FileCreateRequest, FileUpdateRequest,
     MessageAuthorType, MessageContentType,
 };
 
@@ -84,7 +83,7 @@ async fn test_multi_step_ai_development_workflow() {
     assert!(resp.status().is_success());
 
     // Phase 5: LLM Agent Session Creation
-    let llm_session_req = CreateLlmAgentSessionRequest {
+    let llm_session_req = CreateAiSessionRequest {
         work_id: work_id.to_string(),
         provider: "openai".to_string(),
         model: "gpt-4".to_string(),

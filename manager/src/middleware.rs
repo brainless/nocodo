@@ -1,6 +1,6 @@
 use crate::auth::validate_token;
 use crate::error::AppError;
-use crate::models::UserInfo;
+use manager_models::UserInfo;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     error::ErrorUnauthorized,
@@ -9,6 +9,7 @@ use actix_web::{
 use futures_util::future::{ready, Ready};
 
 /// Authentication middleware that extracts JWT token and attaches user info to request
+#[allow(dead_code)]
 pub struct AuthenticationMiddleware;
 
 impl<S, B> Transform<S, ServiceRequest> for AuthenticationMiddleware
@@ -28,6 +29,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub struct AuthenticationMiddlewareService<S> {
     service: S,
 }
@@ -81,7 +83,7 @@ where
         // If JWT secret is not configured, skip authentication (for tests)
         if jwt_secret.is_none() {
             // Insert a test user
-            let test_user = crate::models::UserInfo {
+            let test_user = UserInfo {
                 id: 1,
                 username: "testuser".to_string(),
                 email: "test@example.com".to_string(),
@@ -145,22 +147,18 @@ where
     }
 }
 
-/// Extract user info from request extensions
-pub fn get_user_from_request(req: &ServiceRequest) -> Result<UserInfo, AppError> {
+/// Extract user ID from request extensions
+#[allow(dead_code)]
+pub fn get_user_id_from_request(req: &ServiceRequest) -> Result<i64, AppError> {
     req.extensions()
         .get::<UserInfo>()
-        .cloned()
+        .map(|user| user.id)
         .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))
-}
-
-/// Extract user ID from request extensions
-pub fn get_user_id_from_request(req: &ServiceRequest) -> Result<i64, AppError> {
-    let user = get_user_from_request(req)?;
-    Ok(user.id)
 }
 
 /// Permission requirement for a route
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PermissionRequirement {
     pub resource_type: String,
     pub action: String,
@@ -168,6 +166,7 @@ pub struct PermissionRequirement {
 }
 
 impl PermissionRequirement {
+    #[allow(dead_code)]
     pub fn new(resource_type: &str, action: &str) -> Self {
         Self {
             resource_type: resource_type.to_string(),
@@ -176,6 +175,7 @@ impl PermissionRequirement {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_resource_id(mut self, param_name: &str) -> Self {
         self.resource_id_param = Some(param_name.to_string());
         self
@@ -183,11 +183,13 @@ impl PermissionRequirement {
 }
 
 /// Permission enforcement middleware
+#[allow(dead_code)]
 pub struct PermissionMiddleware {
     pub requirement: PermissionRequirement,
 }
 
 impl PermissionMiddleware {
+    #[allow(dead_code)]
     pub fn new(requirement: PermissionRequirement) -> Self {
         Self { requirement }
     }
@@ -213,6 +215,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub struct PermissionMiddlewareService<S> {
     service: S,
     requirement: PermissionRequirement,
