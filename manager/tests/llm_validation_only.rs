@@ -393,12 +393,8 @@ fn test_integration_summary() {
     println!("   - Forbidden keyword detection");
     println!("");
     println!("🚀 Ready for real LLM testing!");
-    println!("   Set environment variables:");
-    println!("   - XAI_API_KEY='your-xai-key'");
-    println!("   - OPENAI_API_KEY='your-openai-key'");
-    println!("   - ANTHROPIC_API_KEY='your-anthropic-key'");
-    println!("");
-    println!("Then run: ./run_llm_e2e_test.sh");
+    println!("   LLM integration tests have been removed.");
+    println!("   Use the integration tests in manager/tests/integration/ for testing.");
 
     // This is always a success - just a summary
 }
