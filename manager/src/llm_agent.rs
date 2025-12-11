@@ -1,5 +1,5 @@
-use crate::bash_executor::BashExecutor;
-use crate::bash_permissions::BashPermissions;
+use manager_tools::bash_executor::BashExecutor;
+use manager_tools::bash_permissions::BashPermissions;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::llm_client::{create_llm_client, LlmCompletionRequest, LlmMessage};

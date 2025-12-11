@@ -1,6 +1,4 @@
 mod auth;
-mod bash_executor;
-mod bash_permissions;
 mod command_discovery;
 mod config;
 mod database;

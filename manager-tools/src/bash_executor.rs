@@ -8,7 +8,7 @@ use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
 use crate::bash_permissions::BashPermissions;
-use manager_tools::BashExecutorTrait;
+use crate::bash::BashExecutorTrait;
 
 #[derive(Clone)]
 pub struct BashExecutor {
@@ -36,7 +36,7 @@ impl BashExecutor {
         &self,
         command: &str,
         timeout_secs: Option<u64>,
-    ) -> Result<manager_tools::BashExecutionResult> {
+    ) -> Result<crate::bash::BashExecutionResult> {
         let execution_timeout = timeout_secs
             .map(Duration::from_secs)
             .unwrap_or(self.default_timeout);
@@ -84,7 +84,7 @@ impl BashExecutor {
                     stderr.len()
                 );
 
-                Ok(manager_tools::BashExecutionResult {
+                Ok(crate::bash::BashExecutionResult {
                     stdout,
                     stderr,
                     exit_code,
@@ -100,7 +100,7 @@ impl BashExecutor {
                     "Command timed out after {} seconds",
                     execution_timeout.as_secs()
                 );
-                Ok(manager_tools::BashExecutionResult {
+                Ok(crate::bash::BashExecutionResult {
                     stdout: String::new(),
                     stderr: format!(
                         "Command timed out after {} seconds",
@@ -118,7 +118,7 @@ impl BashExecutor {
         command: &str,
         working_dir: &Path,
         timeout_secs: Option<u64>,
-    ) -> Result<manager_tools::BashExecutionResult> {
+    ) -> Result<crate::bash::BashExecutionResult> {
         let execution_timeout = timeout_secs
             .map(Duration::from_secs)
             .unwrap_or(self.default_timeout);
@@ -178,7 +178,7 @@ impl BashExecutor {
                     stderr.len()
                 );
 
-                Ok(manager_tools::BashExecutionResult {
+                Ok(crate::bash::BashExecutionResult {
                     stdout,
                     stderr,
                     exit_code,
@@ -194,7 +194,7 @@ impl BashExecutor {
                     "Command timed out after {} seconds",
                     execution_timeout.as_secs()
                 );
-                Ok(manager_tools::BashExecutionResult {
+                Ok(crate::bash::BashExecutionResult {
                     stdout: String::new(),
                     stderr: format!(
                         "Command timed out after {} seconds",
@@ -224,7 +224,7 @@ impl BashExecutorTrait for BashExecutor {
         command: &str,
         working_dir: &std::path::Path,
         timeout_secs: Option<u64>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<manager_tools::BashExecutionResult>> + Send + '_>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<crate::bash::BashExecutionResult>> + Send + '_>> {
         let command = command.to_string();
         let working_dir = working_dir.to_path_buf();
         let executor = self.clone();
