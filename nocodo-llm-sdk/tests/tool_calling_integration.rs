@@ -225,7 +225,14 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
             // Note: Zen providers use raw request format, not builders
             // We'll need to test if they support tool calling
             // For now, we'll create a basic test structure
-            use schemars::schema_for;
+            // Use inline schema generation to avoid allOf/$ref which Zen doesn't support
+            use schemars::gen::SchemaSettings;
+
+            let settings = SchemaSettings::draft07().with(|s| {
+                s.inline_subschemas = true;
+            });
+            let generator = settings.into_generator();
+            let schema = generator.into_root_schema_for::<WeatherParams>();
 
             let request = nocodo_llm_sdk::grok::types::GrokChatCompletionRequest {
                 model: config.model.to_string(),
@@ -245,7 +252,7 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                     function: nocodo_llm_sdk::grok::types::GrokFunction {
                         name: "get_weather".to_string(),
                         description: "Get current weather for a location".to_string(),
-                        parameters: schema_for!(WeatherParams),
+                        parameters: schema,
                     },
                 }]),
                 tool_choice: None,
@@ -306,7 +313,14 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
         "zen-glm" => {
             let client = ZenGlmClient::new()?;
 
-            use schemars::schema_for;
+            // Use inline schema generation to avoid allOf/$ref which Zen doesn't support
+            use schemars::gen::SchemaSettings;
+
+            let settings = SchemaSettings::draft07().with(|s| {
+                s.inline_subschemas = true;
+            });
+            let generator = settings.into_generator();
+            let schema = generator.into_root_schema_for::<WeatherParams>();
 
             let request = nocodo_llm_sdk::glm::types::GlmChatCompletionRequest {
                 model: config.model.to_string(),
@@ -328,7 +342,7 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                     function: nocodo_llm_sdk::glm::types::GlmFunction {
                         name: "get_weather".to_string(),
                         description: "Get current weather for a location".to_string(),
-                        parameters: schema_for!(WeatherParams),
+                        parameters: schema,
                     },
                 }]),
                 tool_choice: None,
