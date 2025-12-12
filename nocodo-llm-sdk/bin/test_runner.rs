@@ -30,6 +30,7 @@ fn main() {
         ("zen_grok_integration", ""),
         ("zen_glm_integration", ""),
         ("tool_calling_integration", ""), // Runs for all available providers
+        ("multi_turn_tool_use_integration", ""), // Runs for all available providers
     ];
 
     for (test, key) in tests {
