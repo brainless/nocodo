@@ -126,7 +126,7 @@ pub type GrokTool = crate::openai::types::OpenAITool;
 pub type GrokFunction = crate::openai::types::OpenAIFunction;
 
 /// Tool call in Grok response (OpenAI-compatible)
-pub type GrokToolCall = crate::openai::types::OpenAIToolCall;
+pub type GrokToolCall = crate::openai::types::OpenAIResponseToolCall;
 
 /// Function call details (OpenAI-compatible)
 pub type GrokFunctionCall = crate::openai::types::OpenAIFunctionCall;

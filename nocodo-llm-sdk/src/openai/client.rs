@@ -325,6 +325,9 @@ impl crate::client::LlmClient for OpenAIClient {
                 previous_response_id: None,
                 background: None,
                 prompt_cache_retention: None,
+                tools: None, // No tools for generic LlmClient interface
+                tool_choice: None,
+                parallel_tool_calls: None,
             };
 
             // Send request and convert response

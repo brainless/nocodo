@@ -133,7 +133,7 @@ pub type GlmTool = crate::openai::types::OpenAITool;
 pub type GlmFunction = crate::openai::types::OpenAIFunction;
 
 /// Tool call in GLM response (OpenAI-compatible)
-pub type GlmToolCall = crate::openai::types::OpenAIToolCall;
+pub type GlmToolCall = crate::openai::types::OpenAIResponseToolCall;
 
 /// Function call details (OpenAI-compatible)
 pub type GlmFunctionCall = crate::openai::types::OpenAIFunctionCall;

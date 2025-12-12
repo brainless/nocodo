@@ -73,7 +73,16 @@ impl<T: schemars::JsonSchema> ToolBuilder<T> {
     }
 
     pub fn build(self) -> Tool {
-        let schema = schemars::schema_for!(T);
+        // Use inline_subschemas to avoid allOf/$ref which are not supported by xAI
+        // and have limited support in OpenAI and Anthropic APIs
+        use schemars::gen::SchemaSettings;
+
+        let settings = SchemaSettings::draft07().with(|s| {
+            s.inline_subschemas = true;
+        });
+        let generator = settings.into_generator();
+        let schema = generator.into_root_schema_for::<T>();
+
         Tool {
             name: self.name.expect("Tool name is required"),
             description: self.description.unwrap_or_default(),

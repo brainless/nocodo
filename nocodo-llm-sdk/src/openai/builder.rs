@@ -2,8 +2,8 @@ use crate::{
     error::LlmError,
     openai::{
         client::OpenAIClient,
-        tools::OpenAIToolFormat,
-        types::{OpenAIChatCompletionRequest, OpenAIMessage, OpenAIRole, OpenAIResponseRequest, OpenAITool},
+        tools::{OpenAIToolFormat, OpenAIResponseToolFormat},
+        types::{OpenAIChatCompletionRequest, OpenAIMessage, OpenAIRole, OpenAIResponseRequest, OpenAIResponseTool},
     },
     tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
@@ -20,7 +20,7 @@ pub struct OpenAIMessageBuilder<'a> {
     stop: Option<Vec<String>>,
     stream: Option<bool>,
     reasoning_effort: Option<String>,
-    tools: Option<Vec<OpenAITool>>,
+    tools: Option<Vec<OpenAIResponseTool>>,
     tool_choice: Option<serde_json::Value>,
     parallel_tool_calls: Option<bool>,
 }
@@ -138,7 +138,7 @@ impl<'a> OpenAIMessageBuilder<'a> {
     /// Add a tool to the request
     pub fn tool(mut self, tool: Tool) -> Self {
         let tools = self.tools.get_or_insert_with(Vec::new);
-        tools.push(OpenAIToolFormat::to_provider_tool(&tool));
+        tools.push(OpenAIResponseToolFormat::to_response_tool(&tool));
         self
     }
 
@@ -212,6 +212,9 @@ pub struct OpenAIResponseBuilder<'a> {
     previous_response_id: Option<String>,
     background: Option<bool>,
     prompt_cache_retention: Option<String>,
+    tools: Option<Vec<OpenAIResponseTool>>,
+    tool_choice: Option<serde_json::Value>,
+    parallel_tool_calls: Option<bool>,
 }
 
 impl<'a> OpenAIResponseBuilder<'a> {
@@ -225,6 +228,9 @@ impl<'a> OpenAIResponseBuilder<'a> {
             previous_response_id: None,
             background: None,
             prompt_cache_retention: None,
+            tools: None,
+            tool_choice: None,
+            parallel_tool_calls: None,
         }
     }
 
@@ -264,6 +270,33 @@ impl<'a> OpenAIResponseBuilder<'a> {
         self
     }
 
+    /// Add a tool to the request
+    pub fn tool(mut self, tool: Tool) -> Self {
+        let tools = self.tools.get_or_insert_with(Vec::new);
+        tools.push(OpenAIResponseToolFormat::to_response_tool(&tool));
+        self
+    }
+
+    /// Add multiple tools to the request
+    pub fn tools(mut self, tools: Vec<Tool>) -> Self {
+        for tool in tools {
+            self = self.tool(tool);
+        }
+        self
+    }
+
+    /// Set tool choice strategy
+    pub fn tool_choice(mut self, choice: ToolChoice) -> Self {
+        self.tool_choice = Some(OpenAIToolFormat::to_provider_tool_choice(&choice));
+        self
+    }
+
+    /// Enable or disable parallel tool calls (default: true)
+    pub fn parallel_tool_calls(mut self, enabled: bool) -> Self {
+        self.parallel_tool_calls = Some(enabled);
+        self
+    }
+
     /// Send the request and get the response
     pub async fn send(self) -> Result<crate::openai::types::OpenAIResponseResponse, LlmError> {
         let request = OpenAIResponseRequest {
@@ -277,6 +310,9 @@ impl<'a> OpenAIResponseBuilder<'a> {
             previous_response_id: self.previous_response_id,
             background: self.background,
             prompt_cache_retention: self.prompt_cache_retention,
+            tools: self.tools,
+            tool_choice: self.tool_choice,
+            parallel_tool_calls: self.parallel_tool_calls,
         };
 
         self.client.create_response(request).await
