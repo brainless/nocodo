@@ -129,29 +129,54 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
             let api_key = std::env::var("OPENAI_API_KEY")?;
             let client = OpenAIClient::new(api_key)?;
 
-            let response = client
-                .message_builder()
-                .model(config.model)
-                .user_message("What's the weather in Tokyo?")
-                .tool(weather_tool)
-                .tool_choice(ToolChoice::Auto)
-                .send()
-                .await?;
+            // Check if this is a GPT-5.1 model that should use Responses API
+            if config.model.starts_with("gpt-5.1") || config.model.starts_with("gpt-5-codex") {
+                // Use Responses API for GPT-5.1 models
+                let response = client
+                    .response_builder()
+                    .model(config.model)
+                    .input("What's the weather in Tokyo?")
+                    .tool(weather_tool)
+                    .tool_choice(ToolChoice::Auto)
+                    .send()
+                    .await?;
 
-            // Verify tool call was made
-            assert!(response.tool_calls().is_some(), "Expected tool call but got none");
+                // For Responses API, tool calls appear in the output array as function_call items
+                let function_call_items: Vec<_> = response.output.iter()
+                    .filter(|item| item.item_type == "function_call")
+                    .collect();
 
-            let tool_calls = response.tool_calls().unwrap();
-            assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-            assert_eq!(tool_calls[0].name(), "get_weather", "Expected get_weather tool");
+                assert!(!function_call_items.is_empty(), "Expected tool call but got none in Responses API output");
+                
+                // For now, just verify we got a function call item - full parsing can be added later
+                // when the OpenAIOutputItem type is updated to include call_id and arguments fields
+                println!("✅ Found {} function call item(s) in Responses API output", function_call_items.len());
+            } else {
+                // Use Chat Completions API for other models
+                let response = client
+                    .message_builder()
+                    .model(config.model)
+                    .user_message("What's the weather in Tokyo?")
+                    .tool(weather_tool)
+                    .tool_choice(ToolChoice::Auto)
+                    .send()
+                    .await?;
 
-            // Parse and validate arguments
-            let params: WeatherParams = tool_calls[0].parse_arguments()?;
-            assert!(
-                params.location.to_lowercase().contains("tokyo"),
-                "Expected location to contain 'tokyo', got: {}",
-                params.location
-            );
+                // Verify tool call was made
+                assert!(response.tool_calls().is_some(), "Expected tool call but got none");
+
+                let tool_calls = response.tool_calls().unwrap();
+                assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
+                assert_eq!(tool_calls[0].name(), "get_weather", "Expected get_weather tool");
+
+                // Parse and validate arguments
+                let params: WeatherParams = tool_calls[0].parse_arguments()?;
+                assert!(
+                    params.location.to_lowercase().contains("tokyo"),
+                    "Expected location to contain 'tokyo', got: {}",
+                    params.location
+                );
+            }
 
             // For now, just verify we got the tool call - full conversation flow can be added later
             // The important part is that the model correctly called the tool

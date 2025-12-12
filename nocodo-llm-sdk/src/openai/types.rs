@@ -114,7 +114,7 @@ pub struct OpenAIChatCompletionRequest {
     pub reasoning_effort: Option<String>,
     /// Available tools for the model to use
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<OpenAITool>>,
+    pub tools: Option<Vec<OpenAIResponseTool>>,
     /// Tool choice strategy
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,
@@ -132,7 +132,7 @@ pub struct OpenAIMessage {
     pub content: String,
     /// Tool calls made by the assistant
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_calls: Option<Vec<OpenAIToolCall>>,
+    pub tool_calls: Option<Vec<OpenAIResponseToolCall>>,
     /// Tool call ID for tool result messages
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
@@ -269,6 +269,15 @@ pub struct OpenAIResponseRequest {
     /// How long to retain the prompt in cache
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<String>,
+    /// Available tools for the model to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<OpenAIResponseTool>>,
+    /// Tool choice strategy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
+    /// Whether to allow parallel tool calls
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
 }
 
 /// OpenAI Responses API response
@@ -353,7 +362,7 @@ pub struct OpenAIError {
     pub param: Option<String>,
 }
 
-/// OpenAI tool definition
+/// OpenAI tool definition for Chat Completions API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAITool {
     /// Type of tool (always "function")
@@ -361,6 +370,21 @@ pub struct OpenAITool {
     pub r#type: String,
     /// Function definition
     pub function: OpenAIFunction,
+}
+
+
+/// OpenAI tool definition for Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIResponseTool {
+    /// Type of tool (always "function")
+    #[serde(rename = "type")]
+    pub r#type: String,
+    /// Function name
+    pub name: String,
+    /// Function description
+    pub description: String,
+    /// Function parameters schema
+    pub parameters: schemars::schema::RootSchema,
 }
 
 /// OpenAI function definition
@@ -376,7 +400,7 @@ pub struct OpenAIFunction {
 
 /// Tool call in OpenAI response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAIToolCall {
+pub struct OpenAIResponseToolCall {
     /// Unique identifier for the tool call
     pub id: String,
     /// Type of tool call (always "function")
@@ -427,7 +451,7 @@ impl OpenAIMessage {
     }
 
     /// Create an assistant message with tool calls
-    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<OpenAIToolCall>) -> Self {
+    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<OpenAIResponseToolCall>) -> Self {
         Self {
             role: OpenAIRole::Assistant,
             content: content.into(),
