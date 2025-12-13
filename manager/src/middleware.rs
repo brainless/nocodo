@@ -105,7 +105,9 @@ where
             Some(h) => h,
             None => {
                 tracing::warn!("Auth failed: missing Authorization header");
-                return Box::pin(async { Err(ErrorUnauthorized("Missing Authorization header")) });
+                return Box::pin(async { 
+                    Err(AppError::Unauthorized("Missing Authorization header".to_string()).into())
+                });
             }
         };
 
@@ -114,9 +116,9 @@ where
             None => {
                 tracing::warn!("Auth failed: invalid Authorization header format");
                 return Box::pin(async {
-                    Err(ErrorUnauthorized(
-                        "Invalid Authorization header format. Expected 'Bearer <token>'",
-                    ))
+                    Err(AppError::Unauthorized(
+                        "Invalid Authorization header format. Expected 'Bearer <token>'".to_string(),
+                    ).into())
                 });
             }
         };
@@ -141,7 +143,9 @@ where
             }
             Err(_) => {
                 tracing::warn!("Auth failed: invalid or expired token");
-                Box::pin(async { Err(ErrorUnauthorized("Invalid or expired token")) })
+                Box::pin(async { 
+                    Err(AppError::Unauthorized("Invalid or expired token".to_string()).into())
+                })
             }
         }
     }

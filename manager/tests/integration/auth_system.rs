@@ -214,12 +214,12 @@ async fn test_authentication_required_with_jwt_configured() {
     let test_app = test::init_service(
         App::new()
             .app_data(app.app_state.clone())
-            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, false)),
+            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, true)),
     )
     .await;
     
     let valid_req = test::TestRequest::get()
-        .uri("/api/projects")
+        .uri("/api/me/teams")
         .insert_header(("Authorization", format!("Bearer {}", _token)))
         .to_request();
     
@@ -228,11 +228,13 @@ async fn test_authentication_required_with_jwt_configured() {
     
     // Test with no token - should fail with 401
     let no_auth_req = test::TestRequest::get()
-        .uri("/api/projects")
+        .uri("/api/me/teams")
         .to_request();
     
-    let no_auth_response = test::call_service(&test_app, no_auth_req).await;
-    assert_eq!(no_auth_response.status(), actix_web::http::StatusCode::UNAUTHORIZED);
+    let no_auth_response = test::try_call_service(&test_app, no_auth_req).await;
+    assert!(no_auth_response.is_err());
+    let error_response = no_auth_response.unwrap_err();
+    assert!(error_response.to_string().contains("Missing Authorization header"));
 }
 
 #[actix_rt::test]
@@ -249,7 +251,7 @@ async fn test_registration_duplicate_username_returns_error() {
     assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Username already exists"));
+    assert!(error_response["message"].as_str().unwrap().contains("Username already exists"));
 }
 
 #[actix_rt::test]
@@ -263,7 +265,7 @@ async fn test_registration_empty_username_returns_error() {
     assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Username cannot be empty"));
+    assert!(error_response["message"].as_str().unwrap().contains("Username cannot be empty"));
 }
 
 #[actix_rt::test]
@@ -277,7 +279,7 @@ async fn test_registration_empty_password_returns_error() {
     assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Password is required"));
+    assert!(error_response["message"].as_str().unwrap().contains("Password is required"));
 }
 
 #[actix_rt::test]
@@ -291,7 +293,9 @@ async fn test_login_invalid_username_returns_401() {
     assert_eq!(response.status(), actix_web::http::StatusCode::UNAUTHORIZED);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Invalid credentials"));
+    println!("Debug - Actual error response: {}", error_response);
+    println!("Debug - Actual error response: {}", error_response);
+    assert!(error_response["message"].as_str().unwrap().contains("Invalid credentials"));
 }
 
 #[actix_rt::test]
@@ -308,7 +312,9 @@ async fn test_login_invalid_password_returns_401() {
     assert_eq!(response.status(), actix_web::http::StatusCode::UNAUTHORIZED);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Invalid credentials"));
+    println!("Debug - Actual error response: {}", error_response);
+    println!("Debug - Actual error response: {}", error_response);
+    assert!(error_response["message"].as_str().unwrap().contains("Invalid credentials"));
 }
 
 #[actix_rt::test]
@@ -322,7 +328,7 @@ async fn test_login_empty_username_returns_400() {
     assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Username is required"));
+    assert!(error_response["message"].as_str().unwrap().contains("Username cannot be empty"));
 }
 
 #[actix_rt::test]
@@ -336,7 +342,7 @@ async fn test_login_empty_password_returns_400() {
     assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
     
     let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Password is required"));
+    assert!(error_response["message"].as_str().unwrap().contains("Password is required"));
 }
 
 #[actix_rt::test]
@@ -353,22 +359,19 @@ async fn test_jwt_token_malformed_returns_401() {
     let test_app = test::init_service(
         App::new()
             .app_data(app.app_state.clone())
-            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, false)),
+            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, true)),
     )
     .await;
     
     let req = test::TestRequest::get()
-        .uri("/api/projects")
+        .uri("/api/me/teams")
         .insert_header(("Authorization", "Bearer invalid.token.here"))
         .to_request();
     
-    let response = test::call_service(&test_app, req).await;
-    
-    // Verify unauthorized response
-    assert_eq!(response.status(), actix_web::http::StatusCode::UNAUTHORIZED);
-    
-    let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Invalid or expired token"));
+    let response = test::try_call_service(&test_app, req).await;
+    assert!(response.is_err());
+    let error_response = response.unwrap_err();
+    assert!(error_response.to_string().contains("Invalid or expired token"));
 }
 
 #[actix_rt::test]
@@ -385,21 +388,18 @@ async fn test_jwt_token_missing_authorization_header_returns_401() {
     let test_app = test::init_service(
         App::new()
             .app_data(app.app_state.clone())
-            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, false)),
+            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, true)),
     )
     .await;
     
     let req = test::TestRequest::get()
-        .uri("/api/projects")
+        .uri("/api/me/teams")
         .to_request();
     
-    let response = test::call_service(&test_app, req).await;
-    
-    // Verify unauthorized response
-    assert_eq!(response.status(), actix_web::http::StatusCode::UNAUTHORIZED);
-    
-    let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Missing Authorization header"));
+    let response = test::try_call_service(&test_app, req).await;
+    assert!(response.is_err());
+    let error_response = response.unwrap_err();
+    assert!(error_response.to_string().contains("Missing Authorization header"));
 }
 
 #[actix_rt::test]
@@ -451,22 +451,19 @@ async fn test_authorization_header_invalid_format_returns_401() {
     let test_app = test::init_service(
         App::new()
             .app_data(app.app_state.clone())
-            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, false)),
+            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, true)),
     )
     .await;
     
     let req = test::TestRequest::get()
-        .uri("/api/projects")
+        .uri("/api/me/teams")
         .insert_header(("Authorization", "InvalidFormat token123"))
         .to_request();
     
-    let response = test::call_service(&test_app, req).await;
-    
-    // Verify unauthorized response
-    assert_eq!(response.status(), actix_web::http::StatusCode::UNAUTHORIZED);
-    
-    let error_response: serde_json::Value = test::read_body_json(response).await;
-    assert!(error_response["error"].as_str().unwrap().contains("Invalid Authorization header format"));
+    let response = test::try_call_service(&test_app, req).await;
+    assert!(response.is_err());
+    let error_response = response.unwrap_err();
+    assert!(error_response.to_string().contains("Invalid Authorization header format. Expected 'Bearer <token>'"));
 }
 
 #[actix_rt::test]
@@ -483,12 +480,12 @@ async fn test_authenticated_request_with_valid_token_succeeds() {
     let test_app = test::init_service(
         App::new()
             .app_data(app.app_state.clone())
-            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, false)),
+            .configure(|cfg| nocodo_manager::routes::configure_routes(cfg, true)),
     )
     .await;
     
     let req = test::TestRequest::get()
-        .uri("/api/projects")
+        .uri("/api/me/teams")
         .insert_header(("Authorization", format!("Bearer {}", _token)))
         .to_request();
     

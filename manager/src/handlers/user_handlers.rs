@@ -54,7 +54,7 @@ pub async fn create_user(
 
     // Check if user already exists
     if data.database.get_user_by_name(&create_req.username).is_ok() {
-        return Err(AppError::InvalidRequest(
+        return Err(AppError::NotFound(
             "Username already exists".to_string(),
         ));
     }
@@ -222,6 +222,15 @@ pub async fn login(
             AppError::InvalidRequest("Password is required".to_string())
         })?;
 
+    // Validate input fields
+    if username.trim().is_empty() {
+        return Err(AppError::InvalidRequest("Username cannot be empty".to_string()));
+    }
+    
+    if password.trim().is_empty() {
+        return Err(AppError::InvalidRequest("Password is required".to_string()));
+    }
+
     // Get user from database
     let user = data.database.get_user_by_name(username)
         .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?;
@@ -274,6 +283,19 @@ pub async fn register(
         .ok_or_else(|| {
             AppError::InvalidRequest("Password is required".to_string())
         })?;
+
+    // Validate input fields
+    if username.trim().is_empty() {
+        return Err(AppError::InvalidRequest("Username cannot be empty".to_string()));
+    }
+    if password.trim().is_empty() {
+        return Err(AppError::InvalidRequest("Password is required".to_string()));
+    }
+
+    // Check for duplicate username
+    if data.database.get_user_by_name(username).is_ok() {
+        return Err(AppError::InvalidRequest("Username already exists".to_string()));
+    }
 
     // Hash password
     let password_hash = crate::auth::hash_password(password)?;
