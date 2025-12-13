@@ -218,10 +218,10 @@ impl crate::client::LlmClient for ZenGlmClient {
     }
 
     fn provider_name(&self) -> &str {
-        "zen-glm"
+        crate::providers::ZEN
     }
 
     fn model_name(&self) -> &str {
-        "big-pickle" // Default model
+        crate::models::glm::ZAI_GLM_4_6_ID // Default model
     }
 }

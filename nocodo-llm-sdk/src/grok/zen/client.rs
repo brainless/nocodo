@@ -215,10 +215,10 @@ impl crate::client::LlmClient for ZenGrokClient {
     }
 
     fn provider_name(&self) -> &str {
-        "zen-grok"
+        crate::providers::ZEN
     }
 
     fn model_name(&self) -> &str {
-        "grok-code" // Default model
+        crate::models::grok::BETA_ID // Default model
     }
 }

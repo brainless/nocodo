@@ -243,10 +243,10 @@ impl crate::client::LlmClient for XaiGrokClient {
     }
 
     fn provider_name(&self) -> &str {
-        "grok"
+        crate::providers::XAI
     }
 
     fn model_name(&self) -> &str {
-        "grok-code-fast-1" // Default model
+        crate::models::grok::BETA_ID // Default model
     }
 }

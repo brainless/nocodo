@@ -249,10 +249,10 @@ impl crate::client::LlmClient for ClaudeClient {
     }
 
     fn provider_name(&self) -> &str {
-        "claude"
+        crate::providers::ANTHROPIC
     }
 
     fn model_name(&self) -> &str {
-        "claude-sonnet-4-5-20250929" // Default model
+        crate::models::claude::SONNET_4_5_ID // Default model
     }
 }

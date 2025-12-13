@@ -443,10 +443,10 @@ impl crate::client::LlmClient for OpenAIClient {
     }
 
     fn provider_name(&self) -> &str {
-        "openai"
+        crate::providers::OPENAI
     }
 
     fn model_name(&self) -> &str {
-        "gpt-5.1-codex" // Default to GPT-5.1-Codex
+        crate::models::openai::GPT_4O_ID // Default to GPT-4o
     }
 }

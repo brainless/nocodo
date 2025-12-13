@@ -125,8 +125,10 @@ pub mod client;
 pub mod error;
 pub mod glm;
 pub mod grok;
+pub mod model_metadata;
 pub mod models;
 pub mod openai;
+pub mod providers;
 pub mod tools;
 pub mod types;
 

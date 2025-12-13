@@ -252,10 +252,10 @@ impl crate::client::LlmClient for CerebrasGlmClient {
     }
 
     fn provider_name(&self) -> &str {
-        "glm"
+        crate::providers::CEREBRAS
     }
 
     fn model_name(&self) -> &str {
-        "zai-glm-4.6" // Default model
+        crate::models::glm::LLAMA_3_3_70B_ID // Default model
     }
 }

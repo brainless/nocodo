@@ -3,7 +3,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::llm_agent::LlmAgent;
 use crate::models::{
-    ServerStatus, SettingsResponse, UpdateApiKeysRequest,
+    ServerStatus, SettingsResponse, SupportedModel, SupportedModelsResponse, UpdateApiKeysRequest,
 };
 use actix_web::{web, HttpResponse, Result};
 use std::sync::Arc;
@@ -167,28 +167,29 @@ pub async fn add_authorized_ssh_key(
 }
 
 pub async fn get_supported_models(_data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let response = serde_json::json!({
-        "models": [
-            {
-                "id": "claude-sonnet-4-20250514",
-                "name": "Claude Sonnet 4",
-                "provider": "anthropic",
-                "capabilities": ["text", "code", "analysis"]
-            },
-            {
-                "id": "claude-3-5-sonnet-20241022",
-                "name": "Claude 3.5 Sonnet",
-                "provider": "anthropic", 
-                "capabilities": ["text", "code", "analysis"]
-            },
-            {
-                "id": "gpt-4",
-                "name": "GPT-4",
-                "provider": "openai",
-                "capabilities": ["text", "code", "analysis"]
-            }
-        ]
-    });
+    // Get all model metadata from the LLM SDK
+    let sdk_models = nocodo_llm_sdk::model_metadata::get_all_models();
+
+    // Convert to SupportedModel format
+    let models: Vec<SupportedModel> = sdk_models
+        .into_iter()
+        .map(|m| SupportedModel {
+            provider: m.provider.to_string(),
+            model_id: m.model_id.to_string(),
+            name: m.name.to_string(),
+            context_length: m.context_length,
+            supports_streaming: m.supports_streaming,
+            supports_tool_calling: m.supports_tool_calling,
+            supports_vision: m.supports_vision,
+            supports_reasoning: m.supports_reasoning,
+            input_cost_per_token: m.input_cost_per_token,
+            output_cost_per_token: m.output_cost_per_token,
+            default_temperature: m.default_temperature,
+            default_max_tokens: m.default_max_tokens,
+        })
+        .collect();
+
+    let response = SupportedModelsResponse { models };
 
     Ok(HttpResponse::Ok().json(response))
 }
