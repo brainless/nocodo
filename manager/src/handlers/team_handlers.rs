@@ -195,7 +195,7 @@ pub async fn get_current_user_teams(
     // Get user ID from request
     let user_id = _req
         .extensions()
-        .get::<crate::models::UserInfo>()
+        .get::<manager_models::UserInfo>()
         .map(|u| u.id)
         .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
 

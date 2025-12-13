@@ -240,14 +240,14 @@ pub async fn login(
         .and_then(|a| a.jwt_secret.as_ref())
         .ok_or_else(|| AppError::Internal("JWT secret not configured".to_string()))?;
 
-    let claims = crate::auth::Claims::new(user.id, "user".to_string(), None);
+    let claims = crate::auth::Claims::new(user.id, user.name.clone(), None);
     let token = crate::auth::generate_token(&claims, jwt_secret)?;
 
     let response = serde_json::json!({
         "token": token,
         "user": {
             "id": user.id,
-            "name": user.name,
+            "username": user.name,
             "email": user.email
         }
     });
