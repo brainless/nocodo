@@ -12,7 +12,7 @@ async fn test_get_projects_empty() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .route("/api/projects", web::get().to(nocodo_manager::handlers::project_handlers::get_projects))
+            .configure(|cfg| configure_routes(cfg, false))
     ).await;
 
     let req = test::TestRequest::get().uri("/api/projects").to_request();
@@ -79,7 +79,7 @@ async fn test_create_project_invalid_name() {
 
     let create_request = CreateProjectRequest {
         name: "   ".to_string(),
-        path: Some("/tmp/test".to_string()),
+        path: Some(test_app.test_config().projects_dir().join("invalid-name-test").to_string_lossy().to_string()),
         description: None,
         parent_id: None,
         template: None,
@@ -205,7 +205,7 @@ async fn test_get_project_by_id() {
     let test_app = TestApp::new().await;
 
     // Create a project first
-    let project = TestDataGenerator::create_project(Some("get-by-id-test"), Some("/tmp/get-by-id"));
+    let project = TestDataGenerator::create_project(Some("get-by-id-test"), Some(&test_app.test_config().projects_dir().join("get-by-id").to_string_lossy().to_string()));
     test_app.db().create_project(&project).unwrap();
 
     let service = test::init_service(
@@ -226,7 +226,7 @@ async fn test_get_project_by_id() {
 
     assert_eq!(retrieved_project["id"], project.id);
     assert_eq!(retrieved_project["name"], "get-by-id-test");
-    assert_eq!(retrieved_project["path"], "/tmp/get-by-id");
+    assert_eq!(retrieved_project["path"], test_app.test_config().projects_dir().join("get-by-id").to_string_lossy().to_string());
 }
 
 #[actix_rt::test]
