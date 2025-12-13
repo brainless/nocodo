@@ -7,7 +7,6 @@ pub mod app;
 pub mod config;
 pub mod database;
 pub mod fixtures;
-pub mod keyword_validation;
 pub mod llm_config;
 pub mod logging;
 pub mod real_manager;

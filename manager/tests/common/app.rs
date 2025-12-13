@@ -10,7 +10,6 @@ use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 
 use super::config::TestConfig;
 use super::database::TestDatabase;
-use super::keyword_validation::LlmTestContext;
 use super::llm_config::LlmProviderTestConfig;
 
 use nocodo_manager::llm_agent::LlmAgent;
@@ -128,84 +127,7 @@ impl TestApp {
         }
     }
 
-    /// Create project from test scenario context
-    pub async fn create_project_from_scenario(
-        &self,
-        context: &LlmTestContext,
-    ) -> anyhow::Result<i64> {
-        use std::fs;
-        use std::process::Command;
-
-        // Ensure projects directory exists
-        self.config.ensure_projects_dir()?;
-
-        // Extract project name from git repo URL
-        let repo_url = &context.git_repo;
-        let project_name = if repo_url.ends_with(".git") {
-            // Remove .git suffix
-            let without_git = &repo_url[..repo_url.len() - 4];
-            // Extract the last part of the path
-            without_git.split('/').next_back().unwrap_or("unknown")
-        } else {
-            // Extract the last part of the path
-            repo_url.split('/').next_back().unwrap_or("unknown")
-        };
-
-        // Create a test project directory in /tmp with dynamic naming
-        let temp_dir = std::env::temp_dir();
-        let project_dir_name = format!("nocodo-test-{}", project_name);
-        let mut project_path = temp_dir.join(&project_dir_name);
-
-        // Remove existing directory if it exists
-        if project_path.exists() {
-            // Try to remove, but don't fail if it doesn't work (might be in use by another process)
-            let _ = fs::remove_dir_all(&project_path);
-            // Wait a bit and try again
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            if project_path.exists() {
-                // If it still exists, use a unique name
-                let timestamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis();
-                let project_dir_name = format!("nocodo-test-{}-{}", project_name, timestamp);
-                project_path = temp_dir.join(&project_dir_name);
-            }
-        }
-
-        // Clone the git repository with depth 1 for faster testing
-        let output = Command::new("git")
-            .args([
-                "clone",
-                "--depth",
-                "1",
-                &context.git_repo,
-                project_path.to_str().unwrap(),
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            return Err(anyhow::anyhow!(
-                "Failed to clone repository: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        // Create a project record in the database
-        let project = nocodo_manager::models::Project {
-            id: 100, // Test ID
-            name: format!("{} Test Project", project_name),
-            path: project_path.to_string_lossy().to_string(),
-            description: None,
-            parent_id: None,
-            created_at: chrono::Utc::now().timestamp(),
-            updated_at: chrono::Utc::now().timestamp(),
-        };
-
-        self.db().create_project(&project)?;
-
-        Ok(project.id)
-    }
+    
 
     /// Get the LLM agent if available
     pub fn llm_agent(&self) -> anyhow::Result<&Arc<LlmAgent>> {

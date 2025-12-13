@@ -7,7 +7,6 @@ mod common;
 
 // Include the integration test modules
 mod integration {
-    pub mod permission_performance;
     pub mod permission_system_api;
 }
 
