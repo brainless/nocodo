@@ -960,25 +960,38 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        let id_param = if project.id == 0 {
-            None
-        } else {
-            Some(project.id)
-        };
+        tracing::debug!("Creating project: name={}, path={}, parent_id={:?}", project.name, project.path, project.parent_id);
 
-        conn.execute(
-            "INSERT INTO projects (id, name, path, description, parent_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
-            params![
-                id_param,
-                project.name,
-                project.path,
-                project.description,
-                project.parent_id,
-                project.created_at,
-                project.updated_at,
-            ],
-        )?;
+        // Only include ID in INSERT if it's not 0 (0 indicates auto-generate)
+        if project.id == 0 {
+            conn.execute(
+                "INSERT INTO projects (name, path, description, parent_id, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?)",
+                params![
+                    project.name,
+                    project.path,
+                    project.description,
+                    project.parent_id,
+                    project.created_at,
+                    project.updated_at,
+                ],
+            )?;
+        } else {
+            tracing::debug!("Inserting project with specific ID: {}", project.id);
+            conn.execute(
+                "INSERT INTO projects (id, name, path, description, parent_id, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                params![
+                    project.id,
+                    project.name,
+                    project.path,
+                    project.description,
+                    project.parent_id,
+                    project.created_at,
+                    project.updated_at,
+                ],
+            )?;
+        }
 
         let project_id = conn.last_insert_rowid();
         tracing::info!("Created project: {} ({})", project.name, project_id);

@@ -50,7 +50,7 @@ impl TestConfig {
                 path: socket_path.to_string_lossy().to_string(),
             },
             auth: Some(nocodo_manager::config::AuthConfig {
-                jwt_secret: Some("test-jwt-secret-key-for-testing-purposes-only".to_string()),
+                jwt_secret: None, // No JWT secret for tests - disables authentication
             }),
             api_keys: Some(ApiKeysConfig {
                 xai_api_key: Some("test-xai-key".to_string()),

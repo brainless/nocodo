@@ -72,6 +72,8 @@ impl TestApp {
         &self.config
     }
 
+  
+
     /// Create a new test application with real LLM integration
     pub async fn new_with_llm(provider: &LlmProviderTestConfig) -> Self {
         let config = TestConfig::new();

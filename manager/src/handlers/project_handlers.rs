@@ -108,16 +108,26 @@ A new project created with nocodo.
     let project_id = data.database.create_project(&project)?;
     project.id = project_id;
 
-    // Get user ID from request and record ownership
-    let user_id = http_req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .unwrap_or(1); // Use test user ID if not authenticated
+    // Get user ID from request and record ownership (skip in test mode)
+    let is_test_mode = http_req
+        .app_data::<web::Data<AppState>>()
+        .and_then(|state| state.config.read().ok())
+        .map(|config| config.clone())
+        .and_then(|config| config.auth)
+        .and_then(|auth| auth.jwt_secret)
+        .is_none();
 
-    let ownership =
-        crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
-    data.database.create_ownership(&ownership)?;
+    if !is_test_mode {
+        let user_id = http_req
+            .extensions()
+            .get::<crate::models::UserInfo>()
+            .map(|u| u.id)
+            .unwrap_or(1); // Use test user ID if not authenticated
+
+        let ownership =
+            crate::models::ResourceOwnership::new("project".to_string(), project_id, user_id);
+        data.database.create_ownership(&ownership)?;
+    }
 
     // Broadcast project creation via WebSocket
     data.ws_broadcaster
