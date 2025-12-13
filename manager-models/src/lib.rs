@@ -1040,7 +1040,7 @@ pub struct User {
     pub name: String,
     pub email: String,
     pub role: Option<String>,
-    #[serde(skip_serializing)] // Never send password hash to client
+    #[serde(skip)] // Never send password hash to client
     pub password_hash: String,
     pub is_active: bool,
     pub created_at: i64,
