@@ -126,6 +126,14 @@ pub async fn check_permission(
     resource_id: Option<i64>,
     action: Action,
 ) -> AppResult<bool> {
+    // 0. Check if user is member of "Super Admins" team (automatic all permissions)
+    let user_teams = db.get_user_teams(user_id)?;
+    for team in &user_teams {
+        if team.name == "Super Admins" {
+            return Ok(true);
+        }
+    }
+
     // 1. Check ownership (automatic read/write/delete)
     if let Some(rid) = resource_id {
         if db.is_owner(user_id, resource_type_to_string(&resource_type), rid)? {

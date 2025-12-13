@@ -297,6 +297,9 @@ pub async fn register(
         return Err(AppError::InvalidRequest("Username already exists".to_string()));
     }
 
+    // Check if this is the first user (for bootstrap logic)
+    let is_first_user = data.database.get_all_users()?.is_empty();
+
     // Hash password
     let password_hash = crate::auth::hash_password(password)?;
 
@@ -325,6 +328,17 @@ pub async fn register(
     let user_id = data.database.create_user(&user)?;
     let mut user = user;
     user.id = user_id;
+
+    // Bootstrap logic: If this is the first user, create "Super Admins" team and add them to it
+    if is_first_user {
+        let super_admin_team = crate::models::Team::new(
+            "Super Admins".to_string(),
+            Some("Team with full system access. Members have all permissions automatically.".to_string()),
+            user_id,
+        );
+        let team_id = data.database.create_team(&super_admin_team)?;
+        data.database.add_team_member(team_id, user_id, Some(user_id))?;
+    }
 
     let response = crate::models::UserResponse { user };
     Ok(HttpResponse::Created().json(response))

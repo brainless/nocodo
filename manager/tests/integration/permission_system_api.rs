@@ -155,7 +155,7 @@ async fn test_complete_team_management_workflow() {
     assert!(resp.status().is_success());
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let teams = body.as_array().unwrap();
+    let teams = body["teams"].as_array().unwrap();
     assert_eq!(teams.len(), 1);
     assert_eq!(teams[0]["name"], "Super Admins");
 
@@ -539,19 +539,20 @@ async fn test_super_admin_permissions() {
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success());
 
-    // Verify Super Admins team has admin permissions on all resource types
+    // Verify Super Admins team was created
     let req = test::TestRequest::get().uri("/api/teams").to_request();
     let resp = test::call_service(&service, req).await;
     assert!(resp.status().is_success());
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let teams = body.as_array().unwrap();
+    let teams = body["teams"].as_array().unwrap();
     assert_eq!(teams.len(), 1);
     assert_eq!(teams[0]["name"], "Super Admins");
 
     let super_admin_team_id = teams[0]["id"].as_i64().unwrap();
 
-    // Check team permissions
+    // Check team permissions - Super Admins should have NO explicit permissions
+    // They get all permissions automatically through the permission check logic
     let req = test::TestRequest::get()
         .uri(&format!("/api/teams/{}/permissions", super_admin_team_id))
         .to_request();
@@ -562,26 +563,9 @@ async fn test_super_admin_permissions() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let permissions = body.as_array().unwrap();
 
-    // Should have admin permissions on all resource types
-    assert_eq!(permissions.len(), 6); // project, work, settings, user, team, ai_session
-
-    let resource_types: std::collections::HashSet<_> = permissions
-        .iter()
-        .map(|p| p["resource_type"].as_str().unwrap())
-        .collect();
-
-    assert!(resource_types.contains("project"));
-    assert!(resource_types.contains("work"));
-    assert!(resource_types.contains("settings"));
-    assert!(resource_types.contains("user"));
-    assert!(resource_types.contains("team"));
-    assert!(resource_types.contains("ai_session"));
-
-    // All should be admin action with null resource_id (entity-level)
-    for permission in permissions {
-        assert_eq!(permission["action"], "admin");
-        assert!(permission["resource_id"].is_null());
-    }
+    // Super Admins team should have NO explicit permissions
+    // Permissions are granted implicitly by the permission check system
+    assert_eq!(permissions.len(), 0);
 }
 
 #[actix_rt::test]
@@ -621,7 +605,8 @@ async fn test_list_all_permissions_admin_only() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let permissions = body.as_array().unwrap();
-    assert_eq!(permissions.len(), 6); // Super admin permissions
+    // Super Admins have no explicit permissions (they get implicit all permissions)
+    assert_eq!(permissions.len(), 0);
 }
 
 #[actix_rt::test]
@@ -746,7 +731,7 @@ async fn test_team_deletion_cascades() {
     assert!(resp.status().is_success());
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let teams = body.as_array().unwrap();
+    let teams = body["teams"].as_array().unwrap();
     assert_eq!(teams.len(), 1); // Only Super Admins remains
 
     // Verify permissions are gone (cascading delete)
@@ -758,5 +743,6 @@ async fn test_team_deletion_cascades() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let permissions = body.as_array().unwrap();
-    assert_eq!(permissions.len(), 6); // Only Super Admin permissions remain
+    // Super Admins have no explicit permissions (implicit all permissions)
+    assert_eq!(permissions.len(), 0);
 }
