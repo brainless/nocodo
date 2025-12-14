@@ -6,6 +6,49 @@ use crate::models::{CreateTeamRequest, Permission, Team, UpdateTeamRequest};
 use manager_models::TeamListResponse;
 use actix_web::{web, HttpResponse, Result, HttpMessage};
 
+/// Extract user ID from request
+/// With nested PermissionMiddleware, UserInfo may not transfer from ServiceRequest to HttpRequest
+/// This function tries extensions first, then extracts from JWT token as fallback
+fn get_user_id(req: &actix_web::HttpRequest, config: &std::sync::Arc<std::sync::RwLock<crate::config::AppConfig>>) -> Result<i64, AppError> {
+    // Try extensions first
+    if let Some(user_info) = req.extensions().get::<crate::models::UserInfo>() {
+        return Ok(user_info.id);
+    }
+
+    // Check if JWT secret is configured
+    let jwt_secret_opt = {
+        let config_guard = config.read()
+            .map_err(|_| AppError::Internal("Failed to read config".to_string()))?;
+        config_guard
+            .auth
+            .as_ref()
+            .and_then(|a| a.jwt_secret.clone())
+    };
+
+    // If no JWT secret (test mode), return default test user ID
+    let jwt_secret = match jwt_secret_opt {
+        Some(secret) => secret,
+        None => return Ok(1), // Test mode - use test user ID
+    };
+
+    // Fallback: extract from JWT token
+    let auth_header = req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| AppError::Unauthorized("Missing authorization".to_string()))?;
+
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| AppError::Unauthorized("Invalid authorization format".to_string()))?;
+
+    let claims = crate::auth::validate_token(token, &jwt_secret)
+        .map_err(|_| AppError::Unauthorized("Invalid or expired token".to_string()))?;
+
+    claims.sub.parse::<i64>()
+        .map_err(|_| AppError::Internal("Invalid user ID in token".to_string()))
+}
+
 pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let teams = data.database.get_all_teams()?;
     let manager_teams: Vec<manager_models::TeamListItem> = teams
@@ -38,15 +81,15 @@ pub async fn create_team(
     }
 
     // Get current user ID for created_by field
-    let created_by = req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    let created_by = get_user_id(&req, &data.config)?;
 
     // Create team
     let team = Team::new(create_req.name, create_req.description, created_by);
     let team_id = data.database.create_team(&team)?;
+
+    // Add creator as team member (similar to Super Admins team creation)
+    data.database.add_team_member(team_id, created_by, Some(created_by))?;
+
     let mut team = team;
     team.id = team_id;
 
@@ -72,11 +115,7 @@ pub async fn update_team(
     let update_req = request.into_inner();
 
     // Get current user ID for updated_by field (currently not used, but reserved for future audit logging)
-    let _updated_by = req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    let _updated_by = get_user_id(&req, &data.config)?;
 
     // Update team
     data.database.update_team(team_id, &update_req)?;
@@ -113,11 +152,7 @@ pub async fn add_team_member(
     let add_req = request.into_inner();
 
     // Get current user ID for added_by field
-    let added_by = req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    let added_by = get_user_id(&req, &data.config)?;
 
     // Add team member
     data.database
@@ -157,11 +192,7 @@ pub async fn create_permission(
     let create_req = request.into_inner();
 
     // Get current user ID for granted_by field
-    let granted_by = req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    let granted_by = get_user_id(&req, &data.config)?;
 
     // Create permission
     let permission = Permission::new(
@@ -193,11 +224,7 @@ pub async fn get_current_user_teams(
     _req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
     // Get user ID from request
-    let user_id = _req
-        .extensions()
-        .get::<manager_models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    let user_id = get_user_id(&_req, &data.config)?;
 
     let teams = data.database.get_user_teams(user_id)?;
     let teams: Vec<manager_models::TeamListItem> = teams

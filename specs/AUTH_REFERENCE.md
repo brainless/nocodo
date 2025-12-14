@@ -46,7 +46,10 @@ POST /api/auth/register
 
 **First user gets:**
 - "Super Admins" team created automatically
-- Admin permissions on all resource types (project, work, settings, user, team)
+- Added as member of "Super Admins" team
+- **IMPORTANT:** Super Admins team has NO explicit permissions in the database
+- Instead, Super Admins members get **implicit all permissions** through automatic grant in permission check logic
+- This means Super Admins can perform ANY action on ANY resource, regardless of permission records
 
 **Later users:**
 - Account created, no default permissions
@@ -123,7 +126,8 @@ User makes API request
   ↓
 Middleware extracts JWT token → validates → attaches UserInfo
   ↓
-Permission middleware checks:
+Permission middleware checks (in order):
+  0. Is user in "Super Admins" team? → GRANT ALL (implicit, automatic)
   1. Is user the owner? (auto read/write/delete)
   2. Team permission on specific resource?
   3. Parent resource permission? (inheritance)
@@ -131,6 +135,8 @@ Permission middleware checks:
   ↓
 Grant (200) or Deny (403)
 ```
+
+**CRITICAL:** Step 0 (Super Admins check) happens BEFORE all other checks. Super Admins members automatically pass ALL permission checks without needing explicit permission records in the database.
 
 **Implementation:**
 - `manager/src/middleware.rs:AuthenticationMiddleware` - JWT validation
@@ -346,6 +352,55 @@ desktop-app/src/
 
 ## Testing Auth Flow
 
+### Testing Super Admins Permissions
+
+**CRITICAL:** Always verify Super Admins team behavior in tests. Super Admins should have implicit all permissions without explicit permission records.
+
+**Required tests:**
+```rust
+// 1. Verify Super Admins team is created for first user
+#[test]
+fn test_first_user_creates_super_admins_team() {
+    // Register first user
+    // Assert "Super Admins" team exists
+    // Assert first user is member of "Super Admins"
+}
+
+// 2. Verify Super Admins have NO explicit permissions
+#[test]
+fn test_super_admins_no_explicit_permissions() {
+    // Register first user → creates Super Admins team
+    // Query permissions table for Super Admins team
+    // Assert: permission count = 0 (implicit, not explicit)
+}
+
+// 3. Verify Super Admins can access ALL endpoints
+#[test]
+fn test_super_admins_implicit_all_permissions() {
+    // Register first user → becomes Super Admin
+    // Test access to endpoints requiring different permissions:
+    //   - GET /api/projects (project:read)
+    //   - POST /api/projects/scan (project:write)
+    //   - GET /api/settings (settings:read)
+    //   - POST /api/settings/projects-path (settings:write)
+    //   - POST /api/teams (team:write)
+    //   - POST /api/permissions (team:admin)
+    // Assert: All requests succeed (200/201)
+}
+```
+
+**Test locations:**
+- `manager/tests/fresh_install_403_test.rs` - First user bootstrap verification
+- `manager/tests/integration/permission_system_api.rs:test_super_admin_permissions()` - Super Admins implicit permissions
+- `manager/tests/integration/scan_endpoint_super_admin.rs` - Super Admins can scan projects
+
+**What to verify:**
+1. ✅ First user registration creates "Super Admins" team
+2. ✅ First user is automatically added as team member
+3. ✅ Super Admins team has ZERO permission records in database
+4. ✅ Super Admins members can access endpoints requiring any permission
+5. ✅ Later users do NOT get Super Admins membership
+
 ### Manual Test (with curl)
 ```bash
 # 1. Register
@@ -379,6 +434,11 @@ curl http://localhost:8081/api/projects \
 ### Permission Check Priority Order
 
 When checking if a user can perform an action on a resource, the system checks in this order:
+
+0. **Super Admins team** - If user is member of "Super Admins" team → **automatic grant of ALL permissions**
+   - This is an implicit check - Super Admins have NO permission records in database
+   - They automatically pass ALL permission checks regardless of resource or action
+   - See: `manager/src/permissions.rs:129-135`
 
 1. **Ownership** - If user owns the resource → grant read/write/delete automatically
 2. **Resource-level permission** - Check permission on specific resource (team_id + resource_id)

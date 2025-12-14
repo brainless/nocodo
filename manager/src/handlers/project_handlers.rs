@@ -431,12 +431,9 @@ pub async fn scan_projects(
     data: web::Data<AppState>,
     _req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, AppError> {
-    // Get user ID from request for authorization
-    let _user_id = _req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    // NOTE: Permission middleware already checked permissions, no need to check UserInfo here
+    // The explicit UserInfo check was causing issues as extensions don't transfer correctly
+    // from ServiceRequest (middleware) to HttpRequest (handler) in some middleware configurations
 
     // Get all projects from database
     let projects = data.database.get_all_projects().map_err(|e| {
