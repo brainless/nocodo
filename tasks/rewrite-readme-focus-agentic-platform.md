@@ -109,7 +109,6 @@ The main selling point is that nocodo is becoming an agentic platform where:
 
 ### Existing Assets to Leverage
 - Current screenshots can be repurposed if they show business value
-- Pricing information can remain but should be framed around business solutions
 - Team collaboration features should be highlighted as business benefits
 
 ### Migration Strategy
@@ -117,6 +116,7 @@ The main selling point is that nocodo is becoming an agentic platform where:
 - Replace technical sections with business-focused equivalents
 - Maintain existing links and navigation where appropriate
 - Keep the call-to-action and website links
+- Remove pricing information to focus on platform value
 
 ## Success Criteria
 

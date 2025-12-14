@@ -146,12 +146,7 @@ nocodo connects to the tools your business already uses:
 4. **Pilot program** with a focused business use case
 5. **Scale across departments** with proven agent templates
 
-## Pricing
-
-### Team Collaboration
-- **Up to 100 members**: $99/year
-- **Unlimited members**: $1,999/year
-- **Demo URL sharing**: Always free
+## Platform Features
 
 ### What's Included
 - **Unlimited Agents**: Create as many agents as your business needs
