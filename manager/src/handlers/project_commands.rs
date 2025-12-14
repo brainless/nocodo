@@ -750,7 +750,7 @@ fn parse_llm_discovery_response(
     let json_str = if let Some(start) = llm_response.find("```json") {
         if let Some(end) = llm_response[start..].find("```") {
             let json_start = start + 7; // Length of "```json"
-            &llm_response[json_start..start + end].trim()
+            llm_response[json_start..start + end].trim()
         } else {
             llm_response
         }

@@ -1,4 +1,4 @@
-use actix_web::{test, web};
+use actix_web::test;
 use nocodo_manager::routes::configure_routes;
 
 use nocodo_manager::models::CreateProjectRequest;
@@ -112,7 +112,7 @@ async fn test_create_project_default_path() {
     let test_app = TestApp::new().await;
 
     let create_request = CreateProjectRequest {
-        name: format!("test-default-path-{}", chrono::Utc::now().timestamp_nanos()),
+        name: format!("test-default-path-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)),
         path: None,
         description: None,
         parent_id: None,
@@ -205,7 +205,7 @@ async fn test_get_project_by_id() {
     let test_app = TestApp::new().await;
 
     // Create a project first
-    let project = TestDataGenerator::create_project(Some("get-by-id-test"), Some(&test_app.test_config().projects_dir().join("get-by-id").to_string_lossy().to_string()));
+    let project = TestDataGenerator::create_project(Some("get-by-id-test"), Some(test_app.test_config().projects_dir().join("get-by-id").to_string_lossy().as_ref()));
     test_app.db().create_project(&project).unwrap();
 
     let service = test::init_service(
@@ -305,50 +305,106 @@ async fn test_get_projects_after_creation() {
 }
 
 #[actix_rt::test]
-async fn test_project_technology_detection() {
-    let test_app = TestApp::new().await;
-
-    let project_temp_dir = test_app.test_config().projects_dir().join("tech-detection-test");
-
-    // Create project directory structure
-    std::fs::create_dir_all(&project_temp_dir).unwrap();
-    std::fs::write(project_temp_dir.join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"").unwrap();
-    std::fs::create_dir_all(project_temp_dir.join("src")).unwrap();
-    std::fs::write(project_temp_dir.join("src").join("main.rs"), "fn main() {}").unwrap();
-
-    let create_request = CreateProjectRequest {
-        name: "tech-detection-test".to_string(),
-        path: Some(project_temp_dir.to_string_lossy().to_string()),
-        description: None,
-        parent_id: None,
-        template: None,
-    };
-
-    let service = test::init_service(
-        actix_web::App::new()
-            .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
-
-    let req = test::TestRequest::post()
-        .uri("/api/projects")
-        .set_json(&create_request)
-        .to_request();
-
-    let resp = test::call_service(&service, req).await;
-    assert!(resp.status().is_success());
-
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    let project = &body["project"];
-
-    assert_eq!(project["name"], "tech-detection-test");
-}
-
-#[actix_rt::test]
 async fn test_project_creation_workflow() {
     let test_app = TestApp::new().await;
 
-    let project_temp_dir = test_app.test_config().projects_dir().join("workflow-test");
+    let service = test::init_service(
+        actix_web::App::new()
+            .app_data(test_app.app_state().clone())
+            .configure(|cfg| configure_routes(cfg, false))
+    ).await;
+
+    // Test 1: Get available templates
+    let templates_req = test::TestRequest::get().uri("/api/templates").to_request();
+    let templates_resp = test::call_service(&service, templates_req).await;
+    assert!(templates_resp.status().is_success());
+
+    let templates: Vec<serde_json::Value> = test::read_body_json(templates_resp).await;
+    assert!(!templates.is_empty());
+
+    // Verify we have our expected templates
+    let template_names: Vec<&str> = templates
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+    assert!(template_names.contains(&"rust-web-api"));
+    assert!(template_names.contains(&"node-web-app"));
+    assert!(template_names.contains(&"static-site"));
+
+    // Test 2: Create a project with a template
+    let project_path = test_app.test_config().projects_dir().join("test-project");
+    let project_req = serde_json::json!({
+        "name": "test-project",
+        "path": project_path.to_str().unwrap(),
+        "template": "static-site"
+    });
+
+    let create_req = test::TestRequest::post()
+        .uri("/api/projects")
+        .set_json(&project_req)
+        .to_request();
+
+    let create_resp = test::call_service(&service, create_req).await;
+    if !create_resp.status().is_success() {
+        let status = create_resp.status();
+        let error_body = test::read_body(create_resp).await;
+        let error_text = std::str::from_utf8(&error_body).unwrap_or("<invalid utf8>");
+        panic!("Project creation failed with status {status}: {error_text}");
+    }
+
+    let project_response: serde_json::Value = test::read_body_json(create_resp).await;
+    let project = &project_response["project"];
+
+    // Verify project was created correctly
+    assert_eq!(project["name"], "test-project");
+
+    // Verify project files were created
+    assert!(project_path.join("index.html").exists());
+    assert!(project_path.join("styles.css").exists());
+    assert!(project_path.join("script.js").exists());
+    assert!(project_path.join("README.md").exists());
+    assert!(project_path.join(".gitignore").exists());
+
+    // Verify Git repository was initialized
+    assert!(project_path.join(".git").exists());
+
+    // Test 3: Create a project without template
+    let basic_project_path = test_app.test_config().projects_dir().join("basic-project");
+    let basic_project_req = serde_json::json!({
+        "name": "basic-project",
+        "path": basic_project_path.to_str().unwrap()
+    });
+
+    let basic_req = test::TestRequest::post()
+        .uri("/api/projects")
+        .set_json(&basic_project_req)
+        .to_request();
+
+    let basic_resp = test::call_service(&service, basic_req).await;
+    assert!(basic_resp.status().is_success());
+
+    let basic_project_response: serde_json::Value = test::read_body_json(basic_resp).await;
+    let basic_project = &basic_project_response["project"];
+
+    // Verify basic project was created
+    assert_eq!(basic_project["name"], "basic-project");
+
+    // Verify basic files were created
+    assert!(basic_project_path.join("README.md").exists());
+    assert!(basic_project_path.join(".git").exists());
+
+    // Test 4: Verify projects are stored in database
+    let stored_projects = test_app.db().get_all_projects().unwrap();
+    assert_eq!(stored_projects.len(), 2);
+
+    let project_names: Vec<&str> = stored_projects.iter().map(|p| p.name.as_str()).collect();
+    assert!(project_names.contains(&"test-project"));
+    assert!(project_names.contains(&"basic-project"));
+}
+
+#[actix_rt::test]
+async fn test_create_project_unknown_template() {
+    let test_app = TestApp::new().await;
 
     let service = test::init_service(
         actix_web::App::new()
@@ -356,39 +412,17 @@ async fn test_project_creation_workflow() {
             .configure(|cfg| configure_routes(cfg, false))
     ).await;
 
-    // 1. Create project
-    let create_request = CreateProjectRequest {
-        name: "workflow-test".to_string(),
-        path: Some(project_temp_dir.to_string_lossy().to_string()),
-        description: None,
-        parent_id: None,
-        template: Some("rust-web-api".to_string()),
-    };
+    let unknown_template_req = serde_json::json!({
+        "name": "test-project",
+        "path": test_app.test_config().projects_dir().join("test2").to_str().unwrap(),
+        "template": "unknown-template"
+    });
 
-    let create_req = test::TestRequest::post()
+    let req = test::TestRequest::post()
         .uri("/api/projects")
-        .set_json(&create_request)
+        .set_json(&unknown_template_req)
         .to_request();
 
-    let create_resp = test::call_service(&service, create_req).await;
-    assert!(create_resp.status().is_success());
-
-    let create_body: serde_json::Value = test::read_body_json(create_resp).await;
-    let project_id = create_body["project"]["id"].as_i64().unwrap();
-
-    // 2. Get project by ID
-    let get_uri = format!("/api/projects/{}", project_id);
-    let get_req = test::TestRequest::get().uri(&get_uri).to_request();
-    let get_resp = test::call_service(&service, get_req).await;
-    assert!(get_resp.status().is_success());
-
-    // 3. List all projects
-    let list_req = test::TestRequest::get().uri("/api/projects").to_request();
-    let list_resp = test::call_service(&service, list_req).await;
-    assert!(list_resp.status().is_success());
-
-    let list_body: serde_json::Value = test::read_body_json(list_resp).await;
-    let projects = list_body["projects"].as_array().unwrap();
-    assert_eq!(projects.len(), 1);
-    assert_eq!(projects[0]["id"], project_id);
+    let resp = test::call_service(&service, req).await;
+    assert!(!resp.status().is_success());
 }

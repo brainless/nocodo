@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub async fn read_file(
-    base_path: &PathBuf,
+    base_path: &Path,
     max_file_size: u64,
     request: ReadFileRequest,
 ) -> Result<ToolResponse> {
@@ -63,7 +63,7 @@ pub async fn read_file(
 }
 
 /// Validate and resolve a path relative to the base path
-fn validate_and_resolve_path(base_path: &PathBuf, path: &str) -> Result<PathBuf> {
+fn validate_and_resolve_path(base_path: &Path, path: &str) -> Result<PathBuf> {
     let input_path = Path::new(path);
 
     // Normalize the input path to handle . and .. components
@@ -79,7 +79,7 @@ fn validate_and_resolve_path(base_path: &PathBuf, path: &str) -> Result<PathBuf>
 
         let canonical_base = match base_path.canonicalize() {
             Ok(path) => path,
-            Err(_) => base_path.clone(),
+            Err(_) => base_path.to_path_buf(),
         };
 
         // Security check: ensure the path is within or equals the base directory
@@ -97,7 +97,7 @@ fn validate_and_resolve_path(base_path: &PathBuf, path: &str) -> Result<PathBuf>
 
     // Handle relative paths
     let target_path = if normalized_input == Path::new(".") {
-        base_path.clone()
+        base_path.to_path_buf()
     } else {
         base_path.join(&normalized_input)
     };
@@ -128,7 +128,7 @@ fn validate_and_resolve_path(base_path: &PathBuf, path: &str) -> Result<PathBuf>
     // Also canonicalize the base path for comparison (handles symlinks on macOS)
     let canonical_base = match base_path.canonicalize() {
         Ok(path) => path,
-        Err(_) => base_path.clone(), // Fallback to non-canonical base path
+        Err(_) => base_path.to_path_buf(), // Fallback to non-canonical base path
     };
 
     // Security check: ensure the path is within the base directory

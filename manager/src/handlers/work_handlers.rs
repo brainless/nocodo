@@ -133,8 +133,7 @@ pub async fn create_work(
         let project = data.database.get_project_by_id(project_id)?;
         // Use work's working_directory if available, otherwise fall back to project.path
         let working_path = work.working_directory
-            .as_ref()
-            .map(|wd| wd.as_str())
+            .as_deref()
             .unwrap_or(&project.path);
         Some(format!("Project: {}\nPath: {}", project.name, working_path))
     } else {
@@ -300,8 +299,7 @@ pub async fn add_message_to_work(
             let project = data.database.get_project_by_id(project_id)?;
             // Use work's working_directory if available, otherwise fall back to project.path
             let working_path = work.working_directory
-                .as_ref()
-                .map(|wd| wd.as_str())
+                .as_deref()
                 .unwrap_or(&project.path);
             Some(format!("Project: {}\nPath: {}", project.name, working_path))
         } else {
