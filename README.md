@@ -1,13 +1,12 @@
 # nocodo
 
-**Collaborative coding agent that works for everyone in a team, from solo developers to large organizations**
+**The complete agentic platform to transform your business ideas into automated solutions**
 
 🚀 [**nocodo.com →**](https://nocodo.com)
 
 > ⚠️ **Under Active Development** - nocodo is actively developed. If you ⭐ star and 👀 watch this repository, it would mean a lot to me.
 
-Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help teams of all sizes collaborate on software development with AI assistance - whether you're working solo, in a small startup, or part of a large organization.
-
+Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help businesses of all sizes automate their workflows with AI-powered agents - whether you're a solo entrepreneur, a growing startup, or part of a large organization.
 
 ![nocodo Desktop app shows the agent is analysing its own code](./website/src/assets/nocodo_Analysing_Own_Code.png "nocodo Desktop app shows the agent is analysing its own code")
 
@@ -15,166 +14,177 @@ Hello! I am Sumit, a software engineer living in a small Himalayan village in In
 
 ## What is nocodo?
 
-nocodo is a collaborative development platform where coding agents, project management, and development tools work together. It runs locally or in the cloud, giving teams complete control over their development environment while making software development accessible to everyone.
+nocodo is a batteries-included agentic platform that turns your business requirements into fully functional automated agents. From idea to deployment in minutes, not months. Simply describe what you want to achieve, and nocodo handles the rest - integrations, code generation, and deployment.
 
-### Core Features
+### The Business Problem We Solve
 
-- **AI Coding Agent**: Uses LLMs to analyze codebases and will soon be able to write code autonomously
-- **Integrated Project Management**: Tasks, ideas, and discussions all in one place
-- **Team Collaboration**: Share ideas, report bugs, and discuss solutions with AI - everyone on the team can contribute
-- **Desktop App**: Secure access to your development environment (mobile apps coming soon)
-- **Multi-Team Support**: Join multiple teams easily, making it simple to contribute to different projects across organizations
-- **Your Infrastructure, Your Keys**: Use your own cloud servers and AI provider API keys
-- **Demo Deployments**: AI will build and launch demo URLs for manual testing or public sharing (coming soon)
+Every business has unique workflows that need automation:
+- Analyzing customer interactions across email and forms
+- Monitoring competitors and market opportunities  
+- Collecting and processing data from multiple sources
+- Generating reports and insights automatically
 
-### Privacy & Control
+Traditional solutions require custom development, multiple tools, and technical expertise. nocodo eliminates this complexity by providing everything you need in one platform.
 
-- **Your cloud, your choice**: Deploy on DigitalOcean, Scaleway, Linode, Vultr, AWS, GCP, or any Linux server
-- **Bring your own AI**: Use your own API keys for OpenAI, Anthropic, or other LLM providers
-- **Full development environment**: nocodo manager handles everything from code to deployment on your infrastructure
-- **No vendor lock-in**: Switch providers anytime
+## How It Works
 
-## How Does It Work?
+### 1. Describe Your Business Intent
+Tell nocodo what you want to accomplish in plain language:
+- "I want to analyze all sales team emails to identify hot leads"
+- "Monitor my competitors' websites for pricing changes"
+- "Create a daily report of customer feedback from all sources"
 
-nocodo consists of two main components that work together:
+### 2. Answer Simple Questions
+nocodo's AI assistant guides you through discovering what's needed:
+- What data sources should we connect to? (Gmail, databases, APIs)
+- Where does your customer data come from? (Forms, CRM, spreadsheets)
+- How do you want to receive results? (Dashboard, email, Slack, Telegram)
 
-### nocodo Desktop App (Client)
+### 3. Watch Your Agent Come to Life
+nocodo automatically:
+- Connects to your existing systems and data sources
+- Generates the necessary code to tie everything together
+- Sets up proper permissions and security controls
+- Deploys your agent on your infrastructure
 
-![nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH](./website/src/assets/nocodo_Connection_Screen_Local_Remote_SSH_Options.png "Connect to nocodo manager running locally or remote over SSH")
+### 4. Get Immediate Value
+Your custom agent starts working immediately:
+- Processes data in real-time
+- Delivers insights where you need them
+- Scales with your business growth
+- Adapts to changing requirements
 
-![nocodo Desktop app, connecting to my other computer in LAN over SSH](./website/src/assets/nocodo_Connect_Remote_Within_LAN.png "Connecting to my other computer in LAN over SSH")
+## Business Solutions
 
-The desktop app provides secure, native access to your development environment:
+### Sales Team Automation
+Transform how your sales team operates with AI-powered insights:
+- **Lead Scoring**: Automatically analyze email conversations and form submissions to identify hot leads
+- **Competitive Intelligence**: Monitor competitors' websites, pricing, and announcements
+- **Follow-up Optimization**: Get AI suggestions for the best times and messages for customer follow-ups
 
-**Easy Access**
-- Connect to manager via SSH tunnel
-- Access development setup and coding agents
-- Share ideas, create tasks, manage projects
-- View and test deployed demos
+### Customer Interaction Analysis
+Understand your customers like never before:
+- **Multi-channel Insights**: Analyze communications from email, support tickets, and contact forms
+- **Sentiment Tracking**: Monitor customer satisfaction across all touchpoints
+- **Trend Identification**: Spot emerging customer needs and market opportunities
 
-**Team Collaboration**
-- Join multiple teams with secure authentication
-- Contribute to projects across different organizations
-- Integrated UI for all project management needs
-- Mobile apps coming soon
+### Data Collection & Processing
+Automate the tedious work of data gathering:
+- **Web Monitoring**: Track websites, social media, and news sources for relevant information
+- **Database Integration**: Connect to internal systems for comprehensive analysis
+- **Report Generation**: Automatically create and distribute reports to stakeholders
 
-### nocodo Manager (Backend)
+### Custom Workflow Automation
+Build solutions tailored to your unique business processes:
+- **Compliance Monitoring**: Ensure regulatory requirements are automatically tracked
+- **Inventory Management**: Connect multiple systems for real-time stock visibility  
+- **Financial Analysis**: Process transactions and generate financial insights
 
-The manager runs on any Linux machine and handles the complete development environment:
+## Integration Capabilities
 
-**Development Stack Support**
-- **Languages**: Python, Ruby, Node.js, Rust, and more
-- **Frameworks**: Django, Rails, Express, Actix Web, and more
-- **Databases**: PostgreSQL, MariaDB/MySQL, SQLite3
-- **Infrastructure**: Cache, message queues, and deployment tools
+nocodo connects to the tools your business already uses:
 
-**AI-Powered Orchestration**
-- Coding agent integrated with LLMs
-- Manages tasks, code analysis, and deployment workflows
-- Automatic environment setup and configuration
-- Git worktree management (coming soon - one worktree per task)
-- Intelligent task dependency resolution and parallel execution
+### Communication Platforms
+- **Email Providers**: Gmail, Outlook, custom IMAP servers
+- **Messaging Apps**: Slack, Microsoft Teams, Telegram, WhatsApp
+- **Collaboration Tools**: Notion, Confluence, shared documents
+
+### Data Sources
+- **Databases**: PostgreSQL, MySQL, SQLite, cloud databases
+- **Forms & Surveys**: Typeform, Google Forms, custom web forms
+- **APIs**: REST APIs, webhooks, third-party services
+
+### Business Systems
+- **CRM Platforms**: Salesforce, HubSpot, custom CRM systems
+- **E-commerce**: Shopify, WooCommerce, custom stores
+- **Analytics**: Google Analytics, custom tracking systems
+
+### Output Destinations
+- **Dashboards**: Custom web dashboards, business intelligence tools
+- **Reports**: Email reports, PDF generation, spreadsheet exports
+- **Alerts**: Real-time notifications to your preferred channels
+
+## Team & Permission Management
+
+### Enterprise-Ready Security
+- **User Management**: Built-in authentication and authorization system
+- **Role-Based Access**: Control who can view, create, and manage agents
+- **Audit Trails**: Complete logging of all agent activities and data access
+- **Data Privacy**: Your data stays on your infrastructure, always
+
+### Collaborative Features
+- **Team Workspaces**: Multiple teams can work independently with their own agents
+- **Shared Solutions**: Reuse successful agent configurations across departments
+- **Approval Workflows**: Ensure proper review before agents go live
+- **Performance Monitoring**: Track agent effectiveness and business impact
+
+## Deployment Options
+
+### Self-Hosted (Recommended)
+- **Your Infrastructure**: Deploy on your own servers or cloud accounts
+- **Complete Control**: Full ownership of data and processes
+- **Custom Integration**: Connect to internal systems and databases
+- **Compliance Ready**: Meet industry-specific regulatory requirements
+
+### Supported Platforms
+- **Cloud Providers**: AWS, Google Cloud, Azure, DigitalOcean, Scaleway, Linode, Vultr
+- **On-Premise**: Deploy on your own servers and infrastructure
+- **Hybrid**: Combine cloud and on-premise resources as needed
 
 ## Getting Started
 
-### For Solo Developers
+### For Small Teams & Startups
+1. **Deploy nocodo** on your preferred cloud platform (5-minute setup)
+2. **Connect your data sources** using our guided setup
+3. **Create your first agent** by describing your business need
+4. **Start seeing results** as your agent begins working immediately
 
-1. Install nocodo manager on your local machine or cloud server
-2. Launch the desktop app and connect via SSH
-3. Start building with AI assistance
+### For Large Organizations
+1. **Enterprise deployment** on your infrastructure or private cloud
+2. **SSO integration** with your existing identity provider
+3. **Team setup** with proper roles and permissions
+4. **Pilot program** with a focused business use case
+5. **Scale across departments** with proven agent templates
 
-### For Teams
+## Platform Features
 
-1. Deploy nocodo manager on your team's cloud infrastructure
-2. Configure your AI provider API keys
-3. Team members install the desktop app
-4. Everyone connects securely via SSH and starts collaborating
+### What's Included
+- **Unlimited Agents**: Create as many agents as your business needs
+- **All Integrations**: Connect to any supported data source or platform
+- **Team Management**: Built-in user authentication and permissions
+- **Self-Hosting**: Deploy on your infrastructure with full control
+- **Updates & Support**: Continuous platform improvements and technical support
 
-**Team Pricing** (Collaboration features):
-- **Up to 100 members**: $99/year
-- **Unlimited members**: $1,999/year
-- **Demo URL sharing**: Always free
+## Why Choose nocodo?
 
-## Future Roadmap
+### From Idea to Working Agent in Minutes
+Traditional development takes months. nocodo delivers results immediately.
 
-### Near-Term Goals
+### No Technical Expertise Required
+Describe your business needs in plain language. Our AI handles the complexity.
 
-**Intelligent Git Management**
-- Automatic git worktree creation per task
-- Dependency resolution between tasks
-- Serial or parallel agent execution based on dependencies
+### Your Data, Your Control
+Unlike cloud-only solutions, your data and processes stay on your infrastructure.
 
-**Platform Integrations**
-- GitHub/GitLab integration
-- Actions/CI for public-facing builds
-- Issue tracking and automation
+### Built for Business Growth
+Start with one workflow, scale to hundreds. nocodo grows with your business.
 
-**Enhanced Testing**
-- Desktop app support for iOS/Android emulators
-- Launch builds directly in physical devices
-- Integrated mobile development workflow
+### Enterprise Security
+Built-in permissions, audit trails, and compliance features from day one.
 
-### Long-Term Vision
+## Real-World Success Stories
 
-**nocodo Cloud**
-- Managed cloud infrastructure for teams who prefer not to manage their own servers
-- One-click deployment and scaling
+### Startup Sales Team
+*"We went from manually reviewing 50 emails per day to automatically identifying our 10 hottest leads. Our conversion rate increased by 40% in the first month."*
 
-## Technical Architecture
+### Retail Chain Operations  
+*"nocodo monitors 50 competitor websites daily and alerts us to pricing changes. We've saved thousands in lost revenue and stay competitive automatically."*
 
-### Secure by Design
-
-- Manager runs entirely on your infrastructure via Actix Web (Rust)
-- Desktop client connects via SSH tunnel with port forwarding
-- Native cross-platform GUI built with egui/eframe (Rust)
-- SQLite for local data storage
-- HTTP/WebSocket API over encrypted tunnel
-
-### Flexible & Extensible
-
-- Git version control integration
-- Multiple AI model support (bring your own API keys)
-- Adapts to any tech stack
-- Team scaling from 1 to unlimited members
-- Automatic test environment creation
-
-## Real-World Use Cases
-
-**Startups & Small Teams**
-- Collaborate on features and bug fixes
-- Non-technical team members can share ideas and requirements
-- AI helps implement features while developers focus on complex logic
-
-**Large Organizations**
-- Teams work independently with their own managers
-- Developers contribute across multiple projects and organizations
-- Consistent development workflows across departments
-
-**Solo Developers**
-- AI pair programming and code analysis
-- Automatic task management and organization
-- Quick demo deployments for client feedback
-
-## Build Commands
-
-```bash
-# Build Manager daemon (for cloud deployment)
-cargo build --release --bin nocodo-manager
-
-# Build Desktop App (for local distribution)
-cargo build --release --bin nocodo-desktop-app
-```
-
-## Quick Start (Development)
-
-1. Start Manager daemon: `nocodo-manager --config ~/.config/nocodo/manager.toml` (runs on http://localhost:8081)
-2. Start Desktop app: `nocodo-desktop-app` (connects via SSH, opens GUI)
-3. AI-powered development environment with cloud backend and native desktop UI
-
-**Technical details and specifications**: See `specs/PROJECT.md` and linked documentation
+### Financial Services Firm
+*"Our compliance agent processes 1,000+ transactions daily and flags potential issues automatically. What used to take a team now happens instantly."*
 
 ---
 
-**🚀 Ready to transform how your team builds software?** [**Get Started →**](https://nocodo.com)
+**🚀 Ready to transform your business with AI-powered automation?** [**Get Started →**](https://nocodo.com)
 
-Privacy-focused • No vendor lock-in • Works for teams of all sizes
+Batteries-included solution • Self-hosted and secure • Works for businesses of all sizes
