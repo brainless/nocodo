@@ -12,11 +12,14 @@ async fn test_super_admin_can_scan_projects() {
     // Create a test app with REAL authentication (jwt_secret set)
     let test_app = TestApp::new().await;
 
-    // Configure JWT secret for authentication
+    // Configure JWT secret for authentication and projects path
     {
         let mut config = test_app.app_state.config.write().unwrap();
         config.auth = Some(nocodo_manager::config::AuthConfig {
             jwt_secret: Some("test_jwt_secret_for_scan_test".to_string()),
+        });
+        config.projects = Some(nocodo_manager::config::ProjectsConfig {
+            default_path: Some(test_app.config.temp_dir.path().to_string_lossy().to_string()),
         });
     }
 

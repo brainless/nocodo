@@ -16,5 +16,7 @@ pub mod socket;
 pub mod templates;
 pub mod websocket;
 
+pub mod helpers;
+
 #[cfg(test)]
 mod tests;

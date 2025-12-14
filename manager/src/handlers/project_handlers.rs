@@ -1,6 +1,7 @@
 use super::main_handlers::AppState;
 use crate::database::Database;
 use crate::error::AppError;
+use crate::helpers::project;
 use crate::models::{
     AddExistingProjectRequest, CreateProjectRequest, Project, ProjectListResponse, ProjectResponse,
 };
@@ -435,26 +436,56 @@ pub async fn scan_projects(
     // The explicit UserInfo check was causing issues as extensions don't transfer correctly
     // from ServiceRequest (middleware) to HttpRequest (handler) in some middleware configurations
 
-    // Get all projects from database
-    let projects = data.database.get_all_projects().map_err(|e| {
-        eprintln!("get_all_projects error: {}", e);
-        e
+    // Get the configured projects path
+    let scan_path = {
+        let config = data.config.read().map_err(|e| {
+            AppError::Internal(format!("Failed to acquire config read lock: {}", e))
+        })?;
+        
+        config.projects
+            .as_ref()
+            .and_then(|p| p.default_path.as_ref())
+            .ok_or_else(|| {
+                AppError::InvalidRequest("No projects default path configured".to_string())
+            })?
+            .clone()
+    };
+
+    // Expand ~ to home directory if present
+    let expanded_path = if scan_path.starts_with("~/") {
+        if let Some(home) = home::home_dir() {
+            scan_path.replacen('~', &home.to_string_lossy(), 1)
+        } else {
+            scan_path
+        }
+    } else {
+        scan_path
+    };
+
+    let scan_path = std::path::Path::new(&expanded_path);
+
+    // Use the project scanner to discover projects
+    let discovered_projects = project::scan_filesystem_for_projects(
+        scan_path,
+        &data.database,
+    )
+    .await
+    .map_err(|e| {
+        AppError::Internal(format!("Failed to scan projects: {}", e))
     })?;
 
-    // Scan each project for components
-    let mut scan_results = Vec::new();
-
-    for project in &projects {
-        // For now, just return basic project info since WorkflowService needs DB connection
-        let scan_result = serde_json::json!({
-            "project_id": project.id,
-            "project_name": project.name,
-            "project_path": project.path,
-            "status": "scanned"
-        });
-
-        scan_results.push(scan_result);
-    }
+    // Convert discovered projects to JSON response
+    let scan_results: Vec<serde_json::Value> = discovered_projects
+        .into_iter()
+        .map(|project| {
+            serde_json::json!({
+                "project_name": project.name,
+                "project_path": project.path,
+                "project_type": project.project_type,
+                "status": project.status
+            })
+        })
+        .collect();
 
     let response = serde_json::json!({
         "results": scan_results

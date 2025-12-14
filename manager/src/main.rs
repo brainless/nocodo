@@ -5,6 +5,7 @@ mod database;
 mod error;
 mod git;
 mod handlers;
+mod helpers;
 mod llm_agent;
 mod llm_client;
 mod middleware;
