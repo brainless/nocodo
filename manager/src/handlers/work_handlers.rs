@@ -4,7 +4,7 @@ use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     AddMessageRequest, CreateWorkRequest, WorkListResponse, WorkResponse,
 };
-use manager_models::GitBranch;
+
 use nocodo_github_actions::{ExecuteCommandRequest, ScanWorkflowsRequest};
 use actix_web::{web, HttpResponse, Result, HttpMessage};
 use std::time::SystemTime;
@@ -510,21 +510,19 @@ pub async fn get_command_executions(
 }
 
 pub async fn list_worktree_branches(
-    _data: web::Data<AppState>,
-    request: web::Json<ExecuteCommandRequest>,
-    _req: actix_web::HttpRequest,
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
 ) -> Result<HttpResponse, AppError> {
-    let _command_request = request.into_inner();
+    let project_id = path.into_inner();
 
-    // Get user ID from request for authorization
-    let _user_id = _req
-        .extensions()
-        .get::<crate::models::UserInfo>()
-        .map(|u| u.id)
-        .ok_or_else(|| AppError::Unauthorized("User not authenticated".to_string()))?;
+    // Get project from database
+    let project = data.database.get_project_by_id(project_id)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    // For now, return empty branches since WorkflowService needs DB connection
-    let git_branches: Vec<GitBranch> = vec![];
+    // List branches using the helper function
+    let project_path = std::path::Path::new(&project.path);
+    let git_branches = crate::helpers::git_operations::list_project_branches(project_path)?;
+
     let response = crate::models::GitBranchListResponse { branches: git_branches };
 
     Ok(HttpResponse::Ok().json(response))
