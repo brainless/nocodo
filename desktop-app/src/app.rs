@@ -7,6 +7,7 @@ use crate::services::{ApiService, BackgroundTasks};
 use crate::state::ui_state::Page as UiPage;
 use crate::state::{AppState, Server};
 use eframe;
+
 use rusqlite::Connection;
 use std::sync::Arc;
 
@@ -283,12 +284,19 @@ impl DesktopApp {
             std::sync::Arc::new(egui::FontData::from_static(INTER_MEDIUM)),
         );
 
+        // Add Material Icons font data to font definitions
+        fonts.font_data.insert(
+            "MaterialIcons".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_static(egui_material_icons::FONT_DATA)),
+        );
+
         // Create custom font family for light UI widgets (labels, navigation, status)
         // Add emoji support by including default emoji font as fallback
         fonts.families.insert(
             egui::FontFamily::Name("ui_light".into()),
             vec![
                 "ubuntu_light".to_owned(),
+                "MaterialIcons".to_owned(), // Add Material Icons for icon support
                 "NotoEmoji-Regular".to_owned(), // Fallback for emojis
             ],
         );
@@ -299,6 +307,7 @@ impl DesktopApp {
             egui::FontFamily::Name("ui_semibold".into()),
             vec![
                 "ubuntu_semibold".to_owned(),
+                "MaterialIcons".to_owned(), // Add Material Icons for icon support
                 "NotoEmoji-Regular".to_owned(), // Fallback for emojis
             ],
         );
@@ -311,6 +320,12 @@ impl DesktopApp {
             .entry(egui::FontFamily::Proportional)
             .or_default()
             .insert(0, "inter_regular".to_owned());
+        // Add Material Icons to Proportional family
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .push("MaterialIcons".to_owned());
         // Ensure emoji font is present (should be there by default)
         fonts
             .families
@@ -334,6 +349,9 @@ impl DesktopApp {
 
         // Apply fonts to the context
         ctx.set_fonts(fonts);
+        
+        // Initialize material icons AFTER setting fonts
+        egui_material_icons::initialize(ctx);
     }
 
     fn navigate_to(&mut self, page: UiPage) {

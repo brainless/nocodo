@@ -2330,6 +2330,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_flex"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "849265cb6869179fc14abab0a725afbeee36006397f8cbfd3c42b0b7a08eba2b"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui_glow"
 version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2344,6 +2353,15 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "winit",
+]
+
+[[package]]
+name = "egui_material_icons"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ff7d3715b5ee29fe75afd19420756b3e0a970149b62712af1b3204a68e2012b"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
@@ -4509,6 +4527,8 @@ dependencies = [
  "eframe",
  "egui",
  "egui_extras",
+ "egui_flex",
+ "egui_material_icons",
  "manager-models",
  "rand 0.8.5",
  "reqwest 0.12.24",
