@@ -43,6 +43,11 @@ impl BackgroundTasks {
         self.check_login_result(state);
         self.check_current_user_teams_result(state);
         self.check_add_ssh_key_result(state);
+        self.check_command_discovery_result(state);
+        self.check_project_detail_saved_commands_result(state);
+        self.check_create_commands_result(state);
+        self.check_execute_command_result(state);
+        self.check_command_executions_result(state);
     }
 
     fn check_connection_state(&self, state: &mut AppState) {
@@ -682,6 +687,95 @@ impl BackgroundTasks {
                 }
                 Err(e) => {
                     state.ssh_key_message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_command_discovery_result(&self, state: &mut AppState) {
+        let mut result = state.command_discovery_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_command_discovery = false;
+            match res {
+                Ok(discovery_response) => {
+                    state.ui_state.project_detail_command_discovery_results = Some(discovery_response);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to discover commands: {}", e);
+                    state.ui_state.connection_error = Some(format!("Failed to discover commands: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_project_detail_saved_commands_result(&self, state: &mut AppState) {
+        let mut result = state.project_detail_saved_commands_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_project_detail_commands = false;
+            match res {
+                Ok(commands) => {
+                    state.project_detail_saved_commands = commands;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to load project detail saved commands: {}", e);
+                    state.ui_state.connection_error = Some(format!("Failed to load project detail saved commands: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_create_commands_result(&self, state: &mut AppState) {
+        let res_opt = {
+            let mut result = state.create_commands_result.lock().unwrap();
+            result.take()
+        };
+        
+        if let Some(res) = res_opt {
+            match res {
+                Ok(_commands) => {
+                    // Refresh saved commands and command executions
+                    if let Some(project_id) = state.project_detail_worktree_branches_project_id {
+                        self.api_service.list_project_commands(project_id, state);
+                        // Note: get_command_executions requires a specific command_id, so we can't refresh all executions here
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create commands: {}", e);
+                    state.ui_state.connection_error = Some(format!("Failed to create commands: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_execute_command_result(&self, state: &mut AppState) {
+        let mut result = state.execute_command_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.executing_command_id = None;
+            match res {
+                Ok(_execution_result) => {
+                    // Note: get_command_executions requires a specific command_id, 
+                    // so we can't refresh all executions here without knowing which command was executed
+                    // The UI will need to handle refreshing executions for the specific command
+                }
+                Err(e) => {
+                    tracing::error!("Failed to execute command: {}", e);
+                    state.ui_state.connection_error = Some(format!("Failed to execute command: {}", e));
+                }
+            }
+        }
+    }
+
+    fn check_command_executions_result(&self, state: &mut AppState) {
+        let mut result = state.command_executions_result.lock().unwrap();
+        if let Some(res) = result.take() {
+            state.loading_command_executions = false;
+            match res {
+                Ok(executions) => {
+                    state.ui_state.project_detail_command_executions = executions;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to load command executions: {}", e);
+                    state.ui_state.connection_error = Some(format!("Failed to load command executions: {}", e));
                 }
             }
         }
