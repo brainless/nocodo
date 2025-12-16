@@ -1,6 +1,6 @@
 use nocodo_llm_sdk::{
     claude::client::ClaudeClient,
-    glm::{cerebras::CerebrasGlmClient, zen::ZenGlmClient},
+    glm::{zen::ZenGlmClient, zai::ZaiGlmClient},
     grok::zen::ZenGrokClient,
 };
 
@@ -25,14 +25,18 @@ async fn get_zai_glm_response(system_prompt: &str, user_prompt: &str) -> Result<
     let api_key = std::env::var("ZAI_API_KEY")
         .map_err(|_| "ZAI_API_KEY must be set for zai_glm provider".to_string())?;
 
-    // Use CerebrasGlmClient as it uses the same API format
-    // z.ai uses the same API endpoint as Cerebras
-    let client = CerebrasGlmClient::new(api_key)
+    // Check if coding plan is enabled
+    let has_coding_plan = std::env::var("ZAI_CODING_PLAN")
+        .unwrap_or_else(|_| "false".to_string())
+        .parse::<bool>()
+        .unwrap_or(false);
+
+    let client = ZaiGlmClient::with_coding_plan(api_key, has_coding_plan)
         .map_err(|e| format!("Failed to create z.ai GLM client: {}", e))?;
 
     let response = client
         .message_builder()
-        .model("zai-glm-4.6")
+        .model("glm-4.6")
         .max_tokens(2000)
         .system_message(system_prompt)
         .user_message(user_prompt)

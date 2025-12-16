@@ -27,6 +27,7 @@ fn main() {
         ("gpt_integration", "OPENAI_API_KEY"),
         ("grok_integration", "XAI_API_KEY"),
         ("glm_integration", "CEREBRAS_API_KEY"),
+        ("zai_integration", "ZAI_API_KEY"),
         ("zen_grok_integration", ""),
         ("zen_glm_integration", ""),
         ("tool_calling_integration", ""), // Runs for all available providers
