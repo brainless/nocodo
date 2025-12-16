@@ -1,6 +1,8 @@
 use crate::state::AppState;
 use crate::state::ConnectionState;
-use egui::Context;
+use egui::{Context, Vec2};
+use egui_flex::{item, Flex, FlexAlignContent};
+use egui_material_icons::icons;
 
 pub struct StatusBar;
 
@@ -19,32 +21,65 @@ impl Default for StatusBar {
 impl StatusBar {
     pub fn ui(&mut self, ctx: &Context, state: &AppState) {
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                match &state.connection_state {
-                    ConnectionState::Disconnected => {
-                        ui.colored_label(egui::Color32::RED, "● Disconnected");
+            ui.style_mut().spacing.item_spacing = egui::vec2(12.0, 0.0);
+            
+            Flex::horizontal()
+                .gap(Vec2::new(12.0, 0.0))
+                .align_content(FlexAlignContent::Center)
+                .show(ui, |flex| {
+                    // Connection status section
+                    match &state.connection_state {
+                        ConnectionState::Disconnected => {
+                            flex.add(item(), egui::Label::new(
+                                egui::RichText::new(format!("{} Disconnected", icons::ICON_WIFI_OFF))
+                                    .color(egui::Color32::RED)
+                            ));
+                        }
+                        ConnectionState::Connecting => {
+                            flex.add(item(), egui::Label::new(
+                                egui::RichText::new(format!("{} Connecting...", icons::ICON_WIFI))
+                                    .color(egui::Color32::YELLOW)
+                            ));
+                        }
+                        ConnectionState::Connected => {
+                            let label = if let Some(host) = &state.ui_state.connected_host {
+                                format!("{} Connected: {}", icons::ICON_WIFI, host)
+                            } else {
+                                format!("{} Connected", icons::ICON_WIFI)
+                            };
+                            flex.add(item(), egui::Label::new(
+                                egui::RichText::new(label)
+                                    .color(egui::Color32::GREEN)
+                            ));
+                            flex.add(item(), egui::Label::new(
+                                format!("{} Projects: {}", icons::ICON_FOLDER, state.projects.len())
+                            ));
+                        }
+                        ConnectionState::Error(error) => {
+                            flex.add(item(), egui::Label::new(
+                                egui::RichText::new(format!("{} Error: {}", icons::ICON_ERROR, error))
+                                    .color(egui::Color32::RED)
+                            ));
+                        }
                     }
-                    ConnectionState::Connecting => {
-                        ui.colored_label(egui::Color32::YELLOW, "● Connecting...");
-                    }
-                    ConnectionState::Connected => {
-                        let label = if let Some(host) = &state.ui_state.connected_host {
-                            format!("● Connected: {}", host)
-                        } else {
-                            "● Connected".to_string()
-                        };
-                        ui.colored_label(egui::Color32::GREEN, label);
-                        ui.label(format!("Projects: {}", state.projects.len()));
-                    }
-                    ConnectionState::Error(error) => {
-                        ui.colored_label(egui::Color32::RED, format!("Error: {}", error));
-                    }
-                }
 
-                if let Some(error) = &state.ui_state.connection_error {
-                    ui.colored_label(egui::Color32::RED, error);
-                }
-            });
+                    // Error message section
+                    if let Some(error) = &state.ui_state.connection_error {
+                        flex.add(item(), egui::Label::new(
+                            egui::RichText::new(error)
+                                .color(egui::Color32::RED)
+                        ));
+                    }
+
+                    // Add flexible space to push any future right-aligned items
+                    flex.add_flex(
+                        item().grow(1.0),
+                        Flex::horizontal().align_content(FlexAlignContent::End),
+                        |_flex| {
+                            // Future right-aligned items can go here
+                        },
+                    );
+                });
         });
     }
 }

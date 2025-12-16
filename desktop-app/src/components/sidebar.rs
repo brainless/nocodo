@@ -1,6 +1,7 @@
 use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use egui::{Color32, Context};
+use egui_material_icons::icons;
 
 pub struct Sidebar;
 
@@ -23,7 +24,7 @@ impl Sidebar {
         egui::SidePanel::left("sidebar")
             .exact_width(200.0)
             .show(ctx, |ui| {
-                ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
+                ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 4.0);
                 ui.vertical(|ui| {
                     let sidebar_bg = ui.style().visuals.panel_fill;
                     let selected_bg = ui.style().visuals.widgets.active.bg_fill;
@@ -50,6 +51,7 @@ impl Sidebar {
                     if self.sidebar_link(
                         ui,
                         "Projects",
+                        icons::ICON_FOLDER,
                         sidebar_bg,
                         hover_bg,
                         selected_bg,
@@ -117,8 +119,8 @@ impl Sidebar {
                                         new_page = Some(UiPage::ProjectDetail(project.id));
                                         state.pending_project_details_refresh = Some(project.id);
                                     }
+                                }
                             }
-                        }
                         }
                         ui.add_space(4.0);
                     }
@@ -126,6 +128,7 @@ impl Sidebar {
                     if self.sidebar_link(
                         ui,
                         "Board",
+                        icons::ICON_DASHBOARD,
                         sidebar_bg,
                         hover_bg,
                         selected_bg,
@@ -137,6 +140,7 @@ impl Sidebar {
                     if self.sidebar_link(
                         ui,
                         "Mentions",
+                        icons::ICON_NOTIFICATIONS,
                         sidebar_bg,
                         hover_bg,
                         selected_bg,
@@ -152,6 +156,7 @@ impl Sidebar {
                         if self.sidebar_link(
                             ui,
                             "Servers",
+                            icons::ICON_DNS,
                             sidebar_bg,
                             hover_bg,
                             selected_bg,
@@ -163,6 +168,7 @@ impl Sidebar {
                         if self.sidebar_link(
                             ui,
                             "Settings",
+                            icons::ICON_SETTINGS,
                             sidebar_bg,
                             hover_bg,
                             selected_bg,
@@ -174,6 +180,7 @@ impl Sidebar {
                         if self.sidebar_link(
                             ui,
                             "Teams",
+                            icons::ICON_GROUP,
                             sidebar_bg,
                             hover_bg,
                             selected_bg,
@@ -185,6 +192,7 @@ impl Sidebar {
                         if self.sidebar_link(
                             ui,
                             "Users",
+                            icons::ICON_PEOPLE,
                             sidebar_bg,
                             hover_bg,
                             selected_bg,
@@ -204,6 +212,7 @@ impl Sidebar {
         &self,
         ui: &mut egui::Ui,
         text: &str,
+        icon: &str,
         default_bg: Color32,
         hover_bg: Color32,
         selected_bg: Color32,
@@ -235,8 +244,9 @@ impl Sidebar {
         // Draw background
         ui.painter().rect_filled(rect, 0.0, bg_color);
 
-        // Draw text (non-selectable) using Ubuntu Light
-        let text_pos = rect.min + egui::vec2(8.0, 8.0);
+        // Draw icon and text (non-selectable) using Ubuntu Light
+        let icon_pos = rect.min + egui::vec2(8.0, 8.0);
+        let text_pos = rect.min + egui::vec2(32.0, 8.0);
         let font_id = egui::FontId::new(
             14.0,
             egui::FontFamily::Name("ui_light".into()), // Ubuntu Light
@@ -246,6 +256,17 @@ impl Sidebar {
         } else {
             ui.style().visuals.weak_text_color()
         };
+        
+        // Draw icon
+        ui.painter().text(
+            icon_pos,
+            egui::Align2::LEFT_TOP,
+            icon,
+            font_id.clone(),
+            text_color,
+        );
+        
+        // Draw text
         ui.painter().text(
             text_pos,
             egui::Align2::LEFT_TOP,

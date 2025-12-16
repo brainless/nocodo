@@ -48,32 +48,29 @@ impl crate::pages::Page for ServersPage {
                 ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
                 if ui.button("Connect Local").clicked() {
                     // Connect directly to local server without SSH via connection manager
+                    state.connection_state = ConnectionState::Connecting;
+                    state.ui_state.connection_error = None;
+                    state.connection_result = Arc::new(std::sync::Mutex::new(None));
+
                     let connection_manager = Arc::clone(&state.connection_manager);
+                    let result_arc = Arc::clone(&state.connection_result);
+                    
                     tokio::spawn(async move {
                         match connection_manager.connect_local(8081).await {
-                            Ok(_) => tracing::info!("Connected to local manager"),
-                            Err(e) => tracing::error!("Failed to connect to local manager: {}", e),
+                            Ok(_) => {
+                                tracing::info!("Connected to local manager");
+                                // Store successful result
+                                let mut result = result_arc.lock().unwrap();
+                                *result = Some(Ok(("localhost".to_string(), "local".to_string(), 8081)));
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to connect to local manager: {}", e);
+                                // Store error result
+                                let mut result = result_arc.lock().unwrap();
+                                *result = Some(Err(e.to_string()));
+                            }
                         }
                     });
-
-                    state.connection_state = ConnectionState::Connected;
-                    state.ui_state.connected_host = Some("localhost".to_string());
-                    state.current_server_info = Some(("localhost".to_string(), "local".to_string(), 8081));
-                    tracing::info!("Set current_server_info for local connection: {:?}", state.current_server_info);
-                    state.models_fetch_attempted = false; // Reset to allow fetching models on new connection
-
-                    // Check if we need to show auth dialog
-                    let should_show_auth = state.auth_state.jwt_token.is_none();
-                    if should_show_auth {
-                        tracing::info!("Local connection successful, showing auth dialog");
-                        state.ui_state.show_auth_dialog = true;
-                    } else {
-                        // Already authenticated, load data
-                        state.load_favorites_for_current_server();
-                        self.refresh_projects(state);
-                        self.refresh_works(state);
-                        self.refresh_settings(state);
-                    }
                 }
             });
         } else {
@@ -176,18 +173,5 @@ impl ServersPage {
         let _ = api_service.check_local_server(state);
     }
 
-    fn refresh_projects(&self, state: &mut AppState) {
-        let api_service = crate::services::ApiService::new();
-        api_service.refresh_projects(state);
-    }
 
-    fn refresh_works(&self, state: &mut AppState) {
-        let api_service = crate::services::ApiService::new();
-        api_service.refresh_works(state);
-    }
-
-    fn refresh_settings(&self, state: &mut AppState) {
-        let api_service = crate::services::ApiService::new();
-        api_service.refresh_supported_models(state);
-    }
 }
