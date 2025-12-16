@@ -23,6 +23,6 @@ tokio-test = "0.4"
 test-runner = ["toml"]
 
 [[bin]]
-name = "test-runner"
+name = "workflow-test-runner"
 path = "bin/test_runner.rs"
 required-features = ["test-runner"]

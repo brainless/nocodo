@@ -27,6 +27,6 @@ test-runner = ["toml"]
 ffi = []
 
 [[bin]]
-name = "test-runner"
+name = "llm-test-runner"
 path = "bin/test_runner.rs"
 required-features = ["test-runner"]
