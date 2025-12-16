@@ -1,0 +1,15 @@
+# Example test configuration for nocodo-workflow
+# Copy to test-config.toml and add your API keys as needed
+#
+# Note: Keys can be in lowercase (will be converted to uppercase env vars)
+
+[api_keys]
+# Optional: Add API keys for different providers
+# The test runner will select the best available provider based on this preference:
+# 1. z.ai/GLM 4.6 (requires zai_api_key)
+# 2. zen/GLM 4.6 (free, no API key needed - DEFAULT)
+# 3. Anthropic/Claude Sonnet 4.5 (requires anthropic_api_key)
+
+# zai_api_key = "zai-..."
+# zai_coding_plan = true  # Optional: enables coding plan mode for z.ai
+# anthropic_api_key = "sk-ant-..."
