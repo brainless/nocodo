@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // Re-export shared models from manager-models
 pub use manager_models::{
     AddMessageRequest, AiSession, AiSessionOutput,
-    AiSessionResult, ApiKeyConfig,
+    AiSessionOutputListResponse, AiSessionResult, ApiKeyConfig,
     CreateWorkRequest, LlmAgentToolCall,
     MessageAuthorType, MessageContentType, SettingsResponse, SupportedModel, SupportedModelsResponse,
     UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage,

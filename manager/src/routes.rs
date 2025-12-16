@@ -193,6 +193,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                             "/messages",
                             web::get().to(work_handlers::get_work_messages),
                         )
+                        .route(
+                            "/outputs",
+                            web::get().to(work_handlers::list_ai_session_outputs),
+                        )
 
                         .service(
                             web::resource("")

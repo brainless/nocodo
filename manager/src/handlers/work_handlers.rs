@@ -2,7 +2,7 @@ use super::main_handlers::AppState;
 use crate::error::AppError;
 use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
-    AddMessageRequest, CreateWorkRequest, WorkListResponse, WorkResponse,
+    AddMessageRequest, CreateWorkRequest, WorkListResponse, WorkResponse, AiSessionOutputListResponse,
 };
 
 use nocodo_github_actions::{ExecuteCommandRequest, ScanWorkflowsRequest};
@@ -525,5 +525,54 @@ pub async fn list_worktree_branches(
 
     let response = crate::models::GitBranchListResponse { branches: git_branches };
 
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn list_ai_session_outputs(
+    path: web::Path<i64>,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let work_id = path.into_inner();
+    
+    // First, get the AI session for this work
+    let sessions = data.database.get_ai_sessions_by_work_id(work_id)?;
+    if sessions.is_empty() {
+        let response = AiSessionOutputListResponse { outputs: vec![] };
+        return Ok(HttpResponse::Ok().json(response));
+    }
+    
+    // Get the most recent AI session
+    let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
+    
+    // Get outputs for this session
+    let mut outputs = data.database.list_ai_session_outputs(session.id)?;
+    
+    // If this is an LLM agent session, also fetch LLM agent messages
+    if session.tool_name == "llm-agent" {
+        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
+            if let Ok(llm_messages) = data.database.get_llm_agent_messages(llm_agent_session.id) {
+                for msg in llm_messages {
+                    if msg.role == "assistant" || msg.role == "tool" {
+                        let output = crate::models::AiSessionOutput {
+                            id: msg.id,
+                            session_id: session.id,
+                            content: msg.content,
+                            created_at: msg.created_at,
+                            role: Some(msg.role.clone()),
+                            model: if msg.role == "assistant" {
+                                Some(llm_agent_session.model.clone())
+                            } else {
+                                None
+                            },
+                        };
+                        outputs.push(output);
+                    }
+                }
+            }
+        }
+    }
+    
+    outputs.sort_by_key(|o| o.created_at);
+    let response = AiSessionOutputListResponse { outputs };
     Ok(HttpResponse::Ok().json(response))
 }
