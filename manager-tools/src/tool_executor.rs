@@ -4,13 +4,10 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 // Re-export from individual modules
-use crate::apply_patch;
-use crate::bash;
 pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
+use crate::bash;
+use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
-use crate::list_files;
-use crate::read_file;
-use crate::write_file;
 
 /// Tool executor that handles tool requests and responses
 pub struct ToolExecutor {
