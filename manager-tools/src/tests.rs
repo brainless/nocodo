@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod tests {
 
-    use crate::{BashExecutionResult, BashExecutorTrait, ToolExecutor};
+    use crate::ToolExecutor;
     use manager_models::{
         GrepRequest, ListFilesRequest, ReadFileRequest, ToolResponse, WriteFileRequest,
     };
     use std::fs;
-    use std::future::Future;
-    use std::path::Path;
-    use std::pin::Pin;
+    
+    
+    
     use tempfile::TempDir;
 
 
