@@ -8,8 +8,10 @@
 mod common;
 
 use actix_web::{test, web, App};
-use nocodo_manager::handlers::{user_handlers, project_handlers, team_handlers};
-use nocodo_manager::middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement};
+use nocodo_manager::handlers::{project_handlers, team_handlers, user_handlers};
+use nocodo_manager::middleware::{
+    AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement,
+};
 use serde_json::json;
 
 use common::TestApp;
@@ -33,26 +35,36 @@ async fn test_first_user_bootstrap_super_admin() {
             .app_data(test_app.app_state.clone())
             .wrap(AuthenticationMiddleware)
             // Auth endpoints (no auth required)
-            .route("/api/auth/register", web::post().to(user_handlers::register))
+            .route(
+                "/api/auth/register",
+                web::post().to(user_handlers::register),
+            )
             .route("/api/auth/login", web::post().to(user_handlers::login))
             // Protected endpoints (require auth + permissions)
             .service(
                 web::scope("/api/projects")
-                    .wrap(PermissionMiddleware::new(PermissionRequirement::new("project", "read")))
-                    .route("", web::get().to(project_handlers::get_projects))
+                    .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                        "project", "read",
+                    )))
+                    .route("", web::get().to(project_handlers::get_projects)),
             )
             .service(
                 web::scope("/api/teams")
-                    .wrap(PermissionMiddleware::new(PermissionRequirement::new("team", "read")))
+                    .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                        "team", "read",
+                    )))
                     .route("", web::get().to(team_handlers::list_teams))
                     .service(
                         web::scope("/{id}")
                             .wrap(PermissionMiddleware::new(
-                                PermissionRequirement::new("team", "read").with_resource_id("id")
+                                PermissionRequirement::new("team", "read").with_resource_id("id"),
                             ))
-                            .route("/permissions", web::get().to(team_handlers::get_team_permissions))
-                    )
-            )
+                            .route(
+                                "/permissions",
+                                web::get().to(team_handlers::get_team_permissions),
+                            ),
+                    ),
+            ),
     )
     .await;
 
@@ -100,7 +112,10 @@ async fn test_first_user_bootstrap_super_admin() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let teams = body["teams"].as_array().expect("Should get teams array");
     assert_eq!(teams.len(), 1, "Should have exactly one team");
-    assert_eq!(teams[0]["name"], "Super Admins", "Team should be named 'Super Admins'");
+    assert_eq!(
+        teams[0]["name"], "Super Admins",
+        "Team should be named 'Super Admins'"
+    );
 
     println!("\n✓ Super Admins team created");
 
@@ -128,7 +143,11 @@ async fn test_first_user_bootstrap_super_admin() {
         .to_request();
 
     let resp = test::call_service(&service, req).await;
-    assert_eq!(resp.status(), 200, "Should be able to check team permissions");
+    assert_eq!(
+        resp.status(),
+        200,
+        "Should be able to check team permissions"
+    );
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let permissions = body.as_array().expect("Should get permissions array");

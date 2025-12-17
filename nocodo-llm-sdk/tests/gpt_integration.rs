@@ -109,11 +109,12 @@ async fn test_openai_responses_api_gpt51_codex() {
 
     // Check that we have at least one message with text content
     let has_text_content = response.output.iter().any(|item| {
-        item.item_type == "message" &&
-        item.content.as_ref().map_or(false, |blocks| {
-            blocks.iter().any(|block| block.content_type == "output_text" && !block.text.is_empty())
-        })
+        item.item_type == "message"
+            && item.content.as_ref().map_or(false, |blocks| {
+                blocks
+                    .iter()
+                    .any(|block| block.content_type == "output_text" && !block.text.is_empty())
+            })
     });
     assert!(has_text_content);
 }
-

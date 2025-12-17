@@ -6,7 +6,7 @@ use crate::models::{
     AddExistingProjectRequest, CreateProjectRequest, Project, ProjectListResponse, ProjectResponse,
 };
 use crate::templates::{ProjectTemplate, TemplateManager};
-use actix_web::{web, HttpResponse, Result, HttpMessage};
+use actix_web::{web, HttpMessage, HttpResponse, Result};
 use handlebars::Handlebars;
 use std::path::Path;
 
@@ -351,7 +351,7 @@ fn apply_project_template(
 
 fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
     use git2::{Repository, Signature, Time};
-    
+
     // Initialize git repository
     let repo = match Repository::init(project_path) {
         Ok(repo) => repo,
@@ -402,7 +402,7 @@ fn initialize_git_repository(project_path: &Path) -> Result<(), AppError> {
             .as_secs() as i64,
         0,
     );
-    
+
     let signature = match Signature::new("nocodo", "nocodo@localhost", &time) {
         Ok(sig) => sig,
         Err(e) => {
@@ -441,8 +441,9 @@ pub async fn scan_projects(
         let config = data.config.read().map_err(|e| {
             AppError::Internal(format!("Failed to acquire config read lock: {}", e))
         })?;
-        
-        config.projects
+
+        config
+            .projects
             .as_ref()
             .and_then(|p| p.default_path.as_ref())
             .ok_or_else(|| {
@@ -465,14 +466,9 @@ pub async fn scan_projects(
     let scan_path = std::path::Path::new(&expanded_path);
 
     // Use the project scanner to discover projects
-    let discovered_projects = project::scan_filesystem_for_projects(
-        scan_path,
-        &data.database,
-    )
-    .await
-    .map_err(|e| {
-        AppError::Internal(format!("Failed to scan projects: {}", e))
-    })?;
+    let discovered_projects = project::scan_filesystem_for_projects(scan_path, &data.database)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to scan projects: {}", e)))?;
 
     // Convert discovered projects to JSON response
     let scan_results: Vec<serde_json::Value> = discovered_projects
@@ -502,11 +498,10 @@ pub async fn set_projects_default_path(
     let req = request.into_inner();
 
     // Get the default path from request
-    let default_path = req.get("path")
+    let default_path = req
+        .get("path")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Invalid path parameter".to_string())
-        })?;
+        .ok_or_else(|| AppError::InvalidRequest("Invalid path parameter".to_string()))?;
 
     // Expand ~ to home directory
     let expanded_path = if default_path.starts_with("~/") {
@@ -520,9 +515,10 @@ pub async fn set_projects_default_path(
     };
 
     // Update config
-    let mut config = data.config.write().map_err(|e| {
-        AppError::Internal(format!("Failed to acquire config write lock: {}", e))
-    })?;
+    let mut config = data
+        .config
+        .write()
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config write lock: {}", e)))?;
 
     if let Some(ref mut projects) = config.projects {
         projects.default_path = Some(expanded_path.clone());
@@ -536,9 +532,8 @@ pub async fn set_projects_default_path(
     let config_clone = config.clone();
 
     // Save config to file
-    let toml_string = toml::to_string(&config_clone).map_err(|e| {
-        AppError::Internal(format!("Failed to serialize config: {}", e))
-    })?;
+    let toml_string = toml::to_string(&config_clone)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize config: {}", e)))?;
 
     let config_path = if let Some(home) = home::home_dir() {
         home.join(".config/nocodo/manager.toml")

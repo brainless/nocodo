@@ -20,7 +20,11 @@ impl MessageContainer {
                 let datetime = chrono::DateTime::from_timestamp(timestamp, 0)
                     .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
-                ui.label(RichText::new(datetime).size(10.0).color(ui.style().visuals.weak_text_color()));
+                ui.label(
+                    RichText::new(datetime)
+                        .size(10.0)
+                        .color(ui.style().visuals.weak_text_color()),
+                );
             });
         });
     }
@@ -59,7 +63,7 @@ impl AiMessageRenderer {
                 } else {
                     "AI".to_string()
                 };
-                
+
                 MessageContainer::header(ui, &label, timestamp);
                 ui.add_space(4.0);
                 ui.label(RichText::new(content).size(16.0));
@@ -68,7 +72,13 @@ impl AiMessageRenderer {
     }
 
     /// Renders a regular AI response (non-text content)
-    pub fn render_response(ui: &mut Ui, content: &str, role: &str, model: Option<&str>, timestamp: i64) {
+    pub fn render_response(
+        ui: &mut Ui,
+        content: &str,
+        role: &str,
+        model: Option<&str>,
+        timestamp: i64,
+    ) {
         let bg_color = ui.style().visuals.widgets.noninteractive.bg_fill;
 
         MessageContainer::frame(ui, bg_color).show(ui, |ui| {
@@ -78,7 +88,7 @@ impl AiMessageRenderer {
                     ("assistant", Some(model_name)) => format!("AI - {}", model_name),
                     _ => "AI".to_string(),
                 };
-                
+
                 MessageContainer::header(ui, &label, timestamp);
                 ui.add_space(4.0);
                 ui.label(RichText::new(content).size(16.0));

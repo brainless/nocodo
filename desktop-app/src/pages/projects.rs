@@ -71,7 +71,13 @@ impl crate::pages::Page for ProjectsPage {
                         // Status message - Ubuntu Light
                         ui.label(WidgetText::status("No projects found"));
                         // Button - Ubuntu SemiBold with icon
-                        if ui.button(WidgetText::button(&format!(" {} Refresh", icons::ICON_REFRESH))).clicked() {
+                        if ui
+                            .button(WidgetText::button(format!(
+                                " {} Refresh",
+                                icons::ICON_REFRESH
+                            )))
+                            .clicked()
+                        {
                             self.refresh_projects(state);
                         }
                     });
@@ -106,7 +112,7 @@ impl crate::pages::Page for ProjectsPage {
                                                     ui.horizontal(|ui| {
                                                         // Project name - User content (Inter)
                                                         ui.label(ContentText::title(&project.name));
-                                                        
+
                                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                             // Check if this project is a favorite
                                                             let is_favorite = if let Some((server_host, server_user, server_port)) = &state.current_server_info {
@@ -115,13 +121,13 @@ impl crate::pages::Page for ProjectsPage {
                                                             } else {
                                                                 false
                                                             };
-                                                            
+
                                                             let favorite_icon = if is_favorite {
                                                                 icons::ICON_FAVORITE
                                                             } else {
                                                                 icons::ICON_FAVORITE_BORDER
                                                             };
-                                                            
+
                                                             if ui.button(favorite_icon).clicked() {
                                                                 // Toggle favorite status
                                                                 if let Some((server_host, server_user, server_port)) = &state.current_server_info {
@@ -131,7 +137,7 @@ impl crate::pages::Page for ProjectsPage {
                                                                     } else {
                                                                         state.favorite_projects.insert(favorite_key.clone());
                                                                     }
-                                                                    
+
                                                                     // Update database
                                                                     if let Some(db) = &state.db {
                                                                         if is_favorite {
@@ -200,7 +206,13 @@ impl crate::pages::Page for ProjectsPage {
                     // Error message - Ubuntu Light
                     ui.label(WidgetText::error(format!("Error: {}", error)));
                     // Button - Ubuntu SemiBold with icon
-                    if ui.button(WidgetText::button(&format!(" {} Retry", icons::ICON_REFRESH))).clicked() {
+                    if ui
+                        .button(WidgetText::button(format!(
+                            " {} Retry",
+                            icons::ICON_REFRESH
+                        )))
+                        .clicked()
+                    {
                         state.ui_state.show_connection_dialog = true;
                     }
                 });

@@ -30,11 +30,8 @@ pub trait SchemaProvider {
             Schema::Object(mut obj) => {
                 if let Some(object_validation) = &mut obj.object {
                     // Collect all property names
-                    let all_props: BTreeSet<String> = object_validation
-                        .properties
-                        .keys()
-                        .cloned()
-                        .collect();
+                    let all_props: BTreeSet<String> =
+                        object_validation.properties.keys().cloned().collect();
 
                     // Mark all as required
                     object_validation.required = all_props;

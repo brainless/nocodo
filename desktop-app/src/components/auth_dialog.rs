@@ -48,130 +48,130 @@ impl AuthDialog {
                     egui::Frame::NONE
                         .inner_margin(egui::Margin::same(4))
                         .show(ui, |ui| {
-                            Flex::vertical()
-                                .gap(egui::vec2(0.0, 8.0))
-                                .show(ui, |flex| {
-                                    // Show error message if any
-                                    if let Some(ref error) = self.error_message {
-                                        flex.add_ui(item(), |ui| {
-                                            ui.colored_label(egui::Color32::RED, error);
-                                        });
-                                        flex.add_ui(item(), |ui| {
-                                            ui.add_space(4.0);
-                                        });
-                                    }
-
-                                    // Username field
+                            Flex::vertical().gap(egui::vec2(0.0, 8.0)).show(ui, |flex| {
+                                // Show error message if any
+                                if let Some(ref error) = self.error_message {
                                     flex.add_ui(item(), |ui| {
-                                        ui.label("Username:");
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut self.username)
-                                                .desired_width(f32::INFINITY)
-                                        );
+                                        ui.colored_label(egui::Color32::RED, error);
                                     });
-
-                                    // Email field (only in register mode)
-                                    if self.is_register_mode {
-                                        flex.add_ui(item(), |ui| {
-                                            ui.label("Email (optional):");
-                                            ui.add(
-                                                egui::TextEdit::singleline(&mut self.email)
-                                                    .desired_width(f32::INFINITY)
-                                            );
-                                        });
-                                    }
-
-                                    // Password field
                                     flex.add_ui(item(), |ui| {
-                                        ui.label("Password:");
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut self.password)
-                                                .password(true)
-                                                .desired_width(f32::INFINITY)
-                                        );
+                                        ui.add_space(4.0);
                                     });
+                                }
 
-                                    // Separator and button row
-                                    flex.add_ui(item(), |ui| {
-                                        ui.separator();
-                                    });
-
-                                    flex.add_ui(item(), |ui| {
-                                        ui.add_space(8.0);
-                                    });
-
-                                    flex.add_ui(item(), |ui| {
-                                        Flex::horizontal()
-                                            .gap(egui::vec2(8.0, 0.0))
-                                            .align_content(FlexAlignContent::End)
-                                            .show(ui, |flex| {
-                                                flex.add_ui(item(), |ui| {
-                                                    ui.scope(|ui| {
-                                                        ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
-
-                                                        let button_text = if self.is_register_mode {
-                                                            "Register"
-                                                        } else {
-                                                            "Login"
-                                                        };
-
-                                                        if ui.button(button_text).clicked() {
-                                                            if self.is_register_mode {
-                                                                self.register(state);
-                                                            } else {
-                                                                self.login(state);
-                                                            }
-                                                        }
-                                                    });
-                                                });
-
-                                                flex.add_ui(item(), |ui| {
-                                                    ui.scope(|ui| {
-                                                        ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
-
-                                                        if ui.button("Cancel").clicked() {
-                                                            state.ui_state.show_auth_dialog = false;
-                                                            should_close = true;
-                                                        }
-                                                    });
-                                                });
-                                            });
-                                    });
-
-                                    flex.add_ui(item(), |ui| {
-                                        ui.add_space(10.0);
-                                    });
-
-                                    // Toggle between login and register
-                                    flex.add_ui(item(), |ui| {
-                                        Flex::horizontal()
-                                            .gap(egui::vec2(4.0, 0.0))
-                                            .align_content(FlexAlignContent::Center)
-                                            .show(ui, |flex| {
-                                                if self.is_register_mode {
-                                                    flex.add_ui(item(), |ui| {
-                                                        ui.label("Already have an account?");
-                                                    });
-                                                    flex.add_ui(item(), |ui| {
-                                                        if ui.link("Login").clicked() {
-                                                            self.is_register_mode = false;
-                                                            self.error_message = None;
-                                                        }
-                                                    });
-                                                } else {
-                                                    flex.add_ui(item(), |ui| {
-                                                        ui.label("Don't have an account?");
-                                                    });
-                                                    flex.add_ui(item(), |ui| {
-                                                        if ui.link("Register").clicked() {
-                                                            self.is_register_mode = true;
-                                                            self.error_message = None;
-                                                        }
-                                                    });
-                                                }
-                                            });
-                                    });
+                                // Username field
+                                flex.add_ui(item(), |ui| {
+                                    ui.label("Username:");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.username)
+                                            .desired_width(f32::INFINITY),
+                                    );
                                 });
+
+                                // Email field (only in register mode)
+                                if self.is_register_mode {
+                                    flex.add_ui(item(), |ui| {
+                                        ui.label("Email (optional):");
+                                        ui.add(
+                                            egui::TextEdit::singleline(&mut self.email)
+                                                .desired_width(f32::INFINITY),
+                                        );
+                                    });
+                                }
+
+                                // Password field
+                                flex.add_ui(item(), |ui| {
+                                    ui.label("Password:");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.password)
+                                            .password(true)
+                                            .desired_width(f32::INFINITY),
+                                    );
+                                });
+
+                                // Separator and button row
+                                flex.add_ui(item(), |ui| {
+                                    ui.separator();
+                                });
+
+                                flex.add_ui(item(), |ui| {
+                                    ui.add_space(8.0);
+                                });
+
+                                flex.add_ui(item(), |ui| {
+                                    Flex::horizontal()
+                                        .gap(egui::vec2(8.0, 0.0))
+                                        .align_content(FlexAlignContent::End)
+                                        .show(ui, |flex| {
+                                            flex.add_ui(item(), |ui| {
+                                                ui.scope(|ui| {
+                                                    ui.spacing_mut().button_padding =
+                                                        egui::vec2(6.0, 4.0);
+
+                                                    let button_text = if self.is_register_mode {
+                                                        "Register"
+                                                    } else {
+                                                        "Login"
+                                                    };
+
+                                                    if ui.button(button_text).clicked() {
+                                                        if self.is_register_mode {
+                                                            self.register(state);
+                                                        } else {
+                                                            self.login(state);
+                                                        }
+                                                    }
+                                                });
+                                            });
+
+                                            flex.add_ui(item(), |ui| {
+                                                ui.scope(|ui| {
+                                                    ui.spacing_mut().button_padding =
+                                                        egui::vec2(6.0, 4.0);
+
+                                                    if ui.button("Cancel").clicked() {
+                                                        state.ui_state.show_auth_dialog = false;
+                                                        should_close = true;
+                                                    }
+                                                });
+                                            });
+                                        });
+                                });
+
+                                flex.add_ui(item(), |ui| {
+                                    ui.add_space(10.0);
+                                });
+
+                                // Toggle between login and register
+                                flex.add_ui(item(), |ui| {
+                                    Flex::horizontal()
+                                        .gap(egui::vec2(4.0, 0.0))
+                                        .align_content(FlexAlignContent::Center)
+                                        .show(ui, |flex| {
+                                            if self.is_register_mode {
+                                                flex.add_ui(item(), |ui| {
+                                                    ui.label("Already have an account?");
+                                                });
+                                                flex.add_ui(item(), |ui| {
+                                                    if ui.link("Login").clicked() {
+                                                        self.is_register_mode = false;
+                                                        self.error_message = None;
+                                                    }
+                                                });
+                                            } else {
+                                                flex.add_ui(item(), |ui| {
+                                                    ui.label("Don't have an account?");
+                                                });
+                                                flex.add_ui(item(), |ui| {
+                                                    if ui.link("Register").clicked() {
+                                                        self.is_register_mode = true;
+                                                        self.error_message = None;
+                                                    }
+                                                });
+                                            }
+                                        });
+                                });
+                            });
                         });
                 });
         }
@@ -195,7 +195,8 @@ impl AuthDialog {
             match crate::ssh::generate_local_fingerprint() {
                 Ok(fingerprint) => fingerprint,
                 Err(e) => {
-                    self.error_message = Some(format!("Failed to generate machine fingerprint: {}", e));
+                    self.error_message =
+                        Some(format!("Failed to generate machine fingerprint: {}", e));
                     return;
                 }
             }
@@ -210,7 +211,8 @@ impl AuthDialog {
             ) {
                 Ok(fingerprint) => fingerprint,
                 Err(e) => {
-                    self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
+                    self.error_message =
+                        Some(format!("Failed to calculate SSH fingerprint: {}", e));
                     return;
                 }
             }
@@ -309,7 +311,8 @@ impl AuthDialog {
             let fingerprint = match crate::ssh::generate_local_fingerprint() {
                 Ok(fp) => fp,
                 Err(e) => {
-                    self.error_message = Some(format!("Failed to generate machine fingerprint: {}", e));
+                    self.error_message =
+                        Some(format!("Failed to generate machine fingerprint: {}", e));
                     return;
                 }
             };
@@ -326,24 +329,24 @@ impl AuthDialog {
             ) {
                 Ok(fp) => fp,
                 Err(e) => {
-                    self.error_message = Some(format!("Failed to calculate SSH fingerprint: {}", e));
+                    self.error_message =
+                        Some(format!("Failed to calculate SSH fingerprint: {}", e));
                     return;
                 }
             };
 
-            let public_key = match crate::ssh::read_ssh_public_key(
-                if state.config.ssh.ssh_key_path.is_empty() {
+            let public_key =
+                match crate::ssh::read_ssh_public_key(if state.config.ssh.ssh_key_path.is_empty() {
                     None
                 } else {
                     Some(&state.config.ssh.ssh_key_path)
-                },
-            ) {
-                Ok(pk) => pk,
-                Err(e) => {
-                    self.error_message = Some(format!("Failed to read SSH public key: {}", e));
-                    return;
-                }
-            };
+                }) {
+                    Ok(pk) => pk,
+                    Err(e) => {
+                        self.error_message = Some(format!("Failed to read SSH public key: {}", e));
+                        return;
+                    }
+                };
 
             (fingerprint, public_key)
         };
@@ -396,7 +399,8 @@ impl AuthDialog {
                             }
 
                             // Refresh all data after successful login
-                            if let Some(api_client_arc) = connection_manager.get_api_client().await {
+                            if let Some(api_client_arc) = connection_manager.get_api_client().await
+                            {
                                 let api_client = api_client_arc.read().await;
 
                                 let result = api_client.list_projects().await;
@@ -421,7 +425,8 @@ impl AuthDialog {
                                 {
                                     let mut supported_models_result_lock =
                                         supported_models_result.lock().unwrap();
-                                    *supported_models_result_lock = Some(result.map_err(|e| e.to_string()));
+                                    *supported_models_result_lock =
+                                        Some(result.map_err(|e| e.to_string()));
                                 }
                             }
                         }

@@ -144,13 +144,9 @@ impl crate::claude::types::ClaudeMessageResponse {
             .content
             .iter()
             .filter_map(|block| match block {
-                crate::claude::types::ClaudeContentBlock::ToolUse { id, name, input } => {
-                    Some(crate::tools::ToolCall::new(
-                        id.clone(),
-                        name.clone(),
-                        input.clone(),
-                    ))
-                }
+                crate::claude::types::ClaudeContentBlock::ToolUse { id, name, input } => Some(
+                    crate::tools::ToolCall::new(id.clone(), name.clone(), input.clone()),
+                ),
                 _ => None,
             })
             .collect();

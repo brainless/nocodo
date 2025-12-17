@@ -2,16 +2,21 @@ use crate::{
     error::LlmError,
     grok::{
         tools::GrokToolFormat,
+        types::{
+            GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokRole, GrokTool,
+        },
         xai::XaiGrokClient,
         zen::ZenGrokClient,
-        types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokRole, GrokTool},
     },
     tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
 
 /// Trait for Grok clients
 pub trait GrokClientTrait {
-    fn create_chat_completion(&self, request: GrokChatCompletionRequest) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send;
+    fn create_chat_completion(
+        &self,
+        request: GrokChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send;
 }
 
 /// Builder for creating Grok chat completion requests
@@ -29,13 +34,21 @@ pub struct GrokMessageBuilder<'a, T: GrokClientTrait> {
 }
 
 impl GrokClientTrait for XaiGrokClient {
-    fn create_chat_completion(&self, request: GrokChatCompletionRequest) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send {
+    fn create_chat_completion(
+        &self,
+        request: GrokChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send
+    {
         self.create_chat_completion(request)
     }
 }
 
 impl GrokClientTrait for ZenGrokClient {
-    fn create_chat_completion(&self, request: GrokChatCompletionRequest) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send {
+    fn create_chat_completion(
+        &self,
+        request: GrokChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GrokChatCompletionResponse, LlmError>> + Send
+    {
         self.create_chat_completion(request)
     }
 }
@@ -185,5 +198,3 @@ impl XaiGrokClient {
         GrokMessageBuilder::new(self)
     }
 }
-
-

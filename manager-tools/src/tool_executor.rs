@@ -1,16 +1,16 @@
-use manager_models::{ToolRequest, ToolResponse};
 use anyhow::Result;
+use manager_models::{ToolRequest, ToolResponse};
 use serde_json::Value;
 use std::path::PathBuf;
 
 // Re-export from individual modules
+use crate::apply_patch;
+use crate::bash;
 pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
+use crate::grep;
 use crate::list_files;
 use crate::read_file;
 use crate::write_file;
-use crate::grep;
-use crate::apply_patch;
-use crate::bash;
 
 /// Tool executor that handles tool requests and responses
 pub struct ToolExecutor {
@@ -28,13 +28,18 @@ impl ToolExecutor {
         }
     }
 
-    pub fn with_bash_executor(mut self, bash_executor: Box<dyn BashExecutorTrait + Send + Sync>) -> Self {
+    pub fn with_bash_executor(
+        mut self,
+        bash_executor: Box<dyn BashExecutorTrait + Send + Sync>,
+    ) -> Self {
         self.bash_executor = Some(bash_executor);
         self
     }
 
     pub fn bash_executor(&self) -> Option<&(dyn BashExecutorTrait + Send + Sync)> {
-        self.bash_executor.as_ref().map(|executor| executor.as_ref())
+        self.bash_executor
+            .as_ref()
+            .map(|executor| executor.as_ref())
     }
 
     #[allow(dead_code)]
@@ -51,11 +56,20 @@ impl ToolExecutor {
     pub async fn execute(&self, request: ToolRequest) -> Result<ToolResponse> {
         match request {
             ToolRequest::ListFiles(req) => list_files::list_files(&self.base_path, req).await,
-            ToolRequest::ReadFile(req) => read_file::read_file(&self.base_path, self.max_file_size, req).await,
+            ToolRequest::ReadFile(req) => {
+                read_file::read_file(&self.base_path, self.max_file_size, req).await
+            }
             ToolRequest::WriteFile(req) => write_file::write_file(&self.base_path, req).await,
             ToolRequest::Grep(req) => grep::grep_search(&self.base_path, req).await,
             ToolRequest::ApplyPatch(req) => apply_patch::apply_patch(&self.base_path, req).await,
-            ToolRequest::Bash(req) => bash::execute_bash(self.base_path.as_path(), self.bash_executor.as_ref().map(|e| e.as_ref()), req).await,
+            ToolRequest::Bash(req) => {
+                bash::execute_bash(
+                    self.base_path.as_path(),
+                    self.bash_executor.as_ref().map(|e| e.as_ref()),
+                    req,
+                )
+                .await
+            }
         }
     }
 
@@ -127,7 +141,4 @@ impl ToolExecutor {
 
         regex
     }
-
-
 }
-

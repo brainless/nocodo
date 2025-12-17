@@ -155,18 +155,27 @@ impl CerebrasGlmClient {
 impl crate::glm::types::GlmChatCompletionResponse {
     /// Extract tool calls from the response
     pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
-        self.choices.first()?.message.tool_calls.as_ref().map(|calls| {
-            calls.iter().map(|call| {
-                let arguments: serde_json::Value = serde_json::from_str(&call.function.arguments)
-                    .unwrap_or(serde_json::Value::Null);
+        self.choices
+            .first()?
+            .message
+            .tool_calls
+            .as_ref()
+            .map(|calls| {
+                calls
+                    .iter()
+                    .map(|call| {
+                        let arguments: serde_json::Value =
+                            serde_json::from_str(&call.function.arguments)
+                                .unwrap_or(serde_json::Value::Null);
 
-                crate::tools::ToolCall::new(
-                    call.id.clone(),
-                    call.function.name.clone(),
-                    arguments,
-                )
-            }).collect()
-        })
+                        crate::tools::ToolCall::new(
+                            call.id.clone(),
+                            call.function.name.clone(),
+                            arguments,
+                        )
+                    })
+                    .collect()
+            })
     }
 }
 
@@ -242,8 +251,16 @@ impl crate::client::LlmClient for CerebrasGlmClient {
                 crate::glm::types::GlmRole::System => crate::types::Role::System,
             },
             usage: crate::types::Usage {
-                input_tokens: glm_response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
-                output_tokens: glm_response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
+                input_tokens: glm_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.prompt_tokens)
+                    .unwrap_or(0),
+                output_tokens: glm_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.completion_tokens)
+                    .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
         };

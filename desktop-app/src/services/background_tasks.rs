@@ -67,7 +67,10 @@ impl BackgroundTasks {
                     state.ui_state.connected_host = Some(server.clone());
                     state.ui_state.connection_error = None;
                     state.current_server_info = Some((server.clone(), username.clone(), port));
-                    tracing::info!("Set current_server_info for SSH connection: {:?}", state.current_server_info);
+                    tracing::info!(
+                        "Set current_server_info for SSH connection: {:?}",
+                        state.current_server_info
+                    );
                     tracing::info!("Favorites in memory: {:?}", state.favorite_projects);
                     state.models_fetch_attempted = false; // Reset to allow fetching models
 
@@ -75,7 +78,10 @@ impl BackgroundTasks {
                     // (unless already authenticated)
                     let should_show_auth = state.auth_state.jwt_token.is_none();
                     if should_show_auth {
-                        tracing::info!("SSH connection successful to {}, showing auth dialog", server);
+                        tracing::info!(
+                            "SSH connection successful to {}, showing auth dialog",
+                            server
+                        );
                         // Directly set the flag on the ui_state instead of using connection_manager
                         state.ui_state.show_auth_dialog = true;
                     }
@@ -150,7 +156,10 @@ impl BackgroundTasks {
     }
 
     fn check_project_detail_worktree_branches_result(&self, state: &mut AppState) {
-        let mut result = state.project_detail_worktree_branches_result.lock().unwrap();
+        let mut result = state
+            .project_detail_worktree_branches_result
+            .lock()
+            .unwrap();
         if let Some(res) = result.take() {
             state.loading_project_detail_worktree_branches = false;
             match res {
@@ -163,9 +172,14 @@ impl BackgroundTasks {
                     state.ui_state.project_detail_worktree_branches = branches;
                 }
                 Err(e) => {
-                    tracing::error!("[BackgroundTasks] Failed to load project detail worktree branches: {}", e);
-                    state.ui_state.connection_error =
-                        Some(format!("Failed to load project detail worktree branches: {}", e));
+                    tracing::error!(
+                        "[BackgroundTasks] Failed to load project detail worktree branches: {}",
+                        e
+                    );
+                    state.ui_state.connection_error = Some(format!(
+                        "Failed to load project detail worktree branches: {}",
+                        e
+                    ));
                 }
             }
         }
@@ -698,11 +712,13 @@ impl BackgroundTasks {
             state.loading_command_discovery = false;
             match res {
                 Ok(discovery_response) => {
-                    state.ui_state.project_detail_command_discovery_results = Some(discovery_response);
+                    state.ui_state.project_detail_command_discovery_results =
+                        Some(discovery_response);
                 }
                 Err(e) => {
                     tracing::error!("Failed to discover commands: {}", e);
-                    state.ui_state.connection_error = Some(format!("Failed to discover commands: {}", e));
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to discover commands: {}", e));
                 }
             }
         }
@@ -718,7 +734,10 @@ impl BackgroundTasks {
                 }
                 Err(e) => {
                     tracing::error!("Failed to load project detail saved commands: {}", e);
-                    state.ui_state.connection_error = Some(format!("Failed to load project detail saved commands: {}", e));
+                    state.ui_state.connection_error = Some(format!(
+                        "Failed to load project detail saved commands: {}",
+                        e
+                    ));
                 }
             }
         }
@@ -729,7 +748,7 @@ impl BackgroundTasks {
             let mut result = state.create_commands_result.lock().unwrap();
             result.take()
         };
-        
+
         if let Some(res) = res_opt {
             match res {
                 Ok(_commands) => {
@@ -741,7 +760,8 @@ impl BackgroundTasks {
                 }
                 Err(e) => {
                     tracing::error!("Failed to create commands: {}", e);
-                    state.ui_state.connection_error = Some(format!("Failed to create commands: {}", e));
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to create commands: {}", e));
                 }
             }
         }
@@ -753,13 +773,14 @@ impl BackgroundTasks {
             state.executing_command_id = None;
             match res {
                 Ok(_execution_result) => {
-                    // Note: get_command_executions requires a specific command_id, 
+                    // Note: get_command_executions requires a specific command_id,
                     // so we can't refresh all executions here without knowing which command was executed
                     // The UI will need to handle refreshing executions for the specific command
                 }
                 Err(e) => {
                     tracing::error!("Failed to execute command: {}", e);
-                    state.ui_state.connection_error = Some(format!("Failed to execute command: {}", e));
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to execute command: {}", e));
                 }
             }
         }
@@ -775,7 +796,8 @@ impl BackgroundTasks {
                 }
                 Err(e) => {
                     tracing::error!("Failed to load command executions: {}", e);
-                    state.ui_state.connection_error = Some(format!("Failed to load command executions: {}", e));
+                    state.ui_state.connection_error =
+                        Some(format!("Failed to load command executions: {}", e));
                 }
             }
         }

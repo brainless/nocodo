@@ -53,22 +53,21 @@ impl ProjectsView {
                         let project = &self.projects[idx];
 
                         // Allocate fixed width for the card
-                        let response = ui.allocate_ui(
-                            egui::vec2(card_width, card_height),
-                            |ui| {
-                                ui.set_width(card_width);
-                                ui.group(|ui| {
-                                    ui.set_width(card_width - 24.0); // Account for group margins
-                                    ui.vertical(|ui| {
-                                        ui.label(egui::RichText::new(&project.name).strong());
-                                        ui.label(egui::RichText::new(&project.path).small());
-                                        if let Some(description) = &project.description {
-                                            ui.label(egui::RichText::new(description).italics().small());
-                                        }
-                                    });
+                        let response = ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
+                            ui.set_width(card_width);
+                            ui.group(|ui| {
+                                ui.set_width(card_width - 24.0); // Account for group margins
+                                ui.vertical(|ui| {
+                                    ui.label(egui::RichText::new(&project.name).strong());
+                                    ui.label(egui::RichText::new(&project.path).small());
+                                    if let Some(description) = &project.description {
+                                        ui.label(
+                                            egui::RichText::new(description).italics().small(),
+                                        );
+                                    }
                                 });
-                            },
-                        );
+                            });
+                        });
 
                         if response.response.clicked() {
                             if let Some(ref callback) = self.on_project_click {

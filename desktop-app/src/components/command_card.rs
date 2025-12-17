@@ -44,14 +44,18 @@ impl<'a> CommandCard<'a> {
             format!("{}d ago", days)
         } else {
             // For older dates, show the actual date
-            let datetime = chrono::DateTime::from_timestamp(timestamp, 0)
-                .unwrap_or_else(|| chrono::Utc::now());
+            let datetime =
+                chrono::DateTime::from_timestamp(timestamp, 0).unwrap_or_else(chrono::Utc::now);
             datetime.format("%b %d, %Y").to_string()
         }
     }
 
     pub fn ui(self, ui: &mut Ui) -> Response {
-        let card_height = if self.command.description.is_some() { 60.0 } else { 44.0 };
+        let card_height = if self.command.description.is_some() {
+            60.0
+        } else {
+            44.0
+        };
         let available_width = ui.available_width();
 
         let response = ui.allocate_ui_with_layout(
@@ -78,9 +82,10 @@ impl<'a> CommandCard<'a> {
                             // Last executed time
                             if let Some(last_executed) = self.last_executed_at {
                                 ui.add_space(2.0);
-                                ui.label(
-                                    WidgetText::muted(&format!("Last: {}", self.format_last_executed(last_executed)))
-                                );
+                                ui.label(WidgetText::muted(format!(
+                                    "Last: {}",
+                                    self.format_last_executed(last_executed)
+                                )));
                             }
                         });
                     });
@@ -98,7 +103,8 @@ impl<'a> CommandCard<'a> {
         // Add hover background
         if response.hovered() {
             let rect = response.rect;
-            ui.painter().rect_filled(rect, 6.0, ui.style().visuals.widgets.hovered.bg_fill);
+            ui.painter()
+                .rect_filled(rect, 6.0, ui.style().visuals.widgets.hovered.bg_fill);
         }
 
         // Handle click

@@ -372,7 +372,6 @@ pub struct OpenAITool {
     pub function: OpenAIFunction,
 }
 
-
 /// OpenAI tool definition for Responses API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIResponseTool {
@@ -451,7 +450,10 @@ impl OpenAIMessage {
     }
 
     /// Create an assistant message with tool calls
-    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<OpenAIResponseToolCall>) -> Self {
+    pub fn assistant_with_tools<S: Into<String>>(
+        content: S,
+        tool_calls: Vec<OpenAIResponseToolCall>,
+    ) -> Self {
         Self {
             role: OpenAIRole::Assistant,
             content: content.into(),

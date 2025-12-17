@@ -4,8 +4,8 @@
 //! This crate helps users define their agent requirements through interactive questioning,
 //! then connects data sources (APIs, databases, files) to build functional agents.
 
-use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// Input requirement for an agent workflow
 /// Used by the LLM to request API keys, URLs, database names, etc.

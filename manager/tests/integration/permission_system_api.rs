@@ -10,7 +10,7 @@
 #![allow(unused_variables)]
 
 use actix_web::{test, web, App};
-use nocodo_manager::handlers::{main_handlers, user_handlers, team_handlers, project_handlers};
+use nocodo_manager::handlers::{main_handlers, project_handlers, team_handlers, user_handlers};
 
 use nocodo_manager::models::{
     AddTeamMemberRequest, CreatePermissionRequest, CreateTeamRequest, CreateUserRequest,
@@ -24,15 +24,9 @@ macro_rules! create_test_routes {
     ($app:expr) => {
         $app
             // Health check
-            .route(
-                "/api/health",
-                web::get().to(main_handlers::health_check),
-            )
+            .route("/api/health", web::get().to(main_handlers::health_check))
             // Auth endpoints
-            .route(
-                "/api/auth/login",
-                web::post().to(user_handlers::login),
-            )
+            .route("/api/auth/login", web::post().to(user_handlers::login))
             .route(
                 "/api/auth/register",
                 web::post().to(user_handlers::register),
@@ -41,49 +35,36 @@ macro_rules! create_test_routes {
             .service(
                 web::scope("/api/teams")
                     .route("", web::get().to(team_handlers::list_teams))
-                    .service(
-                        web::resource("")
-                            .route(web::post().to(team_handlers::create_team)),
-                    )
+                    .service(web::resource("").route(web::post().to(team_handlers::create_team)))
                     .service(
                         web::scope("/{id}")
                             .route("", web::get().to(team_handlers::get_team))
                             .route("", web::put().to(team_handlers::update_team))
                             .route("", web::delete().to(team_handlers::delete_team))
-                            .route(
-                                "/members",
-                                web::get().to(team_handlers::get_team_members),
-                            )
+                            .route("/members", web::get().to(team_handlers::get_team_members))
                             .route(
                                 "/permissions",
                                 web::get().to(team_handlers::get_team_permissions),
                             )
                             .service(
-                                web::resource("/members").route(
-                                    web::post().to(team_handlers::add_team_member),
-                                ),
+                                web::resource("/members")
+                                    .route(web::post().to(team_handlers::add_team_member)),
                             )
-                            .service(web::scope("/members/{user_id}").route(
-                                "",
-                                web::delete().to(team_handlers::remove_team_member),
-                            )),
+                            .service(
+                                web::scope("/members/{user_id}")
+                                    .route("", web::delete().to(team_handlers::remove_team_member)),
+                            ),
                     ),
             )
             // Permission management endpoints
             .service(
                 web::scope("/api/permissions")
-                    .route(
-                        "",
-                        web::get().to(team_handlers::list_permissions),
-                    )
-                    .route(
-                        "",
-                        web::post().to(team_handlers::create_permission),
-                    )
-                    .service(web::scope("/{id}").route(
-                        "",
-                        web::delete().to(team_handlers::delete_permission),
-                    )),
+                    .route("", web::get().to(team_handlers::list_permissions))
+                    .route("", web::post().to(team_handlers::create_permission))
+                    .service(
+                        web::scope("/{id}")
+                            .route("", web::delete().to(team_handlers::delete_permission)),
+                    ),
             )
             // User management endpoints
             .service(
@@ -102,16 +83,12 @@ macro_rules! create_test_routes {
                 web::scope("/api/projects")
                     .route("", web::get().to(project_handlers::get_projects))
                     .service(
-                        web::resource("")
-                            .route(web::post().to(project_handlers::create_project)),
+                        web::resource("").route(web::post().to(project_handlers::create_project)),
                     )
                     .service(
                         web::scope("/{id}")
                             .route("", web::get().to(project_handlers::get_project))
-                            .route(
-                                "",
-                                web::delete().to(project_handlers::delete_project),
-                            ),
+                            .route("", web::delete().to(project_handlers::delete_project)),
                     ),
             )
     };

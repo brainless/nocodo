@@ -277,7 +277,8 @@ impl SdkLlmClient {
 
         let inner = match config.provider.to_lowercase().as_str() {
             "openai" => {
-                let mut client = nocodo_llm_sdk::openai::client::OpenAIClient::new(&config.api_key)?;
+                let mut client =
+                    nocodo_llm_sdk::openai::client::OpenAIClient::new(&config.api_key)?;
                 if let Some(base_url) = &config.base_url {
                     client = client.with_base_url(base_url);
                 }
@@ -292,7 +293,8 @@ impl SdkLlmClient {
                 ClientType::Grok(client)
             }
             "cerebras" | "zai" | "glm" => {
-                let client = nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient::new(&config.api_key)?;
+                let client =
+                    nocodo_llm_sdk::glm::cerebras::CerebrasGlmClient::new(&config.api_key)?;
                 ClientType::Glm(client)
             }
             "zen-grok" | "zengrok" => {
@@ -710,9 +712,7 @@ impl LlmClient for SdkLlmClient {
                                     nocodo_llm_sdk::glm::types::GlmRole::System => {
                                         "system".to_string()
                                     }
-                                    nocodo_llm_sdk::glm::types::GlmRole::User => {
-                                        "user".to_string()
-                                    }
+                                    nocodo_llm_sdk::glm::types::GlmRole::User => "user".to_string(),
                                     nocodo_llm_sdk::glm::types::GlmRole::Assistant => {
                                         "assistant".to_string()
                                     }
@@ -864,9 +864,7 @@ impl LlmClient for SdkLlmClient {
                                     nocodo_llm_sdk::glm::types::GlmRole::System => {
                                         "system".to_string()
                                     }
-                                    nocodo_llm_sdk::glm::types::GlmRole::User => {
-                                        "user".to_string()
-                                    }
+                                    nocodo_llm_sdk::glm::types::GlmRole::User => "user".to_string(),
                                     nocodo_llm_sdk::glm::types::GlmRole::Assistant => {
                                         "assistant".to_string()
                                     }
@@ -898,7 +896,9 @@ impl LlmClient for SdkLlmClient {
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>> {
         // Streaming not implemented yet - return error stream
         Box::pin(futures_util::stream::once(async {
-            Err(anyhow::anyhow!("Streaming not yet implemented in SDK wrapper"))
+            Err(anyhow::anyhow!(
+                "Streaming not yet implemented in SDK wrapper"
+            ))
         }))
     }
 

@@ -1,6 +1,6 @@
-use manager_models::{BashRequest, BashResponse, ToolErrorResponse, ToolResponse};
 use crate::tool_error::ToolError;
 use anyhow::Result;
+use manager_models::{BashRequest, BashResponse, ToolErrorResponse, ToolResponse};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 

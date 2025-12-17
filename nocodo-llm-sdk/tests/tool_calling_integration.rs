@@ -1,10 +1,10 @@
 use nocodo_llm_sdk::{
     claude::ClaudeClient,
-    openai::OpenAIClient,
-    grok::xai::XaiGrokClient,
-    grok::zen::ZenGrokClient,
     glm::cerebras::CerebrasGlmClient,
     glm::zen::ZenGlmClient,
+    grok::xai::XaiGrokClient,
+    grok::zen::ZenGrokClient,
+    openai::OpenAIClient,
     tools::{Tool, ToolChoice},
 };
 use schemars::JsonSchema;
@@ -40,7 +40,11 @@ struct TestConfig {
 }
 
 impl TestConfig {
-    const fn new(provider: &'static str, model: &'static str, api_key_env: Option<&'static str>) -> Self {
+    const fn new(
+        provider: &'static str,
+        model: &'static str,
+        api_key_env: Option<&'static str>,
+    ) -> Self {
         Self {
             provider,
             model,
@@ -58,7 +62,11 @@ impl TestConfig {
 
 const TEST_CONFIGS: &[TestConfig] = &[
     TestConfig::new("openai", "gpt-5-codex", Some("OPENAI_API_KEY")),
-    TestConfig::new("anthropic", "claude-sonnet-4-5-20250929", Some("ANTHROPIC_API_KEY")),
+    TestConfig::new(
+        "anthropic",
+        "claude-sonnet-4-5-20250929",
+        Some("ANTHROPIC_API_KEY"),
+    ),
     TestConfig::new("xai-grok", "grok-code-fast-1", Some("XAI_API_KEY")),
     TestConfig::new("zen-grok", "grok-code", None),
     TestConfig::new("cerebras-glm", "zai-glm-4.6", Some("CEREBRAS_API_KEY")),
@@ -73,12 +81,18 @@ async fn test_tool_calling_all_providers() {
 
     for config in TEST_CONFIGS {
         if !config.is_available() {
-            println!("⏭️  Skipping {}/{} - API key not available", config.provider, config.model);
+            println!(
+                "⏭️  Skipping {}/{} - API key not available",
+                config.provider, config.model
+            );
             skipped.push((config.provider, config.model));
             continue;
         }
 
-        println!("\n🧪 Testing tool calling: {}/{}", config.provider, config.model);
+        println!(
+            "\n🧪 Testing tool calling: {}/{}",
+            config.provider, config.model
+        );
 
         match test_tool_calling(config).await {
             Ok(_) => {
@@ -111,10 +125,18 @@ async fn test_tool_calling_all_providers() {
         }
     }
 
-    println!("\n📈 Results: {} passed, {} failed, {} skipped", passed, failed, skipped.len());
+    println!(
+        "\n📈 Results: {} passed, {} failed, {} skipped",
+        passed,
+        failed,
+        skipped.len()
+    );
 
     // Assert at least one test ran and all that ran passed
-    assert!(!results.is_empty(), "No tests ran - at least one provider must be available");
+    assert!(
+        !results.is_empty(),
+        "No tests ran - at least one provider must be available"
+    );
     assert_eq!(failed, 0, "Some tests failed - check output above");
 }
 
@@ -142,15 +164,23 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                     .await?;
 
                 // For Responses API, tool calls appear in the output array as function_call items
-                let function_call_items: Vec<_> = response.output.iter()
+                let function_call_items: Vec<_> = response
+                    .output
+                    .iter()
                     .filter(|item| item.item_type == "function_call")
                     .collect();
 
-                assert!(!function_call_items.is_empty(), "Expected tool call but got none in Responses API output");
-                
+                assert!(
+                    !function_call_items.is_empty(),
+                    "Expected tool call but got none in Responses API output"
+                );
+
                 // For now, just verify we got a function call item - full parsing can be added later
                 // when the OpenAIOutputItem type is updated to include call_id and arguments fields
-                println!("✅ Found {} function call item(s) in Responses API output", function_call_items.len());
+                println!(
+                    "✅ Found {} function call item(s) in Responses API output",
+                    function_call_items.len()
+                );
             } else {
                 // Use Chat Completions API for other models
                 let response = client
@@ -163,11 +193,18 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                     .await?;
 
                 // Verify tool call was made
-                assert!(response.tool_calls().is_some(), "Expected tool call but got none");
+                assert!(
+                    response.tool_calls().is_some(),
+                    "Expected tool call but got none"
+                );
 
                 let tool_calls = response.tool_calls().unwrap();
                 assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-                assert_eq!(tool_calls[0].name(), "get_weather", "Expected get_weather tool");
+                assert_eq!(
+                    tool_calls[0].name(),
+                    "get_weather",
+                    "Expected get_weather tool"
+                );
 
                 // Parse and validate arguments
                 let params: WeatherParams = tool_calls[0].parse_arguments()?;
@@ -196,11 +233,18 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                 .await?;
 
             // Verify tool call was made
-            assert!(response.tool_calls().is_some(), "Expected tool call but got none");
+            assert!(
+                response.tool_calls().is_some(),
+                "Expected tool call but got none"
+            );
 
             let tool_calls = response.tool_calls().unwrap();
             assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-            assert_eq!(tool_calls[0].name(), "get_weather", "Expected get_weather tool");
+            assert_eq!(
+                tool_calls[0].name(),
+                "get_weather",
+                "Expected get_weather tool"
+            );
 
             // Parse and validate arguments
             let params: WeatherParams = tool_calls[0].parse_arguments()?;
@@ -227,11 +271,18 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                 .await?;
 
             // Verify tool call was made
-            assert!(response.tool_calls().is_some(), "Expected tool call but got none");
+            assert!(
+                response.tool_calls().is_some(),
+                "Expected tool call but got none"
+            );
 
             let tool_calls = response.tool_calls().unwrap();
             assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-            assert_eq!(tool_calls[0].name(), "get_weather", "Expected get_weather tool");
+            assert_eq!(
+                tool_calls[0].name(),
+                "get_weather",
+                "Expected get_weather tool"
+            );
 
             // Parse and validate arguments
             let params: WeatherParams = tool_calls[0].parse_arguments()?;
@@ -288,7 +339,10 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
             // Check if tool calling is supported
             if let Some(tool_calls) = &response.choices[0].message.tool_calls {
                 assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-                assert_eq!(tool_calls[0].function.name, "get_weather", "Expected get_weather tool");
+                assert_eq!(
+                    tool_calls[0].function.name, "get_weather",
+                    "Expected get_weather tool"
+                );
 
                 // Verify arguments contain Tokyo
                 let args_str = tool_calls[0].function.arguments.to_string();
@@ -299,8 +353,10 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                 );
             } else {
                 // If tool calling isn't supported, just verify we got a response
-                println!("⚠️  Note: {}/{} may not support tool calling, got text response instead",
-                    config.provider, config.model);
+                println!(
+                    "⚠️  Note: {}/{} may not support tool calling, got text response instead",
+                    config.provider, config.model
+                );
                 assert!(!response.choices[0].message.content.is_empty());
             }
         }
@@ -318,11 +374,18 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                 .await?;
 
             // Verify tool call was made
-            assert!(response.tool_calls().is_some(), "Expected tool call but got none");
+            assert!(
+                response.tool_calls().is_some(),
+                "Expected tool call but got none"
+            );
 
             let tool_calls = response.tool_calls().unwrap();
             assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-            assert_eq!(tool_calls[0].name(), "get_weather", "Expected get_weather tool");
+            assert_eq!(
+                tool_calls[0].name(),
+                "get_weather",
+                "Expected get_weather tool"
+            );
 
             // Parse and validate arguments
             let params: WeatherParams = tool_calls[0].parse_arguments()?;
@@ -378,7 +441,10 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
             // Check if tool calling is supported
             if let Some(tool_calls) = &response.choices[0].message.tool_calls {
                 assert_eq!(tool_calls.len(), 1, "Expected 1 tool call");
-                assert_eq!(tool_calls[0].function.name, "get_weather", "Expected get_weather tool");
+                assert_eq!(
+                    tool_calls[0].function.name, "get_weather",
+                    "Expected get_weather tool"
+                );
 
                 // Verify arguments contain Tokyo
                 let args_str = tool_calls[0].function.arguments.to_string();
@@ -389,8 +455,10 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                 );
             } else {
                 // If tool calling isn't supported, just verify we got a response
-                println!("⚠️  Note: {}/{} may not support tool calling, got text response instead",
-                    config.provider, config.model);
+                println!(
+                    "⚠️  Note: {}/{} may not support tool calling, got text response instead",
+                    config.provider, config.model
+                );
                 if let Some(content) = &response.choices[0].message.content {
                     assert!(!content.is_empty(), "Expected non-empty content");
                 }
@@ -413,18 +481,26 @@ async fn test_openai_tool_calling() {
         println!("⏭️  Skipping - OPENAI_API_KEY not set");
         return;
     }
-    test_tool_calling(&config).await.expect("OpenAI tool calling test failed");
+    test_tool_calling(&config)
+        .await
+        .expect("OpenAI tool calling test failed");
 }
 
 #[tokio::test]
 #[ignore]
 async fn test_anthropic_tool_calling() {
-    let config = TestConfig::new("anthropic", "claude-sonnet-4-5-20250929", Some("ANTHROPIC_API_KEY"));
+    let config = TestConfig::new(
+        "anthropic",
+        "claude-sonnet-4-5-20250929",
+        Some("ANTHROPIC_API_KEY"),
+    );
     if !config.is_available() {
         println!("⏭️  Skipping - ANTHROPIC_API_KEY not set");
         return;
     }
-    test_tool_calling(&config).await.expect("Anthropic tool calling test failed");
+    test_tool_calling(&config)
+        .await
+        .expect("Anthropic tool calling test failed");
 }
 
 #[tokio::test]
@@ -435,14 +511,18 @@ async fn test_xai_grok_tool_calling() {
         println!("⏭️  Skipping - XAI_API_KEY not set");
         return;
     }
-    test_tool_calling(&config).await.expect("xAI Grok tool calling test failed");
+    test_tool_calling(&config)
+        .await
+        .expect("xAI Grok tool calling test failed");
 }
 
 #[tokio::test]
 #[ignore]
 async fn test_zen_grok_tool_calling() {
     let config = TestConfig::new("zen-grok", "grok-code", None);
-    test_tool_calling(&config).await.expect("Zen Grok tool calling test failed");
+    test_tool_calling(&config)
+        .await
+        .expect("Zen Grok tool calling test failed");
 }
 
 #[tokio::test]
@@ -453,12 +533,16 @@ async fn test_cerebras_glm_tool_calling() {
         println!("⏭️  Skipping - CEREBRAS_API_KEY not set");
         return;
     }
-    test_tool_calling(&config).await.expect("Cerebras GLM tool calling test failed");
+    test_tool_calling(&config)
+        .await
+        .expect("Cerebras GLM tool calling test failed");
 }
 
 #[tokio::test]
 #[ignore]
 async fn test_zen_glm_tool_calling() {
     let config = TestConfig::new("zen-glm", "big-pickle", None);
-    test_tool_calling(&config).await.expect("Zen GLM tool calling test failed");
+    test_tool_calling(&config)
+        .await
+        .expect("Zen GLM tool calling test failed");
 }

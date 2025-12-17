@@ -3,8 +3,8 @@
 //! Run with: cargo run --example zen_grok_free
 
 use nocodo_llm_sdk::grok::{
-    zen::ZenGrokClient,
     types::{GrokChatCompletionRequest, GrokMessage, GrokRole},
+    zen::ZenGrokClient,
 };
 
 #[tokio::main]

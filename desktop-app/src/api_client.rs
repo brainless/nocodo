@@ -250,11 +250,11 @@ impl ApiClient {
         Ok(models_response.models)
     }
 
-    pub async fn get_worktree_branches(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<String>, ApiError> {
-        let url = format!("{}/api/projects/{}/git/worktree-branches", self.base_url, project_id);
+    pub async fn get_worktree_branches(&self, project_id: i64) -> Result<Vec<String>, ApiError> {
+        let url = format!(
+            "{}/api/projects/{}/git/worktree-branches",
+            self.base_url, project_id
+        );
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
         let response = request
@@ -272,7 +272,8 @@ impl ApiClient {
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         // Extract just the branch names from the GitBranch structs
-        let branch_names: Vec<String> = branches_response.branches
+        let branch_names: Vec<String> = branches_response
+            .branches
             .into_iter()
             .map(|branch| branch.name)
             .collect();
@@ -751,9 +752,7 @@ impl ApiClient {
     }
 
     /// Get the current user's teams
-    pub async fn get_current_user_teams(
-        &self,
-    ) -> Result<Vec<manager_models::TeamItem>, ApiError> {
+    pub async fn get_current_user_teams(&self) -> Result<Vec<manager_models::TeamItem>, ApiError> {
         let url = format!("{}/api/me/teams", self.base_url);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -807,7 +806,10 @@ impl ApiClient {
         project_id: i64,
         use_llm: Option<bool>,
     ) -> Result<manager_models::DiscoverCommandsResponse, ApiError> {
-        let mut url = format!("{}/api/projects/{}/commands/discover", self.base_url, project_id);
+        let mut url = format!(
+            "{}/api/projects/{}/commands/discover",
+            self.base_url, project_id
+        );
 
         if let Some(use_llm_val) = use_llm {
             url.push_str(&format!("?use_llm={}", use_llm_val));
@@ -890,9 +892,11 @@ impl ApiClient {
         command_id: &str,
         limit: Option<i64>,
     ) -> Result<Vec<manager_models::ProjectCommandExecution>, ApiError> {
-        let mut url = format!("{}/api/projects/{}/commands/{}/executions",
-            self.base_url, project_id, command_id);
-        
+        let mut url = format!(
+            "{}/api/projects/{}/commands/{}/executions",
+            self.base_url, project_id, command_id
+        );
+
         if let Some(limit) = limit {
             url.push_str(&format!("?limit={}", limit));
         }
@@ -923,8 +927,10 @@ impl ApiClient {
         command_id: &str,
         git_branch: Option<&str>,
     ) -> Result<serde_json::Value, ApiError> {
-        let url = format!("{}/api/projects/{}/commands/{}/execute",
-            self.base_url, project_id, command_id);
+        let url = format!(
+            "{}/api/projects/{}/commands/{}/execute",
+            self.base_url, project_id, command_id
+        );
 
         let body = serde_json::json!({
             "git_branch": git_branch,

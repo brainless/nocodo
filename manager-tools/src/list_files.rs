@@ -1,13 +1,12 @@
-use manager_models::{FileInfo, FileType, ListFilesRequest, ListFilesResponse, ToolErrorResponse, ToolResponse};
 use crate::tool_error::ToolError;
 use anyhow::Result;
+use manager_models::{
+    FileInfo, FileType, ListFilesRequest, ListFilesResponse, ToolErrorResponse, ToolResponse,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub async fn list_files(
-    base_path: &Path,
-    request: ListFilesRequest,
-) -> Result<ToolResponse> {
+pub async fn list_files(base_path: &Path, request: ListFilesRequest) -> Result<ToolResponse> {
     let target_path = validate_and_resolve_path(base_path, &request.path)?;
 
     if !target_path.exists() {

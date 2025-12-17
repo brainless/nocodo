@@ -7,8 +7,9 @@ use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
     MessageAuthorType, MessageContentType, ProjectCommand, ProjectCommandExecution,
-    ProjectCommandExecutionListResponse, ProjectCommandExecutionResponse, ProjectCommandFilterQuery,
-    ProjectCommandResponse, UpdateProjectCommandRequest, Work, WorkMessage,
+    ProjectCommandExecutionListResponse, ProjectCommandExecutionResponse,
+    ProjectCommandFilterQuery, ProjectCommandResponse, UpdateProjectCommandRequest, Work,
+    WorkMessage,
 };
 use actix_web::{web, HttpResponse, Result};
 use chrono::Utc;
@@ -29,7 +30,8 @@ pub async fn get_project_commands(
     info!("Getting commands for project {}", project_id);
 
     // Verify project exists
-    data.database.get_project_by_id(project_id)
+    data.database
+        .get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
     let mut commands = data.database.get_project_commands(project_id)?;
@@ -93,7 +95,8 @@ pub async fn create_project_command(
     let project_id = project_id.into_inner();
 
     // Verify project exists
-    data.database.get_project_by_id(project_id)
+    data.database
+        .get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
     // Handle both single command and array of commands
@@ -110,10 +113,16 @@ pub async fn create_project_command(
         })?;
 
     if requests.is_empty() {
-        return Err(AppError::InvalidRequest("At least one command is required".into()));
+        return Err(AppError::InvalidRequest(
+            "At least one command is required".into(),
+        ));
     }
 
-    info!("Creating {} command(s) for project {}", requests.len(), project_id);
+    info!(
+        "Creating {} command(s) for project {}",
+        requests.len(),
+        project_id
+    );
 
     let mut created_commands = Vec::new();
     let now = Utc::now().timestamp();
@@ -130,7 +139,9 @@ pub async fn create_project_command(
         }
 
         // Check if command already exists for this project
-        if let Some(existing_command) = data.database.command_exists(project_id, &request.command)? {
+        if let Some(existing_command) =
+            data.database.command_exists(project_id, &request.command)?
+        {
             info!(
                 "Command '{}' already exists for project {} with id {}, skipping creation",
                 request.command, project_id, existing_command.id
@@ -187,7 +198,9 @@ pub async fn update_project_command(
     // Apply updates
     if let Some(name) = &request.name {
         if name.is_empty() {
-            return Err(AppError::InvalidRequest("Command name cannot be empty".into()));
+            return Err(AppError::InvalidRequest(
+                "Command name cannot be empty".into(),
+            ));
         }
         command.name = name.clone();
     }
@@ -276,7 +289,8 @@ pub async fn execute_project_command(
     }
 
     // Get project to determine execution path
-    let project = data.database
+    let project = data
+        .database
         .get_project_by_id(project_id)
         .map_err(|_| AppError::NotFound(format!("Project {} not found", project_id)))?;
 
@@ -292,9 +306,7 @@ pub async fn execute_project_command(
                 &std::path::PathBuf::from(&project.path),
                 branch,
             )
-            .map_err(|e| {
-                AppError::InvalidRequest(format!("Failed to get worktree path: {}", e))
-            })?;
+            .map_err(|e| AppError::InvalidRequest(format!("Failed to get worktree path: {}", e)))?;
             std::path::PathBuf::from(worktree_path)
         }
     };
@@ -333,11 +345,16 @@ pub async fn execute_project_command(
     let shell = command.shell.as_deref().unwrap_or("bash");
     let full_command = format!("cd {:?} && {}", execution_path, command.command);
 
-    info!("Executing: {} (timeout: {}s)", full_command, timeout_seconds);
+    info!(
+        "Executing: {} (timeout: {}s)",
+        full_command, timeout_seconds
+    );
 
     // Execute using tokio::process::Command
     let mut cmd = tokio::process::Command::new(shell);
-    cmd.arg("-c").arg(&command.command).current_dir(&execution_path);
+    cmd.arg("-c")
+        .arg(&command.command)
+        .current_dir(&execution_path);
 
     // Set environment variables
     for (key, value) in env {
@@ -353,7 +370,10 @@ pub async fn execute_project_command(
         Ok(Ok(output)) => output,
         Ok(Err(e)) => {
             error!("Failed to execute command: {}", e);
-            return Err(AppError::Internal(format!("Failed to execute command: {}", e)));
+            return Err(AppError::Internal(format!(
+                "Failed to execute command: {}",
+                e
+            )));
         }
         Err(_) => {
             error!("Command execution timed out after {}s", timeout_seconds);
@@ -420,7 +440,9 @@ pub async fn get_command_executions(
     }
 
     let limit = query.limit.unwrap_or(50);
-    let executions = data.database.get_project_command_executions(&command_id, limit)?;
+    let executions = data
+        .database
+        .get_project_command_executions(&command_id, limit)?;
 
     Ok(HttpResponse::Ok().json(ProjectCommandExecutionListResponse { executions }))
 }
@@ -499,7 +521,10 @@ pub async fn discover_project_commands(
         if use_llm && data.llm_agent.is_none() {
             warn!("LLM enhancement requested but LLM agent not available");
         }
-        (rule_based_response.commands.clone(), rule_based_response.reasoning.clone())
+        (
+            rule_based_response.commands.clone(),
+            rule_based_response.reasoning.clone(),
+        )
     };
 
     info!(
@@ -524,11 +549,13 @@ pub async fn discover_project_commands(
         .collect();
 
     // Return suggested commands (not stored yet - user will select which ones to save)
-    Ok(HttpResponse::Ok().json(manager_models::DiscoverCommandsResponse {
-        commands: commands_response,
-        project_types: rule_based_response.project_types,
-        reasoning,
-    }))
+    Ok(
+        HttpResponse::Ok().json(manager_models::DiscoverCommandsResponse {
+            commands: commands_response,
+            project_types: rule_based_response.project_types,
+            reasoning,
+        }),
+    )
 }
 
 /// Enhance command discovery using LLM
@@ -566,7 +593,8 @@ async fn enhance_discovery_with_llm(
         working_directory: Some(project_path.to_string_lossy().to_string()),
     };
 
-    let work_id = db.create_work(&work)
+    let work_id = db
+        .create_work(&work)
         .map_err(|e| AppError::Internal(format!("Failed to create work item: {}", e)))?;
 
     info!("Created work item {} for command discovery", work_id);
@@ -584,7 +612,8 @@ async fn enhance_discovery_with_llm(
         author_id: Some("system".to_string()),
         sequence_order: 0,
         created_at: chrono::Utc::now().timestamp(),
-    }).map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
+    })
+    .map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
 
     info!(
         "Creating LLM session for discovery with provider: {}, model: {}",
@@ -596,7 +625,12 @@ async fn enhance_discovery_with_llm(
 
     // Create LLM session
     let session = llm_agent
-        .create_session(work_id, provider.clone(), model.clone(), Some(system_prompt))
+        .create_session(
+            work_id,
+            provider.clone(),
+            model.clone(),
+            Some(system_prompt),
+        )
         .await
         .map_err(|e| AppError::Internal(format!("Failed to create LLM session: {}", e)))?;
 
@@ -615,7 +649,8 @@ async fn enhance_discovery_with_llm(
         created_at: chrono::Utc::now().timestamp(),
     };
 
-    let work_message_id = db.create_work_message(&work_message)
+    let work_message_id = db
+        .create_work_message(&work_message)
         .map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
 
     let ai_session = crate::models::AiSession {
@@ -624,15 +659,23 @@ async fn enhance_discovery_with_llm(
         message_id: work_message_id,
         tool_name: "llm-agent".to_string(),
         status: "started".to_string(),
-        project_context: Some(format!("Project: {}\nPath: {}", project_id, project_path.display())),
+        project_context: Some(format!(
+            "Project: {}\nPath: {}",
+            project_id,
+            project_path.display()
+        )),
         started_at: chrono::Utc::now().timestamp(),
         ended_at: None,
     };
 
-    let ai_session_id = db.create_ai_session(&ai_session)
+    let ai_session_id = db
+        .create_ai_session(&ai_session)
         .map_err(|e| AppError::Internal(format!("Failed to create AI session: {}", e)))?;
 
-    info!("AI session created: {} for LLM session: {}", ai_session_id, session.id);
+    info!(
+        "AI session created: {} for LLM session: {}",
+        ai_session_id, session.id
+    );
 
     info!("Sending discovery request to LLM");
     let llm_response = llm_agent
@@ -643,7 +686,8 @@ async fn enhance_discovery_with_llm(
     info!("Received LLM response, parsing commands");
 
     // Parse LLM response to extract enhanced commands
-    let (enhanced_commands, reasoning) = parse_llm_discovery_response(&llm_response, &rule_based_commands)?;
+    let (enhanced_commands, reasoning) =
+        parse_llm_discovery_response(&llm_response, &rule_based_commands)?;
 
     info!(
         "LLM discovery completed: {} commands extracted",
@@ -709,8 +753,8 @@ fn create_discovery_user_message(
     project_path: &std::path::Path,
     rule_based_commands: &[SuggestedCommand],
 ) -> String {
-    let commands_json = serde_json::to_string_pretty(rule_based_commands)
-        .unwrap_or_else(|_| "[]".to_string());
+    let commands_json =
+        serde_json::to_string_pretty(rule_based_commands).unwrap_or_else(|_| "[]".to_string());
 
     format!(
         r#"Please analyze this project and enhance the discovered commands.
@@ -764,9 +808,9 @@ fn parse_llm_discovery_response(
     // Try to parse as JSON
     match serde_json::from_str::<serde_json::Value>(json_str) {
         Ok(json) => {
-            let commands = json["commands"]
-                .as_array()
-                .ok_or_else(|| AppError::Internal("LLM response missing 'commands' array".to_string()))?;
+            let commands = json["commands"].as_array().ok_or_else(|| {
+                AppError::Internal("LLM response missing 'commands' array".to_string())
+            })?;
 
             let mut enhanced_commands = Vec::new();
             for cmd_value in commands {
@@ -786,13 +830,19 @@ fn parse_llm_discovery_response(
             // If LLM didn't return any commands, fall back to rule-based
             if enhanced_commands.is_empty() {
                 warn!("LLM returned no valid commands, using fallback");
-                Ok((fallback_commands.to_vec(), format!("{} (no valid LLM commands, using fallback)", reasoning)))
+                Ok((
+                    fallback_commands.to_vec(),
+                    format!("{} (no valid LLM commands, using fallback)", reasoning),
+                ))
             } else {
                 Ok((enhanced_commands, reasoning))
             }
         }
         Err(e) => {
-            warn!("Failed to parse LLM response as JSON: {}. Using fallback commands.", e);
+            warn!(
+                "Failed to parse LLM response as JSON: {}. Using fallback commands.",
+                e
+            );
             Ok((
                 fallback_commands.to_vec(),
                 format!("Rule-based discovery (LLM response parsing failed: {})", e),

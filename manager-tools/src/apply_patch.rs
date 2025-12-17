@@ -1,13 +1,12 @@
-use manager_models::{ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, ToolErrorResponse, ToolResponse};
 use crate::tool_error::ToolError;
 use anyhow::Result;
+use manager_models::{
+    ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, ToolErrorResponse, ToolResponse,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub async fn apply_patch(
-    base_path: &PathBuf,
-    request: ApplyPatchRequest,
-) -> Result<ToolResponse> {
+pub async fn apply_patch(base_path: &PathBuf, request: ApplyPatchRequest) -> Result<ToolResponse> {
     use codex_apply_patch::{parse_patch, Hunk};
 
     // Parse the patch

@@ -19,7 +19,10 @@ async fn test_zai_glm_regular_mode() {
     if let Err(e) = &result {
         let error_str = e.to_string();
         if error_str.contains("Insufficient balance") || error_str.contains("1113") {
-            println!("Skipping test - Z.AI account has insufficient balance: {}", error_str);
+            println!(
+                "Skipping test - Z.AI account has insufficient balance: {}",
+                error_str
+            );
             return;
         }
     }
@@ -44,7 +47,10 @@ async fn test_zai_glm_coding_plan_mode() {
     let client = ZaiGlmClient::with_coding_plan(api_key, true)
         .expect("Failed to create Z.AI GLM client with coding plan");
 
-    assert!(client.is_coding_plan(), "Client should be in coding plan mode");
+    assert!(
+        client.is_coding_plan(),
+        "Client should be in coding plan mode"
+    );
 
     let result = client
         .message_builder()
@@ -59,7 +65,10 @@ async fn test_zai_glm_coding_plan_mode() {
     if let Err(e) = &result {
         let error_str = e.to_string();
         if error_str.contains("Insufficient balance") || error_str.contains("1113") {
-            println!("Skipping test - Z.AI account has insufficient balance: {}", error_str);
+            println!(
+                "Skipping test - Z.AI account has insufficient balance: {}",
+                error_str
+            );
             return;
         }
     }
@@ -71,7 +80,8 @@ async fn test_zai_glm_coding_plan_mode() {
     assert!(!response_text.trim().is_empty());
     // Should contain Python code for reversing a string
     assert!(
-        response_text.to_lowercase().contains("def") || response_text.to_lowercase().contains("function"),
+        response_text.to_lowercase().contains("def")
+            || response_text.to_lowercase().contains("function"),
         "Response should contain function definition: {}",
         response_text
     );
@@ -97,7 +107,10 @@ async fn test_zai_glm_json_response_format() {
     if let Err(e) = &result {
         let error_str = e.to_string();
         if error_str.contains("Insufficient balance") || error_str.contains("1113") {
-            println!("Skipping test - Z.AI account has insufficient balance: {}", error_str);
+            println!(
+                "Skipping test - Z.AI account has insufficient balance: {}",
+                error_str
+            );
             return;
         }
     }
@@ -107,17 +120,17 @@ async fn test_zai_glm_json_response_format() {
     assert!(!response.choices.is_empty());
     let response_text = response.choices[0].message.get_text();
     assert!(!response_text.trim().is_empty());
-    
+
     // Try to parse as JSON (may not be perfect JSON, but should contain JSON-like structure)
     let trimmed = response_text.trim();
     let looks_like_json = trimmed.starts_with("{") && trimmed.ends_with("}");
-    
+
     if looks_like_json {
         println!("Successfully got JSON response: {}", trimmed);
     } else {
         println!("Got text response that should contain JSON: {}", trimmed);
     }
-    
+
     println!("Z.AI GLM JSON response format test: {:?}", response);
 }
 
@@ -164,7 +177,10 @@ async fn test_zai_glm_thinking_mode() {
     if let Err(e) = &result {
         let error_str = e.to_string();
         if error_str.contains("Insufficient balance") || error_str.contains("1113") {
-            println!("Skipping test - Z.AI account has insufficient balance: {}", error_str);
+            println!(
+                "Skipping test - Z.AI account has insufficient balance: {}",
+                error_str
+            );
             return;
         }
     }
@@ -174,12 +190,13 @@ async fn test_zai_glm_thinking_mode() {
     assert!(!response.choices.is_empty());
     let response_text = response.choices[0].message.get_text();
     assert!(!response_text.trim().is_empty());
-    
+
     // Should contain explanation of Tower of Hanoi solution
     assert!(
-        response_text.to_lowercase().contains("hanoi") || response_text.to_lowercase().contains("tower"),
+        response_text.to_lowercase().contains("hanoi")
+            || response_text.to_lowercase().contains("tower"),
         "Response should contain Tower of Hanoi explanation"
     );
-    
+
     println!("Z.AI GLM thinking mode response: {}", response_text);
 }

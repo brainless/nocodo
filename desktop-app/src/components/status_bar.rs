@@ -22,7 +22,7 @@ impl StatusBar {
     pub fn ui(&mut self, ctx: &Context, state: &AppState) {
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.style_mut().spacing.item_spacing = egui::vec2(12.0, 0.0);
-            
+
             Flex::horizontal()
                 .gap(Vec2::new(12.0, 0.0))
                 .align_content(FlexAlignContent::Center)
@@ -30,16 +30,28 @@ impl StatusBar {
                     // Connection status section
                     match &state.connection_state {
                         ConnectionState::Disconnected => {
-                            flex.add(item(), egui::Label::new(
-                                egui::RichText::new(format!("{} Disconnected", icons::ICON_WIFI_OFF))
-                                    .color(egui::Color32::RED)
-                            ));
+                            flex.add(
+                                item(),
+                                egui::Label::new(
+                                    egui::RichText::new(format!(
+                                        "{} Disconnected",
+                                        icons::ICON_WIFI_OFF
+                                    ))
+                                    .color(egui::Color32::RED),
+                                ),
+                            );
                         }
                         ConnectionState::Connecting => {
-                            flex.add(item(), egui::Label::new(
-                                egui::RichText::new(format!("{} Connecting...", icons::ICON_WIFI))
-                                    .color(egui::Color32::YELLOW)
-                            ));
+                            flex.add(
+                                item(),
+                                egui::Label::new(
+                                    egui::RichText::new(format!(
+                                        "{} Connecting...",
+                                        icons::ICON_WIFI
+                                    ))
+                                    .color(egui::Color32::YELLOW),
+                                ),
+                            );
                         }
                         ConnectionState::Connected => {
                             let label = if let Some(host) = &state.ui_state.connected_host {
@@ -47,28 +59,42 @@ impl StatusBar {
                             } else {
                                 format!("{} Connected", icons::ICON_WIFI)
                             };
-                            flex.add(item(), egui::Label::new(
-                                egui::RichText::new(label)
-                                    .color(egui::Color32::GREEN)
-                            ));
-                            flex.add(item(), egui::Label::new(
-                                format!("{} Projects: {}", icons::ICON_FOLDER, state.projects.len())
-                            ));
+                            flex.add(
+                                item(),
+                                egui::Label::new(
+                                    egui::RichText::new(label).color(egui::Color32::GREEN),
+                                ),
+                            );
+                            flex.add(
+                                item(),
+                                egui::Label::new(format!(
+                                    "{} Projects: {}",
+                                    icons::ICON_FOLDER,
+                                    state.projects.len()
+                                )),
+                            );
                         }
                         ConnectionState::Error(error) => {
-                            flex.add(item(), egui::Label::new(
-                                egui::RichText::new(format!("{} Error: {}", icons::ICON_ERROR, error))
-                                    .color(egui::Color32::RED)
-                            ));
+                            flex.add(
+                                item(),
+                                egui::Label::new(
+                                    egui::RichText::new(format!(
+                                        "{} Error: {}",
+                                        icons::ICON_ERROR,
+                                        error
+                                    ))
+                                    .color(egui::Color32::RED),
+                                ),
+                            );
                         }
                     }
 
                     // Error message section
                     if let Some(error) = &state.ui_state.connection_error {
-                        flex.add(item(), egui::Label::new(
-                            egui::RichText::new(error)
-                                .color(egui::Color32::RED)
-                        ));
+                        flex.add(
+                            item(),
+                            egui::Label::new(egui::RichText::new(error).color(egui::Color32::RED)),
+                        );
                     }
 
                     // Add flexible space to push any future right-aligned items

@@ -960,7 +960,12 @@ impl Database {
             .lock()
             .map_err(|e| AppError::Internal(format!("Failed to acquire database lock: {e}")))?;
 
-        tracing::debug!("Creating project: name={}, path={}, parent_id={:?}", project.name, project.path, project.parent_id);
+        tracing::debug!(
+            "Creating project: name={}, path={}, parent_id={:?}",
+            project.name,
+            project.path,
+            project.parent_id
+        );
 
         // Only include ID in INSERT if it's not 0 (0 indicates auto-generate)
         if project.id == 0 {
@@ -1206,10 +1211,6 @@ impl Database {
         Ok(outputs)
     }
 
-
-
-
-
     #[allow(dead_code)]
     pub fn update_project(&self, project: &Project) -> AppResult<()> {
         let conn = self
@@ -1236,12 +1237,6 @@ impl Database {
         tracing::info!("Updated project: {} ({})", project.name, project.id);
         Ok(())
     }
-
-
-
-
-
-
 
     pub fn get_ai_session_by_id(&self, id: i64) -> AppResult<AiSession> {
         let conn = self
@@ -1303,10 +1298,6 @@ impl Database {
         Ok(())
     }
 
-
-
-
-
     // Store one-shot AI output content for a session
     pub fn create_ai_session_output(&self, session_id: i64, content: &str) -> AppResult<()> {
         let conn = self
@@ -1326,8 +1317,6 @@ impl Database {
         );
         Ok(())
     }
-
-
 
     // Work management methods
     pub fn create_work(&self, work: &crate::models::Work) -> AppResult<i64> {
@@ -1607,12 +1596,7 @@ impl Database {
         Ok(())
     }
 
-
-
     // Work message management methods
-
-
-
 
     pub fn get_work_messages(&self, work_id: i64) -> AppResult<Vec<crate::models::WorkMessage>> {
         let conn = self
@@ -1679,8 +1663,6 @@ impl Database {
             total_messages,
         })
     }
-
-
 
     // AI Session Result methods
     #[allow(dead_code)]
@@ -1776,8 +1758,6 @@ impl Database {
     }
 
     // LLM Agent Methods
-
-
 
     pub fn get_llm_agent_session(&self, session_id: i64) -> AppResult<LlmAgentSession> {
         let conn = self
@@ -1912,10 +1892,6 @@ impl Database {
         tracing::info!("Updated LLM agent session: {}", session.id);
         Ok(())
     }
-
-
-
-
 
     pub fn create_llm_agent_message(
         &self,
@@ -2115,8 +2091,6 @@ impl Database {
         Ok(())
     }
 
-    
-
     #[allow(dead_code)]
     pub fn store_command_execution(
         &self,
@@ -2147,15 +2121,7 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    
-
     // User authentication methods
-
-
-
-
-
-
 
     #[allow(dead_code)]
     pub fn get_user_by_email(&self, email: &str) -> AppResult<crate::models::User> {
@@ -2450,8 +2416,6 @@ impl Database {
         Ok(key_id)
     }
 
-    
-
     #[allow(dead_code)]
     pub fn get_ssh_keys_for_user(&self, user_id: i64) -> AppResult<Vec<crate::models::UserSshKey>> {
         let conn = self
@@ -2482,19 +2446,7 @@ impl Database {
         keys.map_err(AppError::from)
     }
 
-    
-
     // User management methods
-
-
-
-
-
-
-
-
-
-
 
     // Permission management methods
 
@@ -2639,17 +2591,7 @@ impl Database {
         Ok(parent_id)
     }
 
-
-
     // Permission system methods (Phase 2: Permission Checking)
-
-
-
-
-
-
-
-
 
     // Team CRUD methods
 
@@ -2760,16 +2702,6 @@ impl Database {
         tracing::info!("Updated team {}", team_id);
         Ok(())
     }
-
-
-
-
-
-
-
-    
-
-
 
     /// Delete a team
     pub fn delete_team(&self, team_id: i64) -> AppResult<()> {

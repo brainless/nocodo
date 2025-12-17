@@ -69,25 +69,27 @@ fn main() -> eframe::Result {
     use tracing_subscriber::{fmt, EnvFilter};
 
     // Build filter from RUST_LOG
-    let mut env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let mut env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     // Check RUST_SSH_CLIENT_LOGS for SSH-specific log level
-    let ssh_log_level = std::env::var("RUST_SSH_CLIENT_LOGS")
-        .ok()
-        .and_then(|v| {
-            let level = v.trim().to_lowercase();
-            match level.as_str() {
-                "trace" | "debug" | "info" | "warn" | "error" => Some(level),
-                _ => None,
-            }
-        });
+    let ssh_log_level = std::env::var("RUST_SSH_CLIENT_LOGS").ok().and_then(|v| {
+        let level = v.trim().to_lowercase();
+        match level.as_str() {
+            "trace" | "debug" | "info" | "warn" | "error" => Some(level),
+            _ => None,
+        }
+    });
 
     // Apply SSH log level directives
     if let Some(level) = ssh_log_level {
         // Enable russh logs at specified level
         env_filter = env_filter.add_directive(format!("russh={}", level).parse().unwrap());
-        env_filter = env_filter.add_directive(format!("nocodo_desktop_app::ssh={}", level).parse().unwrap());
+        env_filter = env_filter.add_directive(
+            format!("nocodo_desktop_app::ssh={}", level)
+                .parse()
+                .unwrap(),
+        );
     } else {
         // Disable SSH logs by default
         env_filter = env_filter.add_directive("russh=off".parse().unwrap());
@@ -95,28 +97,28 @@ fn main() -> eframe::Result {
     }
 
     // Check RUST_HTTP_CLIENT_LOGS for HTTP client log level
-    let http_log_level = std::env::var("RUST_HTTP_CLIENT_LOGS")
-        .ok()
-        .and_then(|v| {
-            let level = v.trim().to_lowercase();
-            match level.as_str() {
-                "trace" | "debug" | "info" | "warn" | "error" => Some(level),
-                _ => None,
-            }
-        });
+    let http_log_level = std::env::var("RUST_HTTP_CLIENT_LOGS").ok().and_then(|v| {
+        let level = v.trim().to_lowercase();
+        match level.as_str() {
+            "trace" | "debug" | "info" | "warn" | "error" => Some(level),
+            _ => None,
+        }
+    });
 
     // Apply HTTP client log level directives
     if let Some(level) = http_log_level {
         // Enable hyper_util logs at specified level
-        env_filter = env_filter.add_directive(format!("hyper_util::client::legacy={}", level).parse().unwrap());
+        env_filter = env_filter.add_directive(
+            format!("hyper_util::client::legacy={}", level)
+                .parse()
+                .unwrap(),
+        );
     } else {
         // Disable HTTP client logs by default
         env_filter = env_filter.add_directive("hyper_util::client::legacy=off".parse().unwrap());
     }
 
-    fmt()
-        .with_env_filter(env_filter)
-        .init();
+    fmt().with_env_filter(env_filter).init();
 
     // Check for CLI test mode
     let args: Vec<String> = std::env::args().collect();

@@ -1,16 +1,19 @@
-use std::path::Path;
 use crate::error::AppError;
+use std::path::Path;
 
 /// Get the working directory path for a given git branch.
 /// If the branch has a worktree, returns the worktree path.
 /// If no worktree exists for the branch, returns an error.
 #[allow(dead_code)]
-pub fn get_working_directory_for_branch(project_path: &Path, branch_name: &str) -> Result<String, AppError> {
+pub fn get_working_directory_for_branch(
+    project_path: &Path,
+    branch_name: &str,
+) -> Result<String, AppError> {
     let repo = git2::Repository::open(project_path)?;
-    
+
     // Check if this is a worktree branch by looking at git worktree list
     let worktrees = repo.worktrees()?;
-    
+
     for worktree_name in worktrees.iter().flatten() {
         // Try to find the worktree path by checking common locations
         // Worktrees are typically in subdirectories of the main repository
@@ -18,7 +21,7 @@ pub fn get_working_directory_for_branch(project_path: &Path, branch_name: &str) 
             project_path.join(worktree_name),
             project_path.join("..").join(worktree_name),
         ];
-        
+
         for potential_path in &potential_paths {
             if let Ok(worktree_repo) = git2::Repository::open(potential_path) {
                 if let Ok(head) = worktree_repo.head() {
@@ -34,9 +37,9 @@ pub fn get_working_directory_for_branch(project_path: &Path, branch_name: &str) 
             }
         }
     }
-    
+
     Err(AppError::InvalidRequest(format!(
-        "No worktree found for branch '{}'", 
+        "No worktree found for branch '{}'",
         branch_name
     )))
 }

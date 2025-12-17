@@ -1,16 +1,19 @@
 //! Centralized route configuration for the Nocodo manager API.
-//! 
+//!
 //! This module provides a shared function to configure all application routes,
 //! allowing both the main server and test servers to use the same routing setup.
 
-use actix_web::web;
-use crate::handlers::{main_handlers, project_handlers, work_handlers, user_handlers, team_handlers, file_handlers, project_commands};
+use crate::handlers::{
+    file_handlers, main_handlers, project_commands, project_handlers, team_handlers, user_handlers,
+    work_handlers,
+};
 use crate::middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement};
+use actix_web::web;
 
 /// Configures all application routes for the given scope.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `cfg` - The web service configuration to add routes to
 /// * `with_auth` - Whether to include authentication middleware
 pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
@@ -28,30 +31,29 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                 .route("", web::get().to(project_handlers::get_projects))
                 .service(
                     web::resource("")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "project", "write",
+                        )))
                         .route(web::post().to(project_handlers::create_project)),
                 )
                 .service(
                     web::resource("/add-existing")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "project", "write",
+                        )))
                         .route(web::post().to(project_handlers::add_existing_project)),
                 )
                 .service(
                     web::resource("/scan")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "project", "write",
+                        )))
                         .route(web::post().to(project_handlers::scan_projects)),
                 )
                 .service(
                     web::scope("/{id}")
                         .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "read")
-                                .with_resource_id("id"),
+                            PermissionRequirement::new("project", "read").with_resource_id("id"),
                         ))
                         .route("", web::get().to(project_handlers::get_project))
                         .route(
@@ -73,7 +75,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                     PermissionRequirement::new("project", "read")
                                         .with_resource_id("id"),
                                 ))
-                                .route("/worktree-branches", web::get().to(work_handlers::list_worktree_branches)),
+                                .route(
+                                    "/worktree-branches",
+                                    web::get().to(work_handlers::list_worktree_branches),
+                                ),
                         )
                         // Project commands endpoints
                         .service(
@@ -89,7 +94,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                             PermissionRequirement::new("project", "write")
                                                 .with_resource_id("id"),
                                         ))
-                                        .route(web::post().to(project_commands::create_project_command)),
+                                        .route(
+                                            web::post()
+                                                .to(project_commands::create_project_command),
+                                        ),
                                 )
                                 .service(
                                     web::resource("/discover")
@@ -97,7 +105,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                             PermissionRequirement::new("project", "write")
                                                 .with_resource_id("id"),
                                         ))
-                                        .route(web::post().to(project_commands::discover_project_commands)),
+                                        .route(
+                                            web::post()
+                                                .to(project_commands::discover_project_commands),
+                                        ),
                                 )
                                 .service(
                                     web::scope("/{cmd_id}")
@@ -105,15 +116,26 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                             PermissionRequirement::new("project", "read")
                                                 .with_resource_id("id"),
                                         ))
-                                        .route("", web::get().to(project_commands::get_project_command))
+                                        .route(
+                                            "",
+                                            web::get().to(project_commands::get_project_command),
+                                        )
                                         .service(
                                             web::resource("")
                                                 .wrap(PermissionMiddleware::new(
                                                     PermissionRequirement::new("project", "write")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route(web::put().to(project_commands::update_project_command))
-                                                .route(web::delete().to(project_commands::delete_project_command)),
+                                                .route(
+                                                    web::put().to(
+                                                        project_commands::update_project_command,
+                                                    ),
+                                                )
+                                                .route(
+                                                    web::delete().to(
+                                                        project_commands::delete_project_command,
+                                                    ),
+                                                ),
                                         )
                                         .service(
                                             web::resource("/execute")
@@ -121,7 +143,11 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                                     PermissionRequirement::new("project", "write")
                                                         .with_resource_id("id"),
                                                 ))
-                                                .route(web::post().to(project_commands::execute_project_command)),
+                                                .route(
+                                                    web::post().to(
+                                                        project_commands::execute_project_command,
+                                                    ),
+                                                ),
                                         )
                                         .route(
                                             "/executions",
@@ -147,22 +173,22 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                 .route("", web::get().to(file_handlers::list_files))
                 .service(
                     web::resource("")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "project", "write",
+                        )))
                         .route(web::post().to(file_handlers::create_file)),
                 )
                 .service(
                     web::scope("/{path:.*}")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "read"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "project", "read",
+                        )))
                         .route("", web::get().to(file_handlers::get_file_content))
                         .service(
                             web::resource("")
-                                .wrap(PermissionMiddleware::new(
-                                    PermissionRequirement::new("project", "write"),
-                                ))
+                                .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                    "project", "write",
+                                )))
                                 .route(web::put().to(file_handlers::update_file))
                                 .route(web::delete().to(file_handlers::delete_file)),
                         ),
@@ -177,27 +203,22 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                 .route("", web::get().to(work_handlers::list_works))
                 .service(
                     web::resource("")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("work", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "work", "write",
+                        )))
                         .route(web::post().to(work_handlers::create_work)),
                 )
                 .service(
                     web::scope("/{id}")
                         .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("work", "read")
-                                .with_resource_id("id"),
+                            PermissionRequirement::new("work", "read").with_resource_id("id"),
                         ))
                         .route("", web::get().to(work_handlers::get_work))
-                        .route(
-                            "/messages",
-                            web::get().to(work_handlers::get_work_messages),
-                        )
+                        .route("/messages", web::get().to(work_handlers::get_work_messages))
                         .route(
                             "/outputs",
                             web::get().to(work_handlers::list_ai_session_outputs),
                         )
-
                         .service(
                             web::resource("")
                                 .wrap(PermissionMiddleware::new(
@@ -212,9 +233,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                     PermissionRequirement::new("work", "write")
                                         .with_resource_id("id"),
                                 ))
-                                .route(
-                                    web::post().to(work_handlers::add_message_to_work),
-                                ),
+                                .route(web::post().to(work_handlers::add_message_to_work)),
                         ),
                 ),
         )
@@ -222,16 +241,17 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
         .service(
             web::scope("/projects/{id}/workflows")
                 .wrap(PermissionMiddleware::new(
-                    PermissionRequirement::new("project", "read")
-                        .with_resource_id("id"),
+                    PermissionRequirement::new("project", "read").with_resource_id("id"),
                 ))
                 .route("/scan", web::post().to(work_handlers::scan_workflows))
-                .route("/commands", web::get().to(work_handlers::get_workflow_commands))
+                .route(
+                    "/commands",
+                    web::get().to(work_handlers::get_workflow_commands),
+                )
                 .service(
                     web::scope("/commands/{command_id}")
                         .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("project", "write")
-                                .with_resource_id("id"),
+                            PermissionRequirement::new("project", "write").with_resource_id("id"),
                         ))
                         .route(
                             "/execute",
@@ -252,28 +272,31 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                 .route("", web::get().to(main_handlers::get_settings))
                 .service(
                     web::resource("/api-keys")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("settings", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "settings", "write",
+                        )))
                         .route(web::post().to(main_handlers::update_api_keys)),
                 )
                 .service(
                     web::resource("/projects-path")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("settings", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "settings", "write",
+                        )))
                         .route(web::post().to(project_handlers::set_projects_default_path)),
                 )
                 .service(
                     web::resource("/authorized-ssh-keys")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("settings", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "settings", "write",
+                        )))
                         .route(web::post().to(main_handlers::add_authorized_ssh_key)),
                 ),
         )
         // Current user endpoint (get teams for current logged-in user)
-        .route("/me/teams", web::get().to(team_handlers::get_current_user_teams))
+        .route(
+            "/me/teams",
+            web::get().to(team_handlers::get_current_user_teams),
+        )
         .service(
             web::resource("/models")
                 .wrap(PermissionMiddleware::new(PermissionRequirement::new(
@@ -304,22 +327,18 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                 .route("", web::get().to(team_handlers::list_teams))
                 .service(
                     web::resource("")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("team", "write"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "team", "write",
+                        )))
                         .route(web::post().to(team_handlers::create_team)),
                 )
                 .service(
                     web::scope("/{id}")
                         .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("team", "read")
-                                .with_resource_id("id"),
+                            PermissionRequirement::new("team", "read").with_resource_id("id"),
                         ))
                         .route("", web::get().to(team_handlers::get_team))
-                        .route(
-                            "/members",
-                            web::get().to(team_handlers::get_team_members),
-                        )
+                        .route("/members", web::get().to(team_handlers::get_team_members))
                         .route(
                             "/permissions",
                             web::get().to(team_handlers::get_team_permissions),
@@ -347,10 +366,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                                     PermissionRequirement::new("team", "write")
                                         .with_resource_id("id"),
                                 ))
-                                .route(
-                                    "",
-                                    web::delete().to(team_handlers::remove_team_member),
-                                ),
+                                .route("", web::delete().to(team_handlers::remove_team_member)),
                         ),
                 ),
         )
@@ -364,24 +380,24 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, with_auth: bool) {
                 .route("", web::post().to(team_handlers::create_permission))
                 .service(
                     web::scope("/{id}")
-                        .wrap(PermissionMiddleware::new(
-                            PermissionRequirement::new("team", "admin"),
-                        ))
+                        .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                            "team", "admin",
+                        )))
                         .route("", web::delete().to(team_handlers::delete_permission)),
                 ),
         );
-    
+
     // Add authentication middleware if required
     if with_auth {
         cfg.service(api_scope.wrap(AuthenticationMiddleware));
     } else {
         cfg.service(api_scope);
     }
-    
+
     // WebSocket endpoints (they handle auth internally) - added to the service config directly
     cfg.route("/ws", web::get().to(crate::websocket::websocket_handler))
-       .route(
-           "/ws/work/{id}",
-           web::get().to(crate::websocket::ai_session_websocket_handler),
-       );
+        .route(
+            "/ws/work/{id}",
+            web::get().to(crate::websocket::ai_session_websocket_handler),
+        );
 }

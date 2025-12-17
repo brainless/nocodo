@@ -53,13 +53,13 @@ pub struct DiscoveredProject {
 pub enum ScanError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Database error: {0}")]
     Database(String),
-    
+
     #[error("Path does not exist: {0}")]
     PathNotFound(PathBuf),
-    
+
     #[error("Invalid path: {0}")]
     InvalidPath(String),
 }
@@ -69,35 +69,42 @@ pub async fn scan_filesystem_for_projects(
     scan_path: &Path,
     database: &Database,
 ) -> Result<Vec<DiscoveredProject>, ScanError> {
-    info!("Starting filesystem scan for projects in: {}", scan_path.display());
-    
+    info!(
+        "Starting filesystem scan for projects in: {}",
+        scan_path.display()
+    );
+
     // Verify the scan path exists and is a directory
     if !scan_path.exists() {
         return Err(ScanError::PathNotFound(scan_path.to_path_buf()));
     }
-    
+
     if !scan_path.is_dir() {
         return Err(ScanError::InvalidPath(format!(
             "Path is not a directory: {}",
             scan_path.display()
         )));
     }
-    
+
     let mut discovered_projects = Vec::new();
-    
+
     // Walk through the directory looking for projects
     let walkdir = WalkDir::new(scan_path)
         .max_depth(3) // Limit depth to avoid scanning too deep
         .into_iter()
         .filter_entry(|e| !is_hidden_directory(e));
-    
+
     for entry in walkdir {
         match entry {
             Ok(entry) => {
                 if entry.file_type().is_dir() {
-                    if let Some(project) = detect_project(&entry.path()).await {
-                        debug!("Discovered project: {} at {}", project.name, project.path.display());
-                        
+                    if let Some(project) = detect_project(entry.path()).await {
+                        debug!(
+                            "Discovered project: {} at {}",
+                            project.name,
+                            project.path.display()
+                        );
+
                         // Add to database if not already present
                         match add_project_to_database(&project, database).await {
                             Ok(_) => {
@@ -117,8 +124,11 @@ pub async fn scan_filesystem_for_projects(
             }
         }
     }
-    
-    info!("Scan completed. Discovered {} projects", discovered_projects.len());
+
+    info!(
+        "Scan completed. Discovered {} projects",
+        discovered_projects.len()
+    );
     Ok(discovered_projects)
 }
 
@@ -129,52 +139,54 @@ async fn detect_project(project_path: &Path) -> Option<DiscoveredProject> {
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
-    
+
     let mut detected_types = Vec::new();
-    
+
     // Check for different project types
     if project_path.join("package.json").exists() {
-        detected_types.push(ProjectType::NodeJs { 
-            manager: detect_package_manager(project_path).await 
+        detected_types.push(ProjectType::NodeJs {
+            manager: detect_package_manager(project_path).await,
         });
     }
-    
+
     if project_path.join("Cargo.toml").exists() {
         detected_types.push(ProjectType::Rust);
     }
-    
-    if project_path.join("requirements.txt").exists() 
-        || project_path.join("pyproject.toml").exists() 
-        || project_path.join("Pipfile").exists() 
-        || project_path.join("environment.yml").exists() {
-        detected_types.push(ProjectType::Python { 
-            tool: detect_python_tool(project_path).await 
+
+    if project_path.join("requirements.txt").exists()
+        || project_path.join("pyproject.toml").exists()
+        || project_path.join("Pipfile").exists()
+        || project_path.join("environment.yml").exists()
+    {
+        detected_types.push(ProjectType::Python {
+            tool: detect_python_tool(project_path).await,
         });
     }
-    
+
     if project_path.join("go.mod").exists() {
         detected_types.push(ProjectType::Go);
     }
-    
+
     if project_path.join("pom.xml").exists() {
-        detected_types.push(ProjectType::Java { 
-            build_tool: JavaBuildTool::Maven 
+        detected_types.push(ProjectType::Java {
+            build_tool: JavaBuildTool::Maven,
         });
     }
-    
-    if project_path.join("build.gradle").exists() || project_path.join("build.gradle.kts").exists() {
-        detected_types.push(ProjectType::Java { 
-            build_tool: JavaBuildTool::Gradle 
+
+    if project_path.join("build.gradle").exists() || project_path.join("build.gradle.kts").exists()
+    {
+        detected_types.push(ProjectType::Java {
+            build_tool: JavaBuildTool::Gradle,
         });
     }
-    
+
     // Determine final project type
     let project_type = match detected_types.len() {
         0 => return None, // No project detected
         1 => detected_types.into_iter().next().unwrap(),
         _ => ProjectType::Mixed(detected_types),
     };
-    
+
     Some(DiscoveredProject {
         name: project_name,
         path: project_path.to_path_buf(),
@@ -222,14 +234,14 @@ async fn add_project_to_database(
 ) -> Result<(), ScanError> {
     use crate::models::Project;
     use chrono::Utc;
-    
+
     // Check if project already exists
     let existing_projects = database
         .get_all_projects()
         .map_err(|e| ScanError::Database(e.to_string()))?;
-    
+
     let project_path_str = project.path.to_string_lossy();
-    
+
     // Skip if project already exists in database
     for existing_project in existing_projects {
         if existing_project.path == project_path_str {
@@ -237,13 +249,14 @@ async fn add_project_to_database(
             return Ok(());
         }
     }
-    
+
     // Create new project
     let new_project = Project {
         id: 0, // Will be set by database
         name: project.name.clone(),
         path: project_path_str.to_string(),
-        description: Some(format!("Discovered {} project", 
+        description: Some(format!(
+            "Discovered {} project",
             match &project.project_type {
                 ProjectType::NodeJs { .. } => "Node.js",
                 ProjectType::Rust => "Rust",
@@ -258,13 +271,16 @@ async fn add_project_to_database(
         created_at: Utc::now().timestamp(),
         updated_at: Utc::now().timestamp(),
     };
-    
+
     // Add new project to database
     database
         .create_project(&new_project)
         .map_err(|e| ScanError::Database(e.to_string()))?;
-    
-    info!("Added project to database: {} at {}", project.name, project_path_str);
+
+    info!(
+        "Added project to database: {} at {}",
+        project.name, project_path_str
+    );
     Ok(())
 }
 
@@ -290,26 +306,23 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let project_dir = temp_dir.path().join("test-project");
         fs::create_dir(&project_dir).await.unwrap();
-        
+
         // Create package.json
         fs::write(
             project_dir.join("package.json"),
             r#"{"name": "test-project", "version": "1.0.0"}"#,
         )
-        .await.unwrap();
-        
+        .await
+        .unwrap();
 
-        
         // Create in-memory database for testing
         let db_path = temp_dir.path().join("test.db");
         let database = Database::new(&db_path).unwrap();
-        
+
         let results = scan_filesystem_for_projects(temp_dir.path(), &database)
             .await
             .unwrap();
-        
 
-        
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "test-project");
         match &results[0].project_type {
@@ -325,7 +338,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let project_dir = temp_dir.path().join("rust-project");
         fs::create_dir(&project_dir).await.unwrap();
-        
+
         // Create Cargo.toml
         fs::write(
             project_dir.join("Cargo.toml"),
@@ -333,15 +346,16 @@ mod tests {
 name = "rust-project"
 version = "0.1.0""#,
         )
-        .await.unwrap();
-        
+        .await
+        .unwrap();
+
         let db_path = temp_dir.path().join("test.db");
         let database = Database::new(&db_path).unwrap();
-        
+
         let results = scan_filesystem_for_projects(temp_dir.path(), &database)
             .await
             .unwrap();
-        
+
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "rust-project");
         assert_eq!(results[0].project_type, ProjectType::Rust);
@@ -350,7 +364,7 @@ version = "0.1.0""#,
     #[tokio::test]
     async fn test_scan_ignores_hidden_directories() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create hidden directory with project
         let hidden_dir = temp_dir.path().join(".hidden");
         fs::create_dir(&hidden_dir).await.unwrap();
@@ -358,8 +372,9 @@ version = "0.1.0""#,
             hidden_dir.join("package.json"),
             r#"{"name": "hidden-project"}"#,
         )
-        .await.unwrap();
-        
+        .await
+        .unwrap();
+
         // Create node_modules directory
         let node_modules_dir = temp_dir.path().join("node_modules");
         fs::create_dir(&node_modules_dir).await.unwrap();
@@ -367,15 +382,16 @@ version = "0.1.0""#,
             node_modules_dir.join("package.json"),
             r#"{"name": "dependency-project"}"#,
         )
-        .await.unwrap();
-        
+        .await
+        .unwrap();
+
         let db_path = temp_dir.path().join("test.db");
         let database = Database::new(&db_path).unwrap();
-        
+
         let results = scan_filesystem_for_projects(temp_dir.path(), &database)
             .await
             .unwrap();
-        
+
         assert_eq!(results.len(), 0); // Should not find hidden projects
     }
 
@@ -385,9 +401,9 @@ version = "0.1.0""#,
         let nonexistent_path = temp_dir.path().join("nonexistent");
         let db_path = temp_dir.path().join("test.db");
         let database = Database::new(&db_path).unwrap();
-        
+
         let result = scan_filesystem_for_projects(&nonexistent_path, &database).await;
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             ScanError::PathNotFound(path) => {

@@ -28,10 +28,11 @@ impl Tool {
         description: String,
         schema: Value,
     ) -> Result<Self, crate::error::LlmError> {
-        let parameters: RootSchema = serde_json::from_value(schema)
-            .map_err(|e| crate::error::LlmError::InvalidToolSchema {
+        let parameters: RootSchema = serde_json::from_value(schema).map_err(|e| {
+            crate::error::LlmError::InvalidToolSchema {
                 message: e.to_string(),
-            })?;
+            }
+        })?;
 
         Ok(Tool {
             name,
@@ -101,7 +102,11 @@ pub struct ToolCall {
 
 impl ToolCall {
     pub fn new(id: String, name: String, arguments: Value) -> Self {
-        Self { id, name, arguments }
+        Self {
+            id,
+            name,
+            arguments,
+        }
     }
 
     pub fn id(&self) -> &str {
@@ -117,11 +122,12 @@ impl ToolCall {
     where
         T: for<'de> Deserialize<'de>,
     {
-        serde_json::from_value(self.arguments.clone())
-            .map_err(|e| crate::error::LlmError::ToolArgumentParse {
+        serde_json::from_value(self.arguments.clone()).map_err(|e| {
+            crate::error::LlmError::ToolArgumentParse {
                 tool_name: self.name.clone(),
                 source: e,
-            })
+            }
+        })
     }
 
     /// Get raw JSON arguments
@@ -221,11 +227,7 @@ mod tests {
             "limit": 10
         });
 
-        let call = ToolCall::new(
-            "call_123".to_string(),
-            "search".to_string(),
-            args,
-        );
+        let call = ToolCall::new("call_123".to_string(), "search".to_string(), args);
 
         let params: TestParams = call.parse_arguments().unwrap();
         assert_eq!(params.query, "rust");

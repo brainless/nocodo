@@ -1,5 +1,5 @@
+use super::types::{OpenAIFunction, OpenAIResponseTool, OpenAITool};
 use crate::tools::{ProviderToolFormat, Tool, ToolChoice};
-use super::types::{OpenAITool, OpenAIFunction, OpenAIResponseTool};
 use serde_json::{json, Value};
 
 /// OpenAI tool format implementation

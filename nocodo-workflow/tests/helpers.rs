@@ -1,6 +1,6 @@
 use nocodo_llm_sdk::{
     claude::client::ClaudeClient,
-    glm::{zen::ZenGlmClient, zai::ZaiGlmClient},
+    glm::{zai::ZaiGlmClient, zen::ZenGlmClient},
     grok::zen::ZenGrokClient,
 };
 

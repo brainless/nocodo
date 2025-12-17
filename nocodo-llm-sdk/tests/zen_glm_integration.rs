@@ -1,6 +1,6 @@
 use nocodo_llm_sdk::glm::{
-    zen::ZenGlmClient,
     types::{GlmChatCompletionRequest, GlmMessage},
+    zen::ZenGlmClient,
 };
 
 #[tokio::test]

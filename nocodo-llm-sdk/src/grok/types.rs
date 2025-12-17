@@ -158,7 +158,10 @@ impl GrokMessage {
     }
 
     /// Create an assistant message with tool calls
-    pub fn assistant_with_tools<S: Into<String>>(content: S, tool_calls: Vec<GrokToolCall>) -> Self {
+    pub fn assistant_with_tools<S: Into<String>>(
+        content: S,
+        tool_calls: Vec<GrokToolCall>,
+    ) -> Self {
         Self {
             role: GrokRole::Assistant,
             content: content.into(),

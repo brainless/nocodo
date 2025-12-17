@@ -20,7 +20,10 @@ impl ZaiGlmClient {
     }
 
     /// Create a new Z.AI GLM client with coding plan mode
-    pub fn with_coding_plan(api_key: impl Into<String>, coding_plan: bool) -> Result<Self, LlmError> {
+    pub fn with_coding_plan(
+        api_key: impl Into<String>,
+        coding_plan: bool,
+    ) -> Result<Self, LlmError> {
         let api_key = api_key.into();
         if api_key.is_empty() {
             return Err(LlmError::authentication("API key cannot be empty"));
@@ -87,7 +90,7 @@ impl ZaiGlmClient {
                 .json()
                 .await
                 .map_err(|e| LlmError::internal(format!("Failed to parse response: {}", e)))?;
-            
+
             eprintln!("DEBUG - Parsed ZAI response: {:?}", zai_response);
             Ok(zai_response)
         } else {
@@ -100,14 +103,17 @@ impl ZaiGlmClient {
             if let Ok(error_response) = serde_json::from_str::<ZaiErrorResponse>(&error_text) {
                 match status {
                     reqwest::StatusCode::BAD_REQUEST => {
-                        // Check for insufficient balance error (code 1113)
-                        if error_response.error.code.as_ref().map_or(false, |code| *code == 1113) {
-                            Err(LlmError::authentication(error_response.error.message))
-                        } else if error_response
+                        // Check for insufficient balance error (code 1113) or authentication issues
+                        if error_response
                             .error
-                            .message
-                            .to_lowercase()
-                            .contains("api key")
+                            .code
+                            .as_ref()
+                            .is_some_and(|code| *code == 1113)
+                            || error_response
+                                .error
+                                .message
+                                .to_lowercase()
+                                .contains("api key")
                             || error_response
                                 .error
                                 .message
@@ -175,7 +181,10 @@ impl ZaiGlmClient {
 }
 
 impl crate::glm::builder::GlmClientTrait for ZaiGlmClient {
-    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
+    fn create_chat_completion(
+        &self,
+        request: GlmChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
         // Convert the standard GLM request to ZAI-specific request
         let zai_request = ZaiChatCompletionRequest {
             model: request.model,
@@ -203,37 +212,44 @@ impl crate::glm::builder::GlmClientTrait for ZaiGlmClient {
                 object: response.object,
                 created: response.created,
                 model: response.model,
-                choices: response.choices.into_iter().map(|choice| crate::glm::types::GlmChoice {
-                    index: choice.index,
-                    message: crate::glm::types::GlmMessage {
-                        role: match choice.message.role.as_str() {
-                            "system" => crate::glm::types::GlmRole::System,
-                            "user" => crate::glm::types::GlmRole::User,
-                            "assistant" => crate::glm::types::GlmRole::Assistant,
-                            _ => crate::glm::types::GlmRole::User,
+                choices: response
+                    .choices
+                    .into_iter()
+                    .map(|choice| crate::glm::types::GlmChoice {
+                        index: choice.index,
+                        message: crate::glm::types::GlmMessage {
+                            role: match choice.message.role.as_str() {
+                                "system" => crate::glm::types::GlmRole::System,
+                                "user" => crate::glm::types::GlmRole::User,
+                                "assistant" => crate::glm::types::GlmRole::Assistant,
+                                _ => crate::glm::types::GlmRole::User,
+                            },
+                            content: choice.message.content.map(|v| match v {
+                                serde_json::Value::String(s) => s,
+                                _ => v.to_string(),
+                            }),
+                            reasoning: None, // ZAI doesn't provide reasoning_content in standard format
+                            tool_calls: choice.message.tool_calls.map(|calls| {
+                                calls
+                                    .into_iter()
+                                    .map(|call| crate::glm::types::GlmToolCall {
+                                        id: call.id,
+                                        r#type: call.r#type,
+                                        function: crate::glm::types::GlmFunctionCall {
+                                            name: call.function.name,
+                                            arguments: match call.function.arguments {
+                                                serde_json::Value::String(s) => s,
+                                                _ => call.function.arguments.to_string(),
+                                            },
+                                        },
+                                    })
+                                    .collect()
+                            }),
+                            tool_call_id: None,
                         },
-                        content: choice.message.content.and_then(|v| match v {
-                            serde_json::Value::String(s) => Some(s),
-                            _ => Some(v.to_string()),
-                        }),
-                        reasoning: None, // ZAI doesn't provide reasoning_content in standard format
-                        tool_calls: choice.message.tool_calls.map(|calls| {
-                            calls.into_iter().map(|call| crate::glm::types::GlmToolCall {
-                                id: call.id,
-                                r#type: call.r#type,
-                                function: crate::glm::types::GlmFunctionCall {
-                                    name: call.function.name,
-                                    arguments: match call.function.arguments {
-                                        serde_json::Value::String(s) => s,
-                                        _ => call.function.arguments.to_string(),
-                                    },
-                                },
-                            }).collect()
-                        }),
-                        tool_call_id: None,
-                    },
-                    finish_reason: choice.finish_reason,
-                }).collect(),
+                        finish_reason: choice.finish_reason,
+                    })
+                    .collect(),
                 usage: response.usage.map(|u| crate::glm::types::GlmUsage {
                     prompt_tokens: u.prompt_tokens,
                     completion_tokens: u.completion_tokens,
@@ -341,14 +357,17 @@ impl From<crate::glm::types::GlmMessage> for ZaiMessage {
             content: glm_msg.content.map(serde_json::Value::String),
             reasoning_content: glm_msg.reasoning,
             tool_calls: glm_msg.tool_calls.map(|calls| {
-                calls.into_iter().map(|call| ZaiToolCall {
-                    id: call.id,
-                    r#type: call.r#type,
-                    function: ZaiFunctionCall {
-                        name: call.function.name,
-                        arguments: serde_json::Value::String(call.function.arguments),
-                    },
-                }).collect()
+                calls
+                    .into_iter()
+                    .map(|call| ZaiToolCall {
+                        id: call.id,
+                        r#type: call.r#type,
+                        function: ZaiFunctionCall {
+                            name: call.function.name,
+                            arguments: serde_json::Value::String(call.function.arguments),
+                        },
+                    })
+                    .collect()
             }),
             tool_call_id: glm_msg.tool_call_id,
         }

@@ -1,12 +1,12 @@
-use manager_tools::bash_executor::BashExecutor;
-use manager_tools::bash_permissions::BashPermissions;
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::llm_client::{create_llm_client, LlmCompletionRequest, LlmMessage};
 use crate::models::{LlmAgentSession, LlmAgentToolCall, LlmProviderConfig};
-use manager_tools::ToolExecutor;
 use crate::websocket::WebSocketBroadcaster;
 use anyhow::Result;
+use manager_tools::bash_executor::BashExecutor;
+use manager_tools::bash_permissions::BashPermissions;
+use manager_tools::ToolExecutor;
 use std::boxed::Box;
 use std::future::Future;
 use std::path::PathBuf;
@@ -36,8 +36,8 @@ impl LlmAgent {
         let bash_executor =
             BashExecutor::new(bash_permissions, 30).expect("Failed to initialize bash executor");
 
-        let tool_executor = ToolExecutor::new(project_path)
-            .with_bash_executor(Box::new(bash_executor.clone()));
+        let tool_executor =
+            ToolExecutor::new(project_path).with_bash_executor(Box::new(bash_executor.clone()));
 
         Self {
             db,
@@ -785,7 +785,10 @@ impl LlmAgent {
             "FOLLOW_UP_DEBUG: Checking if follow-up calls are enabled and agent is available"
         );
 
-        match self.follow_up_with_llm_with_depth(session_id, depth + 1).await {
+        match self
+            .follow_up_with_llm_with_depth(session_id, depth + 1)
+            .await
+        {
             Ok(response) => {
                 tracing::warn!(  // Use warn to make it more visible
                     session_id = %session_id,
@@ -810,8 +813,6 @@ impl LlmAgent {
 
         Ok(())
     }
-
-
 
     /// Follow up with LLM after tool execution with recursion depth tracking
     fn follow_up_with_llm_with_depth<'a>(
@@ -857,7 +858,8 @@ impl LlmAgent {
                 };
 
                 let llm_client = create_llm_client(config)?;
-                let mut messages = self.reconstruct_conversation_for_followup(&history, session_id)?;
+                let mut messages =
+                    self.reconstruct_conversation_for_followup(&history, session_id)?;
 
                 // Add a final user message asking for the answer based on gathered information
                 messages.push(LlmMessage {
@@ -874,7 +876,7 @@ impl LlmAgent {
                     max_tokens: Some(4000),
                     temperature,
                     stream: Some(false),
-                    tools: None, // Don't provide tools to prevent more tool calls
+                    tools: None,       // Don't provide tools to prevent more tool calls
                     tool_choice: None, // Explicitly disable tool usage
                     functions: None,
                     function_call: None,
@@ -1213,8 +1215,6 @@ impl LlmAgent {
         }
     }
 
-
-
     /// Reconstruct conversation history for follow-up LLM calls with proper tool call handling
     fn reconstruct_conversation_for_followup(
         &self,
@@ -1405,7 +1405,10 @@ impl LlmAgent {
     }
 
     /// Create native tool definitions for supported providers
-    fn create_native_tool_definitions(&self, provider: &str) -> Vec<crate::llm_client::ToolDefinition> {
+    fn create_native_tool_definitions(
+        &self,
+        provider: &str,
+    ) -> Vec<crate::llm_client::ToolDefinition> {
         use crate::models::{
             ApplyPatchRequest, BashRequest, GrepRequest, ListFilesRequest, ReadFileRequest,
             WriteFileRequest,

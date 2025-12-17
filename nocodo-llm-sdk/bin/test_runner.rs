@@ -1,7 +1,7 @@
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
-use std::process::{Command, exit};
-use serde::Deserialize;
+use std::process::{exit, Command};
 
 #[derive(Deserialize)]
 struct Config {

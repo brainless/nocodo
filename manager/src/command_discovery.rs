@@ -197,8 +197,7 @@ impl CommandDiscovery {
             project_types,
             reasoning: Some(format!(
                 "Discovered {} commands from {} project type(s)",
-                num_commands,
-                num_types
+                num_commands, num_types
             )),
         })
     }
@@ -433,18 +432,16 @@ impl CommandDiscovery {
                 });
             }
             PythonTool::Conda => {
-                commands.extend(vec![
-                    SuggestedCommand {
-                        name: "conda-install".to_string(),
-                        description: Some("Install dependencies with Conda".to_string()),
-                        command: "conda install --file requirements.txt".to_string(),
-                        shell: Some("bash".to_string()),
-                        working_directory: None,
-                        environment: None,
-                        timeout_seconds: Some(300),
-                        os_filter: None,
-                    },
-                ]);
+                commands.extend(vec![SuggestedCommand {
+                    name: "conda-install".to_string(),
+                    description: Some("Install dependencies with Conda".to_string()),
+                    command: "conda install --file requirements.txt".to_string(),
+                    shell: Some("bash".to_string()),
+                    working_directory: None,
+                    environment: None,
+                    timeout_seconds: Some(300),
+                    os_filter: None,
+                }]);
             }
         }
 
@@ -457,9 +454,10 @@ impl CommandDiscovery {
                     command: "python manage.py runserver".to_string(),
                     shell: Some("bash".to_string()),
                     working_directory: None,
-                    environment: Some(HashMap::from([
-                        ("DJANGO_SETTINGS_MODULE".to_string(), "settings".to_string()),
-                    ])),
+                    environment: Some(HashMap::from([(
+                        "DJANGO_SETTINGS_MODULE".to_string(),
+                        "settings".to_string(),
+                    )])),
                     timeout_seconds: Some(300),
                     os_filter: None,
                 },
@@ -767,12 +765,14 @@ impl CommandDiscovery {
 
     fn infer_environment(script_name: &str) -> Option<HashMap<String, String>> {
         match script_name {
-            "dev" | "start:dev" => Some(HashMap::from([
-                ("NODE_ENV".to_string(), "development".to_string()),
-            ])),
-            "build" | "start" => Some(HashMap::from([
-                ("NODE_ENV".to_string(), "production".to_string()),
-            ])),
+            "dev" | "start:dev" => Some(HashMap::from([(
+                "NODE_ENV".to_string(),
+                "development".to_string(),
+            )])),
+            "build" | "start" => Some(HashMap::from([(
+                "NODE_ENV".to_string(),
+                "production".to_string(),
+            )])),
             _ => None,
         }
     }
@@ -780,7 +780,6 @@ impl CommandDiscovery {
 
 #[cfg(test)]
 mod tests {
-
 
     #[tokio::test]
     async fn test_detect_nodejs_project() {

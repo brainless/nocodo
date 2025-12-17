@@ -1,7 +1,7 @@
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
-use std::process::{Command, exit};
-use serde::Deserialize;
+use std::process::{exit, Command};
 
 #[derive(Deserialize)]
 struct Config {
@@ -51,13 +51,16 @@ fn main() {
     // Run integration tests with the selected provider
     let mut test_env = keys.clone();
     test_env.insert("WORKFLOW_PROVIDER".to_string(), provider.to_string());
-    
+
     // Set coding plan flag for zai if enabled
     if provider == "zai_glm" && has_coding_plan {
         test_env.insert("ZAI_CODING_PLAN".to_string(), "true".to_string());
     }
 
-    run_test(&["--test", "workflow_integration", "--", "--include-ignored"], &test_env);
+    run_test(
+        &["--test", "workflow_integration", "--", "--include-ignored"],
+        &test_env,
+    );
 }
 
 fn load_config(path: &str) -> (HashMap<String, String>, bool) {

@@ -23,8 +23,6 @@ pub enum ProjectDetailTab {
     Files,
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiState {
     pub show_connection_dialog: bool,

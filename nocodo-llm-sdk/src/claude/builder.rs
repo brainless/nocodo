@@ -135,7 +135,11 @@ impl<'a> MessageBuilder<'a> {
     pub fn tool_result(mut self, result: ToolResult) -> Self {
         // For Claude, tool results are added as user messages with tool_result content
         // This is a simplified approach - in practice, Claude expects tool results in a specific format
-        let content = format!("Tool result for {}: {}", result.tool_call_id(), result.content());
+        let content = format!(
+            "Tool result for {}: {}",
+            result.tool_call_id(),
+            result.content()
+        );
         self.messages.push(ClaudeMessage::user(content));
         self
     }

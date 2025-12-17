@@ -414,10 +414,8 @@ mod tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let allowed_path = temp_dir.path().to_string_lossy().to_string();
 
-        let perms = BashPermissions::new(vec![
-            PermissionRule::allow("cd*").unwrap(),
-        ])
-        .with_allowed_working_dirs(vec![allowed_path.clone()]);
+        let perms = BashPermissions::new(vec![PermissionRule::allow("cd*").unwrap()])
+            .with_allowed_working_dirs(vec![allowed_path.clone()]);
 
         // Should allow commands in allowed directory
         let allowed_cmd = format!("cd {}", allowed_path);

@@ -133,10 +133,10 @@ pub mod tools;
 pub mod types;
 
 // Provider-specific exports
-pub use grok::xai::XaiGrokClient;
-pub use grok::zen::ZenGrokClient;
 pub use glm::cerebras::CerebrasGlmClient;
 pub use glm::zen::ZenGlmClient;
+pub use grok::xai::XaiGrokClient;
+pub use grok::zen::ZenGrokClient;
 
 // Tool exports
 pub use tools::{Tool, ToolCall, ToolChoice, ToolResult};
@@ -162,8 +162,8 @@ mod tests {
         types::{GlmMessage, GlmRole},
     };
     use crate::grok::{
-        xai::XaiGrokClient,
         types::{GrokMessage, GrokRole},
+        xai::XaiGrokClient,
     };
     use crate::openai::{
         client::OpenAIClient,
@@ -288,7 +288,7 @@ mod tests {
         let client = OpenAIClient::new("test-key").unwrap();
         let _builder = client
             .message_builder()
-        .model("gpt-5.1")
+            .model("gpt-5.1")
             .max_completion_tokens(100)
             .user_message("Hello");
 

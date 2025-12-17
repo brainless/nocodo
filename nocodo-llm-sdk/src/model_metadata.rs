@@ -272,7 +272,9 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
 
 /// Get metadata for a specific model by ID
 pub fn get_model_metadata(model_id: &str) -> Option<ModelMetadata> {
-    get_all_models().into_iter().find(|m| m.model_id == model_id)
+    get_all_models()
+        .into_iter()
+        .find(|m| m.model_id == model_id)
 }
 
 /// Get all models for a specific provider

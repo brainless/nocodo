@@ -3,13 +3,16 @@
 use super::main_handlers::AppState;
 use crate::error::AppError;
 use crate::models::{CreateTeamRequest, Permission, Team, UpdateTeamRequest};
+use actix_web::{web, HttpMessage, HttpResponse, Result};
 use manager_models::TeamListResponse;
-use actix_web::{web, HttpResponse, Result, HttpMessage};
 
 /// Extract user ID from request
 /// With nested PermissionMiddleware, UserInfo may not transfer from ServiceRequest to HttpRequest
 /// This function tries extensions first, then extracts from JWT token as fallback
-fn get_user_id(req: &actix_web::HttpRequest, config: &std::sync::Arc<std::sync::RwLock<crate::config::AppConfig>>) -> Result<i64, AppError> {
+fn get_user_id(
+    req: &actix_web::HttpRequest,
+    config: &std::sync::Arc<std::sync::RwLock<crate::config::AppConfig>>,
+) -> Result<i64, AppError> {
     // Try extensions first
     if let Some(user_info) = req.extensions().get::<crate::models::UserInfo>() {
         return Ok(user_info.id);
@@ -17,7 +20,8 @@ fn get_user_id(req: &actix_web::HttpRequest, config: &std::sync::Arc<std::sync::
 
     // Check if JWT secret is configured
     let jwt_secret_opt = {
-        let config_guard = config.read()
+        let config_guard = config
+            .read()
             .map_err(|_| AppError::Internal("Failed to read config".to_string()))?;
         config_guard
             .auth
@@ -45,7 +49,9 @@ fn get_user_id(req: &actix_web::HttpRequest, config: &std::sync::Arc<std::sync::
     let claims = crate::auth::validate_token(token, &jwt_secret)
         .map_err(|_| AppError::Unauthorized("Invalid or expired token".to_string()))?;
 
-    claims.sub.parse::<i64>()
+    claims
+        .sub
+        .parse::<i64>()
         .map_err(|_| AppError::Internal("Invalid user ID in token".to_string()))
 }
 
@@ -88,7 +94,8 @@ pub async fn create_team(
     let team_id = data.database.create_team(&team)?;
 
     // Add creator as team member (similar to Super Admins team creation)
-    data.database.add_team_member(team_id, created_by, Some(created_by))?;
+    data.database
+        .add_team_member(team_id, created_by, Some(created_by))?;
 
     let mut team = team;
     team.id = team_id;

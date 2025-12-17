@@ -7,8 +7,8 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
-use crate::bash_permissions::BashPermissions;
 use crate::bash::BashExecutorTrait;
+use crate::bash_permissions::BashPermissions;
 
 #[derive(Clone)]
 pub struct BashExecutor {
@@ -224,12 +224,16 @@ impl BashExecutorTrait for BashExecutor {
         command: &str,
         working_dir: &std::path::Path,
         timeout_secs: Option<u64>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<crate::bash::BashExecutionResult>> + Send + '_>> {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<crate::bash::BashExecutionResult>> + Send + '_>,
+    > {
         let command = command.to_string();
         let working_dir = working_dir.to_path_buf();
         let executor = self.clone();
         Box::pin(async move {
-            executor.execute_with_cwd(&command, &working_dir, timeout_secs).await
+            executor
+                .execute_with_cwd(&command, &working_dir, timeout_secs)
+                .await
         })
     }
 }
@@ -324,7 +328,8 @@ mod tests {
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("ls*").unwrap(),
             PermissionRule::allow("test*").unwrap(),
-        ]).with_allowed_working_dirs(vec![temp_dir_str]);
+        ])
+        .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
@@ -333,7 +338,10 @@ mod tests {
         std::fs::write(&test_file, "test content").unwrap();
 
         // List files in the project directory
-        let result = executor.execute_with_cwd("ls test_file.txt", temp_dir.path(), None).await.unwrap();
+        let result = executor
+            .execute_with_cwd("ls test_file.txt", temp_dir.path(), None)
+            .await
+            .unwrap();
 
         assert_eq!(result.exit_code, 0);
         assert!(result.stdout.contains("test_file.txt"));
@@ -350,18 +358,27 @@ mod tests {
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
         // Initialize git repository
-        let init_result = executor.execute_with_cwd("git init", temp_dir.path(), None).await.unwrap();
+        let init_result = executor
+            .execute_with_cwd("git init", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(init_result.exit_code, 0);
 
         // Check git status
-        let status_result = executor.execute_with_cwd("git status", temp_dir.path(), None).await.unwrap();
+        let status_result = executor
+            .execute_with_cwd("git status", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(status_result.exit_code, 0);
 
         // Create a test file and add it
         let test_file = temp_dir.path().join("test.txt");
         std::fs::write(&test_file, "test").unwrap();
 
-        let add_result = executor.execute_with_cwd("git add test.txt", temp_dir.path(), None).await.unwrap();
+        let add_result = executor
+            .execute_with_cwd("git add test.txt", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(add_result.exit_code, 0);
     }
 
@@ -373,7 +390,8 @@ mod tests {
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("cargo*").unwrap(),
             PermissionRule::allow("ls*").unwrap(),
-        ]).with_allowed_working_dirs(vec![temp_dir_str]);
+        ])
+        .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
@@ -385,7 +403,10 @@ mod tests {
         assert_eq!(init_result.exit_code, 0, "stderr: {}", init_result.stderr);
 
         // Check if project was created
-        let check_result = executor.execute_with_cwd("ls test_project", temp_dir.path(), None).await.unwrap();
+        let check_result = executor
+            .execute_with_cwd("ls test_project", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(check_result.exit_code, 0);
         assert!(check_result.stdout.contains("Cargo.toml"));
     }
@@ -417,7 +438,8 @@ mod tests {
             PermissionRule::allow("cat*").unwrap(),
             PermissionRule::allow("grep*").unwrap(),
             PermissionRule::allow("wc*").unwrap(),
-        ]).with_allowed_working_dirs(vec![temp_dir_str]);
+        ])
+        .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
@@ -446,9 +468,16 @@ mod tests {
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
         // Test environment variable usage
-        let result = executor.execute_with_cwd("echo $HOME", temp_dir.path(), None).await.unwrap();
+        let result = executor
+            .execute_with_cwd("echo $HOME", temp_dir.path(), None)
+            .await
+            .unwrap();
 
         assert_eq!(result.exit_code, 0, "stderr: {}", result.stderr);
-        assert!(!result.stdout.trim().is_empty(), "stdout was empty: {}", result.stdout);
+        assert!(
+            !result.stdout.trim().is_empty(),
+            "stdout was empty: {}",
+            result.stdout
+        );
     }
 }

@@ -7,6 +7,11 @@ pub type UsersResult =
     Arc<std::sync::Mutex<Option<Result<Vec<manager_models::UserListItem>, String>>>>;
 pub type TeamsResult =
     Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamListItem>, String>>>>;
+pub type TeamItemsResult =
+    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamItem>, String>>>>;
+pub type ProjectCommandsResult =
+    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>;
+pub type ConnectionResult = Arc<std::sync::Mutex<Option<Result<(String, String, u16), String>>>>;
 
 pub mod connection;
 pub mod ui_state;
@@ -134,7 +139,7 @@ pub struct AppState {
     pub current_user_teams: Vec<manager_models::TeamItem>,
     pub loading_current_user_teams: bool,
     #[serde(skip)]
-    pub current_user_teams_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamItem>, String>>>>,
+    pub current_user_teams_result: TeamItemsResult,
 
     // UI Reference state
     pub ui_reference_card_titles: Vec<String>,
@@ -149,23 +154,20 @@ pub struct AppState {
     pub project_details_result:
         Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
     #[serde(skip)]
-    pub create_commands_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
-            #[serde(skip)]
-            pub execute_command_result:
-                Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
-            #[serde(skip)]
-            #[allow(clippy::type_complexity)]
-            pub command_executions_result:
-                Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommandExecution>, String>>>>,
+    pub create_commands_result: ProjectCommandsResult,
+    #[serde(skip)]
+    pub execute_command_result: Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub command_executions_result:
+        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommandExecution>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub projects_result:
         Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub worktree_branches_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    pub worktree_branches_result: Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub settings_result:
@@ -263,13 +265,12 @@ pub struct AppState {
     #[serde(skip)]
     pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
     #[serde(skip)]
-    pub connection_result: Arc<std::sync::Mutex<Option<Result<(String, String, u16), String>>>>,
+    pub connection_result: ConnectionResult,
     #[serde(skip)]
     pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub login_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
+    pub login_result: Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
     #[serde(skip)]
     pub pending_project_details_refresh: Option<i64>,
     #[serde(skip)]
@@ -301,11 +302,15 @@ impl AppState {
 
                 tracing::info!(
                     "DB SELECT params: server_host='{}', server_user='{}', server_port={}",
-                    server_host, server_user, server_port
+                    server_host,
+                    server_user,
+                    server_port
                 );
 
                 // First, check how many total favorites exist
-                if let Ok(total_count) = db.query_row("SELECT COUNT(*) FROM favorites", [], |row| row.get::<_, i64>(0)) {
+                if let Ok(total_count) = db.query_row("SELECT COUNT(*) FROM favorites", [], |row| {
+                    row.get::<_, i64>(0)
+                }) {
                     tracing::info!("Total favorites in database: {}", total_count);
                 }
 
@@ -333,19 +338,35 @@ impl AppState {
                             let db_server_host: String = row.get(2)?;
                             let db_server_user: String = row.get(3)?;
                             let db_server_port: i64 = row.get(4)?;
-                            Ok((entity_type, entity_id, db_server_host, db_server_user, db_server_port))
+                            Ok((
+                                entity_type,
+                                entity_id,
+                                db_server_host,
+                                db_server_user,
+                                db_server_port,
+                            ))
                         },
                     )
                     .expect("Could not query favorites");
 
-                for (entity_type, entity_id, db_server_host, db_server_user, db_server_port) in favorites_iter.flatten() {
+                for (entity_type, entity_id, db_server_host, db_server_user, db_server_port) in
+                    favorites_iter.flatten()
+                {
                     tracing::info!(
                         "Row from DB: entity_type='{}', entity_id={}, server_host='{}', server_user='{}', server_port={}",
                         entity_type, entity_id, db_server_host, db_server_user, db_server_port
                     );
                     if entity_type == "project" {
-                        let favorite_key = (server_host.clone(), server_user.clone(), *server_port, entity_id);
-                        tracing::info!("Loaded favorite from DB for current server: project_id={}", entity_id);
+                        let favorite_key = (
+                            server_host.clone(),
+                            server_user.clone(),
+                            *server_port,
+                            entity_id,
+                        );
+                        tracing::info!(
+                            "Loaded favorite from DB for current server: project_id={}",
+                            entity_id
+                        );
                         self.favorite_projects.insert(favorite_key);
                     }
                 }

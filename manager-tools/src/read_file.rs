@@ -1,7 +1,7 @@
-use manager_models::{ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolResponse};
 use crate::tool_error::ToolError;
 use anyhow::Result;
-use base64::{Engine, prelude::BASE64_STANDARD};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use manager_models::{ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolResponse};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -47,10 +47,7 @@ pub async fn read_file(
         Err(_) => {
             // If it's not UTF-8, read as binary and encode as base64
             let bytes = fs::read(&target_path)?;
-            format!(
-                "[BINARY_FILE_BASE64] {}",
-                BASE64_STANDARD.encode(&bytes)
-            )
+            format!("[BINARY_FILE_BASE64] {}", BASE64_STANDARD.encode(&bytes))
         }
     };
 

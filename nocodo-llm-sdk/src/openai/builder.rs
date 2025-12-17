@@ -2,8 +2,11 @@ use crate::{
     error::LlmError,
     openai::{
         client::OpenAIClient,
-        tools::{OpenAIToolFormat, OpenAIResponseToolFormat},
-        types::{OpenAIChatCompletionRequest, OpenAIMessage, OpenAIRole, OpenAIResponseRequest, OpenAIResponseTool},
+        tools::{OpenAIResponseToolFormat, OpenAIToolFormat},
+        types::{
+            OpenAIChatCompletionRequest, OpenAIMessage, OpenAIResponseRequest, OpenAIResponseTool,
+            OpenAIRole,
+        },
     },
     tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
@@ -172,7 +175,10 @@ impl<'a> OpenAIMessageBuilder<'a> {
     }
 
     /// Continue a conversation from a previous response
-    pub fn continue_from(mut self, response: &crate::openai::types::OpenAIChatCompletionResponse) -> Self {
+    pub fn continue_from(
+        mut self,
+        response: &crate::openai::types::OpenAIChatCompletionResponse,
+    ) -> Self {
         // Copy all messages from the previous response
         for choice in &response.choices {
             self.messages.push(choice.message.clone());
@@ -181,7 +187,9 @@ impl<'a> OpenAIMessageBuilder<'a> {
     }
 
     /// Send the request and get the response
-    pub async fn send(self) -> Result<crate::openai::types::OpenAIChatCompletionResponse, LlmError> {
+    pub async fn send(
+        self,
+    ) -> Result<crate::openai::types::OpenAIChatCompletionResponse, LlmError> {
         let request = OpenAIChatCompletionRequest {
             model: self
                 .model

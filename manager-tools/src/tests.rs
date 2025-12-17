@@ -1,36 +1,17 @@
 #[cfg(test)]
 mod tests {
 
-    use crate::{ToolExecutor, BashExecutorTrait, BashExecutionResult};
-    use manager_models::{ToolResponse, ListFilesRequest, ReadFileRequest, WriteFileRequest, GrepRequest};
-    use tempfile::TempDir;
-    use std::pin::Pin;
-    use std::future::Future;
+    use crate::{BashExecutionResult, BashExecutorTrait, ToolExecutor};
+    use manager_models::{
+        GrepRequest, ListFilesRequest, ReadFileRequest, ToolResponse, WriteFileRequest,
+    };
     use std::fs;
+    use std::future::Future;
     use std::path::Path;
+    use std::pin::Pin;
+    use tempfile::TempDir;
 
 
-
-    // Mock BashExecutor for testing
-    struct MockBashExecutor;
-
-    impl BashExecutorTrait for MockBashExecutor {
-        fn execute_with_cwd(
-            &self,
-            _command: &str,
-            _working_dir: &Path,
-            _timeout_secs: Option<u64>,
-        ) -> Pin<Box<dyn Future<Output = Result<BashExecutionResult, anyhow::Error>> + Send>> {
-            Box::pin(async {
-                Ok(BashExecutionResult {
-                    stdout: "mock output".to_string(),
-                    stderr: "".to_string(),
-                    exit_code: 0,
-                    timed_out: false,
-                })
-            })
-        }
-    }
 
     #[test]
     fn test_glob_to_regex() {
@@ -361,7 +342,10 @@ mod tests {
             .await;
 
         // Directory traversal should be caught during path validation
-        assert!(traversal_response.is_err(), "Should prevent directory traversal");
+        assert!(
+            traversal_response.is_err(),
+            "Should prevent directory traversal"
+        );
     }
 
     #[tokio::test]
@@ -497,7 +481,10 @@ mod tests {
             max_files_searched: Some(100),
         };
 
-        let response = executor.execute(manager_models::ToolRequest::Grep(request)).await.unwrap();
+        let response = executor
+            .execute(manager_models::ToolRequest::Grep(request))
+            .await
+            .unwrap();
 
         match response {
             ToolResponse::Grep(grep_response) => {
@@ -550,7 +537,10 @@ mod tests {
             max_files_searched: Some(100),
         };
 
-        let response = executor.execute(manager_models::ToolRequest::Grep(request)).await.unwrap();
+        let response = executor
+            .execute(manager_models::ToolRequest::Grep(request))
+            .await
+            .unwrap();
 
         match response {
             ToolResponse::Grep(grep_response) => {
