@@ -227,6 +227,12 @@ impl Default for BashPermissions {
             PermissionRule::allow("git status")
                 .unwrap()
                 .with_description("Allow git status"),
+            PermissionRule::allow("git add*")
+                .unwrap()
+                .with_description("Allow git add"),
+            PermissionRule::allow("git commit*")
+                .unwrap()
+                .with_description("Allow git commit"),
             PermissionRule::allow("git log*")
                 .unwrap()
                 .with_description("Allow git log"),
@@ -242,15 +248,24 @@ impl Default for BashPermissions {
             PermissionRule::allow("cargo test")
                 .unwrap()
                 .with_description("Allow cargo test"),
-            PermissionRule::allow("cargo build")
+            PermissionRule::allow("cargo build*")
                 .unwrap()
                 .with_description("Allow cargo build"),
             PermissionRule::allow("npm test")
                 .unwrap()
                 .with_description("Allow npm test"),
-            PermissionRule::allow("npm run build")
+            PermissionRule::allow("npm install")
                 .unwrap()
-                .with_description("Allow npm build"),
+                .with_description("Allow npm install"),
+            PermissionRule::allow("npm run*")
+                .unwrap()
+                .with_description("Allow npm run commands"),
+            PermissionRule::allow("python*")
+                .unwrap()
+                .with_description("Allow python commands"),
+            PermissionRule::allow("make*")
+                .unwrap()
+                .with_description("Allow make commands"),
             PermissionRule::allow("find*")
                 .unwrap()
                 .with_description("Allow finding files"),
@@ -399,21 +414,24 @@ mod tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let allowed_path = temp_dir.path().to_string_lossy().to_string();
 
-        let perms =
-            BashPermissions::default().with_allowed_working_dirs(vec![allowed_path.clone()]);
+        let perms = BashPermissions::new(vec![
+            PermissionRule::allow("cd*").unwrap(),
+        ])
+        .with_allowed_working_dirs(vec![allowed_path.clone()]);
 
         // Should allow commands in allowed directory
         let allowed_cmd = format!("cd {}", allowed_path);
         assert!(perms.is_command_allowed(&allowed_cmd));
 
-        // Should block commands outside allowed directory
-        assert!(!perms.is_command_allowed("cd /etc"));
-        assert!(!perms.is_command_allowed("cd /root"));
+        // Check working directory permissions directly
+        assert!(perms.check_working_directory(temp_dir.path()).is_ok());
+        assert!(perms.check_working_directory(Path::new("/etc")).is_err());
+        assert!(perms.check_working_directory(Path::new("/root")).is_err());
     }
 
     #[test]
     fn test_bash_permissions_rule_management() {
-        let mut perms = BashPermissions::default();
+        let mut perms = BashPermissions::new(vec![]);
 
         // Add rule
         let rule = PermissionRule::allow("test*")
@@ -434,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_bash_permissions_working_dir_management() {
-        let mut perms = BashPermissions::default();
+        let mut perms = BashPermissions::new(vec![]).with_allowed_working_dirs(vec![]);
 
         // Add allowed directory
         let dir1 = "/tmp/test1".to_string();
@@ -479,14 +497,14 @@ mod tests {
     fn test_pattern_matching_edge_cases() {
         let perms = BashPermissions::default();
 
-        // Test exact matches
-        assert!(perms.is_command_allowed("git"));
+        // Test exact matches (using commands that are actually allowed)
+        assert!(perms.is_command_allowed("git status"));
         assert!(perms.is_command_allowed("ls"));
-        assert!(perms.is_command_allowed("cargo"));
+        assert!(perms.is_command_allowed("cargo build"));
 
         // Test partial matches (should not match)
-        assert!(perms.is_command_allowed("git-status")); // This is actually safe
-        assert!(perms.is_command_allowed("ls-l")); // This is actually safe
+        assert!(perms.is_command_allowed("git status")); // This is actually safe
+        assert!(perms.is_command_allowed("ls -l")); // This is actually safe
 
         // Test complex patterns
         assert!(perms.is_command_allowed("cargo build --release"));

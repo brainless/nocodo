@@ -87,6 +87,8 @@ impl ZaiGlmClient {
                 .json()
                 .await
                 .map_err(|e| LlmError::internal(format!("Failed to parse response: {}", e)))?;
+            
+            eprintln!("DEBUG - Parsed ZAI response: {:?}", zai_response);
             Ok(zai_response)
         } else {
             let error_text = response
@@ -298,6 +300,9 @@ pub struct ZaiMessage {
     /// Content of message (can be string for text or array for multimodal)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<serde_json::Value>,
+    /// Reasoning content for ZAI coding plan responses
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     /// Tool calls made by assistant
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ZaiToolCall>>,
@@ -307,12 +312,20 @@ pub struct ZaiMessage {
 }
 
 impl ZaiMessage {
-    /// Get text content from the message
+    /// Get text content from message
     pub fn get_text(&self) -> String {
+        // First check content field
         match &self.content {
             Some(serde_json::Value::String(s)) => s.clone(),
-            Some(other) => other.to_string(),
-            None => String::new(),
+            Some(other) if !other.as_str().unwrap_or("").trim().is_empty() => other.to_string(),
+            Some(_) => {
+                // content is empty/non-string, check reasoning_content
+                self.reasoning_content.clone().unwrap_or_default()
+            }
+            None => {
+                // content is None, check reasoning_content
+                self.reasoning_content.clone().unwrap_or_default()
+            }
         }
     }
 }
@@ -326,6 +339,7 @@ impl From<crate::glm::types::GlmMessage> for ZaiMessage {
                 crate::glm::types::GlmRole::Assistant => "assistant".to_string(),
             },
             content: glm_msg.content.map(serde_json::Value::String),
+            reasoning_content: glm_msg.reasoning,
             tool_calls: glm_msg.tool_calls.map(|calls| {
                 calls.into_iter().map(|call| ZaiToolCall {
                     id: call.id,

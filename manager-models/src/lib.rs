@@ -692,7 +692,7 @@ pub struct ApplyPatchRequest {
     /// The patch content in unified diff format
     ///
     /// Format:
-    /// ```
+    /// ```text
     /// *** Begin Patch
     /// *** Add File: path/to/new.txt
     /// +line content
