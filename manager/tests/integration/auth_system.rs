@@ -560,17 +560,14 @@ async fn test_ssh_key_mock_validation() {
 
     // Test valid ed25519 key
     if ssh_key.starts_with("ssh-ed25519 ") {
-        // Mock successful validation
-        assert!(true);
+        // Mock successful validation - Ed25519 keys are valid
     } else if ssh_key.starts_with("ssh-rsa ") {
-        // Mock RSA validation
-        assert!(true);
+        // Mock RSA validation - RSA keys are valid
     } else if ssh_key.starts_with("ecdsa-sha2-nistp256 ") {
-        // Mock ECDSA validation
-        assert!(true);
+        // Mock ECDSA validation - ECDSA keys are valid
     } else {
         // Mock invalid key
-        assert!(false, "Should handle valid SSH key format");
+        panic!("Should handle valid SSH key format");
     }
 
     // Test invalid key format

@@ -413,7 +413,7 @@ pub enum ToolRequest {
     Bash(BashRequest),
 }
 
-/// List files tool request
+/// List files and directories in a given path
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListFilesRequest {
     pub path: String,
@@ -456,7 +456,7 @@ impl ListFilesRequest {
     }
 }
 
-/// Read file tool request
+/// Read the contents of a file
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReadFileRequest {
     pub path: String,
@@ -485,7 +485,7 @@ impl ReadFileRequest {
     }
 }
 
-/// Write file tool request
+/// Write or modify a file. Supports two modes: 1) Full write with 'content' parameter, 2) Search & replace with 'search' and 'replace' parameters
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteFileRequest {
     /// The file path to write to
@@ -570,7 +570,7 @@ impl WriteFileRequest {
     }
 }
 
-/// Grep search tool request
+/// Search for patterns in files using grep
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GrepRequest {
     pub pattern: String,
@@ -645,7 +645,7 @@ impl GrepRequest {
     }
 }
 
-/// Bash command execution tool request
+/// Execute bash commands with timeout and permission checking
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BashRequest {
     pub command: String,

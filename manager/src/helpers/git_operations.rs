@@ -186,7 +186,7 @@ mod tests {
                 branches.iter().filter(|b| b.is_worktree).collect();
 
             // At least the worktree we created should be found
-            assert!(worktree_branches.len() >= 1);
+            assert!(!worktree_branches.is_empty());
         } else {
             // If worktree creation failed, just verify regular branches work
             let branches = list_project_branches(path).unwrap();

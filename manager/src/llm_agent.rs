@@ -1434,13 +1434,21 @@ impl LlmAgent {
         let schema_provider = get_schema_provider(provider);
 
         // Helper closure to generate tool definition with provider-specific schema
-        let make_tool = |name: &str, description: &str, schema: schemars::schema::RootSchema| {
+        let make_tool = |name: &str, schema: schemars::schema::RootSchema| {
+            // Extract description from schema metadata (struct doc comment)
+            let description = schema
+                .schema
+                .metadata
+                .as_ref()
+                .and_then(|m| m.description.clone())
+                .unwrap_or_else(|| format!("Tool: {}", name));
+
             let customized_schema = schema_provider.customize_schema(schema.schema.into());
             crate::llm_client::ToolDefinition {
                 r#type: "function".to_string(),
                 function: crate::llm_client::FunctionDefinition {
                     name: name.to_string(),
-                    description: description.to_string(),
+                    description,
                     parameters: serde_json::to_value(customized_schema).unwrap_or_default(),
                 },
             }
@@ -1453,25 +1461,13 @@ impl LlmAgent {
             }
             "list_files" => {
                 tracing::info!("ENABLE_TOOLS=list_files: Returning ONLY list_files tool");
-                vec![make_tool(
-                    "list_files",
-                    "List files and directories in a given path",
-                    schema_for!(ListFilesRequest),
-                )]
+                vec![make_tool("list_files", schema_for!(ListFilesRequest))]
             }
             "list_read" => {
                 tracing::info!("ENABLE_TOOLS=list_read: Returning list_files + read_file tools");
                 vec![
-                    make_tool(
-                        "list_files",
-                        "List files and directories in a given path",
-                        schema_for!(ListFilesRequest),
-                    ),
-                    make_tool(
-                        "read_file",
-                        "Read the contents of a file",
-                        schema_for!(ReadFileRequest),
-                    ),
+                    make_tool("list_files", schema_for!(ListFilesRequest)),
+                    make_tool("read_file", schema_for!(ReadFileRequest)),
                 ]
             }
             _ => {
@@ -1481,36 +1477,12 @@ impl LlmAgent {
                     enable_tools
                 );
                 vec![
-                    make_tool(
-                        "list_files",
-                        "List files and directories in a given path",
-                        schema_for!(ListFilesRequest),
-                    ),
-                    make_tool(
-                        "read_file",
-                        "Read the contents of a file",
-                        schema_for!(ReadFileRequest),
-                    ),
-                    make_tool(
-                        "write_file",
-                        "Write or modify a file. Supports two modes: 1) Full write with 'content' parameter, 2) Search & replace with 'search' and 'replace' parameters",
-                        schema_for!(WriteFileRequest),
-                    ),
-                    make_tool(
-                        "grep",
-                        "Search for patterns in files using grep",
-                        schema_for!(GrepRequest),
-                    ),
-                    make_tool(
-                        "apply_patch",
-                        "Apply a patch to create, modify, delete, or move multiple files in a single operation using unified diff format",
-                        schema_for!(ApplyPatchRequest),
-                    ),
-                    make_tool(
-                        "bash",
-                        "Execute bash commands with timeout and permission checking",
-                        schema_for!(BashRequest),
-                    ),
+                    make_tool("list_files", schema_for!(ListFilesRequest)),
+                    make_tool("read_file", schema_for!(ReadFileRequest)),
+                    make_tool("write_file", schema_for!(WriteFileRequest)),
+                    make_tool("grep", schema_for!(GrepRequest)),
+                    make_tool("apply_patch", schema_for!(ApplyPatchRequest)),
+                    make_tool("bash", schema_for!(BashRequest)),
                 ]
             }
         }
