@@ -2,6 +2,12 @@ use chrono::Utc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+// Tool-specific modules
+pub mod tools;
+
+// Re-export user interaction types
+pub use tools::user_interaction::*;
+
 // Shared models for nocodo manager and desktop-app
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -411,6 +417,8 @@ pub enum ToolRequest {
     ApplyPatch(ApplyPatchRequest),
     #[serde(rename = "bash")]
     Bash(BashRequest),
+    #[serde(rename = "ask_user")]
+    AskUser(AskUserRequest),
 }
 
 /// List files and directories in a given path
@@ -736,6 +744,8 @@ pub struct ApplyPatchResponse {
     pub message: String,
 }
 
+
+
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -752,6 +762,8 @@ pub enum ToolResponse {
     ApplyPatch(ApplyPatchResponse),
     #[serde(rename = "bash")]
     Bash(BashResponse),
+    #[serde(rename = "ask_user")]
+    AskUser(AskUserResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }

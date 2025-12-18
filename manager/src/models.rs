@@ -11,6 +11,7 @@ pub use manager_models::{
     AiSessionResult,
     ApiKeyConfig,
     ApplyPatchRequest,
+    AskUserRequest,
     BashRequest,
     CreateWorkRequest,
     FileInfo,

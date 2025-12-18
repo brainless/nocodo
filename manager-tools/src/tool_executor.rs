@@ -8,6 +8,7 @@ pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::bash;
 use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
+use crate::user_interaction;
 
 /// Tool executor that handles tool requests and responses
 pub struct ToolExecutor {
@@ -67,6 +68,7 @@ impl ToolExecutor {
                 )
                 .await
             }
+            ToolRequest::AskUser(req) => user_interaction::ask_user(req).await,
         }
     }
 
@@ -83,6 +85,7 @@ impl ToolExecutor {
             ToolResponse::Grep(response) => serde_json::to_value(response)?,
             ToolResponse::ApplyPatch(response) => serde_json::to_value(response)?,
             ToolResponse::Bash(response) => serde_json::to_value(response)?,
+            ToolResponse::AskUser(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 

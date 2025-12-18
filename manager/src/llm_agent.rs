@@ -595,6 +595,23 @@ impl LlmAgent {
                         }
                     }
                 }
+                "ask_user" => {
+                    match serde_json::from_str::<crate::models::AskUserRequest>(
+                        &tool_call.function.arguments,
+                    ) {
+                        Ok(request) => crate::models::ToolRequest::AskUser(request),
+                        Err(e) => {
+                            tracing::error!(
+                                session_id = %session_id,
+                                tool_index = %index,
+                                error = %e,
+                                arguments = %tool_call.function.arguments,
+                                "Failed to parse ask_user arguments"
+                            );
+                            continue;
+                        }
+                    }
+                }
                 unknown_function => {
                     tracing::error!(
                         session_id = %session_id,
@@ -621,6 +638,7 @@ impl LlmAgent {
                 crate::models::ToolRequest::Grep(_) => "grep",
                 crate::models::ToolRequest::ApplyPatch(_) => "apply_patch",
                 crate::models::ToolRequest::Bash(_) => "bash",
+                crate::models::ToolRequest::AskUser(_) => "ask_user",
             };
 
             tracing::debug!(
