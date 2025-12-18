@@ -1,6 +1,0 @@
-# Test configuration with API keys
-test-config.toml
-
-# Cargo
-target/
-Cargo.lock

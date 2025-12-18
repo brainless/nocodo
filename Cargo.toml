@@ -7,7 +7,6 @@ members = [
     "nocodo-github-actions",
     "desktop-app",
     "nocodo-llm-sdk",
-    "nocodo-workflow",
 ]
 exclude = [
     "manager-web"

@@ -4636,21 +4636,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nocodo-workflow"
-version = "0.1.12"
-dependencies = [
- "anyhow",
- "nocodo-llm-sdk",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "toml 0.8.23",
-]
-
-[[package]]
 name = "nohash-hasher"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
