@@ -1,4 +1,4 @@
-use super::path_utils::{validate_and_resolve_path};
+use super::path_utils::validate_and_resolve_path;
 use anyhow::Result;
 use manager_models::{
     FileInfo, FileType, ListFilesRequest, ListFilesResponse, ToolErrorResponse, ToolResponse,
@@ -117,15 +117,13 @@ pub async fn list_files(base_path: &Path, request: ListFilesRequest) -> Result<T
     }))
 }
 
-
-
 /// Create FileInfo from a path
 fn create_file_info(path: &Path, base_path: &Path) -> Result<FileInfo> {
     let metadata = fs::metadata(path)?;
 
-    let relative_path = path.strip_prefix(base_path).map_err(|_| {
-        anyhow::anyhow!("Cannot compute relative path for {:?}", path)
-    })?;
+    let relative_path = path
+        .strip_prefix(base_path)
+        .map_err(|_| anyhow::anyhow!("Cannot compute relative path for {:?}", path))?;
 
     let relative_path_str = relative_path.to_string_lossy().to_string();
     let absolute_path_str = path.to_string_lossy().to_string();

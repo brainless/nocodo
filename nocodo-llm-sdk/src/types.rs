@@ -12,6 +12,16 @@ pub enum Role {
     System,
 }
 
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Role::User => write!(f, "user"),
+            Role::Assistant => write!(f, "assistant"),
+            Role::System => write!(f, "system"),
+        }
+    }
+}
+
 /// Content block for multimodal messages
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -112,4 +122,15 @@ pub struct CompletionResponse {
     pub usage: Usage,
     /// Stop reason
     pub stop_reason: Option<String>,
+}
+
+/// Streaming response chunk
+#[derive(Debug, Clone, Default)]
+pub struct StreamChunk {
+    /// Text content in this chunk
+    pub content: String,
+    /// Whether this is the final chunk
+    pub is_finished: bool,
+    /// Tool calls (if any)
+    pub tool_calls: Vec<crate::tools::ToolCall>,
 }

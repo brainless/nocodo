@@ -1,4 +1,4 @@
-use super::path_utils::{validate_and_resolve_path};
+use super::path_utils::validate_and_resolve_path;
 use anyhow::Result;
 use manager_models::{
     ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, ToolErrorResponse, ToolResponse,
@@ -232,5 +232,3 @@ pub async fn apply_patch(base_path: &PathBuf, request: ApplyPatchRequest) -> Res
         message,
     }))
 }
-
-

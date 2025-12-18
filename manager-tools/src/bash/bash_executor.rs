@@ -7,8 +7,8 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
-use super::{BashExecutorTrait, BashExecutionResult};
 use super::bash_permissions::BashPermissions;
+use super::{BashExecutionResult, BashExecutorTrait};
 
 #[derive(Clone)]
 pub struct BashExecutor {
@@ -224,9 +224,8 @@ impl BashExecutorTrait for BashExecutor {
         command: &str,
         working_dir: &std::path::Path,
         timeout_secs: Option<u64>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<BashExecutionResult>> + Send + '_>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<BashExecutionResult>> + Send + '_>>
+    {
         let command = command.to_string();
         let working_dir = working_dir.to_path_buf();
         let executor = self.clone();
@@ -240,13 +239,15 @@ impl BashExecutorTrait for BashExecutor {
 
 #[cfg(test)]
 mod tests {
-    
+
     use super::super::bash_permissions::{BashPermissions, PermissionRule};
-use crate::bash::BashExecutor;
+    use crate::bash::BashExecutor;
 
     #[tokio::test]
     async fn test_basic_execution() {
-        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").expect("Failed to create echo rule")]);
+        let permissions = BashPermissions::new(vec![
+            PermissionRule::allow("echo*").expect("Failed to create echo rule")
+        ]);
 
         let executor = BashExecutor::new(permissions, 5).unwrap();
         let result = executor

@@ -1,4 +1,4 @@
-use super::path_utils::{validate_and_resolve_path};
+use super::path_utils::validate_and_resolve_path;
 use anyhow::Result;
 use manager_models::{ToolErrorResponse, ToolResponse, WriteFileRequest, WriteFileResponse};
 use std::fs;
@@ -96,5 +96,3 @@ pub async fn write_file(base_path: &Path, request: WriteFileRequest) -> Result<T
         modified: file_exists,
     }))
 }
-
-

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
@@ -179,6 +180,7 @@ impl crate::glm::types::GlmChatCompletionResponse {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for CerebrasGlmClient {
     async fn complete(
         &self,

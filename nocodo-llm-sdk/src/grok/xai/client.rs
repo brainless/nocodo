@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
@@ -172,6 +173,7 @@ impl crate::grok::types::GrokChatCompletionResponse {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for XaiGrokClient {
     async fn complete(
         &self,

@@ -2,6 +2,7 @@ use crate::{
     error::LlmError,
     glm::types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmErrorResponse},
 };
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 /// Zen provider for GLM (OpenCode Zen - "Big Pickle")
@@ -132,6 +133,7 @@ impl Default for ZenGlmClient {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for ZenGlmClient {
     async fn complete(
         &self,

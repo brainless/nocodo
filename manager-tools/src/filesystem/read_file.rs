@@ -1,4 +1,4 @@
-use super::path_utils::{validate_and_resolve_path};
+use super::path_utils::validate_and_resolve_path;
 use anyhow::Result;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use manager_models::{ReadFileRequest, ReadFileResponse, ToolErrorResponse, ToolResponse};
@@ -58,5 +58,3 @@ pub async fn read_file(
         truncated: false,
     }))
 }
-
-

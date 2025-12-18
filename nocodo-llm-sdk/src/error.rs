@@ -54,6 +54,10 @@ pub enum LlmError {
     /// Tool execution failed
     #[error("Tool execution failed: {message}")]
     ToolExecutionFailed { message: String },
+
+    /// Feature not supported
+    #[error("Not supported: {message}")]
+    NotSupported { message: String },
 }
 
 impl LlmError {
@@ -87,6 +91,13 @@ impl LlmError {
     /// Create an internal error
     pub fn internal<S: Into<String>>(message: S) -> Self {
         Self::Internal {
+            message: message.into(),
+        }
+    }
+
+    /// Create a not supported error
+    pub fn not_supported<S: Into<String>>(message: S) -> Self {
+        Self::NotSupported {
             message: message.into(),
         }
     }

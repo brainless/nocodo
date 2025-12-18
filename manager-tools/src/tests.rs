@@ -6,12 +6,8 @@ mod tests {
         GrepRequest, ListFilesRequest, ReadFileRequest, ToolResponse, WriteFileRequest,
     };
     use std::fs;
-    
-    
-    
+
     use tempfile::TempDir;
-
-
 
     #[test]
     fn test_glob_to_regex() {

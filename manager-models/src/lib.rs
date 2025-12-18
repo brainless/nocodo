@@ -245,8 +245,6 @@ pub struct AddExistingProjectRequest {
     pub framework: Option<String>,
 }
 
-
-
 // Work history models
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageContentType {
@@ -365,8 +363,6 @@ pub enum ToolRequest {
     AskUser(AskUserRequest),
 }
 
-
-
 /// Search for patterns in files using grep
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GrepRequest {
@@ -483,10 +479,6 @@ impl BashRequest {
     }
 }
 
-
-
-
-
 /// Tool response to LLM (typed JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -508,8 +500,6 @@ pub enum ToolResponse {
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
-
-
 
 /// Grep match result
 #[derive(Debug, Clone, Serialize, Deserialize)]

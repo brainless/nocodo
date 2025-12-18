@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use manager_models::{AskUserRequest, UserQuestion, QuestionType};
+    use manager_models::{AskUserRequest, QuestionType, UserQuestion};
 
     #[tokio::test]
     async fn test_ask_user_validation() {
@@ -38,7 +38,7 @@ mod tests {
                     ]),
                     description: Some("Choose your experience level".to_string()),
                     validation: None,
-                }
+                },
             ],
             required: Some(true),
             timeout_secs: Some(300),
@@ -61,17 +61,15 @@ mod tests {
         // Select question without options
         let select_no_options = AskUserRequest {
             prompt: "Test".to_string(),
-            questions: vec![
-                UserQuestion {
-                    id: "choice".to_string(),
-                    question: "Choose an option".to_string(),
-                    response_type: QuestionType::Select,
-                    default: None,
-                    options: None,
-                    description: None,
-                    validation: None,
-                }
-            ],
+            questions: vec![UserQuestion {
+                id: "choice".to_string(),
+                question: "Choose an option".to_string(),
+                response_type: QuestionType::Select,
+                default: None,
+                options: None,
+                description: None,
+                validation: None,
+            }],
             required: Some(true),
             timeout_secs: None,
         };
@@ -98,7 +96,7 @@ mod tests {
                     options: None,
                     description: None,
                     validation: None,
-                }
+                },
             ],
             required: Some(true),
             timeout_secs: None,

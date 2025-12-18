@@ -1,4 +1,4 @@
-use crate::filesystem::path_utils::{validate_and_resolve_path};
+use crate::filesystem::path_utils::validate_and_resolve_path;
 use anyhow::Result;
 use manager_models::{BashRequest, BashResponse, ToolErrorResponse, ToolResponse};
 use std::path::Path;

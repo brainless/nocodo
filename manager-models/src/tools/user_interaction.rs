@@ -236,7 +236,10 @@ impl AskUserRequest {
             }
 
             if question.question.is_empty() {
-                return Err(format!("Question '{}' at index {} has empty text", question.id, index));
+                return Err(format!(
+                    "Question '{}' at index {} has empty text",
+                    question.id, index
+                ));
             }
 
             if question_ids.contains(&question.id) {
@@ -247,7 +250,11 @@ impl AskUserRequest {
             // Validate select/multiselect questions have options
             match question.response_type {
                 QuestionType::Select | QuestionType::Multiselect => {
-                    if question.options.as_ref().map_or(true, |opts| opts.is_empty()) {
+                    if question
+                        .options
+                        .as_ref()
+                        .map_or(true, |opts| opts.is_empty())
+                    {
                         return Err(format!(
                             "Question '{}' of type {:?} requires at least one option",
                             question.id, question.response_type

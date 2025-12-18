@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 use crate::{
@@ -159,6 +160,7 @@ impl crate::claude::types::ClaudeMessageResponse {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for ClaudeClient {
     async fn complete(
         &self,

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
@@ -277,6 +278,7 @@ impl crate::openai::types::OpenAIChatCompletionResponse {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for OpenAIClient {
     /// Routes requests to the appropriate OpenAI API based on model:
     ///

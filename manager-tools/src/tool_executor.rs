@@ -4,8 +4,8 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 // Re-export from individual modules
-pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::bash;
+pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
 use crate::user_interaction;

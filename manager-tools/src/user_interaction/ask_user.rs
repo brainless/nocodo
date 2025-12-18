@@ -1,7 +1,7 @@
 use anyhow::Result;
 use manager_models::{
-    AskUserRequest, AskUserResponse, ToolErrorResponse, ToolResponse, UserQuestion, 
-    QuestionType, UserQuestionResponse
+    AskUserRequest, AskUserResponse, QuestionType, ToolErrorResponse, ToolResponse, UserQuestion,
+    UserQuestionResponse,
 };
 use regex;
 use std::io::{self, Write};
@@ -31,7 +31,7 @@ pub async fn ask_user(request: AskUserRequest) -> Result<ToolResponse> {
         let answer = prompt_question(question)?;
         let validation_result = validate_response(question, &answer);
         let is_valid = validation_result.is_ok();
-        
+
         responses.push(UserQuestionResponse {
             question_id: question.id.clone(),
             answer: answer.clone(),
@@ -65,7 +65,7 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
 
     // Build the question prompt
     let mut prompt_parts = Vec::new();
-    
+
     // Add the question text
     prompt_parts.push(format!("Q: {}", question.question));
 
@@ -149,7 +149,10 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
                         return Ok(options[index - 1].clone());
                     }
                 }
-                return Err(anyhow::anyhow!("Invalid selection. Please enter a number between 1 and {}", options.len()));
+                return Err(anyhow::anyhow!(
+                    "Invalid selection. Please enter a number between 1 and {}",
+                    options.len()
+                ));
             }
         }
         QuestionType::Multiselect => {
@@ -194,7 +197,10 @@ fn validate_response(question: &UserQuestion, response: &str) -> Result<(), Stri
     if let Some(validation) = &question.validation {
         // Length validation for text responses
         match question.response_type {
-            QuestionType::Text | QuestionType::Email | QuestionType::Url | QuestionType::FilePath => {
+            QuestionType::Text
+            | QuestionType::Email
+            | QuestionType::Url
+            | QuestionType::FilePath => {
                 if let Some(min_length) = validation.min_length {
                     if response.len() < min_length {
                         return Err(format!(
@@ -216,18 +222,12 @@ fn validate_response(question: &UserQuestion, response: &str) -> Result<(), Stri
                 if let Ok(num) = response.parse::<f64>() {
                     if let Some(min_value) = validation.min_value {
                         if num < min_value {
-                            return Err(format!(
-                                "Number too small (minimum {})",
-                                min_value
-                            ));
+                            return Err(format!("Number too small (minimum {})", min_value));
                         }
                     }
                     if let Some(max_value) = validation.max_value {
                         if num > max_value {
-                            return Err(format!(
-                                "Number too large (maximum {})",
-                                max_value
-                            ));
+                            return Err(format!("Number too large (maximum {})", max_value));
                         }
                     }
                 } else {
@@ -278,17 +278,15 @@ mod tests {
         // Valid request
         let valid_request = AskUserRequest {
             prompt: "Test prompt".to_string(),
-            questions: vec![
-                UserQuestion {
-                    id: "q1".to_string(),
-                    question: "What is your name?".to_string(),
-                    response_type: QuestionType::Text,
-                    default: None,
-                    options: None,
-                    description: None,
-                    validation: None,
-                }
-            ],
+            questions: vec![UserQuestion {
+                id: "q1".to_string(),
+                question: "What is your name?".to_string(),
+                response_type: QuestionType::Text,
+                default: None,
+                options: None,
+                description: None,
+                validation: None,
+            }],
             required: Some(true),
             timeout_secs: None,
         };
@@ -324,7 +322,7 @@ mod tests {
                     options: None,
                     description: None,
                     validation: None,
-                }
+                },
             ],
             required: Some(true),
             timeout_secs: None,

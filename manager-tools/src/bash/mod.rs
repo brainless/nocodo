@@ -3,9 +3,9 @@ pub mod bash_permissions;
 pub mod types;
 
 // Re-export public types and functions
-pub use types::*;
-pub use bash_executor::{BashExecutor};
+pub use bash_executor::BashExecutor;
 pub use bash_permissions::*;
+pub use types::*;
 
 // Test modules (only for cfg(test))
 #[cfg(test)]

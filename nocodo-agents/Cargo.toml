@@ -1,0 +1,10 @@
+[package]
+name = "nocodo-agents"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+manager-models = { path = "../manager-models" }

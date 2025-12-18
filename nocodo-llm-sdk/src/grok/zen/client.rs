@@ -2,6 +2,7 @@ use crate::{
     error::LlmError,
     grok::types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokErrorResponse},
 };
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 /// Zen provider for Grok (OpenCode Zen)
@@ -131,6 +132,7 @@ impl Default for ZenGrokClient {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for ZenGrokClient {
     async fn complete(
         &self,
