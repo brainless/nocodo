@@ -1,4 +1,7 @@
 pub mod codebase_analysis;
+pub mod factory;
+
+use async_trait::async_trait;
 
 /// Represents the types of tools available to agents
 #[derive(Debug, Clone, PartialEq)]
@@ -28,7 +31,8 @@ impl AgentTool {
 }
 
 /// Trait defining the structure and behavior of an AI agent
-pub trait Agent {
+#[async_trait]
+pub trait Agent: Send + Sync {
     /// Returns the agent's clear objective
     fn objective(&self) -> &str;
 
@@ -43,4 +47,10 @@ pub trait Agent {
 
     /// Returns the list of tools available to this agent
     fn tools(&self) -> Vec<AgentTool>;
+
+    /// Execute the agent with the given user prompt
+    /// Optional method with default implementation that returns an error
+    async fn execute(&self, _user_prompt: &str) -> anyhow::Result<String> {
+        anyhow::bail!("Execute method not implemented for this agent")
+    }
 }

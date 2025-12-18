@@ -7,4 +7,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-manager-models = { path = "../manager-models" }
+nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
+anyhow = { workspace = true }
+async-trait = "0.1"

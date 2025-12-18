@@ -4521,7 +4521,9 @@ dependencies = [
 name = "nocodo-agents"
 version = "0.1.12"
 dependencies = [
- "manager-models",
+ "anyhow",
+ "async-trait",
+ "nocodo-llm-sdk",
 ]
 
 [[package]]
