@@ -228,7 +228,7 @@ impl crate::glm::builder::GlmClientTrait for ZaiGlmClient {
                                 serde_json::Value::String(s) => s,
                                 _ => v.to_string(),
                             }),
-                            reasoning: None, // ZAI doesn't provide reasoning_content in standard format
+                            reasoning: choice.message.reasoning_content, // Use reasoning_content from ZAI response
                             tool_calls: choice.message.tool_calls.map(|calls| {
                                 calls
                                     .into_iter()
