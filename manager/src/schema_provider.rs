@@ -13,9 +13,11 @@ pub trait SchemaProvider {
 
     /// Whether this provider requires all fields to be marked as required
     /// (e.g., OpenAI with strict=true)
+    #[allow(dead_code)] // Not currently used but will be needed for provider customization
     fn requires_all_fields(&self) -> bool;
 
     /// Customize a schema for this provider
+    #[allow(dead_code)] // Not currently used but will be needed for provider customization  
     fn customize_schema(&self, schema: Schema) -> Schema {
         if self.requires_all_fields() {
             self.mark_all_required(schema)
@@ -25,6 +27,7 @@ pub trait SchemaProvider {
     }
 
     /// Mark all properties in a schema as required
+    #[allow(dead_code)] // Not currently used but will be needed for strict mode
     fn mark_all_required(&self, schema: Schema) -> Schema {
         match schema {
             Schema::Object(mut obj) => {
@@ -44,6 +47,7 @@ pub trait SchemaProvider {
 }
 
 /// OpenAI provider - requires all fields as required in strict mode
+#[allow(dead_code)] // Not currently used but will be needed for OpenAI
 pub struct OpenAiSchemaProvider;
 
 impl SchemaProvider for OpenAiSchemaProvider {
@@ -57,6 +61,7 @@ impl SchemaProvider for OpenAiSchemaProvider {
 }
 
 /// Anthropic Claude provider - respects actual required/optional fields
+#[allow(dead_code)] // Not currently used but will be needed for Claude
 pub struct AnthropicSchemaProvider;
 
 impl SchemaProvider for AnthropicSchemaProvider {
@@ -70,6 +75,7 @@ impl SchemaProvider for AnthropicSchemaProvider {
 }
 
 /// GLM (Zhipu AI) provider - respects actual required/optional fields
+#[allow(dead_code)] // Not currently used but will be needed for GLM
 pub struct GlmSchemaProvider;
 
 impl SchemaProvider for GlmSchemaProvider {
@@ -83,6 +89,7 @@ impl SchemaProvider for GlmSchemaProvider {
 }
 
 /// xAI Grok provider - respects actual required/optional fields
+#[allow(dead_code)] // Not currently used but will be needed for xAI
 pub struct XaiSchemaProvider;
 
 impl SchemaProvider for XaiSchemaProvider {
@@ -96,6 +103,7 @@ impl SchemaProvider for XaiSchemaProvider {
 }
 
 /// Get the appropriate schema provider for a given LLM provider name
+#[allow(dead_code)] // Not currently used but will be needed for schema customization
 pub fn get_schema_provider(provider: &str) -> Box<dyn SchemaProvider> {
     match provider.to_lowercase().as_str() {
         "openai" => Box::new(OpenAiSchemaProvider),

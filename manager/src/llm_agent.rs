@@ -15,6 +15,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 /// LLM Agent that handles direct communication with LLMs and tool execution
+#[allow(dead_code)] // Tool execution disabled - fields will be used when re-enabled
 pub struct LlmAgent {
     db: Arc<Database>,
     ws: Arc<WebSocketBroadcaster>,
@@ -432,6 +433,7 @@ impl LlmAgent {
     }
 
     /// Get the tool executor for a specific session's project
+    #[allow(dead_code)] // Tool execution disabled - will be used when re-enabled
     async fn get_tool_executor_for_session(&self, session_id: i64) -> Result<ToolExecutor> {
         // Get session to find work_id
         let session = self.db.get_llm_agent_session(session_id)?;
@@ -458,6 +460,7 @@ impl LlmAgent {
     }
 
     /// Process native tool calls from LLM response
+    #[allow(dead_code)] // Tool execution disabled - will be used when re-enabled
     async fn process_native_tool_calls(
         &self,
         session_id: i64,
@@ -473,6 +476,7 @@ impl LlmAgent {
     }
 
     /// Follow up with LLM after tool execution with recursion depth tracking
+    #[allow(dead_code)] // Tool execution disabled - will be used when re-enabled
     fn follow_up_with_llm_with_depth<'a>(
         &'a self,
         session_id: i64,
@@ -656,6 +660,7 @@ impl LlmAgent {
     }
 
     /// Reconstruct conversation history for follow-up LLM calls with proper tool call handling
+    #[allow(dead_code)] // Tool execution disabled - will be used when re-enabled
     fn reconstruct_conversation_for_followup(
         &self,
         history: &[crate::models::LlmAgentMessage],
@@ -762,6 +767,7 @@ impl LlmAgent {
     }
 
     /// Create native tool definitions for supported providers
+    #[allow(dead_code)] // Tool execution disabled - will be used when re-enabled
     fn create_native_tool_definitions(&self, provider: &str) -> Vec<serde_json::Value> {
         use crate::models::{
             ApplyPatchRequest, BashRequest, GrepRequest, ListFilesRequest, ReadFileRequest,

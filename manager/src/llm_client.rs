@@ -1,9 +1,10 @@
 use crate::models::LlmProviderConfig;
 
 use anyhow::Result;
+
 // Re-export SDK types for backward compatibility and convenience
+#[allow(unused_imports)] // Some types may be used in the future
 pub use nocodo_llm_sdk::client::LlmClient;
-pub use nocodo_llm_sdk::tools::ToolChoice;
 pub use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
 
 // Re-export model constants for convenience

@@ -33,7 +33,7 @@ pub async fn list_files(
     };
 
     // Determine the base path - use worktree path if git_branch is specified
-    let project_path = if let Some(ref git_branch) = request.git_branch {
+    let project_path = if let Some(git_branch) = request.git_branch {
         tracing::info!(
             "Switching to branch '{}' for project at: {}",
             git_branch,
@@ -41,7 +41,7 @@ pub async fn list_files(
         );
         // Get worktree path for the specified branch
         let worktree_path =
-            crate::git::get_working_directory_for_branch(Path::new(&project.path), git_branch)?;
+            crate::git::get_working_directory_for_branch(Path::new(&project.path), &git_branch)?;
         tracing::info!("Using worktree path: {}", worktree_path);
         Path::new(&worktree_path).to_path_buf()
     } else {

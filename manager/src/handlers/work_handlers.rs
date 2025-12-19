@@ -165,7 +165,7 @@ pub async fn create_work(
         if tool_name == "llm-agent" {
             if let Some(ref llm_agent) = data.llm_agent {
                 // Determine provider and model from work.model or fall back to environment/defaults
-                let (provider, model) = if let Some(ref model_id) = work.model {
+                let (provider, model) = if let Some(model_id) = &work.model {
                     let provider = infer_provider_from_model(model_id);
                     (provider.to_string(), model_id.clone())
                 } else {
@@ -174,7 +174,7 @@ pub async fn create_work(
                         std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                     let model = std::env::var("MODEL")
                         .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                    (provider, model)
+                    (provider, model.clone())
                 };
 
                 // Create LLM agent session
@@ -353,15 +353,15 @@ pub async fn add_message_to_work(
             });
         } else {
             // No existing session - create a new one
-            let (provider, model) = if let Some(ref model_id) = work.model {
+            let (provider, model) = if let Some(model_id) = &work.model {
                 let provider = infer_provider_from_model(model_id);
                 (provider.to_string(), model_id.clone())
             } else {
                 let provider =
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-                let model = std::env::var("MODEL")
-                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                (provider, model)
+                    let model = std::env::var("MODEL")
+                        .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
+                    (provider, model.clone())
             };
 
             let llm_session = llm_agent

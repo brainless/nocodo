@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)] // False positive - tests module
 mod tests {
 
     use crate::ToolExecutor;

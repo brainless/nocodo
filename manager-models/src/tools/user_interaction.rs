@@ -68,7 +68,7 @@ pub enum QuestionType {
 }
 
 /// Validation rules for question responses
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct QuestionValidation {
     /// Minimum length for text responses
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,18 +90,7 @@ pub struct QuestionValidation {
     pub error_message: Option<String>,
 }
 
-impl Default for QuestionValidation {
-    fn default() -> Self {
-        Self {
-            min_length: None,
-            max_length: None,
-            min_value: None,
-            max_value: None,
-            pattern: None,
-            error_message: None,
-        }
-    }
-}
+
 
 /// Response from the ask_user tool containing user answers
 #[derive(Debug, Clone, Serialize, Deserialize)]
