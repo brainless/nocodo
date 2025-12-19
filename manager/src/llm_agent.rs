@@ -15,6 +15,24 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 /// LLM Agent that handles direct communication with LLMs and tool execution
+/// 
+/// ## Tool Execution Status
+/// 
+/// Tool execution is currently **disabled** due to SDK integration complexity:
+/// 
+/// 1. **SDK Tool Integration**: The new trait-based SDK architecture requires
+///    proper conversion between our tool definitions and each provider's
+///    tool calling format (OpenAI function calling, Anthropic tools, etc.)
+/// 
+/// 2. **Provider Compatibility**: Different providers have different tool
+///    calling mechanisms that need to be handled in the SDK layer
+/// 
+/// 3. **Future Re-enablement**: All tool execution code is preserved with
+///    `#[allow(dead_code)]` attributes and will be re-enabled once SDK
+///    tool integration is complete
+/// 
+/// The agent can still handle conversations and store messages, but cannot
+/// execute tools until the SDK tool integration is implemented.
 #[allow(dead_code)] // Tool execution disabled - fields will be used when re-enabled
 pub struct LlmAgent {
     db: Arc<Database>,

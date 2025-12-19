@@ -1,3 +1,14 @@
+//! Schema generation providers for different LLM vendors
+//! 
+//! Each LLM provider has different requirements for JSON schema generation,
+//! particularly around strict mode and required field handling.
+//! 
+//! ## Status
+//! 
+//! This module is currently **unused** because tool execution is disabled.
+//! It will be needed when tool execution is re-enabled to handle provider-specific
+//! schema requirements (e.g., OpenAI strict mode requiring all fields).
+
 use schemars::schema::Schema;
 use std::collections::BTreeSet;
 
