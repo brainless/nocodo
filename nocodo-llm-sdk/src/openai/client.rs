@@ -377,6 +377,7 @@ impl crate::client::LlmClient for OpenAIClient {
                         .unwrap_or(openai_response.usage.completion_tokens.unwrap_or(0)),
                 },
                 stop_reason: Some("completed".to_string()), // Responses API doesn't have finish_reason like Chat Completions
+                tool_calls: None, // TODO: Extract tool calls from OpenAI response
             };
 
             Ok(response)
@@ -462,6 +463,7 @@ impl crate::client::LlmClient for OpenAIClient {
                         .unwrap_or(openai_response.usage.output_tokens.unwrap_or(0)),
                 },
                 stop_reason: choice.finish_reason.clone(),
+                tool_calls: None, // TODO: Extract tool calls from OpenAI response
             };
 
             Ok(response)

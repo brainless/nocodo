@@ -1,5 +1,5 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
-use crate::Agent;
+use crate::{Agent, database::Database, tools::executor::ToolExecutor};
 use nocodo_llm_sdk::client::LlmClient;
 use std::sync::Arc;
 
@@ -38,8 +38,35 @@ pub enum AgentType {
 /// # }
 /// ```
 pub fn create_agent(agent_type: AgentType, client: Arc<dyn LlmClient>) -> Box<dyn Agent> {
+    // This is a legacy function - for now create dummy components
+    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:")).unwrap());
+    let tool_executor = Arc::new(ToolExecutor::new(std::env::current_dir().unwrap()));
+    
+    create_agent_with_tools(agent_type, client, database, tool_executor)
+}
+
+/// Factory function to create an agent with database and tool executor support
+///
+/// # Arguments
+///
+/// * `agent_type` - The type of agent to create
+/// * `client` - The LLM client to use for agent
+/// * `database` - Database for session persistence
+/// * `tool_executor` - Tool executor for running tools
+///
+/// # Returns
+///
+/// A boxed trait object implementing the Agent trait
+pub fn create_agent_with_tools(
+    agent_type: AgentType,
+    client: Arc<dyn LlmClient>,
+    database: Arc<Database>,
+    tool_executor: Arc<ToolExecutor>,
+) -> Box<dyn Agent> {
     match agent_type {
-        AgentType::CodebaseAnalysis => Box::new(CodebaseAnalysisAgent::new(client)),
+        AgentType::CodebaseAnalysis => {
+            Box::new(CodebaseAnalysisAgent::new(client, database, tool_executor))
+        }
     }
 }
 
@@ -68,6 +95,7 @@ mod tests {
                     output_tokens: 20,
                 },
                 stop_reason: Some("end_turn".to_string()),
+                tool_calls: None,
             })
         }
 

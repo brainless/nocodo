@@ -241,6 +241,7 @@ impl crate::client::LlmClient for ClaudeClient {
                 output_tokens: claude_response.usage.output_tokens,
             },
             stop_reason: claude_response.stop_reason,
+            tool_calls: None, // TODO: Extract tool calls from Claude response
         };
 
         Ok(response)

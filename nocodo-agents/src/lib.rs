@@ -1,5 +1,7 @@
 pub mod codebase_analysis;
+pub mod database;
 pub mod factory;
+pub mod tools;
 
 use async_trait::async_trait;
 
@@ -27,6 +29,14 @@ impl AgentTool {
             AgentTool::Bash => "bash",
             AgentTool::AskUser => "ask_user",
         }
+    }
+
+    /// Convert AgentTool to Tool definition with JSON schema
+    pub fn to_tool_definition(&self) -> nocodo_llm_sdk::tools::Tool {
+        let all_tools = tools::schemas::create_tool_definitions();
+        all_tools.into_iter()
+            .find(|tool| tool.name() == self.name())
+            .expect("Tool definition must exist")
     }
 }
 

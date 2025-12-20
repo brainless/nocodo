@@ -218,6 +218,7 @@ impl crate::client::LlmClient for ZenGlmClient {
                     .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
+            tool_calls: None, // TODO: Extract tool calls from Zen response
         };
 
         Ok(response)

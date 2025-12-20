@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::marker::PhantomData;
 
 /// A tool that can be called by an LLM
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tool {
     name: String,
     description: String,
@@ -93,7 +93,7 @@ impl<T: schemars::JsonSchema> ToolBuilder<T> {
 }
 
 /// A tool call from the LLM
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolCall {
     id: String,
     name: String,
@@ -132,6 +132,11 @@ impl ToolCall {
 
     /// Get raw JSON arguments
     pub fn raw_arguments(&self) -> &Value {
+        &self.arguments
+    }
+
+    /// Get arguments as a clone (for convenience)
+    pub fn arguments(&self) -> &Value {
         &self.arguments
     }
 }

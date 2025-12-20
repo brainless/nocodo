@@ -535,3 +535,152 @@ impl ZaiGlmClient {
         crate::glm::builder::GlmMessageBuilder::new(self)
     }
 }
+
+#[async_trait::async_trait]
+impl crate::client::LlmClient for ZaiGlmClient {
+    async fn complete(
+        &self,
+        request: crate::types::CompletionRequest,
+    ) -> Result<crate::types::CompletionResponse, LlmError> {
+        // Convert generic request to GLM-specific request
+        let glm_messages = request
+            .messages
+            .into_iter()
+            .map(|msg| {
+                let role = match msg.role {
+                    crate::types::Role::User => crate::glm::types::GlmRole::User,
+                    crate::types::Role::Assistant => crate::glm::types::GlmRole::Assistant,
+                    crate::types::Role::System => crate::glm::types::GlmRole::System,
+                };
+
+                // For now, only support text content
+                let content = msg
+                    .content
+                    .into_iter()
+                    .map(|block| match block {
+                        crate::types::ContentBlock::Text { text } => Ok(text),
+                        crate::types::ContentBlock::Image { .. } => Err(LlmError::invalid_request(
+                            "Image content not supported in v0.1",
+                        )),
+                    })
+                    .collect::<Result<Vec<String>, LlmError>>()?
+                    .join(""); // Join multiple text blocks
+
+                Ok(crate::glm::types::GlmMessage {
+                    role,
+                    content: Some(content),
+                    reasoning: None,
+                    tool_calls: None,
+                    tool_call_id: None,
+                })
+            })
+            .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
+
+        // Convert tools to ZAI format
+        let tools = request.tools.map(|tools| {
+            tools.into_iter().map(|tool| {
+                crate::glm::types::GlmTool {
+                    r#type: "function".to_string(),
+                    function: crate::glm::types::GlmFunction {
+                        name: tool.name().to_string(),
+                        description: tool.description().to_string(),
+                        parameters: tool.parameters().clone(),
+                    },
+                }
+            }).collect()
+        });
+
+        let zai_request = ZaiChatCompletionRequest {
+            model: request.model,
+            messages: glm_messages.into_iter().map(ZaiMessage::from).collect(),
+            request_id: None,
+            do_sample: Some(true),
+            stream: None,
+            thinking: None,
+            temperature: request.temperature,
+            top_p: request.top_p,
+            max_tokens: Some(request.max_tokens),
+            tool_stream: None,
+            tools,
+            tool_choice: request.tool_choice.map(|choice| {
+                match choice {
+                    crate::tools::ToolChoice::Auto => serde_json::json!("auto"),
+                    crate::tools::ToolChoice::Required => serde_json::json!("required"),
+                    crate::tools::ToolChoice::None => serde_json::json!(null),
+                    crate::tools::ToolChoice::Specific { name } => serde_json::json!({ "type": "function", "function": { "name": name } }),
+                }
+            }),
+            stop: request.stop_sequences,
+            response_format: None,
+            user_id: None,
+        };
+
+        // Send request and convert response
+        let zai_response = self.create_chat_completion(zai_request).await?;
+
+        if zai_response.choices.is_empty() {
+            return Err(LlmError::internal("No completion choices returned"));
+        }
+
+        let choice = &zai_response.choices[0];
+        let content = vec![crate::types::ContentBlock::Text {
+            text: choice.message.get_text(),
+        }];
+
+        // Extract tool calls from response
+        let tool_calls = choice.message.tool_calls.as_ref().map(|calls| {
+            calls.iter().map(|call| {
+                let arguments = match &call.function.arguments {
+                    serde_json::Value::String(s) => serde_json::from_str(s).unwrap_or_default(),
+                    v => v.clone(),
+                };
+                crate::tools::ToolCall::new(
+                    call.id.clone(),
+                    call.function.name.clone(),
+                    arguments,
+                )
+            }).collect()
+        });
+
+        let response = crate::types::CompletionResponse {
+            content,
+            role: match choice.message.role.as_str() {
+                "user" => crate::types::Role::User,
+                "assistant" => crate::types::Role::Assistant,
+                "system" => crate::types::Role::System,
+                _ => crate::types::Role::Assistant, // Default to assistant
+            },
+            usage: crate::types::Usage {
+                input_tokens: zai_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.prompt_tokens)
+                    .unwrap_or(0),
+                output_tokens: zai_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.completion_tokens)
+                    .unwrap_or(0),
+            },
+            stop_reason: choice.finish_reason.clone(),
+            tool_calls,
+        };
+
+        Ok(response)
+    }
+
+    fn provider_name(&self) -> &str {
+        if self.coding_plan {
+            "zai-coding"
+        } else {
+            "zai"
+        }
+    }
+
+    fn model_name(&self) -> &str {
+        // ZAI API expects "glm-4.6" not "zai-glm-4.6"
+        // Note: The constant ZAI_GLM_4_6_ID is "zai-glm-4.6" which is for identification,
+        // but the actual API call needs "glm-4.6"
+        "glm-4.6"
+    }
+}

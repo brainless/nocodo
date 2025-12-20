@@ -265,6 +265,7 @@ impl crate::client::LlmClient for CerebrasGlmClient {
                     .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
+            tool_calls: None, // TODO: Extract tool calls from Cerebras response
         };
 
         Ok(response)

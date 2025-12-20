@@ -236,26 +236,27 @@ impl crate::client::LlmClient for XaiGrokClient {
             text: choice.message.content.clone(),
         }];
 
-        let response = crate::types::CompletionResponse {
+let response = crate::types::CompletionResponse {
             content,
             role: match choice.message.role {
                 crate::grok::types::GrokRole::User => crate::types::Role::User,
                 crate::grok::types::GrokRole::Assistant => crate::types::Role::Assistant,
                 crate::grok::types::GrokRole::System => crate::types::Role::System,
             },
-            usage: crate::types::Usage {
+usage: crate::types::Usage {
                 input_tokens: grok_response
                     .usage
                     .as_ref()
-                    .map(|u| u.prompt_tokens)
+                    .and_then(|u| Some(u.prompt_tokens))
                     .unwrap_or(0),
                 output_tokens: grok_response
                     .usage
                     .as_ref()
-                    .map(|u| u.completion_tokens)
+                    .and_then(|u| Some(u.completion_tokens))
                     .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
+            tool_calls: None, // TODO: Extract tool calls from Grok response
         };
 
         Ok(response)

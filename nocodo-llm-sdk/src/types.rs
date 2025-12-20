@@ -109,6 +109,10 @@ pub struct CompletionRequest {
     pub top_p: Option<f32>,
     /// Stop sequences
     pub stop_sequences: Option<Vec<String>>,
+    /// Tools available to the LLM
+    pub tools: Option<Vec<crate::tools::Tool>>,
+    /// Tool choice strategy
+    pub tool_choice: Option<crate::tools::ToolChoice>,
 }
 
 /// Generic completion response (provider-agnostic)
@@ -122,6 +126,8 @@ pub struct CompletionResponse {
     pub usage: Usage,
     /// Stop reason
     pub stop_reason: Option<String>,
+    /// Tool calls requested by the LLM
+    pub tool_calls: Option<Vec<crate::tools::ToolCall>>,
 }
 
 /// Streaming response chunk
