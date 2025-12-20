@@ -8,6 +8,8 @@ repository.workspace = true
 
 [dependencies]
 nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
+manager-models = { path = "../manager-models" }
+manager-tools = { path = "../manager-tools" }
 anyhow = { workspace = true }
 async-trait = "0.1"
 tokio = { version = "1.0", features = ["full"] }
@@ -20,8 +22,6 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 schemars = { version = "0.8", features = ["preserve_order"] }
-walkdir = "2.4"
-regex = "1.10"
 serde_json = "1.0"
 
 [[bin]]

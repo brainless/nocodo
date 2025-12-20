@@ -1,5 +1,6 @@
 use clap::Parser;
-use nocodo_agents::{database::Database, factory::{create_agent_with_tools, AgentType}, tools::executor::ToolExecutor};
+use nocodo_agents::{database::Database, factory::{create_agent_with_tools, AgentType}};
+use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -120,7 +121,11 @@ async fn main() -> anyhow::Result<()> {
     let database = Arc::new(Database::new(&database_path)?);
 
     let base_path = get_base_path(&args.base_path)?;
-    let tool_executor = Arc::new(ToolExecutor::new(base_path));
+    // Create tool executor with manager-tools (supports more configuration)
+    let tool_executor = Arc::new(
+        ToolExecutor::new(base_path.clone())
+            .with_max_file_size(10 * 1024 * 1024)  // max_file_size: 10MB
+    );
 
     // Create agent with database and tool executor
     let agent = create_agent_with_tools(agent_type, client, database, tool_executor);

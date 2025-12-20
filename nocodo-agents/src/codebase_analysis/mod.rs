@@ -1,5 +1,7 @@
-use crate::{Agent, AgentTool, database::Database, tools::executor::ToolExecutor};
+use crate::{Agent, AgentTool, database::Database};
+use manager_tools::ToolExecutor;
 use async_trait::async_trait;
+use anyhow;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
 use nocodo_llm_sdk::tools::ToolChoice;
@@ -160,7 +162,13 @@ impl CodebaseAnalysisAgent {
         message_id: Option<i64>,
         tool_call: &ToolCall,
     ) -> anyhow::Result<()> {
-        // 1. Record tool call in database
+        // 1. Parse LLM tool call into typed ToolRequest
+        let tool_request = AgentTool::parse_tool_call(
+            tool_call.name(),
+            tool_call.arguments().clone(),
+        )?;
+
+        // 2. Record tool call in database
         let call_id = self.database.create_tool_call(
             session_id,
             message_id,
@@ -169,20 +177,22 @@ impl CodebaseAnalysisAgent {
             tool_call.arguments().clone(),
         )?;
 
-        // 2. Execute tool
+        // 3. Execute tool with typed request ✅
         let start = Instant::now();
-        let result = self.tool_executor
-            .execute(tool_call.name(), tool_call.arguments().clone())
+        let result: anyhow::Result<manager_models::ToolResponse> = self.tool_executor
+            .execute(tool_request)  // ✅ Typed execution
             .await;
         let execution_time = start.elapsed().as_millis() as i64;
 
-        // 3. Update database with result
+        // 4. Update database with typed result
         match result {
             Ok(response) => {
-                self.database.complete_tool_call(call_id, response.clone(), execution_time)?;
+                // Convert ToolResponse to JSON for storage
+                let response_json = serde_json::to_value(&response)?;
+                self.database.complete_tool_call(call_id, response_json.clone(), execution_time)?;
 
-                // 4. Add tool result as a message for next LLM call
-                let result_text = serde_json::to_string_pretty(&response)?;
+                // Add tool result as a message for next LLM call
+                let result_text = crate::format_tool_response(&response);
                 self.database.create_message(
                     session_id,
                     "tool",
@@ -190,13 +200,14 @@ impl CodebaseAnalysisAgent {
                 )?;
             }
             Err(e) => {
-                self.database.fail_tool_call(call_id, &e.to_string())?;
+                let error_msg = format!("{:?}", e);
+                self.database.fail_tool_call(call_id, &error_msg)?;
 
-                // Still send error back to LLM so it can handle it
+                // Send error back to LLM
                 self.database.create_message(
                     session_id,
                     "tool",
-                    &format!("Tool {} failed: {}", tool_call.name(), e),
+                    &format!("Tool {} failed: {}", tool_call.name(), error_msg),
                 )?;
             }
         }

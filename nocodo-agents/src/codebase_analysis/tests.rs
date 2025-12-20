@@ -23,6 +23,7 @@ impl LlmClient for MockLlmClient {
                 output_tokens: 20,
             },
             stop_reason: Some("end_turn".to_string()),
+            tool_calls: None,
         })
     }
 
@@ -36,8 +37,18 @@ impl LlmClient for MockLlmClient {
 }
 
 fn create_test_agent() -> CodebaseAnalysisAgent {
+    use crate::database::Database;
+    use manager_tools::ToolExecutor;
+    use std::path::PathBuf;
+
     let client: Arc<dyn LlmClient> = Arc::new(MockLlmClient);
-    CodebaseAnalysisAgent::new(client)
+    let database = Arc::new(Database::new(&PathBuf::from(":memory:")).unwrap());
+    let tool_executor = Arc::new(
+        ToolExecutor::new(PathBuf::from("."))
+            .with_max_file_size(10 * 1024 * 1024) // 10MB
+    );
+
+    CodebaseAnalysisAgent::new(client, database, tool_executor)
 }
 
 #[test]
