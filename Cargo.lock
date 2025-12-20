@@ -4523,7 +4523,18 @@ version = "0.1.12"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
+ "clap",
+ "manager-models",
+ "manager-tools",
  "nocodo-llm-sdk",
+ "rusqlite",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
 ]
 
 [[package]]
