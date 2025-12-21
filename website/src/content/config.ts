@@ -46,6 +46,7 @@ const blog = defineCollection({
     youtubeTitle: z.string().optional(),
     youtubeStartTime: z.number().optional(),
     youtubeEndTime: z.number().optional(),
+    publishDate: z.coerce.date().optional(),
   }),
 });
 

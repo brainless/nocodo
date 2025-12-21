@@ -4,12 +4,20 @@ import { getCollection } from 'astro:content';
 
 const blogEntries = await getCollection('blog');
 
-const blogPosts = blogEntries.map(entry => ({
-  title: entry.data.title || 'Untitled',
-  description: entry.data.description || '',
-  slug: entry.slug,
-  tags: entry.data.tags || [],
-}));
+const blogPosts = blogEntries
+  .map(entry => ({
+    title: entry.data.title || 'Untitled',
+    description: entry.data.description || '',
+    slug: entry.slug,
+    tags: entry.data.tags || [],
+    publishDate: entry.data.publishDate,
+  }))
+  .sort((a, b) => {
+    if (!a.publishDate && !b.publishDate) return 0;
+    if (!a.publishDate) return 1;
+    if (!b.publishDate) return -1;
+    return b.publishDate.getTime() - a.publishDate.getTime();
+  });
 ---
 
 <Layout
@@ -42,9 +50,20 @@ const blogPosts = blogEntries.map(entry => ({
               </div>
             )}
 
-            <!-- Title -->
+            <!-- Title and Date -->
             <a href={`/blog/${post.slug}`} class="block group">
-              <h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-700 transition-colors">{post.title}</h3>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-2xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors">{post.title}</h3>
+                {post.publishDate && (
+                  <time datetime={post.publishDate.toISOString()} class="text-sm text-gray-500 whitespace-nowrap ml-4">
+                    {post.publishDate.toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    })}
+                  </time>
+                )}
+              </div>
             </a>
 
             <!-- Description -->

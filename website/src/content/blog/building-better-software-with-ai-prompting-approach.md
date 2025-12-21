@@ -3,6 +3,7 @@ title: "Building Better Software with AI: My Prompting Approach"
 description: "Learn high-level prompting techniques for structuring projects when building with large language models and coding agents."
 tags: ["AI development", "prompting", "project structure", "software architecture"]
 youtubeVideoId: "44-xXzLclYE"
+publishDate: 2025-12-20
 ---
 
 Good morning! Today I want to share something I've been discussing with a few people - my approach to prompting feels different. It's more nuanced yet simpler once the concept clicks. I think this is the perfect time to discuss the high-level prompting techniques I use for structuring projects.
