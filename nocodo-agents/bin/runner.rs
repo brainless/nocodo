@@ -1,6 +1,10 @@
 use clap::Parser;
-use nocodo_agents::{database::Database, factory::{create_agent_with_tools, AgentType}};
+use home;
 use manager_tools::ToolExecutor;
+use nocodo_agents::{
+    database::Database,
+    factory::{create_agent_with_tools, AgentType},
+};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -23,8 +27,8 @@ struct Args {
     config: PathBuf,
 
     /// Path to SQLite database for storing agent sessions
-    #[arg(long, default_value = "~/.nocodo-agents/agent.db")]
-    database_path: String,
+    #[arg(long)]
+    database_path: Option<String>,
 
     /// Base path for tool execution (file operations are relative to this)
     #[arg(long, default_value = ".")]
@@ -62,17 +66,18 @@ fn get_bool_option(config: &Config, key_name: &str, default: bool) -> bool {
 
 fn get_database_path(path_str: &str) -> anyhow::Result<PathBuf> {
     let path = if path_str.starts_with('~') {
-        let home = std::env::var("HOME").map_err(|_| anyhow::anyhow!("HOME environment variable not set"))?;
+        let home = std::env::var("HOME")
+            .map_err(|_| anyhow::anyhow!("HOME environment variable not set"))?;
         PathBuf::from(path_str.replace('~', &home))
     } else {
         PathBuf::from(path_str)
     };
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    
+
     Ok(path)
 }
 
@@ -82,12 +87,20 @@ fn get_base_path(path_str: &str) -> anyhow::Result<PathBuf> {
     } else {
         PathBuf::from(path_str)
     };
-    
+
     if !path.exists() {
         std::fs::create_dir_all(&path)?;
     }
-    
+
     Ok(path)
+}
+
+fn get_default_db_path() -> PathBuf {
+    if let Some(home) = home::home_dir() {
+        home.join(".local/share/nocodo/agents.db")
+    } else {
+        PathBuf::from("agents.db")
+    }
 }
 
 #[tokio::main]
@@ -98,8 +111,8 @@ async fn main() -> anyhow::Result<()> {
     let config = load_config(&args.config)?;
 
     // Get ZAI API key (try lowercase first, then uppercase)
-    let zai_api_key = get_api_key(&config, "zai_api_key")
-        .or_else(|_| get_api_key(&config, "ZAI_API_KEY"))?;
+    let zai_api_key =
+        get_api_key(&config, "zai_api_key").or_else(|_| get_api_key(&config, "ZAI_API_KEY"))?;
 
     // Check if coding plan mode is enabled (default to true)
     let coding_plan = get_bool_option(&config, "zai_coding_plan", true);
@@ -112,19 +125,22 @@ async fn main() -> anyhow::Result<()> {
     let agent_type = match args.agent.to_lowercase().as_str() {
         "codebase-analysis" | "codebase_analysis" => AgentType::CodebaseAnalysis,
         _ => {
-            anyhow::bail!("Unknown agent type: {}. Available: codebase-analysis", args.agent)
+            anyhow::bail!(
+                "Unknown agent type: {}. Available: codebase-analysis",
+                args.agent
+            )
         }
     };
 
     // Initialize database and tool executor
-    let database_path = get_database_path(&args.database_path)?;
+    let database_path_str = args.database_path.unwrap_or_else(|| get_default_db_path().to_string_lossy().to_string());
+    let database_path = get_database_path(&database_path_str)?;
     let database = Arc::new(Database::new(&database_path)?);
 
     let base_path = get_base_path(&args.base_path)?;
     // Create tool executor with manager-tools (supports more configuration)
     let tool_executor = Arc::new(
-        ToolExecutor::new(base_path.clone())
-            .with_max_file_size(10 * 1024 * 1024)  // max_file_size: 10MB
+        ToolExecutor::new(base_path.clone()).with_max_file_size(10 * 1024 * 1024), // max_file_size: 10MB
     );
 
     // Create agent with database and tool executor

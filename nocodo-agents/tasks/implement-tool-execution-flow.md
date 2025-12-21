@@ -721,7 +721,7 @@ async fn main() -> anyhow::Result<()> {
     let client = ZaiGlmClient::with_coding_plan(zai_api_key, coding_plan)?;
     let client: Arc<dyn nocodo_llm_sdk::client::LlmClient> = Arc::new(client);
 
-    // Initialize database (use ~/.nocodo-agents/agent.db or config option)
+    // Initialize database (use ~/.local/share/nocodo/agents.db or config option)
     let db_path = get_database_path(&config)?;
     let database = Arc::new(Database::new(&db_path)?);
 
@@ -751,10 +751,12 @@ async fn main() -> anyhow::Result<()> {
 
 fn get_database_path(config: &Config) -> anyhow::Result<PathBuf> {
     // Check config for database_path option
-    // Otherwise use ~/.nocodo-agents/agent.db
+    // Otherwise use ~/.local/share/nocodo/agents.db
     Ok(PathBuf::from(std::env::var("HOME")?)
-        .join(".nocodo-agents")
-        .join("agent.db"))
+        .join(".local")
+        .join("share")
+        .join("nocodo")
+        .join("agents.db"))
 }
 
 fn get_base_path(config: &Config) -> anyhow::Result<PathBuf> {
@@ -854,7 +856,7 @@ zai_coding_plan = true
 
 [agent]
 # Path to SQLite database for storing agent sessions
-# Default: ~/.nocodo-agents/agent.db
+# Default: ~/.local/share/nocodo/agents.db
 database_path = "/path/to/agent.db"
 
 # Base path for tool execution (file operations are relative to this)

@@ -52,7 +52,7 @@ The agent runner takes three required arguments:
 
 Optional arguments:
 
-- `--database-path`: Path to SQLite database for storing agent sessions (default: `~/.nocodo-agents/agent.db`)
+- `--database-path`: Path to SQLite database for storing agent sessions (default: `~/.local/share/nocodo/agents.db`)
 - `--base-path`: Base directory for tool execution (default: current directory)
 
 Example:
@@ -126,7 +126,7 @@ All agent executions are tracked in a SQLite database:
 - `agent_messages` - Conversation history (user, assistant, tool messages)
 - `agent_tool_calls` - Tool execution tracking with timing and results
 
-**Default location**: `~/.nocodo-agents/agent.db`
+**Default location**: `~/.local/share/nocodo/agents.db`
 
 **Session lifecycle:**
 1. Session created with `running` status
@@ -135,7 +135,7 @@ All agent executions are tracked in a SQLite database:
 
 View session data:
 ```bash
-sqlite3 ~/.nocodo-agents/agent.db "SELECT * FROM agent_sessions ORDER BY started_at DESC LIMIT 5;"
+sqlite3 ~/.local/share/nocodo/agents.db "SELECT * FROM agent_sessions ORDER BY started_at DESC LIMIT 5;"
 ```
 
 ### Agent Execution Flow

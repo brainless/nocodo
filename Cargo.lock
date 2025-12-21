@@ -4525,6 +4525,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
+ "home",
  "manager-models",
  "manager-tools",
  "nocodo-llm-sdk",
