@@ -6,8 +6,6 @@
 
 > ⚠️ **Under Active Development** - nocodo is actively developed. If you ⭐ star and 👀 watch this repository, it would mean a lot to me.
 
-Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help businesses of all sizes automate their workflows with AI-powered agents - whether you're a solo entrepreneur, a growing startup, or part of a large organization.
-
 ![nocodo Desktop app shows the agent is analysing its own code](./website/src/assets/nocodo_Analysing_Own_Code.png "nocodo Desktop app shows the agent is analysing its own code")
 
 > ⚠️ **Under Active Development** - the desktop app shows tool call outputs as raw JSON, a better UI will come soon.
@@ -182,6 +180,10 @@ Built-in permissions, audit trails, and compliance features from day one.
 
 ### Financial Services Firm
 *"Our compliance agent processes 1,000+ transactions daily and flags potential issues automatically. What used to take a team now happens instantly."*
+
+---
+
+Hello! I am Sumit, a software engineer living in a small Himalayan village in India. I am building nocodo to help businesses of all sizes automate their workflows with AI-powered agents - whether you're a solo entrepreneur, a growing startup, or part of a large organization.
 
 ---
 

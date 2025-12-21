@@ -2,6 +2,7 @@
 title: "nocodo: A Complete Introduction"
 description: "Learn the fundamentals of nocodo - a structured approach to AI-assisted development that focuses on user flows and business logic."
 tags: ["nocodo", "AI development", "methodology"]
+publishDate: 2025-10-15
 ---
 
 I've been vibe coding for the last two to three months now. On a daily basis, I've been using Claude Code, Gemini CLI, a little bit of Repl.it, Bolt, Lovable, and many other tools in between. I use primarily Claude Code and I've been quite happy with the results.

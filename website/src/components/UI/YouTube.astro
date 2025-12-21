@@ -1,0 +1,43 @@
+---
+interface Props {
+  videoId: string;
+  title?: string;
+  startTime?: number;
+  endTime?: number;
+}
+
+const { videoId, title, startTime = 0, endTime } = Astro.props;
+
+// Build YouTube embed URL with parameters
+const params = new URLSearchParams({
+  rel: '0',
+  modestbranding: '1',
+  start: startTime.toString(),
+});
+
+if (endTime) {
+  params.set('end', endTime.toString());
+}
+
+const embedUrl = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+---
+
+<div class="youtube-widget my-8">
+  {title && <h3 class="text-lg font-semibold text-gray-900 mb-3">{title}</h3>}
+  <div class="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-lg">
+    <iframe
+      src={embedUrl}
+      class="absolute top-0 left-0 w-full h-full border-0"
+      title={title || `YouTube video ${videoId}`}
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen
+      loading="lazy"
+    />
+  </div>
+</div>
+
+<style>
+  .youtube-widget iframe {
+    border-radius: 0.5rem;
+  }
+</style>
