@@ -1,8 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import Section from '../../components/theme/Section.astro';
-import SectionHeader from '../../components/theme/SectionHeader.astro';
-import Card from '../../components/theme/Card.astro';
 import { getCollection } from 'astro:content';
 
 const blogEntries = await getCollection('blog');
@@ -20,66 +17,62 @@ const blogPosts = blogEntries.map(entry => ({
   description="Articles, insights, and deep dives into vibe coding, AI-assisted development, and nocodo methodology"
 >
   <!-- Blog Posts -->
-  <Section background="primary">
-    <SectionHeader
-      title="Latest Articles"
-      subtitle="Deep dives into vibe coding methodology, AI development practices, and real-world case studies"
-    />
-
-    <!-- Posts Grid -->
-    <div class="grid lg:grid-cols-1 gap-8 max-w-4xl mx-auto">
-      {blogPosts.map((post) => (
-        <Card class="p-8 border-l-4 border-accent-emerald">
-          <!-- Tags -->
-          {post.tags.length > 0 && (
-            <div class="flex flex-wrap gap-2 mb-4">
-              {post.tags.map((tag) => (
-                <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <!-- Icon -->
-          <div class="text-4xl mb-4">📝</div>
-
-          <!-- Title -->
-          <h3 class="text-2xl font-bold text-text-primary mb-3">{post.title}</h3>
-
-          <!-- Description -->
-          {post.description && (
-            <p class="text-text-secondary mb-6">{post.description}</p>
-          )}
-
-          <!-- Read Button -->
-          <a
-            href={`/blog/${post.slug}`}
-            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold rounded-lg transition-all duration-200"
-          >
-            Read Article
-            <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </a>
-        </Card>
-      ))}
-    </div>
-
-    {blogPosts.length === 0 && (
-      <div class="text-center">
-        <div class="inline-flex items-center justify-center w-12 h-12 bg-bg-tertiary rounded-full mb-4">
-          <svg class="w-6 h-6 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.286a1 1 0 00-.293-.707l-5.657-5.657A1 1 0 0015.343 1H5a2 2 0 00-2 2v16a2 2 0 002 2z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-semibold text-text-primary mb-2">More Articles Coming Soon</h3>
-        <p class="text-text-secondary max-w-2xl mx-auto">
-          We're working on more in-depth articles covering advanced vibe coding techniques,
-          case studies, and implementation guides. Stay tuned!
+  <section class="bg-white py-20 sm:py-32">
+    <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">Latest Articles</h2>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+          Deep dives into vibe coding methodology, AI development practices, and real-world case studies
         </p>
       </div>
-    )}
-  </Section>
+
+      <!-- Posts Grid -->
+      <div class="grid lg:grid-cols-1 gap-8 max-w-4xl mx-auto">
+        {blogPosts.map((post) => (
+          <article class="bg-white rounded-lg shadow-sm border border-gray-200" id="article-content">
+            <div class="content-prose p-8">
+            <!-- Tags -->
+            {post.tags.length > 0 && (
+              <div class="flex flex-wrap gap-2 mb-4">
+                {post.tags.map((tag) => (
+                  <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <!-- Title -->
+            <a href={`/blog/${post.slug}`} class="block group">
+              <h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-700 transition-colors">{post.title}</h3>
+            </a>
+
+            <!-- Description -->
+            {post.description && (
+              <a href={`/blog/${post.slug}`} class="block group">
+                <p class="text-gray-600 mb-6 group-hover:text-gray-700 transition-colors">{post.description}</p>
+              </a>
+            )}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {blogPosts.length === 0 && (
+        <div class="text-center">
+          <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-200 rounded-full mb-4">
+            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.286a1 1 0 00-.293-.707l-5.657-5.657A1 1 0 0015.343 1H5a2 2 0 00-2 2v16a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">More Articles Coming Soon</h3>
+          <p class="text-gray-600 max-w-2xl mx-auto">
+            We're working on more in-depth articles covering advanced vibe coding techniques,
+            case studies, and implementation guides. Stay tuned!
+          </p>
+        </div>
+      )}
+    </div>
+  </section>
 
 </Layout>

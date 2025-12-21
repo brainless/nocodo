@@ -24,14 +24,14 @@ const description = data.description || '';
 ---
 
 <Layout title={title} description={description}>
-  <div class="min-h-screen bg-bg-primary">
+  <div class="min-h-screen bg-white">
     <!-- Table of Contents Overlay -->
     <div id="toc-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden">
-      <div class="fixed right-0 top-0 h-full w-80 bg-bg-secondary shadow-xl transform translate-x-full transition-transform duration-300 ease-in-out" id="toc-panel">
-        <div class="p-6 border-b border-border-primary">
+      <div class="fixed right-0 top-0 h-full w-80 bg-white shadow-xl transform translate-x-full transition-transform duration-300 ease-in-out" id="toc-panel">
+        <div class="p-6 border-b border-gray-200">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-text-primary">Table of Contents</h3>
-            <button id="toc-close" class="text-text-tertiary hover:text-text-secondary">
+            <h3 class="text-lg font-semibold text-gray-900">Table of Contents</h3>
+            <button id="toc-close" class="text-gray-500 hover:text-gray-700">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
@@ -43,11 +43,11 @@ const description = data.description || '';
             {headings.map((heading) => (
               <a
                 href={`#${heading.slug}`}
-                class={`block text-sm hover:text-accent-emerald transition-colors toc-link ${
-                  heading.depth === 1 ? 'font-semibold text-text-primary' :
-                  heading.depth === 2 ? 'pl-4 text-text-secondary' :
-                  heading.depth === 3 ? 'pl-8 text-text-tertiary' :
-                  'pl-12 text-text-muted'
+                class={`block text-sm hover:text-gray-700 transition-colors toc-link ${
+                  heading.depth === 1 ? 'font-semibold text-gray-900' :
+                  heading.depth === 2 ? 'pl-4 text-gray-700' :
+                  heading.depth === 3 ? 'pl-8 text-gray-600' :
+                  'pl-12 text-gray-500'
                 }`}
                 data-heading-id={heading.slug}
               >
@@ -60,14 +60,14 @@ const description = data.description || '';
     </div>
 
     <!-- Fixed Reading Progress Bar -->
-    <div class="fixed top-0 left-0 right-0 z-40 bg-bg-secondary/95 backdrop-blur-sm border-b border-border-primary shadow-sm" id="progress-container">
+    <div class="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm" id="progress-container">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div class="flex items-center justify-between text-sm text-text-secondary mb-2">
+        <div class="flex items-center justify-between text-sm text-gray-600 mb-2">
           <span class="font-medium">Reading Progress</span>
-          <span id="reading-progress-text" class="font-medium text-accent-emerald">0%</span>
+          <span id="reading-progress-text" class="font-medium text-gray-700">0%</span>
         </div>
-        <div class="w-full bg-bg-tertiary rounded-full h-1.5">
-          <div id="reading-progress-bar" class="bg-accent-emerald h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5">
+          <div id="reading-progress-bar" class="bg-gray-700 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
         </div>
       </div>
     </div>
@@ -75,7 +75,7 @@ const description = data.description || '';
     <!-- Floating TOC Button -->
     <button
       id="toc-toggle"
-      class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-full shadow-lg transition-all duration-200 z-30 flex items-center justify-center group"
+      class="fixed bottom-6 right-6 w-14 h-14 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg transition-all duration-200 z-30 flex items-center justify-center group"
       title="Table of Contents"
     >
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,38 +88,38 @@ const description = data.description || '';
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Breadcrumb -->
         <nav class="mb-8">
-          <ol class="flex items-center space-x-2 text-sm text-text-muted">
-            <li><a href="/" class="hover:text-text-secondary">Home</a></li>
+          <ol class="flex items-center space-x-2 text-sm text-gray-500">
+            <li><a href="/" class="hover:text-gray-700">Home</a></li>
             <li>/</li>
-            <li><a href="/blog" class="hover:text-text-secondary">Blog</a></li>
+            <li><a href="/blog" class="hover:text-gray-700">Blog</a></li>
             <li>/</li>
-            <li class="text-text-primary">{title}</li>
+            <li class="text-gray-900">{title}</li>
           </ol>
         </nav>
 
         <!-- Article Header -->
         <header class="mb-8">
           <div class="flex items-center space-x-3 mb-4">
-            <div class="w-12 h-12 bg-accent-emerald/10 rounded-lg flex items-center justify-center border border-accent-emerald/20">
-              <svg class="w-6 h-6 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center border border-gray-300">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
               </svg>
             </div>
             <div>
-              <div class="text-sm text-accent-emerald font-medium">nocodo Blog</div>
-              <h1 class="text-4xl font-bold text-text-primary">{title}</h1>
+              <div class="text-sm text-gray-600 font-medium">nocodo Blog</div>
+              <h1 class="text-4xl font-bold text-gray-900">{title}</h1>
             </div>
           </div>
 
           {description && (
-            <p class="text-xl text-text-secondary">{description}</p>
+            <p class="text-xl text-gray-600">{description}</p>
           )}
 
           <!-- Tags -->
           {data.tags && (
             <div class="mt-4 flex flex-wrap gap-2">
               {data.tags.map((tag) => (
-                <span class="inline-block px-3 py-1 text-xs font-medium bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30 rounded-full">
+                <span class="inline-block px-3 py-1 text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300 rounded-full">
                   {tag}
                 </span>
               ))}
@@ -129,7 +129,7 @@ const description = data.description || '';
         </header>
 
         <!-- Article Content -->
-        <article class="bg-bg-secondary rounded-lg shadow-sm border border-border-primary" id="article-content">
+        <article class="bg-white rounded-lg shadow-sm border border-gray-200" id="article-content">
           <div class="content-prose p-8">
             <Content />
           </div>
@@ -139,14 +139,14 @@ const description = data.description || '';
         <nav class="mt-12 flex justify-between">
           <a
             href="/blog"
-            class="inline-flex items-center px-4 py-2 border border-border-primary text-sm font-medium rounded-md text-text-secondary bg-bg-secondary hover:bg-bg-tertiary transition-colors"
+            class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
           >
             ← Back to Blog
           </a>
 
           <a
             href="/playbook"
-            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 transition-colors"
+            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-700 hover:bg-gray-800 transition-colors"
           >
             Read the Playbook →
           </a>
@@ -245,14 +245,14 @@ const description = data.description || '';
 
     // Remove all active states
     tocLinks.forEach(link => {
-      link.classList.remove('text-accent-emerald', 'font-medium');
+      link.classList.remove('text-gray-700', 'font-medium');
     });
 
     // Add active state to current section
     if (currentHeading && (currentHeading as HTMLElement).id) {
       const currentLink = document.querySelector(`[data-heading-id="${(currentHeading as HTMLElement).id}"]`);
       if (currentLink) {
-        currentLink.classList.add('text-accent-emerald', 'font-medium');
+        currentLink.classList.add('text-gray-700', 'font-medium');
       }
     }
   }
@@ -282,13 +282,13 @@ const description = data.description || '';
 <style is:global>
   /* Reset and style content prose - Override Tailwind's CSS reset */
   .content-prose {
-    color: rgb(203 213 225); /* text-text-secondary */
+    color: rgb(75 85 99); /* text-gray-600 */
     line-height: 1.75;
     max-width: none;
   }
 
   .content-prose h1 {
-    color: rgb(241 245 249) !important; /* text-text-primary */
+    color: rgb(17 24 39) !important; /* text-gray-900 */
     font-weight: 800 !important;
     font-size: 2.25rem !important;
     margin-top: 0 !important;
@@ -298,7 +298,7 @@ const description = data.description || '';
   }
   
   .content-prose h2 {
-    color: rgb(241 245 249) !important; /* text-text-primary */
+    color: rgb(17 24 39) !important; /* text-gray-900 */
     font-weight: 700 !important;
     font-size: 1.875rem !important;
     margin-top: 3rem !important;
@@ -308,7 +308,7 @@ const description = data.description || '';
   }
 
   .content-prose h3 {
-    color: rgb(241 245 249) !important; /* text-text-primary */
+    color: rgb(17 24 39) !important; /* text-gray-900 */
     font-weight: 600 !important;
     font-size: 1.5rem !important;
     margin-top: 2rem !important;
@@ -318,7 +318,7 @@ const description = data.description || '';
   }
 
   .content-prose h4 {
-    color: rgb(241 245 249) !important; /* text-text-primary */
+    color: rgb(17 24 39) !important; /* text-gray-900 */
     font-weight: 600 !important;
     font-size: 1.25rem !important;
     margin-top: 1.5rem !important;
@@ -329,7 +329,7 @@ const description = data.description || '';
 
   .content-prose p {
     margin-bottom: 1.25rem !important;
-    color: rgb(203 213 225) !important; /* text-text-secondary */
+    color: rgb(75 85 99) !important; /* text-gray-600 */
   }
 
   .content-prose ul {
@@ -340,12 +340,12 @@ const description = data.description || '';
   .content-prose li {
     margin-bottom: 0.5rem !important;
     list-style-type: disc !important;
-    color: rgb(203 213 225) !important; /* text-text-secondary */
+    color: rgb(75 85 99) !important; /* text-gray-600 */
   }
 
   .content-prose code {
-    color: rgb(52 211 153) !important; /* accent-emerald */
-    background-color: rgb(30 41 59) !important; /* bg-tertiary */
+    color: rgb(55 65 81) !important; /* text-gray-700 */
+    background-color: rgb(243 244 246) !important; /* bg-gray-100 */
     padding: 0.125rem 0.25rem !important;
     border-radius: 0.25rem !important;
     font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace !important;
@@ -353,13 +353,13 @@ const description = data.description || '';
   }
   
   .content-prose pre {
-    background-color: rgb(15 23 42) !important; /* bg-secondary/darker */
-    color: rgb(241 245 249) !important; /* text-text-primary */
+    background-color: rgb(249 250 251) !important; /* bg-gray-50 */
+    color: rgb(17 24 39) !important; /* text-gray-900 */
     padding: 1rem !important;
     border-radius: 0.5rem !important;
     overflow-x: auto !important;
     margin: 1.5rem 0 !important;
-    border: 1px solid rgb(51 65 85) !important; /* border-primary */
+    border: 1px solid rgb(229 231 235) !important; /* border-gray-200 */
   }
 
   .content-prose pre code {
@@ -371,7 +371,7 @@ const description = data.description || '';
 
   .content-prose strong {
     font-weight: 600 !important;
-    color: rgb(241 245 249) !important; /* text-text-primary */
+    color: rgb(17 24 39) !important; /* text-gray-900 */
   }
 
   .content-prose em {
@@ -379,11 +379,11 @@ const description = data.description || '';
   }
 
   .content-prose blockquote {
-    border-left: 4px solid rgb(52 211 153); /* accent-emerald */
+    border-left: 4px solid rgb(156 163 175); /* border-gray-400 */
     padding-left: 1rem;
     margin: 1.5rem 0;
     font-style: italic;
-    color: rgb(148 163 184); /* text-tertiary */
+    color: rgb(107 114 128); /* text-gray-500 */
   }
 
   #toc-toggle {
