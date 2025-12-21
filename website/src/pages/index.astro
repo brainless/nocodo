@@ -1,914 +1,580 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import Section from "../components/theme/Section.astro";
-import SectionHeader from "../components/theme/SectionHeader.astro";
-import Card from "../components/theme/Card.astro";
-import FeatureCard from "../components/theme/FeatureCard.astro";
-import heroScreenshot from "../assets/nocodo_Analysing_Own_Code.png";
-import connectionScreenshot from "../assets/nocodo_Connection_Screen_Local_Remote_SSH_Options.png";
-import lanConnectScreenshot from "../assets/nocodo_Connect_Remote_Within_LAN.png";
 ---
 
 <Layout
-    title="nocodo - Agentic Platform for Business Automation"
-    description="Batteries-included agentic platform to build custom agents from idea to deployment. Automate sales, competitive intelligence, data collection, and more."
+    title="nocodo - AI-Powered Business Automation Made Simple"
+    description="Transform your business workflows into intelligent automation in minutes. No coding required."
 >
     <!-- Hero Section -->
-    <section
-        class="relative overflow-hidden bg-gradient-to-b from-bg-primary via-bg-secondary to-bg-primary text-text-primary"
-    >
-        <!-- Background Pattern -->
-        <div class="absolute inset-0 opacity-10">
-            <svg
-                class="absolute inset-0 h-full w-full"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-                <defs>
-                    <pattern
-                        id="grid"
-                        width="32"
-                        height="32"
-                        patternUnits="userSpaceOnUse"
-                    >
-                        <path
-                            d="M0 32V0h32"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1"></path>
-                    </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)"></rect>
-            </svg>
-        </div>
+    <section class="bg-white">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 sm:py-32">
+            <div class="text-center max-w-4xl mx-auto">
+                <div class="mb-8">
+                    <span class="inline-block text-indigo-600 text-lg font-semibold tracking-wide uppercase mb-4">
+                        AI Business Automation
+                    </span>
+                </div>
 
-        <div
-            class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32"
-        >
-            <div class="text-center">
-                <!-- Logo/Brand -->
-                <h1
-                    class="text-6xl sm:text-7xl lg:text-8xl font-bold mb-8 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent"
-                >
-                    nocodo
+                <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-8 leading-tight">
+                    Turn Your Business Ideas Into
+                    <span class="text-indigo-600"> Automated Solutions</span>
                 </h1>
 
-                <!-- Tagline -->
-                <p
-                    class="text-2xl sm:text-3xl lg:text-4xl text-text-secondary max-w-4xl mx-auto mb-6 leading-tight font-light"
-                >
-                    Batteries-included agentic platform
+                <p class="text-xl sm:text-2xl text-gray-600 mb-12 leading-relaxed">
+                    Describe what you want to achieve. Watch as AI builds and deploys your custom automation agent. No technical expertise needed.
                 </p>
 
-                <p
-                    class="text-lg sm:text-xl text-text-tertiary max-w-3xl mx-auto mb-12"
-                >
-                    From idea to hosted agents in minutes
-                </p>
-
-                <!-- CTA -->
-                <div
-                    class="flex flex-col sm:flex-row gap-4 justify-center items-center"
-                >
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
                     <a
                         href="https://github.com/brainless/nocodo"
-                        class="inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                        class="inline-flex items-center px-8 py-4 text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
-                        <svg
-                            class="mr-3 w-6 h-6"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                            ></path>
+                        Get Started Free
+                        <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
                         </svg>
-                        Star on GitHub
+                    </a>
+
+                    <a
+                        href="#how-it-works"
+                        class="inline-flex items-center px-8 py-4 text-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+                    >
+                        See How It Works
                     </a>
                 </div>
 
-                <p class="text-sm text-text-muted mt-8">
-                    Under active development • Star and watch for updates
-                </p>
+                <div class="mt-16 flex justify-center items-center gap-12 text-sm text-gray-500">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>5-minute setup</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Self-hosted & secure</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>No code required</span>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Hero Screenshot -->
-    <Section background="primary" paddingY="sm">
-        <div class="relative">
-            <img
-                src={heroScreenshot.src}
-                alt="nocodo Desktop app connected over SSH, showing past prompts"
-                title="Desktop app showing past prompts, current prompt, on connected manager instance"
-                class="w-full rounded-lg shadow-2xl border border-border-primary"
-            />
-        </div>
-        <div class="mt-4 text-center">
-            <p class="text-sm text-text-muted">
-                ⚠️ Under active development - the desktop app shows tool call
-                outputs as raw JSON, a better UI will come soon
-            </p>
-        </div>
-    </Section>
-
-    <!-- Business Value Proposition -->
-    <Section background="secondary" containerWidth="5xl">
-        <SectionHeader title="Transform Your Business with AI Agents" />
-
-        <Card class="p-8 sm:p-12">
-            <p
-                class="text-xl sm:text-2xl text-text-secondary leading-relaxed mb-6"
-            >
-                Building custom automation shouldn't require months of development.
-            </p>
-            <p class="text-lg sm:text-xl text-text-secondary leading-relaxed">
-                Define your business requirements, and nocodo automatically discovers the integrations you need, generates the glue code, and deploys a self-hosted agent solution that works for your specific business context.
-            </p>
-        </Card>
-    </Section>
-
-    <!-- Platform Capabilities -->
-    <Section background="primary">
-        <SectionHeader
-            title="The nocodo Platform"
-            subtitle="Complete agentic platform for business automation"
-        />
-
-        <div class="grid lg:grid-cols-2 gap-8">
-            <!-- Agent Builder -->
-            <Card
-                variant="gradient"
-                class="hover:border-accent-emerald/50 transition-all duration-300"
-            >
-                <div class="flex items-center mb-6">
-                    <div
-                        class="w-12 h-12 bg-accent-emerald/10 rounded-lg flex items-center justify-center mr-4"
-                    >
-                        <svg
-                            class="w-6 h-6 text-accent-emerald"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                            ></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-2xl font-bold text-text-primary">
-                        AI-Powered Agent Builder
-                    </h3>
-                </div>
-                <p class="text-text-secondary mb-6 leading-relaxed">
-                    Define business intent, let AI discover integrations and generate solutions
+    <!-- Business Problems Section -->
+    <section class="bg-gray-50 py-20 sm:py-32">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
+                    Built for Real Business Challenges
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Stop spending time on manual tasks. Let AI handle the heavy lifting while you focus on growing your business.
                 </p>
-                <ul class="space-y-3 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Business requirement analysis</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Automatic integration discovery</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Glue code generation</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Deterministic agent deployment</span>
-                    </li>
-                </ul>
-            </Card>
-
-            <!-- Integration Hub -->
-            <Card
-                variant="gradient"
-                class="hover:border-accent-cyan/50 transition-all duration-300"
-            >
-                <div class="flex items-center mb-6">
-                    <div
-                        class="w-12 h-12 bg-accent-cyan/10 rounded-lg flex items-center justify-center mr-4"
-                    >
-                        <svg
-                            class="w-6 h-6 text-accent-cyan"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                            ></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-2xl font-bold text-text-primary">
-                        Universal Integration Hub
-                    </h3>
-                </div>
-                <p class="text-text-secondary mb-6 leading-relaxed">
-                    Connect to any service, database, or API with pre-built integrations
-                </p>
-                <ul class="space-y-3 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Email providers (Gmail, Outlook)</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Databases and form data</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Communication platforms</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Custom API connections</span>
-                    </li>
-                </ul>
-            </Card>
-        </div>
-
-        <!-- Connection Screenshots -->
-        <div class="mt-12 space-y-8">
-            <div class="relative">
-                <img
-                    src={connectionScreenshot.src}
-                    alt="nocodo Desktop app showing connection screen - can connect to nocodo manager running locally or remote over SSH"
-                    title="Connect to nocodo manager running locally or remote over SSH"
-                    class="w-full rounded-lg border border-border-primary shadow-2xl"
-                />
             </div>
-            <div class="relative">
-                <img
-                    src={lanConnectScreenshot.src}
-                    alt="nocodo Desktop app, connecting to my other computer in LAN over SSH"
-                    title="Connecting to my other computer in LAN over SSH"
-                    class="w-full rounded-lg border border-border-primary shadow-2xl"
-                />
-            </div>
-        </div>
 
-        <div class="mt-12 text-center">
-            <p class="text-text-tertiary text-lg">Mobile apps coming soon</p>
-        </div>
-    </Section>
-
-    <!-- Business Process Flow -->
-    <Section background="secondary">
-        <SectionHeader title="From Idea to Agent in Minutes" />
-
-        <div class="space-y-8">
-            <!-- Step 1 -->
-            <Card class="p-8">
-                <div class="flex items-start">
-                    <div
-                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
-                    >
-                        1
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-text-primary mb-3">
-                            Define Your Business Intent
-                        </h3>
-                        <p class="text-text-secondary leading-relaxed">
-                            Describe what you want to achieve in plain language - analyze customer interactions, track competitors, automate data collection, or any business process you need streamlined.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-
-            <!-- Step 2 -->
-            <Card class="p-8">
-                <div class="flex items-start">
-                    <div
-                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
-                    >
-                        2
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-text-primary mb-3">
-                            AI Discovers Required Integrations
-                        </h3>
-                        <p class="text-text-secondary leading-relaxed">
-                            The AI-powered discovery system asks targeted questions to understand your needs and automatically identifies the services, APIs, and data sources required for your custom agent.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-
-            <!-- Step 3 -->
-            <Card class="p-8">
-                <div class="flex items-start">
-                    <div
-                        class="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center mr-6 flex-shrink-0 font-bold text-lg"
-                    >
-                        3
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-text-primary mb-3">
-                            Agent Generated and Deployed
-                        </h3>
-                        <p class="text-text-secondary leading-relaxed">
-                            Using nocodo's extensive library of pre-built components, the platform generates all necessary glue code and deploys a deterministic, self-hosted agent that works for your specific business context.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-        </div>
-    </Section>
-
-    <!-- Business Use Cases -->
-    <Section background="primary">
-        <SectionHeader 
-            title="Business Solutions"
-            subtitle="Transform your operations with custom AI agents"
-        />
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <!-- Sales Team Assistance -->
-            <Card class="p-6 hover:border-accent-emerald/50 transition-all duration-300">
-                <div class="flex items-center mb-4">
-                    <div class="w-10 h-10 bg-accent-emerald/10 rounded-lg flex items-center justify-center mr-3">
-                        <svg class="w-5 h-5 text-accent-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Card 1 -->
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="w-14 h-14 bg-blue-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold text-text-primary">Sales Team Assistance</h3>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                        Sales Intelligence
+                    </h3>
+                    <p class="text-gray-600 mb-6">
+                        Automatically analyze customer emails and identify hot leads. Get AI-powered insights on the best follow-up strategies.
+                    </p>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Automatic lead scoring</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Sentiment analysis</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Daily summary reports</span>
+                        </li>
+                    </ul>
                 </div>
-                <p class="text-text-tertiary mb-4">
-                    Analyze all client interactions and prospective clients using AI to identify opportunities and optimize sales strategies.
-                </p>
-                <ul class="text-sm text-text-muted space-y-1">
-                    <li>• Customer interaction analysis</li>
-                    <li>• Lead scoring and prioritization</li>
-                    <li>• Sales pattern recognition</li>
-                </ul>
-            </Card>
 
-            <!-- Competitive Intelligence -->
-            <Card class="p-6 hover:border-accent-cyan/50 transition-all duration-300">
-                <div class="flex items-center mb-4">
-                    <div class="w-10 h-10 bg-accent-cyan/10 rounded-lg flex items-center justify-center mr-3">
-                        <svg class="w-5 h-5 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Card 2 -->
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="w-14 h-14 bg-purple-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold text-text-primary">Competitive Intelligence</h3>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                        Market Monitoring
+                    </h3>
+                    <p class="text-gray-600 mb-6">
+                        Track competitor pricing, product launches, and market trends. Get instant alerts when opportunities arise.
+                    </p>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Competitor tracking</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Price change alerts</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Trend analysis</span>
+                        </li>
+                    </ul>
                 </div>
-                <p class="text-text-tertiary mb-4">
-                    Given potential customers, automatically find and analyze their competitors to provide strategic insights.
-                </p>
-                <ul class="text-sm text-text-muted space-y-1">
-                    <li>• Competitor discovery</li>
-                    <li>• Market positioning analysis</li>
-                    <li>• Competitive advantage identification</li>
-                </ul>
-            </Card>
 
-            <!-- Data Collection & Analysis -->
-            <Card class="p-6 hover:border-accent-purple/50 transition-all duration-300">
-                <div class="flex items-center mb-4">
-                    <div class="w-10 h-10 bg-accent-purple/10 rounded-lg flex items-center justify-center mr-3">
-                        <svg class="w-5 h-5 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v1a1 1 0 001 1h4a1 1 0 001-1v-1m3-2V8a2 2 0 00-2-2H8a2 2 0 00-2 2v7m3-2h6"></path>
+                <!-- Card 3 -->
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="w-14 h-14 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold text-text-primary">Data Collection & Analysis</h3>
-                </div>
-                <p class="text-text-tertiary mb-4">
-                    Crawl and collect data from various sources for business insights and automated reporting.
-                </p>
-                <ul class="text-sm text-text-muted space-y-1">
-                    <li>• Multi-source data aggregation</li>
-                    <li>• Automated report generation</li>
-                    <li>• Real-time data monitoring</li>
-                </ul>
-            </Card>
-        </div>
-    </Section>
-
-    <!-- Integration Capabilities -->
-    <Section background="secondary">
-        <SectionHeader title="Integration Capabilities" />
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Email Integration
-                </h3>
-                <p class="text-text-tertiary">
-                    Connect Gmail, Outlook, and other email providers for automated communication analysis
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Database Connectivity
-                </h3>
-                <p class="text-text-tertiary">
-                    Direct integration with your databases and form data for comprehensive insights
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    API Connections
-                </h3>
-                <p class="text-text-tertiary">
-                    Connect to any external service or API with pre-built authentication and data handling
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Communication Platforms
-                </h3>
-                <p class="text-text-tertiary">
-                    Integrate with Telegram, WhatsApp, Slack for automated notifications and responses
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Dashboard Generation
-                </h3>
-                <p class="text-text-tertiary">
-                    Automatically create dashboards and reports from collected data and analysis
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <h3 class="text-lg font-bold text-text-primary mb-2">
-                    Custom Integrations
-                </h3>
-                <p class="text-text-tertiary">
-                    Build custom connections to any service with our extensible integration framework
-                </p>
-            </Card>
-        </div>
-    </Section>
-
-    <!-- Platform Roadmap -->
-    <Section background="secondary">
-        <SectionHeader
-            title="Platform Evolution"
-            subtitle="The future of business automation with nocodo"
-        />
-
-        <div class="grid md:grid-cols-2 gap-8">
-            <!-- Near-term -->
-            <Card class="p-8">
-                <h3 class="text-2xl font-bold text-text-primary mb-6">
-                    Coming Soon
-                </h3>
-                <ul class="space-y-4 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Advanced agent orchestration</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Multi-agent collaboration</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Real-time agent monitoring</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Enterprise-grade security features</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-emerald mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Advanced analytics and reporting</span>
-                    </li>
-                </ul>
-            </Card>
-
-            <!-- Long-term -->
-            <Card class="p-8">
-                <h3 class="text-2xl font-bold text-text-primary mb-6">
-                    Future Vision
-                </h3>
-                <ul class="space-y-4 text-text-secondary">
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>AI-powered agent optimization</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Industry-specific agent templates</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Managed cloud deployment options</span>
-                    </li>
-                    <li class="flex items-start">
-                        <svg
-                            class="w-5 h-5 text-accent-cyan mr-3 mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                        </svg>
-                        <span>Global agent marketplace</span>
-                    </li>
-                </ul>
-            </Card>
-        </div>
-
-        
-    </Section>
-
-    <!-- Privacy & Control -->
-    <Section background="primary" containerWidth="5xl">
-        <SectionHeader title="Privacy & Control" />
-
-        <div class="grid md:grid-cols-2 gap-6">
-            <Card class="p-6">
-                <div class="flex items-center mb-3">
-                    <svg
-                        class="w-6 h-6 text-accent-emerald mr-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        ></path>
-                    </svg>
-                    <h3 class="text-lg font-bold text-text-primary">
-                        Your Infrastructure
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                        Data Collection
                     </h3>
-                </div>
-                <p class="text-text-tertiary">
-                    Run on your own cloud servers - you control everything
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <div class="flex items-center mb-3">
-                    <svg
-                        class="w-6 h-6 text-accent-emerald mr-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                        ></path>
-                    </svg>
-                    <h3 class="text-lg font-bold text-text-primary">
-                        Your API Keys
-                    </h3>
-                </div>
-                <p class="text-text-tertiary">
-                    Bring your own keys for OpenAI, Anthropic, or any LLM
-                    provider
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <div class="flex items-center mb-3">
-                    <svg
-                        class="w-6 h-6 text-accent-emerald mr-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                        ></path>
-                    </svg>
-                    <h3 class="text-lg font-bold text-text-primary">
-                        No Vendor Lock-in
-                    </h3>
-                </div>
-                <p class="text-text-tertiary">
-                    Switch cloud providers or AI models anytime
-                </p>
-            </Card>
-
-            <Card class="p-6">
-                <div class="flex items-center mb-3">
-                    <svg
-                        class="w-6 h-6 text-accent-emerald mr-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                        ></path>
-                    </svg>
-                    <h3 class="text-lg font-bold text-text-primary">
-                        Complete Privacy
-                    </h3>
-                </div>
-                <p class="text-text-tertiary">
-                    Your code never leaves your infrastructure
-                </p>
-            </Card>
-        </div>
-    </Section>
-
-    <!-- Built with Agents -->
-    <Section background="secondary">
-        <SectionHeader
-            title="Built with Agents"
-            subtitle="nocodo is itself built with coding agents"
-        />
-
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="text-center">
-                <Card class="p-8">
-                    <h3 class="text-xl font-bold text-text-primary mb-4">
-                        Manager
-                    </h3>
-                    <p class="text-text-tertiary mb-4">Actix Web • SQLite</p>
-                    <p class="text-sm text-text-muted">
-                        API daemon for cloud deployment
+                    <p class="text-gray-600 mb-6">
+                        Gather information from multiple sources automatically. Transform raw data into actionable insights.
                     </p>
-                </Card>
-            </div>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Multi-source aggregation</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Automated reports</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Real-time monitoring</span>
+                        </li>
+                    </ul>
+                </div>
 
-            <div class="text-center">
-                <Card class="p-8">
-                    <h3 class="text-xl font-bold text-text-primary mb-4">
-                        Desktop App
+                <!-- Card 4 -->
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="w-14 h-14 bg-orange-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                        Customer Support
                     </h3>
-                    <p class="text-text-tertiary mb-4">egui/eframe</p>
-                    <p class="text-sm text-text-muted">
-                        Cross-platform native GUI
+                    <p class="text-gray-600 mb-6">
+                        Analyze customer feedback across all channels. Identify issues before they become problems.
                     </p>
-                </Card>
-            </div>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Multi-channel analysis</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Satisfaction tracking</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Issue detection</span>
+                        </li>
+                    </ul>
+                </div>
 
-            <div class="text-center">
-                <Card class="p-8">
-                    <h3 class="text-xl font-bold text-text-primary mb-4">
-                        Communication
+                <!-- Card 5 -->
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="w-14 h-14 bg-red-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                        Compliance Monitoring
                     </h3>
-                    <p class="text-text-tertiary mb-4">SSH • HTTP/WebSocket</p>
-                    <p class="text-sm text-text-muted">
-                        Secure encrypted tunnel
+                    <p class="text-gray-600 mb-6">
+                        Ensure regulatory compliance automatically. Get alerts when action is needed.
                     </p>
-                </Card>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Automated checks</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Real-time alerts</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Audit trails</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="w-14 h-14 bg-indigo-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                        Custom Workflows
+                    </h3>
+                    <p class="text-gray-600 mb-6">
+                        Build automation tailored to your unique business processes and requirements.
+                    </p>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Flexible workflows</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Custom integrations</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>Process automation</span>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
-    </Section>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="bg-white py-20 sm:py-32">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
+                    From Idea to Automation in Three Steps
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    No coding required. No complex setup. Just describe what you need and let AI do the rest.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-12 lg:gap-16">
+                <!-- Step 1 -->
+                <div class="relative">
+                    <div class="flex flex-col items-center text-center">
+                        <div class="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                            <span class="text-3xl font-bold text-white">1</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                            Describe Your Goal
+                        </h3>
+                        <p class="text-lg text-gray-600 mb-6">
+                            Tell us what you want to achieve in plain English. Like "I need to track competitor prices and alert me when they change."
+                        </p>
+                        <div class="bg-gray-50 rounded-lg p-4 text-left w-full">
+                            <p class="text-sm text-gray-500 mb-2 font-semibold">Example:</p>
+                            <p class="text-gray-700 italic">
+                                "Analyze all my sales emails, identify hot leads based on their engagement, and send me a daily summary."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="relative">
+                    <div class="flex flex-col items-center text-center">
+                        <div class="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                            <span class="text-3xl font-bold text-white">2</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                            AI Builds Your Agent
+                        </h3>
+                        <p class="text-lg text-gray-600 mb-6">
+                            Our AI figures out what integrations you need, generates the code, and sets up everything automatically.
+                        </p>
+                        <div class="bg-gray-50 rounded-lg p-4 w-full">
+                            <ul class="space-y-3 text-left">
+                                <li class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 text-indigo-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Connects data sources
+                                </li>
+                                <li class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 text-indigo-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Generates automation
+                                </li>
+                                <li class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 text-indigo-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Configures security
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="relative">
+                    <div class="flex flex-col items-center text-center">
+                        <div class="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                            <span class="text-3xl font-bold text-white">3</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">
+                            Get Immediate Results
+                        </h3>
+                        <p class="text-lg text-gray-600 mb-6">
+                            Your agent deploys to your infrastructure and starts working immediately. Monitor, adjust, and scale as needed.
+                        </p>
+                        <div class="bg-gray-50 rounded-lg p-4 w-full">
+                            <ul class="space-y-3 text-left">
+                                <li class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Instant deployment
+                                </li>
+                                <li class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Real-time monitoring
+                                </li>
+                                <li class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Easy to adjust
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Social Proof Section -->
+    <section class="bg-indigo-600 py-16">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+            <div class="grid md:grid-cols-3 gap-12 text-center text-white">
+                <div>
+                    <div class="text-5xl font-bold mb-2">40%</div>
+                    <div class="text-indigo-200 text-lg">Increase in conversion rates</div>
+                    <div class="text-indigo-300 text-sm mt-2">Startup sales team</div>
+                </div>
+                <div>
+                    <div class="text-5xl font-bold mb-2">50+</div>
+                    <div class="text-indigo-200 text-lg">Competitor sites monitored daily</div>
+                    <div class="text-indigo-300 text-sm mt-2">Retail chain operations</div>
+                </div>
+                <div>
+                    <div class="text-5xl font-bold mb-2">1000+</div>
+                    <div class="text-indigo-200 text-lg">Transactions processed daily</div>
+                    <div class="text-indigo-300 text-sm mt-2">Financial services firm</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Choose Section -->
+    <section class="bg-gray-50 py-20 sm:py-32">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
+                    Why Choose nocodo?
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Built for businesses who value speed, security, and control.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-12">
+                <!-- Benefit 1 -->
+                <div class="flex gap-6">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Minutes, Not Months</h3>
+                        <p class="text-gray-600 text-lg">
+                            Traditional automation projects take months and cost thousands. With nocodo, you go from idea to working agent in minutes.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Benefit 2 -->
+                <div class="flex gap-6">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Your Data Stays Yours</h3>
+                        <p class="text-gray-600 text-lg">
+                            Self-hosted on your infrastructure means you maintain complete control over your data and business processes.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Benefit 3 -->
+                <div class="flex gap-6">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">No Technical Skills Required</h3>
+                        <p class="text-gray-600 text-lg">
+                            Describe what you need in plain language. Our AI handles all the technical complexity, integrations, and deployment.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Benefit 4 -->
+                <div class="flex gap-6">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Scales With Your Business</h3>
+                        <p class="text-gray-600 text-lg">
+                            Start with one workflow, scale to hundreds. Add new agents as your business needs evolve without limitations.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- CTA Section -->
-    <section
-        class="py-24 bg-gradient-to-b from-bg-primary to-bg-secondary text-text-primary"
-    >
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2
-                class="text-4xl sm:text-5xl font-bold mb-6 bg-gradient-to-r from-accent-emerald to-accent-cyan bg-clip-text text-transparent"
-            >
-                Transform Your Business Today
+    <section class="bg-white py-20 sm:py-32">
+        <div class="max-w-4xl mx-auto px-6 sm:px-8 lg:px-12 text-center">
+            <h2 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-8">
+                Ready to Automate Your Business?
             </h2>
-            <p class="text-xl text-text-secondary mb-12 max-w-2xl mx-auto">
-                Start building custom AI agents for your business. nocodo is under active development - star the project to follow our journey.
+            <p class="text-xl sm:text-2xl text-gray-600 mb-12 leading-relaxed">
+                Join businesses that are already saving time and increasing efficiency with AI-powered automation.
             </p>
-            <a
-                href="https://github.com/brainless/nocodo"
-                class="inline-flex items-center px-10 py-5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold text-lg rounded-lg shadow-xl hover:shadow-2xl transition-all duration-200"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                <svg
-                    class="mr-3 w-7 h-7"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+                <a
+                    href="https://github.com/brainless/nocodo"
+                    class="inline-flex items-center px-10 py-5 text-xl font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5 transition-all duration-200"
+                    target="_blank"
+                    rel="noopener noreferrer"
                 >
-                    <path
-                        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                    ></path>
-                </svg>
-                Star on GitHub
-            </a>
-            <p class="text-text-muted mt-8 text-sm">
-                Self-hosted • Secure • Business-ready automation
+                    Get Started Now
+                    <svg class="ml-3 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                </a>
+            </div>
+            <p class="text-gray-500">
+                Free and open source • Self-hosted • Enterprise-ready
             </p>
         </div>
     </section>
 
-    <!-- Footer Note -->
-    <section
-        class="py-12 bg-bg-primary text-text-primary border-t border-border-secondary"
-    >
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p class="text-text-tertiary">
-                Hello! I am Sumit, a software engineer living in a small
-                Himalayan village in India.
-            </p>
-            <p class="text-text-tertiary mt-2">
-                I am building nocodo to help businesses automate their operations with custom AI agents - from idea to deployment in minutes.
-            </p>
+    <!-- Footer -->
+    <footer class="bg-gray-900 py-12">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+            <div class="text-center">
+                <h3 class="text-2xl font-bold text-white mb-4">nocodo</h3>
+                <p class="text-gray-400 max-w-2xl mx-auto mb-8">
+                    Built by Sumit, a software engineer in the Himalayas, to help businesses of all sizes harness the power of AI automation.
+                </p>
+                <div class="flex justify-center mb-8">
+                    <a
+                        href="https://github.com/brainless/nocodo"
+                        class="text-gray-400 hover:text-white transition-colors duration-200"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                    </a>
+                </div>
+                <p class="text-gray-500 text-sm">
+                    Open source • Self-hosted • Always improving
+                </p>
+            </div>
         </div>
-    </section>
+    </footer>
 </Layout>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+    :global(body) {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+</style>
