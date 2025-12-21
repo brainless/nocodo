@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getCollection, getEntry } from 'astro:content';
+import YouTube from '../../components/UI/YouTube.astro';
 
 export async function getStaticPaths() {
   const blogEntries = await getCollection('blog');
@@ -84,7 +85,7 @@ const description = data.description || '';
     </button>
 
     <!-- Main Content -->
-    <div class="py-12 pt-32">
+    <div class="py-12 pt-12">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Breadcrumb -->
         <nav class="mb-8">
@@ -127,6 +128,18 @@ const description = data.description || '';
           )}
 
         </header>
+
+        <!-- YouTube Widget (if present) -->
+        {data.youtubeVideoId && (
+          <div class="mb-8">
+            <YouTube
+              videoId={data.youtubeVideoId}
+              title={data.youtubeTitle}
+              startTime={data.youtubeStartTime}
+              endTime={data.youtubeEndTime}
+            />
+          </div>
+        )}
 
         <!-- Article Content -->
         <article class="bg-white rounded-lg shadow-sm border border-gray-200" id="article-content">
@@ -209,11 +222,11 @@ const description = data.description || '';
     const articleRect = articleContent.getBoundingClientRect();
     const articleHeight = articleContent.offsetHeight;
     const viewportHeight = window.innerHeight;
-    
+
     // Calculate how much of the article has been scrolled past
     const scrolled = Math.max(0, -articleRect.top);
     const totalScrollable = articleHeight - viewportHeight;
-    
+
     if (totalScrollable <= 0) {
       // Article is shorter than viewport
       const progress = articleRect.top <= 0 ? 100 : 0;
@@ -296,7 +309,7 @@ const description = data.description || '';
     line-height: 1.1 !important;
     scroll-margin-top: 6rem !important;
   }
-  
+
   .content-prose h2 {
     color: rgb(17 24 39) !important; /* text-gray-900 */
     font-weight: 700 !important;
@@ -351,7 +364,7 @@ const description = data.description || '';
     font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace !important;
     font-size: 0.875rem !important;
   }
-  
+
   .content-prose pre {
     background-color: rgb(249 250 251) !important; /* bg-gray-50 */
     color: rgb(17 24 39) !important; /* text-gray-900 */

@@ -2,6 +2,7 @@
 title: "Building Software Without Writing Code"
 description: "Discover how AI-powered development is revolutionizing software creation, enabling both technical and non-technical users to build custom applications without writing code manually."
 tags: ["AI development", "coding agents", "software development", "low-code", "vibe coding"]
+youtubeVideoId: "IfLhxeMNzUw"
 ---
 
 Hey everyone, Sumit here. I have been building a coding agent for a while now. I've been building LLM-enabled applications for almost two years full-time, and I have a very different thesis around why I believe the world is going to be empowered with agentic coding, low-code development, or AI-powered coding—however you phrase it.
