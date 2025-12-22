@@ -10,6 +10,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -105,6 +106,18 @@ fn get_default_db_path() -> PathBuf {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize tracing subscriber with RUST_LOG env var support
+    // Default to "info" level, but allow override via RUST_LOG
+    // Example: RUST_LOG=debug cargo run ...
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(true) // Enable ANSI colors
+                .with_target(false) // Hide target (module path) for cleaner output
+        )
+        .init();
+
     let args = Args::parse();
 
     // Load config

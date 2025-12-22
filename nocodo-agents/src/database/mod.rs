@@ -243,7 +243,7 @@ impl Database {
         let calls = stmt.query_map([session_id], |row| {
             let request_str: String = row.get(5)?;
 let request: serde_json::Value = serde_json::from_str(&request_str)
-            .map_err(|e| rusqlite::Error::InvalidColumnType(5, request_str.clone(), rusqlite::types::Type::Text))?;
+            .map_err(|_e| rusqlite::Error::InvalidColumnType(5, request_str.clone(), rusqlite::types::Type::Text))?;
         
         let response: Option<serde_json::Value> = row.get(6).ok().and_then(|s: String| serde_json::from_str(&s).ok());
             

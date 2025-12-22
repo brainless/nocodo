@@ -1,11 +1,11 @@
-use crate::{Agent, AgentTool, database::Database};
-use manager_tools::ToolExecutor;
-use async_trait::async_trait;
+use crate::{database::Database, Agent, AgentTool};
 use anyhow;
+use async_trait::async_trait;
+use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
-use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
-use nocodo_llm_sdk::tools::ToolChoice;
 use nocodo_llm_sdk::tools::ToolCall;
+use nocodo_llm_sdk::tools::ToolChoice;
+use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -26,7 +26,11 @@ impl CodebaseAnalysisAgent {
         database: Arc<Database>,
         tool_executor: Arc<ToolExecutor>,
     ) -> Self {
-        Self { client, database, tool_executor }
+        Self {
+            client,
+            database,
+            tool_executor,
+        }
     }
 
     /// Get tool definitions for this agent
@@ -55,7 +59,7 @@ impl Agent for CodebaseAnalysisAgent {
         vec![AgentTool::ListFiles, AgentTool::ReadFile, AgentTool::Grep]
     }
 
-async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
+    async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
         // 1. Create session in database
         let session_id = self.database.create_session(
             "codebase-analysis",
@@ -66,14 +70,15 @@ async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
         )?;
 
         // 2. Create initial user message
-        self.database.create_message(session_id, "user", user_prompt)?;
+        self.database
+            .create_message(session_id, "user", user_prompt)?;
 
         // 3. Get tool definitions
         let tools = self.get_tool_definitions();
 
         // 4. Execution loop (max 10 iterations)
         let mut iteration = 0;
-        let max_iterations = 10;
+        let max_iterations = 30;
 
         loop {
             iteration += 1;
@@ -103,11 +108,9 @@ async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
 
             // 7. Extract text and save assistant message
             let text = extract_text_from_content(&response.content);
-            let message_id = self.database.create_message(
-                session_id,
-                "assistant",
-                &text,
-            )?;
+            let message_id = self
+                .database
+                .create_message(session_id, "assistant", &text)?;
 
             // 8. Check for tool calls
             if let Some(tool_calls) = response.tool_calls {
@@ -119,11 +122,8 @@ async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
 
                 // 9. Execute tools
                 for tool_call in tool_calls {
-                    self.execute_tool_call(
-                        session_id,
-                        Some(message_id),
-                        &tool_call,
-                    ).await?;
+                    self.execute_tool_call(session_id, Some(message_id), &tool_call)
+                        .await?;
                 }
 
                 // Continue loop to send results back to LLM
@@ -140,20 +140,23 @@ impl CodebaseAnalysisAgent {
     fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<Message>> {
         let db_messages = self.database.get_messages(session_id)?;
 
-        db_messages.into_iter().map(|msg| {
-            let role = match msg.role.as_str() {
-                "user" => Role::User,
-                "assistant" => Role::Assistant,
-                "system" => Role::System,
-                "tool" => Role::User, // Tool results sent as user messages
-                _ => Role::User,
-            };
+        db_messages
+            .into_iter()
+            .map(|msg| {
+                let role = match msg.role.as_str() {
+                    "user" => Role::User,
+                    "assistant" => Role::Assistant,
+                    "system" => Role::System,
+                    "tool" => Role::User, // Tool results sent as user messages
+                    _ => Role::User,
+                };
 
-            Ok(Message {
-                role,
-                content: vec![ContentBlock::Text { text: msg.content }],
+                Ok(Message {
+                    role,
+                    content: vec![ContentBlock::Text { text: msg.content }],
+                })
             })
-        }).collect()
+            .collect()
     }
 
     async fn execute_tool_call(
@@ -163,10 +166,8 @@ impl CodebaseAnalysisAgent {
         tool_call: &ToolCall,
     ) -> anyhow::Result<()> {
         // 1. Parse LLM tool call into typed ToolRequest
-        let tool_request = AgentTool::parse_tool_call(
-            tool_call.name(),
-            tool_call.arguments().clone(),
-        )?;
+        let tool_request =
+            AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
 
         // 2. Record tool call in database
         let call_id = self.database.create_tool_call(
@@ -179,8 +180,9 @@ impl CodebaseAnalysisAgent {
 
         // 3. Execute tool with typed request ✅
         let start = Instant::now();
-        let result: anyhow::Result<manager_models::ToolResponse> = self.tool_executor
-            .execute(tool_request)  // ✅ Typed execution
+        let result: anyhow::Result<manager_models::ToolResponse> = self
+            .tool_executor
+            .execute(tool_request) // ✅ Typed execution
             .await;
         let execution_time = start.elapsed().as_millis() as i64;
 
@@ -189,14 +191,25 @@ impl CodebaseAnalysisAgent {
             Ok(response) => {
                 // Convert ToolResponse to JSON for storage
                 let response_json = serde_json::to_value(&response)?;
-                self.database.complete_tool_call(call_id, response_json.clone(), execution_time)?;
+                self.database
+                    .complete_tool_call(call_id, response_json.clone(), execution_time)?;
 
                 // Add tool result as a message for next LLM call
                 let result_text = crate::format_tool_response(&response);
+                let message_to_llm = format!("Tool {} result:\n{}", tool_call.name(), result_text);
+
+                tracing::debug!(
+                    tool_name = tool_call.name(),
+                    tool_id = tool_call.id(),
+                    execution_time_ms = execution_time,
+                    response = %message_to_llm,
+                    "Sending tool response to model"
+                );
+
                 self.database.create_message(
                     session_id,
                     "tool",
-                    &format!("Tool {} result:\n{}", tool_call.name(), result_text),
+                    &message_to_llm,
                 )?;
             }
             Err(e) => {
@@ -204,10 +217,20 @@ impl CodebaseAnalysisAgent {
                 self.database.fail_tool_call(call_id, &error_msg)?;
 
                 // Send error back to LLM
+                let error_message_to_llm = format!("Tool {} failed: {}", tool_call.name(), error_msg);
+
+                tracing::debug!(
+                    tool_name = tool_call.name(),
+                    tool_id = tool_call.id(),
+                    error = %error_msg,
+                    response = %error_message_to_llm,
+                    "Sending tool error to model"
+                );
+
                 self.database.create_message(
                     session_id,
                     "tool",
-                    &format!("Tool {} failed: {}", tool_call.name(), error_msg),
+                    &error_message_to_llm,
                 )?;
             }
         }

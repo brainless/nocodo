@@ -166,17 +166,12 @@ fn create_file_info(path: &Path, base_path: &Path) -> Result<FileInfo> {
 }
 
 /// Format files as a tree structure
-fn format_as_tree(files: &[FileInfo], base_path: &Path) -> String {
+fn format_as_tree(files: &[FileInfo], _base_path: &Path) -> String {
     let mut output = String::new();
 
-    // Add root directory name
-    let root_name = base_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    output.push_str(&root_name);
-    output.push('\n');
+    // Note: We don't add the root directory name here because paths are relative
+    // to the base_path. Adding the root name would confuse the LLM into using
+    // incorrect paths (e.g., "nocodo-agents/Cargo.toml" instead of "Cargo.toml")
 
     // Group files by their directory depth and parent
     let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =
