@@ -28,6 +28,7 @@ tokio = { version = "1", features = ["full"] }
 
 # Shared Models
 manager-models = { path = "../manager-models" }
+manager-tools = { path = "../manager-tools" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

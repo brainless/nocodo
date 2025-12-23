@@ -3,7 +3,9 @@ use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
 use egui::{Context, Ui};
-use manager_models::{BashRequest, ReadFileRequest, ToolRequest, ToolResponse};
+use manager_tools::types::{
+    BashRequest, GrepRequest, ReadFileRequest, ToolRequest, ToolResponse, WriteFileRequest,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static READ_FILE_PARSE_ERROR_LOGGED: AtomicBool = AtomicBool::new(false);
@@ -868,7 +870,7 @@ if !skip_regular_response {
                                                                         }
                                                                     }
                                                                     "write_file" => {
-                                                                        if let Ok(req) = serde_json::from_value::<manager_models::WriteFileRequest>(tool_call.request.clone()) {
+                                                                        if let Ok(req) = serde_json::from_value::<WriteFileRequest>(tool_call.request.clone()) {
                                                                             let filename = std::path::Path::new(&req.path)
                                                                                 .file_name()
                                                                                 .and_then(|n| n.to_str())
@@ -880,7 +882,7 @@ if !skip_regular_response {
                                                                         }
                                                                     }
                                                                     "grep" => {
-                                                                        if let Ok(req) = serde_json::from_value::<manager_models::GrepRequest>(tool_call.request.clone()) {
+                                                                        if let Ok(req) = serde_json::from_value::<GrepRequest>(tool_call.request.clone()) {
                                                                             if let Some(ref response) = tool_call.response {
                                                                                 if let Ok(ToolResponse::Grep(grep_response)) = serde_json::from_value::<ToolResponse>(response.clone()) {
                                                                                     format!("Found {} matches for \"{}\"", grep_response.total_matches, req.pattern)

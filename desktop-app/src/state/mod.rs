@@ -2,16 +2,18 @@ use rusqlite::Connection;
 use serde_json::Value;
 use std::sync::Arc;
 
+use manager_tools::types::FileInfo;
+
 // Type aliases to reduce complexity
-pub type UsersResult =
-    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::UserListItem>, String>>>>;
-pub type TeamsResult =
-    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamListItem>, String>>>>;
-pub type TeamItemsResult =
-    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamItem>, String>>>>;
-pub type ProjectCommandsResult =
-    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>;
-pub type ConnectionResult = Arc<std::sync::Mutex<Option<Result<(String, String, u16), String>>>>;
+pub type ArcResult<T> = Arc<std::sync::Mutex<Option<Result<T, String>>>>;
+pub type ArcOption<T> = Arc<std::sync::Mutex<Option<T>>>;
+pub type ArcMutex<T> = Arc<std::sync::Mutex<T>>;
+
+pub type UsersResult = ArcResult<Vec<manager_models::UserListItem>>;
+pub type TeamsResult = ArcResult<Vec<manager_models::TeamListItem>>;
+pub type TeamItemsResult = ArcResult<Vec<manager_models::TeamItem>>;
+pub type ProjectCommandsResult = ArcResult<Vec<manager_models::ProjectCommand>>;
+pub type ConnectionResult = ArcResult<(String, String, u16)>;
 
 pub mod connection;
 pub mod ui_state;
@@ -107,10 +109,10 @@ pub struct AppState {
 
     // Update results
     #[serde(skip)]
-    pub update_user_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub update_user_result: ArcResult<()>,
     pub updating_user: bool,
     #[serde(skip)]
-    pub update_team_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub update_team_result: ArcResult<()>,
     pub updating_team: bool,
 
     // Favorite state - stores (server_host, server_user, server_port, project_id) tuples
@@ -151,52 +153,44 @@ pub struct AppState {
     #[serde(skip)]
     pub connection_manager: Arc<crate::connection_manager::ConnectionManager>,
     #[serde(skip)]
-    pub project_details_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
+    pub project_details_result: ArcResult<manager_models::ProjectDetailsResponse>,
     #[serde(skip)]
     pub create_commands_result: ProjectCommandsResult,
     #[serde(skip)]
-    pub execute_command_result: Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
+    pub execute_command_result: ArcResult<serde_json::Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub command_executions_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommandExecution>, String>>>>,
+    pub command_executions_result: ArcResult<Vec<manager_models::ProjectCommandExecution>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub projects_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
+    pub projects_result: ArcResult<Vec<manager_models::Project>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub worktree_branches_result: Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    pub worktree_branches_result: ArcResult<Vec<String>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub settings_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
+    pub settings_result: ArcResult<manager_models::SettingsResponse>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
+    pub works_result: ArcResult<Vec<manager_models::Work>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub work_messages_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::WorkMessage>, String>>>>,
+    pub work_messages_result: ArcResult<Vec<manager_models::WorkMessage>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_session_outputs_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::AiSessionOutput>, String>>>>,
+    pub ai_session_outputs_result: ArcResult<Vec<manager_models::AiSessionOutput>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_tool_calls_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::LlmAgentToolCall>, String>>>>,
+    pub ai_tool_calls_result: ArcResult<Vec<manager_models::LlmAgentToolCall>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub update_projects_path_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    pub update_projects_path_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub scan_projects_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    pub scan_projects_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub supported_models_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::SupportedModel>, String>>>>,
+    pub supported_models_result: ArcResult<Vec<manager_models::SupportedModel>>,
     #[serde(skip)]
     pub loading_projects: bool,
     #[serde(skip)]
@@ -240,51 +234,44 @@ pub struct AppState {
     pub sending_message: bool,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
+    pub create_work_result: ArcResult<manager_models::Work>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub send_message_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::WorkMessage, String>>>>,
+    pub send_message_result: ArcResult<manager_models::WorkMessage>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub create_ai_session_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::AiSession, String>>>>,
+    pub create_ai_session_result: ArcResult<manager_models::AiSession>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    pub update_api_keys_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub file_list_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::FileInfo>, String>>>>,
+    pub file_list_result: ArcResult<Vec<FileInfo>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub file_content_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::FileContentResponse, String>>>>,
+    pub file_content_result: ArcResult<crate::api_client::FileContentResponse>,
     #[serde(skip)]
     pub db: Option<Connection>,
     #[serde(skip)]
-    pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
+    pub local_server_check_result: ArcOption<bool>,
     #[serde(skip)]
     pub connection_result: ConnectionResult,
     #[serde(skip)]
-    pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
+    pub auth_required: ArcMutex<bool>, // Flag set when 401 is detected
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub login_result: Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
+    pub login_result: ArcResult<manager_models::LoginResponse>,
     #[serde(skip)]
     pub pending_project_details_refresh: Option<i64>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub project_detail_worktree_branches_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    pub project_detail_worktree_branches_result: ArcResult<Vec<String>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub project_detail_saved_commands_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
+    pub project_detail_saved_commands_result: ArcResult<Vec<manager_models::ProjectCommand>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub command_discovery_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>>,
+    pub command_discovery_result: ArcResult<manager_models::DiscoverCommandsResponse>,
 }
 
 impl AppState {

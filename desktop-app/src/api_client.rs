@@ -1,11 +1,20 @@
 use manager_models::{
-    CreateWorkRequest, FileContentResponse, FileInfo, PermissionItem, Project,
-    ProjectDetailsResponse, ProjectListResponse, ServerStatus, SettingsResponse,
-    SupportedModelsResponse, Team, TeamListItem, TeamListResponse, UpdateApiKeysRequest,
-    UpdateUserRequest, UserDetailResponse, UserListItem, UserListResponse, Work, WorkListResponse,
-    WorkResponse,
+    CreateWorkRequest, PermissionItem, Project, ProjectDetailsResponse, ProjectListResponse,
+    ServerStatus, SettingsResponse, SupportedModelsResponse, Team, TeamListItem, TeamListResponse,
+    UpdateApiKeysRequest, UpdateUserRequest, UserDetailResponse, UserListItem, UserListResponse,
+    Work, WorkListResponse, WorkResponse,
 };
+use manager_tools::types::FileInfo;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+/// File content response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileContentResponse {
+    pub path: String,
+    pub content: String,
+    pub modified_at: Option<i64>,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiClient {
@@ -420,12 +429,15 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let file_list_response: manager_models::FileListResponse = response
+        let file_list_response: Value = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
-        Ok(file_list_response.files)
+        let files: Vec<FileInfo> = serde_json::from_value(file_list_response["files"].clone())
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(files)
     }
 
     pub async fn get_file_content(
