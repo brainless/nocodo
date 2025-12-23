@@ -9,10 +9,7 @@ struct MockLlmClient;
 
 #[async_trait::async_trait]
 impl LlmClient for MockLlmClient {
-    async fn complete(
-        &self,
-        _request: CompletionRequest,
-    ) -> Result<CompletionResponse, LlmError> {
+    async fn complete(&self, _request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
         Ok(CompletionResponse {
             content: vec![ContentBlock::Text {
                 text: "Mock response".to_string(),
@@ -44,8 +41,7 @@ fn create_test_agent() -> CodebaseAnalysisAgent {
     let client: Arc<dyn LlmClient> = Arc::new(MockLlmClient);
     let database = Arc::new(Database::new(&PathBuf::from(":memory:")).unwrap());
     let tool_executor = Arc::new(
-        ToolExecutor::new(PathBuf::from("."))
-            .with_max_file_size(10 * 1024 * 1024) // 10MB
+        ToolExecutor::new(PathBuf::from(".")).with_max_file_size(10 * 1024 * 1024), // 10MB
     );
 
     CodebaseAnalysisAgent::new(client, database, tool_executor)

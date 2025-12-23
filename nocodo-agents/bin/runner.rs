@@ -114,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_ansi(true) // Enable ANSI colors
-                .with_target(false) // Hide target (module path) for cleaner output
+                .with_target(false), // Hide target (module path) for cleaner output
         )
         .init();
 
@@ -146,7 +146,9 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Initialize database and tool executor
-    let database_path_str = args.database_path.unwrap_or_else(|| get_default_db_path().to_string_lossy().to_string());
+    let database_path_str = args
+        .database_path
+        .unwrap_or_else(|| get_default_db_path().to_string_lossy().to_string());
     let database_path = get_database_path(&database_path_str)?;
     let database = Arc::new(Database::new(&database_path)?);
 

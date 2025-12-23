@@ -236,14 +236,14 @@ impl crate::client::LlmClient for XaiGrokClient {
             text: choice.message.content.clone(),
         }];
 
-let response = crate::types::CompletionResponse {
+        let response = crate::types::CompletionResponse {
             content,
             role: match choice.message.role {
                 crate::grok::types::GrokRole::User => crate::types::Role::User,
                 crate::grok::types::GrokRole::Assistant => crate::types::Role::Assistant,
                 crate::grok::types::GrokRole::System => crate::types::Role::System,
             },
-usage: crate::types::Usage {
+            usage: crate::types::Usage {
                 input_tokens: grok_response
                     .usage
                     .as_ref()

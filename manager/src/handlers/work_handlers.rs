@@ -359,9 +359,9 @@ pub async fn add_message_to_work(
             } else {
                 let provider =
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-                    let model = std::env::var("MODEL")
-                        .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                    (provider, model.clone())
+                let model = std::env::var("MODEL")
+                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
+                (provider, model.clone())
             };
 
             let llm_session = llm_agent

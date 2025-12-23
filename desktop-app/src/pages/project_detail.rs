@@ -4,6 +4,7 @@ use crate::state::AppState;
 use crate::state::ConnectionState;
 use crate::ui_text::{ContentText, WidgetText};
 use egui::{Context, Ui};
+use manager_tools::types::FileInfo;
 use std::sync::Arc;
 
 pub struct ProjectDetailPage {
@@ -547,7 +548,7 @@ impl ProjectDetailPage {
         &self,
         ui: &mut Ui,
         state: &mut AppState,
-        files: &[manager_models::FileInfo],
+        files: &[FileInfo],
         _prefix: &str,
     ) {
         // Show "Go up.." if not in root directory
@@ -713,7 +714,8 @@ impl ProjectDetailPage {
             let project_id = self.project_id;
             let path = path.map(|p| p.to_string());
             let git_branch = state.ui_state.project_detail_selected_branch.clone();
-            let file_list_result_clone = Arc::clone(&state.file_list_result);
+            let file_list_result_clone: crate::state::ArcResult<Vec<FileInfo>> =
+                Arc::clone(&state.file_list_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {

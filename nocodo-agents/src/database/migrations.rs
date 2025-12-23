@@ -81,8 +81,7 @@ pub fn run_agent_migrations(conn: &Connection) -> anyhow::Result<()> {
 
 /// Check if agent tables exist in database
 pub fn has_agent_schema(conn: &Connection) -> anyhow::Result<bool> {
-    let mut stmt = conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='agent_sessions'"
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_sessions'")?;
     Ok(stmt.exists([])?)
 }

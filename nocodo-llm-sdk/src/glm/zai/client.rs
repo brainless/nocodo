@@ -578,16 +578,17 @@ impl crate::client::LlmClient for ZaiGlmClient {
 
         // Convert tools to ZAI format
         let tools = request.tools.map(|tools| {
-            tools.into_iter().map(|tool| {
-                crate::glm::types::GlmTool {
+            tools
+                .into_iter()
+                .map(|tool| crate::glm::types::GlmTool {
                     r#type: "function".to_string(),
                     function: crate::glm::types::GlmFunction {
                         name: tool.name().to_string(),
                         description: tool.description().to_string(),
                         parameters: tool.parameters().clone(),
                     },
-                }
-            }).collect()
+                })
+                .collect()
         });
 
         let zai_request = ZaiChatCompletionRequest {
@@ -602,12 +603,12 @@ impl crate::client::LlmClient for ZaiGlmClient {
             max_tokens: Some(request.max_tokens),
             tool_stream: None,
             tools,
-            tool_choice: request.tool_choice.map(|choice| {
-                match choice {
-                    crate::tools::ToolChoice::Auto => serde_json::json!("auto"),
-                    crate::tools::ToolChoice::Required => serde_json::json!("required"),
-                    crate::tools::ToolChoice::None => serde_json::json!(null),
-                    crate::tools::ToolChoice::Specific { name } => serde_json::json!({ "type": "function", "function": { "name": name } }),
+            tool_choice: request.tool_choice.map(|choice| match choice {
+                crate::tools::ToolChoice::Auto => serde_json::json!("auto"),
+                crate::tools::ToolChoice::Required => serde_json::json!("required"),
+                crate::tools::ToolChoice::None => serde_json::json!(null),
+                crate::tools::ToolChoice::Specific { name } => {
+                    serde_json::json!({ "type": "function", "function": { "name": name } })
                 }
             }),
             stop: request.stop_sequences,
@@ -629,17 +630,20 @@ impl crate::client::LlmClient for ZaiGlmClient {
 
         // Extract tool calls from response
         let tool_calls = choice.message.tool_calls.as_ref().map(|calls| {
-            calls.iter().map(|call| {
-                let arguments = match &call.function.arguments {
-                    serde_json::Value::String(s) => serde_json::from_str(s).unwrap_or_default(),
-                    v => v.clone(),
-                };
-                crate::tools::ToolCall::new(
-                    call.id.clone(),
-                    call.function.name.clone(),
-                    arguments,
-                )
-            }).collect()
+            calls
+                .iter()
+                .map(|call| {
+                    let arguments = match &call.function.arguments {
+                        serde_json::Value::String(s) => serde_json::from_str(s).unwrap_or_default(),
+                        v => v.clone(),
+                    };
+                    crate::tools::ToolCall::new(
+                        call.id.clone(),
+                        call.function.name.clone(),
+                        arguments,
+                    )
+                })
+                .collect()
         });
 
         let response = crate::types::CompletionResponse {

@@ -1,10 +1,10 @@
 //! Schema generation providers for different LLM vendors
-//! 
+//!
 //! Each LLM provider has different requirements for JSON schema generation,
 //! particularly around strict mode and required field handling.
-//! 
+//!
 //! ## Status
-//! 
+//!
 //! This module is currently **unused** because tool execution is disabled.
 //! It will be needed when tool execution is re-enabled to handle provider-specific
 //! schema requirements (e.g., OpenAI strict mode requiring all fields).
@@ -28,7 +28,7 @@ pub trait SchemaProvider {
     fn requires_all_fields(&self) -> bool;
 
     /// Customize a schema for this provider
-    #[allow(dead_code)] // Not currently used but will be needed for provider customization  
+    #[allow(dead_code)] // Not currently used but will be needed for provider customization
     fn customize_schema(&self, schema: Schema) -> Schema {
         if self.requires_all_fields() {
             self.mark_all_required(schema)

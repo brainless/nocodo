@@ -1,5 +1,5 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
-use crate::{Agent, database::Database};
+use crate::{database::Database, Agent};
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
 use std::sync::Arc;
@@ -42,10 +42,9 @@ pub fn create_agent(agent_type: AgentType, client: Arc<dyn LlmClient>) -> Box<dy
     // This is a legacy function - for now create dummy components
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:")).unwrap());
     let tool_executor = Arc::new(
-        ToolExecutor::new(std::env::current_dir().unwrap())
-            .with_max_file_size(10 * 1024 * 1024) // 10MB
+        ToolExecutor::new(std::env::current_dir().unwrap()).with_max_file_size(10 * 1024 * 1024), // 10MB
     );
-    
+
     create_agent_with_tools(agent_type, client, database, tool_executor)
 }
 
