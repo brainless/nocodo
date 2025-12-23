@@ -2,10 +2,10 @@
 #[allow(clippy::module_inception)] // False positive - tests module
 mod tests {
 
-    use crate::ToolExecutor;
-    use manager_models::{
+    use crate::types::{
         GrepRequest, ListFilesRequest, ReadFileRequest, ToolResponse, WriteFileRequest,
     };
+    use crate::ToolExecutor;
     use std::fs;
 
     use tempfile::TempDir;
@@ -102,7 +102,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::ListFiles(request))
+            .execute(crate::types::ToolRequest::ListFiles(request))
             .await
             .unwrap();
 
@@ -150,7 +150,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::ListFiles(request))
+            .execute(crate::types::ToolRequest::ListFiles(request))
             .await
             .unwrap();
 
@@ -175,7 +175,7 @@ mod tests {
         };
 
         let response_hidden = executor
-            .execute(manager_models::ToolRequest::ListFiles(request_hidden))
+            .execute(crate::types::ToolRequest::ListFiles(request_hidden))
             .await
             .unwrap();
 
@@ -214,7 +214,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::ListFiles(request))
+            .execute(crate::types::ToolRequest::ListFiles(request))
             .await
             .unwrap();
 
@@ -256,7 +256,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::ListFiles(request))
+            .execute(crate::types::ToolRequest::ListFiles(request))
             .await
             .unwrap();
 
@@ -278,7 +278,7 @@ mod tests {
         };
 
         let response_high = executor
-            .execute(manager_models::ToolRequest::ListFiles(request_high_limit))
+            .execute(crate::types::ToolRequest::ListFiles(request_high_limit))
             .await
             .unwrap();
 
@@ -315,7 +315,7 @@ mod tests {
             };
 
             let response = executor
-                .execute(manager_models::ToolRequest::ReadFile(request))
+                .execute(crate::types::ToolRequest::ReadFile(request))
                 .await
                 .unwrap();
 
@@ -335,7 +335,7 @@ mod tests {
         };
 
         let traversal_response = executor
-            .execute(manager_models::ToolRequest::ReadFile(traversal_request))
+            .execute(crate::types::ToolRequest::ReadFile(traversal_request))
             .await;
 
         // Directory traversal should be caught during path validation
@@ -358,7 +358,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::ReadFile(request))
+            .execute(crate::types::ToolRequest::ReadFile(request))
             .await
             .unwrap();
 
@@ -387,7 +387,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::WriteFile(request))
+            .execute(crate::types::ToolRequest::WriteFile(request))
             .await
             .unwrap();
 
@@ -425,7 +425,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::WriteFile(request))
+            .execute(crate::types::ToolRequest::WriteFile(request))
             .await
             .unwrap();
 
@@ -479,7 +479,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::Grep(request))
+            .execute(crate::types::ToolRequest::Grep(request))
             .await
             .unwrap();
 
@@ -535,7 +535,7 @@ mod tests {
         };
 
         let response = executor
-            .execute(manager_models::ToolRequest::Grep(request))
+            .execute(crate::types::ToolRequest::Grep(request))
             .await
             .unwrap();
 

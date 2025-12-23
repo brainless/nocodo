@@ -180,7 +180,7 @@ impl CodebaseAnalysisAgent {
 
         // 3. Execute tool with typed request ✅
         let start = Instant::now();
-        let result: anyhow::Result<manager_models::ToolResponse> = self
+        let result: anyhow::Result<manager_tools::types::ToolResponse> = self
             .tool_executor
             .execute(tool_request) // ✅ Typed execution
             .await;
@@ -206,18 +206,16 @@ impl CodebaseAnalysisAgent {
                     "Sending tool response to model"
                 );
 
-                self.database.create_message(
-                    session_id,
-                    "tool",
-                    &message_to_llm,
-                )?;
+                self.database
+                    .create_message(session_id, "tool", &message_to_llm)?;
             }
             Err(e) => {
                 let error_msg = format!("{:?}", e);
                 self.database.fail_tool_call(call_id, &error_msg)?;
 
                 // Send error back to LLM
-                let error_message_to_llm = format!("Tool {} failed: {}", tool_call.name(), error_msg);
+                let error_message_to_llm =
+                    format!("Tool {} failed: {}", tool_call.name(), error_msg);
 
                 tracing::debug!(
                     tool_name = tool_call.name(),
@@ -227,11 +225,8 @@ impl CodebaseAnalysisAgent {
                     "Sending tool error to model"
                 );
 
-                self.database.create_message(
-                    session_id,
-                    "tool",
-                    &error_message_to_llm,
-                )?;
+                self.database
+                    .create_message(session_id, "tool", &error_message_to_llm)?;
             }
         }
 

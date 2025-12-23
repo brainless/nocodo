@@ -1,7 +1,7 @@
-use manager_models::tools::filesystem::*;
-use manager_models::tools::user_interaction::*;
-use manager_models::{GrepRequest, BashRequest};
-use nocodo_llm_sdk::tools::{Tool};
+use manager_tools::types::filesystem::*;
+use manager_tools::types::user_interaction::*;
+use manager_tools::types::{BashRequest, GrepRequest};
+use nocodo_llm_sdk::tools::Tool;
 
 /// Create tool definitions for LLM using manager-models types
 pub fn create_tool_definitions() -> Vec<Tool> {
@@ -32,7 +32,9 @@ pub fn create_tool_definitions() -> Vec<Tool> {
             .build(),
         Tool::from_type::<AskUserRequest>()
             .name("ask_user")
-            .description("Ask the user a list of questions to gather information or confirm actions")
+            .description(
+                "Ask the user a list of questions to gather information or confirm actions",
+            )
             .build(),
     ]
 }

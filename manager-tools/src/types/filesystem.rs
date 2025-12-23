@@ -20,48 +20,6 @@ pub struct FileInfo {
     pub modified_at: Option<String>, // ISO 8601 timestamp, None for directories
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FileListRequest {
-    pub project_id: Option<i64>,
-    pub path: Option<String>, // Relative path within project, defaults to root
-    pub git_branch: Option<String>, // Git branch/worktree to use, defaults to current branch
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FileListResponse {
-    pub files: Vec<FileInfo>, // List of files and directories
-    pub current_path: String, // Current directory being listed
-    pub total_files: u32,     // Total number of files found
-    pub truncated: bool,      // Whether results were limited to 100
-    pub limit: u32,           // Maximum files returned (100)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FileCreateRequest {
-    pub project_id: i64,
-    pub path: String,            // Relative path within project
-    pub content: Option<String>, // None for directories
-    pub is_directory: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FileUpdateRequest {
-    pub project_id: i64,
-    pub content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FileContentResponse {
-    pub path: String,
-    pub content: String,
-    pub modified_at: Option<i64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FileResponse {
-    pub file: FileInfo,
-}
-
 /// List files and directories in a given path
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListFilesRequest {

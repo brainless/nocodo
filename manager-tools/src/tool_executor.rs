@@ -1,5 +1,5 @@
+use crate::types::{ToolRequest, ToolResponse};
 use anyhow::Result;
-use manager_models::{ToolRequest, ToolResponse};
 use serde_json::Value;
 use std::path::PathBuf;
 

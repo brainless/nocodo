@@ -4,10 +4,9 @@ pub mod factory;
 pub mod tools;
 
 use async_trait::async_trait;
-use manager_models::{ToolRequest, ToolResponse};
-use manager_models::tools::filesystem::*;
-use manager_models::tools::user_interaction::*;
-
+use manager_tools::types::filesystem::*;
+use manager_tools::types::user_interaction::*;
+use manager_tools::types::{ToolRequest, ToolResponse};
 
 /// Represents the types of tools available to agents
 #[derive(Debug, Clone, PartialEq)]
@@ -38,8 +37,7 @@ impl AgentTool {
     /// Convert AgentTool to nocodo-llm-sdk Tool definition for LLM
     pub fn to_tool_definition(&self) -> nocodo_llm_sdk::tools::Tool {
         // Use the schema generation from llm_schemas
-        tools::llm_schemas::get_tool_definition(self.name())
-            .expect("Tool definition must exist")
+        tools::llm_schemas::get_tool_definition(self.name()).expect("Tool definition must exist")
     }
 
     /// Parse LLM tool call into typed ToolRequest
@@ -61,7 +59,7 @@ impl AgentTool {
                 ToolRequest::WriteFile(req)
             }
             "grep" => {
-                let req: manager_models::GrepRequest = serde_json::from_value(arguments)?;
+                let req: manager_tools::types::GrepRequest = serde_json::from_value(arguments)?;
                 ToolRequest::Grep(req)
             }
             "apply_patch" => {
@@ -69,7 +67,7 @@ impl AgentTool {
                 ToolRequest::ApplyPatch(req)
             }
             "bash" => {
-                let req: manager_models::BashRequest = serde_json::from_value(arguments)?;
+                let req: manager_tools::types::BashRequest = serde_json::from_value(arguments)?;
                 ToolRequest::Bash(req)
             }
             "ask_user" => {
@@ -84,14 +82,19 @@ impl AgentTool {
 }
 
 /// Format ToolResponse for display to LLM
-pub fn format_tool_response(response: &manager_models::ToolResponse) -> String {
+pub fn format_tool_response(response: &manager_tools::types::ToolResponse) -> String {
     match response {
         ToolResponse::ListFiles(r) => format!("Found {} files:\n{}", r.files.len(), r.files),
-        ToolResponse::ReadFile(r) => format!("File contents ({} bytes):\n{}", r.content.len(), r.content),
+        ToolResponse::ReadFile(r) => {
+            format!("File contents ({} bytes):\n{}", r.content.len(), r.content)
+        }
         ToolResponse::WriteFile(r) => format!("Wrote {} bytes to {}", r.bytes_written, r.path),
         ToolResponse::Grep(r) => format!("Found {} matches:\n{:#?}", r.matches.len(), r.matches),
         ToolResponse::ApplyPatch(r) => format!("Applied patch: {:?}", r),
-        ToolResponse::Bash(r) => format!("Exit code: {}\nStdout:\n{}\nStderr:\n{}", r.exit_code, r.stdout, r.stderr),
+        ToolResponse::Bash(r) => format!(
+            "Exit code: {}\nStdout:\n{}\nStderr:\n{}",
+            r.exit_code, r.stdout, r.stderr
+        ),
         ToolResponse::AskUser(r) => format!("User response: {:?}", r.responses),
         ToolResponse::Error(e) => format!("Error: {}", e.message),
     }

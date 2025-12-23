@@ -10,14 +10,7 @@ pub use manager_models::{
     AiSessionOutputListResponse,
     AiSessionResult,
     ApiKeyConfig,
-    ApplyPatchRequest,
-    AskUserRequest,
-    BashRequest,
     CreateWorkRequest,
-    FileInfo,
-    FileType,
-    GrepRequest,
-    ListFilesRequest,
     LlmAgentMessage,
     // LLM Agent types
     LlmAgentSession,
@@ -25,12 +18,9 @@ pub use manager_models::{
     LlmProviderConfig,
     MessageAuthorType,
     MessageContentType,
-    ReadFileRequest,
     SettingsResponse,
     SupportedModel,
     SupportedModelsResponse,
-    // Tool-related types
-    ToolRequest,
     UpdateApiKeysRequest,
     UpdateTeamRequest,
     UpdateUserRequest,
@@ -44,7 +34,12 @@ pub use manager_models::{
     WorkMessageResponse,
     WorkResponse,
     WorkWithHistory,
-    WriteFileRequest,
+};
+
+// Re-export tool types from manager-tools
+pub use manager_tools::types::{
+    ApplyPatchRequest, BashRequest, FileInfo, FileType, GrepRequest, ListFilesRequest,
+    ReadFileRequest, ToolRequest, ToolResponse, WriteFileRequest,
 };
 
 // User and SSH key authentication models (User is re-exported from manager-models)

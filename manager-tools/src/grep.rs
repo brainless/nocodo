@@ -1,6 +1,6 @@
 use crate::tool_error::ToolError;
+use crate::types::{GrepMatch, GrepRequest, GrepResponse, ToolErrorResponse, ToolResponse};
 use anyhow::Result;
-use manager_models::{GrepMatch, GrepRequest, GrepResponse, ToolErrorResponse, ToolResponse};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;

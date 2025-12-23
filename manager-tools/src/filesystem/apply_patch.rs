@@ -1,8 +1,8 @@
 use super::path_utils::validate_and_resolve_path;
-use anyhow::Result;
-use manager_models::{
+use crate::types::{
     ApplyPatchFileChange, ApplyPatchRequest, ApplyPatchResponse, ToolErrorResponse, ToolResponse,
 };
+use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
 

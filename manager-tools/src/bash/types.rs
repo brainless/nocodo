@@ -1,6 +1,6 @@
 use crate::filesystem::path_utils::validate_and_resolve_path;
+use crate::types::{BashRequest, BashResponse, ToolErrorResponse, ToolResponse};
 use anyhow::Result;
-use manager_models::{BashRequest, BashResponse, ToolErrorResponse, ToolResponse};
 use std::path::Path;
 use std::time::Instant;
 

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use manager_models::{AskUserRequest, QuestionType, UserQuestion};
+    use crate::types::{AskUserRequest, QuestionType, UserQuestion};
 
     #[tokio::test]
     async fn test_ask_user_validation() {

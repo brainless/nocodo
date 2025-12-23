@@ -90,8 +90,6 @@ pub struct QuestionValidation {
     pub error_message: Option<String>,
 }
 
-
-
 /// Response from the ask_user tool containing user answers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AskUserResponse {
