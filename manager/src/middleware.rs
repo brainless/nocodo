@@ -6,7 +6,7 @@ use actix_web::{
     web, Error, HttpMessage,
 };
 use futures_util::future::{ready, Ready};
-use manager_models::UserInfo;
+use shared_types::UserInfo;
 
 /// Authentication middleware that extracts JWT token and attaches user info to request
 #[allow(dead_code)]

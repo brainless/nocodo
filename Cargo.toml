@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "manager",
-    "manager-models",
+    "shared-types",
     "manager-tools",
     "nocodo-github-actions",
     "desktop-app",

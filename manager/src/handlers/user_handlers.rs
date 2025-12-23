@@ -3,8 +3,8 @@ use crate::auth;
 use crate::error::AppError;
 use crate::models::{CreateUserRequest, UpdateUserRequest, User, UserResponse};
 use actix_web::{web, HttpMessage, HttpResponse, Result};
-use manager_models::TeamListResponse;
-use manager_models::{SearchQuery, TeamItem, UserListItem};
+use shared_types::TeamListResponse;
+use shared_types::{SearchQuery, TeamItem, UserListItem};
 
 pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let users = data.database.get_all_users()?;
@@ -30,7 +30,7 @@ pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppEr
         user_list_items.push(user_item);
     }
 
-    let response = manager_models::UserListResponse {
+    let response = shared_types::UserListResponse {
         users: user_list_items,
     };
     Ok(HttpResponse::Ok().json(response))
@@ -164,7 +164,7 @@ pub async fn search_users(
         user_list_items.push(user_item);
     }
 
-    let response = manager_models::UserListResponse {
+    let response = shared_types::UserListResponse {
         users: user_list_items,
     };
     Ok(HttpResponse::Ok().json(response))
@@ -177,9 +177,9 @@ pub async fn get_user_teams(
 ) -> Result<HttpResponse, AppError> {
     let user_id = path.into_inner();
     let teams = data.database.get_user_teams(user_id)?;
-    let teams: Vec<manager_models::TeamListItem> = teams
+    let teams: Vec<shared_types::TeamListItem> = teams
         .into_iter()
-        .map(|t| manager_models::TeamListItem {
+        .map(|t| shared_types::TeamListItem {
             id: t.id,
             name: t.name,
             description: t.description,

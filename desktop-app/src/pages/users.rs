@@ -3,7 +3,7 @@ use crate::services::ApiService;
 use crate::state::{AppState, ConnectionState};
 use crate::ui_text::{ContentText, WidgetText};
 use egui::{Context, Ui};
-use manager_models::UpdateUserRequest;
+use shared_types::UpdateUserRequest;
 use std::sync::Arc;
 
 pub struct UsersPage;
@@ -105,7 +105,7 @@ impl UsersPage {
         }
 
         // Table with proper column layout
-        let mut clicked_user: Option<manager_models::User> = None;
+        let mut clicked_user: Option<shared_types::User> = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui_extras::TableBuilder::new(ui)
                 .column(egui_extras::Column::remainder()) // ID column
@@ -133,7 +133,7 @@ impl UsersPage {
                                 let id_text = ContentText::text(user_item.id.to_string());
                                 if ui.label(id_text).clicked() {
                                     // Create a full User object for editing
-                                    clicked_user = Some(manager_models::User {
+                                    clicked_user = Some(shared_types::User {
                                         id: user_item.id,
                                         name: user_item.name.clone(),
                                         email: user_item.email.clone(),
@@ -150,7 +150,7 @@ impl UsersPage {
                                 let name_text = ContentText::text(&user_item.name);
                                 if ui.label(name_text).clicked() {
                                     // Create a full User object for editing
-                                    clicked_user = Some(manager_models::User {
+                                    clicked_user = Some(shared_types::User {
                                         id: user_item.id,
                                         name: user_item.name.clone(),
                                         email: user_item.email.clone(),
@@ -167,7 +167,7 @@ impl UsersPage {
                                 let email_text = ContentText::text(&user_item.email);
                                 if ui.label(email_text).clicked() {
                                     // Create a full User object for editing
-                                    clicked_user = Some(manager_models::User {
+                                    clicked_user = Some(shared_types::User {
                                         id: user_item.id,
                                         name: user_item.name.clone(),
                                         email: user_item.email.clone(),
@@ -194,7 +194,7 @@ impl UsersPage {
                                 let teams_text = ContentText::text(&teams_text);
                                 if ui.label(teams_text).clicked() {
                                     // Create a full User object for editing
-                                    clicked_user = Some(manager_models::User {
+                                    clicked_user = Some(shared_types::User {
                                         id: user_item.id,
                                         name: user_item.name.clone(),
                                         email: user_item.email.clone(),

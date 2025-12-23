@@ -1,5 +1,5 @@
 use egui::{Context, Ui};
-use manager_models::Project;
+use shared_types::Project;
 
 pub struct ProjectsView {
     projects: Vec<Project>,

@@ -533,10 +533,10 @@ pub async fn discover_project_commands(
         project_id
     );
 
-    // Convert local SuggestedCommand to manager_models::SuggestedCommand
-    let commands_response: Vec<manager_models::SuggestedCommand> = final_commands
+    // Convert local SuggestedCommand to shared_types::SuggestedCommand
+    let commands_response: Vec<shared_types::SuggestedCommand> = final_commands
         .iter()
-        .map(|cmd| manager_models::SuggestedCommand {
+        .map(|cmd| shared_types::SuggestedCommand {
             name: cmd.name.clone(),
             description: cmd.description.clone(),
             command: cmd.command.clone(),
@@ -550,7 +550,7 @@ pub async fn discover_project_commands(
 
     // Return suggested commands (not stored yet - user will select which ones to save)
     Ok(
-        HttpResponse::Ok().json(manager_models::DiscoverCommandsResponse {
+        HttpResponse::Ok().json(shared_types::DiscoverCommandsResponse {
             commands: commands_response,
             project_types: rule_based_response.project_types,
             reasoning,

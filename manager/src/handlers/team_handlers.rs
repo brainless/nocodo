@@ -4,7 +4,7 @@ use super::main_handlers::AppState;
 use crate::error::AppError;
 use crate::models::{CreateTeamRequest, Permission, Team, UpdateTeamRequest};
 use actix_web::{web, HttpMessage, HttpResponse, Result};
-use manager_models::TeamListResponse;
+use shared_types::TeamListResponse;
 
 /// Extract user ID from request
 /// With nested PermissionMiddleware, UserInfo may not transfer from ServiceRequest to HttpRequest
@@ -57,9 +57,9 @@ fn get_user_id(
 
 pub async fn list_teams(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let teams = data.database.get_all_teams()?;
-    let manager_teams: Vec<manager_models::TeamListItem> = teams
+    let manager_teams: Vec<shared_types::TeamListItem> = teams
         .into_iter()
-        .map(|team| manager_models::TeamListItem {
+        .map(|team| shared_types::TeamListItem {
             id: team.id,
             name: team.name,
             description: team.description,
@@ -234,15 +234,15 @@ pub async fn get_current_user_teams(
     let user_id = get_user_id(&_req, &data.config)?;
 
     let teams = data.database.get_user_teams(user_id)?;
-    let teams: Vec<manager_models::TeamListItem> = teams
+    let teams: Vec<shared_types::TeamListItem> = teams
         .into_iter()
-        .map(|t| manager_models::TeamListItem {
+        .map(|t| shared_types::TeamListItem {
             id: t.id,
             name: t.name,
             description: t.description,
             permissions: Vec::new(), // Will be loaded separately
         })
         .collect();
-    let response = manager_models::TeamListResponse { teams };
+    let response = shared_types::TeamListResponse { teams };
     Ok(HttpResponse::Ok().json(response))
 }

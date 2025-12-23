@@ -56,7 +56,7 @@ signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
 glob = "0.3"
 schemars = { version = "0.8", features = ["preserve_order"] }
 nocodo-github-actions = { path = "../nocodo-github-actions", features = ["nocodo-integration"] }
-manager-models = { path = "../manager-models" }
+shared-types = { path = "../shared-types" }
 manager-tools = { path = "../manager-tools" }
 nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
 

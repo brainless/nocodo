@@ -292,7 +292,7 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let request = manager_models::CreateWorkRequest {
+                    let request = shared_types::CreateWorkRequest {
                         title,
                         project_id,
                         model,
@@ -336,10 +336,10 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let request = manager_models::AddMessageRequest {
+                    let request = shared_types::AddMessageRequest {
                         content: message_content,
-                        content_type: manager_models::MessageContentType::Text,
-                        author_type: manager_models::MessageAuthorType::User,
+                        content_type: shared_types::MessageContentType::Text,
+                        author_type: shared_types::MessageAuthorType::User,
                         author_id: None,
                     };
                     let result = api_client.add_message_to_work(work_id, request).await;
@@ -602,7 +602,7 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let request = manager_models::UpdateApiKeysRequest {
+                    let request = shared_types::UpdateApiKeysRequest {
                         xai_api_key: xai_key,
                         openai_api_key: openai_key,
                         anthropic_api_key: anthropic_key,
@@ -729,7 +729,7 @@ impl ApiService {
         &self,
         state: &mut AppState,
         user_id: i64,
-        request: manager_models::UpdateUserRequest,
+        request: shared_types::UpdateUserRequest,
     ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.updating_user = true;
@@ -836,7 +836,7 @@ impl ApiService {
         &self,
         state: &mut AppState,
         team_id: i64,
-        request: manager_models::UpdateTeamRequest,
+        request: shared_types::UpdateTeamRequest,
     ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.updating_team = true;
@@ -989,7 +989,7 @@ impl ApiService {
 
             let connection_manager = Arc::clone(&state.connection_manager);
             let result_clone: Arc<
-                std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>,
+                std::sync::Mutex<Option<Result<shared_types::DiscoverCommandsResponse, String>>>,
             > = Arc::clone(&state.command_discovery_result);
 
             tokio::spawn(async move {
@@ -1059,7 +1059,7 @@ impl ApiService {
     pub fn create_project_commands(
         &self,
         project_id: i64,
-        commands: Vec<manager_models::ProjectCommand>,
+        commands: Vec<shared_types::ProjectCommand>,
         state: &mut AppState,
     ) {
         if state.connection_state == crate::state::ConnectionState::Connected {

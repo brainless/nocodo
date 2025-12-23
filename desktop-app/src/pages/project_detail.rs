@@ -1174,7 +1174,7 @@ impl ProjectDetailPage {
                             // Filter selected commands from discovery results
                             let selected_items =
                                 state.ui_state.project_detail_command_selected_items.clone();
-                            let selected_commands: Vec<manager_models::ProjectCommand> = results
+                            let selected_commands: Vec<shared_types::ProjectCommand> = results
                                 .commands
                                 .iter()
                                 .filter(|cmd| selected_items.contains(&cmd.name))
@@ -1279,7 +1279,7 @@ impl ProjectDetailPage {
     fn show_execution_entry(
         &self,
         ui: &mut Ui,
-        execution: &manager_models::ProjectCommandExecution,
+        execution: &shared_types::ProjectCommandExecution,
     ) {
         let executed_at = chrono::DateTime::from_timestamp(execution.executed_at, 0)
             .unwrap_or_else(chrono::Utc::now);

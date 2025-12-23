@@ -408,9 +408,9 @@ impl crate::pages::Page for WorkPage {
                                                 // Combine and sort all messages by timestamp
                                                 #[derive(Clone)]
                                                 enum DisplayMessage {
-                                                    WorkMessage(manager_models::WorkMessage),
-                                                    AiOutput(manager_models::AiSessionOutput),
-                                                    ToolCall(manager_models::LlmAgentToolCall),
+                                                    WorkMessage(shared_types::WorkMessage),
+                                                    AiOutput(shared_types::AiSessionOutput),
+                                                    ToolCall(shared_types::LlmAgentToolCall),
                                                 }
 
                                                 let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();

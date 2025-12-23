@@ -64,13 +64,13 @@ pub struct UiState {
     /// Message continuation input for work detail
     pub continue_message_input: String,
     /// Command discovery state
-    pub project_detail_command_discovery_results: Option<manager_models::DiscoverCommandsResponse>,
+    pub project_detail_command_discovery_results: Option<shared_types::DiscoverCommandsResponse>,
     pub project_detail_command_selected_items: std::collections::HashSet<String>,
     pub project_detail_show_discovery_form: bool,
     pub project_detail_use_llm_discovery: bool,
     /// Command details state
     pub project_detail_selected_command_id: Option<String>,
-    pub project_detail_command_executions: Vec<manager_models::ProjectCommandExecution>,
+    pub project_detail_command_executions: Vec<shared_types::ProjectCommandExecution>,
     /// Flags to trigger data refresh on page navigation
     #[serde(skip)]
     pub pending_projects_refresh: bool,

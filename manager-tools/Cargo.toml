@@ -26,7 +26,7 @@ schemars = "0.8"
 codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch" }
 codex-core = { git = "https://github.com/openai/codex", package = "codex-core" }
 codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening" }
-manager-models = { path = "../manager-models" }
+shared-types = { path = "../shared-types" }
 
 [dev-dependencies]
 tempfile = "3.12"

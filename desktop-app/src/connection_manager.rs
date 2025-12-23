@@ -430,7 +430,7 @@ impl ConnectionManager {
         username: &str,
         password: &str,
         ssh_fingerprint: &str,
-    ) -> Result<manager_models::LoginResponse, ConnectionError> {
+    ) -> Result<shared_types::LoginResponse, ConnectionError> {
         let api_client_arc = self.api_client.read().await;
         let client_arc = api_client_arc
             .as_ref()
@@ -465,7 +465,7 @@ impl ConnectionManager {
         email: Option<&str>,
         ssh_public_key: &str,
         ssh_fingerprint: &str,
-    ) -> Result<manager_models::UserResponse, ConnectionError> {
+    ) -> Result<shared_types::UserResponse, ConnectionError> {
         let api_client_arc = self.api_client.read().await;
         let client_arc = api_client_arc
             .as_ref()

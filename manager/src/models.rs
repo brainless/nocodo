@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // Re-export shared models from manager-models
-pub use manager_models::{
+pub use shared_types::{
     AddMessageRequest,
     AiSession,
     AiSessionOutput,
@@ -93,7 +93,7 @@ impl UserSshKey {
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct GitBranchListResponse {
-    pub branches: Vec<manager_models::GitBranch>,
+    pub branches: Vec<shared_types::GitBranch>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

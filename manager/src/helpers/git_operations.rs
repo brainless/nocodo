@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use manager_models::GitBranch;
+use shared_types::GitBranch;
 use std::path::Path;
 
 /// List all git branches and worktrees for a project

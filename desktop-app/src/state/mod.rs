@@ -9,10 +9,10 @@ pub type ArcResult<T> = Arc<std::sync::Mutex<Option<Result<T, String>>>>;
 pub type ArcOption<T> = Arc<std::sync::Mutex<Option<T>>>;
 pub type ArcMutex<T> = Arc<std::sync::Mutex<T>>;
 
-pub type UsersResult = ArcResult<Vec<manager_models::UserListItem>>;
-pub type TeamsResult = ArcResult<Vec<manager_models::TeamListItem>>;
-pub type TeamItemsResult = ArcResult<Vec<manager_models::TeamItem>>;
-pub type ProjectCommandsResult = ArcResult<Vec<manager_models::ProjectCommand>>;
+pub type UsersResult = ArcResult<Vec<shared_types::UserListItem>>;
+pub type TeamsResult = ArcResult<Vec<shared_types::TeamListItem>>;
+pub type TeamItemsResult = ArcResult<Vec<shared_types::TeamItem>>;
+pub type ProjectCommandsResult = ArcResult<Vec<shared_types::ProjectCommand>>;
 pub type ConnectionResult = ArcResult<(String, String, u16)>;
 
 pub mod connection;
@@ -64,23 +64,23 @@ pub struct AppState {
     pub ui_state: UiState,
 
     // Data
-    pub projects: Vec<manager_models::Project>,
-    pub works: Vec<manager_models::Work>,
-    pub work_messages: Vec<manager_models::WorkMessage>,
-    pub ai_session_outputs: Vec<manager_models::AiSessionOutput>,
-    pub ai_tool_calls: Vec<manager_models::LlmAgentToolCall>,
-    pub project_details: Option<manager_models::ProjectDetailsResponse>,
+    pub projects: Vec<shared_types::Project>,
+    pub works: Vec<shared_types::Work>,
+    pub work_messages: Vec<shared_types::WorkMessage>,
+    pub ai_session_outputs: Vec<shared_types::AiSessionOutput>,
+    pub ai_tool_calls: Vec<shared_types::LlmAgentToolCall>,
+    pub project_details: Option<shared_types::ProjectDetailsResponse>,
     pub servers: Vec<Server>,
-    pub settings: Option<manager_models::SettingsResponse>,
-    pub supported_models: Vec<manager_models::SupportedModel>,
+    pub settings: Option<shared_types::SettingsResponse>,
+    pub supported_models: Vec<shared_types::SupportedModel>,
     pub worktree_branches: Vec<String>,
 
     // Command management state
-    pub project_detail_saved_commands: Vec<manager_models::ProjectCommand>,
+    pub project_detail_saved_commands: Vec<shared_types::ProjectCommand>,
 
     // Users management
-    pub users: Vec<manager_models::UserListItem>,
-    pub filtered_users: Vec<manager_models::UserListItem>,
+    pub users: Vec<shared_types::UserListItem>,
+    pub filtered_users: Vec<shared_types::UserListItem>,
     pub user_search_query: String,
     pub selected_user_ids: std::collections::HashSet<i64>,
     pub loading_users: bool,
@@ -89,13 +89,13 @@ pub struct AppState {
 
     // User detail modal
     pub show_user_modal: bool,
-    pub editing_user: Option<manager_models::User>,
+    pub editing_user: Option<shared_types::User>,
     pub editing_user_teams: Vec<i64>,
 
     // Teams
-    pub teams: Vec<manager_models::Team>,
-    pub team_list_items: Vec<manager_models::TeamListItem>,
-    pub filtered_teams: Vec<manager_models::TeamListItem>,
+    pub teams: Vec<shared_types::Team>,
+    pub team_list_items: Vec<shared_types::TeamListItem>,
+    pub filtered_teams: Vec<shared_types::TeamListItem>,
     pub team_search_query: String,
     pub selected_team_ids: std::collections::HashSet<i64>,
     pub loading_teams: bool,
@@ -104,7 +104,7 @@ pub struct AppState {
 
     // Team detail modal
     pub show_team_modal: bool,
-    pub editing_team: Option<manager_models::Team>,
+    pub editing_team: Option<shared_types::Team>,
     pub editing_team_permissions: Vec<i64>, // Permission IDs for team being edited
 
     // Update results
@@ -138,7 +138,7 @@ pub struct AppState {
     pub ssh_key_message: Option<String>,
 
     // Current user teams
-    pub current_user_teams: Vec<manager_models::TeamItem>,
+    pub current_user_teams: Vec<shared_types::TeamItem>,
     pub loading_current_user_teams: bool,
     #[serde(skip)]
     pub current_user_teams_result: TeamItemsResult,
@@ -153,35 +153,35 @@ pub struct AppState {
     #[serde(skip)]
     pub connection_manager: Arc<crate::connection_manager::ConnectionManager>,
     #[serde(skip)]
-    pub project_details_result: ArcResult<manager_models::ProjectDetailsResponse>,
+    pub project_details_result: ArcResult<shared_types::ProjectDetailsResponse>,
     #[serde(skip)]
     pub create_commands_result: ProjectCommandsResult,
     #[serde(skip)]
     pub execute_command_result: ArcResult<serde_json::Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub command_executions_result: ArcResult<Vec<manager_models::ProjectCommandExecution>>,
+    pub command_executions_result: ArcResult<Vec<shared_types::ProjectCommandExecution>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub projects_result: ArcResult<Vec<manager_models::Project>>,
+    pub projects_result: ArcResult<Vec<shared_types::Project>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub worktree_branches_result: ArcResult<Vec<String>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub settings_result: ArcResult<manager_models::SettingsResponse>,
+    pub settings_result: ArcResult<shared_types::SettingsResponse>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub works_result: ArcResult<Vec<manager_models::Work>>,
+    pub works_result: ArcResult<Vec<shared_types::Work>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub work_messages_result: ArcResult<Vec<manager_models::WorkMessage>>,
+    pub work_messages_result: ArcResult<Vec<shared_types::WorkMessage>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_session_outputs_result: ArcResult<Vec<manager_models::AiSessionOutput>>,
+    pub ai_session_outputs_result: ArcResult<Vec<shared_types::AiSessionOutput>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_tool_calls_result: ArcResult<Vec<manager_models::LlmAgentToolCall>>,
+    pub ai_tool_calls_result: ArcResult<Vec<shared_types::LlmAgentToolCall>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub update_projects_path_result: ArcResult<Value>,
@@ -190,7 +190,7 @@ pub struct AppState {
     pub scan_projects_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub supported_models_result: ArcResult<Vec<manager_models::SupportedModel>>,
+    pub supported_models_result: ArcResult<Vec<shared_types::SupportedModel>>,
     #[serde(skip)]
     pub loading_projects: bool,
     #[serde(skip)]
@@ -234,13 +234,13 @@ pub struct AppState {
     pub sending_message: bool,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub create_work_result: ArcResult<manager_models::Work>,
+    pub create_work_result: ArcResult<shared_types::Work>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub send_message_result: ArcResult<manager_models::WorkMessage>,
+    pub send_message_result: ArcResult<shared_types::WorkMessage>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub create_ai_session_result: ArcResult<manager_models::AiSession>,
+    pub create_ai_session_result: ArcResult<shared_types::AiSession>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
     pub update_api_keys_result: ArcResult<Value>,
@@ -260,7 +260,7 @@ pub struct AppState {
     pub auth_required: ArcMutex<bool>, // Flag set when 401 is detected
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub login_result: ArcResult<manager_models::LoginResponse>,
+    pub login_result: ArcResult<shared_types::LoginResponse>,
     #[serde(skip)]
     pub pending_project_details_refresh: Option<i64>,
     #[serde(skip)]
@@ -268,10 +268,10 @@ pub struct AppState {
     pub project_detail_worktree_branches_result: ArcResult<Vec<String>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub project_detail_saved_commands_result: ArcResult<Vec<manager_models::ProjectCommand>>,
+    pub project_detail_saved_commands_result: ArcResult<Vec<shared_types::ProjectCommand>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub command_discovery_result: ArcResult<manager_models::DiscoverCommandsResponse>,
+    pub command_discovery_result: ArcResult<shared_types::DiscoverCommandsResponse>,
 }
 
 impl AppState {

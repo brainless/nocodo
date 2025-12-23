@@ -1,6 +1,6 @@
 use crate::ui_text::{ContentText, WidgetText};
 use egui::{Response, Ui};
-use manager_models::ProjectCommand;
+use shared_types::ProjectCommand;
 
 pub struct CommandCard<'a> {
     command: &'a ProjectCommand,

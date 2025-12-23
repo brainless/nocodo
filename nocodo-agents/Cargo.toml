@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
-manager-models = { path = "../manager-models" }
+shared-types = { path = "../shared-types" }
 manager-tools = { path = "../manager-tools" }
 anyhow = { workspace = true }
 async-trait = "0.1"

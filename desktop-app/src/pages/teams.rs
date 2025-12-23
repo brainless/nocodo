@@ -3,7 +3,7 @@ use crate::services::ApiService;
 use crate::state::{AppState, ConnectionState};
 use crate::ui_text::{ContentText, WidgetText};
 use egui::{Context, Ui};
-use manager_models::UpdateTeamRequest;
+use shared_types::UpdateTeamRequest;
 
 pub struct TeamsPage;
 
@@ -92,7 +92,7 @@ impl TeamsPage {
         }
 
         // Table with proper column layout
-        let mut clicked_team: Option<manager_models::Team> = None;
+        let mut clicked_team: Option<shared_types::Team> = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui_extras::TableBuilder::new(ui)
                 .column(egui_extras::Column::remainder()) // ID column
@@ -117,7 +117,7 @@ impl TeamsPage {
                     for team_item in &state.filtered_teams {
                         body.row(18.0, |mut row| {
                             // Helper to create Team from TeamListItem
-                            let create_team_from_item = || manager_models::Team {
+                            let create_team_from_item = || shared_types::Team {
                                 id: team_item.id,
                                 name: team_item.name.clone(),
                                 description: team_item.description.clone(),
