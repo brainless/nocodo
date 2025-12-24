@@ -2,6 +2,7 @@ pub mod bash;
 pub mod core;
 pub mod filesystem;
 pub mod grep;
+pub mod sqlite;
 pub mod user_interaction;
 
 // Re-export commonly used types
@@ -13,6 +14,7 @@ pub use filesystem::{
     WriteFileResponse,
 };
 pub use grep::{GrepMatch, GrepRequest, GrepResponse};
+pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse};
 pub use user_interaction::{
     AskUserRequest, AskUserResponse, QuestionType, QuestionValidation, UserQuestion,
     UserQuestionResponse,

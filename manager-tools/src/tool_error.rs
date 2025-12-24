@@ -17,6 +17,10 @@ pub enum ToolError {
     IoError(String),
     #[error("Serialization error: {0}")]
     SerializationError(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+    #[error("Execution error: {0}")]
+    ExecutionError(String),
 }
 
 impl From<std::io::Error> for ToolError {
@@ -28,5 +32,11 @@ impl From<std::io::Error> for ToolError {
 impl From<serde_json::Error> for ToolError {
     fn from(err: serde_json::Error) -> Self {
         ToolError::SerializationError(err.to_string())
+    }
+}
+
+impl From<anyhow::Error> for ToolError {
+    fn from(err: anyhow::Error) -> Self {
+        ToolError::ExecutionError(err.to_string())
     }
 }

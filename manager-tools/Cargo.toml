@@ -27,6 +27,8 @@ codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-
 codex-core = { git = "https://github.com/openai/codex", package = "codex-core" }
 codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening" }
 shared-types = { path = "../shared-types" }
+rusqlite = { version = "0.37", features = ["bundled"] }
+sqlparser = "0.51"
 
 [dev-dependencies]
 tempfile = "3.12"

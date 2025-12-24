@@ -1,6 +1,7 @@
 pub mod bash;
 pub mod filesystem;
 pub mod grep;
+pub mod sqlite;
 pub mod tool_error;
 pub mod tool_executor;
 pub mod types;

@@ -136,6 +136,7 @@ Executes a typed tool request and returns a typed response.
 - `ToolRequest::ApplyPatch` - Apply patches to multiple files
 - `ToolRequest::Bash` - Execute bash commands
 - `ToolRequest::AskUser` - Ask user questions (interactive)
+- `ToolRequest::Sqlite3Reader` - Execute read-only SQL queries on SQLite databases
 
 **Example:**
 ```rust
@@ -279,7 +280,7 @@ let request = ToolRequest::Bash(BashRequest {
 ### User Interaction Tools
 
 #### AskUser
-Ask the user questions and get responses.
+Ask user questions and get responses.
 
 ```rust
 use manager_models::tools::user_interaction::{AskUserRequest, Question};
@@ -294,6 +295,45 @@ let request = ToolRequest::AskUser(AskUserRequest {
     ],
 });
 ```
+
+### Database Tools
+
+#### Sqlite3Reader
+Execute read-only SQL queries on SQLite databases. Only SELECT queries and PRAGMA statements are allowed.
+
+```rust
+use manager_models::Sqlite3ReaderRequest;
+
+let request = ToolRequest::Sqlite3Reader(Sqlite3ReaderRequest {
+    db_path: "/path/to/database.db".to_string(),
+    query: "SELECT * FROM users LIMIT 10".to_string(),
+    limit: Some(10),
+});
+```
+
+**Schema introspection with PRAGMA:**
+```rust
+// List all tables
+let request = ToolRequest::Sqlite3Reader(Sqlite3ReaderRequest {
+    db_path: "/path/to/database.db".to_string(),
+    query: "SELECT name FROM sqlite_master WHERE type='table'".to_string(),
+    limit: None,
+});
+
+// Get table schema
+let request = ToolRequest::Sqlite3Reader(Sqlite3ReaderRequest {
+    db_path: "/path/to/database.db".to_string(),
+    query: "PRAGMA table_info(users)".to_string(),
+    limit: None,
+});
+```
+
+**Security:**
+- Only SELECT queries and PRAGMA statements are allowed
+- Blocks INSERT, UPDATE, DELETE, DROP, and other write operations
+- SQL injection protection via AST parsing
+- Automatic row limiting (default: 100, max: 1000)
+- Path validation to ensure database file exists
 
 ## Error Handling
 
@@ -404,6 +444,8 @@ impl BashExecutorTrait for SafeBashExecutor {
 - `serde_json` - JSON serialization
 - `walkdir` - Directory traversal
 - `regex` - Pattern matching
+- `rusqlite` - SQLite database access
+- `sqlparser` - SQL parsing and validation
 
 ## Related Crates
 

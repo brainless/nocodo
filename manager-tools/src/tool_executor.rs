@@ -8,6 +8,7 @@ use crate::bash;
 pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
+use crate::sqlite;
 use crate::user_interaction;
 
 /// Tool executor that handles tool requests and responses
@@ -69,6 +70,9 @@ impl ToolExecutor {
                 .await
             }
             ToolRequest::AskUser(req) => user_interaction::ask_user(req).await,
+            ToolRequest::Sqlite3Reader(req) => sqlite::execute_sqlite3_reader(req)
+                .await
+                .map_err(|e| anyhow::anyhow!(e)),
         }
     }
 
@@ -86,6 +90,7 @@ impl ToolExecutor {
             ToolResponse::ApplyPatch(response) => serde_json::to_value(response)?,
             ToolResponse::Bash(response) => serde_json::to_value(response)?,
             ToolResponse::AskUser(response) => serde_json::to_value(response)?,
+            ToolResponse::Sqlite3Reader(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 

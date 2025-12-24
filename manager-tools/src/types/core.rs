@@ -19,6 +19,8 @@ pub enum ToolRequest {
     Bash(super::bash::BashRequest),
     #[serde(rename = "ask_user")]
     AskUser(super::user_interaction::AskUserRequest),
+    #[serde(rename = "sqlite3_reader")]
+    Sqlite3Reader(super::sqlite::Sqlite3ReaderRequest),
 }
 
 /// Tool response enum containing all possible tool results
@@ -39,6 +41,8 @@ pub enum ToolResponse {
     Bash(super::bash::BashResponse),
     #[serde(rename = "ask_user")]
     AskUser(super::user_interaction::AskUserResponse),
+    #[serde(rename = "sqlite3_reader")]
+    Sqlite3Reader(super::sqlite::Sqlite3ReaderResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
