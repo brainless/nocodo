@@ -2,11 +2,12 @@ use super::main_handlers::AppState;
 use crate::error::AppError;
 use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
-    AddMessageRequest, CreateWorkRequest, WorkListResponse, WorkResponse, AiSessionOutputListResponse,
+    AddMessageRequest, AiSessionOutputListResponse, CreateWorkRequest, WorkListResponse,
+    WorkResponse,
 };
 
+use actix_web::{web, HttpMessage, HttpResponse, Result};
 use nocodo_github_actions::{ExecuteCommandRequest, ScanWorkflowsRequest};
-use actix_web::{web, HttpResponse, Result, HttpMessage};
 use std::time::SystemTime;
 
 /// Helper function to infer the provider from a model ID
@@ -53,26 +54,31 @@ pub async fn create_work(
         .as_secs() as i64;
 
     // Resolve working_directory from git_branch if provided
-    let working_directory = if let (Some(git_branch), Some(project_id)) = (&work_req.git_branch, work_req.project_id) {
-        // Get project to find project path
-        let project = data.database.get_project_by_id(project_id)?;
-        let project_path = std::path::Path::new(&project.path);
+    let working_directory =
+        if let (Some(git_branch), Some(project_id)) = (&work_req.git_branch, work_req.project_id) {
+            // Get project to find project path
+            let project = data.database.get_project_by_id(project_id)?;
+            let project_path = std::path::Path::new(&project.path);
 
-        // Resolve the working directory for the given branch
-        match crate::git::get_working_directory_for_branch(project_path, git_branch) {
-            Ok(path) => Some(path),
-            Err(e) => {
-                tracing::warn!("Failed to resolve working directory for branch '{}': {}. Using project path.", git_branch, e);
-                Some(project.path.clone())
+            // Resolve the working directory for the given branch
+            match crate::git::get_working_directory_for_branch(project_path, git_branch) {
+                Ok(path) => Some(path),
+                Err(e) => {
+                    tracing::warn!(
+                    "Failed to resolve working directory for branch '{}': {}. Using project path.",
+                    git_branch,
+                    e
+                );
+                    Some(project.path.clone())
+                }
             }
-        }
-    } else if let Some(project_id) = work_req.project_id {
-        // No git_branch specified, use project path as working_directory
-        let project = data.database.get_project_by_id(project_id)?;
-        Some(project.path.clone())
-    } else {
-        None
-    };
+        } else if let Some(project_id) = work_req.project_id {
+            // No git_branch specified, use project path as working_directory
+            let project = data.database.get_project_by_id(project_id)?;
+            Some(project.path.clone())
+        } else {
+            None
+        };
 
     let work = crate::models::Work {
         id: 0, // Will be set by database AUTOINCREMENT
@@ -105,15 +111,16 @@ pub async fn create_work(
     data.database.create_ownership(&ownership)?;
 
     // Broadcast work creation via WebSocket
-    data.ws_broadcaster.broadcast_project_created(crate::models::Project {
-        id: work.id,
-        name: work.title.clone(),
-        path: "".to_string(), // Works don't have a path like projects
-        description: None,
-        parent_id: None,
-        created_at: work.created_at,
-        updated_at: work.updated_at,
-    });
+    data.ws_broadcaster
+        .broadcast_project_created(crate::models::Project {
+            id: work.id,
+            name: work.title.clone(),
+            path: "".to_string(), // Works don't have a path like projects
+            description: None,
+            parent_id: None,
+            created_at: work.created_at,
+            updated_at: work.updated_at,
+        });
 
     tracing::info!(
         "Successfully created work '{}' with ID {} and message ID {}",
@@ -128,17 +135,15 @@ pub async fn create_work(
             .tool_name
             .unwrap_or_else(|| "llm-agent".to_string());
 
-    // Generate project context if work is associated with a project
-    let project_context = if let Some(project_id) = work.project_id {
-        let project = data.database.get_project_by_id(project_id)?;
-        // Use work's working_directory if available, otherwise fall back to project.path
-        let working_path = work.working_directory
-            .as_deref()
-            .unwrap_or(&project.path);
-        Some(format!("Project: {}\nPath: {}", project.name, working_path))
-    } else {
-        None
-    };
+        // Generate project context if work is associated with a project
+        let project_context = if let Some(project_id) = work.project_id {
+            let project = data.database.get_project_by_id(project_id)?;
+            // Use work's working_directory if available, otherwise fall back to project.path
+            let working_path = work.working_directory.as_deref().unwrap_or(&project.path);
+            Some(format!("Project: {}\nPath: {}", project.name, working_path))
+        } else {
+            None
+        };
 
         // Create AI session record
         let session = crate::models::AiSession::new(
@@ -160,7 +165,7 @@ pub async fn create_work(
         if tool_name == "llm-agent" {
             if let Some(ref llm_agent) = data.llm_agent {
                 // Determine provider and model from work.model or fall back to environment/defaults
-                let (provider, model) = if let Some(ref model_id) = work.model {
+                let (provider, model) = if let Some(model_id) = &work.model {
                     let provider = infer_provider_from_model(model_id);
                     (provider.to_string(), model_id.clone())
                 } else {
@@ -169,7 +174,7 @@ pub async fn create_work(
                         std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                     let model = std::env::var("MODEL")
                         .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                    (provider, model)
+                    (provider, model.clone())
                 };
 
                 // Create LLM agent session
@@ -294,20 +299,18 @@ pub async fn add_message_to_work(
     let work = data.database.get_work_by_id(work_id)?;
     let tool_name = "llm-agent".to_string();
 
-        // Generate project context if work is associated with a project
-        let project_context = if let Some(project_id) = work.project_id {
-            let project = data.database.get_project_by_id(project_id)?;
-            // Use work's working_directory if available, otherwise fall back to project.path
-            let working_path = work.working_directory
-                .as_deref()
-                .unwrap_or(&project.path);
-            Some(format!("Project: {}\nPath: {}", project.name, working_path))
-        } else {
-            None
-        };
+    // Generate project context if work is associated with a project
+    let project_context = if let Some(project_id) = work.project_id {
+        let project = data.database.get_project_by_id(project_id)?;
+        // Use work's working_directory if available, otherwise fall back to project.path
+        let working_path = work.working_directory.as_deref().unwrap_or(&project.path);
+        Some(format!("Project: {}\nPath: {}", project.name, working_path))
+    } else {
+        None
+    };
 
-        // Create AI session record
-        let session = crate::models::AiSession::new(
+    // Create AI session record
+    let session = crate::models::AiSession::new(
         work_id,
         message_id,
         tool_name.clone(),
@@ -350,7 +353,7 @@ pub async fn add_message_to_work(
             });
         } else {
             // No existing session - create a new one
-            let (provider, model) = if let Some(ref model_id) = work.model {
+            let (provider, model) = if let Some(model_id) = &work.model {
                 let provider = infer_provider_from_model(model_id);
                 (provider.to_string(), model_id.clone())
             } else {
@@ -358,7 +361,7 @@ pub async fn add_message_to_work(
                     std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
                 let model = std::env::var("MODEL")
                     .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                (provider, model)
+                (provider, model.clone())
             };
 
             let llm_session = llm_agent
@@ -516,14 +519,18 @@ pub async fn list_worktree_branches(
     let project_id = path.into_inner();
 
     // Get project from database
-    let project = data.database.get_project_by_id(project_id)
+    let project = data
+        .database
+        .get_project_by_id(project_id)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // List branches using the helper function
     let project_path = std::path::Path::new(&project.path);
     let git_branches = crate::helpers::git_operations::list_project_branches(project_path)?;
 
-    let response = crate::models::GitBranchListResponse { branches: git_branches };
+    let response = crate::models::GitBranchListResponse {
+        branches: git_branches,
+    };
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -533,20 +540,20 @@ pub async fn list_ai_session_outputs(
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let work_id = path.into_inner();
-    
+
     // First, get the AI session for this work
     let sessions = data.database.get_ai_sessions_by_work_id(work_id)?;
     if sessions.is_empty() {
         let response = AiSessionOutputListResponse { outputs: vec![] };
         return Ok(HttpResponse::Ok().json(response));
     }
-    
+
     // Get the most recent AI session
     let session = sessions.into_iter().max_by_key(|s| s.started_at).unwrap();
-    
+
     // Get outputs for this session
     let mut outputs = data.database.list_ai_session_outputs(session.id)?;
-    
+
     // If this is an LLM agent session, also fetch LLM agent messages
     if session.tool_name == "llm-agent" {
         if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
@@ -571,7 +578,7 @@ pub async fn list_ai_session_outputs(
             }
         }
     }
-    
+
     outputs.sort_by_key(|o| o.created_at);
     let response = AiSessionOutputListResponse { outputs };
     Ok(HttpResponse::Ok().json(response))

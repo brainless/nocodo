@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::marker::PhantomData;
 
 /// A tool that can be called by an LLM
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tool {
     name: String,
     description: String,
@@ -28,10 +28,11 @@ impl Tool {
         description: String,
         schema: Value,
     ) -> Result<Self, crate::error::LlmError> {
-        let parameters: RootSchema = serde_json::from_value(schema)
-            .map_err(|e| crate::error::LlmError::InvalidToolSchema {
+        let parameters: RootSchema = serde_json::from_value(schema).map_err(|e| {
+            crate::error::LlmError::InvalidToolSchema {
                 message: e.to_string(),
-            })?;
+            }
+        })?;
 
         Ok(Tool {
             name,
@@ -92,7 +93,7 @@ impl<T: schemars::JsonSchema> ToolBuilder<T> {
 }
 
 /// A tool call from the LLM
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolCall {
     id: String,
     name: String,
@@ -101,7 +102,11 @@ pub struct ToolCall {
 
 impl ToolCall {
     pub fn new(id: String, name: String, arguments: Value) -> Self {
-        Self { id, name, arguments }
+        Self {
+            id,
+            name,
+            arguments,
+        }
     }
 
     pub fn id(&self) -> &str {
@@ -117,15 +122,21 @@ impl ToolCall {
     where
         T: for<'de> Deserialize<'de>,
     {
-        serde_json::from_value(self.arguments.clone())
-            .map_err(|e| crate::error::LlmError::ToolArgumentParse {
+        serde_json::from_value(self.arguments.clone()).map_err(|e| {
+            crate::error::LlmError::ToolArgumentParse {
                 tool_name: self.name.clone(),
                 source: e,
-            })
+            }
+        })
     }
 
     /// Get raw JSON arguments
     pub fn raw_arguments(&self) -> &Value {
+        &self.arguments
+    }
+
+    /// Get arguments as a clone (for convenience)
+    pub fn arguments(&self) -> &Value {
         &self.arguments
     }
 }
@@ -221,11 +232,7 @@ mod tests {
             "limit": 10
         });
 
-        let call = ToolCall::new(
-            "call_123".to_string(),
-            "search".to_string(),
-            args,
-        );
+        let call = ToolCall::new("call_123".to_string(), "search".to_string(), args);
 
         let params: TestParams = call.parse_arguments().unwrap();
         assert_eq!(params.query, "rust");

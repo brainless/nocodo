@@ -1,5 +1,5 @@
 use egui::{Response, Ui};
-use manager_models::Project;
+use shared_types::Project;
 
 pub struct ProjectCard<'a> {
     project: &'a Project,

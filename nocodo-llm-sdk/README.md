@@ -17,6 +17,46 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Multi-provider**: Same models available from different providers
 - **Extensible**: Designed for easy addition of other LLM providers
 
+## Architecture
+
+### Trait-Based Design
+
+The SDK uses a **trait-based architecture** that provides a unified interface across all LLM providers while maintaining type safety and extensibility:
+
+```rust
+// Core trait that all providers implement
+pub trait LlmClient: Send + Sync {
+    type Response: LlmResponse;
+    type MessageBuilder: MessageBuilder;
+    
+    fn message_builder(&self) -> Self::MessageBuilder;
+    fn with_base_url(self, url: impl Into<String>) -> Self;
+}
+
+// Provider-specific implementations
+impl LlmClient for ClaudeClient { /* ... */ }
+impl LlmClient for GrokClient { /* ... */ }
+impl LlmClient for GlmClient { /* ... */ }
+impl LlmClient for OpenAIClient { /* ... */ }
+```
+
+### Benefits
+
+- **Type Safety**: Each provider has its own response types and message builders
+- **Unified API**: Common operations work across all providers via the trait
+- **Extensibility**: New providers can be added by implementing the trait
+- **Zero-Cost Abstractions**: No runtime overhead from the trait system
+- **Provider-Specific Features**: Access to unique capabilities of each provider
+
+### Multi-Provider Support
+
+Access the same models through different providers for flexibility in cost, performance, and availability:
+
+| Model | Zen (Free) | xAI (Paid) | Cerebras (Paid) |
+|-------|------------|------------|------------------|
+| **Grok** | `grok-code` | `grok-code-fast-1` | - |
+| **GLM 4.6** | `big-pickle` | - | `zai-glm-4.6` |
+
 ## Installation
 
 Add this to your `Cargo.toml`:

@@ -12,8 +12,9 @@ async fn test_get_projects_empty() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     let req = test::TestRequest::get().uri("/api/projects").to_request();
     let resp = test::call_service(&service, req).await;
@@ -29,7 +30,10 @@ async fn test_get_projects_empty() {
 async fn test_create_project_basic() {
     let test_app = TestApp::new().await;
 
-    let project_temp_dir = test_app.test_config().projects_dir().join("basic-test-project");
+    let project_temp_dir = test_app
+        .test_config()
+        .projects_dir()
+        .join("basic-test-project");
 
     let create_request = CreateProjectRequest {
         name: "basic-test-project".to_string(),
@@ -42,10 +46,11 @@ async fn test_create_project_basic() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
-let req = test::TestRequest::post()
+    let req = test::TestRequest::post()
         .uri("/api/projects")
         .set_json(&create_request)
         .to_request();
@@ -79,7 +84,14 @@ async fn test_create_project_invalid_name() {
 
     let create_request = CreateProjectRequest {
         name: "   ".to_string(),
-        path: Some(test_app.test_config().projects_dir().join("invalid-name-test").to_string_lossy().to_string()),
+        path: Some(
+            test_app
+                .test_config()
+                .projects_dir()
+                .join("invalid-name-test")
+                .to_string_lossy()
+                .to_string(),
+        ),
         description: None,
         parent_id: None,
         template: None,
@@ -88,8 +100,9 @@ async fn test_create_project_invalid_name() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/projects")
@@ -112,7 +125,10 @@ async fn test_create_project_default_path() {
     let test_app = TestApp::new().await;
 
     let create_request = CreateProjectRequest {
-        name: format!("test-default-path-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)),
+        name: format!(
+            "test-default-path-{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ),
         path: None,
         description: None,
         parent_id: None,
@@ -122,8 +138,9 @@ async fn test_create_project_default_path() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/api/projects")
@@ -150,13 +167,17 @@ async fn test_create_project_default_path() {
 async fn test_create_project_duplicate_path() {
     let test_app = TestApp::new().await;
 
-    let project_path = test_app.test_config().projects_dir().join("duplicate-path-project");
+    let project_path = test_app
+        .test_config()
+        .projects_dir()
+        .join("duplicate-path-project");
 
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     // Create first project
     let create_request1 = CreateProjectRequest {
@@ -205,14 +226,25 @@ async fn test_get_project_by_id() {
     let test_app = TestApp::new().await;
 
     // Create a project first
-    let project = TestDataGenerator::create_project(Some("get-by-id-test"), Some(test_app.test_config().projects_dir().join("get-by-id").to_string_lossy().as_ref()));
+    let project = TestDataGenerator::create_project(
+        Some("get-by-id-test"),
+        Some(
+            test_app
+                .test_config()
+                .projects_dir()
+                .join("get-by-id")
+                .to_string_lossy()
+                .as_ref(),
+        ),
+    );
     test_app.db().create_project(&project).unwrap();
 
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     // Get the project by ID
     let uri = format!("/api/projects/{}", project.id);
@@ -226,7 +258,15 @@ async fn test_get_project_by_id() {
 
     assert_eq!(retrieved_project["id"], project.id);
     assert_eq!(retrieved_project["name"], "get-by-id-test");
-    assert_eq!(retrieved_project["path"], test_app.test_config().projects_dir().join("get-by-id").to_string_lossy().to_string());
+    assert_eq!(
+        retrieved_project["path"],
+        test_app
+            .test_config()
+            .projects_dir()
+            .join("get-by-id")
+            .to_string_lossy()
+            .to_string()
+    );
 }
 
 #[actix_rt::test]
@@ -236,8 +276,9 @@ async fn test_get_project_not_found() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/api/projects/non-existent-id")
@@ -249,14 +290,15 @@ async fn test_get_project_not_found() {
 
     let body_bytes = test::read_body(resp).await;
     let body_str = std::str::from_utf8(&body_bytes).unwrap_or("<invalid utf8>");
-    
+
     // Check if response body is empty or contains JSON error
     if body_str.is_empty() {
         // Empty response body is acceptable for 404
         assert_eq!(status, 404);
     } else {
         println!("Response body: {}", body_str);
-        let body: serde_json::Value = serde_json::from_str(body_str).unwrap_or(serde_json::json!({}));
+        let body: serde_json::Value =
+            serde_json::from_str(body_str).unwrap_or(serde_json::json!({}));
         if body.get("error").is_some() {
             assert_eq!(body["error"], "project_not_found");
         } else {
@@ -279,8 +321,9 @@ async fn test_get_projects_after_creation() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     // Get all projects
     let req = test::TestRequest::get().uri("/api/projects").to_request();
@@ -311,8 +354,9 @@ async fn test_project_creation_workflow() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     // Test 1: Get available templates
     let templates_req = test::TestRequest::get().uri("/api/templates").to_request();
@@ -409,8 +453,9 @@ async fn test_create_project_unknown_template() {
     let service = test::init_service(
         actix_web::App::new()
             .app_data(test_app.app_state().clone())
-            .configure(|cfg| configure_routes(cfg, false))
-    ).await;
+            .configure(|cfg| configure_routes(cfg, false)),
+    )
+    .await;
 
     let unknown_template_req = serde_json::json!({
         "name": "test-project",

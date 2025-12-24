@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 use crate::{
@@ -144,13 +145,9 @@ impl crate::claude::types::ClaudeMessageResponse {
             .content
             .iter()
             .filter_map(|block| match block {
-                crate::claude::types::ClaudeContentBlock::ToolUse { id, name, input } => {
-                    Some(crate::tools::ToolCall::new(
-                        id.clone(),
-                        name.clone(),
-                        input.clone(),
-                    ))
-                }
+                crate::claude::types::ClaudeContentBlock::ToolUse { id, name, input } => Some(
+                    crate::tools::ToolCall::new(id.clone(), name.clone(), input.clone()),
+                ),
                 _ => None,
             })
             .collect();
@@ -163,6 +160,7 @@ impl crate::claude::types::ClaudeMessageResponse {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for ClaudeClient {
     async fn complete(
         &self,
@@ -200,6 +198,29 @@ impl crate::client::LlmClient for ClaudeClient {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Convert tools from generic format to Claude format
+        let claude_tools = request.tools.map(|tools| {
+            tools
+                .into_iter()
+                .map(|tool| crate::claude::types::ClaudeTool {
+                    name: tool.name().to_string(),
+                    description: tool.description().to_string(),
+                    input_schema: tool.parameters().clone(),
+                    cache_control: None,
+                })
+                .collect()
+        });
+
+        // Convert tool_choice
+        let claude_tool_choice = request.tool_choice.map(|choice| match choice {
+            crate::tools::ToolChoice::Auto => serde_json::json!({"type": "auto"}),
+            crate::tools::ToolChoice::Required => serde_json::json!({"type": "any"}),
+            crate::tools::ToolChoice::None => serde_json::json!({"type": "none"}),
+            crate::tools::ToolChoice::Specific { name } => {
+                serde_json::json!({"type": "tool", "name": name})
+            }
+        });
+
         let claude_request = crate::claude::types::ClaudeMessageRequest {
             model: request.model,
             max_tokens: request.max_tokens,
@@ -208,29 +229,27 @@ impl crate::client::LlmClient for ClaudeClient {
             temperature: request.temperature,
             top_p: request.top_p,
             stop_sequences: request.stop_sequences,
-            tools: None, // No tools for generic LlmClient interface
-            tool_choice: None,
+            tools: claude_tools,
+            tool_choice: claude_tool_choice,
         };
 
         // Send request and convert response
         let claude_response = self.create_message(claude_request).await?;
 
-        let content = claude_response
-            .content
-            .into_iter()
-            .map(|block| match block {
+        // Extract text content and tool calls from response
+        let mut content = Vec::new();
+        let mut tool_calls = Vec::new();
+
+        for block in claude_response.content {
+            match block {
                 crate::claude::types::ClaudeContentBlock::Text { text } => {
-                    crate::types::ContentBlock::Text { text }
+                    content.push(crate::types::ContentBlock::Text { text });
                 }
-                crate::claude::types::ClaudeContentBlock::ToolUse { .. } => {
-                    // For now, convert tool use to text representation
-                    // This is a temporary solution until the generic interface supports tools
-                    crate::types::ContentBlock::Text {
-                        text: "[Tool use content not supported in generic interface]".to_string(),
-                    }
+                crate::claude::types::ClaudeContentBlock::ToolUse { id, name, input } => {
+                    tool_calls.push(crate::tools::ToolCall::new(id, name, input));
                 }
-            })
-            .collect();
+            }
+        }
 
         let response = crate::types::CompletionResponse {
             content,
@@ -243,6 +262,11 @@ impl crate::client::LlmClient for ClaudeClient {
                 output_tokens: claude_response.usage.output_tokens,
             },
             stop_reason: claude_response.stop_reason,
+            tool_calls: if tool_calls.is_empty() {
+                None
+            } else {
+                Some(tool_calls)
+            },
         };
 
         Ok(response)

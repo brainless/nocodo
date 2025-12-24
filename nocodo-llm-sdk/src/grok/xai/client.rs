@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
@@ -148,21 +149,31 @@ impl XaiGrokClient {
 impl crate::grok::types::GrokChatCompletionResponse {
     /// Extract tool calls from the response
     pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
-        self.choices.first()?.message.tool_calls.as_ref().map(|calls| {
-            calls.iter().map(|call| {
-                let arguments: serde_json::Value = serde_json::from_str(&call.function.arguments)
-                    .unwrap_or(serde_json::Value::Null);
+        self.choices
+            .first()?
+            .message
+            .tool_calls
+            .as_ref()
+            .map(|calls| {
+                calls
+                    .iter()
+                    .map(|call| {
+                        let arguments: serde_json::Value =
+                            serde_json::from_str(&call.function.arguments)
+                                .unwrap_or(serde_json::Value::Null);
 
-                crate::tools::ToolCall::new(
-                    call.id.clone(),
-                    call.function.name.clone(),
-                    arguments,
-                )
-            }).collect()
-        })
+                        crate::tools::ToolCall::new(
+                            call.id.clone(),
+                            call.function.name.clone(),
+                            arguments,
+                        )
+                    })
+                    .collect()
+            })
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for XaiGrokClient {
     async fn complete(
         &self,
@@ -201,17 +212,17 @@ impl crate::client::LlmClient for XaiGrokClient {
             })
             .collect::<Result<Vec<crate::grok::types::GrokMessage>, LlmError>>()?;
 
-            let grok_request = crate::grok::types::GrokChatCompletionRequest {
-                model: request.model,
-                messages: grok_messages,
-                max_tokens: Some(request.max_tokens),
-                temperature: request.temperature,
-                top_p: request.top_p,
-                stop: request.stop_sequences,
-                stream: None, // Non-streaming for now
-                tools: None, // No tools for generic LlmClient interface
-                tool_choice: None,
-            };
+        let grok_request = crate::grok::types::GrokChatCompletionRequest {
+            model: request.model,
+            messages: grok_messages,
+            max_tokens: Some(request.max_tokens),
+            temperature: request.temperature,
+            top_p: request.top_p,
+            stop: request.stop_sequences,
+            stream: None, // Non-streaming for now
+            tools: None,  // No tools for generic LlmClient interface
+            tool_choice: None,
+        };
 
         // Send request and convert response
         let grok_response = self.create_chat_completion(grok_request).await?;
@@ -233,10 +244,19 @@ impl crate::client::LlmClient for XaiGrokClient {
                 crate::grok::types::GrokRole::System => crate::types::Role::System,
             },
             usage: crate::types::Usage {
-                input_tokens: grok_response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
-                output_tokens: grok_response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
+                input_tokens: grok_response
+                    .usage
+                    .as_ref()
+                    .and_then(|u| Some(u.prompt_tokens))
+                    .unwrap_or(0),
+                output_tokens: grok_response
+                    .usage
+                    .as_ref()
+                    .and_then(|u| Some(u.completion_tokens))
+                    .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
+            tool_calls: None, // TODO: Extract tool calls from Grok response
         };
 
         Ok(response)

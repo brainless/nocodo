@@ -15,6 +15,7 @@ tokio = { version = "1.0", features = ["full"] }
 thiserror = "1.0"
 anyhow = "1.0"
 tracing = "0.1"
+futures-util = "0.3"
 toml = { version = "0.8", optional = true }
 schemars = { version = "0.8", features = ["preserve_order"] }
 
@@ -26,7 +27,11 @@ tokio-test = "0.4"
 test-runner = ["toml"]
 ffi = []
 
+[[test]]
+name = "trait_implementation_tests"
+path = "tests/trait_implementation_tests.rs"
+
 [[bin]]
-name = "test-runner"
+name = "llm-test-runner"
 path = "bin/test_runner.rs"
 required-features = ["test-runner"]

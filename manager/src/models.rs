@@ -3,21 +3,43 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // Re-export shared models from manager-models
-pub use manager_models::{
-    AddMessageRequest, AiSession, AiSessionOutput,
-    AiSessionOutputListResponse, AiSessionResult, ApiKeyConfig,
-    CreateWorkRequest, LlmAgentToolCall,
-    MessageAuthorType, MessageContentType, SettingsResponse, SupportedModel, SupportedModelsResponse,
-    UpdateApiKeysRequest, Work, WorkListResponse, WorkMessage,
-    WorkMessageListResponse, WorkMessageResponse, WorkResponse, WorkWithHistory,
-    // Tool-related types
-    ToolRequest, ListFilesRequest, ReadFileRequest, WriteFileRequest,
-    GrepRequest, ApplyPatchRequest, BashRequest,
-    FileInfo, FileType,
+pub use shared_types::{
+    AddMessageRequest,
+    AiSession,
+    AiSessionOutput,
+    AiSessionOutputListResponse,
+    AiSessionResult,
+    ApiKeyConfig,
+    CreateWorkRequest,
+    LlmAgentMessage,
     // LLM Agent types
-    LlmAgentSession, LlmAgentMessage, LlmProviderConfig,
+    LlmAgentSession,
+    LlmAgentToolCall,
+    LlmProviderConfig,
+    MessageAuthorType,
+    MessageContentType,
+    SettingsResponse,
+    SupportedModel,
+    SupportedModelsResponse,
+    UpdateApiKeysRequest,
+    UpdateTeamRequest,
+    UpdateUserRequest,
     // User types from manager-models
-    User, UserResponse, UpdateUserRequest, UpdateTeamRequest,
+    User,
+    UserResponse,
+    Work,
+    WorkListResponse,
+    WorkMessage,
+    WorkMessageListResponse,
+    WorkMessageResponse,
+    WorkResponse,
+    WorkWithHistory,
+};
+
+// Re-export tool types from manager-tools
+pub use manager_tools::types::{
+    ApplyPatchRequest, BashRequest, FileInfo, FileType, GrepRequest, ListFilesRequest,
+    ReadFileRequest, ToolRequest, ToolResponse, WriteFileRequest,
 };
 
 // User and SSH key authentication models (User is re-exported from manager-models)
@@ -71,7 +93,7 @@ impl UserSshKey {
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct GitBranchListResponse {
-    pub branches: Vec<manager_models::GitBranch>,
+    pub branches: Vec<shared_types::GitBranch>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,8 +186,6 @@ pub struct ServerStatus {
     pub uptime: u64,
 }
 
-
-
 // AiSession, CreateAiSessionRequest, AiSessionResponse, AiSessionListResponse,
 // AiSessionOutput, AiSessionResult, AiSessionOutputListResponse
 // are now re-exported from manager-models (see top of file)
@@ -178,8 +198,6 @@ pub struct AddExistingProjectRequest {
     pub description: Option<String>,
     pub parent_id: Option<i64>,
 }
-
-
 
 // File operation models (FileType and FileInfo are re-exported from manager-models)
 
@@ -236,7 +254,6 @@ pub struct FileResponse {
 // WorkMessageResponse, WorkMessageListResponse) and tool-related types are now re-exported
 // from manager-models
 
-
 /// Bash execution log entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -283,8 +300,6 @@ impl BashExecutionLog {
         }
     }
 }
-
-
 
 // User and Team management models (types not in manager-models)
 
@@ -343,8 +358,6 @@ impl TeamMember {
     }
 }
 
-
-
 /// Permission - access rules assigned to teams
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Permission {
@@ -379,8 +392,6 @@ impl Permission {
     }
 }
 
-
-
 /// Resource ownership - tracks who created/owns resources
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceOwnership {
@@ -404,8 +415,6 @@ impl ResourceOwnership {
         }
     }
 }
-
-
 
 // User and Team management request models
 
@@ -465,12 +474,7 @@ pub struct ProjectCommand {
 
 #[allow(dead_code)]
 impl ProjectCommand {
-    pub fn new(
-        id: String,
-        project_id: i64,
-        name: String,
-        command: String,
-    ) -> Self {
+    pub fn new(id: String, project_id: i64, name: String, command: String) -> Self {
         let now = Utc::now().timestamp();
         Self {
             id,

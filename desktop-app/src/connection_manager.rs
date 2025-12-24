@@ -412,9 +412,12 @@ impl ConnectionManager {
     /// Get detailed connection information for favorites
     pub async fn get_connection_details(&self) -> Option<(String, String, u16)> {
         match self.connection_type.read().await.as_ref()? {
-            ConnectionType::Ssh { server, username, port, .. } => {
-                Some((server.clone(), username.clone(), *port))
-            }
+            ConnectionType::Ssh {
+                server,
+                username,
+                port,
+                ..
+            } => Some((server.clone(), username.clone(), *port)),
             ConnectionType::Local { .. } => {
                 Some(("localhost".to_string(), "local".to_string(), 22))
             }
@@ -427,7 +430,7 @@ impl ConnectionManager {
         username: &str,
         password: &str,
         ssh_fingerprint: &str,
-    ) -> Result<manager_models::LoginResponse, ConnectionError> {
+    ) -> Result<shared_types::LoginResponse, ConnectionError> {
         let api_client_arc = self.api_client.read().await;
         let client_arc = api_client_arc
             .as_ref()
@@ -462,7 +465,7 @@ impl ConnectionManager {
         email: Option<&str>,
         ssh_public_key: &str,
         ssh_fingerprint: &str,
-    ) -> Result<manager_models::UserResponse, ConnectionError> {
+    ) -> Result<shared_types::UserResponse, ConnectionError> {
         let api_client_arc = self.api_client.read().await;
         let client_arc = api_client_arc
             .as_ref()

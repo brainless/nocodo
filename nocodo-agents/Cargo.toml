@@ -1,0 +1,34 @@
+[package]
+name = "nocodo-agents"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
+shared-types = { path = "../shared-types" }
+manager-tools = { path = "../manager-tools" }
+anyhow = { workspace = true }
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+clap = { version = "4.5", features = ["derive"] }
+home = "0.5"
+
+# New for tool execution
+rusqlite = { version = "0.37", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+schemars = { version = "0.8", features = ["preserve_order"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.0"
+
+[[bin]]
+name = "agent-runner"
+path = "bin/runner.rs"

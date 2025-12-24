@@ -34,9 +34,10 @@ pub async fn health_check(data: web::Data<AppState>) -> Result<HttpResponse, App
 }
 
 pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    let config = data.config.read().map_err(|e| {
-        AppError::Internal(format!("Failed to acquire config read lock: {}", e))
-    })?;
+    let config = data
+        .config
+        .read()
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
 
     let api_keys = if let Some(ref keys) = config.api_keys {
         vec![
@@ -68,7 +69,10 @@ pub async fn get_settings(data: web::Data<AppState>) -> Result<HttpResponse, App
     let response = SettingsResponse {
         config_file_path: "manager.toml".to_string(),
         api_keys,
-        projects_default_path: config.projects.as_ref().and_then(|p| p.default_path.clone()),
+        projects_default_path: config
+            .projects
+            .as_ref()
+            .and_then(|p| p.default_path.clone()),
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -82,9 +86,10 @@ pub async fn update_api_keys(
     let req = request.into_inner();
 
     // Update config
-    let mut config = data.config.write().map_err(|e| {
-        AppError::Internal(format!("Failed to acquire config write lock: {}", e))
-    })?;
+    let mut config = data
+        .config
+        .write()
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config write lock: {}", e)))?;
 
     // Update API keys from request
     if let Some(ref mut keys) = config.api_keys {
@@ -119,9 +124,8 @@ pub async fn update_api_keys(
     let config_clone = config.clone();
 
     // Save config to file
-    let toml_string = toml::to_string(&config_clone).map_err(|e| {
-        AppError::Internal(format!("Failed to serialize config: {}", e))
-    })?;
+    let toml_string = toml::to_string(&config_clone)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize config: {}", e)))?;
 
     let config_path = if let Some(home) = home::home_dir() {
         home.join(".config/nocodo/manager.toml")
@@ -140,8 +144,6 @@ pub async fn update_api_keys(
     })))
 }
 
-
-
 pub async fn add_authorized_ssh_key(
     _data: web::Data<AppState>,
     request: web::Json<serde_json::Value>,
@@ -150,11 +152,10 @@ pub async fn add_authorized_ssh_key(
     let req = request.into_inner();
 
     // Get the SSH key from request
-    let _ssh_key = req.get("ssh_key")
+    let _ssh_key = req
+        .get("ssh_key")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Invalid ssh_key parameter".to_string())
-        })?;
+        .ok_or_else(|| AppError::InvalidRequest("Invalid ssh_key parameter".to_string()))?;
 
     // For now, just return success - SSH key management would need to be added to config
     tracing::info!("SSH key addition requested (not implemented in config yet)");

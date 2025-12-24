@@ -22,10 +22,13 @@ regex = "1.10"
 thiserror = { workspace = true }
 tracing = { workspace = true }
 glob = "0.3"
+schemars = "0.8"
 codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch" }
 codex-core = { git = "https://github.com/openai/codex", package = "codex-core" }
 codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening" }
-manager-models = { path = "../manager-models" }
+shared-types = { path = "../shared-types" }
+rusqlite = { version = "0.37", features = ["bundled"] }
+sqlparser = "0.51"
 
 [dev-dependencies]
 tempfile = "3.12"

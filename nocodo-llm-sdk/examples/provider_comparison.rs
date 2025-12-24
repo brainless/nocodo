@@ -4,14 +4,14 @@
 //! XAI_API_KEY="..." CEREBRAS_API_KEY="..." cargo run --example provider_comparison
 
 use nocodo_llm_sdk::{
-    grok::{
-        xai::XaiGrokClient,
-        zen::ZenGrokClient,
-        types::{GrokChatCompletionRequest, GrokMessage, GrokRole},
-    },
     glm::{
         cerebras::CerebrasGlmClient,
         types::{GlmChatCompletionRequest, GlmMessage},
+    },
+    grok::{
+        types::{GrokChatCompletionRequest, GrokMessage, GrokRole},
+        xai::XaiGrokClient,
+        zen::ZenGrokClient,
     },
 };
 
@@ -58,7 +58,10 @@ async fn test_grok_providers() -> Result<(), Box<dyn std::error::Error>> {
     match zen_client.create_chat_completion(request).await {
         Ok(response) => {
             println!("   Model: {}", response.model);
-            println!("   Response: {}", response.choices[0].message.content.trim());
+            println!(
+                "   Response: {}",
+                response.choices[0].message.content.trim()
+            );
         }
         Err(e) => println!("   Error: {}", e),
     }
@@ -87,7 +90,10 @@ async fn test_grok_providers() -> Result<(), Box<dyn std::error::Error>> {
         match xai_client.create_chat_completion(request).await {
             Ok(response) => {
                 println!("   Model: {}", response.model);
-                println!("   Response: {}", response.choices[0].message.content.trim());
+                println!(
+                    "   Response: {}",
+                    response.choices[0].message.content.trim()
+                );
             }
             Err(e) => println!("   Error: {}", e),
         }
@@ -123,7 +129,10 @@ async fn test_glm_providers() -> Result<(), Box<dyn std::error::Error>> {
         match cerebras_client.create_chat_completion(request).await {
             Ok(response) => {
                 println!("   Model: {}", response.model);
-                println!("   Response: {}", response.choices[0].message.get_text().trim());
+                println!(
+                    "   Response: {}",
+                    response.choices[0].message.get_text().trim()
+                );
             }
             Err(e) => println!("   Error: {}", e),
         }

@@ -1,6 +1,8 @@
 use crate::state::AppState;
 use std::sync::Arc;
 
+use crate::state::ProjectCommandsResult;
+
 pub struct ApiService;
 
 impl ApiService {
@@ -30,8 +32,12 @@ impl ApiService {
             Ok(_) => {
                 state.connection_state = crate::state::ConnectionState::Connected;
                 state.ui_state.connected_host = Some("localhost".to_string());
-                state.current_server_info = Some(("localhost".to_string(), "local".to_string(), 8081));
-                tracing::info!("Set current_server_info for local connection: {:?}", state.current_server_info);
+                state.current_server_info =
+                    Some(("localhost".to_string(), "local".to_string(), 8081));
+                tracing::info!(
+                    "Set current_server_info for local connection: {:?}",
+                    state.current_server_info
+                );
                 state.models_fetch_attempted = false;
 
                 // Check if we need to show auth dialog
@@ -286,7 +292,7 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let request = manager_models::CreateWorkRequest {
+                    let request = shared_types::CreateWorkRequest {
                         title,
                         project_id,
                         model,
@@ -330,10 +336,10 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let request = manager_models::AddMessageRequest {
+                    let request = shared_types::AddMessageRequest {
                         content: message_content,
-                        content_type: manager_models::MessageContentType::Text,
-                        author_type: manager_models::MessageAuthorType::User,
+                        content_type: shared_types::MessageContentType::Text,
+                        author_type: shared_types::MessageAuthorType::User,
                         author_id: None,
                     };
                     let result = api_client.add_message_to_work(work_id, request).await;
@@ -596,7 +602,7 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let request = manager_models::UpdateApiKeysRequest {
+                    let request = shared_types::UpdateApiKeysRequest {
                         xai_api_key: xai_key,
                         openai_api_key: openai_key,
                         anthropic_api_key: anthropic_key,
@@ -641,10 +647,7 @@ impl ApiService {
                 .unwrap();
             let url = "http://localhost:8081/api/health";
 
-            let is_running = match client.get(url).send().await {
-                Ok(response) if response.status().is_success() => true,
-                _ => false,
-            };
+            let is_running = matches!(client.get(url).send().await, Ok(response) if response.status().is_success());
 
             let mut result = result_clone.lock().unwrap();
             *result = Some(is_running);
@@ -726,7 +729,7 @@ impl ApiService {
         &self,
         state: &mut AppState,
         user_id: i64,
-        request: manager_models::UpdateUserRequest,
+        request: shared_types::UpdateUserRequest,
     ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.updating_user = true;
@@ -833,7 +836,7 @@ impl ApiService {
         &self,
         state: &mut AppState,
         team_id: i64,
-        request: manager_models::UpdateTeamRequest,
+        request: shared_types::UpdateTeamRequest,
     ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.updating_team = true;
@@ -974,18 +977,27 @@ impl ApiService {
     }
 
     // Command management methods
-    pub fn discover_project_commands(&self, project_id: i64, use_llm: Option<bool>, state: &mut AppState) {
+    pub fn discover_project_commands(
+        &self,
+        project_id: i64,
+        use_llm: Option<bool>,
+        state: &mut AppState,
+    ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.loading_command_discovery = true;
             state.command_discovery_result = Arc::new(std::sync::Mutex::new(None));
 
             let connection_manager = Arc::clone(&state.connection_manager);
-            let result_clone: Arc<std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>> = Arc::clone(&state.command_discovery_result);
+            let result_clone: Arc<
+                std::sync::Mutex<Option<Result<shared_types::DiscoverCommandsResponse, String>>>,
+            > = Arc::clone(&state.command_discovery_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.discover_project_commands(project_id, use_llm).await;
+                    let result = api_client
+                        .discover_project_commands(project_id, use_llm)
+                        .await;
                     let mut discovery_result = result_clone.lock().unwrap();
 
                     // Check for 401 Unauthorized and set auth required flag
@@ -1015,7 +1027,8 @@ impl ApiService {
             state.project_detail_saved_commands_result = Arc::new(std::sync::Mutex::new(None));
 
             let connection_manager = Arc::clone(&state.connection_manager);
-            let result_clone: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>> = Arc::clone(&state.project_detail_saved_commands_result);
+            let result_clone: ProjectCommandsResult =
+                Arc::clone(&state.project_detail_saved_commands_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
@@ -1043,7 +1056,12 @@ impl ApiService {
         }
     }
 
-    pub fn create_project_commands(&self, project_id: i64, commands: Vec<manager_models::ProjectCommand>, state: &mut AppState) {
+    pub fn create_project_commands(
+        &self,
+        project_id: i64,
+        commands: Vec<shared_types::ProjectCommand>,
+        state: &mut AppState,
+    ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.create_commands_result = Arc::new(std::sync::Mutex::new(None));
 
@@ -1053,7 +1071,9 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.create_project_commands(project_id, commands).await;
+                    let result = api_client
+                        .create_project_commands(project_id, commands)
+                        .await;
                     let mut create_result = result_clone.lock().unwrap();
 
                     // Check for 401 Unauthorized and set auth required flag
@@ -1076,7 +1096,13 @@ impl ApiService {
         }
     }
 
-    pub fn execute_project_command(&self, project_id: i64, command_id: &str, git_branch: Option<&str>, state: &mut AppState) {
+    pub fn execute_project_command(
+        &self,
+        project_id: i64,
+        command_id: &str,
+        git_branch: Option<&str>,
+        state: &mut AppState,
+    ) {
         if state.connection_state == crate::state::ConnectionState::Connected {
             state.executing_command_id = Some(command_id.to_string());
             state.execute_command_result = Arc::new(std::sync::Mutex::new(None));
@@ -1089,7 +1115,9 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.execute_project_command(project_id, &command_id, git_branch.as_deref()).await;
+                    let result = api_client
+                        .execute_project_command(project_id, &command_id, git_branch.as_deref())
+                        .await;
                     let mut execute_result = result_clone.lock().unwrap();
 
                     // Check for 401 Unauthorized and set auth required flag
@@ -1124,7 +1152,9 @@ impl ApiService {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.get_command_executions(project_id, &command_id, Some(10)).await;
+                    let result = api_client
+                        .get_command_executions(project_id, &command_id, Some(10))
+                        .await;
                     let mut executions_result = result_clone.lock().unwrap();
 
                     // Check for 401 Unauthorized and set auth required flag

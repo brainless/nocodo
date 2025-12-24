@@ -1,12 +1,12 @@
 use crate::auth::validate_token;
 use crate::error::AppError;
-use manager_models::UserInfo;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     error::ErrorUnauthorized,
     web, Error, HttpMessage,
 };
 use futures_util::future::{ready, Ready};
+use shared_types::UserInfo;
 
 /// Authentication middleware that extracts JWT token and attaches user info to request
 #[allow(dead_code)]
@@ -105,7 +105,7 @@ where
             Some(h) => h,
             None => {
                 tracing::warn!("Auth failed: missing Authorization header");
-                return Box::pin(async { 
+                return Box::pin(async {
                     Err(AppError::Unauthorized("Missing Authorization header".to_string()).into())
                 });
             }
@@ -117,8 +117,10 @@ where
                 tracing::warn!("Auth failed: invalid Authorization header format");
                 return Box::pin(async {
                     Err(AppError::Unauthorized(
-                        "Invalid Authorization header format. Expected 'Bearer <token>'".to_string(),
-                    ).into())
+                        "Invalid Authorization header format. Expected 'Bearer <token>'"
+                            .to_string(),
+                    )
+                    .into())
                 });
             }
         };
@@ -143,7 +145,7 @@ where
             }
             Err(_) => {
                 tracing::warn!("Auth failed: invalid or expired token");
-                Box::pin(async { 
+                Box::pin(async {
                     Err(AppError::Unauthorized("Invalid or expired token".to_string()).into())
                 })
             }
@@ -254,7 +256,8 @@ where
         };
 
         // Check if JWT secret is configured
-        let jwt_secret_configured = req.app_data::<web::Data<crate::handlers::AppState>>()
+        let jwt_secret_configured = req
+            .app_data::<web::Data<crate::handlers::AppState>>()
             .and_then(|state| state.config.read().ok())
             .map(|config| config.clone())
             .and_then(|config| config.auth)
@@ -283,7 +286,6 @@ where
                 }
             }
         };
-
 
         // Extract resource_id if needed
         let resource_id = if let Some(param_name) = &requirement.resource_id_param {

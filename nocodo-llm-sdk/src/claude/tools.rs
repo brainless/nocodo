@@ -1,5 +1,5 @@
-use crate::tools::{ProviderToolFormat, Tool, ToolChoice};
 use super::types::ClaudeTool;
+use crate::tools::{ProviderToolFormat, Tool, ToolChoice};
 use serde_json::{json, Value};
 
 /// Claude tool format implementation

@@ -3,15 +3,20 @@ use crate::{
     glm::{
         cerebras::CerebrasGlmClient,
         tools::GlmToolFormat,
+        types::{
+            GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmRole, GlmTool,
+        },
         zen::ZenGlmClient,
-        types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmRole, GlmTool},
     },
     tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
 };
 
 /// Trait for GLM clients
 pub trait GlmClientTrait {
-    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send;
+    fn create_chat_completion(
+        &self,
+        request: GlmChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send;
 }
 
 /// Builder for creating GLM chat completion requests
@@ -30,13 +35,19 @@ pub struct GlmMessageBuilder<'a, T: GlmClientTrait> {
 }
 
 impl GlmClientTrait for CerebrasGlmClient {
-    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
+    fn create_chat_completion(
+        &self,
+        request: GlmChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
         self.create_chat_completion(request)
     }
 }
 
 impl GlmClientTrait for ZenGlmClient {
-    fn create_chat_completion(&self, request: GlmChatCompletionRequest) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
+    fn create_chat_completion(
+        &self,
+        request: GlmChatCompletionRequest,
+    ) -> impl std::future::Future<Output = Result<GlmChatCompletionResponse, LlmError>> + Send {
         self.create_chat_completion(request)
     }
 }
@@ -194,5 +205,3 @@ impl CerebrasGlmClient {
         GlmMessageBuilder::new(self)
     }
 }
-
-

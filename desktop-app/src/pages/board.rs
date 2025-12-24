@@ -1,9 +1,11 @@
 use crate::components::message_renderer::{AiMessageRenderer, UserMessageRenderer};
+use crate::state::ui_state::Page as UiPage;
 use crate::state::AppState;
 use crate::state::ConnectionState;
-use crate::state::ui_state::Page as UiPage;
 use egui::{Context, Ui};
-use manager_models::{BashRequest, ReadFileRequest, ToolRequest, ToolResponse};
+use manager_tools::types::{
+    BashRequest, GrepRequest, ReadFileRequest, ToolRequest, ToolResponse, WriteFileRequest,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static READ_FILE_PARSE_ERROR_LOGGED: AtomicBool = AtomicBool::new(false);
@@ -300,19 +302,19 @@ impl crate::pages::Page for WorkPage {
                                         if let Some(project) = state.projects.iter().find(|p| p.id == project_id) {
                                             ui.separator();
                                             ui.label("Project:");
-                                            
+
                                             // Make project name clickable to navigate to project detail
                                             let project_label_response = ui.label(
                                                 egui::RichText::new(&project.name)
                                                     .color(egui::Color32::from_rgb(0, 120, 215)) // Blue color for link
                                                     .underline()
                                             );
-                                            
+
                                             // Change cursor to pointer on hover
                                             if project_label_response.hovered() {
                                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                             }
-                                            
+
                                             // Navigate to project detail on click
                                             if project_label_response.interact(egui::Sense::click()).clicked() {
                                                 state.ui_state.current_page = UiPage::ProjectDetail(project_id);
@@ -321,7 +323,7 @@ impl crate::pages::Page for WorkPage {
                                             }
                                         }
                                     }
-                                    
+
                                     // Add branch information if present
                                     if let Some(git_branch) = &work.git_branch {
                                         ui.separator();
@@ -406,9 +408,9 @@ impl crate::pages::Page for WorkPage {
                                                 // Combine and sort all messages by timestamp
                                                 #[derive(Clone)]
                                                 enum DisplayMessage {
-                                                    WorkMessage(manager_models::WorkMessage),
-                                                    AiOutput(manager_models::AiSessionOutput),
-                                                    ToolCall(manager_models::LlmAgentToolCall),
+                                                    WorkMessage(shared_types::WorkMessage),
+                                                    AiOutput(shared_types::AiSessionOutput),
+                                                    ToolCall(shared_types::LlmAgentToolCall),
                                                 }
 
                                                 let mut all_messages: Vec<(i64, DisplayMessage)> = Vec::new();
@@ -819,8 +821,8 @@ if let Some(ref text) = assistant_text {
 if !skip_regular_response {
                                                                 // Regular AI response message
                                                                 AiMessageRenderer::render_response(
-                                                                    ui, 
-                                                                    &output.content, 
+                                                                    ui,
+                                                                    &output.content,
                                                                     output.role.as_deref().unwrap_or("assistant"),
                                                                     output.model.as_deref(),
                                                                     output.created_at
@@ -868,7 +870,7 @@ if !skip_regular_response {
                                                                         }
                                                                     }
                                                                     "write_file" => {
-                                                                        if let Ok(req) = serde_json::from_value::<manager_models::WriteFileRequest>(tool_call.request.clone()) {
+                                                                        if let Ok(req) = serde_json::from_value::<WriteFileRequest>(tool_call.request.clone()) {
                                                                             let filename = std::path::Path::new(&req.path)
                                                                                 .file_name()
                                                                                 .and_then(|n| n.to_str())
@@ -880,7 +882,7 @@ if !skip_regular_response {
                                                                         }
                                                                     }
                                                                     "grep" => {
-                                                                        if let Ok(req) = serde_json::from_value::<manager_models::GrepRequest>(tool_call.request.clone()) {
+                                                                        if let Ok(req) = serde_json::from_value::<GrepRequest>(tool_call.request.clone()) {
                                                                             if let Some(ref response) = tool_call.response {
                                                                                 if let Ok(ToolResponse::Grep(grep_response)) = serde_json::from_value::<ToolResponse>(response.clone()) {
                                                                                     format!("Found {} matches for \"{}\"", grep_response.total_matches, req.pattern)

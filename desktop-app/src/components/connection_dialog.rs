@@ -30,126 +30,141 @@ impl ConnectionDialog {
                     egui::Frame::NONE
                         .inner_margin(egui::Margin::same(4))
                         .show(ui, |ui| {
-                            Flex::vertical()
-                                .gap(egui::vec2(0.0, 8.0))
-                                .show(ui, |flex| {
-                                    // SSH Server field
+                            Flex::vertical().gap(egui::vec2(0.0, 8.0)).show(ui, |flex| {
+                                // SSH Server field
+                                flex.add_ui(item(), |ui| {
+                                    ui.label("SSH Server:");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut state.config.ssh.server)
+                                            .desired_width(f32::INFINITY),
+                                    );
+                                });
+
+                                // Username field
+                                flex.add_ui(item(), |ui| {
+                                    ui.label("Username:");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut state.config.ssh.username)
+                                            .desired_width(f32::INFINITY),
+                                    );
+                                });
+
+                                // Port field
+                                flex.add_ui(item(), |ui| {
+                                    ui.label("Port:");
+                                    ui.add(
+                                        egui::DragValue::new(&mut state.config.ssh.port)
+                                            .range(1..=65535),
+                                    );
+                                });
+
+                                // SSH Key Path field
+                                flex.add_ui(item(), |ui| {
+                                    ui.label("SSH Key Path:");
+                                    ui.add(
+                                        egui::TextEdit::singleline(
+                                            &mut state.config.ssh.ssh_key_path,
+                                        )
+                                        .desired_width(f32::INFINITY),
+                                    );
+                                });
+
+                                // Only show SSH public key when adding a new server
+                                if state.ui_state.is_adding_new_server {
                                     flex.add_ui(item(), |ui| {
-                                        ui.label("SSH Server:");
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut state.config.ssh.server)
-                                                .desired_width(f32::INFINITY)
-                                        );
+                                        ui.add_space(10.0);
                                     });
 
-                                    // Username field
-                                    flex.add_ui(item(), |ui| {
-                                        ui.label("Username:");
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut state.config.ssh.username)
-                                                .desired_width(f32::INFINITY)
-                                        );
-                                    });
-
-                                    // Port field
-                                    flex.add_ui(item(), |ui| {
-                                        ui.label("Port:");
-                                        ui.add(egui::DragValue::new(&mut state.config.ssh.port).range(1..=65535));
-                                    });
-
-                                    // SSH Key Path field
-                                    flex.add_ui(item(), |ui| {
-                                        ui.label("SSH Key Path:");
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut state.config.ssh.ssh_key_path)
-                                                .desired_width(f32::INFINITY)
-                                        );
-                                    });
-
-                                    // Only show SSH public key when adding a new server
-                                    if state.ui_state.is_adding_new_server {
-                                        flex.add_ui(item(), |ui| {
-                                            ui.add_space(10.0);
-                                        });
-
-                                        // Display SSH public key
-                                        flex.add_ui(item(), |ui| {
-                                            ui.separator();
-                                            ui.label(egui::RichText::new("Your SSH Public Key:").strong());
-
-                                            let key_path = if state.config.ssh.ssh_key_path.is_empty() {
-                                                None
-                                            } else {
-                                                Some(state.config.ssh.ssh_key_path.as_str())
-                                            };
-
-                                            match crate::ssh::read_ssh_public_key(key_path) {
-                                                Ok(public_key) => {
-                                                    egui::ScrollArea::vertical()
-                                                        .max_height(80.0)
-                                                        .show(ui, |ui| {
-                                                            ui.add(
-                                                                egui::TextEdit::multiline(&mut public_key.as_str())
-                                                                    .desired_width(f32::INFINITY)
-                                                                    .font(egui::TextStyle::Monospace)
-                                                            );
-                                                        });
-                                                }
-                                                Err(e) => {
-                                                    ui.label(
-                                                        egui::RichText::new(format!("Could not read public key: {}", e))
-                                                            .color(ui.style().visuals.warn_fg_color)
-                                                    );
-                                                }
-                                            }
-                                        });
-
-                                        flex.add_ui(item(), |ui| {
-                                            ui.add_space(10.0);
-                                        });
-                                    }
-
-                                    // Separator and button row
+                                    // Display SSH public key
                                     flex.add_ui(item(), |ui| {
                                         ui.separator();
+                                        ui.label(
+                                            egui::RichText::new("Your SSH Public Key:").strong(),
+                                        );
+
+                                        let key_path = if state.config.ssh.ssh_key_path.is_empty() {
+                                            None
+                                        } else {
+                                            Some(state.config.ssh.ssh_key_path.as_str())
+                                        };
+
+                                        match crate::ssh::read_ssh_public_key(key_path) {
+                                            Ok(public_key) => {
+                                                egui::ScrollArea::vertical().max_height(80.0).show(
+                                                    ui,
+                                                    |ui| {
+                                                        ui.add(
+                                                            egui::TextEdit::multiline(
+                                                                &mut public_key.as_str(),
+                                                            )
+                                                            .desired_width(f32::INFINITY)
+                                                            .font(egui::TextStyle::Monospace),
+                                                        );
+                                                    },
+                                                );
+                                            }
+                                            Err(e) => {
+                                                ui.label(
+                                                    egui::RichText::new(format!(
+                                                        "Could not read public key: {}",
+                                                        e
+                                                    ))
+                                                    .color(ui.style().visuals.warn_fg_color),
+                                                );
+                                            }
+                                        }
                                     });
 
                                     flex.add_ui(item(), |ui| {
-                                        ui.add_space(8.0);
+                                        ui.add_space(10.0);
                                     });
+                                }
 
-                                    flex.add_ui(item(), |ui| {
-                                        Flex::horizontal()
-                                            .gap(egui::vec2(8.0, 0.0))
-                                            .align_content(FlexAlignContent::End)
-                                            .show(ui, |flex| {
-                                                flex.add_ui(item(), |ui| {
-                                                    ui.scope(|ui| {
-                                                        ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+                                // Separator and button row
+                                flex.add_ui(item(), |ui| {
+                                    ui.separator();
+                                });
 
-                                                        if ui.button("Connect").clicked() {
-                                                            self.connect(state);
-                                                            state.ui_state.show_connection_dialog = false;
-                                                            should_close = true;
-                                                        }
-                                                    });
-                                                });
+                                flex.add_ui(item(), |ui| {
+                                    ui.add_space(8.0);
+                                });
 
-                                                flex.add_ui(item(), |ui| {
-                                                    ui.scope(|ui| {
-                                                        ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
+                                flex.add_ui(item(), |ui| {
+                                    Flex::horizontal()
+                                        .gap(egui::vec2(8.0, 0.0))
+                                        .align_content(FlexAlignContent::End)
+                                        .show(ui, |flex| {
+                                            flex.add_ui(item(), |ui| {
+                                                ui.scope(|ui| {
+                                                    ui.spacing_mut().button_padding =
+                                                        egui::vec2(6.0, 4.0);
 
-                                                        if ui.button("Cancel").clicked() {
-                                                            state.ui_state.show_connection_dialog = false;
-                                                            should_close = true;
-                                                        }
-                                                    });
+                                                    if ui.button("Connect").clicked() {
+                                                        self.connect(state);
+                                                        state.ui_state.show_connection_dialog =
+                                                            false;
+                                                        should_close = true;
+                                                    }
                                                 });
                                             });
-                                    });
+
+                                            flex.add_ui(item(), |ui| {
+                                                ui.scope(|ui| {
+                                                    ui.spacing_mut().button_padding =
+                                                        egui::vec2(6.0, 4.0);
+
+                                                    if ui.button("Cancel").clicked() {
+                                                        state.ui_state.show_connection_dialog =
+                                                            false;
+                                                        should_close = true;
+                                                    }
+                                                });
+                                            });
+                                        });
                                 });
+                            });
                         });
-                    });
+                });
         }
 
         should_close

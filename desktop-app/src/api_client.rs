@@ -1,11 +1,20 @@
-use manager_models::{
-    CreateWorkRequest, FileContentResponse, FileInfo, PermissionItem, Project,
-    ProjectDetailsResponse, ProjectListResponse, ServerStatus, SettingsResponse,
-    SupportedModelsResponse, Team, TeamListItem, TeamListResponse, UpdateApiKeysRequest,
-    UpdateUserRequest, UserDetailResponse, UserListItem, UserListResponse, Work, WorkListResponse,
-    WorkResponse,
-};
+use manager_tools::types::FileInfo;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use shared_types::{
+    CreateWorkRequest, PermissionItem, Project, ProjectDetailsResponse, ProjectListResponse,
+    ServerStatus, SettingsResponse, SupportedModelsResponse, Team, TeamListItem, TeamListResponse,
+    UpdateApiKeysRequest, UpdateUserRequest, UserDetailResponse, UserListItem, UserListResponse,
+    Work, WorkListResponse, WorkResponse,
+};
+
+/// File content response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileContentResponse {
+    pub path: String,
+    pub content: String,
+    pub modified_at: Option<i64>,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiClient {
@@ -111,7 +120,7 @@ impl ApiClient {
     pub async fn get_work_messages(
         &self,
         work_id: i64,
-    ) -> Result<Vec<manager_models::WorkMessage>, ApiError> {
+    ) -> Result<Vec<shared_types::WorkMessage>, ApiError> {
         let url = format!("{}/api/work/{}/messages", self.base_url, work_id);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -124,7 +133,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let messages_response: manager_models::WorkMessageListResponse = response
+        let messages_response: shared_types::WorkMessageListResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -135,7 +144,7 @@ impl ApiClient {
     pub async fn get_ai_session_outputs(
         &self,
         work_id: i64,
-    ) -> Result<Vec<manager_models::AiSessionOutput>, ApiError> {
+    ) -> Result<Vec<shared_types::AiSessionOutput>, ApiError> {
         let url = format!("{}/api/work/{}/outputs", self.base_url, work_id);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -148,11 +157,10 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let outputs_response: manager_models::AiSessionOutputListResponse =
-            response
-                .json()
-                .await
-                .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+        let outputs_response: shared_types::AiSessionOutputListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(outputs_response.outputs)
     }
@@ -160,7 +168,7 @@ impl ApiClient {
     pub async fn get_ai_tool_calls(
         &self,
         work_id: i64,
-    ) -> Result<Vec<manager_models::LlmAgentToolCall>, ApiError> {
+    ) -> Result<Vec<shared_types::LlmAgentToolCall>, ApiError> {
         let url = format!("{}/api/work/{}/tool-calls", self.base_url, work_id);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -173,7 +181,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let tool_calls_response: manager_models::LlmAgentToolCallListResponse = response
+        let tool_calls_response: shared_types::LlmAgentToolCallListResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -205,8 +213,8 @@ impl ApiClient {
     pub async fn add_message_to_work(
         &self,
         work_id: i64,
-        request: manager_models::AddMessageRequest,
-    ) -> Result<manager_models::WorkMessage, ApiError> {
+        request: shared_types::AddMessageRequest,
+    ) -> Result<shared_types::WorkMessage, ApiError> {
         let url = format!("{}/api/work/{}/messages", self.base_url, work_id);
         let req = self.client().post(&url).json(&request);
         let req = self.add_auth_header(req);
@@ -219,7 +227,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let message_response: manager_models::WorkMessageResponse = response
+        let message_response: shared_types::WorkMessageResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -229,7 +237,7 @@ impl ApiClient {
 
     pub async fn get_supported_models(
         &self,
-    ) -> Result<Vec<manager_models::SupportedModel>, ApiError> {
+    ) -> Result<Vec<shared_types::SupportedModel>, ApiError> {
         let url = format!("{}/api/models", self.base_url);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -250,11 +258,11 @@ impl ApiClient {
         Ok(models_response.models)
     }
 
-    pub async fn get_worktree_branches(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<String>, ApiError> {
-        let url = format!("{}/api/projects/{}/git/worktree-branches", self.base_url, project_id);
+    pub async fn get_worktree_branches(&self, project_id: i64) -> Result<Vec<String>, ApiError> {
+        let url = format!(
+            "{}/api/projects/{}/git/worktree-branches",
+            self.base_url, project_id
+        );
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
         let response = request
@@ -266,13 +274,14 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let branches_response: manager_models::GitBranchListResponse = response
+        let branches_response: shared_types::GitBranchListResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         // Extract just the branch names from the GitBranch structs
-        let branch_names: Vec<String> = branches_response.branches
+        let branch_names: Vec<String> = branches_response
+            .branches
             .into_iter()
             .map(|branch| branch.name)
             .collect();
@@ -419,12 +428,15 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let file_list_response: manager_models::FileListResponse = response
+        let file_list_response: Value = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
-        Ok(file_list_response.files)
+        let files: Vec<FileInfo> = serde_json::from_value(file_list_response["files"].clone())
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+
+        Ok(files)
     }
 
     pub async fn get_file_content(
@@ -474,9 +486,9 @@ impl ApiClient {
         email: Option<&str>,
         ssh_public_key: &str,
         ssh_fingerprint: &str,
-    ) -> Result<manager_models::UserResponse, ApiError> {
+    ) -> Result<shared_types::UserResponse, ApiError> {
         let url = format!("{}/api/auth/register", self.base_url);
-        let payload = manager_models::CreateUserRequest {
+        let payload = shared_types::CreateUserRequest {
             username: username.to_string(),
             email: email.map(|s| s.to_string()),
             password: password.to_string(),
@@ -496,7 +508,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let user_response: manager_models::UserResponse = response
+        let user_response: shared_types::UserResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -510,9 +522,9 @@ impl ApiClient {
         username: &str,
         password: &str,
         ssh_fingerprint: &str,
-    ) -> Result<manager_models::LoginResponse, ApiError> {
+    ) -> Result<shared_types::LoginResponse, ApiError> {
         let url = format!("{}/api/auth/login", self.base_url);
-        let payload = manager_models::LoginRequest {
+        let payload = shared_types::LoginRequest {
             username: username.to_string(),
             password: password.to_string(),
             ssh_fingerprint: ssh_fingerprint.to_string(),
@@ -530,7 +542,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let login_response: manager_models::LoginResponse = response
+        let login_response: shared_types::LoginResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -692,7 +704,7 @@ impl ApiClient {
     pub async fn update_team(
         &self,
         team_id: i64,
-        update_request: manager_models::UpdateTeamRequest,
+        update_request: shared_types::UpdateTeamRequest,
     ) -> Result<Team, ApiError> {
         let url = format!("{}/api/teams/{}", self.base_url, team_id);
         let request = self.client().patch(&url);
@@ -731,7 +743,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let permissions: Vec<manager_models::Permission> = response
+        let permissions: Vec<shared_types::Permission> = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -751,9 +763,7 @@ impl ApiClient {
     }
 
     /// Get the current user's teams
-    pub async fn get_current_user_teams(
-        &self,
-    ) -> Result<Vec<manager_models::TeamItem>, ApiError> {
+    pub async fn get_current_user_teams(&self) -> Result<Vec<shared_types::TeamItem>, ApiError> {
         let url = format!("{}/api/me/teams", self.base_url);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -766,7 +776,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let teams_response: manager_models::CurrentUserTeamsResponse = response
+        let teams_response: shared_types::CurrentUserTeamsResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -778,9 +788,9 @@ impl ApiClient {
     pub async fn add_authorized_ssh_key(
         &self,
         public_key: String,
-    ) -> Result<manager_models::AddAuthorizedSshKeyResponse, ApiError> {
+    ) -> Result<shared_types::AddAuthorizedSshKeyResponse, ApiError> {
         let url = format!("{}/api/settings/authorized-ssh-keys", self.base_url);
-        let payload = manager_models::AddAuthorizedSshKeyRequest { public_key };
+        let payload = shared_types::AddAuthorizedSshKeyRequest { public_key };
 
         let req = self.client().post(&url).json(&payload);
         let req = self.add_auth_header(req);
@@ -793,7 +803,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let result: manager_models::AddAuthorizedSshKeyResponse = response
+        let result: shared_types::AddAuthorizedSshKeyResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -806,8 +816,11 @@ impl ApiClient {
         &self,
         project_id: i64,
         use_llm: Option<bool>,
-    ) -> Result<manager_models::DiscoverCommandsResponse, ApiError> {
-        let mut url = format!("{}/api/projects/{}/commands/discover", self.base_url, project_id);
+    ) -> Result<shared_types::DiscoverCommandsResponse, ApiError> {
+        let mut url = format!(
+            "{}/api/projects/{}/commands/discover",
+            self.base_url, project_id
+        );
 
         if let Some(use_llm_val) = use_llm {
             url.push_str(&format!("?use_llm={}", use_llm_val));
@@ -824,7 +837,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let result: manager_models::DiscoverCommandsResponse = response
+        let result: shared_types::DiscoverCommandsResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -836,7 +849,7 @@ impl ApiClient {
     pub async fn list_project_commands(
         &self,
         project_id: i64,
-    ) -> Result<Vec<manager_models::ProjectCommand>, ApiError> {
+    ) -> Result<Vec<shared_types::ProjectCommand>, ApiError> {
         let url = format!("{}/api/projects/{}/commands", self.base_url, project_id);
         let request = self.client().get(&url);
         let request = self.add_auth_header(request);
@@ -849,7 +862,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let result: Vec<manager_models::ProjectCommand> = response
+        let result: Vec<shared_types::ProjectCommand> = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -861,8 +874,8 @@ impl ApiClient {
     pub async fn create_project_commands(
         &self,
         project_id: i64,
-        commands: Vec<manager_models::ProjectCommand>,
-    ) -> Result<Vec<manager_models::ProjectCommand>, ApiError> {
+        commands: Vec<shared_types::ProjectCommand>,
+    ) -> Result<Vec<shared_types::ProjectCommand>, ApiError> {
         let url = format!("{}/api/projects/{}/commands", self.base_url, project_id);
         let req = self.client().post(&url).json(&commands);
         let req = self.add_auth_header(req);
@@ -875,7 +888,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let result: Vec<manager_models::ProjectCommand> = response
+        let result: Vec<shared_types::ProjectCommand> = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -889,10 +902,12 @@ impl ApiClient {
         project_id: i64,
         command_id: &str,
         limit: Option<i64>,
-    ) -> Result<Vec<manager_models::ProjectCommandExecution>, ApiError> {
-        let mut url = format!("{}/api/projects/{}/commands/{}/executions",
-            self.base_url, project_id, command_id);
-        
+    ) -> Result<Vec<shared_types::ProjectCommandExecution>, ApiError> {
+        let mut url = format!(
+            "{}/api/projects/{}/commands/{}/executions",
+            self.base_url, project_id, command_id
+        );
+
         if let Some(limit) = limit {
             url.push_str(&format!("?limit={}", limit));
         }
@@ -908,7 +923,7 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let result: manager_models::ProjectCommandExecutionListResponse = response
+        let result: shared_types::ProjectCommandExecutionListResponse = response
             .json()
             .await
             .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
@@ -923,8 +938,10 @@ impl ApiClient {
         command_id: &str,
         git_branch: Option<&str>,
     ) -> Result<serde_json::Value, ApiError> {
-        let url = format!("{}/api/projects/{}/commands/{}/execute",
-            self.base_url, project_id, command_id);
+        let url = format!(
+            "{}/api/projects/{}/commands/{}/execute",
+            self.base_url, project_id, command_id
+        );
 
         let body = serde_json::json!({
             "git_branch": git_branch,

@@ -1,8 +1,10 @@
 //! Test to verify Super Admins can access the /api/projects/scan endpoint
 
 use actix_web::{test, web, App};
-use nocodo_manager::handlers::{user_handlers, project_handlers};
-use nocodo_manager::middleware::{AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement};
+use nocodo_manager::handlers::{project_handlers, user_handlers};
+use nocodo_manager::middleware::{
+    AuthenticationMiddleware, PermissionMiddleware, PermissionRequirement,
+};
 use serde_json::json;
 
 use crate::common::TestApp;
@@ -19,7 +21,14 @@ async fn test_super_admin_can_scan_projects() {
             jwt_secret: Some("test_jwt_secret_for_scan_test".to_string()),
         });
         config.projects = Some(nocodo_manager::config::ProjectsConfig {
-            default_path: Some(test_app.config.temp_dir.path().to_string_lossy().to_string()),
+            default_path: Some(
+                test_app
+                    .config
+                    .temp_dir
+                    .path()
+                    .to_string_lossy()
+                    .to_string(),
+            ),
         });
     }
 
@@ -29,20 +38,25 @@ async fn test_super_admin_can_scan_projects() {
             .app_data(test_app.app_state.clone())
             .wrap(AuthenticationMiddleware)
             // Auth endpoints (no auth required)
-            .route("/api/auth/register", web::post().to(user_handlers::register))
+            .route(
+                "/api/auth/register",
+                web::post().to(user_handlers::register),
+            )
             .route("/api/auth/login", web::post().to(user_handlers::login))
             // Projects scope with nested permission middlewares (matching actual routes.rs)
             .service(
                 web::scope("/api/projects")
-                    .wrap(PermissionMiddleware::new(PermissionRequirement::new("project", "read")))
+                    .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                        "project", "read",
+                    )))
                     .service(
                         web::resource("/scan")
-                            .wrap(PermissionMiddleware::new(
-                                PermissionRequirement::new("project", "write"),
-                            ))
+                            .wrap(PermissionMiddleware::new(PermissionRequirement::new(
+                                "project", "write",
+                            )))
                             .route(web::post().to(project_handlers::scan_projects)),
-                    )
-            )
+                    ),
+            ),
     )
     .await;
 
@@ -100,20 +114,18 @@ async fn test_super_admin_can_scan_projects() {
         println!("Error response body: {}", body_str);
         panic!(
             "Super Admin should be able to scan projects. Got {} status. Body: {}",
-            status,
-            body_str
+            status, body_str
         );
     }
 
     // This should succeed because Super Admins have implicit all permissions
-    assert_eq!(
-        status,
-        200,
-        "Super Admin should be able to scan projects"
-    );
+    assert_eq!(status, 200, "Super Admin should be able to scan projects");
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    println!("Response body: {}", serde_json::to_string_pretty(&body).unwrap());
+    println!(
+        "Response body: {}",
+        serde_json::to_string_pretty(&body).unwrap()
+    );
 
     assert!(
         body.get("results").is_some(),

@@ -1,7 +1,7 @@
 use config::{Config, ConfigError, File};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use rand::Rng;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AuthConfig {

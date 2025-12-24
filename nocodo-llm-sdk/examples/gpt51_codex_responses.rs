@@ -32,7 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "Usage: {} input tokens, {} output tokens",
-        response.usage.input_tokens.unwrap_or(0), response.usage.output_tokens.unwrap_or(0)
+        response.usage.input_tokens.unwrap_or(0),
+        response.usage.output_tokens.unwrap_or(0)
     );
     Ok(())
 }

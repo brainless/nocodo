@@ -2,11 +2,18 @@ use rusqlite::Connection;
 use serde_json::Value;
 use std::sync::Arc;
 
+use manager_tools::types::FileInfo;
+
 // Type aliases to reduce complexity
-pub type UsersResult =
-    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::UserListItem>, String>>>>;
-pub type TeamsResult =
-    Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamListItem>, String>>>>;
+pub type ArcResult<T> = Arc<std::sync::Mutex<Option<Result<T, String>>>>;
+pub type ArcOption<T> = Arc<std::sync::Mutex<Option<T>>>;
+pub type ArcMutex<T> = Arc<std::sync::Mutex<T>>;
+
+pub type UsersResult = ArcResult<Vec<shared_types::UserListItem>>;
+pub type TeamsResult = ArcResult<Vec<shared_types::TeamListItem>>;
+pub type TeamItemsResult = ArcResult<Vec<shared_types::TeamItem>>;
+pub type ProjectCommandsResult = ArcResult<Vec<shared_types::ProjectCommand>>;
+pub type ConnectionResult = ArcResult<(String, String, u16)>;
 
 pub mod connection;
 pub mod ui_state;
@@ -57,23 +64,23 @@ pub struct AppState {
     pub ui_state: UiState,
 
     // Data
-    pub projects: Vec<manager_models::Project>,
-    pub works: Vec<manager_models::Work>,
-    pub work_messages: Vec<manager_models::WorkMessage>,
-    pub ai_session_outputs: Vec<manager_models::AiSessionOutput>,
-    pub ai_tool_calls: Vec<manager_models::LlmAgentToolCall>,
-    pub project_details: Option<manager_models::ProjectDetailsResponse>,
+    pub projects: Vec<shared_types::Project>,
+    pub works: Vec<shared_types::Work>,
+    pub work_messages: Vec<shared_types::WorkMessage>,
+    pub ai_session_outputs: Vec<shared_types::AiSessionOutput>,
+    pub ai_tool_calls: Vec<shared_types::LlmAgentToolCall>,
+    pub project_details: Option<shared_types::ProjectDetailsResponse>,
     pub servers: Vec<Server>,
-    pub settings: Option<manager_models::SettingsResponse>,
-    pub supported_models: Vec<manager_models::SupportedModel>,
+    pub settings: Option<shared_types::SettingsResponse>,
+    pub supported_models: Vec<shared_types::SupportedModel>,
     pub worktree_branches: Vec<String>,
 
     // Command management state
-    pub project_detail_saved_commands: Vec<manager_models::ProjectCommand>,
+    pub project_detail_saved_commands: Vec<shared_types::ProjectCommand>,
 
     // Users management
-    pub users: Vec<manager_models::UserListItem>,
-    pub filtered_users: Vec<manager_models::UserListItem>,
+    pub users: Vec<shared_types::UserListItem>,
+    pub filtered_users: Vec<shared_types::UserListItem>,
     pub user_search_query: String,
     pub selected_user_ids: std::collections::HashSet<i64>,
     pub loading_users: bool,
@@ -82,13 +89,13 @@ pub struct AppState {
 
     // User detail modal
     pub show_user_modal: bool,
-    pub editing_user: Option<manager_models::User>,
+    pub editing_user: Option<shared_types::User>,
     pub editing_user_teams: Vec<i64>,
 
     // Teams
-    pub teams: Vec<manager_models::Team>,
-    pub team_list_items: Vec<manager_models::TeamListItem>,
-    pub filtered_teams: Vec<manager_models::TeamListItem>,
+    pub teams: Vec<shared_types::Team>,
+    pub team_list_items: Vec<shared_types::TeamListItem>,
+    pub filtered_teams: Vec<shared_types::TeamListItem>,
     pub team_search_query: String,
     pub selected_team_ids: std::collections::HashSet<i64>,
     pub loading_teams: bool,
@@ -97,15 +104,15 @@ pub struct AppState {
 
     // Team detail modal
     pub show_team_modal: bool,
-    pub editing_team: Option<manager_models::Team>,
+    pub editing_team: Option<shared_types::Team>,
     pub editing_team_permissions: Vec<i64>, // Permission IDs for team being edited
 
     // Update results
     #[serde(skip)]
-    pub update_user_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub update_user_result: ArcResult<()>,
     pub updating_user: bool,
     #[serde(skip)]
-    pub update_team_result: Arc<std::sync::Mutex<Option<Result<(), String>>>>,
+    pub update_team_result: ArcResult<()>,
     pub updating_team: bool,
 
     // Favorite state - stores (server_host, server_user, server_port, project_id) tuples
@@ -131,10 +138,10 @@ pub struct AppState {
     pub ssh_key_message: Option<String>,
 
     // Current user teams
-    pub current_user_teams: Vec<manager_models::TeamItem>,
+    pub current_user_teams: Vec<shared_types::TeamItem>,
     pub loading_current_user_teams: bool,
     #[serde(skip)]
-    pub current_user_teams_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::TeamItem>, String>>>>,
+    pub current_user_teams_result: TeamItemsResult,
 
     // UI Reference state
     pub ui_reference_card_titles: Vec<String>,
@@ -146,55 +153,44 @@ pub struct AppState {
     #[serde(skip)]
     pub connection_manager: Arc<crate::connection_manager::ConnectionManager>,
     #[serde(skip)]
-    pub project_details_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::ProjectDetailsResponse, String>>>>,
+    pub project_details_result: ArcResult<shared_types::ProjectDetailsResponse>,
     #[serde(skip)]
-    pub create_commands_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
-            #[serde(skip)]
-            pub execute_command_result:
-                Arc<std::sync::Mutex<Option<Result<serde_json::Value, String>>>>,
-            #[serde(skip)]
-            #[allow(clippy::type_complexity)]
-            pub command_executions_result:
-                Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommandExecution>, String>>>>,
+    pub create_commands_result: ProjectCommandsResult,
+    #[serde(skip)]
+    pub execute_command_result: ArcResult<serde_json::Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub projects_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Project>, String>>>>,
+    pub command_executions_result: ArcResult<Vec<shared_types::ProjectCommandExecution>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub worktree_branches_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    pub projects_result: ArcResult<Vec<shared_types::Project>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub settings_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::SettingsResponse, String>>>>,
+    pub worktree_branches_result: ArcResult<Vec<String>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub works_result: Arc<std::sync::Mutex<Option<Result<Vec<manager_models::Work>, String>>>>,
+    pub settings_result: ArcResult<shared_types::SettingsResponse>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub work_messages_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::WorkMessage>, String>>>>,
+    pub works_result: ArcResult<Vec<shared_types::Work>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_session_outputs_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::AiSessionOutput>, String>>>>,
+    pub work_messages_result: ArcResult<Vec<shared_types::WorkMessage>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_tool_calls_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::LlmAgentToolCall>, String>>>>,
+    pub ai_session_outputs_result: ArcResult<Vec<shared_types::AiSessionOutput>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub update_projects_path_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    pub ai_tool_calls_result: ArcResult<Vec<shared_types::LlmAgentToolCall>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub scan_projects_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    pub update_projects_path_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub supported_models_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::SupportedModel>, String>>>>,
+    pub scan_projects_result: ArcResult<Value>,
+    #[serde(skip)]
+    #[allow(clippy::type_complexity)]
+    pub supported_models_result: ArcResult<Vec<shared_types::SupportedModel>>,
     #[serde(skip)]
     pub loading_projects: bool,
     #[serde(skip)]
@@ -238,52 +234,44 @@ pub struct AppState {
     pub sending_message: bool,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub create_work_result: Arc<std::sync::Mutex<Option<Result<manager_models::Work, String>>>>,
+    pub create_work_result: ArcResult<shared_types::Work>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub send_message_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::WorkMessage, String>>>>,
+    pub send_message_result: ArcResult<shared_types::WorkMessage>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub create_ai_session_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::AiSession, String>>>>,
+    pub create_ai_session_result: ArcResult<shared_types::AiSession>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub update_api_keys_result: Arc<std::sync::Mutex<Option<Result<Value, String>>>>,
+    pub update_api_keys_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub file_list_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::FileInfo>, String>>>>,
+    pub file_list_result: ArcResult<Vec<FileInfo>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub file_content_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::FileContentResponse, String>>>>,
+    pub file_content_result: ArcResult<crate::api_client::FileContentResponse>,
     #[serde(skip)]
     pub db: Option<Connection>,
     #[serde(skip)]
-    pub local_server_check_result: Arc<std::sync::Mutex<Option<bool>>>,
+    pub local_server_check_result: ArcOption<bool>,
     #[serde(skip)]
-    pub connection_result: Arc<std::sync::Mutex<Option<Result<(String, String, u16), String>>>>,
+    pub connection_result: ConnectionResult,
     #[serde(skip)]
-    pub auth_required: Arc<std::sync::Mutex<bool>>, // Flag set when 401 is detected
+    pub auth_required: ArcMutex<bool>, // Flag set when 401 is detected
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub login_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::LoginResponse, String>>>>,
+    pub login_result: ArcResult<shared_types::LoginResponse>,
     #[serde(skip)]
     pub pending_project_details_refresh: Option<i64>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub project_detail_worktree_branches_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<String>, String>>>>,
+    pub project_detail_worktree_branches_result: ArcResult<Vec<String>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub project_detail_saved_commands_result:
-        Arc<std::sync::Mutex<Option<Result<Vec<manager_models::ProjectCommand>, String>>>>,
+    pub project_detail_saved_commands_result: ArcResult<Vec<shared_types::ProjectCommand>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub command_discovery_result:
-        Arc<std::sync::Mutex<Option<Result<manager_models::DiscoverCommandsResponse, String>>>>,
+    pub command_discovery_result: ArcResult<shared_types::DiscoverCommandsResponse>,
 }
 
 impl AppState {
@@ -301,11 +289,15 @@ impl AppState {
 
                 tracing::info!(
                     "DB SELECT params: server_host='{}', server_user='{}', server_port={}",
-                    server_host, server_user, server_port
+                    server_host,
+                    server_user,
+                    server_port
                 );
 
                 // First, check how many total favorites exist
-                if let Ok(total_count) = db.query_row("SELECT COUNT(*) FROM favorites", [], |row| row.get::<_, i64>(0)) {
+                if let Ok(total_count) = db.query_row("SELECT COUNT(*) FROM favorites", [], |row| {
+                    row.get::<_, i64>(0)
+                }) {
                     tracing::info!("Total favorites in database: {}", total_count);
                 }
 
@@ -333,19 +325,35 @@ impl AppState {
                             let db_server_host: String = row.get(2)?;
                             let db_server_user: String = row.get(3)?;
                             let db_server_port: i64 = row.get(4)?;
-                            Ok((entity_type, entity_id, db_server_host, db_server_user, db_server_port))
+                            Ok((
+                                entity_type,
+                                entity_id,
+                                db_server_host,
+                                db_server_user,
+                                db_server_port,
+                            ))
                         },
                     )
                     .expect("Could not query favorites");
 
-                for (entity_type, entity_id, db_server_host, db_server_user, db_server_port) in favorites_iter.flatten() {
+                for (entity_type, entity_id, db_server_host, db_server_user, db_server_port) in
+                    favorites_iter.flatten()
+                {
                     tracing::info!(
                         "Row from DB: entity_type='{}', entity_id={}, server_host='{}', server_user='{}', server_port={}",
                         entity_type, entity_id, db_server_host, db_server_user, db_server_port
                     );
                     if entity_type == "project" {
-                        let favorite_key = (server_host.clone(), server_user.clone(), *server_port, entity_id);
-                        tracing::info!("Loaded favorite from DB for current server: project_id={}", entity_id);
+                        let favorite_key = (
+                            server_host.clone(),
+                            server_user.clone(),
+                            *server_port,
+                            entity_id,
+                        );
+                        tracing::info!(
+                            "Loaded favorite from DB for current server: project_id={}",
+                            entity_id
+                        );
                         self.favorite_projects.insert(favorite_key);
                     }
                 }

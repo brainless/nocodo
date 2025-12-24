@@ -7,8 +7,8 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
-use crate::bash_permissions::BashPermissions;
-use crate::bash::BashExecutorTrait;
+use super::bash_permissions::BashPermissions;
+use super::{BashExecutionResult, BashExecutorTrait};
 
 #[derive(Clone)]
 pub struct BashExecutor {
@@ -36,7 +36,7 @@ impl BashExecutor {
         &self,
         command: &str,
         timeout_secs: Option<u64>,
-    ) -> Result<crate::bash::BashExecutionResult> {
+    ) -> Result<BashExecutionResult> {
         let execution_timeout = timeout_secs
             .map(Duration::from_secs)
             .unwrap_or(self.default_timeout);
@@ -50,12 +50,12 @@ impl BashExecutor {
             return Err(anyhow::anyhow!("Command denied: {}", denied_reason));
         }
 
-        // Create exec env for command
+        // Create exec env for command with current environment
         let exec_env = ExecEnv {
             command: vec!["bash".to_string(), "-c".to_string(), command.to_string()],
             cwd: std::env::current_dir().context("Failed to get current directory")?,
             timeout_ms: Some(execution_timeout.as_millis() as u64),
-            env: std::collections::HashMap::new(),
+            env: std::env::vars().collect::<std::collections::HashMap<_, _>>(),
             sandbox: SandboxType::None,
             with_escalated_permissions: Some(false),
             justification: None,
@@ -84,7 +84,7 @@ impl BashExecutor {
                     stderr.len()
                 );
 
-                Ok(crate::bash::BashExecutionResult {
+                Ok(BashExecutionResult {
                     stdout,
                     stderr,
                     exit_code,
@@ -100,7 +100,7 @@ impl BashExecutor {
                     "Command timed out after {} seconds",
                     execution_timeout.as_secs()
                 );
-                Ok(crate::bash::BashExecutionResult {
+                Ok(BashExecutionResult {
                     stdout: String::new(),
                     stderr: format!(
                         "Command timed out after {} seconds",
@@ -118,7 +118,7 @@ impl BashExecutor {
         command: &str,
         working_dir: &Path,
         timeout_secs: Option<u64>,
-    ) -> Result<crate::bash::BashExecutionResult> {
+    ) -> Result<BashExecutionResult> {
         let execution_timeout = timeout_secs
             .map(Duration::from_secs)
             .unwrap_or(self.default_timeout);
@@ -148,7 +148,7 @@ impl BashExecutor {
             command: vec!["bash".to_string(), "-c".to_string(), command.to_string()],
             cwd: working_dir.to_path_buf(),
             timeout_ms: Some(execution_timeout.as_millis() as u64),
-            env: std::collections::HashMap::new(),
+            env: std::env::vars().collect::<std::collections::HashMap<_, _>>(),
             sandbox: SandboxType::None,
             with_escalated_permissions: Some(false),
             justification: None,
@@ -178,7 +178,7 @@ impl BashExecutor {
                     stderr.len()
                 );
 
-                Ok(crate::bash::BashExecutionResult {
+                Ok(BashExecutionResult {
                     stdout,
                     stderr,
                     exit_code,
@@ -194,7 +194,7 @@ impl BashExecutor {
                     "Command timed out after {} seconds",
                     execution_timeout.as_secs()
                 );
-                Ok(crate::bash::BashExecutionResult {
+                Ok(BashExecutionResult {
                     stdout: String::new(),
                     stderr: format!(
                         "Command timed out after {} seconds",
@@ -224,24 +224,30 @@ impl BashExecutorTrait for BashExecutor {
         command: &str,
         working_dir: &std::path::Path,
         timeout_secs: Option<u64>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<crate::bash::BashExecutionResult>> + Send + '_>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<BashExecutionResult>> + Send + '_>>
+    {
         let command = command.to_string();
         let working_dir = working_dir.to_path_buf();
         let executor = self.clone();
         Box::pin(async move {
-            executor.execute_with_cwd(&command, &working_dir, timeout_secs).await
+            executor
+                .execute_with_cwd(&command, &working_dir, timeout_secs)
+                .await
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::bash_permissions::{BashPermissions, PermissionRule};
+
+    use super::super::bash_permissions::{BashPermissions, PermissionRule};
+    use crate::bash::BashExecutor;
 
     #[tokio::test]
     async fn test_basic_execution() {
-        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()]);
+        let permissions = BashPermissions::new(vec![
+            PermissionRule::allow("echo*").expect("Failed to create echo rule")
+        ]);
 
         let executor = BashExecutor::new(permissions, 5).unwrap();
         let result = executor
@@ -319,11 +325,13 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_working_directory() {
         let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir_str = temp_dir.path().to_string_lossy().to_string();
 
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("ls*").unwrap(),
             PermissionRule::allow("test*").unwrap(),
-        ]);
+        ])
+        .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
@@ -332,7 +340,10 @@ mod tests {
         std::fs::write(&test_file, "test content").unwrap();
 
         // List files in the project directory
-        let result = executor.execute("ls test_file.txt", None).await.unwrap();
+        let result = executor
+            .execute_with_cwd("ls test_file.txt", temp_dir.path(), None)
+            .await
+            .unwrap();
 
         assert_eq!(result.exit_code, 0);
         assert!(result.stdout.contains("test_file.txt"));
@@ -341,47 +352,63 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_git_commands() {
         let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir_str = temp_dir.path().to_string_lossy().to_string();
 
-        let permissions = BashPermissions::new(vec![PermissionRule::allow("git*").unwrap()]);
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("git*").unwrap()])
+            .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
         // Initialize git repository
-        let init_result = executor.execute("git init", None).await.unwrap();
+        let init_result = executor
+            .execute_with_cwd("git init", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(init_result.exit_code, 0);
 
         // Check git status
-        let status_result = executor.execute("git status", None).await.unwrap();
+        let status_result = executor
+            .execute_with_cwd("git status", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(status_result.exit_code, 0);
 
         // Create a test file and add it
         let test_file = temp_dir.path().join("test.txt");
         std::fs::write(&test_file, "test").unwrap();
 
-        let add_result = executor.execute("git add test.txt", None).await.unwrap();
+        let add_result = executor
+            .execute_with_cwd("git add test.txt", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(add_result.exit_code, 0);
     }
 
     #[tokio::test]
     async fn test_bash_executor_cargo_commands() {
-        let _temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir_str = temp_dir.path().to_string_lossy().to_string();
 
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("cargo*").unwrap(),
             PermissionRule::allow("ls*").unwrap(),
-        ]);
+        ])
+        .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
         // Initialize a minimal Rust project
         let init_result = executor
-            .execute("cargo init --bin test_project", None)
+            .execute_with_cwd("cargo init --bin test_project", temp_dir.path(), None)
             .await
             .unwrap();
-        assert_eq!(init_result.exit_code, 0);
+        assert_eq!(init_result.exit_code, 0, "stderr: {}", init_result.stderr);
 
         // Check if project was created
-        let check_result = executor.execute("ls test_project", None).await.unwrap();
+        let check_result = executor
+            .execute_with_cwd("ls test_project", temp_dir.path(), None)
+            .await
+            .unwrap();
         assert_eq!(check_result.exit_code, 0);
         assert!(check_result.stdout.contains("Cargo.toml"));
     }
@@ -407,12 +434,14 @@ mod tests {
     #[tokio::test]
     async fn test_bash_executor_complex_command() {
         let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir_str = temp_dir.path().to_string_lossy().to_string();
 
         let permissions = BashPermissions::new(vec![
             PermissionRule::allow("cat*").unwrap(),
             PermissionRule::allow("grep*").unwrap(),
             PermissionRule::allow("wc*").unwrap(),
-        ]);
+        ])
+        .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
@@ -422,7 +451,7 @@ mod tests {
 
         // Run a complex command with pipes and redirects
         let result = executor
-            .execute("cat test.txt | grep hello | wc -l", None)
+            .execute_with_cwd("cat test.txt | grep hello | wc -l", temp_dir.path(), None)
             .await
             .unwrap();
 
@@ -432,14 +461,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_bash_executor_environment_variables() {
-        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()]);
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir_str = temp_dir.path().to_string_lossy().to_string();
+
+        let permissions = BashPermissions::new(vec![PermissionRule::allow("echo*").unwrap()])
+            .with_allowed_working_dirs(vec![temp_dir_str]);
 
         let executor = BashExecutor::new(permissions, 10).unwrap();
 
         // Test environment variable usage
-        let result = executor.execute("echo $HOME", None).await.unwrap();
+        let result = executor
+            .execute_with_cwd("echo $HOME", temp_dir.path(), None)
+            .await
+            .unwrap();
 
-        assert_eq!(result.exit_code, 0);
-        assert!(!result.stdout.trim().is_empty());
+        assert_eq!(result.exit_code, 0, "stderr: {}", result.stderr);
+        assert!(
+            !result.stdout.trim().is_empty(),
+            "stdout was empty: {}",
+            result.stdout
+        );
     }
 }

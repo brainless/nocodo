@@ -1,6 +1,6 @@
-use std::path::Path;
 use crate::error::AppError;
-use manager_models::GitBranch;
+use shared_types::GitBranch;
+use std::path::Path;
 
 /// List all git branches and worktrees for a project
 /// Returns both regular branches and worktree branches with their paths
@@ -14,7 +14,7 @@ pub fn list_project_branches(project_path: &Path) -> Result<Vec<GitBranch>, AppE
         let (branch, _branch_type) = branch_result?;
         if let Some(name) = branch.name()? {
             let branch_name = name.to_string();
-            
+
             // Check if this branch has a worktree
             let is_worktree = has_worktree_for_branch(&repo, &branch_name)?;
             let worktree_path = if is_worktree {
@@ -40,11 +40,11 @@ pub fn list_project_branches(project_path: &Path) -> Result<Vec<GitBranch>, AppE
         }
 
         let worktree_path = get_worktree_path_for_branch(project_path, worktree_name)?;
-            branches.push(GitBranch {
-                name: worktree_name.to_string(),
-                is_worktree: true,
-                path: worktree_path,
-            });
+        branches.push(GitBranch {
+            name: worktree_name.to_string(),
+            is_worktree: true,
+            path: worktree_path,
+        });
     }
 
     Ok(branches)
@@ -53,21 +53,24 @@ pub fn list_project_branches(project_path: &Path) -> Result<Vec<GitBranch>, AppE
 /// Check if a branch has an associated worktree
 fn has_worktree_for_branch(repo: &git2::Repository, branch_name: &str) -> Result<bool, AppError> {
     let worktrees = repo.worktrees()?;
-    
+
     for worktree_name in worktrees.iter().flatten() {
         if worktree_name == branch_name {
             return Ok(true);
         }
     }
-    
+
     Ok(false)
 }
 
 /// Get the filesystem path for a worktree branch
-fn get_worktree_path_for_branch(project_path: &Path, branch_name: &str) -> Result<Option<String>, AppError> {
+fn get_worktree_path_for_branch(
+    project_path: &Path,
+    branch_name: &str,
+) -> Result<Option<String>, AppError> {
     let repo = git2::Repository::open(project_path)?;
     let worktrees = repo.worktrees()?;
-    
+
     for worktree_name in worktrees.iter().flatten() {
         if worktree_name == branch_name {
             // Try to find the worktree path
@@ -75,23 +78,23 @@ fn get_worktree_path_for_branch(project_path: &Path, branch_name: &str) -> Resul
                 project_path.join(worktree_name),
                 project_path.join("..").join(worktree_name),
             ];
-            
+
             for potential_path in &potential_paths {
-                if let Ok(_) = git2::Repository::open(potential_path) {
+                if git2::Repository::open(potential_path).is_ok() {
                     return Ok(Some(potential_path.to_string_lossy().to_string()));
                 }
             }
         }
     }
-    
+
     Ok(None)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::process::Command;
+    use tempfile::TempDir;
 
     fn create_test_repo_with_branches() -> (TempDir, String) {
         let temp_dir = TempDir::new().unwrap();
@@ -150,15 +153,14 @@ mod tests {
 
         // Should have at least main/master and feature-branch
         assert!(branches.len() >= 2);
-        
+
         // Check that we have the expected branches
         let branch_names: Vec<&str> = branches.iter().map(|b| b.name.as_str()).collect();
         assert!(branch_names.contains(&"feature-branch"));
-        
+
         // Initially no worktrees
-        let worktree_branches: Vec<&GitBranch> = branches.iter()
-            .filter(|b| b.is_worktree)
-            .collect();
+        let worktree_branches: Vec<&GitBranch> =
+            branches.iter().filter(|b| b.is_worktree).collect();
         assert_eq!(worktree_branches.len(), 0);
     }
 
@@ -170,31 +172,32 @@ mod tests {
         // Create a worktree using git2
         let repo = git2::Repository::open(path).unwrap();
         let worktree_path = temp_dir.path().join("worktree-feature");
-        
+
         // Create worktree for the feature-branch
         let worktree = repo.worktree("feature-worktree", &worktree_path, None);
-        
-        // If worktree creation fails (e.g., due to git limitations in test), 
+
+        // If worktree creation fails (e.g., due to git limitations in test),
         // just test that the function works with regular branches
         if worktree.is_ok() {
             let branches = list_project_branches(path).unwrap();
-            
+
             // Should find worktree branches
-            let worktree_branches: Vec<&GitBranch> = branches.iter()
-                .filter(|b| b.is_worktree)
-                .collect();
-            
+            let worktree_branches: Vec<&GitBranch> =
+                branches.iter().filter(|b| b.is_worktree).collect();
+
             // At least the worktree we created should be found
-            assert!(worktree_branches.len() >= 1);
+            assert!(!worktree_branches.is_empty());
         } else {
             // If worktree creation failed, just verify regular branches work
             let branches = list_project_branches(path).unwrap();
             assert!(branches.len() >= 2); // main and feature-branch
-            
+
             // Verify branch structure
             for branch in &branches {
                 assert!(!branch.name.is_empty());
-                assert!(branch.path.is_none() || branch.path.as_ref().unwrap().contains("worktree"));
+                assert!(
+                    branch.path.is_none() || branch.path.as_ref().unwrap().contains("worktree")
+                );
             }
         }
     }

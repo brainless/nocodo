@@ -1,13 +1,12 @@
-use manager_models::{FileInfo, FileType, ListFilesRequest, ListFilesResponse, ToolErrorResponse, ToolResponse};
-use crate::tool_error::ToolError;
+use super::path_utils::validate_and_resolve_path;
+use crate::types::{
+    FileInfo, FileType, ListFilesRequest, ListFilesResponse, ToolErrorResponse, ToolResponse,
+};
 use anyhow::Result;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-pub async fn list_files(
-    base_path: &Path,
-    request: ListFilesRequest,
-) -> Result<ToolResponse> {
+pub async fn list_files(base_path: &Path, request: ListFilesRequest) -> Result<ToolResponse> {
     let target_path = validate_and_resolve_path(base_path, &request.path)?;
 
     if !target_path.exists() {
@@ -118,137 +117,13 @@ pub async fn list_files(
     }))
 }
 
-/// Validate and resolve a path relative to the base path
-fn validate_and_resolve_path(base_path: &Path, path: &str) -> Result<PathBuf> {
-    let input_path = Path::new(path);
-
-    // Normalize the input path to handle . and .. components
-    let normalized_input = normalize_path(input_path)?;
-
-    // Handle absolute paths
-    if normalized_input.is_absolute() {
-        // If the absolute path equals our base path, allow it
-        let canonical_input = match normalized_input.canonicalize() {
-            Ok(path) => path,
-            Err(_) => normalized_input.to_path_buf(), // Fallback if it doesn't exist yet
-        };
-
-        let canonical_base = match base_path.canonicalize() {
-            Ok(path) => path,
-            Err(_) => base_path.to_path_buf(),
-        };
-
-        // Security check: ensure the path is within or equals the base directory
-        if canonical_input == canonical_base || canonical_input.starts_with(&canonical_base) {
-            return Ok(canonical_input);
-        } else {
-            return Err(ToolError::InvalidPath(format!(
-                "Absolute path '{}' is outside the allowed directory '{}'",
-                path,
-                base_path.display()
-            ))
-            .into());
-        }
-    }
-
-    // Handle relative paths
-    let target_path = if normalized_input == Path::new(".") {
-        base_path.to_path_buf()
-    } else {
-        base_path.join(&normalized_input)
-    };
-
-    // Canonicalize the path to resolve any remaining relative components
-    let canonical_path = match target_path.canonicalize() {
-        Ok(path) => path,
-        Err(_) => {
-            // If file doesn't exist, try to canonicalize parent directory
-            // and reconstruct the path to handle symlink issues on macOS
-            if let Some(parent) = target_path.parent() {
-                match parent.canonicalize() {
-                    Ok(canonical_parent) => {
-                        if let Some(filename) = target_path.file_name() {
-                            canonical_parent.join(filename)
-                        } else {
-                            target_path
-                        }
-                    }
-                    Err(_) => target_path,
-                }
-            } else {
-                target_path
-            }
-        }
-    };
-
-    // Also canonicalize the base path for comparison (handles symlinks on macOS)
-    let canonical_base = match base_path.canonicalize() {
-        Ok(path) => path,
-        Err(_) => base_path.to_path_buf(), // Fallback to non-canonical base path
-    };
-
-    // Security check: ensure the path is within the base directory
-    if !canonical_path.starts_with(&canonical_base) {
-        return Err(ToolError::InvalidPath(format!(
-            "Path '{}' resolves to location outside the allowed directory",
-            path
-        ))
-        .into());
-    }
-
-    Ok(canonical_path)
-}
-
-/// Normalize a path by resolving . and .. components while preventing directory traversal
-fn normalize_path(path: &Path) -> Result<PathBuf> {
-    let mut components = Vec::new();
-
-    for component in path.components() {
-        match component {
-            std::path::Component::Prefix(_) | std::path::Component::RootDir => {
-                // For absolute paths, keep the prefix/root
-                components.push(component);
-            }
-            std::path::Component::CurDir => {
-                // Skip current directory components
-                continue;
-            }
-            std::path::Component::ParentDir => {
-                // Prevent directory traversal attacks
-                if components.is_empty()
-                    || matches!(components.last(), Some(std::path::Component::ParentDir))
-                {
-                    return Err(ToolError::InvalidPath(format!(
-                        "Invalid path '{}': contains directory traversal",
-                        path.display()
-                    ))
-                    .into());
-                }
-                // Remove the last component (go up one level)
-                components.pop();
-            }
-            std::path::Component::Normal(_name) => {
-                components.push(component);
-            }
-        }
-    }
-
-    // Reconstruct the path from components
-    let mut result = PathBuf::new();
-    for component in components {
-        result.push(component);
-    }
-
-    Ok(result)
-}
-
 /// Create FileInfo from a path
 fn create_file_info(path: &Path, base_path: &Path) -> Result<FileInfo> {
     let metadata = fs::metadata(path)?;
 
-    let relative_path = path.strip_prefix(base_path).map_err(|_| {
-        ToolError::InvalidPath(format!("Cannot compute relative path for {:?}", path))
-    })?;
+    let relative_path = path
+        .strip_prefix(base_path)
+        .map_err(|_| anyhow::anyhow!("Cannot compute relative path for {:?}", path))?;
 
     let relative_path_str = relative_path.to_string_lossy().to_string();
     let absolute_path_str = path.to_string_lossy().to_string();
@@ -291,17 +166,12 @@ fn create_file_info(path: &Path, base_path: &Path) -> Result<FileInfo> {
 }
 
 /// Format files as a tree structure
-fn format_as_tree(files: &[FileInfo], base_path: &Path) -> String {
+fn format_as_tree(files: &[FileInfo], _base_path: &Path) -> String {
     let mut output = String::new();
 
-    // Add root directory name
-    let root_name = base_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    output.push_str(&root_name);
-    output.push('\n');
+    // Note: We don't add the root directory name here because paths are relative
+    // to the base_path. Adding the root name would confuse the LLM into using
+    // incorrect paths (e.g., "nocodo-agents/Cargo.toml" instead of "Cargo.toml")
 
     // Group files by their directory depth and parent
     let mut file_tree: std::collections::BTreeMap<String, Vec<&FileInfo>> =

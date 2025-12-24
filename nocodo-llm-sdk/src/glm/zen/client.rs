@@ -1,8 +1,9 @@
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use crate::{
     error::LlmError,
     glm::types::{GlmChatCompletionRequest, GlmChatCompletionResponse, GlmErrorResponse},
 };
+use async_trait::async_trait;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 /// Zen provider for GLM (OpenCode Zen - "Big Pickle")
 ///
@@ -69,15 +70,13 @@ impl ZenGlmClient {
         if let Some(ref api_key) = self.api_key {
             headers.insert(
                 AUTHORIZATION,
-                HeaderValue::from_str(&format!("Bearer {}", api_key))
-                    .map_err(|e| LlmError::authentication(format!("Invalid API key format: {}", e)))?,
+                HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| {
+                    LlmError::authentication(format!("Invalid API key format: {}", e))
+                })?,
             );
         }
 
-        headers.insert(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        );
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         let response = self
             .http_client
@@ -107,9 +106,7 @@ impl ZenGlmClient {
             return Err(LlmError::api_error(status.as_u16(), error_body));
         }
 
-        let completion_response = response
-            .json::<GlmChatCompletionResponse>()
-            .await?;
+        let completion_response = response.json::<GlmChatCompletionResponse>().await?;
 
         Ok(completion_response)
     }
@@ -136,6 +133,7 @@ impl Default for ZenGlmClient {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for ZenGlmClient {
     async fn complete(
         &self,
@@ -208,10 +206,19 @@ impl crate::client::LlmClient for ZenGlmClient {
                 crate::glm::types::GlmRole::System => crate::types::Role::System,
             },
             usage: crate::types::Usage {
-                input_tokens: glm_response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
-                output_tokens: glm_response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
+                input_tokens: glm_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.prompt_tokens)
+                    .unwrap_or(0),
+                output_tokens: glm_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.completion_tokens)
+                    .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
+            tool_calls: None, // TODO: Extract tool calls from Zen response
         };
 
         Ok(response)

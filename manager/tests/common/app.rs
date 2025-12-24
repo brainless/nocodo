@@ -71,8 +71,6 @@ impl TestApp {
         &self.config
     }
 
-  
-
     /// Create a new test application with real LLM integration
     pub async fn new_with_llm(provider: &LlmProviderTestConfig) -> Self {
         let config = TestConfig::new();
@@ -127,8 +125,6 @@ impl TestApp {
         }
     }
 
-    
-
     /// Get the LLM agent if available
     pub fn llm_agent(&self) -> anyhow::Result<&Arc<LlmAgent>> {
         self.app_state
@@ -161,7 +157,11 @@ mod tests {
 
         // Test health check endpoint
         let req = test::TestRequest::get().uri("/api/health").to_request();
-        let service = test::init_service(App::new().app_data(test_app.app_state.clone()).configure(|cfg| configure_routes(cfg, false)))
+        let service = test::init_service(
+            App::new()
+                .app_data(test_app.app_state.clone())
+                .configure(|cfg| configure_routes(cfg, false)),
+        )
         .await;
         let resp = test::call_service(&service, req).await;
 

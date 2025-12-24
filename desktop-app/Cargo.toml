@@ -27,7 +27,8 @@ reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 
 # Shared Models
-manager-models = { path = "../manager-models" }
+shared-types = { path = "../shared-types" }
+manager-tools = { path = "../manager-tools" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

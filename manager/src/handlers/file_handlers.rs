@@ -16,8 +16,12 @@ pub async fn list_files(
 ) -> Result<HttpResponse, AppError> {
     let request = query.into_inner();
 
-    tracing::info!("list_files called with project_id: {:?}, path: {:?}, git_branch: {:?}",
-        request.project_id, request.path, request.git_branch);
+    tracing::info!(
+        "list_files called with project_id: {:?}, path: {:?}, git_branch: {:?}",
+        request.project_id,
+        request.path,
+        request.git_branch
+    );
 
     // Get the project to determine the base path
     let project = if let Some(project_id) = &request.project_id {
@@ -29,17 +33,22 @@ pub async fn list_files(
     };
 
     // Determine the base path - use worktree path if git_branch is specified
-    let project_path = if let Some(ref git_branch) = request.git_branch {
-        tracing::info!("Switching to branch '{}' for project at: {}", git_branch, project.path);
+    let project_path = if let Some(git_branch) = request.git_branch {
+        tracing::info!(
+            "Switching to branch '{}' for project at: {}",
+            git_branch,
+            project.path
+        );
         // Get worktree path for the specified branch
-        let worktree_path = crate::git::get_working_directory_for_branch(
-            Path::new(&project.path),
-            git_branch
-        )?;
+        let worktree_path =
+            crate::git::get_working_directory_for_branch(Path::new(&project.path), &git_branch)?;
         tracing::info!("Using worktree path: {}", worktree_path);
         Path::new(&worktree_path).to_path_buf()
     } else {
-        tracing::info!("No branch specified, using default project path: {}", project.path);
+        tracing::info!(
+            "No branch specified, using default project path: {}",
+            project.path
+        );
         Path::new(&project.path).to_path_buf()
     };
 
@@ -274,23 +283,32 @@ pub async fn get_file_content(
 
     let git_branch = query.get("git_branch").map(|s| s.as_str());
 
-    tracing::info!("get_file_content called for project_id: {}, path: {}, git_branch: {:?}",
-        project_id, file_path, git_branch);
+    tracing::info!(
+        "get_file_content called for project_id: {}, path: {}, git_branch: {:?}",
+        project_id,
+        file_path,
+        git_branch
+    );
 
     // Get the project to determine the base path
     let project = data.database.get_project_by_id(project_id)?;
 
     // Determine the base path - use worktree path if git_branch is specified
     let project_path = if let Some(branch) = git_branch {
-        tracing::info!("Switching to branch '{}' for file content in project: {}", branch, project.path);
-        let worktree_path = crate::git::get_working_directory_for_branch(
-            Path::new(&project.path),
-            branch
-        )?;
+        tracing::info!(
+            "Switching to branch '{}' for file content in project: {}",
+            branch,
+            project.path
+        );
+        let worktree_path =
+            crate::git::get_working_directory_for_branch(Path::new(&project.path), branch)?;
         tracing::info!("Using worktree path for file content: {}", worktree_path);
         Path::new(&worktree_path).to_path_buf()
     } else {
-        tracing::info!("No branch specified for file content, using default project path: {}", project.path);
+        tracing::info!(
+            "No branch specified for file content, using default project path: {}",
+            project.path
+        );
         Path::new(&project.path).to_path_buf()
     };
 

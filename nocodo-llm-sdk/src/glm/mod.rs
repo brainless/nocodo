@@ -1,7 +1,8 @@
 pub mod builder;
+pub mod cerebras;
 pub mod tools;
 pub mod types;
-pub mod cerebras;
+pub mod zai;
 pub mod zen;
 
 pub use builder::GlmMessageBuilder;
@@ -10,6 +11,7 @@ pub use types::*;
 
 // Re-export for convenience
 pub use cerebras::*;
+pub use zai::*;
 pub use zen::*;
 
 // Type alias for backwards compatibility

@@ -1,8 +1,12 @@
+use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
     error::LlmError,
-    openai::types::{OpenAIChatCompletionRequest, OpenAIChatCompletionResponse, OpenAIErrorResponse, OpenAIResponseRequest, OpenAIResponseResponse},
+    openai::types::{
+        OpenAIChatCompletionRequest, OpenAIChatCompletionResponse, OpenAIErrorResponse,
+        OpenAIResponseRequest, OpenAIResponseResponse,
+    },
 };
 
 /// OpenAI LLM client
@@ -106,9 +110,10 @@ impl OpenAIClient {
                     reqwest::StatusCode::PAYLOAD_TOO_LARGE => {
                         Err(LlmError::invalid_request("Request too large"))
                     }
-                    reqwest::StatusCode::TOO_MANY_REQUESTS => {
-                        Err(LlmError::rate_limit(error_response.error.message, retry_after))
-                    }
+                    reqwest::StatusCode::TOO_MANY_REQUESTS => Err(LlmError::rate_limit(
+                        error_response.error.message,
+                        retry_after,
+                    )),
                     reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
                         Err(LlmError::api_error(500, error_response.error.message))
                     }
@@ -120,9 +125,7 @@ impl OpenAIClient {
             } else {
                 // Fallback for non-standard error responses
                 match status {
-                    reqwest::StatusCode::BAD_REQUEST => {
-                        Err(LlmError::invalid_request(error_text))
-                    }
+                    reqwest::StatusCode::BAD_REQUEST => Err(LlmError::invalid_request(error_text)),
                     reqwest::StatusCode::UNAUTHORIZED => Err(LlmError::authentication(error_text)),
                     reqwest::StatusCode::FORBIDDEN => Err(LlmError::authentication(error_text)),
                     reqwest::StatusCode::NOT_FOUND => Err(LlmError::api_error(404, error_text)),
@@ -208,9 +211,10 @@ impl OpenAIClient {
                     reqwest::StatusCode::PAYLOAD_TOO_LARGE => {
                         Err(LlmError::invalid_request("Request too large"))
                     }
-                    reqwest::StatusCode::TOO_MANY_REQUESTS => {
-                        Err(LlmError::rate_limit(error_response.error.message, retry_after))
-                    }
+                    reqwest::StatusCode::TOO_MANY_REQUESTS => Err(LlmError::rate_limit(
+                        error_response.error.message,
+                        retry_after,
+                    )),
                     reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
                         Err(LlmError::api_error(500, error_response.error.message))
                     }
@@ -222,9 +226,7 @@ impl OpenAIClient {
             } else {
                 // Fallback for non-standard error responses
                 match status {
-                    reqwest::StatusCode::BAD_REQUEST => {
-                        Err(LlmError::invalid_request(error_text))
-                    }
+                    reqwest::StatusCode::BAD_REQUEST => Err(LlmError::invalid_request(error_text)),
                     reqwest::StatusCode::UNAUTHORIZED => Err(LlmError::authentication(error_text)),
                     reqwest::StatusCode::FORBIDDEN => Err(LlmError::authentication(error_text)),
                     reqwest::StatusCode::NOT_FOUND => Err(LlmError::api_error(404, error_text)),
@@ -252,21 +254,31 @@ impl crate::openai::types::OpenAIChatCompletionResponse {
 
     /// Extract tool calls from the response
     pub fn tool_calls(&self) -> Option<Vec<crate::tools::ToolCall>> {
-        self.choices.first()?.message.tool_calls.as_ref().map(|calls| {
-            calls.iter().map(|call| {
-                let arguments: serde_json::Value = serde_json::from_str(&call.function.arguments)
-                    .unwrap_or(serde_json::Value::Null);
+        self.choices
+            .first()?
+            .message
+            .tool_calls
+            .as_ref()
+            .map(|calls| {
+                calls
+                    .iter()
+                    .map(|call| {
+                        let arguments: serde_json::Value =
+                            serde_json::from_str(&call.function.arguments)
+                                .unwrap_or(serde_json::Value::Null);
 
-                crate::tools::ToolCall::new(
-                    call.id.clone(),
-                    call.function.name.clone(),
-                    arguments,
-                )
-            }).collect()
-        })
+                        crate::tools::ToolCall::new(
+                            call.id.clone(),
+                            call.function.name.clone(),
+                            arguments,
+                        )
+                    })
+                    .collect()
+            })
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for OpenAIClient {
     /// Routes requests to the appropriate OpenAI API based on model:
     ///
@@ -306,9 +318,11 @@ impl crate::client::LlmClient for OpenAIClient {
                         .into_iter()
                         .map(|block| match block {
                             crate::types::ContentBlock::Text { text } => Ok(text),
-                            crate::types::ContentBlock::Image { .. } => Err(LlmError::invalid_request(
-                                "Image content not supported in Responses API",
-                            )),
+                            crate::types::ContentBlock::Image { .. } => {
+                                Err(LlmError::invalid_request(
+                                    "Image content not supported in Responses API",
+                                ))
+                            }
                         })
                         .collect::<Result<Vec<String>, LlmError>>()
                 })
@@ -347,18 +361,23 @@ impl crate::client::LlmClient for OpenAIClient {
                 }
             }
 
-            let content = vec![crate::types::ContentBlock::Text {
-                text: text_content,
-            }];
+            let content = vec![crate::types::ContentBlock::Text { text: text_content }];
 
             let response = crate::types::CompletionResponse {
                 content,
                 role: crate::types::Role::Assistant,
                 usage: crate::types::Usage {
-                    input_tokens: openai_response.usage.input_tokens.unwrap_or(openai_response.usage.prompt_tokens.unwrap_or(0)),
-                    output_tokens: openai_response.usage.output_tokens.unwrap_or(openai_response.usage.completion_tokens.unwrap_or(0)),
+                    input_tokens: openai_response
+                        .usage
+                        .input_tokens
+                        .unwrap_or(openai_response.usage.prompt_tokens.unwrap_or(0)),
+                    output_tokens: openai_response
+                        .usage
+                        .output_tokens
+                        .unwrap_or(openai_response.usage.completion_tokens.unwrap_or(0)),
                 },
                 stop_reason: Some("completed".to_string()), // Responses API doesn't have finish_reason like Chat Completions
+                tool_calls: None, // TODO: Extract tool calls from OpenAI response
             };
 
             Ok(response)
@@ -370,7 +389,9 @@ impl crate::client::LlmClient for OpenAIClient {
                 .map(|msg| {
                     let role = match msg.role {
                         crate::types::Role::User => crate::openai::types::OpenAIRole::User,
-                        crate::types::Role::Assistant => crate::openai::types::OpenAIRole::Assistant,
+                        crate::types::Role::Assistant => {
+                            crate::openai::types::OpenAIRole::Assistant
+                        }
                         crate::types::Role::System => crate::openai::types::OpenAIRole::System,
                     };
 
@@ -380,9 +401,9 @@ impl crate::client::LlmClient for OpenAIClient {
                         .into_iter()
                         .map(|block| match block {
                             crate::types::ContentBlock::Text { text } => Ok(text),
-                            crate::types::ContentBlock::Image { .. } => Err(LlmError::invalid_request(
-                                "Image content not supported in v0.1",
-                            )),
+                            crate::types::ContentBlock::Image { .. } => Err(
+                                LlmError::invalid_request("Image content not supported in v0.1"),
+                            ),
                         })
                         .collect::<Result<Vec<String>, LlmError>>()?
                         .join(""); // Join multiple text blocks
@@ -404,9 +425,9 @@ impl crate::client::LlmClient for OpenAIClient {
                 temperature: request.temperature,
                 top_p: request.top_p,
                 stop: request.stop_sequences,
-                stream: None, // Non-streaming for now
+                stream: None,           // Non-streaming for now
                 reasoning_effort: None, // Default reasoning effort
-                tools: None, // No tools for generic LlmClient interface
+                tools: None,            // No tools for generic LlmClient interface
                 tool_choice: None,
                 parallel_tool_calls: None,
             };
@@ -432,10 +453,17 @@ impl crate::client::LlmClient for OpenAIClient {
                     crate::openai::types::OpenAIRole::Tool => crate::types::Role::Assistant, // Map tool to assistant
                 },
                 usage: crate::types::Usage {
-                    input_tokens: openai_response.usage.prompt_tokens.unwrap_or(openai_response.usage.input_tokens.unwrap_or(0)),
-                    output_tokens: openai_response.usage.completion_tokens.unwrap_or(openai_response.usage.output_tokens.unwrap_or(0)),
+                    input_tokens: openai_response
+                        .usage
+                        .prompt_tokens
+                        .unwrap_or(openai_response.usage.input_tokens.unwrap_or(0)),
+                    output_tokens: openai_response
+                        .usage
+                        .completion_tokens
+                        .unwrap_or(openai_response.usage.output_tokens.unwrap_or(0)),
                 },
                 stop_reason: choice.finish_reason.clone(),
+                tool_calls: None, // TODO: Extract tool calls from OpenAI response
             };
 
             Ok(response)

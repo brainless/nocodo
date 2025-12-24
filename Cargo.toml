@@ -2,10 +2,11 @@
 resolver = "2"
 members = [
     "manager",
-    "manager-models",
+    "shared-types",
     "manager-tools",
     "nocodo-github-actions",
-    "desktop-app", "nocodo-llm-sdk",
+    "desktop-app",
+    "nocodo-llm-sdk", "nocodo-agents",
 ]
 exclude = [
     "manager-web"

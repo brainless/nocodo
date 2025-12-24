@@ -1,12 +1,10 @@
 use super::main_handlers::AppState;
 use crate::auth;
 use crate::error::AppError;
-use crate::models::{
-    CreateUserRequest, UpdateUserRequest, User, UserResponse,
-};
-use manager_models::{TeamItem, UserListItem, SearchQuery};
-use actix_web::{web, HttpResponse, Result, HttpMessage};
-use manager_models::TeamListResponse;
+use crate::models::{CreateUserRequest, UpdateUserRequest, User, UserResponse};
+use actix_web::{web, HttpMessage, HttpResponse, Result};
+use shared_types::TeamListResponse;
+use shared_types::{SearchQuery, TeamItem, UserListItem};
 
 pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     let users = data.database.get_all_users()?;
@@ -32,7 +30,7 @@ pub async fn list_users(data: web::Data<AppState>) -> Result<HttpResponse, AppEr
         user_list_items.push(user_item);
     }
 
-    let response = manager_models::UserListResponse {
+    let response = shared_types::UserListResponse {
         users: user_list_items,
     };
     Ok(HttpResponse::Ok().json(response))
@@ -54,9 +52,7 @@ pub async fn create_user(
 
     // Check if user already exists
     if data.database.get_user_by_name(&create_req.username).is_ok() {
-        return Err(AppError::NotFound(
-            "Username already exists".to_string(),
-        ));
+        return Err(AppError::NotFound("Username already exists".to_string()));
     }
 
     // Hash password
@@ -168,7 +164,7 @@ pub async fn search_users(
         user_list_items.push(user_item);
     }
 
-    let response = manager_models::UserListResponse {
+    let response = shared_types::UserListResponse {
         users: user_list_items,
     };
     Ok(HttpResponse::Ok().json(response))
@@ -181,9 +177,9 @@ pub async fn get_user_teams(
 ) -> Result<HttpResponse, AppError> {
     let user_id = path.into_inner();
     let teams = data.database.get_user_teams(user_id)?;
-    let teams: Vec<manager_models::TeamListItem> = teams
+    let teams: Vec<shared_types::TeamListItem> = teams
         .into_iter()
-        .map(|t| manager_models::TeamListItem {
+        .map(|t| shared_types::TeamListItem {
             id: t.id,
             name: t.name,
             description: t.description,
@@ -210,29 +206,31 @@ pub async fn login(
     let req = request.into_inner();
 
     // Get username and password from request
-    let username = req.get("username")
+    let username = req
+        .get("username")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Username is required".to_string())
-        })?;
+        .ok_or_else(|| AppError::InvalidRequest("Username is required".to_string()))?;
 
-    let password = req.get("password")
+    let password = req
+        .get("password")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Password is required".to_string())
-        })?;
+        .ok_or_else(|| AppError::InvalidRequest("Password is required".to_string()))?;
 
     // Validate input fields
     if username.trim().is_empty() {
-        return Err(AppError::InvalidRequest("Username cannot be empty".to_string()));
+        return Err(AppError::InvalidRequest(
+            "Username cannot be empty".to_string(),
+        ));
     }
-    
+
     if password.trim().is_empty() {
         return Err(AppError::InvalidRequest("Password is required".to_string()));
     }
 
     // Get user from database
-    let user = data.database.get_user_by_name(username)
+    let user = data
+        .database
+        .get_user_by_name(username)
         .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?;
 
     // Verify password
@@ -241,11 +239,14 @@ pub async fn login(
     }
 
     // Generate JWT token
-    let config = data.config.read().map_err(|e| {
-        AppError::Internal(format!("Failed to acquire config read lock: {}", e))
-    })?;
+    let config = data
+        .config
+        .read()
+        .map_err(|e| AppError::Internal(format!("Failed to acquire config read lock: {}", e)))?;
 
-    let jwt_secret = config.auth.as_ref()
+    let jwt_secret = config
+        .auth
+        .as_ref()
         .and_then(|a| a.jwt_secret.as_ref())
         .ok_or_else(|| AppError::Internal("JWT secret not configured".to_string()))?;
 
@@ -272,21 +273,21 @@ pub async fn register(
     let req = request.into_inner();
 
     // Get username and password from request
-    let username = req.get("username")
+    let username = req
+        .get("username")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Username is required".to_string())
-        })?;
+        .ok_or_else(|| AppError::InvalidRequest("Username is required".to_string()))?;
 
-    let password = req.get("password")
+    let password = req
+        .get("password")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            AppError::InvalidRequest("Password is required".to_string())
-        })?;
+        .ok_or_else(|| AppError::InvalidRequest("Password is required".to_string()))?;
 
     // Validate input fields
     if username.trim().is_empty() {
-        return Err(AppError::InvalidRequest("Username cannot be empty".to_string()));
+        return Err(AppError::InvalidRequest(
+            "Username cannot be empty".to_string(),
+        ));
     }
     if password.trim().is_empty() {
         return Err(AppError::InvalidRequest("Password is required".to_string()));
@@ -294,7 +295,9 @@ pub async fn register(
 
     // Check for duplicate username
     if data.database.get_user_by_name(username).is_ok() {
-        return Err(AppError::InvalidRequest("Username already exists".to_string()));
+        return Err(AppError::InvalidRequest(
+            "Username already exists".to_string(),
+        ));
     }
 
     // Check if this is the first user (for bootstrap logic)
@@ -307,7 +310,8 @@ pub async fn register(
     let user = crate::models::User {
         id: 0, // Will be set by database
         name: username.to_string(),
-        email: req.get("email")
+        email: req
+            .get("email")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .unwrap_or_default(),
@@ -333,11 +337,15 @@ pub async fn register(
     if is_first_user {
         let super_admin_team = crate::models::Team::new(
             "Super Admins".to_string(),
-            Some("Team with full system access. Members have all permissions automatically.".to_string()),
+            Some(
+                "Team with full system access. Members have all permissions automatically."
+                    .to_string(),
+            ),
             user_id,
         );
         let team_id = data.database.create_team(&super_admin_team)?;
-        data.database.add_team_member(team_id, user_id, Some(user_id))?;
+        data.database
+            .add_team_member(team_id, user_id, Some(user_id))?;
     }
 
     let response = crate::models::UserResponse { user };

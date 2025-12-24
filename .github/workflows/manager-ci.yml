@@ -51,12 +51,11 @@ jobs:
           # Cache key differentiation
           key: check-${{ hashFiles('**/Cargo.lock') }}
           # Cache workspace and registry
-          workspaces: |
-            .
-            manager
+          workspaces: manager
 
-      - name: Check workspace
-        run: cargo check --workspace --all-targets --verbose
+      - name: Check Manager
+        working-directory: manager
+        run: cargo check --all-targets --verbose
 
   # Code formatting verification
   format:
@@ -72,6 +71,7 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
+        working-directory: manager
         run: cargo fmt --all --check --verbose
 
   # Linting with Clippy
@@ -96,12 +96,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: clippy-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            .
-            manager
+          workspaces: manager
 
       - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- --deny warnings --verbose
+        working-directory: manager
+        run: cargo clippy --all-targets --all-features -- --deny warnings --verbose
 
   # Unit and integration tests
   test:
@@ -128,15 +127,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: test-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            .
-            manager
+          workspaces: manager
 
       - name: Run tests
-        run: cargo test --workspace --all-features --verbose
-
-      - name: Run doctests
-        run: cargo test --workspace --doc --verbose
+        working-directory: manager
+        run: |
+          cargo test --all-features --verbose
+          cargo test --doc --verbose
 
   # Security vulnerability audit
   audit:
@@ -154,6 +151,7 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run security audit
+        working-directory: manager
         run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0436
 
   # Build release binaries
@@ -177,11 +175,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: build-${{ hashFiles('**/Cargo.lock') }}
-          workspaces: |
-            .
-            manager
+          workspaces: manager
 
       - name: Build Manager in release mode
+        working-directory: manager
         run: cargo build --release --bin nocodo-manager --verbose
 
       - name: Upload Manager binary

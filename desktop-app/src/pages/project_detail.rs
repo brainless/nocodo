@@ -4,6 +4,7 @@ use crate::state::AppState;
 use crate::state::ConnectionState;
 use crate::ui_text::{ContentText, WidgetText};
 use egui::{Context, Ui};
+use manager_tools::types::FileInfo;
 use std::sync::Arc;
 
 pub struct ProjectDetailPage {
@@ -83,7 +84,7 @@ impl crate::pages::Page for ProjectDetailPage {
                     let project_name = details.project.name.clone();
                     let project_path = details.project.path.clone();
                     let project_description = details.project.description.clone();
-                    
+
                     // Update state for this page after cloning needed data
                     self.update_state(state);
 
@@ -178,13 +179,19 @@ impl crate::pages::Page for ProjectDetailPage {
                     // Tab bar
                     ui.horizontal(|ui| {
                         // Commands tab
-                        if ui.selectable_label(
-                            state.ui_state.project_detail_selected_tab == ProjectDetailTab::Commands,
-                            "Commands"
-                        ).clicked() {
-                            let was_previously_on_files = state.ui_state.project_detail_selected_tab == ProjectDetailTab::Files;
+                        if ui
+                            .selectable_label(
+                                state.ui_state.project_detail_selected_tab
+                                    == ProjectDetailTab::Commands,
+                                "Commands",
+                            )
+                            .clicked()
+                        {
+                            let was_previously_on_files =
+                                state.ui_state.project_detail_selected_tab
+                                    == ProjectDetailTab::Files;
                             state.ui_state.project_detail_selected_tab = ProjectDetailTab::Commands;
-                            
+
                             // Refresh commands list when tab is opened (especially from Files tab)
                             if was_previously_on_files {
                                 state.project_detail_commands_fetch_attempted = false;
@@ -195,10 +202,14 @@ impl crate::pages::Page for ProjectDetailPage {
                         ui.add_space(8.0);
 
                         // Files tab
-                        if ui.selectable_label(
-                            state.ui_state.project_detail_selected_tab == ProjectDetailTab::Files,
-                            "Files"
-                        ).clicked() {
+                        if ui
+                            .selectable_label(
+                                state.ui_state.project_detail_selected_tab
+                                    == ProjectDetailTab::Files,
+                                "Files",
+                            )
+                            .clicked()
+                        {
                             state.ui_state.project_detail_selected_tab = ProjectDetailTab::Files;
                         }
                     });
@@ -280,7 +291,12 @@ impl ProjectDetailPage {
     fn is_project_favorite_sync(&self, state: &AppState) -> bool {
         // Check if project is favorite for current server
         if let Some((server_host, server_user, server_port)) = &state.current_server_info {
-            let favorite_key = (server_host.clone(), server_user.clone(), *server_port, self.project_id);
+            let favorite_key = (
+                server_host.clone(),
+                server_user.clone(),
+                *server_port,
+                self.project_id,
+            );
             let is_favorite = state.favorite_projects.contains(&favorite_key);
             tracing::trace!(
                 "Checking favorite for project {}: key={:?}, is_favorite={}, total_favorites={}",
@@ -291,7 +307,10 @@ impl ProjectDetailPage {
             );
             is_favorite
         } else {
-            tracing::trace!("No current_server_info set when checking favorite for project {}", self.project_id);
+            tracing::trace!(
+                "No current_server_info set when checking favorite for project {}",
+                self.project_id
+            );
             false
         }
     }
@@ -299,11 +318,20 @@ impl ProjectDetailPage {
     fn toggle_project_favorite_sync(&self, state: &mut AppState) {
         tracing::debug!("Toggle favorite clicked for project {}", self.project_id);
         if let Some((server_host, server_user, server_port)) = &state.current_server_info {
-            let favorite_key = (server_host.clone(), server_user.clone(), *server_port, self.project_id);
+            let favorite_key = (
+                server_host.clone(),
+                server_user.clone(),
+                *server_port,
+                self.project_id,
+            );
             let was_favorite = state.favorite_projects.contains(&favorite_key);
-            
-            tracing::debug!("Current favorite status: {} for key {:?}", was_favorite, favorite_key);
-            
+
+            tracing::debug!(
+                "Current favorite status: {} for key {:?}",
+                was_favorite,
+                favorite_key
+            );
+
             if was_favorite {
                 // Remove favorite
                 state.favorite_projects.remove(&favorite_key);
@@ -350,7 +378,10 @@ impl ProjectDetailPage {
                 }
             }
         } else {
-            tracing::debug!("No current_server_info when toggling favorite for project {}", self.project_id);
+            tracing::debug!(
+                "No current_server_info when toggling favorite for project {}",
+                self.project_id
+            );
         }
     }
 
@@ -404,7 +435,7 @@ impl ProjectDetailPage {
                                                 self.render_file_tree(ui, state, &files_clone, "");
                                             }
                                         }
-                    Err(e) => {
+                                        Err(e) => {
                                             let e_clone = e.clone();
                                             drop(file_list_result);
                                             ui.label(WidgetText::error(format!(
@@ -420,14 +451,12 @@ impl ProjectDetailPage {
             );
 
             // Add 1px vertical separator
-            let separator_rect = egui::Rect::from_min_size(
-                ui.cursor().min,
-                egui::vec2(1.0, available_size.y)
-            );
+            let separator_rect =
+                egui::Rect::from_min_size(ui.cursor().min, egui::vec2(1.0, available_size.y));
             ui.painter().rect_filled(
                 separator_rect,
                 0.0,
-                ui.style().visuals.widgets.noninteractive.bg_stroke.color
+                ui.style().visuals.widgets.noninteractive.bg_stroke.color,
             );
             ui.add_space(1.0);
 
@@ -449,61 +478,63 @@ impl ProjectDetailPage {
                         .auto_shrink(false)
                         .show(ui, |ui| {
                             ui.add_space(8.0);
-                            
+
                             // Add 8px left/right inner spacing
                             ui.horizontal(|ui| {
                                 ui.add_space(8.0);
                                 ui.vertical(|ui| {
+                                    if let Some(path) = &state.ui_state.selected_file_path {
+                                        if state.loading_file_content {
+                                            ui.vertical_centered(|ui| {
+                                                ui.label(WidgetText::status(
+                                                    "Loading file content...",
+                                                ));
+                                                ui.add(egui::Spinner::new());
+                                            });
+                                        } else {
+                                            let file_content_result =
+                                                state.file_content_result.lock().unwrap();
+                                            if let Some(result) = file_content_result.as_ref() {
+                                                match result {
+                                                    Ok(content_response) => {
+                                                        let content =
+                                                            content_response.content.clone();
+                                                        drop(file_content_result);
 
-                                if let Some(path) = &state.ui_state.selected_file_path {
-                                    if state.loading_file_content {
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(WidgetText::status("Loading file content..."));
-                                            ui.add(egui::Spinner::new());
-                                        });
-                                    } else {
-                                        let file_content_result =
-                                            state.file_content_result.lock().unwrap();
-                                        if let Some(result) = file_content_result.as_ref() {
-                                            match result {
-                                                Ok(content_response) => {
-                                                    let content = content_response.content.clone();
-                                                    drop(file_content_result);
+                                                        // Check if this is a markdown file
+                                                        let is_markdown = path.ends_with(".md");
 
-                                                    // Check if this is a markdown file
-                                                    let is_markdown = path.ends_with(".md");
-
-                                                    if is_markdown {
-                                                        // Render markdown with styling
-                                                        MarkdownRenderer::render(ui, &content);
-                                                    } else {
-                                                        // Show other files in a monospace font
-                                                        ui.add(
-                                                            egui::TextEdit::multiline(
-                                                                &mut content.as_str(),
-                                                            )
-                                                            .desired_width(ui.available_width())
-                                                            .desired_rows(30)
-                                                            .font(egui::TextStyle::Monospace)
-                                                            .interactive(false),
-                                                        );
+                                                        if is_markdown {
+                                                            // Render markdown with styling
+                                                            MarkdownRenderer::render(ui, &content);
+                                                        } else {
+                                                            // Show other files in a monospace font
+                                                            ui.add(
+                                                                egui::TextEdit::multiline(
+                                                                    &mut content.as_str(),
+                                                                )
+                                                                .desired_width(ui.available_width())
+                                                                .desired_rows(30)
+                                                                .font(egui::TextStyle::Monospace)
+                                                                .interactive(false),
+                                                            );
+                                                        }
                                                     }
-                                                }
-                    Err(e) => {
-                                                    ui.label(WidgetText::error(format!(
-                                                        "Error loading file: {}",
-                                                        e
-                                                    )));
+                                                    Err(e) => {
+                                                        ui.label(WidgetText::error(format!(
+                                                            "Error loading file: {}",
+                                                            e
+                                                        )));
+                                                    }
                                                 }
                                             }
                                         }
+                                    } else {
+                                        ui.vertical_centered(|ui| {
+                                            ui.label(WidgetText::status("No file selected"));
+                                        });
                                     }
-                                } else {
-                                    ui.vertical_centered(|ui| {
-                                        ui.label(WidgetText::status("No file selected"));
-                                    });
-                                }
-                                ui.add_space(8.0);
+                                    ui.add_space(8.0);
                                 });
                                 ui.add_space(8.0);
                             });
@@ -517,16 +548,14 @@ impl ProjectDetailPage {
         &self,
         ui: &mut Ui,
         state: &mut AppState,
-        files: &[manager_models::FileInfo],
+        files: &[FileInfo],
         _prefix: &str,
     ) {
         // Show "Go up.." if not in root directory
         if state.ui_state.current_directory_path.is_some() {
             let available_width = ui.available_width();
-            let (rect, response) = ui.allocate_exact_size(
-                egui::vec2(available_width, 24.0),
-                egui::Sense::click(),
-            );
+            let (rect, response) =
+                ui.allocate_exact_size(egui::vec2(available_width, 24.0), egui::Sense::click());
 
             // Change cursor to pointer on hover
             if response.hovered() {
@@ -535,7 +564,8 @@ impl ProjectDetailPage {
 
             // Add hover background (same as sidebar)
             if response.hovered() {
-                ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+                ui.painter()
+                    .rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
             }
 
             // Draw "Go up.." text
@@ -545,7 +575,7 @@ impl ProjectDetailPage {
                 egui::Align2::LEFT_TOP,
                 "⬆ Go up..",
                 egui::FontId::new(14.0, egui::FontFamily::Proportional),
-                ui.style().visuals.text_color()
+                ui.style().visuals.text_color(),
             );
 
             if response.clicked() {
@@ -576,10 +606,8 @@ impl ProjectDetailPage {
             let is_expanded = state.ui_state.expanded_folders.contains(&full_path);
 
             let available_width = ui.available_width();
-            let (rect, response) = ui.allocate_exact_size(
-                egui::vec2(available_width, 24.0),
-                egui::Sense::click(),
-            );
+            let (rect, response) =
+                ui.allocate_exact_size(egui::vec2(available_width, 24.0), egui::Sense::click());
 
             // Change cursor to pointer on hover
             if response.hovered() {
@@ -588,7 +616,8 @@ impl ProjectDetailPage {
 
             // Add hover background (same as sidebar)
             if response.hovered() {
-                ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+                ui.painter()
+                    .rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
             }
 
             // Draw folder icon and name
@@ -599,7 +628,7 @@ impl ProjectDetailPage {
                 egui::Align2::LEFT_TOP,
                 format!("{} {}", icon, directory.name),
                 egui::FontId::new(14.0, egui::FontFamily::Proportional),
-                ui.style().visuals.text_color()
+                ui.style().visuals.text_color(),
             );
 
             if response.clicked() {
@@ -623,10 +652,8 @@ impl ProjectDetailPage {
             let full_path = file.path.clone();
 
             let available_width = ui.available_width();
-            let (rect, response) = ui.allocate_exact_size(
-                egui::vec2(available_width, 24.0),
-                egui::Sense::click(),
-            );
+            let (rect, response) =
+                ui.allocate_exact_size(egui::vec2(available_width, 24.0), egui::Sense::click());
 
             // Change cursor to pointer on hover
             if response.hovered() {
@@ -635,7 +662,8 @@ impl ProjectDetailPage {
 
             // Add hover background (same as sidebar)
             if response.hovered() {
-                ui.painter().rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
+                ui.painter()
+                    .rect_filled(rect, 0.0, ui.style().visuals.widgets.hovered.bg_fill);
             }
 
             // Draw file icon and name
@@ -646,7 +674,7 @@ impl ProjectDetailPage {
                 egui::Align2::LEFT_TOP,
                 format!("{} {}", icon, file.name),
                 egui::FontId::new(14.0, egui::FontFamily::Proportional),
-                ui.style().visuals.text_color()
+                ui.style().visuals.text_color(),
             );
 
             if response.clicked() {
@@ -686,12 +714,15 @@ impl ProjectDetailPage {
             let project_id = self.project_id;
             let path = path.map(|p| p.to_string());
             let git_branch = state.ui_state.project_detail_selected_branch.clone();
-            let file_list_result_clone = Arc::clone(&state.file_list_result);
+            let file_list_result_clone: crate::state::ArcResult<Vec<FileInfo>> =
+                Arc::clone(&state.file_list_result);
 
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.list_files(project_id, path.as_deref(), git_branch.as_deref()).await;
+                    let result = api_client
+                        .list_files(project_id, path.as_deref(), git_branch.as_deref())
+                        .await;
                     let mut file_list_result = file_list_result_clone.lock().unwrap();
                     *file_list_result = Some(result.map_err(|e| e.to_string()));
                 } else {
@@ -719,7 +750,9 @@ impl ProjectDetailPage {
             tokio::spawn(async move {
                 if let Some(api_client_arc) = connection_manager.get_api_client().await {
                     let api_client = api_client_arc.read().await;
-                    let result = api_client.get_file_content(project_id, &path, git_branch.as_deref()).await;
+                    let result = api_client
+                        .get_file_content(project_id, &path, git_branch.as_deref())
+                        .await;
                     let mut file_content_result = file_content_result_clone.lock().unwrap();
                     *file_content_result = Some(result.map_err(|e| e.to_string()));
                 } else {
@@ -730,18 +763,16 @@ impl ProjectDetailPage {
         }
     }
 
-
-
     fn navigate_into_directory(&self, state: &mut AppState, directory_path: &str) {
         // Set current directory path
         state.ui_state.current_directory_path = Some(directory_path.to_string());
-        
+
         // Clear file list result to trigger reload
         {
             let mut file_list_result = state.file_list_result.lock().unwrap();
             *file_list_result = None;
         }
-        
+
         // Load files for this directory
         self.load_file_list(state, Some(directory_path));
     }
@@ -761,13 +792,13 @@ impl ProjectDetailPage {
                 // No parent, go to root
                 state.ui_state.current_directory_path = None;
             }
-            
+
             // Clear file list result to trigger reload
             {
                 let mut file_list_result = state.file_list_result.lock().unwrap();
                 *file_list_result = None;
             }
-            
+
             // Load files for the parent directory
             let current_path = state.ui_state.current_directory_path.clone();
             self.load_file_list(state, current_path.as_deref());
@@ -821,11 +852,15 @@ impl ProjectDetailPage {
             state.loading_project_detail_worktree_branches = false;
             state.project_detail_worktree_branches_project_id = Some(self.project_id);
 
-            tracing::info!("[ProjectDetail::update_state] All state cleared for new project {}", self.project_id);
+            tracing::info!(
+                "[ProjectDetail::update_state] All state cleared for new project {}",
+                self.project_id
+            );
         }
 
         // Load saved commands if not already loaded
-        if !state.project_detail_commands_fetch_attempted && !state.loading_project_detail_commands {
+        if !state.project_detail_commands_fetch_attempted && !state.loading_project_detail_commands
+        {
             let api_service = crate::services::ApiService::new();
             api_service.list_project_commands(self.project_id, state);
         }
@@ -846,7 +881,8 @@ impl ProjectDetailPage {
                 }
                 // Clear the result to avoid reprocessing
                 drop(commands_result);
-                let mut commands_result = state.project_detail_saved_commands_result.lock().unwrap();
+                let mut commands_result =
+                    state.project_detail_saved_commands_result.lock().unwrap();
                 *commands_result = None;
             }
         }
@@ -857,7 +893,8 @@ impl ProjectDetailPage {
             if let Some(result) = discovery_result.as_ref() {
                 match result {
                     Ok(discovery) => {
-                        state.ui_state.project_detail_command_discovery_results = Some(discovery.clone());
+                        state.ui_state.project_detail_command_discovery_results =
+                            Some(discovery.clone());
                         state.loading_command_discovery = false;
                     }
                     Err(_e) => {
@@ -922,7 +959,10 @@ impl ProjectDetailPage {
 
         // Check for worktree branches results
         {
-            let branches_result = state.project_detail_worktree_branches_result.lock().unwrap();
+            let branches_result = state
+                .project_detail_worktree_branches_result
+                .lock()
+                .unwrap();
             if let Some(result) = branches_result.as_ref() {
                 match result {
                     Ok(branches) => {
@@ -935,14 +975,20 @@ impl ProjectDetailPage {
                         state.loading_project_detail_worktree_branches = false;
                     }
                     Err(e) => {
-                        tracing::error!("[ProjectDetail::update_state] Failed to load branches: {}", e);
+                        tracing::error!(
+                            "[ProjectDetail::update_state] Failed to load branches: {}",
+                            e
+                        );
                         state.loading_project_detail_worktree_branches = false;
                         // Error will be shown in UI
                     }
                 }
                 // Clear the result to avoid reprocessing
                 drop(branches_result);
-                let mut branches_result = state.project_detail_worktree_branches_result.lock().unwrap();
+                let mut branches_result = state
+                    .project_detail_worktree_branches_result
+                    .lock()
+                    .unwrap();
                 *branches_result = None;
             }
         }
@@ -1006,7 +1052,9 @@ impl ProjectDetailPage {
                 let command_id = command.id.clone();
 
                 // Get last execution time for this command
-                let last_executed_at = state.ui_state.project_detail_command_executions
+                let last_executed_at = state
+                    .ui_state
+                    .project_detail_command_executions
                     .iter()
                     .find(|exec| exec.command_id == command_id)
                     .map(|exec| exec.executed_at);
@@ -1019,7 +1067,7 @@ impl ProjectDetailPage {
                     // Select this command and hide discovery form
                     state.ui_state.project_detail_selected_command_id = Some(command_id.clone());
                     state.ui_state.project_detail_show_discovery_form = false;
-                    
+
                     // Load execution history for this command
                     let api_service = crate::services::ApiService::new();
                     api_service.get_command_executions(self.project_id, &command_id, state);
@@ -1036,7 +1084,10 @@ impl ProjectDetailPage {
 
         // LLM Discovery checkbox
         ui.horizontal(|ui| {
-            ui.checkbox(&mut state.ui_state.project_detail_use_llm_discovery, "Enable LLM-based discovery");
+            ui.checkbox(
+                &mut state.ui_state.project_detail_use_llm_discovery,
+                "Enable LLM-based discovery",
+            );
         });
 
         ui.add_space(8.0);
@@ -1050,18 +1101,22 @@ impl ProjectDetailPage {
         } else if ui.button(WidgetText::button("Start Discovery")).clicked() {
             let api_service = crate::services::ApiService::new();
             api_service.discover_project_commands(
-                self.project_id, 
-                Some(state.ui_state.project_detail_use_llm_discovery), 
-                state
+                self.project_id,
+                Some(state.ui_state.project_detail_use_llm_discovery),
+                state,
             );
         }
 
         ui.add_space(16.0);
 
         // Show discovered commands
-        if let Some(results) = state.ui_state.project_detail_command_discovery_results.clone() {
+        if let Some(results) = state
+            .ui_state
+            .project_detail_command_discovery_results
+            .clone()
+        {
             ui.heading(WidgetText::section_heading("Discovered Commands"));
-            
+
             egui::ScrollArea::vertical()
                 .id_salt("discovered_commands_scroll")
                 .auto_shrink(false)
@@ -1074,14 +1129,22 @@ impl ProjectDetailPage {
 
                         // Checkbox for selection
                         ui.horizontal(|ui| {
-                            let mut is_selected = state.ui_state.project_detail_command_selected_items
+                            let mut is_selected = state
+                                .ui_state
+                                .project_detail_command_selected_items
                                 .contains(command_name);
 
                             if ui.checkbox(&mut is_selected, "").changed() {
                                 if is_selected {
-                                    state.ui_state.project_detail_command_selected_items.insert(command_name.to_string());
+                                    state
+                                        .ui_state
+                                        .project_detail_command_selected_items
+                                        .insert(command_name.to_string());
                                 } else {
-                                    state.ui_state.project_detail_command_selected_items.remove(command_name);
+                                    state
+                                        .ui_state
+                                        .project_detail_command_selected_items
+                                        .remove(command_name);
                                 }
                             }
 
@@ -1098,19 +1161,32 @@ impl ProjectDetailPage {
                     }
 
                     // Save selected commands button
-                    if !state.ui_state.project_detail_command_selected_items.is_empty() {
+                    if !state
+                        .ui_state
+                        .project_detail_command_selected_items
+                        .is_empty()
+                    {
                         ui.add_space(16.0);
-                        if ui.button(WidgetText::button("Save selected commands")).clicked() {
+                        if ui
+                            .button(WidgetText::button("Save selected commands"))
+                            .clicked()
+                        {
                             // Filter selected commands from discovery results
-                            let selected_items = state.ui_state.project_detail_command_selected_items.clone();
-                            let selected_commands: Vec<manager_models::ProjectCommand> = results.commands
+                            let selected_items =
+                                state.ui_state.project_detail_command_selected_items.clone();
+                            let selected_commands: Vec<shared_types::ProjectCommand> = results
+                                .commands
                                 .iter()
                                 .filter(|cmd| selected_items.contains(&cmd.name))
                                 .map(|cmd| cmd.to_project_command(self.project_id))
                                 .collect();
 
                             let api_service = crate::services::ApiService::new();
-                            api_service.create_project_commands(self.project_id, selected_commands, state);
+                            api_service.create_project_commands(
+                                self.project_id,
+                                selected_commands,
+                                state,
+                            );
                         }
                     }
                 });
@@ -1126,13 +1202,14 @@ impl ProjectDetailPage {
         ui.add_space(8.0);
 
         // Find the command details
-        if let Some(command) = state.project_detail_saved_commands
+        if let Some(command) = state
+            .project_detail_saved_commands
             .iter()
-            .find(|cmd| cmd.id == command_id) {
-            
+            .find(|cmd| cmd.id == command_id)
+        {
             // Command name and description
             ui.label(ContentText::title(&command.name));
-            
+
             if let Some(description) = &command.description {
                 ui.add_space(4.0);
                 ui.label(ContentText::description(ui, description));
@@ -1188,10 +1265,10 @@ impl ProjectDetailPage {
             if ui.button(WidgetText::button("Execute Command")).clicked() {
                 let api_service = crate::services::ApiService::new();
                 api_service.execute_project_command(
-                    self.project_id, 
-                    command_id, 
+                    self.project_id,
+                    command_id,
                     selected_branch.as_deref(),
-                    state
+                    state,
                 );
             }
         } else {
@@ -1199,15 +1276,15 @@ impl ProjectDetailPage {
         }
     }
 
-    fn show_execution_entry(&self, ui: &mut Ui, execution: &manager_models::ProjectCommandExecution) {
+    fn show_execution_entry(&self, ui: &mut Ui, execution: &shared_types::ProjectCommandExecution) {
         let executed_at = chrono::DateTime::from_timestamp(execution.executed_at, 0)
-            .unwrap_or_else(|| chrono::Utc::now());
+            .unwrap_or_else(chrono::Utc::now);
         let formatted_time = executed_at.format("%Y-%m-%d %H:%M:%S").to_string();
 
         // Execution header
         ui.horizontal(|ui| {
             ui.label(WidgetText::label(&formatted_time));
-            
+
             // Status indicator
             let status_text = if execution.success {
                 WidgetText::success("✓ Success")
@@ -1227,12 +1304,12 @@ impl ProjectDetailPage {
 
         // Exit code
         if let Some(exit_code) = execution.exit_code {
-            ui.label(WidgetText::muted(&format!("Exit code: {}", exit_code)));
+            ui.label(WidgetText::muted(format!("Exit code: {}", exit_code)));
         }
 
         // Git branch if present
         if let Some(branch) = &execution.git_branch {
-            ui.label(WidgetText::muted(&format!("Branch: {}", branch)));
+            ui.label(WidgetText::muted(format!("Branch: {}", branch)));
         }
 
         // Output
@@ -1273,7 +1350,9 @@ impl ProjectDetailPage {
         ui.add_space(8.0);
 
         ui.vertical_centered(|ui| {
-            ui.label(WidgetText::status("Select a command or discover new commands"));
+            ui.label(WidgetText::status(
+                "Select a command or discover new commands",
+            ));
         });
     }
 
@@ -1344,7 +1423,9 @@ impl ProjectDetailPage {
                     // Show discovery form or command details
                     if state.ui_state.project_detail_show_discovery_form {
                         self.show_discovery_form(ui, state);
-                    } else if let Some(selected_command_id) = state.ui_state.project_detail_selected_command_id.clone() {
+                    } else if let Some(selected_command_id) =
+                        state.ui_state.project_detail_selected_command_id.clone()
+                    {
                         self.show_command_details(ui, state, &selected_command_id);
                     } else {
                         self.show_command_details_placeholder(ui, state);

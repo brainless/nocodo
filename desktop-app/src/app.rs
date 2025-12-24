@@ -241,7 +241,9 @@ impl DesktopApp {
 
         // Don't load favorites at startup - they will be loaded after successful connection and auth
         // This ensures favorites are only loaded when we have a server context
-        tracing::info!("Favorites will be loaded after successful server connection and authentication");
+        tracing::info!(
+            "Favorites will be loaded after successful server connection and authentication"
+        );
 
         app.state.db = Some(db);
 
@@ -349,7 +351,7 @@ impl DesktopApp {
 
         // Apply fonts to the context
         ctx.set_fonts(fonts);
-        
+
         // Initialize material icons AFTER setting fonts
         egui_material_icons::initialize(ctx);
     }

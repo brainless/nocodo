@@ -1,14 +1,11 @@
-use manager_models::{GrepMatch, GrepRequest, GrepResponse, ToolErrorResponse, ToolResponse};
 use crate::tool_error::ToolError;
+use crate::types::{GrepMatch, GrepRequest, GrepResponse, ToolErrorResponse, ToolResponse};
 use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub async fn grep_search(
-    base_path: &Path,
-    request: GrepRequest,
-) -> Result<ToolResponse> {
+pub async fn grep_search(base_path: &Path, request: GrepRequest) -> Result<ToolResponse> {
     use regex::RegexBuilder;
 
     let search_path = if let Some(path) = &request.path {
@@ -35,25 +32,27 @@ pub async fn grep_search(
         .map_err(|e| ToolError::InvalidPath(format!("Invalid regex pattern: {}", e)))?;
 
     // Compile include/exclude patterns (convert from glob to regex)
-    let include_regex =
-        if let Some(pattern) = &request.include_pattern {
-            let regex_pattern = glob_to_regex(pattern);
-            Some(RegexBuilder::new(&regex_pattern).build().map_err(|e| {
-                ToolError::InvalidPath(format!("Invalid include pattern: {}", e))
-            })?)
-        } else {
-            None
-        };
+    let include_regex = if let Some(pattern) = &request.include_pattern {
+        let regex_pattern = glob_to_regex(pattern);
+        Some(
+            RegexBuilder::new(&regex_pattern)
+                .build()
+                .map_err(|e| ToolError::InvalidPath(format!("Invalid include pattern: {}", e)))?,
+        )
+    } else {
+        None
+    };
 
-    let exclude_regex =
-        if let Some(pattern) = &request.exclude_pattern {
-            let regex_pattern = glob_to_regex(pattern);
-            Some(RegexBuilder::new(&regex_pattern).build().map_err(|e| {
-                ToolError::InvalidPath(format!("Invalid exclude pattern: {}", e))
-            })?)
-        } else {
-            None
-        };
+    let exclude_regex = if let Some(pattern) = &request.exclude_pattern {
+        let regex_pattern = glob_to_regex(pattern);
+        Some(
+            RegexBuilder::new(&regex_pattern)
+                .build()
+                .map_err(|e| ToolError::InvalidPath(format!("Invalid exclude pattern: {}", e)))?,
+        )
+    } else {
+        None
+    };
 
     let mut matches = Vec::new();
     let mut files_searched = 0;

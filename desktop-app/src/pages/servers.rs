@@ -54,14 +54,15 @@ impl crate::pages::Page for ServersPage {
 
                     let connection_manager = Arc::clone(&state.connection_manager);
                     let result_arc = Arc::clone(&state.connection_result);
-                    
+
                     tokio::spawn(async move {
                         match connection_manager.connect_local(8081).await {
                             Ok(_) => {
                                 tracing::info!("Connected to local manager");
                                 // Store successful result
                                 let mut result = result_arc.lock().unwrap();
-                                *result = Some(Ok(("localhost".to_string(), "local".to_string(), 8081)));
+                                *result =
+                                    Some(Ok(("localhost".to_string(), "local".to_string(), 8081)));
                             }
                             Err(e) => {
                                 tracing::error!("Failed to connect to local manager: {}", e);
@@ -172,6 +173,4 @@ impl ServersPage {
         let api_service = crate::services::ApiService::new();
         let _ = api_service.check_local_server(state);
     }
-
-
 }

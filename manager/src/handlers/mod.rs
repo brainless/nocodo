@@ -5,18 +5,14 @@ pub use main_handlers::AppState;
 // Project handlers module
 pub mod project_handlers;
 
-
-// Work handlers module  
+// Work handlers module
 pub mod work_handlers;
-
 
 // User handlers module
 pub mod user_handlers;
 
-
 // Team handlers module
 pub mod team_handlers;
-
 
 // File handlers module
 pub mod file_handlers;

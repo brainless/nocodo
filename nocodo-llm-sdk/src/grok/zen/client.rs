@@ -1,8 +1,9 @@
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use crate::{
     error::LlmError,
     grok::types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokErrorResponse},
 };
+use async_trait::async_trait;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 /// Zen provider for Grok (OpenCode Zen)
 ///
@@ -68,15 +69,13 @@ impl ZenGrokClient {
         if let Some(ref api_key) = self.api_key {
             headers.insert(
                 AUTHORIZATION,
-                HeaderValue::from_str(&format!("Bearer {}", api_key))
-                    .map_err(|e| LlmError::authentication(format!("Invalid API key format: {}", e)))?,
+                HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| {
+                    LlmError::authentication(format!("Invalid API key format: {}", e))
+                })?,
             );
         }
 
-        headers.insert(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        );
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         let response = self
             .http_client
@@ -106,9 +105,7 @@ impl ZenGrokClient {
             return Err(LlmError::api_error(status.as_u16(), error_body));
         }
 
-        let completion_response = response
-            .json::<GrokChatCompletionResponse>()
-            .await?;
+        let completion_response = response.json::<GrokChatCompletionResponse>().await?;
 
         Ok(completion_response)
     }
@@ -135,6 +132,7 @@ impl Default for ZenGrokClient {
     }
 }
 
+#[async_trait]
 impl crate::client::LlmClient for ZenGrokClient {
     async fn complete(
         &self,
@@ -181,7 +179,7 @@ impl crate::client::LlmClient for ZenGrokClient {
             top_p: request.top_p,
             stop: request.stop_sequences,
             stream: None, // Non-streaming for now
-            tools: None, // No tools for generic LlmClient interface
+            tools: None,  // No tools for generic LlmClient interface
             tool_choice: None,
         };
 
@@ -205,10 +203,19 @@ impl crate::client::LlmClient for ZenGrokClient {
                 crate::grok::types::GrokRole::System => crate::types::Role::System,
             },
             usage: crate::types::Usage {
-                input_tokens: grok_response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
-                output_tokens: grok_response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
+                input_tokens: grok_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.prompt_tokens)
+                    .unwrap_or(0),
+                output_tokens: grok_response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.completion_tokens)
+                    .unwrap_or(0),
             },
             stop_reason: choice.finish_reason.clone(),
+            tool_calls: None, // TODO: Extract tool calls from Grok Zen response
         };
 
         Ok(response)

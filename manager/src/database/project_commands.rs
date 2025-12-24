@@ -6,7 +6,11 @@ use rusqlite::{params, OptionalExtension};
 #[allow(dead_code)]
 impl super::Database {
     /// Check if a command already exists for a project (by command string)
-    pub fn command_exists(&self, project_id: i64, command_str: &str) -> AppResult<Option<ProjectCommand>> {
+    pub fn command_exists(
+        &self,
+        project_id: i64,
+        command_str: &str,
+    ) -> AppResult<Option<ProjectCommand>> {
         let conn = self
             .connection
             .lock()
@@ -88,7 +92,7 @@ impl super::Database {
             .transpose()
             .map_err(|e| AppError::Internal(format!("Failed to serialize os_filter: {}", e)))?;
 
-conn.execute(
+        conn.execute(
             r#"
             INSERT INTO project_commands
             (id, project_id, name, description, command, shell, working_directory, environment, timeout_seconds, os_filter, created_at, updated_at)
@@ -132,7 +136,8 @@ conn.execute(
 
         let command_iter = stmt.query_map([project_id], |row| {
             let environment: Option<String> = row.get(7)?;
-            let environment_parsed = environment.as_ref()
+            let environment_parsed = environment
+                .as_ref()
                 .map(|env_json| serde_json::from_str(env_json))
                 .transpose()
                 .map_err(|e| {
@@ -145,7 +150,8 @@ conn.execute(
 
             let timeout_seconds: Option<i64> = row.get(8)?;
             let os_filter: Option<String> = row.get(9)?;
-            let os_filter_parsed = os_filter.as_ref()
+            let os_filter_parsed = os_filter
+                .as_ref()
                 .map(|os_json| serde_json::from_str(os_json))
                 .transpose()
                 .map_err(|e| {
@@ -241,7 +247,10 @@ conn.execute(
 
         match command {
             Some(command) => Ok(command),
-            None => Err(AppError::NotFound(format!("Project command not found: {}", id))),
+            None => Err(AppError::NotFound(format!(
+                "Project command not found: {}",
+                id
+            ))),
         }
     }
 
@@ -287,7 +296,10 @@ conn.execute(
         )?;
 
         if rows_affected == 0 {
-            return Err(AppError::NotFound(format!("Project command not found: {}", command.id)));
+            return Err(AppError::NotFound(format!(
+                "Project command not found: {}",
+                command.id
+            )));
         }
 
         tracing::info!("Updated project command: {} ({})", command.name, command.id);
@@ -304,7 +316,10 @@ conn.execute(
         let rows_affected = conn.execute("DELETE FROM project_commands WHERE id = ?", [id])?;
 
         if rows_affected == 0 {
-            return Err(AppError::NotFound(format!("Project command not found: {}", id)));
+            return Err(AppError::NotFound(format!(
+                "Project command not found: {}",
+                id
+            )));
         }
 
         tracing::info!("Deleted project command: {}", id);
@@ -312,7 +327,10 @@ conn.execute(
     }
 
     /// Create a project command execution record
-    pub fn create_project_command_execution(&self, execution: &ProjectCommandExecution) -> AppResult<i64> {
+    pub fn create_project_command_execution(
+        &self,
+        execution: &ProjectCommandExecution,
+    ) -> AppResult<i64> {
         let conn = self
             .connection
             .lock()
@@ -337,12 +355,20 @@ conn.execute(
         )?;
 
         let execution_id = conn.last_insert_rowid();
-        tracing::info!("Created project command execution: {} for command {}", execution_id, execution.command_id);
+        tracing::info!(
+            "Created project command execution: {} for command {}",
+            execution_id,
+            execution.command_id
+        );
         Ok(execution_id)
     }
 
     /// Get execution history for a project command
-    pub fn get_project_command_executions(&self, command_id: &str, limit: i64) -> AppResult<Vec<ProjectCommandExecution>> {
+    pub fn get_project_command_executions(
+        &self,
+        command_id: &str,
+        limit: i64,
+    ) -> AppResult<Vec<ProjectCommandExecution>> {
         let conn = self
             .connection
             .lock()

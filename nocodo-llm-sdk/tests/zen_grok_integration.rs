@@ -1,6 +1,6 @@
 use nocodo_llm_sdk::grok::{
-    zen::ZenGrokClient,
     types::{GrokChatCompletionRequest, GrokMessage, GrokRole},
+    zen::ZenGrokClient,
 };
 
 #[tokio::test]

@@ -1,5 +1,5 @@
 [package]
-name = "manager-models"
+name = "shared-types"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

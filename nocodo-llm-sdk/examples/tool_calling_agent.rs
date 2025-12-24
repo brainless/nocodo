@@ -28,11 +28,16 @@ struct CalculateParams {
     expression: String,
 }
 
-async fn execute_tool(call: &nocodo_llm_sdk::tools::ToolCall) -> Result<ToolResult, Box<dyn std::error::Error>> {
+async fn execute_tool(
+    call: &nocodo_llm_sdk::tools::ToolCall,
+) -> Result<ToolResult, Box<dyn std::error::Error>> {
     match call.name() {
         "search" => {
             let params: SearchParams = call.parse_arguments()?;
-            println!("🔍 Searching for: {} (limit: {})", params.query, params.limit);
+            println!(
+                "🔍 Searching for: {} (limit: {})",
+                params.query, params.limit
+            );
 
             // Simulate search results
             let results = format!(
