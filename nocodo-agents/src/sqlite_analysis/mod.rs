@@ -9,6 +9,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
+#[cfg(test)]
+mod tests;
+
 pub struct SqliteAnalysisAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
@@ -34,6 +37,25 @@ impl SqliteAnalysisAgent {
             db_path,
             system_prompt,
         })
+    }
+
+    /// Create a new SqliteAnalysisAgent for testing (skips path validation)
+    #[cfg(test)]
+    pub fn new_for_testing(
+        client: Arc<dyn LlmClient>,
+        database: Arc<Database>,
+        tool_executor: Arc<ToolExecutor>,
+        db_path: String,
+    ) -> Self {
+        let system_prompt = generate_system_prompt(&db_path);
+
+        Self {
+            client,
+            database,
+            tool_executor,
+            db_path,
+            system_prompt,
+        }
     }
 
     fn get_tool_definitions(&self) -> Vec<nocodo_llm_sdk::tools::Tool> {
@@ -193,9 +215,17 @@ impl Agent for SqliteAnalysisAgent {
             let response = self.client.complete(request).await?;
 
             let text = extract_text_from_content(&response.content);
+
+            // If there's no text but there are tool calls, use a placeholder for storage
+            let text_to_save = if text.is_empty() && response.tool_calls.is_some() {
+                "[Using tools]"
+            } else {
+                &text
+            };
+
             let message_id = self
                 .database
-                .create_message(session_id, "assistant", &text)?;
+                .create_message(session_id, "assistant", text_to_save)?;
 
             if let Some(tool_calls) = response.tool_calls {
                 if tool_calls.is_empty() {
@@ -245,27 +275,28 @@ fn generate_system_prompt(db_path: &str) -> String {
         "You are a database analysis expert specialized in SQLite databases. \
          You are analyzing the database at: {}
 
-Your role is to explore schemas, query data, and provide insights about \
-database structure and contents. You have access to the sqlite3_reader tool \
-which executes read-only SQL queries (SELECT and PRAGMA statements).
+Your role is to query data and provide insights about database contents. \
+You have access to the sqlite3_reader tool which executes read-only SQL queries.
 
-IMPORTANT: Always use db_path='{}' in your sqlite3_reader tool calls.
+IMPORTANT: The database path is already configured. You do NOT need to specify \
+db_path in your tool calls - just provide the SQL query.
 
-Schema Exploration Commands:
-- PRAGMA table_list - List all tables
-- PRAGMA table_info(table_name) - Get column details for a table
-- PRAGMA foreign_key_list(table_name) - Get foreign key relationships
-- SELECT sql FROM sqlite_master WHERE name='table_name' - Get CREATE statement
+ALLOWED QUERIES:
+- SELECT queries to retrieve data
+- PRAGMA queries to inspect schema (PRAGMA table_list, PRAGMA table_info(name))
+
+You can ONLY use SELECT and PRAGMA statements. Do NOT use CREATE, INSERT, UPDATE, \
+DELETE, ALTER, DROP, or any other statements.
 
 Best Practices:
-1. Start by exploring the schema before querying data
-2. Use appropriate LIMIT clauses for large result sets
-3. Provide clear explanations of your findings
-4. When counting rows, use COUNT(*) queries
-5. Identify relationships between tables using foreign keys
+1. Keep queries simple and direct
+2. Use LIMIT clauses for large result sets
+3. For latest/newest records: use ORDER BY column DESC LIMIT 1
+4. For counting: use SELECT COUNT(*) FROM table
+5. Answer user questions concisely based on query results
 
-Always base your analysis on actual database contents, not assumptions.",
-        db_path, db_path
+Focus on answering the user's question directly.",
+        db_path
     )
 }
 

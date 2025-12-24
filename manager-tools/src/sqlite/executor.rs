@@ -284,11 +284,15 @@ impl SqlExecutor {
 fn is_safe_context(query: &str, keyword: &str) -> bool {
     let query_upper = query.to_uppercase();
 
+    // UNION is allowed in SELECT queries (for combining results)
     if keyword == "UNION" {
         return query_upper.contains("SELECT");
     }
 
-    false
+    // Check if keyword appears as part of a column/table name rather than as a SQL keyword
+    // Example: "created_at" contains "CREATE" but it's not a CREATE statement
+    let keyword_pattern = regex::Regex::new(&format!(r"\b{}\b", regex::escape(keyword))).unwrap();
+    !keyword_pattern.is_match(&query_upper)
 }
 
 #[cfg(test)]
