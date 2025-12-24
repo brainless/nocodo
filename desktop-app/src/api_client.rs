@@ -1,12 +1,12 @@
+use manager_tools::types::FileInfo;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use shared_types::{
     CreateWorkRequest, PermissionItem, Project, ProjectDetailsResponse, ProjectListResponse,
     ServerStatus, SettingsResponse, SupportedModelsResponse, Team, TeamListItem, TeamListResponse,
     UpdateApiKeysRequest, UpdateUserRequest, UserDetailResponse, UserListItem, UserListResponse,
     Work, WorkListResponse, WorkResponse,
 };
-use manager_tools::types::FileInfo;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 /// File content response from API
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,11 +157,10 @@ impl ApiClient {
             return Err(ApiError::HttpStatus(response.status()));
         }
 
-        let outputs_response: shared_types::AiSessionOutputListResponse =
-            response
-                .json()
-                .await
-                .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
+        let outputs_response: shared_types::AiSessionOutputListResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
 
         Ok(outputs_response.outputs)
     }

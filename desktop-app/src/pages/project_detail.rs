@@ -1276,11 +1276,7 @@ impl ProjectDetailPage {
         }
     }
 
-    fn show_execution_entry(
-        &self,
-        ui: &mut Ui,
-        execution: &shared_types::ProjectCommandExecution,
-    ) {
+    fn show_execution_entry(&self, ui: &mut Ui, execution: &shared_types::ProjectCommandExecution) {
         let executed_at = chrono::DateTime::from_timestamp(execution.executed_at, 0)
             .unwrap_or_else(chrono::Utc::now);
         let formatted_time = executed_at.format("%Y-%m-%d %H:%M:%S").to_string();
