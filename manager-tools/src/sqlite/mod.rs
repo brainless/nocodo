@@ -2,7 +2,6 @@ use crate::tool_error::ToolError;
 
 pub mod executor;
 pub mod formatter;
-pub mod validator;
 
 pub use executor::{QueryResult, SqlExecutor};
 

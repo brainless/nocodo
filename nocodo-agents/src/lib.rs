@@ -96,6 +96,7 @@ pub fn format_tool_response(response: &manager_tools::types::ToolResponse) -> St
             r.exit_code, r.stdout, r.stderr
         ),
         ToolResponse::AskUser(r) => format!("User response: {:?}", r.responses),
+        ToolResponse::Sqlite3Reader(r) => r.formatted_output.clone(),
         ToolResponse::Error(e) => format!("Error: {}", e.message),
     }
 }

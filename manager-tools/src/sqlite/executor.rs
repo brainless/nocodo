@@ -79,7 +79,6 @@ impl SqlExecutor {
 
         let mut result_rows = Vec::new();
         let mut row_count = 0;
-        let mut truncated = false;
 
         for row in rows {
             let row = row?;
@@ -87,10 +86,11 @@ impl SqlExecutor {
             row_count += 1;
 
             if row_count >= effective_limit {
-                truncated = row_count >= effective_limit;
                 break;
             }
         }
+
+        let truncated = result_rows.len() == effective_limit;
 
         let execution_time_ms = start_time.elapsed().as_millis() as u64;
 
