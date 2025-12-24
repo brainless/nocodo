@@ -1,3 +1,28 @@
+//! Query Result Formatting for LLM Consumption
+//!
+//! This module formats SQL query results into human-readable table format optimized for
+//! Large Language Models and human readers.
+//!
+//! # Features
+//!
+//! - **Table formatting**: Results displayed in aligned column format with separators
+//! - **Metadata**: Includes row count, execution time, and truncation notices
+//! - **Smart truncation**: Long strings truncated to 50 characters, large result sets show first 20 rows
+//! - **Type-aware formatting**: Proper handling of NULL, numbers, strings, booleans, and BLOBs
+//!
+//! # Example Output
+//!
+//! ```text
+//! Query executed successfully. Returned 3 rows.
+//! Execution time: 15ms
+//!
+//! id | name  | email
+//! ---+-------+------------------
+//! 1  | Alice | alice@example.com
+//! 2  | Bob   | bob@example.com
+//! 3  | Carol | carol@example.com
+//! ```
+
 pub fn format_query_result(result: &crate::sqlite::executor::QueryResult) -> String {
     if result.row_count == 0 {
         return "Query executed successfully but returned no rows.".to_string();

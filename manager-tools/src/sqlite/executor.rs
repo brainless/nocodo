@@ -1,3 +1,27 @@
+//! SQL Query Executor with Security Validation
+//!
+//! This module provides the core query execution logic with comprehensive security validation.
+//! It uses Abstract Syntax Tree (AST) parsing to deeply inspect queries and ensure they comply
+//! with read-only constraints.
+//!
+//! # Key Components
+//!
+//! - [`SqlExecutor`]: Main executor that manages database connections and query execution
+//! - [`QueryResult`]: Structured result containing columns, rows, and execution metadata
+//!
+//! # Validation Strategy
+//!
+//! The validation process uses multiple complementary techniques:
+//!
+//! 1. **Pre-parsing checks**: Fast string-based checks for multiple statements
+//! 2. **AST parsing**: Full query parsing using `sqlparser` crate
+//! 3. **Statement type validation**: Only SELECT and PRAGMA allowed
+//! 4. **Recursive body validation**: Deep inspection of query components (subqueries, joins, expressions)
+//! 5. **Keyword scanning**: Final safety check for dangerous keywords
+//!
+//! This defense-in-depth approach ensures that even if one validation layer has a gap,
+//! other layers will catch malicious queries.
+
 use rusqlite::Connection;
 use serde_json::Value;
 use sqlparser::ast::{SetExpr, Statement};
