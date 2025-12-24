@@ -1,0 +1,281 @@
+use crate::{database::Database, Agent, AgentTool};
+use anyhow::{self};
+use async_trait::async_trait;
+use manager_tools::ToolExecutor;
+use nocodo_llm_sdk::client::LlmClient;
+use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
+use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Instant;
+
+pub struct SqliteAnalysisAgent {
+    client: Arc<dyn LlmClient>,
+    database: Arc<Database>,
+    tool_executor: Arc<ToolExecutor>,
+    db_path: String,
+    system_prompt: String,
+}
+
+impl SqliteAnalysisAgent {
+    pub fn new(
+        client: Arc<dyn LlmClient>,
+        database: Arc<Database>,
+        tool_executor: Arc<ToolExecutor>,
+        db_path: String,
+    ) -> anyhow::Result<Self> {
+        validate_db_path(&db_path)?;
+        let system_prompt = generate_system_prompt(&db_path);
+
+        Ok(Self {
+            client,
+            database,
+            tool_executor,
+            db_path,
+            system_prompt,
+        })
+    }
+
+    fn get_tool_definitions(&self) -> Vec<nocodo_llm_sdk::tools::Tool> {
+        self.tools()
+            .into_iter()
+            .map(|tool| tool.to_tool_definition())
+            .collect()
+    }
+
+    fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<Message>> {
+        let db_messages = self.database.get_messages(session_id)?;
+
+        db_messages
+            .into_iter()
+            .map(|msg| {
+                let role = match msg.role.as_str() {
+                    "user" => Role::User,
+                    "assistant" => Role::Assistant,
+                    "system" => Role::System,
+                    "tool" => Role::User,
+                    _ => Role::User,
+                };
+
+                Ok(Message {
+                    role,
+                    content: vec![ContentBlock::Text { text: msg.content }],
+                })
+            })
+            .collect()
+    }
+
+    async fn execute_tool_call(
+        &self,
+        session_id: i64,
+        message_id: Option<i64>,
+        tool_call: &ToolCall,
+    ) -> anyhow::Result<()> {
+        let mut tool_request =
+            AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
+
+        if let manager_tools::types::ToolRequest::Sqlite3Reader(ref mut req) = tool_request {
+            req.db_path = self.db_path.clone();
+            tracing::debug!(
+                db_path = %self.db_path,
+                "Injected database path into sqlite3_reader tool call"
+            );
+        }
+
+        let call_id = self.database.create_tool_call(
+            session_id,
+            message_id,
+            tool_call.id(),
+            tool_call.name(),
+            tool_call.arguments().clone(),
+        )?;
+
+        let start = Instant::now();
+        let result: anyhow::Result<manager_tools::types::ToolResponse> =
+            self.tool_executor.execute(tool_request).await;
+        let execution_time = start.elapsed().as_millis() as i64;
+
+        match result {
+            Ok(response) => {
+                let response_json = serde_json::to_value(&response)?;
+                self.database
+                    .complete_tool_call(call_id, response_json.clone(), execution_time)?;
+
+                let result_text = crate::format_tool_response(&response);
+                let message_to_llm = format!("Tool {} result:\n{}", tool_call.name(), result_text);
+
+                tracing::debug!(
+                    tool_name = tool_call.name(),
+                    tool_id = tool_call.id(),
+                    execution_time_ms = execution_time,
+                    "Tool execution completed successfully"
+                );
+
+                self.database
+                    .create_message(session_id, "tool", &message_to_llm)?;
+            }
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                self.database.fail_tool_call(call_id, &error_msg)?;
+
+                let error_message_to_llm =
+                    format!("Tool {} failed: {}", tool_call.name(), error_msg);
+
+                tracing::debug!(
+                    tool_name = tool_call.name(),
+                    tool_id = tool_call.id(),
+                    error = %error_msg,
+                    "Tool execution failed"
+                );
+
+                self.database
+                    .create_message(session_id, "tool", &error_message_to_llm)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Agent for SqliteAnalysisAgent {
+    fn objective(&self) -> &str {
+        "Analyze SQLite database structure and contents"
+    }
+
+    fn system_prompt(&self) -> String {
+        self.system_prompt.clone()
+    }
+
+    fn tools(&self) -> Vec<AgentTool> {
+        vec![AgentTool::Sqlite3Reader]
+    }
+
+    async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
+        let session_id = self.database.create_session(
+            "sqlite-analysis",
+            self.client.provider_name(),
+            self.client.model_name(),
+            Some(&self.system_prompt),
+            user_prompt,
+        )?;
+
+        self.database
+            .create_message(session_id, "user", user_prompt)?;
+
+        let tools = self.get_tool_definitions();
+
+        let mut iteration = 0;
+        let max_iterations = 30;
+
+        loop {
+            iteration += 1;
+            if iteration > max_iterations {
+                let error = "Maximum iteration limit reached";
+                self.database.fail_session(session_id, error)?;
+                return Err(anyhow::anyhow!(error));
+            }
+
+            let messages = self.build_messages(session_id)?;
+
+            let request = CompletionRequest {
+                messages,
+                max_tokens: 4000,
+                model: self.client.model_name().to_string(),
+                system: Some(self.system_prompt()),
+                temperature: Some(0.7),
+                top_p: None,
+                stop_sequences: None,
+                tools: Some(tools.clone()),
+                tool_choice: Some(ToolChoice::Auto),
+            };
+
+            let response = self.client.complete(request).await?;
+
+            let text = extract_text_from_content(&response.content);
+            let message_id = self
+                .database
+                .create_message(session_id, "assistant", &text)?;
+
+            if let Some(tool_calls) = response.tool_calls {
+                if tool_calls.is_empty() {
+                    self.database.complete_session(session_id, &text)?;
+                    return Ok(text);
+                }
+
+                for tool_call in tool_calls {
+                    self.execute_tool_call(session_id, Some(message_id), &tool_call)
+                        .await?;
+                }
+            } else {
+                self.database.complete_session(session_id, &text)?;
+                return Ok(text);
+            }
+        }
+    }
+}
+
+fn validate_db_path(db_path: &str) -> anyhow::Result<()> {
+    if db_path.is_empty() {
+        anyhow::bail!("Database path cannot be empty");
+    }
+
+    let path = Path::new(db_path);
+
+    if !path.is_absolute() {
+        anyhow::bail!(
+            "Database path must be absolute: {}. Use std::fs::canonicalize() if needed.",
+            db_path
+        );
+    }
+
+    if !path.exists() {
+        anyhow::bail!("Database file not found: {}", db_path);
+    }
+
+    if !path.is_file() {
+        anyhow::bail!("Path is not a file: {}", db_path);
+    }
+
+    Ok(())
+}
+
+fn generate_system_prompt(db_path: &str) -> String {
+    format!(
+        "You are a database analysis expert specialized in SQLite databases. \
+         You are analyzing the database at: {}
+
+Your role is to explore schemas, query data, and provide insights about \
+database structure and contents. You have access to the sqlite3_reader tool \
+which executes read-only SQL queries (SELECT and PRAGMA statements).
+
+IMPORTANT: Always use db_path='{}' in your sqlite3_reader tool calls.
+
+Schema Exploration Commands:
+- PRAGMA table_list - List all tables
+- PRAGMA table_info(table_name) - Get column details for a table
+- PRAGMA foreign_key_list(table_name) - Get foreign key relationships
+- SELECT sql FROM sqlite_master WHERE name='table_name' - Get CREATE statement
+
+Best Practices:
+1. Start by exploring the schema before querying data
+2. Use appropriate LIMIT clauses for large result sets
+3. Provide clear explanations of your findings
+4. When counting rows, use COUNT(*) queries
+5. Identify relationships between tables using foreign keys
+
+Always base your analysis on actual database contents, not assumptions.",
+        db_path, db_path
+    )
+}
+
+fn extract_text_from_content(content: &[ContentBlock]) -> String {
+    content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Text { text } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}

@@ -48,11 +48,12 @@ impl Agent for CodebaseAnalysisAgent {
         "Analyze codebase structure and identify architectural patterns"
     }
 
-    fn system_prompt(&self) -> &str {
+    fn system_prompt(&self) -> String {
         "You are a codebase analysis expert. Your role is to examine code repositories, \
          understand their structure, identify architectural patterns, and provide clear insights \
          about the codebase organization. You should analyze file structures, dependencies, \
          design patterns, and architectural decisions."
+            .to_string()
     }
 
     fn tools(&self) -> Vec<AgentTool> {
@@ -65,7 +66,7 @@ impl Agent for CodebaseAnalysisAgent {
             "codebase-analysis",
             self.client.provider_name(),
             self.client.model_name(),
-            Some(self.system_prompt()),
+            Some(&self.system_prompt()),
             user_prompt,
         )?;
 

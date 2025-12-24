@@ -1,4 +1,5 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
+use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::{database::Database, Agent};
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
@@ -9,6 +10,50 @@ use std::sync::Arc;
 pub enum AgentType {
     /// Agent for analyzing codebase structure and architecture
     CodebaseAnalysis,
+}
+
+/// Factory for creating AI agents with shared dependencies
+pub struct AgentFactory {
+    llm_client: Arc<dyn LlmClient>,
+    database: Arc<Database>,
+    tool_executor: Arc<ToolExecutor>,
+}
+
+impl AgentFactory {
+    /// Create a new AgentFactory with the given dependencies
+    pub fn new(
+        llm_client: Arc<dyn LlmClient>,
+        database: Arc<Database>,
+        tool_executor: Arc<ToolExecutor>,
+    ) -> Self {
+        Self {
+            llm_client,
+            database,
+            tool_executor,
+        }
+    }
+
+    /// Create a SqliteAnalysisAgent for analyzing a specific database
+    pub fn create_sqlite_analysis_agent(
+        &self,
+        db_path: String,
+    ) -> anyhow::Result<SqliteAnalysisAgent> {
+        SqliteAnalysisAgent::new(
+            self.llm_client.clone(),
+            self.database.clone(),
+            self.tool_executor.clone(),
+            db_path,
+        )
+    }
+
+    /// Create a CodebaseAnalysisAgent
+    pub fn create_codebase_analysis_agent(&self) -> CodebaseAnalysisAgent {
+        CodebaseAnalysisAgent::new(
+            self.llm_client.clone(),
+            self.database.clone(),
+            self.tool_executor.clone(),
+        )
+    }
 }
 
 /// Factory function to create an agent of the specified type

@@ -1,6 +1,6 @@
 use manager_tools::types::filesystem::*;
 use manager_tools::types::user_interaction::*;
-use manager_tools::types::{BashRequest, GrepRequest};
+use manager_tools::types::{BashRequest, GrepRequest, Sqlite3ReaderRequest};
 use nocodo_llm_sdk::tools::Tool;
 
 /// Create tool definitions for LLM using manager-models types
@@ -35,6 +35,10 @@ pub fn create_tool_definitions() -> Vec<Tool> {
             .description(
                 "Ask the user a list of questions to gather information or confirm actions",
             )
+            .build(),
+        Tool::from_type::<Sqlite3ReaderRequest>()
+            .name("sqlite3_reader")
+            .description("Execute read-only SQL queries (SELECT and PRAGMA) on SQLite databases")
             .build(),
     ]
 }

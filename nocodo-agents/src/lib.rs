@@ -1,6 +1,7 @@
 pub mod codebase_analysis;
 pub mod database;
 pub mod factory;
+pub mod sqlite_analysis;
 pub mod tools;
 
 use async_trait::async_trait;
@@ -18,6 +19,7 @@ pub enum AgentTool {
     ApplyPatch,
     Bash,
     AskUser,
+    Sqlite3Reader,
 }
 
 impl AgentTool {
@@ -31,6 +33,7 @@ impl AgentTool {
             AgentTool::ApplyPatch => "apply_patch",
             AgentTool::Bash => "bash",
             AgentTool::AskUser => "ask_user",
+            AgentTool::Sqlite3Reader => "sqlite3_reader",
         }
     }
 
@@ -74,6 +77,11 @@ impl AgentTool {
                 let req: AskUserRequest = serde_json::from_value(arguments)?;
                 ToolRequest::AskUser(req)
             }
+            "sqlite3_reader" => {
+                let req: manager_tools::types::Sqlite3ReaderRequest =
+                    serde_json::from_value(arguments)?;
+                ToolRequest::Sqlite3Reader(req)
+            }
             _ => anyhow::bail!("Unknown tool: {}", name),
         };
 
@@ -108,7 +116,7 @@ pub trait Agent: Send + Sync {
     fn objective(&self) -> &str;
 
     /// Returns the system prompt for the agent
-    fn system_prompt(&self) -> &str;
+    fn system_prompt(&self) -> String;
 
     /// Returns optional pre-conditions that must be met before the agent can start
     /// Pre-conditions will be checked by an executor
