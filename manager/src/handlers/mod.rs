@@ -17,8 +17,5 @@ pub mod team_handlers;
 // File handlers module
 pub mod file_handlers;
 
-// AI session handlers module
-pub mod ai_session_handlers;
-
 // Project commands handlers (separate module to keep main handlers from growing too large)
 pub mod project_commands;

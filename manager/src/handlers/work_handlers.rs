@@ -1,6 +1,5 @@
 use super::main_handlers::AppState;
 use crate::error::AppError;
-use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
     AddMessageRequest, AiSessionOutputListResponse, CreateWorkRequest, WorkListResponse,
     WorkResponse,
@@ -9,29 +8,6 @@ use crate::models::{
 use actix_web::{web, HttpMessage, HttpResponse, Result};
 use nocodo_github_actions::{ExecuteCommandRequest, ScanWorkflowsRequest};
 use std::time::SystemTime;
-
-/// Helper function to infer the provider from a model ID
-fn infer_provider_from_model(model_id: &str) -> &str {
-    let model_lower = model_id.to_lowercase();
-
-    if model_lower.contains("gpt") || model_lower.contains("o1") || model_lower.starts_with("gpt-")
-    {
-        "openai"
-    } else if model_lower.contains("claude")
-        || model_lower.contains("opus")
-        || model_lower.contains("sonnet")
-        || model_lower.contains("haiku")
-    {
-        "anthropic"
-    } else if model_lower.contains("grok") {
-        "xai"
-    } else if model_lower.contains("glm") {
-        "zai"
-    } else {
-        // Default to anthropic if we can't determine
-        "anthropic"
-    }
-}
 
 pub async fn create_work(
     data: web::Data<AppState>,
@@ -129,89 +105,6 @@ pub async fn create_work(
         message_id
     );
 
-    // Auto-start LLM agent session if requested (default: true)
-    if work_req.auto_start {
-        let tool_name = work_req
-            .tool_name
-            .unwrap_or_else(|| "llm-agent".to_string());
-
-        // Generate project context if work is associated with a project
-        let project_context = if let Some(project_id) = work.project_id {
-            let project = data.database.get_project_by_id(project_id)?;
-            // Use work's working_directory if available, otherwise fall back to project.path
-            let working_path = work.working_directory.as_deref().unwrap_or(&project.path);
-            Some(format!("Project: {}\nPath: {}", project.name, working_path))
-        } else {
-            None
-        };
-
-        // Create AI session record
-        let session = crate::models::AiSession::new(
-            work_id,
-            message_id,
-            tool_name.clone(),
-            project_context.clone(),
-        );
-        let session_id = data.database.create_ai_session(&session)?;
-
-        tracing::info!(
-            "Auto-starting {} session {} for work {}",
-            tool_name,
-            session_id,
-            work_id
-        );
-
-        // Handle LLM agent specially
-        if tool_name == "llm-agent" {
-            if let Some(ref llm_agent) = data.llm_agent {
-                // Determine provider and model from work.model or fall back to environment/defaults
-                let (provider, model) = if let Some(model_id) = &work.model {
-                    let provider = infer_provider_from_model(model_id);
-                    (provider.to_string(), model_id.clone())
-                } else {
-                    // Fall back to environment variables or defaults
-                    let provider =
-                        std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-                    let model = std::env::var("MODEL")
-                        .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                    (provider, model.clone())
-                };
-
-                // Create LLM agent session
-                let llm_session = llm_agent
-                    .create_session(work_id, provider, model, project_context)
-                    .await?;
-
-                // Process the message in background task to avoid blocking HTTP response
-                let llm_agent_clone = llm_agent.clone();
-                let session_id = llm_session.id;
-                let message_content = work_req.title.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = llm_agent_clone
-                        .process_message(session_id, message_content)
-                        .await
-                    {
-                        tracing::error!(
-                            "Failed to process LLM message for session {}: {}",
-                            session_id,
-                            e
-                        );
-                    } else {
-                        tracing::info!(
-                            "Successfully completed LLM agent processing for session {}",
-                            session_id
-                        );
-                    }
-                });
-            } else {
-                tracing::warn!(
-                    "LLM agent not available - work {} will not have auto-started session",
-                    work_id
-                );
-            }
-        }
-    }
-
     let response = WorkResponse { work };
     Ok(HttpResponse::Created().json(response))
 }
@@ -294,109 +187,6 @@ pub async fn add_message_to_work(
         message.id,
         work_id
     );
-
-    // Auto-start AI session to continue the conversation
-    let work = data.database.get_work_by_id(work_id)?;
-    let tool_name = "llm-agent".to_string();
-
-    // Generate project context if work is associated with a project
-    let project_context = if let Some(project_id) = work.project_id {
-        let project = data.database.get_project_by_id(project_id)?;
-        // Use work's working_directory if available, otherwise fall back to project.path
-        let working_path = work.working_directory.as_deref().unwrap_or(&project.path);
-        Some(format!("Project: {}\nPath: {}", project.name, working_path))
-    } else {
-        None
-    };
-
-    // Create AI session record
-    let session = crate::models::AiSession::new(
-        work_id,
-        message_id,
-        tool_name.clone(),
-        project_context.clone(),
-    );
-    let session_id = data.database.create_ai_session(&session)?;
-
-    tracing::info!(
-        "Auto-starting {} session {} for work {} (message continuation)",
-        tool_name,
-        session_id,
-        work_id
-    );
-
-    // Handle LLM agent
-    if let Some(ref llm_agent) = data.llm_agent {
-        // Get existing LLM agent session for this work
-        if let Ok(llm_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
-            // Use existing session - just process the new message
-            let session_id = llm_session.id;
-            let message_content = message.content.clone();
-            let llm_agent_clone = llm_agent.clone();
-
-            tokio::spawn(async move {
-                if let Err(e) = llm_agent_clone
-                    .process_message(session_id, message_content)
-                    .await
-                {
-                    tracing::error!(
-                        "Failed to process LLM message for session {}: {}",
-                        session_id,
-                        e
-                    );
-                } else {
-                    tracing::info!(
-                        "Successfully completed LLM agent processing for session {}",
-                        session_id
-                    );
-                }
-            });
-        } else {
-            // No existing session - create a new one
-            let (provider, model) = if let Some(model_id) = &work.model {
-                let provider = infer_provider_from_model(model_id);
-                (provider.to_string(), model_id.clone())
-            } else {
-                let provider =
-                    std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
-                let model = std::env::var("MODEL")
-                    .unwrap_or_else(|_| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-                (provider, model.clone())
-            };
-
-            let llm_session = llm_agent
-                .create_session(work_id, provider, model, project_context)
-                .await?;
-
-            let llm_agent_clone = llm_agent.clone();
-            let session_id = llm_session.id;
-            let message_content = message.content.clone();
-
-            tokio::spawn(async move {
-                if let Err(e) = llm_agent_clone
-                    .process_message(session_id, message_content)
-                    .await
-                {
-                    tracing::error!(
-                        "Failed to process LLM message for session {}: {}",
-                        session_id,
-                        e
-                    );
-                } else {
-                    tracing::info!(
-                        "Successfully completed LLM agent processing for session {}",
-                        session_id
-                    );
-                }
-            });
-        }
-    } else {
-        tracing::warn!(
-            "LLM agent not available - work {} message {} will not be processed",
-            work_id,
-            message_id
-        );
-    }
 
     let response = crate::models::WorkMessageResponse { message };
     Ok(HttpResponse::Created().json(response))
@@ -553,31 +343,6 @@ pub async fn list_ai_session_outputs(
 
     // Get outputs for this session
     let mut outputs = data.database.list_ai_session_outputs(session.id)?;
-
-    // If this is an LLM agent session, also fetch LLM agent messages
-    if session.tool_name == "llm-agent" {
-        if let Ok(llm_agent_session) = data.database.get_llm_agent_session_by_work_id(work_id) {
-            if let Ok(llm_messages) = data.database.get_llm_agent_messages(llm_agent_session.id) {
-                for msg in llm_messages {
-                    if msg.role == "assistant" || msg.role == "tool" {
-                        let output = crate::models::AiSessionOutput {
-                            id: msg.id,
-                            session_id: session.id,
-                            content: msg.content,
-                            created_at: msg.created_at,
-                            role: Some(msg.role.clone()),
-                            model: if msg.role == "assistant" {
-                                Some(llm_agent_session.model.clone())
-                            } else {
-                                None
-                            },
-                        };
-                        outputs.push(output);
-                    }
-                }
-            }
-        }
-    }
 
     outputs.sort_by_key(|o| o.created_at);
     let response = AiSessionOutputListResponse { outputs };

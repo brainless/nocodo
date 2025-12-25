@@ -11,11 +11,6 @@ pub use shared_types::{
     AiSessionResult,
     ApiKeyConfig,
     CreateWorkRequest,
-    LlmAgentMessage,
-    // LLM Agent types
-    LlmAgentSession,
-    LlmAgentToolCall,
-    LlmProviderConfig,
     MessageAuthorType,
     MessageContentType,
     SettingsResponse,
@@ -37,11 +32,7 @@ pub use shared_types::{
 };
 
 // Re-export tool types from manager-tools
-pub use manager_tools::types::{
-    ApplyPatchRequest, BashRequest, FileInfo, FileType, GrepRequest, ListFilesRequest,
-    ReadFileRequest, ToolRequest, ToolResponse, WriteFileRequest,
-};
-
+pub use manager_tools::types::{FileInfo, FileType};
 // User and SSH key authentication models (User is re-exported from manager-models)
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
