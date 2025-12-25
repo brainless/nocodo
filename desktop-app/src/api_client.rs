@@ -165,30 +165,6 @@ impl ApiClient {
         Ok(outputs_response.outputs)
     }
 
-    pub async fn get_ai_tool_calls(
-        &self,
-        work_id: i64,
-    ) -> Result<Vec<shared_types::LlmAgentToolCall>, ApiError> {
-        let url = format!("{}/api/work/{}/tool-calls", self.base_url, work_id);
-        let request = self.client().get(&url);
-        let request = self.add_auth_header(request);
-        let response = request
-            .send()
-            .await
-            .map_err(|e| ApiError::RequestFailed(e.to_string()))?;
-
-        if !response.status().is_success() {
-            return Err(ApiError::HttpStatus(response.status()));
-        }
-
-        let tool_calls_response: shared_types::LlmAgentToolCallListResponse = response
-            .json()
-            .await
-            .map_err(|e| ApiError::ParseFailed(e.to_string()))?;
-
-        Ok(tool_calls_response.tool_calls)
-    }
-
     pub async fn create_work(&self, request: CreateWorkRequest) -> Result<Work, ApiError> {
         let url = format!("{}/api/work", self.base_url);
         let req = self.client().post(&url).json(&request);

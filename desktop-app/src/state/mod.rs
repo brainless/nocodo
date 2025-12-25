@@ -68,7 +68,6 @@ pub struct AppState {
     pub works: Vec<shared_types::Work>,
     pub work_messages: Vec<shared_types::WorkMessage>,
     pub ai_session_outputs: Vec<shared_types::AiSessionOutput>,
-    pub ai_tool_calls: Vec<shared_types::LlmAgentToolCall>,
     pub project_details: Option<shared_types::ProjectDetailsResponse>,
     pub servers: Vec<Server>,
     pub settings: Option<shared_types::SettingsResponse>,
@@ -181,9 +180,6 @@ pub struct AppState {
     pub ai_session_outputs_result: ArcResult<Vec<shared_types::AiSessionOutput>>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
-    pub ai_tool_calls_result: ArcResult<Vec<shared_types::LlmAgentToolCall>>,
-    #[serde(skip)]
-    #[allow(clippy::type_complexity)]
     pub update_projects_path_result: ArcResult<Value>,
     #[serde(skip)]
     #[allow(clippy::type_complexity)]
@@ -197,7 +193,6 @@ pub struct AppState {
     pub loading_works: bool,
     pub loading_work_messages: bool,
     pub loading_ai_session_outputs: bool,
-    pub loading_ai_tool_calls: bool,
     pub loading_worktree_branches: bool,
     pub loading_project_detail_worktree_branches: bool,
     pub loading_project_detail_commands: bool,
@@ -385,7 +380,6 @@ impl Default for AppState {
             works: Vec::new(),
             work_messages: Vec::new(),
             ai_session_outputs: Vec::new(),
-            ai_tool_calls: Vec::new(),
             project_details: None,
             servers: Vec::new(),
             settings: None,
@@ -450,7 +444,6 @@ impl Default for AppState {
             command_executions_result: Arc::new(std::sync::Mutex::new(None)),
             work_messages_result: Arc::new(std::sync::Mutex::new(None)),
             ai_session_outputs_result: Arc::new(std::sync::Mutex::new(None)),
-            ai_tool_calls_result: Arc::new(std::sync::Mutex::new(None)),
             update_projects_path_result: Arc::new(std::sync::Mutex::new(None)),
             scan_projects_result: Arc::new(std::sync::Mutex::new(None)),
             supported_models_result: Arc::new(std::sync::Mutex::new(None)),
@@ -458,7 +451,6 @@ impl Default for AppState {
             loading_works: false,
             loading_work_messages: false,
             loading_ai_session_outputs: false,
-            loading_ai_tool_calls: false,
             loading_worktree_branches: false,
             loading_project_detail_worktree_branches: false,
             loading_project_detail_commands: false,
