@@ -29,6 +29,7 @@ codex-process-hardening = { git = "https://github.com/openai/codex", package = "
 shared-types = { path = "../shared-types" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 sqlparser = "0.51"
+reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]
 tempfile = "3.12"

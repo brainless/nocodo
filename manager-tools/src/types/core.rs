@@ -21,6 +21,8 @@ pub enum ToolRequest {
     AskUser(super::user_interaction::AskUserRequest),
     #[serde(rename = "sqlite3_reader")]
     Sqlite3Reader(super::sqlite::Sqlite3ReaderRequest),
+    #[serde(rename = "hackernews_request")]
+    HackerNewsRequest(super::hackernews::HackerNewsRequest),
 }
 
 /// Tool response enum containing all possible tool results
@@ -43,6 +45,8 @@ pub enum ToolResponse {
     AskUser(super::user_interaction::AskUserResponse),
     #[serde(rename = "sqlite3_reader")]
     Sqlite3Reader(super::sqlite::Sqlite3ReaderResponse),
+    #[serde(rename = "hackernews_response")]
+    HackerNewsResponse(super::hackernews::HackerNewsResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
