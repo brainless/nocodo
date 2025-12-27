@@ -7,18 +7,24 @@ pub struct ItemFetcher {
     client: HnClient,
     storage: HnStorage,
     batch_size: usize,
+    max_depth: usize,
 }
 
 impl ItemFetcher {
-    pub fn new(db_path: &str, batch_size: usize) -> Result<Self> {
+    pub fn new(db_path: &str, batch_size: usize, max_depth: usize) -> Result<Self> {
         Ok(Self {
             client: HnClient::new()?,
             storage: HnStorage::new(db_path)?,
             batch_size,
+            max_depth,
         })
     }
 
     pub async fn fetch_items(&self, item_ids: Vec<i64>) -> Result<FetchStats> {
+        self.fetch_items_internal(item_ids, 0).await
+    }
+
+    async fn fetch_items_internal(&self, item_ids: Vec<i64>, depth: usize) -> Result<FetchStats> {
         let mut stats = FetchStats::default();
 
         let mut to_fetch = Vec::new();
@@ -31,14 +37,14 @@ impl ItemFetcher {
         }
 
         for batch in to_fetch.chunks(self.batch_size) {
-            let batch_stats = self.fetch_batch(batch).await?;
+            let batch_stats = self.fetch_batch_internal(batch, depth).await?;
             stats.merge(batch_stats);
         }
 
         Ok(stats)
     }
 
-    async fn fetch_batch(&self, item_ids: &[i64]) -> Result<FetchStats> {
+    async fn fetch_batch_internal(&self, item_ids: &[i64], depth: usize) -> Result<FetchStats> {
         let mut stats = FetchStats::default();
         let mut tasks = JoinSet::new();
 
@@ -62,9 +68,11 @@ impl ItemFetcher {
                 }
                 Ok(Err(e)) => {
                     eprintln!("Error fetching item: {}", e);
+                    stats.items_failed += 1;
                 }
                 Err(e) => {
                     eprintln!("Task join error: {}", e);
+                    stats.items_failed += 1;
                 }
             }
         }
@@ -90,8 +98,8 @@ impl ItemFetcher {
         let user_stats = self.fetch_users(user_ids).await?;
         stats.merge(user_stats);
 
-        if !comment_ids.is_empty() {
-            let comment_stats = Box::pin(self.fetch_items(comment_ids)).await?;
+        if !comment_ids.is_empty() && depth < self.max_depth {
+            let comment_stats = Box::pin(self.fetch_items_internal(comment_ids, depth + 1)).await?;
             stats.merge(comment_stats);
         }
 
@@ -125,9 +133,11 @@ impl ItemFetcher {
                 Ok(Ok(None)) => {}
                 Ok(Err(e)) => {
                     eprintln!("Error fetching user: {}", e);
+                    stats.users_failed += 1;
                 }
                 Err(e) => {
                     eprintln!("Task join error: {}", e);
+                    stats.users_failed += 1;
                 }
             }
         }
@@ -141,6 +151,8 @@ pub struct FetchStats {
     pub items_downloaded: usize,
     pub users_downloaded: usize,
     pub items_skipped: usize,
+    pub items_failed: usize,
+    pub users_failed: usize,
 }
 
 impl FetchStats {
@@ -148,9 +160,11 @@ impl FetchStats {
         self.items_downloaded += other.items_downloaded;
         self.users_downloaded += other.users_downloaded;
         self.items_skipped += other.items_skipped;
+        self.items_failed += other.items_failed;
+        self.users_failed += other.users_failed;
     }
 
     pub fn items_processed(&self) -> usize {
-        self.items_downloaded + self.items_skipped
+        self.items_downloaded + self.items_skipped + self.items_failed
     }
 }

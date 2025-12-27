@@ -2,6 +2,7 @@ use rusqlite::Connection;
 use anyhow::Result;
 
 pub fn initialize_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(r#"
         CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY,
@@ -49,6 +50,7 @@ pub fn initialize_schema(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
         CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent);
         CREATE INDEX IF NOT EXISTS idx_items_time ON items(time DESC);
+        CREATE INDEX IF NOT EXISTS idx_fetch_queue_queued_at ON fetch_queue(queued_at);
     "#)?;
 
     Ok(())

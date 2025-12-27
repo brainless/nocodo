@@ -11,18 +11,20 @@ pub use client::HnClient;
 pub use fetcher::{ItemFetcher, FetchStats};
 
 const DEFAULT_BATCH_SIZE: usize = 20;
+const DEFAULT_MAX_DEPTH: usize = 5;
 
 pub async fn execute_hackernews_request(
     request: HackerNewsRequest,
 ) -> Result<ToolResponse, ToolError> {
     let batch_size = request.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
+    let max_depth = request.max_depth.unwrap_or(DEFAULT_MAX_DEPTH);
 
     match request.fetch_mode {
         FetchMode::StoryType { story_type } => {
-            execute_story_type_mode(&request.db_path, story_type, batch_size).await
+            execute_story_type_mode(&request.db_path, story_type, batch_size, max_depth).await
         }
         FetchMode::FetchAll => {
-            execute_fetch_all_mode(&request.db_path, batch_size).await
+            execute_fetch_all_mode(&request.db_path, batch_size, max_depth).await
         }
     }
 }
@@ -31,10 +33,11 @@ async fn execute_story_type_mode(
     db_path: &str,
     story_type: StoryType,
     batch_size: usize,
+    max_depth: usize,
 ) -> Result<ToolResponse, ToolError> {
     let client = HnClient::new()
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create HN client: {}", e)))?;
-    let fetcher = ItemFetcher::new(db_path, batch_size)
+    let fetcher = ItemFetcher::new(db_path, batch_size, max_depth)
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create item fetcher: {}", e)))?;
 
     let item_ids = if matches!(story_type, StoryType::All) {
@@ -52,6 +55,8 @@ async fn execute_story_type_mode(
         items_downloaded: stats.items_downloaded,
         users_downloaded: stats.users_downloaded,
         items_skipped: stats.items_skipped,
+        items_failed: stats.items_failed,
+        users_failed: stats.users_failed,
         items_processed: stats.items_processed(),
         has_more: false,
         state: DownloadState {
@@ -62,11 +67,13 @@ async fn execute_story_type_mode(
             in_progress_users: vec![],
         },
         message: format!(
-            "Downloaded {} items ({} new, {} skipped) and {} users for {:?} stories",
+            "Downloaded {} items ({} new, {} skipped, {} failed) and {} users ({} failed) for {:?} stories",
             stats.items_processed(),
             stats.items_downloaded,
             stats.items_skipped,
+            stats.items_failed,
             stats.users_downloaded,
+            stats.users_failed,
             story_type
         ),
     };
@@ -77,10 +84,11 @@ async fn execute_story_type_mode(
 async fn execute_fetch_all_mode(
     db_path: &str,
     batch_size: usize,
+    max_depth: usize,
 ) -> Result<ToolResponse, ToolError> {
     let client = HnClient::new()
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create HN client: {}", e)))?;
-    let fetcher = ItemFetcher::new(db_path, batch_size)
+    let fetcher = ItemFetcher::new(db_path, batch_size, max_depth)
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create item fetcher: {}", e)))?;
 
     let max_id = client.fetch_max_item_id().await
@@ -96,6 +104,8 @@ async fn execute_fetch_all_mode(
         items_downloaded: stats.items_downloaded,
         users_downloaded: stats.users_downloaded,
         items_skipped: stats.items_skipped,
+        items_failed: stats.items_failed,
+        users_failed: stats.users_failed,
         items_processed: stats.items_processed(),
         has_more: start_id > 1,
         state: DownloadState {
@@ -106,13 +116,15 @@ async fn execute_fetch_all_mode(
             in_progress_users: vec![],
         },
         message: format!(
-            "Downloaded batch from ID {} to {}: {} items ({} new, {} skipped), {} users. More: {}",
+            "Downloaded batch from ID {} to {}: {} items ({} new, {} skipped, {} failed), {} users ({} failed). More: {}",
             start_id,
             max_id,
             stats.items_processed(),
             stats.items_downloaded,
             stats.items_skipped,
+            stats.items_failed,
             stats.users_downloaded,
+            stats.users_failed,
             start_id > 1
         ),
     };

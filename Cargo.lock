@@ -4239,6 +4239,7 @@ dependencies = [
  "codex-process-hardening",
  "glob",
  "regex",
+ "reqwest 0.12.24",
  "rusqlite",
  "schemars 0.8.22",
  "serde",
