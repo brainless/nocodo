@@ -30,5 +30,5 @@ serde_json = "1.0"
 tempfile = "3.0"
 
 [[bin]]
-name = "agent-runner"
+name = "codebase-analysis-runner"
 path = "bin/runner.rs"

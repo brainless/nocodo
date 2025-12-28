@@ -1,6 +1,6 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
-use crate::sqlite_analysis::SqliteAnalysisAgent;
-use crate::{database::Database, Agent};
+use crate::database::Database;
+use crate::Agent;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
 use std::sync::Arc;
@@ -31,19 +31,6 @@ impl AgentFactory {
             database,
             tool_executor,
         }
-    }
-
-    /// Create a SqliteAnalysisAgent for analyzing a specific database
-    pub fn create_sqlite_analysis_agent(
-        &self,
-        db_path: String,
-    ) -> anyhow::Result<SqliteAnalysisAgent> {
-        SqliteAnalysisAgent::new(
-            self.llm_client.clone(),
-            self.database.clone(),
-            self.tool_executor.clone(),
-            db_path,
-        )
     }
 
     /// Create a CodebaseAnalysisAgent
@@ -116,6 +103,26 @@ pub fn create_agent_with_tools(
             Box::new(CodebaseAnalysisAgent::new(client, database, tool_executor))
         }
     }
+}
+
+/// Create a CodebaseAnalysisAgent with tool executor support
+///
+/// Uses an in-memory database by default for session persistence
+///
+/// # Arguments
+///
+/// * `client` - The LLM client to use for the agent
+/// * `tool_executor` - Tool executor for running tools
+///
+/// # Returns
+///
+/// A CodebaseAnalysisAgent instance
+pub fn create_codebase_analysis_agent(
+    client: Arc<dyn LlmClient>,
+    tool_executor: Arc<ToolExecutor>,
+) -> CodebaseAnalysisAgent {
+    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:")).unwrap());
+    CodebaseAnalysisAgent::new(client, database, tool_executor)
 }
 
 #[cfg(test)]

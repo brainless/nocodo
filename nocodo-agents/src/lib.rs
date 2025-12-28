@@ -105,6 +105,7 @@ pub fn format_tool_response(response: &manager_tools::types::ToolResponse) -> St
         ),
         ToolResponse::AskUser(r) => format!("User response: {:?}", r.responses),
         ToolResponse::Sqlite3Reader(r) => r.formatted_output.clone(),
+        ToolResponse::HackerNewsResponse(r) => r.message.clone(),
         ToolResponse::Error(e) => format!("Error: {}", e.message),
     }
 }

@@ -1,9 +1,8 @@
 use clap::Parser;
-use home;
 use manager_tools::ToolExecutor;
 use nocodo_agents::{
-    database::Database,
-    factory::{create_agent_with_tools, AgentType},
+    Agent,
+    factory::create_codebase_analysis_agent,
 };
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use serde::Deserialize;
@@ -15,10 +14,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Agent name to run (e.g., "codebase-analysis")
-    #[arg(short, long)]
-    agent: String,
-
     /// User prompt for the agent
     #[arg(short, long)]
     prompt: String,
@@ -26,10 +21,6 @@ struct Args {
     /// Path to config file containing API keys
     #[arg(short, long)]
     config: PathBuf,
-
-    /// Path to SQLite database for storing agent sessions
-    #[arg(long)]
-    database_path: Option<String>,
 
     /// Base path for tool execution (file operations are relative to this)
     #[arg(long, default_value = ".")]
@@ -65,23 +56,6 @@ fn get_bool_option(config: &Config, key_name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-fn get_database_path(path_str: &str) -> anyhow::Result<PathBuf> {
-    let path = if path_str.starts_with('~') {
-        let home = std::env::var("HOME")
-            .map_err(|_| anyhow::anyhow!("HOME environment variable not set"))?;
-        PathBuf::from(path_str.replace('~', &home))
-    } else {
-        PathBuf::from(path_str)
-    };
-
-    // Ensure parent directory exists
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    Ok(path)
-}
-
 fn get_base_path(path_str: &str) -> anyhow::Result<PathBuf> {
     let path = if path_str == "." {
         std::env::current_dir()?
@@ -94,14 +68,6 @@ fn get_base_path(path_str: &str) -> anyhow::Result<PathBuf> {
     }
 
     Ok(path)
-}
-
-fn get_default_db_path() -> PathBuf {
-    if let Some(home) = home::home_dir() {
-        home.join(".local/share/nocodo/agents.db")
-    } else {
-        PathBuf::from("agents.db")
-    }
 }
 
 #[tokio::main]
@@ -134,32 +100,14 @@ async fn main() -> anyhow::Result<()> {
     let client = ZaiGlmClient::with_coding_plan(zai_api_key, coding_plan)?;
     let client: Arc<dyn nocodo_llm_sdk::client::LlmClient> = Arc::new(client);
 
-    // Parse agent type
-    let agent_type = match args.agent.to_lowercase().as_str() {
-        "codebase-analysis" | "codebase_analysis" => AgentType::CodebaseAnalysis,
-        _ => {
-            anyhow::bail!(
-                "Unknown agent type: {}. Available: codebase-analysis",
-                args.agent
-            )
-        }
-    };
-
-    // Initialize database and tool executor
-    let database_path_str = args
-        .database_path
-        .unwrap_or_else(|| get_default_db_path().to_string_lossy().to_string());
-    let database_path = get_database_path(&database_path_str)?;
-    let database = Arc::new(Database::new(&database_path)?);
-
     let base_path = get_base_path(&args.base_path)?;
     // Create tool executor with manager-tools (supports more configuration)
     let tool_executor = Arc::new(
         ToolExecutor::new(base_path.clone()).with_max_file_size(10 * 1024 * 1024), // max_file_size: 10MB
     );
 
-    // Create agent with database and tool executor
-    let agent = create_agent_with_tools(agent_type, client, database, tool_executor);
+    // Create codebase analysis agent
+    let agent = create_codebase_analysis_agent(client, tool_executor);
 
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
