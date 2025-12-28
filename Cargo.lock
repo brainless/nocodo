@@ -4234,10 +4234,12 @@ version = "0.1.12"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "clap",
  "codex-apply-patch",
  "codex-core",
  "codex-process-hardening",
  "glob",
+ "home",
  "regex",
  "reqwest 0.12.24",
  "rusqlite",
@@ -4251,6 +4253,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "tracing-subscriber",
  "walkdir",
 ]
 

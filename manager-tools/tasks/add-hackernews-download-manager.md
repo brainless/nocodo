@@ -1020,14 +1020,23 @@ pub mod hackernews;
 - [ ] No clippy warnings
 - [ ] Documentation complete
 
+## Default Database Path
+
+The tool uses a consistent default database path following the same pattern as the manager:
+- **Default path**: `~/.local/share/nocodo/hackernews.db`
+- Falls back to `hackernews.db` in current directory if home directory is unavailable
+- Parent directory is created automatically if it doesn't exist
+
+This ensures data persistence across restarts and consistency with the manager's data storage approach.
+
 ## Usage Example
 
 ```rust
 use manager_tools::{ToolExecutor, ToolRequest, HackerNewsRequest, FetchMode, StoryType};
 
-// Fetch top stories
+// Fetch top stories (uses default path: ~/.local/share/nocodo/hackernews.db)
 let request = ToolRequest::HackerNewsRequest(HackerNewsRequest {
-    db_path: "/tmp/hackernews.db".to_string(),
+    db_path: String::new(), // Empty string will use default path
     fetch_mode: FetchMode::StoryType {
         story_type: StoryType::Top,
     },
@@ -1036,9 +1045,9 @@ let request = ToolRequest::HackerNewsRequest(HackerNewsRequest {
 
 let response = executor.execute(request).await?;
 
-// Fetch all from max ID
+// Fetch all from max ID with custom path
 let request = ToolRequest::HackerNewsRequest(HackerNewsRequest {
-    db_path: "/tmp/hackernews.db".to_string(),
+    db_path: "/tmp/hackernews.db".to_string(), // Custom path
     fetch_mode: FetchMode::FetchAll,
     batch_size: Some(50),
 });

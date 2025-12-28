@@ -1,10 +1,17 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-const DEFAULT_DB_PATH: &str = "/tmp/hackernews.db";
+use std::path::PathBuf;
 
 fn default_db_path() -> String {
-    DEFAULT_DB_PATH.to_string()
+    get_default_db_path().to_string_lossy().to_string()
+}
+
+fn get_default_db_path() -> PathBuf {
+    if let Some(home) = home::home_dir() {
+        home.join(".local/share/nocodo/hackernews.db")
+    } else {
+        PathBuf::from("hackernews.db")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

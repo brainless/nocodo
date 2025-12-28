@@ -1,6 +1,7 @@
 use rusqlite::{Connection, params};
 use anyhow::Result;
 use super::client::{HnItem, HnUser};
+use std::path::Path;
 
 pub struct HnStorage {
     conn: Connection,
@@ -8,6 +9,12 @@ pub struct HnStorage {
 
 impl HnStorage {
     pub fn new(db_path: &str) -> Result<Self> {
+        // Create parent directory if it doesn't exist
+        let path = Path::new(db_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
         let conn = Connection::open(db_path)?;
         super::schema::initialize_schema(&conn)?;
         Ok(Self { conn })
