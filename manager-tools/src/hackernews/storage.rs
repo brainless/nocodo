@@ -2,9 +2,10 @@ use rusqlite::{Connection, params};
 use anyhow::Result;
 use super::client::{HnItem, HnUser};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 pub struct HnStorage {
-    conn: Connection,
+    conn: Arc<Mutex<Connection>>,
 }
 
 impl HnStorage {
@@ -17,11 +18,12 @@ impl HnStorage {
 
         let conn = Connection::open(db_path)?;
         super::schema::initialize_schema(&conn)?;
-        Ok(Self { conn })
+        Ok(Self { conn: Arc::new(Mutex::new(conn)) })
     }
 
     pub fn item_exists(&self, id: i64) -> Result<bool> {
-        let count: i64 = self.conn.query_row(
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+        let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM items WHERE id = ?1",
             params![id],
             |row| row.get(0),
@@ -30,7 +32,8 @@ impl HnStorage {
     }
 
     pub fn user_exists(&self, id: &str) -> Result<bool> {
-        let count: i64 = self.conn.query_row(
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+        let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM users WHERE id = ?1",
             params![id],
             |row| row.get(0),
@@ -39,11 +42,12 @@ impl HnStorage {
     }
 
     pub fn save_item(&self, item: &HnItem) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
         let fetched_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
 
-        self.conn.execute(
+        conn.execute(
             r#"
             INSERT OR REPLACE INTO items (
                 id, type, by, time, deleted, dead, parent, poll,
@@ -74,11 +78,12 @@ impl HnStorage {
     }
 
     pub fn save_user(&self, user: &HnUser) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
         let fetched_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
 
-        self.conn.execute(
+        conn.execute(
             r#"
             INSERT OR REPLACE INTO users (
                 id, created, karma, about, submitted, fetched_at
@@ -98,12 +103,13 @@ impl HnStorage {
     }
 
     pub fn queue_items(&self, item_ids: &[i64]) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
 
         for id in item_ids {
-            self.conn.execute(
+            conn.execute(
                 "INSERT OR IGNORE INTO fetch_queue (item_id, queued_at) VALUES (?1, ?2)",
                 params![id, now],
             )?;
@@ -112,8 +118,9 @@ impl HnStorage {
     }
 
     pub fn dequeue_items(&self, item_ids: &[i64]) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
         for id in item_ids {
-            self.conn.execute(
+            conn.execute(
                 "DELETE FROM fetch_queue WHERE item_id = ?1",
                 params![id],
             )?;
@@ -122,7 +129,8 @@ impl HnStorage {
     }
 
     pub fn get_queued_items(&self) -> Result<Vec<i64>> {
-        let mut stmt = self.conn.prepare("SELECT item_id FROM fetch_queue")?;
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+        let mut stmt = conn.prepare("SELECT item_id FROM fetch_queue")?;
         let ids = stmt.query_map([], |row| row.get(0))?.collect::<Result<Vec<_>, _>>()?;
         Ok(ids)
     }
