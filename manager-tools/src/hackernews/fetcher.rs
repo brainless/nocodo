@@ -1,8 +1,8 @@
-use anyhow::Result;
 use super::client::HnClient;
 use super::storage::HnStorage;
-use tokio::task::JoinSet;
+use anyhow::Result;
 use std::sync::Arc;
+use tokio::task::JoinSet;
 
 pub struct ItemFetcher {
     client: HnClient,
@@ -64,9 +64,7 @@ impl ItemFetcher {
 
         for &id in item_ids {
             let client = self.client.clone();
-            tasks.spawn(async move {
-                client.fetch_item(id).await
-            });
+            tasks.spawn(async move { client.fetch_item(id).await });
         }
 
         let mut items_to_save = Vec::new();
@@ -142,7 +140,8 @@ impl ItemFetcher {
         for id in user_ids {
             let storage = Arc::clone(&self.storage);
             let id_clone = id.clone();
-            let exists = tokio::task::spawn_blocking(move || storage.user_exists(&id_clone)).await??;
+            let exists =
+                tokio::task::spawn_blocking(move || storage.user_exists(&id_clone)).await??;
             if !exists {
                 to_fetch.push(id);
             } else {
@@ -169,7 +168,8 @@ impl ItemFetcher {
                     {
                         let storage = Arc::clone(&self.storage);
                         let user_clone = user.clone();
-                        tokio::task::spawn_blocking(move || storage.save_user(&user_clone)).await??;
+                        tokio::task::spawn_blocking(move || storage.save_user(&user_clone))
+                            .await??;
                     }
                     stats.users_downloaded += 1;
                     tracing::info!("Downloaded user {} (karma: {})", user_id, user.karma);

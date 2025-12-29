@@ -1,5 +1,6 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::database::Database;
+use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::Agent;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
@@ -125,6 +126,28 @@ pub fn create_codebase_analysis_agent(
     CodebaseAnalysisAgent::new(client, database, tool_executor)
 }
 
+/// Create a SqliteAnalysisAgent with tool executor support
+///
+/// Uses an in-memory database by default for session persistence
+///
+/// # Arguments
+///
+/// * `client` - The LLM client to use for the agent
+/// * `tool_executor` - Tool executor for running tools
+/// * `db_path` - Path to the SQLite database to analyze
+///
+/// # Returns
+///
+/// A SqliteAnalysisAgent instance
+pub fn create_sqlite_analysis_agent(
+    client: Arc<dyn LlmClient>,
+    tool_executor: Arc<ToolExecutor>,
+    db_path: String,
+) -> anyhow::Result<SqliteAnalysisAgent> {
+    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+    SqliteAnalysisAgent::new(client, database, tool_executor, db_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,7 +201,6 @@ mod tests {
     fn test_agent_type_values() {
         let agent_types = vec![AgentType::CodebaseAnalysis];
 
-        // Ensure we can iterate over agent types
         for agent_type in agent_types {
             let client: Arc<dyn LlmClient> = Arc::new(MockLlmClient);
             let _agent = create_agent(agent_type, client);

@@ -1,7 +1,7 @@
+use crate::types::hackernews::StoryType;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use crate::types::hackernews::StoryType;
 
 const BASE_URL: &str = "https://hacker-news.firebaseio.com/v0";
 const TIMEOUT_SECS: u64 = 10;
@@ -68,7 +68,13 @@ impl HnClient {
         };
 
         let url = format!("{}/{}.json", BASE_URL, endpoint);
-        let ids = self.client.get(&url).send().await?.json::<Vec<i64>>().await?;
+        let ids = self
+            .client
+            .get(&url)
+            .send()
+            .await?
+            .json::<Vec<i64>>()
+            .await?;
         Ok(ids)
     }
 

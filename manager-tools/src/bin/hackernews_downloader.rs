@@ -64,9 +64,7 @@ fn get_default_db_path() -> String {
             .to_string_lossy()
             .to_string()
     } else {
-        PathBuf::from("hackernews.db")
-            .to_string_lossy()
-            .to_string()
+        PathBuf::from("hackernews.db").to_string_lossy().to_string()
     }
 }
 
@@ -79,13 +77,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Starting HackerNews downloader");
 
     let fetch_mode = match cli.fetch_mode {
-        FetchModeArg::Top => FetchMode::StoryType { story_type: StoryType::Top },
-        FetchModeArg::New => FetchMode::StoryType { story_type: StoryType::New },
-        FetchModeArg::Best => FetchMode::StoryType { story_type: StoryType::Best },
-        FetchModeArg::Ask => FetchMode::StoryType { story_type: StoryType::Ask },
-        FetchModeArg::Show => FetchMode::StoryType { story_type: StoryType::Show },
-        FetchModeArg::Job => FetchMode::StoryType { story_type: StoryType::Job },
-        FetchModeArg::All => FetchMode::StoryType { story_type: StoryType::All },
+        FetchModeArg::Top => FetchMode::StoryType {
+            story_type: StoryType::Top,
+        },
+        FetchModeArg::New => FetchMode::StoryType {
+            story_type: StoryType::New,
+        },
+        FetchModeArg::Best => FetchMode::StoryType {
+            story_type: StoryType::Best,
+        },
+        FetchModeArg::Ask => FetchMode::StoryType {
+            story_type: StoryType::Ask,
+        },
+        FetchModeArg::Show => FetchMode::StoryType {
+            story_type: StoryType::Show,
+        },
+        FetchModeArg::Job => FetchMode::StoryType {
+            story_type: StoryType::Job,
+        },
+        FetchModeArg::All => FetchMode::StoryType {
+            story_type: StoryType::All,
+        },
         FetchModeArg::FetchAll => FetchMode::FetchAll,
     };
 

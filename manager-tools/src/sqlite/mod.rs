@@ -65,26 +65,74 @@
 //! - Simplifies error handling and cleanup
 //! - Avoids connection pool complexity for this read-only use case
 //!
-//! # Usage Example
+//! # Usage Examples
+//!
+//! ## Query Mode - Basic SELECT
 //!
 //! ```rust,no_run
 //! use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
 //! use manager_tools::sqlite::execute_sqlite3_reader;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Execute a SELECT query in query mode
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
 //!     mode: SqliteMode::Query {
-//!         query: "SELECT name, email FROM users WHERE active = 1".to_string(),
+//!         query: "SELECT name, email FROM users WHERE active = 1 ORDER BY name".to_string(),
 //!     },
 //!     limit: Some(50),
 //! };
 //!
 //! let response = execute_sqlite3_reader(request).await?;
+//! # Ok(())
+//! # }
+//! ```
 //!
-//! // Introspect database schema in reflect mode
-//! let schema_request = Sqlite3ReaderRequest {
+//! ## Query Mode - PRAGMA Statements
+//!
+//! ```rust,no_run
+//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let request = Sqlite3ReaderRequest {
+//!     db_path: "/path/to/database.db".to_string(),
+//!     mode: SqliteMode::Query {
+//!         query: "PRAGMA table_info(users)".to_string(),
+//!     },
+//!     limit: None,
+//! };
+//!
+//! let response = execute_sqlite3_reader(request).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Reflect Mode - Discover Tables
+//!
+//! ```rust,no_run
+//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let request = Sqlite3ReaderRequest {
+//!     db_path: "/path/to/database.db".to_string(),
+//!     mode: SqliteMode::Reflect {
+//!         target: "tables".to_string(),
+//!         table_name: None,
+//!     },
+//!     limit: None,
+//! };
+//!
+//! let response = execute_sqlite3_reader(request).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Reflect Mode - Inspect Table Schema
+//!
+//! ```rust,no_run
+//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
 //!     mode: SqliteMode::Reflect {
 //!         target: "table_info".to_string(),
@@ -93,7 +141,47 @@
 //!     limit: None,
 //! };
 //!
-//! let schema_response = execute_sqlite3_reader(schema_request).await?;
+//! let response = execute_sqlite3_reader(request).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Reflect Mode - Check Foreign Keys
+//!
+//! ```rust,no_run
+//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let request = Sqlite3ReaderRequest {
+//!     db_path: "/path/to/database.db".to_string(),
+//!     mode: SqliteMode::Reflect {
+//!         target: "foreign_keys".to_string(),
+//!         table_name: Some("posts".to_string()),
+//!     },
+//!     limit: None,
+//! };
+//!
+//! let response = execute_sqlite3_reader(request).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Reflect Mode - Database Statistics
+//!
+//! ```rust,no_run
+//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let request = Sqlite3ReaderRequest {
+//!     db_path: "/path/to/database.db".to_string(),
+//!     mode: SqliteMode::Reflect {
+//!         target: "stats".to_string(),
+//!         table_name: None,
+//!     },
+//!     limit: None,
+//! };
+//!
+//! let response = execute_sqlite3_reader(request).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -114,6 +202,8 @@
 //! - `table_info` - Column information for a specific table (requires table_name)
 //! - `indexes` - List all indexes
 //! - `views` - List all views
+//! - `foreign_keys` - Foreign key relationships for a specific table (requires table_name)
+//! - `stats` - Database statistics and table counts
 //!
 //! # PRAGMA Support
 //!
@@ -215,9 +305,20 @@ fn build_reflection_query(target: &str, table_name: Option<&str>) -> Result<Stri
         "views" => {
             "SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name".to_string()
         }
+        "foreign_keys" => {
+            match table_name {
+                Some(name) => format!("PRAGMA foreign_key_list({})", name),
+                None => return Err(ToolError::InvalidInput(
+                    "table_name is required for foreign_keys reflection".to_string()
+                )),
+            }
+        }
+        "stats" => {
+            "SELECT name, file FROM pragma_database_list UNION ALL SELECT 'Total Tables' as name, CAST(COUNT(*) as TEXT) as file FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'".to_string()
+        }
         _ => {
             return Err(ToolError::InvalidInput(
-                format!("Unknown reflection target: {}. Valid targets: tables, schema, table_info, indexes, views", target)
+                format!("Unknown reflection target: {}. Valid targets: tables, schema, table_info, indexes, views, foreign_keys, stats", target)
             ))
         }
     };
@@ -525,6 +626,127 @@ mod tests {
                     result.formatted_output.contains("id")
                         || result.formatted_output.contains("name")
                 );
+            }
+            _ => panic!("Expected Sqlite3Reader response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_foreign_keys() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE posts (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                title TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "foreign_keys".to_string(),
+                table_name: Some("posts".to_string()),
+            },
+            limit: None,
+        };
+
+        let response = execute_sqlite3_reader(request).await.unwrap();
+
+        match response {
+            crate::types::ToolResponse::Sqlite3Reader(result) => {
+                assert!(result
+                    .formatted_output
+                    .contains("Schema Reflection (foreign_keys)"));
+            }
+            _ => panic!("Expected Sqlite3Reader response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_foreign_keys_missing_table_name() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "foreign_keys".to_string(),
+                table_name: None,
+            },
+            limit: None,
+        };
+
+        let result = execute_sqlite3_reader(request).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(ToolError::InvalidInput(msg)) => {
+                assert!(msg.contains("table_name is required for foreign_keys reflection"));
+            }
+            _ => panic!("Expected InvalidInput error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_stats() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE posts (
+                id INTEGER PRIMARY KEY,
+                title TEXT
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "stats".to_string(),
+                table_name: None,
+            },
+            limit: None,
+        };
+
+        let response = execute_sqlite3_reader(request).await.unwrap();
+
+        match response {
+            crate::types::ToolResponse::Sqlite3Reader(result) => {
+                assert!(result.row_count > 0);
+                assert!(result
+                    .formatted_output
+                    .contains("Schema Reflection (stats)"));
             }
             _ => panic!("Expected Sqlite3Reader response"),
         }

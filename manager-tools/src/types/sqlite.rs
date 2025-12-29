@@ -15,11 +15,11 @@ pub enum SqliteMode {
     #[serde(rename = "reflect")]
     Reflect {
         #[schemars(
-            description = "Target of reflection: tables, schema, table_info, indexes, views"
+            description = "Target of reflection: tables, schema, table_info, indexes, views, foreign_keys, stats"
         )]
         target: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        #[schemars(description = "Optional: specific table name for table_info mode")]
+        #[schemars(description = "Optional: specific table name for table_info and foreign_keys modes")]
         table_name: Option<String>,
     },
 }

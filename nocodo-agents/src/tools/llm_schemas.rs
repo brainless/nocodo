@@ -5,13 +5,37 @@ use nocodo_llm_sdk::tools::Tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// LLM-facing schema for Sqlite3Reader mode (excludes db_path since it's auto-injected)
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "mode")]
+enum SqliteModeLlm {
+    /// Execute arbitrary SQL queries (SELECT or PRAGMA)
+    #[serde(rename = "query")]
+    Query {
+        #[schemars(
+            description = "SQL query to execute. Only SELECT queries and PRAGMA statements are allowed."
+        )]
+        query: String,
+    },
+
+    /// Reflect/introspect database schema
+    #[serde(rename = "reflect")]
+    Reflect {
+        #[schemars(
+            description = "Target of reflection: tables (list all tables), schema (full schema dump), table_info (column info for a table), indexes (list indexes), views (list views), foreign_keys (foreign key relationships), stats (database statistics)"
+        )]
+        target: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[schemars(description = "Optional: specific table name for table_info and foreign_keys modes")]
+        table_name: Option<String>,
+    },
+}
+
 /// LLM-facing schema for Sqlite3Reader tool (excludes db_path since it's auto-injected)
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 struct Sqlite3ReaderRequestLlm {
-    #[schemars(
-        description = "SQL query to execute. Only SELECT queries and PRAGMA statements are allowed."
-    )]
-    query: String,
+    #[schemars(description = "Execution mode: either query or reflect")]
+    mode: SqliteModeLlm,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Maximum number of rows to return. Defaults to 100, maximum 1000.")]
@@ -53,7 +77,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
             .build(),
         Tool::from_type::<Sqlite3ReaderRequestLlm>()
             .name("sqlite3_reader")
-            .description("Execute read-only SQL queries (SELECT and PRAGMA) on SQLite databases. The database path is pre-configured, so only provide the query.")
+            .description("Read-only SQLite database tool with two modes: 1) query mode - execute SELECT/PRAGMA statements, 2) reflect mode - introspect schema (tables, indexes, views, foreign keys, stats). The database path is pre-configured.")
             .build(),
     ]
 }

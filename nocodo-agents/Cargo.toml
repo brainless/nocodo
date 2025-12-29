@@ -32,3 +32,7 @@ tempfile = "3.0"
 [[bin]]
 name = "codebase-analysis-runner"
 path = "bin/codebase_analysis_runner.rs"
+
+[[bin]]
+name = "sqlite-analysis-runner"
+path = "bin/sqlite_analysis_runner.rs"

@@ -1,14 +1,16 @@
-use crate::types::{HackerNewsRequest, HackerNewsResponse, ToolResponse, StoryType, FetchMode, DownloadState};
 use crate::tool_error::ToolError;
+use crate::types::{
+    DownloadState, FetchMode, HackerNewsRequest, HackerNewsResponse, StoryType, ToolResponse,
+};
 use anyhow::Result;
 
 pub mod client;
 pub mod fetcher;
-pub mod storage;
 pub mod schema;
+pub mod storage;
 
 pub use client::HnClient;
-pub use fetcher::{ItemFetcher, FetchStats};
+pub use fetcher::{FetchStats, ItemFetcher};
 
 const DEFAULT_BATCH_SIZE: usize = 20;
 const DEFAULT_MAX_DEPTH: usize = 5;
@@ -40,15 +42,20 @@ async fn execute_story_type_mode(
     let fetcher = ItemFetcher::new(db_path, batch_size, max_depth)
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create item fetcher: {}", e)))?;
 
-    let item_ids = if matches!(story_type, StoryType::All) {
-        client.fetch_all_story_ids().await
-            .map_err(|e| ToolError::ExecutionError(format!("Failed to fetch story IDs: {}", e)))?
-    } else {
-        client.fetch_story_ids(&story_type).await
-            .map_err(|e| ToolError::ExecutionError(format!("Failed to fetch story IDs: {}", e)))?
-    };
+    let item_ids =
+        if matches!(story_type, StoryType::All) {
+            client.fetch_all_story_ids().await.map_err(|e| {
+                ToolError::ExecutionError(format!("Failed to fetch story IDs: {}", e))
+            })?
+        } else {
+            client.fetch_story_ids(&story_type).await.map_err(|e| {
+                ToolError::ExecutionError(format!("Failed to fetch story IDs: {}", e))
+            })?
+        };
 
-    let stats = fetcher.fetch_items(item_ids.clone()).await
+    let stats = fetcher
+        .fetch_items(item_ids.clone())
+        .await
         .map_err(|e| ToolError::ExecutionError(format!("Failed to fetch items: {}", e)))?;
 
     let response = HackerNewsResponse {
@@ -91,13 +98,17 @@ async fn execute_fetch_all_mode(
     let fetcher = ItemFetcher::new(db_path, batch_size, max_depth)
         .map_err(|e| ToolError::ExecutionError(format!("Failed to create item fetcher: {}", e)))?;
 
-    let max_id = client.fetch_max_item_id().await
+    let max_id = client
+        .fetch_max_item_id()
+        .await
         .map_err(|e| ToolError::ExecutionError(format!("Failed to fetch max item ID: {}", e)))?;
 
     let start_id = max_id - batch_size as i64 + 1;
     let item_ids: Vec<i64> = (start_id.max(1)..=max_id).collect();
 
-    let stats = fetcher.fetch_items(item_ids).await
+    let stats = fetcher
+        .fetch_items(item_ids)
+        .await
         .map_err(|e| ToolError::ExecutionError(format!("Failed to fetch items: {}", e)))?;
 
     let response = HackerNewsResponse {
