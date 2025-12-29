@@ -139,13 +139,13 @@ pub fn create_codebase_analysis_agent(
 /// # Returns
 ///
 /// A SqliteAnalysisAgent instance
-pub fn create_sqlite_analysis_agent(
+pub async fn create_sqlite_analysis_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,
     db_path: String,
 ) -> anyhow::Result<SqliteAnalysisAgent> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    SqliteAnalysisAgent::new(client, database, tool_executor, db_path)
+    SqliteAnalysisAgent::new(client, database, tool_executor, db_path).await
 }
 
 #[cfg(test)]
