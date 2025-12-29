@@ -68,23 +68,28 @@
 //! # Usage Example
 //!
 //! ```rust,no_run
-//! use manager_tools::types::Sqlite3ReaderRequest;
+//! use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
 //! use manager_tools::sqlite::execute_sqlite3_reader;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Execute a SELECT query
+//! // Execute a SELECT query in query mode
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
-//!     query: "SELECT name, email FROM users WHERE active = 1".to_string(),
+//!     mode: SqliteMode::Query {
+//!         query: "SELECT name, email FROM users WHERE active = 1".to_string(),
+//!     },
 //!     limit: Some(50),
 //! };
 //!
 //! let response = execute_sqlite3_reader(request).await?;
 //!
-//! // Introspect database schema with PRAGMA
+//! // Introspect database schema in reflect mode
 //! let schema_request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
-//!     query: "PRAGMA table_info(users)".to_string(),
+//!     mode: SqliteMode::Reflect {
+//!         target: "table_info".to_string(),
+//!         table_name: Some("users".to_string()),
+//!     },
 //!     limit: None,
 //! };
 //!
@@ -93,9 +98,26 @@
 //! # }
 //! ```
 //!
+//! # Modes
+//!
+//! ## Query Mode
+//!
+//! Execute arbitrary SQL SELECT queries and PRAGMA statements. The query is subject to
+//! validation to ensure it's read-only and safe.
+//!
+//! ## Reflect Mode
+//!
+//! Introspect database schema without writing SQL queries. Supported targets:
+//!
+//! - `tables` - List all user tables with CREATE statements
+//! - `schema` - Full schema dump (tables, indexes, views)
+//! - `table_info` - Column information for a specific table (requires table_name)
+//! - `indexes` - List all indexes
+//! - `views` - List all views
+//!
 //! # PRAGMA Support
 //!
-//! PRAGMA statements are supported for schema introspection:
+//! PRAGMA statements are also supported in query mode for schema introspection:
 //!
 //! - `PRAGMA table_list` - List all tables
 //! - `PRAGMA table_info(table_name)` - Get column information
@@ -115,6 +137,7 @@
 //! All errors include descriptive messages to aid in debugging.
 
 use crate::tool_error::ToolError;
+use crate::types::SqliteMode;
 
 pub mod executor;
 pub mod formatter;
@@ -135,11 +158,28 @@ pub async fn execute_sqlite3_reader(
     let executor = SqlExecutor::new(&request.db_path, MAX_LIMIT, TIMEOUT_MS)
         .map_err(|e| ToolError::ExecutionError(format!("Failed to open database: {}", e)))?;
 
+    let (query, target_label) = match request.mode {
+        SqliteMode::Query { query } => (query, None),
+        SqliteMode::Reflect { target, table_name } => (
+            build_reflection_query(&target, table_name.as_deref())?,
+            Some(target),
+        ),
+    };
+
     let result = executor
-        .execute(&request.query, Some(limit))
+        .execute(&query, Some(limit))
         .map_err(|e| ToolError::ExecutionError(format!("Query execution failed: {}", e)))?;
 
-    let formatted_output = formatter::format_query_result(&result);
+    let formatted_output = match target_label {
+        Some(target) => {
+            format!(
+                "Schema Reflection ({}):\n{}",
+                target,
+                formatter::format_query_result(&result)
+            )
+        }
+        None => formatter::format_query_result(&result),
+    };
 
     Ok(crate::types::ToolResponse::Sqlite3Reader(
         crate::types::Sqlite3ReaderResponse {
@@ -151,6 +191,38 @@ pub async fn execute_sqlite3_reader(
             formatted_output,
         },
     ))
+}
+
+fn build_reflection_query(target: &str, table_name: Option<&str>) -> Result<String, ToolError> {
+    let query = match target.to_lowercase().as_str() {
+        "tables" => {
+            "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name".to_string()
+        }
+        "schema" => {
+            "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name".to_string()
+        }
+        "table_info" => {
+            match table_name {
+                Some(name) => format!("PRAGMA table_info({})", name),
+                None => return Err(ToolError::InvalidInput(
+                    "table_name is required for table_info reflection".to_string()
+                )),
+            }
+        }
+        "indexes" => {
+            "SELECT name, tbl_name, sql FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' ORDER BY tbl_name, name".to_string()
+        }
+        "views" => {
+            "SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name".to_string()
+        }
+        _ => {
+            return Err(ToolError::InvalidInput(
+                format!("Unknown reflection target: {}. Valid targets: tables, schema, table_info, indexes, views", target)
+            ))
+        }
+    };
+
+    Ok(query)
 }
 
 fn validate_db_path(db_path: &str) -> Result<(), ToolError> {
@@ -181,11 +253,12 @@ fn validate_db_path(db_path: &str) -> Result<(), ToolError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::SqliteMode;
     use rusqlite::Connection;
     use tempfile::NamedTempFile;
 
     #[tokio::test]
-    async fn test_sqlite3_reader_tool() {
+    async fn test_query_mode() {
         let temp_file = NamedTempFile::new().unwrap();
         let conn = Connection::open(temp_file.path()).unwrap();
 
@@ -205,7 +278,9 @@ mod tests {
 
         let request = crate::types::Sqlite3ReaderRequest {
             db_path: temp_file.path().to_str().unwrap().to_string(),
-            query: "SELECT name, value FROM test_table ORDER BY value DESC".to_string(),
+            mode: SqliteMode::Query {
+                query: "SELECT name, value FROM test_table ORDER BY value DESC".to_string(),
+            },
             limit: None,
         };
 
@@ -223,10 +298,90 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_pragma_support() {
-        use rusqlite::Connection;
-        use tempfile::NamedTempFile;
+    async fn test_reflect_mode_tables() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
 
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE posts (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                title TEXT
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "tables".to_string(),
+                table_name: None,
+            },
+            limit: None,
+        };
+
+        let response = execute_sqlite3_reader(request).await.unwrap();
+
+        match response {
+            crate::types::ToolResponse::Sqlite3Reader(result) => {
+                assert!(result.row_count >= 2);
+                assert!(result.formatted_output.contains("users"));
+                assert!(result.formatted_output.contains("posts"));
+            }
+            _ => panic!("Expected Sqlite3Reader response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_table_info() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "table_info".to_string(),
+                table_name: Some("users".to_string()),
+            },
+            limit: None,
+        };
+
+        let response = execute_sqlite3_reader(request).await.unwrap();
+
+        match response {
+            crate::types::ToolResponse::Sqlite3Reader(result) => {
+                assert!(result.row_count > 0);
+                assert!(
+                    result.formatted_output.contains("id")
+                        || result.formatted_output.contains("name")
+                        || result.formatted_output.contains("email")
+                );
+            }
+            _ => panic!("Expected Sqlite3Reader response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_table_info_missing_table_name() {
         let temp_file = NamedTempFile::new().unwrap();
         let conn = Connection::open(temp_file.path()).unwrap();
 
@@ -243,7 +398,121 @@ mod tests {
 
         let request = crate::types::Sqlite3ReaderRequest {
             db_path: temp_file.path().to_str().unwrap().to_string(),
-            query: "PRAGMA table_info(users)".to_string(),
+            mode: SqliteMode::Reflect {
+                target: "table_info".to_string(),
+                table_name: None,
+            },
+            limit: None,
+        };
+
+        let result = execute_sqlite3_reader(request).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(ToolError::InvalidInput(msg)) => {
+                assert!(msg.contains("table_name is required for table_info reflection"));
+            }
+            _ => panic!("Expected InvalidInput error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_invalid_target() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "invalid_target".to_string(),
+                table_name: None,
+            },
+            limit: None,
+        };
+
+        let result = execute_sqlite3_reader(request).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(ToolError::InvalidInput(msg)) => {
+                assert!(msg.contains("Unknown reflection target"));
+                assert!(msg.contains("tables, schema, table_info, indexes, views"));
+            }
+            _ => panic!("Expected InvalidInput error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reflect_mode_schema() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE INDEX idx_users_name ON users(name);
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Reflect {
+                target: "schema".to_string(),
+                table_name: None,
+            },
+            limit: None,
+        };
+
+        let response = execute_sqlite3_reader(request).await.unwrap();
+
+        match response {
+            crate::types::ToolResponse::Sqlite3Reader(result) => {
+                assert!(result.row_count > 0);
+                assert!(result
+                    .formatted_output
+                    .contains("Schema Reflection (schema)"));
+            }
+            _ => panic!("Expected Sqlite3Reader response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_query_mode_pragma() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let request = crate::types::Sqlite3ReaderRequest {
+            db_path: temp_file.path().to_str().unwrap().to_string(),
+            mode: SqliteMode::Query {
+                query: "PRAGMA table_info(users)".to_string(),
+            },
             limit: None,
         };
 

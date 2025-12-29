@@ -16,7 +16,7 @@ pub use filesystem::{
 };
 pub use grep::{GrepMatch, GrepRequest, GrepResponse};
 pub use hackernews::{DownloadState, FetchMode, HackerNewsRequest, HackerNewsResponse, StoryType};
-pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse};
+pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 pub use user_interaction::{
     AskUserRequest, AskUserResponse, QuestionType, QuestionValidation, UserQuestion,
     UserQuestionResponse,
