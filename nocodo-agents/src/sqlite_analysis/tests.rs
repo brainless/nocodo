@@ -157,99 +157,10 @@ async fn test_latest_user_registration_integration() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_parse_tables_from_reflection() {
-    let output = r#"Schema Reflection (tables):
-Query executed successfully. Returned 2 rows.
-Execution time: 1ms
-
-name              | sql
------------------+-------------------------------------------------------------
-users             | CREATE TABLE users (
-                  |     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  |     name TEXT NOT NULL,
-                  |     email TEXT NOT NULL,
-                  |     created_at TEXT NOT NULL
-                  | )
-posts             | CREATE TABLE posts (
-                  |     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  |     user_id INTEGER NOT NULL,
-                  |     title TEXT NOT NULL
-                  | )"#;
-
-    let tables = parse_tables_from_reflection(output).unwrap();
-    assert_eq!(tables.len(), 2);
-    assert_eq!(tables[0].name, "users");
-    assert!(tables[0].create_sql.is_some());
-    assert_eq!(tables[1].name, "posts");
-    assert!(tables[1].create_sql.is_some());
-}
-
-#[test]
-fn test_extract_table_name_from_create_sql() {
-    assert_eq!(
-        extract_table_name_from_create_sql("CREATE TABLE users (id INTEGER)"),
-        Some("users".to_string())
-    );
-    assert_eq!(
-        extract_table_name_from_create_sql("CREATE TABLE IF NOT EXISTS posts (id INTEGER)"),
-        Some("posts".to_string())
-    );
-    assert_eq!(
-        extract_table_name_from_create_sql("CREATE TABLE [user_data] (id INTEGER)"),
-        Some("user_data".to_string())
-    );
-    assert!(extract_table_name_from_create_sql("SELECT * FROM users").is_none());
-}
-
-#[test]
-fn test_extract_columns_from_ddl() {
-    let ddl = "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT)";
-    let columns = extract_columns_from_ddl(ddl);
-    assert!(columns.contains("id"));
-    assert!(columns.contains("name"));
-    assert!(columns.contains("email"));
-}
-
-#[test]
-fn test_extract_columns_from_ddl_long() {
-    let ddl = "CREATE TABLE users (id INTEGER, name TEXT, email TEXT, created_at TEXT, updated_at TEXT, status TEXT, age INTEGER, score INTEGER, rank INTEGER, level INTEGER, extra1 TEXT, extra2 TEXT)";
-    let columns = extract_columns_from_ddl(ddl);
-    assert!(columns.contains("..."));
-    assert!(columns.contains("more"));
-}
-
-#[test]
-fn test_schema_info_empty() {
-    let schema = SchemaInfo { tables: vec![] };
-    assert_eq!(schema.tables.len(), 0);
-}
-
-#[test]
-fn test_generate_system_prompt_with_schema() {
-    let schema = SchemaInfo {
-        tables: vec![
-            TableInfo {
-                name: "users".to_string(),
-                create_sql: Some("CREATE TABLE users (id INTEGER, name TEXT)".to_string()),
-            },
-            TableInfo {
-                name: "posts".to_string(),
-                create_sql: Some("CREATE TABLE posts (id INTEGER, title TEXT)".to_string()),
-            },
-        ],
-    };
-
-    let prompt = generate_system_prompt_with_schema("/path/to/db.db", &schema);
-    assert!(prompt.contains("users"));
-    assert!(prompt.contains("posts"));
-    assert!(prompt.contains("DATABASE SCHEMA"));
-    assert!(prompt.contains("QUERY MODE"));
-    assert!(prompt.contains("REFLECT MODE"));
-}
-
-#[test]
-fn test_generate_system_prompt_empty_schema() {
-    let schema = SchemaInfo { tables: vec![] };
-    let prompt = generate_system_prompt_with_schema("/path/to/db.db", &schema);
-    assert!(prompt.contains("No tables found"));
+fn test_generate_system_prompt() {
+    let prompt = generate_system_prompt("/path/to/db.db");
+    assert!(prompt.contains("PRAGMA table_list"));
+    assert!(prompt.contains("PRAGMA table_info"));
+    assert!(!prompt.contains("QUERY MODE"));
+    assert!(!prompt.contains("REFLECT MODE"));
 }
