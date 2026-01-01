@@ -80,6 +80,7 @@ async fn test_count_users_integration() -> anyhow::Result<()> {
         session_db,
         tool_executor,
         db_path.clone(),
+        vec!["users".to_string()],
     );
 
     // Execute query
@@ -130,6 +131,7 @@ async fn test_latest_user_registration_integration() -> anyhow::Result<()> {
         session_db,
         tool_executor,
         db_path.clone(),
+        vec!["users".to_string()],
     );
 
     // Execute query
@@ -158,9 +160,12 @@ async fn test_latest_user_registration_integration() -> anyhow::Result<()> {
 
 #[test]
 fn test_generate_system_prompt() {
-    let prompt = generate_system_prompt("/path/to/db.db");
-    assert!(prompt.contains("PRAGMA table_list"));
+    let table_names = vec!["users".to_string(), "posts".to_string()];
+    let prompt = generate_system_prompt("my_database", &table_names);
+    assert!(prompt.contains("You are analyzing the database named: my_database"));
+    assert!(prompt.contains("Tables in the database: users, posts"));
     assert!(prompt.contains("PRAGMA table_info"));
+    assert!(!prompt.contains("PRAGMA table_list"));
     assert!(!prompt.contains("QUERY MODE"));
     assert!(!prompt.contains("REFLECT MODE"));
 }

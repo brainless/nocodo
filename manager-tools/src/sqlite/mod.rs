@@ -234,6 +234,36 @@ pub mod formatter;
 
 pub use executor::{QueryResult, SqlExecutor};
 
+pub async fn get_table_names(db_path: &str) -> Result<Vec<String>, ToolError> {
+    validate_db_path(db_path)?;
+
+    const MAX_LIMIT: usize = 1000;
+    const TIMEOUT_MS: u64 = 5000;
+
+    let executor = SqlExecutor::new(db_path, MAX_LIMIT, TIMEOUT_MS)
+        .map_err(|e| ToolError::ExecutionError(format!("Failed to open database: {}", e)))?;
+
+    let query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name";
+
+    let result = executor
+        .execute(query, None)
+        .map_err(|e| ToolError::ExecutionError(format!("Failed to get table names: {}", e)))?;
+
+    let table_names: Vec<String> = result
+        .rows
+        .iter()
+        .filter_map(|row| {
+            if let Some(serde_json::Value::String(name)) = row.first() {
+                Some(name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(table_names)
+}
+
 pub async fn execute_sqlite3_reader(
     request: crate::types::Sqlite3ReaderRequest,
 ) -> Result<crate::types::ToolResponse, ToolError> {
@@ -750,5 +780,49 @@ mod tests {
             }
             _ => panic!("Expected Sqlite3Reader response"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_get_table_names() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE posts (
+                id INTEGER PRIMARY KEY,
+                title TEXT
+            );
+            CREATE TABLE comments (
+                id INTEGER PRIMARY KEY,
+                post_id INTEGER
+            );
+        "#,
+        )
+        .unwrap();
+        drop(conn);
+
+        let table_names = get_table_names(temp_file.path().to_str().unwrap()).await.unwrap();
+
+        assert_eq!(table_names.len(), 3);
+        assert!(table_names.contains(&"users".to_string()));
+        assert!(table_names.contains(&"posts".to_string()));
+        assert!(table_names.contains(&"comments".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_table_names_empty_db() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        drop(conn);
+
+        let table_names = get_table_names(temp_file.path().to_str().unwrap()).await.unwrap();
+
+        assert_eq!(table_names.len(), 0);
     }
 }

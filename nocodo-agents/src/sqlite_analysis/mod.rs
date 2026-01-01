@@ -29,7 +29,14 @@ impl SqliteAnalysisAgent {
     ) -> anyhow::Result<Self> {
         validate_db_path(&db_path)?;
 
-        let system_prompt = generate_system_prompt(&db_path);
+        let table_names = manager_tools::sqlite::get_table_names(&db_path).await?;
+
+        let db_name = std::path::Path::new(&db_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("database");
+
+        let system_prompt = generate_system_prompt(db_name, &table_names);
 
         Ok(Self {
             client,
@@ -47,8 +54,14 @@ impl SqliteAnalysisAgent {
         database: Arc<Database>,
         tool_executor: Arc<ToolExecutor>,
         db_path: String,
+        table_names: Vec<String>,
     ) -> Self {
-        let system_prompt = generate_system_prompt(&db_path);
+        let db_name = std::path::Path::new(&db_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("database");
+
+        let system_prompt = generate_system_prompt(db_name, &table_names);
 
         Self {
             client,
@@ -271,52 +284,37 @@ fn validate_db_path(db_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn generate_system_prompt(db_path: &str) -> String {
-    format!(
-        "You are a database analysis expert specialized in SQLite databases. \
-         You are analyzing the database at: {}
+fn generate_system_prompt(db_name: &str, table_names: &[String]) -> String {
+    let tables_list = if table_names.is_empty() {
+        "No tables found".to_string()
+    } else {
+        table_names.join(", ")
+    };
 
- Your role is to query data and provide insights about database contents. \
+    format!(
+        "You are a database analysis expert specialized in SQLite databases.
+ Your role is to query data and provide insights about database contents.
  You have access to the sqlite3_reader tool to execute SQL queries.
 
  Use SELECT queries to retrieve data and PRAGMA statements to inspect schema and database structure.
-
- Example queries:
- - SELECT * FROM users LIMIT 5
- - PRAGMA table_list
- - PRAGMA table_info(users)
- - SELECT COUNT(*) FROM posts
-
- IMPORTANT: The database path is already configured. You do NOT need to specify \
- db_path in your tool calls.
 
  ALLOWED QUERIES:
  - SELECT queries to retrieve and analyze data
  - PRAGMA queries to inspect database schema and structure
 
  Useful PRAGMA commands for schema discovery:
- - PRAGMA table_list - Get list of all tables
  - PRAGMA table_info(table_name) - Get column information for a specific table
  - PRAGMA index_list(table_name) - Get indexes for a table
  - PRAGMA foreign_key_list(table_name) - Get foreign keys for a table
- - PRAGMA database_list - Get attached databases
- - PRAGMA schema_version - Get schema version
 
  You can ONLY use SELECT and PRAGMA statements. Do NOT use CREATE, \
  INSERT, UPDATE, DELETE, ALTER, DROP, or any other data modification statements.
 
- Best Practices:
- 1. When you need to explore the database schema, use PRAGMA commands first
- 2. Use PRAGMA table_list to see available tables
- 3. Use PRAGMA table_info(table_name) to understand table structure
- 4. Keep queries simple and direct
- 5. Use LIMIT clauses for large result sets
- 6. For latest/newest records: use ORDER BY column DESC LIMIT 1
- 7. For counting: use SELECT COUNT(*) FROM table
- 8. Answer user questions concisely based on query results
-
- Focus on answering the user's question directly by querying the database.",
-        db_path
+ IMPORTANT: The database path is already configured.
+ You are analyzing the database named: {}
+ Tables in the database: {}
+ ",
+        db_name, tables_list
     )
 }
 

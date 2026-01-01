@@ -85,6 +85,8 @@ async fn main() -> anyhow::Result<()> {
 
     let agent = create_sqlite_analysis_agent(client, tool_executor, args.db_path).await?;
 
+    tracing::info!("System prompt:\n{}", agent.system_prompt());
+
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 
