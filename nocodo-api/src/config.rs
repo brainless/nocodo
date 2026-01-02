@@ -7,6 +7,12 @@ pub struct ApiConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub api_keys: Option<ApiKeysConfig>,
+    pub llm: Option<LlmConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LlmConfig {
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -42,12 +48,13 @@ impl Default for ApiConfig {
                 path: get_default_db_path(),
             },
             api_keys: None,
+            llm: None,
         }
     }
 }
 
 impl ApiConfig {
-    pub fn load() -> Result<Self, ConfigError> {
+    pub fn load() -> Result<(Self, PathBuf), ConfigError> {
         let config_path = get_config_path();
 
         // Create config directory if it doesn't exist
@@ -66,6 +73,9 @@ port = 8080
 
 [database]
 path = "~/.local/share/nocodo/api.db"
+
+[llm]
+# provider = "anthropic"  # Options: anthropic, openai, xai, zai
 
 [api_keys]
 # xai_api_key = "your-xai-key"
@@ -96,7 +106,7 @@ path = "~/.local/share/nocodo/api.db"
             }
         }
 
-        Ok(config)
+        Ok((config, config_path))
     }
 }
 

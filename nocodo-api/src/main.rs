@@ -19,13 +19,17 @@ async fn main() -> std::io::Result<()> {
         )
         .init();
 
-    let llm_client = helpers::llm::create_llm_client().expect("Failed to create LLM client");
+    let (api_config, config_path) = config::ApiConfig::load().expect("Failed to load config");
+    info!("Loaded config from: {}", config_path.display());
+    let app_config = Arc::new(std::sync::RwLock::new(api_config));
+
+    let config = app_config
+        .read()
+        .expect("Failed to acquire config read lock");
+    let llm_client = helpers::llm::create_llm_client(&config).expect("Failed to create LLM client");
+    drop(config);
     let (db_conn, db) =
         helpers::database::initialize_database().expect("Failed to initialize database");
-
-    let app_config = Arc::new(std::sync::RwLock::new(
-        config::ApiConfig::load().expect("Failed to load config"),
-    ));
 
     let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);
