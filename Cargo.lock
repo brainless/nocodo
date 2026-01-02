@@ -4543,6 +4543,7 @@ dependencies = [
  "actix-web",
  "anyhow",
  "chrono",
+ "config",
  "home",
  "manager-tools",
  "nocodo-agents",
@@ -4550,7 +4551,9 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "shared-types",
  "tokio",
+ "toml 0.9.8",
  "tracing",
  "tracing-subscriber",
 ]

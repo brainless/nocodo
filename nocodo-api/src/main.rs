@@ -1,3 +1,4 @@
+mod config;
 mod handlers;
 mod helpers;
 mod models;
@@ -22,6 +23,10 @@ async fn main() -> std::io::Result<()> {
     let (db_conn, db) =
         helpers::database::initialize_database().expect("Failed to initialize database");
 
+    let app_config = Arc::new(std::sync::RwLock::new(
+        config::ApiConfig::load().expect("Failed to load config"),
+    ));
+
     let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);
 
@@ -30,10 +35,21 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(llm_client.clone()))
             .app_data(web::Data::new(db_conn.clone()))
             .app_data(web::Data::new(db.clone()))
+            .app_data(web::Data::new(handlers::settings::SettingsAppState {
+                config: app_config.clone(),
+            }))
             .service(handlers::llm_providers::list_providers)
             .service(handlers::agents::list_agents)
             .service(handlers::agent_execution::execute_sqlite_agent)
             .service(handlers::sessions::get_session)
+            .service(
+                web::scope("/settings")
+                    .route("", web::get().to(handlers::settings::get_settings))
+                    .route(
+                        "/api-keys",
+                        web::post().to(handlers::settings::update_api_keys),
+                    ),
+            )
     })
     .bind(bind_addr)?
     .run()

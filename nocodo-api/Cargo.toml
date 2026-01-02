@@ -10,6 +10,7 @@ repository.workspace = true
 nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
 nocodo-agents = { path = "../nocodo-agents" }
 manager-tools = { path = "../manager-tools" }
+shared-types = { path = "../shared-types" }
 actix-web.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -20,3 +21,5 @@ chrono.workspace = true
 anyhow.workspace = true
 home = "0.5"
 rusqlite = { version = "0.37", features = ["bundled"] }
+toml = "0.9"
+config.workspace = true
