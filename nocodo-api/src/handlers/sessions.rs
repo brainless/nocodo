@@ -1,10 +1,8 @@
 use crate::models::{ErrorResponse, SessionMessage, SessionResponse, SessionToolCall};
+use crate::DbConnection;
 use actix_web::{get, web, HttpResponse, Responder};
 use rusqlite::{params, Connection};
-use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
-
-pub type DbConnection = Arc<Mutex<Connection>>;
 
 #[get("/agents/sessions/{session_id}")]
 pub async fn get_session(
@@ -40,10 +38,13 @@ fn get_session_from_db(
     session_id: i64,
 ) -> Result<Option<SessionResponse>, anyhow::Error> {
     let session = conn.query_row(
-        "SELECT id, agent_name, provider, model, system_prompt, user_prompt, status, result
+        "SELECT id, agent_name, provider, model, system_prompt, user_prompt, config, status, result
          FROM agent_sessions WHERE id = ?1",
         params![session_id],
         |row| {
+            let config_str: Option<String> = row.get(6)?;
+            let config = config_str.and_then(|s| serde_json::from_str(&s).ok());
+
             Ok(SessionResponse {
                 id: row.get(0)?,
                 agent_name: row.get(1)?,
@@ -51,8 +52,9 @@ fn get_session_from_db(
                 model: row.get(3)?,
                 system_prompt: row.get(4)?,
                 user_prompt: row.get(5)?,
-                status: row.get(6)?,
-                result: row.get(7)?,
+                config,
+                status: row.get(7)?,
+                result: row.get(8)?,
                 messages: Vec::new(),
                 tool_calls: Vec::new(),
             })

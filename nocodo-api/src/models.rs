@@ -38,6 +38,7 @@ pub struct SessionResponse {
     pub model: String,
     pub system_prompt: Option<String>,
     pub user_prompt: String,
+    pub config: Option<serde_json::Value>,
     pub status: String,
     pub result: Option<String>,
     pub messages: Vec<SessionMessage>,

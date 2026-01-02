@@ -14,6 +14,7 @@ pub fn run_agent_migrations(conn: &Connection) -> anyhow::Result<()> {
             model TEXT NOT NULL,
             system_prompt TEXT,
             user_prompt TEXT NOT NULL,
+            config TEXT,
             status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed')),
             started_at INTEGER NOT NULL,
             ended_at INTEGER,
@@ -22,6 +23,20 @@ pub fn run_agent_migrations(conn: &Connection) -> anyhow::Result<()> {
         )",
         [],
     )?;
+
+    // Add config column if it doesn't exist (for existing databases)
+    let has_config: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('agent_sessions') WHERE name = 'config'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        == 1;
+
+    if !has_config {
+        conn.execute("ALTER TABLE agent_sessions ADD COLUMN config TEXT", [])?;
+    }
 
     // Create agent_messages table
     conn.execute(

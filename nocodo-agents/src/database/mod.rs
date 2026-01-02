@@ -41,6 +41,7 @@ impl Database {
                 model TEXT NOT NULL,
                 system_prompt TEXT,
                 user_prompt TEXT NOT NULL,
+                config TEXT,
                 status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed')),
                 started_at INTEGER NOT NULL,
                 ended_at INTEGER,
@@ -49,6 +50,20 @@ impl Database {
             )",
             [],
         )?;
+
+        // Add config column if it doesn't exist (for existing databases)
+        let has_config: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('agent_sessions') WHERE name = 'config'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+            == 1;
+
+        if !has_config {
+            conn.execute("ALTER TABLE agent_sessions ADD COLUMN config TEXT", [])?;
+        }
 
         // Create agent_messages table
         conn.execute(
@@ -114,14 +129,19 @@ impl Database {
         model: &str,
         system_prompt: Option<&str>,
         user_prompt: &str,
+        config: Option<serde_json::Value>,
     ) -> anyhow::Result<i64> {
         let conn = self.connection.lock().unwrap();
         let now = chrono::Utc::now().timestamp();
 
+        let config_json = config
+            .map(|c| serde_json::to_string(&c).unwrap())
+            .unwrap_or_else(|| "null".to_string());
+
         conn.execute(
-            "INSERT INTO agent_sessions (agent_name, provider, model, system_prompt, user_prompt, started_at)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![agent_name, provider, model, system_prompt, user_prompt, now],
+            "INSERT INTO agent_sessions (agent_name, provider, model, system_prompt, user_prompt, config, started_at)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![agent_name, provider, model, system_prompt, user_prompt, config_json, now],
         )?;
 
         Ok(conn.last_insert_rowid())

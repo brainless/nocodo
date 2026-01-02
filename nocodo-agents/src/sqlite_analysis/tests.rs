@@ -35,7 +35,11 @@ fn setup_test_db() -> anyhow::Result<(NamedTempFile, String)> {
     let users = vec![
         ("Alice Johnson", "alice@example.com", "2024-01-15 10:30:00"),
         ("Bob Smith", "bob@example.com", "2024-02-20 14:15:00"),
-        ("Charlie Brown", "charlie@example.com", "2024-03-10 09:00:00"),
+        (
+            "Charlie Brown",
+            "charlie@example.com",
+            "2024-03-10 09:00:00",
+        ),
         ("Diana Prince", "diana@example.com", "2024-04-05 16:45:00"),
         ("Eve Anderson", "eve@example.com", "2024-05-12 11:20:00"),
     ];

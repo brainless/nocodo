@@ -68,6 +68,7 @@ impl Agent for CodebaseAnalysisAgent {
             self.client.model_name(),
             Some(&self.system_prompt()),
             user_prompt,
+            None,
         )?;
 
         // 2. Create initial user message
