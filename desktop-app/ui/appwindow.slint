@@ -1,0 +1,102 @@
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+// Using VerticalLayout and HorizontalLayout for the main structure to avoid margins
+
+component SideBar inherits Rectangle {
+    in property <string> current-page;
+    callback page-selected(string);
+
+    background: #2c3e50;
+    width: 200px;
+
+    VerticalBox {
+        padding: 16px;
+        spacing: 8px;
+
+        // Settings link
+        Rectangle {
+            height: 40px;
+            background: current-page == "settings" ? #34495e : transparent;
+            border-radius: 4px;
+
+            HorizontalBox {
+                padding: 8px;
+                alignment: start;
+
+                Text {
+                    text: "Settings";
+                    color: #ecf0f1;
+                    vertical-alignment: center;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.page-selected("settings");
+                }
+            }
+        }
+    }
+}
+
+component StatusBar inherits Rectangle {
+    height: 30px;
+    background: #34495e;
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+
+        Text {
+            text: "Ready";
+            color: #ecf0f1;
+            vertical-alignment: center;
+            font-size: 12px;
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    preferred-width: 1024px;
+    preferred-height: 768px;
+    title: "NocoDo Desktop";
+
+    property <string> current-page: "settings";
+
+    VerticalLayout {
+        spacing: 0;
+
+        HorizontalLayout {
+            spacing: 0;
+            vertical-stretch: 1;
+            min-height: 800px;
+
+            // Left sidebar
+            sidebar := SideBar {
+                current-page: root.current-page;
+                page-selected(page) => {
+                    root.current-page = page;
+                }
+            }
+
+            // Main content area
+            Rectangle {
+                background: #ecf0f1;
+                horizontal-stretch: 1;
+
+                VerticalBox {
+                    padding: 24px;
+
+                    if root.current-page == "settings": Text {
+                        text: "Settings Page";
+                        font-size: 24px;
+                        color: #2c3e50;
+                    }
+                }
+            }
+        }
+
+        // Bottom status bar
+        StatusBar {}
+    }
+}
