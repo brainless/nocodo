@@ -58,7 +58,11 @@ component StatusBar inherits Rectangle {
 
 export component AppWindow inherits Window {
     preferred-width: 1024px;
-    preferred-height: 768px;
+    preferred-height: 900px;
+    min-width: 600px;
+    min-height: 830px;
+    max-width: 3000px;
+    max-height: 2000px;
     title: "NocoDo Desktop";
 
     property <string> current-page: "settings";
