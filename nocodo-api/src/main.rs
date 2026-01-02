@@ -1,4 +1,5 @@
 mod handlers;
+mod helpers;
 
 use actix_web::{App, HttpServer};
 use tracing::info;
@@ -15,8 +16,12 @@ async fn main() -> std::io::Result<()> {
     let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);
 
-    HttpServer::new(|| App::new().service(handlers::llm_providers::list_providers))
-        .bind(bind_addr)?
-        .run()
-        .await
+    HttpServer::new(|| {
+        App::new()
+            .service(handlers::llm_providers::list_providers)
+            .service(handlers::agents::list_agents)
+    })
+    .bind(bind_addr)?
+    .run()
+    .await
 }
