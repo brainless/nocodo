@@ -4537,6 +4537,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nocodo-api"
+version = "0.1.12"
+dependencies = [
+ "actix-web",
+ "nocodo-llm-sdk",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "nocodo-desktop-app"
 version = "0.1.17"
 dependencies = [

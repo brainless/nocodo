@@ -1,0 +1,16 @@
+[package]
+name = "nocodo-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
+actix-web.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
