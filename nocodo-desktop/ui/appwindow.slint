@@ -2,6 +2,11 @@ import { VerticalBox, HorizontalBox } from "std-widgets.slint";
 
 // Using VerticalLayout and HorizontalLayout for the main structure to avoid margins
 
+export struct ApiKeyEntry {
+    name: string,
+    key: string,
+}
+
 component SideBar inherits Rectangle {
     in property <string> current-page;
     callback page-selected(string);
@@ -66,6 +71,9 @@ export component AppWindow inherits Window {
     title: "NocoDo Desktop";
 
     property <string> current-page: "settings";
+    in-out property <[ApiKeyEntry]> api-keys: [];
+
+    callback load-settings();
 
     VerticalLayout {
         spacing: 0;
@@ -88,13 +96,63 @@ export component AppWindow inherits Window {
                 background: #ecf0f1;
                 horizontal-stretch: 1;
 
-                VerticalBox {
+                if root.current-page == "settings": VerticalBox {
                     padding: 24px;
+                    spacing: 16px;
 
-                    if root.current-page == "settings": Text {
-                        text: "Settings Page";
+                    Text {
+                        text: "Settings";
                         font-size: 24px;
                         color: #2c3e50;
+                    }
+
+                    Text {
+                        text: "API Keys";
+                        font-size: 18px;
+                        color: #2c3e50;
+                    }
+
+                    for entry in api-keys : HorizontalBox {
+                        height: 80px;
+
+                        Rectangle {
+                            height: 80px;
+                            background: white;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: #bdc3c7;
+                            horizontal-stretch: 1;
+
+                            VerticalBox {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: entry.name;
+                                    font-weight: 700;
+                                    color: #2c3e50;
+                                    font-size: 14px;
+                                }
+
+                                Rectangle {
+                                    height: 32px;
+                                    background: #ecf0f1;
+                                    border-radius: 4px;
+                                    border-width: 1px;
+                                    border-color: #bdc3c7;
+
+                                    HorizontalBox {
+                                        padding: 8px;
+
+                                        Text {
+                                            text: entry.key;
+                                            color: #34495e;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

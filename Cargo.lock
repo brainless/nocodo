@@ -4998,8 +4998,13 @@ dependencies = [
 name = "nocodo-desktop"
 version = "0.1.12"
 dependencies = [
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "shared-types",
  "slint",
  "slint-build",
+ "tokio",
 ]
 
 [[package]]

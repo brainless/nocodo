@@ -8,6 +8,21 @@ pub struct SettingsAppState {
     pub config: Arc<std::sync::RwLock<ApiConfig>>,
 }
 
+fn mask_api_key(key: &Option<String>) -> Option<String> {
+    key.as_ref().map(|k| {
+        if k.len() <= 6 {
+            k.clone()
+        } else {
+            let masked = format!("{}{}", &k[..6], "*".repeat(k.len() - 6));
+            if masked.len() > 40 {
+                format!("{}...", &masked[..37])
+            } else {
+                masked
+            }
+        }
+    })
+}
+
 pub async fn get_settings(data: web::Data<SettingsAppState>) -> Result<HttpResponse> {
     let config = data.config.read().map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!(
@@ -20,22 +35,22 @@ pub async fn get_settings(data: web::Data<SettingsAppState>) -> Result<HttpRespo
         vec![
             ApiKeyConfig {
                 name: "xai".to_string(),
-                key: keys.xai_api_key.clone(),
+                key: mask_api_key(&keys.xai_api_key),
                 is_configured: keys.xai_api_key.is_some(),
             },
             ApiKeyConfig {
                 name: "openai".to_string(),
-                key: keys.openai_api_key.clone(),
+                key: mask_api_key(&keys.openai_api_key),
                 is_configured: keys.openai_api_key.is_some(),
             },
             ApiKeyConfig {
                 name: "anthropic".to_string(),
-                key: keys.anthropic_api_key.clone(),
+                key: mask_api_key(&keys.anthropic_api_key),
                 is_configured: keys.anthropic_api_key.is_some(),
             },
             ApiKeyConfig {
                 name: "zai".to_string(),
-                key: keys.zai_api_key.clone(),
+                key: mask_api_key(&keys.zai_api_key),
                 is_configured: keys.zai_api_key.is_some(),
             },
         ]
