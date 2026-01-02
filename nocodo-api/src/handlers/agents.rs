@@ -1,5 +1,5 @@
-use actix_web::{get, HttpResponse, Responder};
 use crate::helpers::agents::{list_supported_agents, AgentInfo};
+use actix_web::{get, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

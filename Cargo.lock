@@ -4541,7 +4541,13 @@ name = "nocodo-api"
 version = "0.1.12"
 dependencies = [
  "actix-web",
+ "anyhow",
+ "chrono",
+ "home",
+ "manager-tools",
+ "nocodo-agents",
  "nocodo-llm-sdk",
+ "rusqlite",
  "serde",
  "serde_json",
  "tokio",
