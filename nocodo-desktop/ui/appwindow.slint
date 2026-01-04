@@ -132,7 +132,7 @@ export component AppWindow inherits Window {
                 if root.current-page == "chats": VerticalLayout {
                     alignment: center;
 
-                    HorizontalLayout {
+                    chat_layout := HorizontalLayout {
                         alignment: center;
                         padding: DesktopSizes.space_lg;
 
@@ -140,7 +140,7 @@ export component AppWindow inherits Window {
                             spacing: DesktopSizes.space_md;
                             min-width: DesktopSizes.textarea_min_width;
                             max-width: DesktopSizes.textarea_max_width;
-                            preferred-width: 100%;
+                            preferred-width: min(chat_layout.width - 2 * DesktopSizes.space_lg, DesktopSizes.textarea_max_width);
 
                             // Textarea with 5 rows
                             Rectangle {
