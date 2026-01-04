@@ -1,7 +1,8 @@
-use crate::models::{ErrorResponse, SessionMessage, SessionResponse, SessionToolCall};
+use crate::models::ErrorResponse;
 use crate::DbConnection;
 use actix_web::{get, web, HttpResponse, Responder};
 use rusqlite::{params, Connection};
+use shared_types::{SessionMessage, SessionResponse, SessionToolCall};
 use tracing::{error, info, warn};
 
 #[get("/agents/sessions/{session_id}")]

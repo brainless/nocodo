@@ -1,10 +1,10 @@
 use crate::helpers::agents::create_sqlite_agent;
-use crate::models::{AgentExecutionResponse, ErrorResponse};
+use crate::models::ErrorResponse;
 use actix_web::{post, web, HttpResponse, Responder};
 use nocodo_agents::codebase_analysis::CodebaseAnalysisAgent;
 use nocodo_agents::Agent;
 use serde_json::json;
-use shared_types::{AgentConfig, AgentExecutionRequest};
+use shared_types::{AgentConfig, AgentExecutionRequest, AgentExecutionResponse};
 use std::sync::Arc;
 use tracing::{error, info};
 

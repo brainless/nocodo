@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod agent;
 pub mod auth;
+pub mod session;
 
 pub use agent::{
     AgentConfig, AgentExecutionRequest, AgentInfo, AgentsResponse, CodebaseAnalysisAgentConfig,
@@ -14,6 +15,7 @@ pub use auth::{
     Team, TeamItem, TeamListItem, TeamListResponse, UpdateTeamRequest, UpdateUserRequest, User,
     UserDetailResponse, UserInfo, UserListItem, UserListResponse, UserResponse, UserWithTeams,
 };
+pub use session::{AgentExecutionResponse, SessionMessage, SessionResponse, SessionToolCall};
 
 // Shared models for nocodo manager and desktop-app
 
