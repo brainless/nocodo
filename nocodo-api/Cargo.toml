@@ -23,3 +23,9 @@ home = "0.5"
 rusqlite = { version = "0.37", features = ["bundled"] }
 toml = "0.9"
 config.workspace = true
+async-trait = "0.1"
+tempfile = "3"
+
+[dev-dependencies]
+actix-rt = "2"
+actix-http = "3"

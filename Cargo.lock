@@ -4976,8 +4976,11 @@ dependencies = [
 name = "nocodo-api"
 version = "0.1.12"
 dependencies = [
+ "actix-http",
+ "actix-rt",
  "actix-web",
  "anyhow",
+ "async-trait",
  "chrono",
  "config",
  "home",
@@ -4988,6 +4991,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-types",
+ "tempfile",
  "tokio",
  "toml 0.9.8",
  "tracing",
