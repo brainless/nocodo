@@ -3,14 +3,23 @@ use shared_types::AgentInfo;
 use std::sync::Arc;
 
 /// Returns a list of all supported agents
-/// Currently only SQLite agent is enabled
 pub fn list_supported_agents() -> Vec<AgentInfo> {
-    vec![AgentInfo {
-        id: "sqlite".to_string(),
-        name: "SQLite Analysis Agent".to_string(),
-        description: "Agent for analyzing SQLite databases and running SQL queries".to_string(),
-        enabled: true,
-    }]
+    vec![
+        AgentInfo {
+            id: "sqlite".to_string(),
+            name: "SQLite Analysis Agent".to_string(),
+            description: "Agent for analyzing SQLite databases and running SQL queries".to_string(),
+            enabled: true,
+        },
+        AgentInfo {
+            id: "codebase-analysis".to_string(),
+            name: "Codebase Analysis Agent".to_string(),
+            description:
+                "Agent for analyzing codebase structure and identifying architectural patterns"
+                    .to_string(),
+            enabled: true,
+        },
+    ]
 }
 
 /// Creates a SQLite analysis agent using the shared database

@@ -1,10 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Deserialize)]
-pub struct AgentExecutionRequest {
-    pub user_prompt: String,
-    pub db_path: String,
-}
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct AgentExecutionResponse {
