@@ -1,0 +1,221 @@
+// Component Examples - Common desktop UI patterns using the design system
+// This file demonstrates how to use DesktopSizes, DesktopTypography, and DesktopColors
+
+import { VerticalBox, HorizontalBox, LineEdit, TextEdit, Button } from "std-widgets.slint";
+import { DesktopSizes, DesktopTypography, DesktopColors } from "theme.slint";
+
+// Example: Text Input with standard sizing
+export component StandardInput inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder: "";
+
+    min-width: DesktopSizes.input_min_width;
+    preferred-width: DesktopSizes.input_default_width;
+    max-width: DesktopSizes.input_max_width;
+    height: DesktopSizes.input_height;
+
+    background: DesktopColors.surface;
+    border-radius: DesktopSizes.radius_sm;
+    border-width: DesktopSizes.border_thin;
+    border-color: DesktopColors.border_medium;
+
+    LineEdit {
+        text <=> root.text;
+        placeholder-text: root.placeholder;
+        font-size: DesktopTypography.font_base;
+    }
+}
+
+// Example: Text Area with standard sizing
+export component StandardTextArea inherits Rectangle {
+    in-out property <string> text;
+
+    min-width: DesktopSizes.textarea_min_width;
+    preferred-width: DesktopSizes.textarea_default_width;
+    max-width: DesktopSizes.textarea_max_width;
+    min-height: DesktopSizes.textarea_min_height;
+
+    background: DesktopColors.surface;
+    border-radius: DesktopSizes.radius_sm;
+    border-width: DesktopSizes.border_thin;
+    border-color: DesktopColors.border_medium;
+
+    TextEdit {
+        text <=> root.text;
+        font-size: DesktopTypography.font_base;
+    }
+}
+
+// Example: Information Card with standard sizing
+export component InfoCard inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+
+    min-width: DesktopSizes.card_min_width;
+    preferred-width: DesktopSizes.card_default_width;
+    max-width: DesktopSizes.card_max_width;
+
+    background: DesktopColors.surface;
+    border-radius: DesktopSizes.radius_md;
+    border-width: DesktopSizes.border_thin;
+    border-color: DesktopColors.border_light;
+
+    VerticalBox {
+        padding: DesktopSizes.padding_card;
+        spacing: DesktopSizes.space_sm;
+
+        Text {
+            text: root.title;
+            font-size: DesktopTypography.font_lg;
+            font-weight: DesktopTypography.weight_semibold;
+            color: DesktopColors.text_primary;
+        }
+
+        Text {
+            text: root.description;
+            font-size: DesktopTypography.font_base;
+            color: DesktopColors.text_secondary;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// Example: Dialog with standard sizing
+export component StandardDialog inherits Rectangle {
+    in property <string> title;
+    in property <string> size: "medium"; // "small", "medium", "large"
+
+    width: size == "small" ? DesktopSizes.dialog_small_width :
+           size == "large" ? DesktopSizes.dialog_large_width :
+           DesktopSizes.dialog_medium_width;
+
+    background: DesktopColors.surface;
+    border-radius: DesktopSizes.radius_lg;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000020;
+
+    VerticalLayout {
+        padding: DesktopSizes.padding_dialog;
+        spacing: DesktopSizes.space_lg;
+
+        // Dialog title
+        Text {
+            text: root.title;
+            font-size: DesktopTypography.font_xl;
+            font-weight: DesktopTypography.weight_semibold;
+            color: DesktopColors.text_primary;
+        }
+
+        // Content area (use @children for custom content)
+        @children
+
+        // Dialog actions
+        HorizontalLayout {
+            alignment: end;
+            spacing: DesktopSizes.space_sm;
+
+            Button {
+                text: "Cancel";
+                min-width: 80px;
+            }
+
+            Button {
+                text: "OK";
+                min-width: 80px;
+            }
+        }
+    }
+}
+
+// Example: Form with consistent spacing
+export component StandardForm inherits VerticalBox {
+    padding: DesktopSizes.space_lg;
+    spacing: DesktopSizes.space_md;
+
+    // Form field
+    VerticalLayout {
+        spacing: DesktopSizes.space_xs;
+
+        Text {
+            text: "Name";
+            font-size: DesktopTypography.font_sm;
+            font-weight: DesktopTypography.weight_medium;
+            color: DesktopColors.text_primary;
+        }
+
+        StandardInput {
+            placeholder: "Enter your name";
+        }
+    }
+
+    // Another form field
+    VerticalLayout {
+        spacing: DesktopSizes.space_xs;
+
+        Text {
+            text: "Description";
+            font-size: DesktopTypography.font_sm;
+            font-weight: DesktopTypography.weight_medium;
+            color: DesktopColors.text_primary;
+        }
+
+        StandardTextArea { }
+    }
+}
+
+// Example: Section Header
+export component SectionHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+
+    height: subtitle == "" ? 40px : 60px;
+
+    VerticalLayout {
+        padding-bottom: DesktopSizes.space_sm;
+        spacing: DesktopSizes.space_xs;
+
+        Text {
+            text: root.title;
+            font-size: DesktopTypography.font_2xl;
+            font-weight: DesktopTypography.weight_semibold;
+            color: DesktopColors.text_primary;
+        }
+
+        if subtitle != "" : Text {
+            text: root.subtitle;
+            font-size: DesktopTypography.font_base;
+            color: DesktopColors.text_secondary;
+        }
+    }
+
+    // Bottom border
+    Rectangle {
+        y: parent.height - self.height;
+        height: DesktopSizes.border_thin;
+        background: DesktopColors.border_light;
+    }
+}
+
+// Example: Content container with max-width
+export component ContentContainer inherits HorizontalLayout {
+    in property <string> width_type: "medium"; // "narrow", "medium", "wide", "full"
+
+    alignment: center;
+
+    Rectangle {
+        horizontal-stretch: 1;
+    }
+
+    VerticalLayout {
+        max-width: width_type == "narrow" ? DesktopSizes.content_narrow :
+                   width_type == "wide" ? DesktopSizes.content_wide :
+                   width_type == "full" ? DesktopSizes.content_full :
+                   DesktopSizes.content_medium;
+
+        @children
+    }
+
+    Rectangle {
+        horizontal-stretch: 1;
+    }
+}
