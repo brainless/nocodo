@@ -1,6 +1,8 @@
 // nocodo Desktop Design System
 // Centralized sizing and spacing tokens for consistent UI
 
+import "fonts/Inter/Inter-VariableFont_opsz,wght.ttf";
+
 export global DesktopSizes {
     // Component widths (min/max constraints)
     out property <length> input_min_width: 200px;
@@ -65,6 +67,9 @@ export global DesktopSizes {
 }
 
 export global DesktopTypography {
+    // Font family
+    out property <string> font_family: "Inter";
+
     // Font sizes
     out property <length> font_xs: 11px;
     out property <length> font_sm: 12px;

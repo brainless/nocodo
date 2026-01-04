@@ -1,4 +1,9 @@
-import { VerticalBox, HorizontalBox, ComboBox, TextEdit } from "std-widgets.slint";
+import {
+    VerticalBox,
+    HorizontalBox,
+    ComboBox,
+    TextEdit,
+} from "std-widgets.slint";
 import { DesktopSizes, DesktopTypography, DesktopColors } from "theme.slint";
 
 export struct ApiKeyEntry {
@@ -24,7 +29,7 @@ component SideBar inherits Rectangle {
     width: DesktopSizes.sidebar_width;
 
     VerticalBox {
-        padding: DesktopSizes.space_md;
+        padding: DesktopSizes.space_xs;
         spacing: DesktopSizes.space_sm;
 
         // Chats link
@@ -129,6 +134,7 @@ export component AppWindow inherits Window {
     max-width: 3000px;
     max-height: 2000px;
     title: "NocoDo Desktop";
+    default-font-family: DesktopTypography.font_family;
 
     property <string> current-page: "chats";
     in-out property <[ApiKeyEntry]> api-keys: [];
@@ -136,7 +142,10 @@ export component AppWindow inherits Window {
     in-out property <[string]> agent-names: ["Loading agents..."];
     in-out property <[ChatMessage]> chat-messages: [
         { role: "user", content: "Analyze the users table in my SQLite database" },
-        { role: "assistant", content: "I'll analyze the users table in your SQLite database. Let me first check the structure and then provide insights.\n\n## Schema Analysis\n\nThe users table has the following columns:\n- id: INTEGER PRIMARY KEY\n- username: TEXT UNIQUE\n- email: TEXT\n- created_at: TIMESTAMP\n\n## Data Summary\n\nThe table contains 150 user records. The most recent user was created on 2025-01-04.\n\n## Observations\n\n1. All usernames are unique (as enforced by the UNIQUE constraint)\n2. Email format validation should be considered\n3. The created_at timestamps are consistent\n\nWould you like me to perform any specific queries on this data?" }
+        {
+            role: "assistant",
+            content: "I'll analyze the users table in your SQLite database. Let me first check the structure and then provide insights.\n\n## Schema Analysis\n\nThe users table has the following columns:\n- id: INTEGER PRIMARY KEY\n- username: TEXT UNIQUE\n- email: TEXT\n- created_at: TIMESTAMP\n\n## Data Summary\n\nThe table contains 150 user records. The most recent user was created on 2025-01-04.\n\n## Observations\n\n1. All usernames are unique (as enforced by the UNIQUE constraint)\n2. Email format validation should be considered\n3. The created_at timestamps are consistent\n\nWould you like me to perform any specific queries on this data?"
+        }
     ];
 
     callback load-settings();
@@ -208,7 +217,7 @@ export component AppWindow inherits Window {
                     spacing: DesktopSizes.space_md;
 
                     // User's first message at the top
-                    if root.chat-messages.length > 0 : Rectangle {
+                    if root.chat-messages.length > 0: Rectangle {
                         background: DesktopColors.surface;
                         border-radius: DesktopSizes.radius_sm;
                         border-width: DesktopSizes.border_thin;
@@ -244,7 +253,7 @@ export component AppWindow inherits Window {
                     }
 
                     // Agent responses - iterate through messages
-                    for message in root.chat-messages : Rectangle {
+                    for message in root.chat-messages: Rectangle {
                         background: DesktopColors.surface;
                         border-radius: DesktopSizes.radius_sm;
                         border-width: DesktopSizes.border_thin;
@@ -300,7 +309,7 @@ export component AppWindow inherits Window {
                         color: DesktopColors.text_primary;
                     }
 
-                    for entry in api-keys : HorizontalBox {
+                    for entry in api-keys: HorizontalBox {
                         height: DesktopSizes.card_item_height;
 
                         Rectangle {
@@ -348,6 +357,6 @@ export component AppWindow inherits Window {
         }
 
         // Bottom status bar
-        StatusBar {}
+        StatusBar { }
     }
 }
