@@ -1,0 +1,90 @@
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { DesktopSizes, DesktopColors, DesktopTypography } from "../theme.slint";
+
+export component SideBar inherits Rectangle {
+    in property <string> current-page;
+    callback page-selected(string);
+
+    background: DesktopColors.sidebar_bg;
+    width: DesktopSizes.sidebar_width;
+
+    VerticalBox {
+        padding: DesktopSizes.space_xs;
+        spacing: DesktopSizes.space_sm;
+
+        // Chats link
+        Rectangle {
+            height: DesktopSizes.input_height;
+            background: current-page == "chats" ? DesktopColors.sidebar_item_active : transparent;
+            border-radius: DesktopSizes.radius_sm;
+
+            HorizontalBox {
+                padding: DesktopSizes.space_sm;
+                alignment: start;
+
+                Text {
+                    text: "Chats";
+                    color: DesktopColors.text_on_dark;
+                    vertical-alignment: center;
+                    font-size: DesktopTypography.font_base;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.page-selected("chats");
+                }
+            }
+        }
+
+        // Chat Detail link
+        Rectangle {
+            height: DesktopSizes.input_height;
+            background: current-page == "chat-detail" ? DesktopColors.sidebar_item_active : transparent;
+            border-radius: DesktopSizes.radius_sm;
+
+            HorizontalBox {
+                padding: DesktopSizes.space_sm;
+                alignment: start;
+
+                Text {
+                    text: "Chat Detail";
+                    color: DesktopColors.text_on_dark;
+                    vertical-alignment: center;
+                    font-size: DesktopTypography.font_base;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.page-selected("chat-detail");
+                }
+            }
+        }
+
+        // Settings link
+        Rectangle {
+            height: DesktopSizes.input_height;
+            background: current-page == "settings" ? DesktopColors.sidebar_item_active : transparent;
+            border-radius: DesktopSizes.radius_sm;
+
+            HorizontalBox {
+                padding: DesktopSizes.space_sm;
+                alignment: start;
+
+                Text {
+                    text: "Settings";
+                    color: DesktopColors.text_on_dark;
+                    vertical-alignment: center;
+                    font-size: DesktopTypography.font_base;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.page-selected("settings");
+                }
+            }
+        }
+    }
+}

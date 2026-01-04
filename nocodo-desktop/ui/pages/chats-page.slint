@@ -1,0 +1,49 @@
+import { VerticalBox, ComboBox, TextEdit } from "std-widgets.slint";
+import { DesktopSizes, DesktopColors, DesktopTypography } from "../theme.slint";
+
+export component ChatsPage inherits Rectangle {
+    in-out property <[string]> agent-names;
+
+    background: DesktopColors.background;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        alignment: center;
+
+        chat_layout := HorizontalLayout {
+            alignment: center;
+            padding: DesktopSizes.space_lg;
+
+            VerticalBox {
+                spacing: DesktopSizes.space_md;
+                min-width: DesktopSizes.textarea_min_width;
+                max-width: DesktopSizes.textarea_max_width;
+                preferred-width: min(chat_layout.width - 2 * DesktopSizes.space_lg, DesktopSizes.textarea_max_width);
+
+                // Textarea with 5 rows
+                Rectangle {
+                    min-height: 5 * DesktopTypography.font_base * DesktopTypography.line_height_normal;
+                    preferred-height: self.min-height;
+                    background: DesktopColors.surface;
+                    border-radius: DesktopSizes.radius_sm;
+                    border-width: DesktopSizes.border_thin;
+                    border-color: DesktopColors.border_medium;
+
+                    TextEdit {
+                        font-size: DesktopTypography.font_base;
+                        wrap: word-wrap;
+                    }
+                }
+
+                // Dropdown for agents
+                Rectangle {
+                    height: DesktopSizes.input_height;
+
+                    ComboBox {
+                        model: root.agent-names;
+                    }
+                }
+            }
+        }
+    }
+}
