@@ -343,6 +343,21 @@ pub struct SettingsResponse {
     pub projects_default_path: Option<String>,
 }
 
+/// Agent information for the agents list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub enabled: bool,
+}
+
+/// Response containing list of available agents
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentsResponse {
+    pub agents: Vec<AgentInfo>,
+}
+
 /// Supported model information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupportedModel {

@@ -1,9 +1,14 @@
-import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { VerticalBox, HorizontalBox, ComboBox, TextEdit } from "std-widgets.slint";
 import { DesktopSizes, DesktopTypography, DesktopColors } from "theme.slint";
 
 export struct ApiKeyEntry {
     name: string,
     key: string,
+}
+
+export struct AgentEntry {
+    id: string,
+    name: string,
 }
 
 component SideBar inherits Rectangle {
@@ -16,6 +21,31 @@ component SideBar inherits Rectangle {
     VerticalBox {
         padding: DesktopSizes.space_md;
         spacing: DesktopSizes.space_sm;
+
+        // Chats link
+        Rectangle {
+            height: DesktopSizes.input_height;
+            background: current-page == "chats" ? DesktopColors.sidebar_item_active : transparent;
+            border-radius: DesktopSizes.radius_sm;
+
+            HorizontalBox {
+                padding: DesktopSizes.space_sm;
+                alignment: start;
+
+                Text {
+                    text: "Chats";
+                    color: DesktopColors.text_on_dark;
+                    vertical-alignment: center;
+                    font-size: DesktopTypography.font_base;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.page-selected("chats");
+                }
+            }
+        }
 
         // Settings link
         Rectangle {
@@ -70,10 +100,13 @@ export component AppWindow inherits Window {
     max-height: 2000px;
     title: "NocoDo Desktop";
 
-    property <string> current-page: "settings";
+    property <string> current-page: "chats";
     in-out property <[ApiKeyEntry]> api-keys: [];
+    in-out property <[AgentEntry]> agents: [];
+    in-out property <[string]> agent-names: ["Loading agents..."];
 
     callback load-settings();
+    callback load-agents();
 
     VerticalLayout {
         spacing: 0;
@@ -95,6 +128,46 @@ export component AppWindow inherits Window {
             Rectangle {
                 background: DesktopColors.background;
                 horizontal-stretch: 1;
+
+                if root.current-page == "chats": VerticalLayout {
+                    alignment: center;
+
+                    HorizontalLayout {
+                        alignment: center;
+                        padding: DesktopSizes.space_lg;
+
+                        VerticalBox {
+                            spacing: DesktopSizes.space_md;
+                            min-width: DesktopSizes.textarea_min_width;
+                            max-width: DesktopSizes.textarea_max_width;
+                            preferred-width: 100%;
+
+                            // Textarea with 5 rows
+                            Rectangle {
+                                min-height: 5 * DesktopTypography.font_base * DesktopTypography.line_height_normal;
+                                preferred-height: self.min-height;
+                                background: DesktopColors.surface;
+                                border-radius: DesktopSizes.radius_sm;
+                                border-width: DesktopSizes.border_thin;
+                                border-color: DesktopColors.border_medium;
+
+                                TextEdit {
+                                    font-size: DesktopTypography.font_base;
+                                    wrap: word-wrap;
+                                }
+                            }
+
+                            // Dropdown for agents
+                            Rectangle {
+                                height: DesktopSizes.input_height;
+
+                                ComboBox {
+                                    model: root.agent-names;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if root.current-page == "settings": VerticalBox {
                     padding: DesktopSizes.space_lg;

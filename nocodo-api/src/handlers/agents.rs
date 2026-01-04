@@ -1,11 +1,6 @@
-use crate::helpers::agents::{list_supported_agents, AgentInfo};
+use crate::helpers::agents::list_supported_agents;
 use actix_web::{get, HttpResponse, Responder};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AgentsResponse {
-    pub agents: Vec<AgentInfo>,
-}
+use shared_types::AgentsResponse;
 
 #[get("/agents")]
 pub async fn list_agents() -> impl Responder {

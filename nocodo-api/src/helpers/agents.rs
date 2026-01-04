@@ -1,14 +1,6 @@
 use nocodo_llm_sdk::client::LlmClient;
-use serde::{Deserialize, Serialize};
+use shared_types::AgentInfo;
 use std::sync::Arc;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentInfo {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub enabled: bool,
-}
 
 /// Returns a list of all supported agents
 /// Currently only SQLite agent is enabled
