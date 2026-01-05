@@ -56,16 +56,16 @@ export component SettingsPage inherits Rectangle {
                         border-radius: DesktopSizes.radius_sm;
                         border-width: DesktopSizes.border_thin;
                         border-color: DesktopColors.border_medium;
+                        clip: true;
 
-                        HorizontalBox {
-                            padding: DesktopSizes.space_sm;
-
-                            Text {
-                                text: entry.key;
-                                color: DesktopColors.text_secondary;
-                                vertical-alignment: center;
-                                font-size: DesktopTypography.font_base;
-                            }
+                        Text {
+                            x: DesktopSizes.space_sm;
+                            width: parent.width - 2 * DesktopSizes.space_sm;
+                            text: entry.key;
+                            color: DesktopColors.text_secondary;
+                            vertical-alignment: center;
+                            font-size: DesktopTypography.font_base;
+                            overflow: TextOverflow.elide;
                         }
                     }
                 }

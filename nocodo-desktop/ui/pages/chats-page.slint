@@ -11,13 +11,18 @@ export component ChatsPage inherits Rectangle {
         alignment: center;
 
         chat_layout := HorizontalLayout {
-            alignment: center;
             padding: DesktopSizes.space_lg;
+
+            // Left spacer for centering
+            Rectangle {
+                horizontal-stretch: 1;
+            }
 
             VerticalBox {
                 spacing: DesktopSizes.space_md;
                 min-width: DesktopSizes.textarea_min_width;
                 max-width: DesktopSizes.textarea_max_width;
+                horizontal-stretch: 1;
 
                 // Textarea with 5 rows
                 Rectangle {
@@ -27,10 +32,12 @@ export component ChatsPage inherits Rectangle {
                     border-radius: DesktopSizes.radius_sm;
                     border-width: DesktopSizes.border_thin;
                     border-color: DesktopColors.border_medium;
+                    horizontal-stretch: 1;
 
                     TextEdit {
                         font-size: DesktopTypography.font_base;
                         wrap: word-wrap;
+                        horizontal-stretch: 1;
                     }
                 }
 
@@ -42,6 +49,11 @@ export component ChatsPage inherits Rectangle {
                         model: root.agent-names;
                     }
                 }
+            }
+
+            // Right spacer for centering
+            Rectangle {
+                horizontal-stretch: 1;
             }
         }
     }
