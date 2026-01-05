@@ -7,8 +7,10 @@ export component SettingsPage inherits Rectangle {
 
     background: DesktopColors.background;
     horizontal-stretch: 1;
+    min-width: 0;
 
-    VerticalBox {
+    VerticalLayout {
+        width: 100%;
         padding: DesktopSizes.space_lg;
         spacing: DesktopSizes.space_md;
 
@@ -26,8 +28,8 @@ export component SettingsPage inherits Rectangle {
             color: DesktopColors.text_primary;
         }
 
-        for entry in api-keys: HorizontalBox {
-            height: DesktopSizes.card_item_height;
+        for entry in api-keys: HorizontalLayout {
+            alignment: start;
 
             Rectangle {
                 width: DesktopSizes.input_default_width;
