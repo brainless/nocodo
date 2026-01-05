@@ -67,7 +67,8 @@ impl AgentFactory {
 /// let agent = create_agent(AgentType::CodebaseAnalysis, client);
 ///
 /// println!("Agent objective: {}", agent.objective());
-/// let result = agent.execute("Analyze this codebase").await?;
+/// let session_id = database.create_session("codebase-analysis", "example", "example", Some(&agent.system_prompt()), "Analyze this codebase", None)?;
+/// let result = agent.execute("Analyze this codebase", session_id).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -121,9 +122,10 @@ pub fn create_agent_with_tools(
 pub fn create_codebase_analysis_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,
-) -> CodebaseAnalysisAgent {
+) -> (CodebaseAnalysisAgent, Arc<Database>) {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:")).unwrap());
-    CodebaseAnalysisAgent::new(client, database, tool_executor)
+    let agent = CodebaseAnalysisAgent::new(client, database.clone(), tool_executor);
+    (agent, database)
 }
 
 /// Create a SqliteAnalysisAgent with tool executor support
@@ -143,9 +145,10 @@ pub async fn create_sqlite_analysis_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,
     db_path: String,
-) -> anyhow::Result<SqliteAnalysisAgent> {
+) -> anyhow::Result<(SqliteAnalysisAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    SqliteAnalysisAgent::new(client, database, tool_executor, db_path).await
+    let agent = SqliteAnalysisAgent::new(client, database.clone(), tool_executor, db_path).await?;
+    Ok((agent, database))
 }
 
 #[cfg(test)]

@@ -187,20 +187,7 @@ impl Agent for SqliteAnalysisAgent {
         vec![AgentTool::Sqlite3Reader]
     }
 
-    async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
-        let config = serde_json::json!({
-            "db_path": self.db_path
-        });
-
-        let session_id = self.database.create_session(
-            "sqlite-analysis",
-            self.client.provider_name(),
-            self.client.model_name(),
-            Some(&self.system_prompt),
-            user_prompt,
-            Some(config),
-        )?;
-
+    async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
         self.database
             .create_message(session_id, "user", user_prompt)?;
 

@@ -81,15 +81,27 @@ async fn test_count_users_integration() -> anyhow::Result<()> {
     // Create agent
     let agent = SqliteAnalysisAgent::new_for_testing(
         llm_client,
-        session_db,
+        session_db.clone(),
         tool_executor,
         db_path.clone(),
         vec!["users".to_string()],
     );
 
+    // Create session
+    let session_id = session_db.create_session(
+        "sqlite-analysis",
+        "claude",
+        "claude-3-5-sonnet-20241022",
+        Some("test system prompt"),
+        "How many users do we have?",
+        None,
+    )?;
+
     // Execute query
     println!("Asking: How many users do we have?");
-    let result = agent.execute("How many users do we have?").await?;
+    let result = agent
+        .execute("How many users do we have?", session_id)
+        .await?;
     println!("Agent response: {}", result);
 
     // Verify the response mentions 5 users
@@ -132,16 +144,26 @@ async fn test_latest_user_registration_integration() -> anyhow::Result<()> {
     // Create agent
     let agent = SqliteAnalysisAgent::new_for_testing(
         llm_client,
-        session_db,
+        session_db.clone(),
         tool_executor,
         db_path.clone(),
         vec!["users".to_string()],
     );
 
+    // Create session
+    let session_id = session_db.create_session(
+        "sqlite-analysis",
+        "claude",
+        "claude-3-5-sonnet-20241022",
+        Some("test system prompt"),
+        "When was the latest user registration?",
+        None,
+    )?;
+
     // Execute query
     println!("Asking: When was the latest user registration?");
     let result = agent
-        .execute("When was the latest user registration?")
+        .execute("When was the latest user registration?", session_id)
         .await?;
     println!("Agent response: {}", result);
 

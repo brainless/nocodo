@@ -86,7 +86,10 @@ impl AgentTool {
                     .ok_or_else(|| anyhow::anyhow!("Missing 'query' field in sqlite3_reader call"))?
                     .to_string();
 
-                let limit = value.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let limit = value
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
 
                 ToolRequest::Sqlite3Reader(manager_tools::types::Sqlite3ReaderRequest {
                     db_path: String::new(),
@@ -140,9 +143,9 @@ pub trait Agent: Send + Sync {
     /// Returns the list of tools available to this agent
     fn tools(&self) -> Vec<AgentTool>;
 
-    /// Execute the agent with the given user prompt
+    /// Execute the agent with the given user prompt and session ID
     /// Optional method with default implementation that returns an error
-    async fn execute(&self, _user_prompt: &str) -> anyhow::Result<String> {
+    async fn execute(&self, _user_prompt: &str, _session_id: i64) -> anyhow::Result<String> {
         anyhow::bail!("Execute method not implemented for this agent")
     }
 }

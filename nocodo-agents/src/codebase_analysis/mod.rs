@@ -60,18 +60,8 @@ impl Agent for CodebaseAnalysisAgent {
         vec![AgentTool::ListFiles, AgentTool::ReadFile, AgentTool::Grep]
     }
 
-    async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
-        // 1. Create session in database
-        let session_id = self.database.create_session(
-            "codebase-analysis",
-            self.client.provider_name(),
-            self.client.model_name(),
-            Some(&self.system_prompt()),
-            user_prompt,
-            None,
-        )?;
-
-        // 2. Create initial user message
+    async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
+        // 1. Create initial user message
         self.database
             .create_message(session_id, "user", user_prompt)?;
 

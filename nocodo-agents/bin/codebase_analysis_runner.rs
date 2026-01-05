@@ -1,9 +1,6 @@
 use clap::Parser;
 use manager_tools::ToolExecutor;
-use nocodo_agents::{
-    Agent,
-    factory::create_codebase_analysis_agent,
-};
+use nocodo_agents::{factory::create_codebase_analysis_agent, Agent};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -107,13 +104,23 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // Create codebase analysis agent
-    let agent = create_codebase_analysis_agent(client, tool_executor);
+    let (agent, database) = create_codebase_analysis_agent(client, tool_executor);
 
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 
+    // Create session
+    let session_id = database.create_session(
+        "codebase-analysis",
+        "standalone",
+        "standalone",
+        Some(&agent.system_prompt()),
+        &args.prompt,
+        None,
+    )?;
+
     // Execute agent
-    let result = agent.execute(&args.prompt).await?;
+    let result = agent.execute(&args.prompt, session_id).await?;
 
     println!("\n--- Agent Result ---\n{}", result);
 

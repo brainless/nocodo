@@ -66,7 +66,7 @@ pub async fn execute_sqlite_agent(
         }
     };
 
-    match agent.execute(&user_prompt).await {
+    match agent.execute(&user_prompt, session_id).await {
         Ok(result) => {
             info!(result = %result, session_id = session_id, "Agent execution completed successfully");
 
@@ -152,7 +152,7 @@ pub async fn execute_codebase_analysis_agent(
         tool_executor,
     );
 
-    match agent.execute(&user_prompt).await {
+    match agent.execute(&user_prompt, session_id).await {
         Ok(result) => {
             info!(result = %result, session_id = session_id, "Agent execution completed successfully");
 
