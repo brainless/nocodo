@@ -5,6 +5,9 @@ import { StyledTextArea } from "../components/styled-textarea.slint";
 export component ChatsPage inherits Rectangle {
     in-out property <[string]> agent-names;
     in-out property <string> input-text;
+    in-out property <int> selected-agent-index: -1;
+
+    callback start-agent-clicked();
 
     background: DesktopColors.background;
     horizontal-stretch: 1;
@@ -40,6 +43,38 @@ export component ChatsPage inherits Rectangle {
 
                     ComboBox {
                         model: root.agent-names;
+                        current-index <=> root.selected-agent-index;
+                    }
+                }
+
+                // Start button
+                Rectangle {
+                    height: DesktopSizes.input_height;
+
+                    HorizontalLayout {
+                        alignment: end;
+
+                        start-button := Rectangle {
+                            width: 120px;
+                            height: DesktopSizes.input_height;
+                            background: touch-area.has-hover ? DesktopColors.primary_hover : DesktopColors.primary;
+                            border-radius: DesktopSizes.radius_sm;
+
+                            Text {
+                                text: "Start";
+                                color: Colors.white;
+                                font-size: DesktopTypography.font_base;
+                                font-weight: DesktopTypography.weight_medium;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            touch-area := TouchArea {
+                                clicked => {
+                                    root.start-agent-clicked();
+                                }
+                            }
+                        }
                     }
                 }
             }

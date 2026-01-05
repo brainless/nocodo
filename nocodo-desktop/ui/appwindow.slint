@@ -14,20 +14,19 @@ export component AppWindow inherits Window {
     title: "NocoDo Desktop";
     default-font-family: DesktopTypography.font_family;
 
-    property <string> current-page: "chats";
+    in-out property <string> current-page: "chats";
     in-out property <[ApiKeyEntry]> api-keys: [];
     in-out property <[AgentEntry]> agents: [];
     in-out property <[string]> agent-names: ["Loading agents..."];
-    in-out property <[ChatMessage]> chat-messages: [
-        { role: "user", content: "Analyze the users table in my SQLite database" },
-        {
-            role: "assistant",
-            content: "I'll analyze the users table in your SQLite database. Let me first check the structure and then provide insights.\n\n## Schema Analysis\n\nThe users table has the following columns:\n- id: INTEGER PRIMARY KEY\n- username: TEXT UNIQUE\n- email: TEXT\n- created_at: TIMESTAMP\n\n## Data Summary\n\nThe table contains 150 user records. The most recent user was created on 2025-01-04.\n\n## Observations\n\n1. All usernames are unique (as enforced by the UNIQUE constraint)\n2. Email format validation should be considered\n3. The created_at timestamps are consistent\n\nWould you like me to perform any specific queries on this data?"
-        }
-    ];
+    in-out property <[ChatMessage]> chat-messages: [];
+    in-out property <bool> is-loading-chat: false;
+    in-out property <string> current-session-agent-name: "";
+    in-out property <string> input-text: "";
+    in-out property <int> chats-selected-index: -1;
 
     callback load-settings();
     callback load-agents();
+    callback handle-start-agent();
 
     VerticalLayout {
         spacing: 0;
@@ -48,10 +47,17 @@ export component AppWindow inherits Window {
             // Main content area - page components
             if root.current-page == "chats": ChatsPage {
                 agent-names: root.agent-names;
+                input-text <=> root.input-text;
+                selected-agent-index <=> root.chats-selected-index;
+                start-agent-clicked => {
+                    root.handle-start-agent();
+                }
             }
 
             if root.current-page == "chat-detail": ChatDetailPage {
                 chat-messages: root.chat-messages;
+                is-loading: root.is-loading-chat;
+                agent-name: root.current-session-agent-name;
             }
 
             if root.current-page == "settings": SettingsPage {

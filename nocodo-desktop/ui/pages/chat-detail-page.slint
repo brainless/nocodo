@@ -4,6 +4,8 @@ import { ChatMessage } from "../types.slint";
 
 export component ChatDetailPage inherits Rectangle {
     in-out property <[ChatMessage]> chat-messages;
+    in property <bool> is-loading: false;
+    in property <string> agent-name: "";
 
     background: DesktopColors.background;
     horizontal-stretch: 1;
@@ -12,8 +14,43 @@ export component ChatDetailPage inherits Rectangle {
         padding: DesktopSizes.space_lg;
         spacing: DesktopSizes.space_md;
 
+        // Loading indicator
+        if root.is-loading: Rectangle {
+            background: DesktopColors.surface;
+            border-radius: DesktopSizes.radius_sm;
+            border-width: DesktopSizes.border_thin;
+            border-color: DesktopColors.border_medium;
+
+            VerticalBox {
+                padding: DesktopSizes.space_md;
+                spacing: DesktopSizes.space_sm;
+                alignment: center;
+
+                Text {
+                    text: "Executing " + root.agent-name + " agent...";
+                    font-size: DesktopTypography.font_base;
+                    color: DesktopColors.text_secondary;
+                    horizontal-alignment: center;
+                }
+
+                Rectangle {
+                    height: 4px;
+                    width: 200px;
+                    background: DesktopColors.border_light;
+                    border-radius: DesktopSizes.radius_sm;
+
+                    Rectangle {
+                        height: 4px;
+                        width: 60px;
+                        background: DesktopColors.primary;
+                        border-radius: DesktopSizes.radius_sm;
+                    }
+                }
+            }
+        }
+
         // User's first message at the top
-        if root.chat-messages.length > 0: Rectangle {
+        if !root.is-loading && root.chat-messages.length > 0: Rectangle {
             background: DesktopColors.surface;
             border-radius: DesktopSizes.radius_sm;
             border-width: DesktopSizes.border_thin;
@@ -55,7 +92,7 @@ export component ChatDetailPage inherits Rectangle {
             border-width: DesktopSizes.border_thin;
             border-color: DesktopColors.border_medium;
 
-            visible: message.role == "assistant";
+            visible: !root.is-loading && message.role == "assistant";
 
             VerticalBox {
                 padding: DesktopSizes.space_md;
