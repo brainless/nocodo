@@ -1,8 +1,10 @@
-import { VerticalBox, ComboBox, TextEdit } from "std-widgets.slint";
+import { VerticalBox, ComboBox } from "std-widgets.slint";
 import { DesktopSizes, DesktopColors, DesktopTypography } from "../theme.slint";
+import { StyledTextArea } from "../components/styled-textarea.slint";
 
 export component ChatsPage inherits Rectangle {
     in-out property <[string]> agent-names;
+    in-out property <string> input-text;
 
     background: DesktopColors.background;
     horizontal-stretch: 1;
@@ -25,20 +27,11 @@ export component ChatsPage inherits Rectangle {
                 horizontal-stretch: 1;
 
                 // Textarea with 5 rows
-                Rectangle {
+                StyledTextArea {
+                    text <=> root.input-text;
                     min-height: 5 * DesktopTypography.font_base * DesktopTypography.line_height_normal;
                     preferred-height: self.min-height;
-                    background: DesktopColors.surface;
-                    border-radius: DesktopSizes.radius_sm;
-                    border-width: DesktopSizes.border_thin;
-                    border-color: DesktopColors.border_medium;
                     horizontal-stretch: 1;
-
-                    TextEdit {
-                        font-size: DesktopTypography.font_base;
-                        wrap: word-wrap;
-                        horizontal-stretch: 1;
-                    }
                 }
 
                 // Dropdown for agents

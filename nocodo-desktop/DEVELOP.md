@@ -63,3 +63,31 @@ Rectangle {
 ```
 
 **Why:** Direct Text positioning with explicit width + `TextOverflow.elide` shows ellipsis. Rectangle `clip: true` prevents visual overflow.
+
+### Custom Scrollable Text Area
+
+For multi-line text input with custom styling:
+
+```slint
+Rectangle {
+    clip: true;
+    background: DesktopColors.surface;
+
+    Flickable {
+        x: padding; y: padding;
+        width: parent.width - 2 * padding;
+        height: parent.height - 2 * padding;
+        viewport-height: max(self.height, text-input.preferred-height);
+
+        text-input := TextInput {
+            width: parent.width;
+            font-family: DesktopTypography.font_family;
+            font-weight: DesktopTypography.weight_regular;
+            wrap: word-wrap;
+            single-line: false;
+        }
+    }
+}
+```
+
+**Why:** `std-widgets.slint` TextEdit doesn't expose `background` or `font-family` properties. Primitive `TextInput` + `Flickable` enables custom styling with scrolling. `clip: true` prevents overflow.

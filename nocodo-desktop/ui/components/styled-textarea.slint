@@ -1,0 +1,32 @@
+import { DesktopSizes, DesktopColors, DesktopTypography } from "../theme.slint";
+
+export component StyledTextArea inherits Rectangle {
+    in-out property <string> text;
+    in property <length> font-size: DesktopTypography.font_base;
+
+    background: DesktopColors.surface;
+    border-radius: DesktopSizes.radius_sm;
+    border-width: DesktopSizes.border_thin;
+    border-color: DesktopColors.border_medium;
+    clip: true;
+
+    Flickable {
+        x: DesktopSizes.space_sm;
+        y: DesktopSizes.space_sm;
+        width: parent.width - 2 * DesktopSizes.space_sm;
+        height: parent.height - 2 * DesktopSizes.space_sm;
+        viewport-width: self.width;
+        viewport-height: max(self.height, text-input.preferred-height);
+
+        text-input := TextInput {
+            width: parent.width;
+            text <=> root.text;
+            font-size: root.font-size;
+            font-family: DesktopTypography.font_family;
+            font-weight: DesktopTypography.weight_regular;
+            wrap: word-wrap;
+            single-line: false;
+            color: DesktopColors.text_primary;
+        }
+    }
+}
