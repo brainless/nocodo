@@ -17,11 +17,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ui_weak3 = ui_weak.clone();
     let ui_weak4 = ui_weak.clone();
     let ui_weak5 = ui_weak.clone();
+    let ui_weak6 = ui_weak.clone();
+    let ui_weak7 = ui_weak.clone();
     let api_url_clone1 = api_url.clone();
     let api_url_clone2 = api_url.clone();
     let api_url_clone3 = api_url.clone();
     let api_url_clone4 = api_url.clone();
     let api_url_clone5 = api_url.clone();
+    let api_url_clone6 = api_url.clone();
+    let api_url_clone7 = api_url.clone();
 
     ui.on_load_settings(move || {
         let ui = ui_weak.upgrade().unwrap();
@@ -85,6 +89,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     eprintln!("Failed to fetch agents: {}", e);
+                }
+            }
+        })
+        .unwrap();
+    });
+
+    ui.on_load_chats(move || {
+        let ui = ui_weak6.upgrade().unwrap();
+        let api_url = api_url_clone6.clone();
+
+        slint::spawn_local(async move {
+            match fetch_sessions(&api_url).await {
+                Ok(sessions_response) => {
+                    let entries: Vec<ChatListItem> = sessions_response
+                        .sessions
+                        .iter()
+                        .map(|session| ChatListItem {
+                            id: session.id as i32,
+                            agent_name: session.agent_name.clone().into(),
+                            user_prompt: session.user_prompt.clone().into(),
+                            created_at: session.created_at.clone().into(),
+                        })
+                        .collect();
+
+                    ui.set_chat_list(slint::ModelRc::new(slint::VecModel::from(entries)));
+                }
+                Err(e) => {
+                    eprintln!("Failed to fetch sessions: {}", e);
                 }
             }
         })
@@ -163,6 +195,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })
     .unwrap();
 
+    slint::spawn_local(async move {
+        match fetch_sessions(&api_url_clone7).await {
+            Ok(sessions_response) => {
+                let ui = ui_weak7.upgrade().unwrap();
+                let entries: Vec<ChatListItem> = sessions_response
+                    .sessions
+                    .iter()
+                    .map(|session| ChatListItem {
+                        id: session.id as i32,
+                        agent_name: session.agent_name.clone().into(),
+                        user_prompt: session.user_prompt.clone().into(),
+                        created_at: session.created_at.clone().into(),
+                    })
+                    .collect();
+
+                ui.set_chat_list(slint::ModelRc::new(slint::VecModel::from(entries)));
+            }
+            Err(e) => {
+                eprintln!("Failed to fetch sessions: {}", e);
+            }
+        }
+    })
+    .unwrap();
+
     Ok(ui.run()?)
 }
 
@@ -192,6 +248,23 @@ async fn fetch_agents(
 
     let agents: shared_types::AgentsResponse = response.json().await?;
     Ok(agents)
+}
+
+async fn fetch_sessions(
+    api_url: &str,
+) -> Result<shared_types::SessionListResponse, Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&format!("{}/agents/sessions", api_url))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(format!("API request failed with status: {}", response.status()).into());
+    }
+
+    let sessions: shared_types::SessionListResponse = response.json().await?;
+    Ok(sessions)
 }
 
 fn build_agent_config(

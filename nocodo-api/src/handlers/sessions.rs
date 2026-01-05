@@ -2,7 +2,9 @@ use crate::models::ErrorResponse;
 use crate::DbConnection;
 use actix_web::{get, web, HttpResponse, Responder};
 use rusqlite::{params, Connection};
-use shared_types::{SessionMessage, SessionResponse, SessionToolCall};
+use shared_types::{
+    SessionListItem, SessionListResponse, SessionMessage, SessionResponse, SessionToolCall,
+};
 use tracing::{error, info, warn};
 
 #[get("/agents/sessions/{session_id}")]
@@ -119,4 +121,45 @@ fn get_session_from_db(
     session.tool_calls = tool_calls;
 
     Ok(Some(session))
+}
+
+#[get("/agents/sessions")]
+pub async fn list_sessions(db: web::Data<DbConnection>) -> impl Responder {
+    info!("Retrieving recent sessions");
+
+    let conn = db.lock().unwrap();
+
+    let sessions = match get_sessions_from_db(&conn) {
+        Ok(sessions) => sessions,
+        Err(e) => {
+            error!(error = %e, "Failed to retrieve sessions");
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: format!("Failed to retrieve sessions: {}", e),
+            });
+        }
+    };
+
+    HttpResponse::Ok().json(SessionListResponse { sessions })
+}
+
+fn get_sessions_from_db(conn: &Connection) -> Result<Vec<SessionListItem>, anyhow::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, agent_name, user_prompt, created_at
+         FROM agent_sessions
+         ORDER BY created_at DESC
+         LIMIT 50",
+    )?;
+
+    let sessions = stmt
+        .query_map([], |row| {
+            Ok(SessionListItem {
+                id: row.get(0)?,
+                agent_name: row.get(1)?,
+                user_prompt: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(sessions)
 }

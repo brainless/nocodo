@@ -1,23 +1,26 @@
-import { VerticalBox, ComboBox } from "std-widgets.slint";
+import { VerticalBox, ComboBox, ScrollView } from "std-widgets.slint";
 import { DesktopSizes, DesktopColors, DesktopTypography } from "../theme.slint";
 import { StyledTextArea } from "../components/styled-textarea.slint";
+import { ChatListItem } from "../types.slint";
 
 export component ChatsPage inherits Rectangle {
     in-out property <[string]> agent-names;
     in-out property <string> input-text;
     in-out property <int> selected-agent-index: -1;
+    in-out property <[ChatListItem]> chat-list;
 
     callback start-agent-clicked();
+    callback load-chats();
 
     background: DesktopColors.background;
     horizontal-stretch: 1;
 
     VerticalLayout {
-        alignment: center;
+        padding: DesktopSizes.space_lg;
+        spacing: DesktopSizes.space_lg;
 
-        chat_layout := HorizontalLayout {
-            padding: DesktopSizes.space_lg;
-
+        // Form section
+        HorizontalLayout {
             // Left spacer for centering
             Rectangle {
                 horizontal-stretch: 1;
@@ -72,6 +75,96 @@ export component ChatsPage inherits Rectangle {
                             touch-area := TouchArea {
                                 clicked => {
                                     root.start-agent-clicked();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Right spacer for centering
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+        }
+
+        // Chat list section
+        HorizontalLayout {
+            // Left spacer for centering
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            VerticalLayout {
+                spacing: DesktopSizes.space_sm;
+                min-width: DesktopSizes.textarea_min_width;
+                max-width: DesktopSizes.textarea_max_width;
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+
+                // Header
+                Text {
+                    text: "Recent Chats";
+                    font-size: DesktopTypography.font_lg;
+                    font-weight: DesktopTypography.weight_semibold;
+                    color: DesktopColors.text_primary;
+                }
+
+                // Chat list
+                ScrollView {
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        spacing: DesktopSizes.space_sm;
+
+                        for item in root.chat-list: Rectangle {
+                            height: self.preferred-height;
+                            preferred-height: chat-item-layout.preferred-height + 2 * DesktopSizes.space_md;
+                            background: chat-touch-area.has-hover ? DesktopColors.surface_variant : DesktopColors.surface;
+                            border-radius: DesktopSizes.radius_md;
+
+                            chat-item-layout := VerticalLayout {
+                                padding: DesktopSizes.space_md;
+                                spacing: DesktopSizes.space_xs;
+
+                                // User prompt (truncated to 3 lines)
+                                Text {
+                                    text: item.user_prompt;
+                                    font-size: DesktopTypography.font_base;
+                                    color: DesktopColors.text_primary;
+                                    wrap: word-wrap;
+                                    overflow: elide;
+                                    max-height: 3 * DesktopTypography.font_base * DesktopTypography.line_height_normal;
+                                }
+
+                                // Agent name and date
+                                HorizontalLayout {
+                                    spacing: DesktopSizes.space_sm;
+
+                                    Text {
+                                        text: item.agent_name;
+                                        font-size: DesktopTypography.font_sm;
+                                        font-weight: DesktopTypography.weight_medium;
+                                        color: DesktopColors.primary;
+                                    }
+
+                                    Text {
+                                        text: "•";
+                                        font-size: DesktopTypography.font_sm;
+                                        color: DesktopColors.text_secondary;
+                                    }
+
+                                    Text {
+                                        text: item.created_at;
+                                        font-size: DesktopTypography.font_sm;
+                                        color: DesktopColors.text_secondary;
+                                    }
+                                }
+                            }
+
+                            chat-touch-area := TouchArea {
+                                clicked => {
+                                    // TODO: Navigate to chat detail
                                 }
                             }
                         }

@@ -38,3 +38,16 @@ pub struct SessionResponse {
     pub messages: Vec<SessionMessage>,
     pub tool_calls: Vec<SessionToolCall>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionListItem {
+    pub id: i64,
+    pub agent_name: String,
+    pub user_prompt: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionListResponse {
+    pub sessions: Vec<SessionListItem>,
+}

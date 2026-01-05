@@ -1,5 +1,5 @@
 import { DesktopTypography } from "theme.slint";
-import { ApiKeyEntry, AgentEntry, ChatMessage } from "types.slint";
+import { ApiKeyEntry, AgentEntry, ChatMessage, ChatListItem } from "types.slint";
 import { SideBar } from "components/sidebar.slint";
 import { StatusBar } from "components/statusbar.slint";
 import { ChatsPage, ChatDetailPage, SettingsPage } from "pages/pages.slint";
@@ -19,6 +19,7 @@ export component AppWindow inherits Window {
     in-out property <[AgentEntry]> agents: [];
     in-out property <[string]> agent-names: ["Loading agents..."];
     in-out property <[ChatMessage]> chat-messages: [];
+    in-out property <[ChatListItem]> chat-list: [];
     in-out property <bool> is-loading-chat: false;
     in-out property <string> current-session-agent-name: "";
     in-out property <string> input-text: "";
@@ -26,6 +27,7 @@ export component AppWindow inherits Window {
 
     callback load-settings();
     callback load-agents();
+    callback load-chats();
     callback handle-start-agent();
 
     VerticalLayout {
@@ -49,8 +51,12 @@ export component AppWindow inherits Window {
                 agent-names: root.agent-names;
                 input-text <=> root.input-text;
                 selected-agent-index <=> root.chats-selected-index;
+                chat-list: root.chat-list;
                 start-agent-clicked => {
                     root.handle-start-agent();
+                }
+                load-chats => {
+                    root.load-chats();
                 }
             }
 

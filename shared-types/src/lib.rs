@@ -15,7 +15,10 @@ pub use auth::{
     Team, TeamItem, TeamListItem, TeamListResponse, UpdateTeamRequest, UpdateUserRequest, User,
     UserDetailResponse, UserInfo, UserListItem, UserListResponse, UserResponse, UserWithTeams,
 };
-pub use session::{AgentExecutionResponse, SessionMessage, SessionResponse, SessionToolCall};
+pub use session::{
+    AgentExecutionResponse, SessionListItem, SessionListResponse, SessionMessage, SessionResponse,
+    SessionToolCall,
+};
 
 // Shared models for nocodo manager and desktop-app
 

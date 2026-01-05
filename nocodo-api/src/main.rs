@@ -46,6 +46,7 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::agents::list_agents)
             .service(handlers::agent_execution::execute_sqlite_agent)
             .service(handlers::agent_execution::execute_codebase_analysis_agent)
+            .service(handlers::sessions::list_sessions)
             .service(handlers::sessions::get_session)
             .service(
                 web::scope("/settings")
