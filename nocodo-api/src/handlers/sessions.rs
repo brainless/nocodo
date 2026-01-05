@@ -144,9 +144,9 @@ pub async fn list_sessions(db: web::Data<DbConnection>) -> impl Responder {
 
 fn get_sessions_from_db(conn: &Connection) -> Result<Vec<SessionListItem>, anyhow::Error> {
     let mut stmt = conn.prepare(
-        "SELECT id, agent_name, user_prompt, created_at
+        "SELECT id, agent_name, user_prompt, started_at
          FROM agent_sessions
-         ORDER BY created_at DESC
+         ORDER BY started_at DESC
          LIMIT 50",
     )?;
 
@@ -156,7 +156,7 @@ fn get_sessions_from_db(conn: &Connection) -> Result<Vec<SessionListItem>, anyho
                 id: row.get(0)?,
                 agent_name: row.get(1)?,
                 user_prompt: row.get(2)?,
-                created_at: row.get(3)?,
+                started_at: row.get(3)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

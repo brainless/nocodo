@@ -44,7 +44,7 @@ pub struct SessionListItem {
     pub id: i64,
     pub agent_name: String,
     pub user_prompt: String,
-    pub created_at: String,
+    pub started_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

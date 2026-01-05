@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             id: session.id as i32,
                             agent_name: session.agent_name.clone().into(),
                             user_prompt: session.user_prompt.clone().into(),
-                            created_at: session.created_at.clone().into(),
+                            started_at: session.started_at.to_string().into(),
                         })
                         .collect();
 
@@ -206,7 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         id: session.id as i32,
                         agent_name: session.agent_name.clone().into(),
                         user_prompt: session.user_prompt.clone().into(),
-                        created_at: session.created_at.clone().into(),
+                        started_at: session.started_at.to_string().into(),
                     })
                     .collect();
 
