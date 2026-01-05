@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 pub type DbConnection = Arc<Mutex<Connection>>;
 
 pub struct Database {
-    pub(crate) connection: DbConnection,
+    pub connection: DbConnection,
 }
 
 impl Database {

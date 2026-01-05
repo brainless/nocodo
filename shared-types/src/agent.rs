@@ -33,7 +33,7 @@ pub enum AgentConfig {
 }
 
 /// Generic agent execution request with type-safe config
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AgentExecutionRequest {
     pub user_prompt: String,
     pub config: AgentConfig,

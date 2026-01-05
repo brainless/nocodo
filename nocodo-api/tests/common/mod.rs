@@ -145,11 +145,15 @@ pub fn create_mock_llm_client() -> Arc<MockLlmClient> {
     Arc::new(MockLlmClient::new())
 }
 
-pub async fn setup_test_app() -> anyhow::Result<TestApp<impl actix_web::dev::Service<
-    actix_http::Request,
-    Response = actix_web::dev::ServiceResponse,
-    Error = actix_web::Error,
->>> {
+pub async fn setup_test_app() -> anyhow::Result<
+    TestApp<
+        impl actix_web::dev::Service<
+            actix_http::Request,
+            Response = actix_web::dev::ServiceResponse,
+            Error = actix_web::Error,
+        >,
+    >,
+> {
     let db = Arc::new(setup_test_db()?);
     let db_conn = db.connection.clone();
     let mock_llm_client = create_mock_llm_client();
