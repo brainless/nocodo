@@ -1,37 +1,37 @@
-export interface AgentInfo {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-}
+/**
+ * Agent information for the agents list
+ */
+export type AgentInfo = { id: string, name: string, description: string, enabled: boolean, };
 
-export interface SqliteAgentConfig {
-  db_path: string;
-}
 
-export interface CodebaseAnalysisAgentConfig {
-  path: string;
-  max_depth?: number;
-}
+/**
+ * Configuration for SQLite analysis agent
+ */
+export type SqliteAgentConfig = { db_path: string, };
 
-export type AgentConfig = { type: "sqlite" } & SqliteAgentConfig | { type: "codebase-analysis" } & CodebaseAnalysisAgentConfig;
 
-export interface AgentExecutionRequest {
-  user_prompt: string;
-  config: AgentConfig;
-}
+/**
+ * Configuration for codebase analysis agent
+ */
+export type CodebaseAnalysisAgentConfig = { path: string, max_depth: number | null, };
 
-export interface AgentsResponse {
-  agents: AgentInfo[];
-}
 
-export interface AgentExecutionResponse {
-  session_id: number;
-  agent_name: string;
-  status: string;
-  result: string;
-}
+export type AgentConfig = { "type": "sqlite" } & SqliteAgentConfig | { "type": "codebase-analysis" } & CodebaseAnalysisAgentConfig;
 
-export interface ErrorResponse {
-  error: string;
-}
+
+/**
+ * Generic agent execution request with type-safe config
+ */
+export type AgentExecutionRequest = { user_prompt: string, config: AgentConfig, };
+
+
+/**
+ * Response containing list of available agents
+ */
+export type AgentsResponse = { agents: Array<AgentInfo>, };
+
+
+export type AgentExecutionResponse = { session_id: bigint, agent_name: string, status: string, result: string, };
+
+
+export type ErrorResponse = { error: string, };
