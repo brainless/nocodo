@@ -12,6 +12,7 @@ nocodo-agents = { path = "../nocodo-agents" }
 manager-tools = { path = "../manager-tools" }
 shared-types = { path = "../shared-types" }
 actix-web.workspace = true
+actix-cors = "0.7"
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

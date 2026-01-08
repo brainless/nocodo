@@ -8,11 +8,17 @@ pub struct ApiConfig {
     pub database: DatabaseConfig,
     pub api_keys: Option<ApiKeysConfig>,
     pub llm: Option<LlmConfig>,
+    pub cors: Option<CorsConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LlmConfig {
     pub provider: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CorsConfig {
+    pub allowed_origins: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -49,6 +55,9 @@ impl Default for ApiConfig {
             },
             api_keys: None,
             llm: None,
+            cors: Some(CorsConfig {
+                allowed_origins: vec!["http://localhost:3000".to_string()],
+            }),
         }
     }
 }
@@ -73,6 +82,9 @@ port = 8080
 
 [database]
 path = "~/.local/share/nocodo/api.db"
+
+[cors]
+allowed_origins = ["http://localhost:3000"]
 
 [llm]
 # provider = "anthropic"  # Options: anthropic, openai, xai, zai

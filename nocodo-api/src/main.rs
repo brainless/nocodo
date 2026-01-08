@@ -3,6 +3,7 @@ mod handlers;
 mod helpers;
 mod models;
 
+use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -11,7 +12,7 @@ use tracing::info;
 pub type DbConnection = Arc<Mutex<Connection>>;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -34,8 +35,32 @@ async fn main() -> std::io::Result<()> {
     let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);
 
+    let cors_config = app_config
+        .read()
+        .expect("Failed to acquire config read lock")
+        .cors
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("CORS configuration is missing from config file"))?;
+
+    let allowed_origins = cors_config
+        .allowed_origins
+        .into_iter()
+        .map(|origin| {
+            origin
+                .parse::<actix_web::http::header::HeaderValue>()
+                .map_err(|e| anyhow::anyhow!("Invalid CORS origin '{}': {}", origin, e))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
     HttpServer::new(move || {
+        let origins = allowed_origins.clone();
+        let cors = Cors::default()
+            .allowed_origin_fn(move |origin, _req_head| origins.contains(origin))
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
         App::new()
+            .wrap(cors)
             .app_data(web::Data::new(llm_client.clone()))
             .app_data(web::Data::new(db_conn.clone()))
             .app_data(web::Data::new(db.clone()))
@@ -60,4 +85,5 @@ async fn main() -> std::io::Result<()> {
     .bind(bind_addr)?
     .run()
     .await
+    .map_err(|e| anyhow::anyhow!("Server error: {}", e))
 }
