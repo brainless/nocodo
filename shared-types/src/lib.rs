@@ -353,7 +353,8 @@ pub struct WorkMessageListResponse {
 }
 
 /// API key configuration for the settings page
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct ApiKeyConfig {
     pub name: String,
     pub key: Option<String>, // Will be masked for security
@@ -361,7 +362,8 @@ pub struct ApiKeyConfig {
 }
 
 /// Settings response containing API keys and configuration info
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct SettingsResponse {
     pub config_file_path: String,
     pub api_keys: Vec<ApiKeyConfig>,
@@ -392,7 +394,8 @@ pub struct SupportedModelsResponse {
 }
 
 /// Request for updating API keys
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct UpdateApiKeysRequest {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,

@@ -46,3 +46,32 @@ export type AgentExecutionResponse = {
 };
 
 export type ErrorResponse = { error: string };
+
+/**
+ * API key configuration for the settings page
+ */
+export type ApiKeyConfig = {
+  name: string;
+  key: string | null;
+  is_configured: boolean;
+};
+
+/**
+ * Settings response containing API keys and configuration info
+ */
+export type SettingsResponse = {
+  config_file_path: string;
+  api_keys: Array<ApiKeyConfig>;
+  projects_default_path: string | null;
+};
+
+/**
+ * Request for updating API keys
+ */
+export type UpdateApiKeysRequest = {
+  xai_api_key: string | null;
+  openai_api_key: string | null;
+  anthropic_api_key: string | null;
+  zai_api_key: string | null;
+  zai_coding_plan: boolean | null;
+};

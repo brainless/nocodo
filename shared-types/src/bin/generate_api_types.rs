@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(AgentsResponse::export_to_string()?));
     types.push(clean_type(AgentExecutionResponse::export_to_string()?));
     types.push(clean_type(ErrorResponse::export_to_string()?));
+    types.push(clean_type(ApiKeyConfig::export_to_string()?));
+    types.push(clean_type(SettingsResponse::export_to_string()?));
+    types.push(clean_type(UpdateApiKeysRequest::export_to_string()?));
 
     let output_dir = Path::new("../gui/api-types");
     fs::create_dir_all(output_dir)?;

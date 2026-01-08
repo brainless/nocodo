@@ -2,6 +2,7 @@ import { type Component, type ParentComponent } from 'solid-js';
 import { Router, Route, A } from '@solidjs/router';
 import Agents from './pages/Agents';
 import Home from './pages/Home';
+import Settings from './pages/Settings';
 
 const Layout: ParentComponent = (props) => {
   return (
@@ -28,7 +29,7 @@ const Layout: ParentComponent = (props) => {
               <A href="/agents">Agents</A>
             </li>
             <li>
-              <a>Settings</a>
+              <A href="/settings">Settings</A>
             </li>
           </ul>
         </div>
@@ -43,6 +44,7 @@ const App: Component = () => {
     <Router root={Layout}>
       <Route path="/" component={Home} />
       <Route path="/agents" component={Agents} />
+      <Route path="/settings" component={Settings} />
     </Router>
   );
 };
