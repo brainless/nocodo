@@ -5,7 +5,6 @@ members = [
     "shared-types",
     "manager-tools",
     "nocodo-github-actions",
-    "nocodo-desktop",
     "nocodo-llm-sdk", "nocodo-agents",
     "nocodo-api",
 ]
