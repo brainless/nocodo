@@ -21,14 +21,22 @@ pub struct SqliteAnalysisAgent {
 }
 
 impl SqliteAnalysisAgent {
-    pub fn new(
+    pub async fn new(
         client: Arc<dyn LlmClient>,
         database: Arc<Database>,
         tool_executor: Arc<ToolExecutor>,
         db_path: String,
     ) -> anyhow::Result<Self> {
         validate_db_path(&db_path)?;
-        let system_prompt = generate_system_prompt(&db_path);
+
+        let table_names = manager_tools::sqlite::get_table_names(&db_path).await?;
+
+        let db_name = std::path::Path::new(&db_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("database");
+
+        let system_prompt = generate_system_prompt(db_name, &table_names);
 
         Ok(Self {
             client,
@@ -46,8 +54,14 @@ impl SqliteAnalysisAgent {
         database: Arc<Database>,
         tool_executor: Arc<ToolExecutor>,
         db_path: String,
+        table_names: Vec<String>,
     ) -> Self {
-        let system_prompt = generate_system_prompt(&db_path);
+        let db_name = std::path::Path::new(&db_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("database");
+
+        let system_prompt = generate_system_prompt(db_name, &table_names);
 
         Self {
             client,
@@ -173,15 +187,7 @@ impl Agent for SqliteAnalysisAgent {
         vec![AgentTool::Sqlite3Reader]
     }
 
-    async fn execute(&self, user_prompt: &str) -> anyhow::Result<String> {
-        let session_id = self.database.create_session(
-            "sqlite-analysis",
-            self.client.provider_name(),
-            self.client.model_name(),
-            Some(&self.system_prompt),
-            user_prompt,
-        )?;
-
+    async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
         self.database
             .create_message(session_id, "user", user_prompt)?;
 
@@ -270,33 +276,39 @@ fn validate_db_path(db_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn generate_system_prompt(db_path: &str) -> String {
+fn generate_system_prompt(db_name: &str, table_names: &[String]) -> String {
+    let tables_list = if table_names.is_empty() {
+        "No tables found".to_string()
+    } else {
+        table_names.join(", ")
+    };
+
     format!(
-        "You are a database analysis expert specialized in SQLite databases. \
-         You are analyzing the database at: {}
+        "You are a database analysis expert specialized in SQLite databases.
+Your role is to query data and provide insights about database contents.
+You have access to the sqlite3_reader tool to execute SQL queries.
 
-Your role is to query data and provide insights about database contents. \
-You have access to the sqlite3_reader tool which executes read-only SQL queries.
-
-IMPORTANT: The database path is already configured. You do NOT need to specify \
-db_path in your tool calls - just provide the SQL query.
+Use SELECT queries to retrieve data and PRAGMA statements to inspect schema and database structure.
 
 ALLOWED QUERIES:
-- SELECT queries to retrieve data
-- PRAGMA queries to inspect schema (PRAGMA table_list, PRAGMA table_info(name))
+- SELECT queries to retrieve and analyze data
+- PRAGMA queries to inspect database schema and structure
 
-You can ONLY use SELECT and PRAGMA statements. Do NOT use CREATE, INSERT, UPDATE, \
-DELETE, ALTER, DROP, or any other statements.
+Useful PRAGMA commands for schema discovery:
+- PRAGMA table_info(table_name) - Get column information for a specific table
+- PRAGMA index_list(table_name) - Get indexes for a table
+- PRAGMA foreign_key_list(table_name) - Get foreign keys for a table
 
-Best Practices:
-1. Keep queries simple and direct
-2. Use LIMIT clauses for large result sets
-3. For latest/newest records: use ORDER BY column DESC LIMIT 1
-4. For counting: use SELECT COUNT(*) FROM table
-5. Answer user questions concisely based on query results
+You can ONLY use SELECT and PRAGMA statements. Do NOT use CREATE, \
+INSERT, UPDATE, DELETE, ALTER, DROP, or any other data modification statements.
 
-Focus on answering the user's question directly.",
-        db_path
+You should not summarize the data unless explicitly asked. Just list the results.
+
+IMPORTANT: The database path is already configured.
+You are analyzing the database named: {}
+Tables in the database: {}
+",
+        db_name, tables_list
     )
 }
 

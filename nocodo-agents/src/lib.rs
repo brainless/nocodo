@@ -78,9 +78,24 @@ impl AgentTool {
                 ToolRequest::AskUser(req)
             }
             "sqlite3_reader" => {
-                let req: manager_tools::types::Sqlite3ReaderRequest =
-                    serde_json::from_value(arguments)?;
-                ToolRequest::Sqlite3Reader(req)
+                let value: serde_json::Value = arguments;
+
+                let query = value
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'query' field in sqlite3_reader call"))?
+                    .to_string();
+
+                let limit = value
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+
+                ToolRequest::Sqlite3Reader(manager_tools::types::Sqlite3ReaderRequest {
+                    db_path: String::new(),
+                    mode: manager_tools::types::SqliteMode::Query { query },
+                    limit,
+                })
             }
             _ => anyhow::bail!("Unknown tool: {}", name),
         };
@@ -105,6 +120,7 @@ pub fn format_tool_response(response: &manager_tools::types::ToolResponse) -> St
         ),
         ToolResponse::AskUser(r) => format!("User response: {:?}", r.responses),
         ToolResponse::Sqlite3Reader(r) => r.formatted_output.clone(),
+        ToolResponse::HackerNewsResponse(r) => r.message.clone(),
         ToolResponse::Error(e) => format!("Error: {}", e.message),
     }
 }
@@ -127,9 +143,9 @@ pub trait Agent: Send + Sync {
     /// Returns the list of tools available to this agent
     fn tools(&self) -> Vec<AgentTool>;
 
-    /// Execute the agent with the given user prompt
+    /// Execute the agent with the given user prompt and session ID
     /// Optional method with default implementation that returns an error
-    async fn execute(&self, _user_prompt: &str) -> anyhow::Result<String> {
+    async fn execute(&self, _user_prompt: &str, _session_id: i64) -> anyhow::Result<String> {
         anyhow::bail!("Execute method not implemented for this agent")
     }
 }

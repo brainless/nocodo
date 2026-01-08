@@ -11,6 +11,10 @@ description = "Tool execution utilities for nocodo manager"
 name = "manager_tools"
 path = "src/lib.rs"
 
+[[bin]]
+name = "hackernews_downloader"
+path = "src/bin/hackernews_downloader.rs"
+
 [dependencies]
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -21,6 +25,7 @@ walkdir = "2.5"
 regex = "1.10"
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 glob = "0.3"
 schemars = "0.8"
 codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch" }
@@ -29,6 +34,9 @@ codex-process-hardening = { git = "https://github.com/openai/codex", package = "
 shared-types = { path = "../shared-types" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 sqlparser = "0.51"
+reqwest = { version = "0.12", features = ["json", "charset"] }
+home = "0.5"
+clap = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.12"

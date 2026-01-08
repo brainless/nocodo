@@ -2,24 +2,27 @@ use manager_tools::types::filesystem::*;
 use manager_tools::types::user_interaction::*;
 use manager_tools::types::{BashRequest, GrepRequest};
 use nocodo_llm_sdk::tools::Tool;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
-/// LLM-facing schema for Sqlite3Reader tool (excludes db_path since it's auto-injected)
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-struct Sqlite3ReaderRequestLlm {
-    #[schemars(
-        description = "SQL query to execute. Only SELECT queries and PRAGMA statements are allowed."
-    )]
-    query: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "Maximum number of rows to return. Defaults to 100, maximum 1000.")]
-    limit: Option<usize>,
-}
 
 /// Create tool definitions for LLM using manager-models types
 pub fn create_tool_definitions() -> Vec<Tool> {
+    let sqlite_schema = serde_json::json!({
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "SQL query to execute. Use SELECT to retrieve data, or PRAGMA statements to inspect database schema. PRAGMA commands include: table_list (list tables), table_info(table_name) (column info), index_list(table_name) (indexes), foreign_key_list(table_name) (foreign keys)."
+            },
+            "limit": {"type": "integer", "description": "Maximum number of rows to return. Defaults to 100, maximum 1000."}
+        }
+    });
+
+    let sqlite_tool = Tool::from_json_schema(
+        "sqlite3_reader".to_string(),
+        "Read-only SQLite database tool. Use SELECT queries to retrieve data and PRAGMA statements to inspect database schema (tables, columns, indexes, foreign keys). The database path is pre-configured.".to_string(),
+        sqlite_schema,
+    ).expect("Failed to create sqlite3_reader tool schema");
+
     vec![
         Tool::from_type::<ListFilesRequest>()
             .name("list_files")
@@ -51,10 +54,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
                 "Ask the user a list of questions to gather information or confirm actions",
             )
             .build(),
-        Tool::from_type::<Sqlite3ReaderRequestLlm>()
-            .name("sqlite3_reader")
-            .description("Execute read-only SQL queries (SELECT and PRAGMA) on SQLite databases. The database path is pre-configured, so only provide the query.")
-            .build(),
+        sqlite_tool,
     ]
 }
 

@@ -2,9 +2,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use nocodo_manager::database::Database;
 use nocodo_manager::models::{
-    AiSession, AiSessionOutput, AiSessionResult, LlmAgentMessage, LlmAgentSession,
-    LlmAgentToolCall, MessageAuthorType, MessageContentType, Permission, Project, ProjectComponent,
-    Team, User, Work, WorkMessage,
+    AiSession, AiSessionOutput, AiSessionResult, MessageAuthorType, MessageContentType,
+    Permission, Project, ProjectComponent, Team, User, Work, WorkMessage,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -124,53 +123,6 @@ impl TestDataGenerator {
             status: "completed".to_string(),
             created_at: chrono::Utc::now().timestamp(),
             completed_at: Some(chrono::Utc::now().timestamp()),
-        }
-    }
-
-    /// Create a test LLM agent session
-    pub fn create_llm_agent_session(work_id: i64, provider: &str, model: &str) -> LlmAgentSession {
-        LlmAgentSession {
-            id: get_unique_id("llm-session"),
-            work_id,
-            provider: provider.to_string(),
-            model: model.to_string(),
-            status: "running".to_string(),
-            system_prompt: Some("You are a helpful assistant.".to_string()),
-            started_at: chrono::Utc::now().timestamp(),
-            ended_at: None,
-        }
-    }
-
-    /// Create a test LLM agent message
-    pub fn create_llm_agent_message(session_id: i64, role: &str, content: &str) -> LlmAgentMessage {
-        LlmAgentMessage {
-            id: 1, // Auto-increment in DB
-            session_id,
-            role: role.to_string(),
-            content: content.to_string(),
-            created_at: chrono::Utc::now().timestamp(),
-        }
-    }
-
-    /// Create a test LLM agent tool call
-    pub fn create_llm_agent_tool_call(
-        session_id: i64,
-        tool_name: &str,
-        request: serde_json::Value,
-    ) -> LlmAgentToolCall {
-        LlmAgentToolCall {
-            id: 1, // Auto-increment in DB
-            session_id,
-            message_id: None,
-            tool_name: tool_name.to_string(),
-            request,
-            response: None,
-            status: "pending".to_string(),
-            created_at: chrono::Utc::now().timestamp(),
-            completed_at: None,
-            execution_time_ms: None,
-            progress_updates: None,
-            error_details: None,
         }
     }
 

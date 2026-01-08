@@ -71,12 +71,6 @@ pub enum WebSocketMessage {
     Ping,
     Pong,
 
-    // LLM Agent messages
-    LlmAgentChunk {
-        session_id: i64,
-        content: String,
-    },
-
     // Tool call lifecycle messages
     ToolCallStarted {
         session_id: i64,
@@ -466,16 +460,6 @@ impl WebSocketBroadcaster {
                 stream: stream.to_string(),
                 content: content.to_string(),
                 seq,
-            },
-        });
-    }
-
-    /// Broadcast LLM agent chunk
-    pub async fn broadcast_llm_agent_chunk(&self, session_id: i64, content: String) {
-        self.server.do_send(Broadcast {
-            message: WebSocketMessage::LlmAgentChunk {
-                session_id,
-                content,
             },
         });
     }

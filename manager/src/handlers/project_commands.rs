@@ -1,21 +1,15 @@
-use crate::command_discovery::{CommandDiscovery, SuggestedCommand};
-use crate::database::Database;
+use crate::command_discovery::CommandDiscovery;
 use crate::error::AppError;
 use crate::handlers::main_handlers::AppState;
-use crate::llm_agent::LlmAgent;
-use crate::llm_client::CLAUDE_SONNET_4_5_MODEL_ID;
 use crate::models::{
-    CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
-    MessageAuthorType, MessageContentType, ProjectCommand, ProjectCommandExecution,
+    CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest, ProjectCommand, ProjectCommandExecution,
     ProjectCommandExecutionListResponse, ProjectCommandExecutionResponse,
-    ProjectCommandFilterQuery, ProjectCommandResponse, UpdateProjectCommandRequest, Work,
-    WorkMessage,
+    ProjectCommandFilterQuery, ProjectCommandResponse, UpdateProjectCommandRequest,
 };
 use actix_web::{web, HttpResponse, Result};
 use chrono::Utc;
-use std::sync::Arc;
 use std::time::Instant;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use uuid::Uuid;
 
 /// GET /api/projects/{id}/commands
@@ -408,7 +402,7 @@ pub async fn execute_project_command(
 
     let execution_id = data.database.create_project_command_execution(&execution)?;
 
-    // Return execution with the assigned ID
+    // Return execution with assigned ID
     let mut execution = execution;
     execution.id = execution_id;
 
@@ -452,15 +446,14 @@ pub async fn get_command_executions(
 #[allow(dead_code)]
 pub async fn discover_project_commands(
     project_id: web::Path<i64>,
-    query: web::Query<DiscoveryOptionsQuery>,
+    _query: web::Query<DiscoveryOptionsQuery>,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
-    let use_llm = query.use_llm.unwrap_or(true);
 
     info!(
-        "Discovering commands for project {} (use_llm: {})",
-        project_id, use_llm
+        "Discovering commands for project {}",
+        project_id
     );
 
     // Get project
@@ -471,7 +464,7 @@ pub async fn discover_project_commands(
 
     let project_path = std::path::PathBuf::from(&project.path);
 
-    // Phase 1: Rule-based discovery (always run - it's fast and reliable)
+    // Rule-based discovery (LLM enhancement has been removed)
     info!("Running rule-based discovery for project {}", project_id);
     let discovery = CommandDiscovery::new(project_path.clone(), project_id);
     let rule_based_response = discovery.discover_all().await?;
@@ -482,50 +475,11 @@ pub async fn discover_project_commands(
         project_id
     );
 
-    // Phase 2: LLM enhancement (conditional)
-    let (final_commands, reasoning) = if use_llm && data.llm_agent.is_some() {
-        info!("Enhancing discovery with LLM for project {}", project_id);
-        match enhance_discovery_with_llm(
-            data.llm_agent.as_ref().unwrap().as_ref(),
-            &data.database,
-            project_id,
-            &project_path,
-            rule_based_response.commands.clone(),
-            &query,
-        )
-        .await
-        {
-            Ok((enhanced_commands, llm_reasoning)) => {
-                info!(
-                    "LLM enhancement completed: {} commands total",
-                    enhanced_commands.len()
-                );
-                (enhanced_commands, Some(llm_reasoning))
-            }
-            Err(e) => {
-                warn!(
-                    "LLM enhancement failed for project {}: {}. Falling back to rule-based results.",
-                    project_id, e
-                );
-                (
-                    rule_based_response.commands.clone(),
-                    Some(format!(
-                        "{}. LLM enhancement failed: {}",
-                        rule_based_response.reasoning.clone().unwrap_or_default(),
-                        e
-                    )),
-                )
-            }
-        }
-    } else {
-        if use_llm && data.llm_agent.is_none() {
-            warn!("LLM enhancement requested but LLM agent not available");
-        }
-        (
-            rule_based_response.commands.clone(),
-            rule_based_response.reasoning.clone(),
-        )
-    };
+    // LLM enhancement has been removed - using only rule-based discovery
+    let (final_commands, reasoning) = (
+        rule_based_response.commands.clone(),
+        rule_based_response.reasoning.clone(),
+    );
 
     info!(
         "Discovered {} commands for project {}",
@@ -556,297 +510,4 @@ pub async fn discover_project_commands(
             reasoning,
         }),
     )
-}
-
-/// Enhance command discovery using LLM
-#[allow(dead_code)]
-async fn enhance_discovery_with_llm(
-    llm_agent: &LlmAgent,
-    db: &Arc<Database>,
-    project_id: i64,
-    project_path: &std::path::Path,
-    rule_based_commands: Vec<SuggestedCommand>,
-    query: &DiscoveryOptionsQuery,
-) -> Result<(Vec<SuggestedCommand>, String), AppError> {
-    info!("Starting LLM-enhanced discovery for project {}", project_id);
-
-    // Get LLM provider and model from query or use defaults
-    let provider = query
-        .llm_provider
-        .clone()
-        .unwrap_or_else(|| "anthropic".to_string());
-    let model = query
-        .llm_model
-        .clone()
-        .unwrap_or_else(|| CLAUDE_SONNET_4_5_MODEL_ID.to_string());
-
-    // Create a Work item for command discovery
-    let work = Work {
-        id: 0,
-        title: format!("Command Discovery for Project {}", project_id),
-        project_id: Some(project_id),
-        model: Some(model.clone()),
-        status: "active".to_string(),
-        created_at: chrono::Utc::now().timestamp(),
-        updated_at: chrono::Utc::now().timestamp(),
-        git_branch: None,
-        working_directory: Some(project_path.to_string_lossy().to_string()),
-    };
-
-    let work_id = db
-        .create_work(&work)
-        .map_err(|e| AppError::Internal(format!("Failed to create work item: {}", e)))?;
-
-    info!("Created work item {} for command discovery", work_id);
-
-    // Create the actual user message that will be sent to LLM
-    let user_message = create_discovery_user_message(project_path, &rule_based_commands);
-
-    // Add the exact user prompt to Work
-    db.create_work_message(&WorkMessage {
-        id: 0,
-        work_id,
-        content: user_message.clone(),
-        content_type: MessageContentType::Text,
-        author_type: MessageAuthorType::User,
-        author_id: Some("system".to_string()),
-        sequence_order: 0,
-        created_at: chrono::Utc::now().timestamp(),
-    })
-    .map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
-
-    info!(
-        "Creating LLM session for discovery with provider: {}, model: {}",
-        provider, model
-    );
-
-    // Create discovery prompt
-    let system_prompt = create_discovery_system_prompt(project_path, &rule_based_commands);
-
-    // Create LLM session
-    let session = llm_agent
-        .create_session(
-            work_id,
-            provider.clone(),
-            model.clone(),
-            Some(system_prompt),
-        )
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to create LLM session: {}", e)))?;
-
-    info!("LLM session created: {}", session.id);
-
-    // Also create an AI session entry for desktop app compatibility
-    // First create a work message to get message_id
-    let work_message = crate::models::WorkMessage {
-        id: 0,
-        work_id,
-        content: "LLM is analyzing the project and enhancing command discovery...".to_string(),
-        content_type: crate::models::MessageContentType::Text,
-        author_type: crate::models::MessageAuthorType::User,
-        author_id: Some("system".to_string()),
-        sequence_order: 1,
-        created_at: chrono::Utc::now().timestamp(),
-    };
-
-    let work_message_id = db
-        .create_work_message(&work_message)
-        .map_err(|e| AppError::Internal(format!("Failed to create work message: {}", e)))?;
-
-    let ai_session = crate::models::AiSession {
-        id: 0,
-        work_id,
-        message_id: work_message_id,
-        tool_name: "llm-agent".to_string(),
-        status: "started".to_string(),
-        project_context: Some(format!(
-            "Project: {}\nPath: {}",
-            project_id,
-            project_path.display()
-        )),
-        started_at: chrono::Utc::now().timestamp(),
-        ended_at: None,
-    };
-
-    let ai_session_id = db
-        .create_ai_session(&ai_session)
-        .map_err(|e| AppError::Internal(format!("Failed to create AI session: {}", e)))?;
-
-    info!(
-        "AI session created: {} for LLM session: {}",
-        ai_session_id, session.id
-    );
-
-    info!("Sending discovery request to LLM");
-    let llm_response = llm_agent
-        .process_message(session.id, user_message)
-        .await
-        .map_err(|e| AppError::Internal(format!("LLM processing failed: {}", e)))?;
-
-    info!("Received LLM response, parsing commands");
-
-    // Parse LLM response to extract enhanced commands
-    let (enhanced_commands, reasoning) =
-        parse_llm_discovery_response(&llm_response, &rule_based_commands)?;
-
-    info!(
-        "LLM discovery completed: {} commands extracted",
-        enhanced_commands.len()
-    );
-
-    Ok((enhanced_commands, reasoning))
-}
-
-/// Create system prompt for LLM discovery
-#[allow(dead_code)]
-fn create_discovery_system_prompt(
-    project_path: &std::path::Path,
-    rule_based_commands: &[SuggestedCommand],
-) -> String {
-    format!(
-        r#"You are an expert software development assistant analyzing a project to discover and validate development commands.
-
-Project Path: {:?}
-Rule-based Discovery: Found {} commands through automated detection
-
-Your task:
-1. Review the commands discovered through rule-based analysis
-2. Use available tools (list_files, read_file, grep) to explore the project
-3. Validate the discovered commands and suggest improvements
-4. Identify any missing commands that would be useful for developers
-5. Provide enhanced command descriptions and proper environment variables
-6. Suggest working directories if commands should run in specific subdirectories
-
-Guidelines:
-- Prioritize accuracy over completeness
-- Include environment variables when relevant (NODE_ENV, DEBUG, DATABASE_URL, etc.)
-- Specify working_directory only if the command must run in a subdirectory
-- Use descriptive names and clear descriptions
-- Consider the project's technology stack and common development workflows
-
-Return your response as a JSON object with this structure:
-{{
-  "commands": [
-    {{
-      "name": "command-name",
-      "command": "actual command to run",
-      "description": "Clear description of what this does",
-      "shell": "bash",
-      "working_directory": null,
-      "environment": {{"KEY": "value"}},
-      "timeout_seconds": 120,
-      "os_filter": null
-    }}
-  ],
-  "reasoning": "Explanation of your analysis and decisions"
-}}
-
-Be thorough but concise. Focus on commands that developers will actually use."#,
-        project_path,
-        rule_based_commands.len()
-    )
-}
-
-/// Create user message for LLM discovery request
-#[allow(dead_code)]
-fn create_discovery_user_message(
-    project_path: &std::path::Path,
-    rule_based_commands: &[SuggestedCommand],
-) -> String {
-    let commands_json =
-        serde_json::to_string_pretty(rule_based_commands).unwrap_or_else(|_| "[]".to_string());
-
-    format!(
-        r#"Please analyze this project and enhance the discovered commands.
-
-Project path: {:?}
-
-Commands found through rule-based analysis:
-```json
-{}
-```
-
-Tasks:
-1. Explore the project structure using list_files to understand the layout
-2. Read key configuration files (package.json, Cargo.toml, etc.) to validate the tech stack
-3. Review and enhance the discovered commands:
-   - Validate each command is correct for this project
-   - Add or improve descriptions
-   - Add environment variables where appropriate
-   - Suggest any missing important commands (e.g., database migrations, linting, etc.)
-4. Return the final command list as JSON
-
-Please provide your enhanced command discovery results."#,
-        project_path, commands_json
-    )
-}
-
-/// Parse LLM response to extract enhanced commands
-#[allow(dead_code)]
-fn parse_llm_discovery_response(
-    llm_response: &str,
-    fallback_commands: &[SuggestedCommand],
-) -> Result<(Vec<SuggestedCommand>, String), AppError> {
-    // Try to find JSON in the response
-    // LLM might wrap it in markdown code blocks or include explanatory text
-
-    // First, try to extract JSON from code blocks
-    let json_str = if let Some(start) = llm_response.find("```json") {
-        if let Some(end) = llm_response[start..].find("```") {
-            let json_start = start + 7; // Length of "```json"
-            llm_response[json_start..start + end].trim()
-        } else {
-            llm_response
-        }
-    } else if let Some(start) = llm_response.find('{') {
-        // Try to find JSON object
-        &llm_response[start..]
-    } else {
-        llm_response
-    };
-
-    // Try to parse as JSON
-    match serde_json::from_str::<serde_json::Value>(json_str) {
-        Ok(json) => {
-            let commands = json["commands"].as_array().ok_or_else(|| {
-                AppError::Internal("LLM response missing 'commands' array".to_string())
-            })?;
-
-            let mut enhanced_commands = Vec::new();
-            for cmd_value in commands {
-                match serde_json::from_value::<SuggestedCommand>(cmd_value.clone()) {
-                    Ok(cmd) => enhanced_commands.push(cmd),
-                    Err(e) => {
-                        warn!("Failed to parse LLM command: {}. Skipping.", e);
-                    }
-                }
-            }
-
-            let reasoning = json["reasoning"]
-                .as_str()
-                .unwrap_or("LLM-enhanced discovery completed")
-                .to_string();
-
-            // If LLM didn't return any commands, fall back to rule-based
-            if enhanced_commands.is_empty() {
-                warn!("LLM returned no valid commands, using fallback");
-                Ok((
-                    fallback_commands.to_vec(),
-                    format!("{} (no valid LLM commands, using fallback)", reasoning),
-                ))
-            } else {
-                Ok((enhanced_commands, reasoning))
-            }
-        }
-        Err(e) => {
-            warn!(
-                "Failed to parse LLM response as JSON: {}. Using fallback commands.",
-                e
-            );
-            Ok((
-                fallback_commands.to_vec(),
-                format!("Rule-based discovery (LLM response parsing failed: {})", e),
-            ))
-        }
-    }
 }

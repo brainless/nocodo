@@ -10,11 +10,8 @@ use nocodo_manager::websocket::{WebSocketBroadcaster, WebSocketServer};
 
 use super::config::TestConfig;
 use super::database::TestDatabase;
-use super::llm_config::LlmProviderTestConfig;
 
-use nocodo_manager::llm_agent::LlmAgent;
-
-/// TestApp provides a fully configured test application with isolated resources
+/// TestApp provides a fully configured test application with isolated resources (LLM agent removed)
 pub struct TestApp {
     pub config: TestConfig,
     pub database: TestDatabase,
@@ -37,7 +34,6 @@ impl TestApp {
             database: database.database.clone(),
             start_time: SystemTime::now(),
             ws_broadcaster,
-            llm_agent: None, // Not needed for basic API tests
             config: Arc::new(std::sync::RwLock::new(config.config.clone())),
         });
 
@@ -69,68 +65,6 @@ impl TestApp {
     /// Get the test configuration
     pub fn test_config(&self) -> &TestConfig {
         &self.config
-    }
-
-    /// Create a new test application with real LLM integration
-    pub async fn new_with_llm(provider: &LlmProviderTestConfig) -> Self {
-        let config = TestConfig::new();
-        let database = TestDatabase::new().unwrap();
-
-        // Create WebSocket server and broadcaster
-        let ws_server = WebSocketServer::default().start();
-        let ws_broadcaster = Arc::new(WebSocketBroadcaster::new(ws_server));
-
-        // Create real LLM agent with provider configuration
-        let llm_agent = Some(Arc::new(LlmAgent::new(
-            database.database.clone(),
-            ws_broadcaster.clone(),
-            config.projects_dir(),
-            Arc::new(provider.to_app_config()),
-        )));
-
-        // Create app state with LLM agent
-        let app_state = web::Data::new(AppState {
-            database: database.database.clone(),
-            start_time: SystemTime::now(),
-            ws_broadcaster,
-            llm_agent, // Real LLM agent, not None!
-            config: Arc::new(std::sync::RwLock::new(config.config.clone())),
-        });
-
-        // Create the test service with all routes
-        let _test_service = test::init_service(
-            App::new()
-                .app_data(app_state.clone())
-                .configure(|cfg| configure_routes(cfg, false)),
-        )
-        .await;
-
-        Self {
-            config,
-            database,
-            app_state,
-        }
-    }
-
-    /// Send a message to the LLM agent and get the response
-    pub async fn send_llm_message(
-        &self,
-        session_id: i64,
-        message: String,
-    ) -> anyhow::Result<String> {
-        if let Some(llm_agent) = &self.app_state.llm_agent {
-            llm_agent.process_message(session_id, message).await
-        } else {
-            Err(anyhow::anyhow!("No LLM agent configured for this test app"))
-        }
-    }
-
-    /// Get the LLM agent if available
-    pub fn llm_agent(&self) -> anyhow::Result<&Arc<LlmAgent>> {
-        self.app_state
-            .llm_agent
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No LLM agent configured"))
     }
 
     /// Clean up resources (called automatically on drop)

@@ -6,13 +6,10 @@ mod error;
 mod git;
 mod handlers;
 mod helpers;
-mod llm_agent;
-mod llm_client;
 mod middleware;
 mod models;
 mod permissions;
 mod routes;
-mod schema_provider;
 mod socket;
 mod templates;
 mod websocket;
@@ -24,7 +21,6 @@ use config::AppConfig;
 use database::Database;
 use error::AppResult;
 use handlers::AppState;
-use llm_agent::LlmAgent;
 
 use crate::routes::configure_routes;
 use socket::SocketServer;
@@ -91,21 +87,10 @@ async fn main() -> AppResult<()> {
     });
 
     // Create application state with WebSocket broadcaster
-
-    // Initialize LLM agent (always enabled)
-    tracing::info!("Initializing LLM agent");
-    let llm_agent = Some(Arc::new(LlmAgent::new(
-        Arc::clone(&database),
-        Arc::clone(&broadcaster),
-        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-        Arc::new(config.clone()),
-    )));
-
     let app_state = web::Data::new(AppState {
         database,
         start_time: SystemTime::now(),
         ws_broadcaster: broadcaster,
-        llm_agent,
         config: Arc::new(std::sync::RwLock::new(config.clone())),
     });
 

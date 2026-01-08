@@ -25,9 +25,6 @@ pub enum AppError {
     #[error("Internal server error: {0}")]
     Internal(String),
 
-    #[error("LLM agent error: {0}")]
-    LlmAgent(#[from] anyhow::Error),
-
     #[error("Git error: {0}")]
     Git(#[from] git2::Error),
 
@@ -58,7 +55,6 @@ impl ResponseError for AppError {
             | AppError::Config(_)
             | AppError::Io(_)
             | AppError::Internal(_)
-            | AppError::LlmAgent(_)
             | AppError::Git(_) => HttpResponse::InternalServerError().json(error_response),
         }
     }
@@ -74,7 +70,6 @@ impl AppError {
             AppError::NotFound(_) => "not_found".to_string(),
             AppError::InvalidRequest(_) => "invalid_request".to_string(),
             AppError::Internal(_) => "internal_error".to_string(),
-            AppError::LlmAgent(_) => "llm_agent_error".to_string(),
             AppError::Git(_) => "git_error".to_string(),
             AppError::Unauthorized(_) => "unauthorized".to_string(),
         }

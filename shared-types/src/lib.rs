@@ -1,5 +1,25 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+pub mod agent;
+pub mod auth;
+pub mod session;
+
+pub use agent::{
+    AgentConfig, AgentExecutionRequest, AgentInfo, AgentsResponse, CodebaseAnalysisAgentConfig,
+    SqliteAgentConfig,
+};
+pub use auth::{
+    AddAuthorizedSshKeyRequest, AddAuthorizedSshKeyResponse, CreateUserRequest,
+    CurrentUserTeamsResponse, LoginRequest, LoginResponse, Permission, PermissionItem, SearchQuery,
+    Team, TeamItem, TeamListItem, TeamListResponse, UpdateTeamRequest, UpdateUserRequest, User,
+    UserDetailResponse, UserInfo, UserListItem, UserListResponse, UserResponse, UserWithTeams,
+};
+pub use session::{
+    AgentExecutionResponse, SessionListItem, SessionListResponse, SessionMessage, SessionResponse,
+    SessionToolCall,
+};
 
 // Shared models for nocodo manager and desktop-app
 
@@ -106,6 +126,12 @@ pub struct ServerStatus {
     pub status: String,
     pub version: String,
     pub uptime: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ErrorResponse {
+    pub error: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -223,11 +249,6 @@ pub struct AiSessionOutputListResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LlmAgentToolCallListResponse {
-    pub tool_calls: Vec<LlmAgentToolCall>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct AddExistingProjectRequest {
     pub name: String,
     pub path: String, // Required - must be existing directory
@@ -302,8 +323,8 @@ pub struct CreateWorkRequest {
     pub project_id: Option<i64>,
     pub model: Option<String>, // Model ID for the work (e.g., "gpt-4", "claude-3-opus-20240229")
     #[serde(default = "default_auto_start")]
-    pub auto_start: bool, // Whether to automatically start LLM agent session (default: true)
-    pub tool_name: Option<String>, // Tool to use for auto-started session (default: "llm-agent")
+    pub auto_start: bool, // Whether to automatically start AI agent session (default: true, auto-start removed)
+    pub tool_name: Option<String>, // Tool to use for auto-started session (LLM agent removed)
     pub git_branch: Option<String>, // Git branch for worktree support
 }
 
@@ -331,124 +352,9 @@ pub struct WorkMessageListResponse {
     pub messages: Vec<WorkMessage>,
 }
 
-/// LLM provider configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmProviderConfig {
-    pub provider: String,
-    pub model: String,
-    pub api_key: String,
-    pub base_url: Option<String>,
-    pub max_tokens: Option<u32>,
-    pub temperature: Option<f32>,
-}
-
-/// LLM agent session
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmAgentSession {
-    pub id: i64,
-    pub work_id: i64,
-    pub provider: String,
-    pub model: String,
-    pub status: String,
-    pub system_prompt: Option<String>,
-    pub started_at: i64,
-    pub ended_at: Option<i64>,
-}
-
-impl LlmAgentSession {
-    pub fn new(work_id: i64, provider: String, model: String) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: 0, // Will be set by database AUTOINCREMENT
-            work_id,
-            provider,
-            model,
-            status: "running".to_string(),
-            system_prompt: None,
-            started_at: now,
-            ended_at: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn fail(&mut self) {
-        self.status = "failed".to_string();
-        self.ended_at = Some(Utc::now().timestamp());
-    }
-}
-
-/// Create LLM agent session request
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct CreateLlmAgentSessionRequest {
-    pub provider: String,
-    pub model: String,
-    pub system_prompt: Option<String>,
-}
-
-/// LLM agent message
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmAgentMessage {
-    pub id: i64,
-    pub session_id: i64,
-    pub role: String, // "user" | "assistant" | "system"
-    pub content: String,
-    pub created_at: i64,
-}
-
-/// LLM agent tool call
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmAgentToolCall {
-    pub id: i64,
-    pub session_id: i64,
-    pub message_id: Option<i64>,
-    pub tool_name: String,
-    pub request: serde_json::Value,
-    pub response: Option<serde_json::Value>,
-    pub status: String, // "pending" | "executing" | "completed" | "failed"
-    pub created_at: i64,
-    pub completed_at: Option<i64>,
-    pub execution_time_ms: Option<i64>,
-    pub progress_updates: Option<String>, // JSON array of progress updates
-    pub error_details: Option<String>,
-}
-
-impl LlmAgentToolCall {
-    pub fn new(session_id: i64, tool_name: String, request: serde_json::Value) -> Self {
-        let now = Utc::now().timestamp();
-        Self {
-            id: now, // Simple ID based on timestamp
-            session_id,
-            message_id: None,
-            tool_name,
-            request,
-            response: None,
-            status: "pending".to_string(),
-            created_at: now,
-            completed_at: None,
-            execution_time_ms: None,
-            progress_updates: None,
-            error_details: None,
-        }
-    }
-
-    pub fn complete(&mut self, response: serde_json::Value) {
-        self.response = Some(response);
-        self.status = "completed".to_string();
-        self.completed_at = Some(Utc::now().timestamp());
-    }
-
-    pub fn fail(&mut self, error: String) {
-        self.response = Some(serde_json::json!({
-            "error": error
-        }));
-        self.status = "failed".to_string();
-        self.completed_at = Some(Utc::now().timestamp());
-    }
-}
-
 /// API key configuration for the settings page
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct ApiKeyConfig {
     pub name: String,
     pub key: Option<String>, // Will be masked for security
@@ -456,7 +362,8 @@ pub struct ApiKeyConfig {
 }
 
 /// Settings response containing API keys and configuration info
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct SettingsResponse {
     pub config_file_path: String,
     pub api_keys: Vec<ApiKeyConfig>,
@@ -487,181 +394,14 @@ pub struct SupportedModelsResponse {
 }
 
 /// Request for updating API keys
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct UpdateApiKeysRequest {
     pub xai_api_key: Option<String>,
     pub openai_api_key: Option<String>,
     pub anthropic_api_key: Option<String>,
     pub zai_api_key: Option<String>,
     pub zai_coding_plan: Option<bool>,
-}
-
-// ============ Authentication & User Management ============
-
-/// Login request with username, password, and SSH fingerprint
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
-    pub ssh_fingerprint: String, // SHA256 fingerprint from client
-}
-
-/// Login response with JWT token and user info
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginResponse {
-    pub token: String,
-    pub user: UserInfo,
-}
-
-/// User information returned after login
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserInfo {
-    pub id: i64,
-    pub username: String,
-    pub email: String,
-}
-
-/// Request to create a new user (registration)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateUserRequest {
-    pub username: String,
-    pub email: Option<String>,
-    pub password: String,
-    pub ssh_public_key: String,
-    pub ssh_fingerprint: String,
-}
-
-/// Response after user creation/registration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserResponse {
-    pub user: User,
-}
-
-/// User model (full details, including password hash - only for internal use)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
-    pub id: i64,
-    pub name: String,
-    pub email: String,
-    pub role: Option<String>,
-    #[serde(skip)] // Never send password hash to client
-    pub password_hash: String,
-    pub is_active: bool,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub last_login_at: Option<i64>,
-}
-
-impl User {
-    pub fn new(name: String, email: String, password_hash: String) -> Self {
-        let now = chrono::Utc::now().timestamp();
-        Self {
-            id: 0, // Will be set by database AUTOINCREMENT
-            name,
-            email,
-            role: None,
-            password_hash,
-            is_active: true,
-            created_at: now,
-            updated_at: now,
-            last_login_at: None,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct UserWithTeams {
-    pub user: User,
-    pub teams: Vec<Team>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct UserDetailResponse {
-    pub user: User,
-    pub teams: Vec<Team>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct UpdateUserRequest {
-    pub name: Option<String>,
-    pub email: Option<String>,
-    pub team_ids: Option<Vec<i64>>, // Update team memberships
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SearchQuery {
-    pub q: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Team {
-    pub id: i64,
-    pub name: String,
-    pub description: Option<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub created_by: i64,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct TeamListResponse {
-    pub teams: Vec<TeamListItem>,
-}
-
-// Clean models specifically for user list display
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserListItem {
-    pub id: i64,
-    pub name: String,
-    pub email: String,
-    pub teams: Vec<TeamItem>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TeamItem {
-    pub id: i64,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct UserListResponse {
-    pub users: Vec<UserListItem>,
-}
-
-// Clean models specifically for team list display
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TeamListItem {
-    pub id: i64,
-    pub name: String,
-    pub description: Option<String>,
-    pub permissions: Vec<PermissionItem>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PermissionItem {
-    pub id: i64,
-    pub resource_type: String,
-    pub resource_id: Option<i64>,
-    pub action: String,
-}
-
-// Permission model for full permission details
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Permission {
-    pub id: i64,
-    pub team_id: i64,
-    pub resource_type: String,
-    pub resource_id: Option<i64>,
-    pub action: String,
-    pub granted_by: Option<i64>,
-    pub granted_at: i64,
-}
-
-// Request model for updating teams
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateTeamRequest {
-    pub name: Option<String>,
-    pub description: Option<String>,
 }
 
 /// Git branch information for worktree support
@@ -676,25 +416,6 @@ pub struct GitBranch {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitBranchListResponse {
     pub branches: Vec<GitBranch>,
-}
-
-/// Request to add an authorized SSH key to the server
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AddAuthorizedSshKeyRequest {
-    pub public_key: String,
-}
-
-/// Response for adding an authorized SSH key
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AddAuthorizedSshKeyResponse {
-    pub success: bool,
-    pub message: String,
-}
-
-/// Response containing user's teams (for current user)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CurrentUserTeamsResponse {
-    pub teams: Vec<TeamItem>,
 }
 
 // ============ Project Commands ============

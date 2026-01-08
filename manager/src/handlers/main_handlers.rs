@@ -1,7 +1,6 @@
 use crate::config::AppConfig;
 use crate::database::Database;
 use crate::error::AppError;
-use crate::llm_agent::LlmAgent;
 use crate::models::{
     ServerStatus, SettingsResponse, SupportedModel, SupportedModelsResponse, UpdateApiKeysRequest,
 };
@@ -13,7 +12,6 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub start_time: SystemTime,
     pub ws_broadcaster: Arc<crate::websocket::WebSocketBroadcaster>,
-    pub llm_agent: Option<Arc<LlmAgent>>,
     pub config: Arc<std::sync::RwLock<AppConfig>>,
 }
 

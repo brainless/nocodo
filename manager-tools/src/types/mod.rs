@@ -2,6 +2,7 @@ pub mod bash;
 pub mod core;
 pub mod filesystem;
 pub mod grep;
+pub mod hackernews;
 pub mod sqlite;
 pub mod user_interaction;
 
@@ -14,7 +15,8 @@ pub use filesystem::{
     WriteFileResponse,
 };
 pub use grep::{GrepMatch, GrepRequest, GrepResponse};
-pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse};
+pub use hackernews::{DownloadState, FetchMode, HackerNewsRequest, HackerNewsResponse, StoryType};
+pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 pub use user_interaction::{
     AskUserRequest, AskUserResponse, QuestionType, QuestionValidation, UserQuestion,
     UserQuestionResponse,
