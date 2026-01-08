@@ -55,40 +55,42 @@ pub async fn execute_sqlite_agent(
         }
     };
 
-    let agent = match create_sqlite_agent(&llm_client, &database, &db_path).await {
-        Ok(agent) => agent,
-        Err(e) => {
-            error!(error = %e, "Failed to create SQLite agent");
-            let _ = database.fail_session(session_id, &format!("Failed to create agent: {}", e));
-            return HttpResponse::InternalServerError().json(ErrorResponse {
-                error: format!("Failed to create agent: {}", e),
-            });
-        }
-    };
+    // Return immediately with session_id and spawn background task
+    let llm_client_clone = llm_client.get_ref().clone();
+    let database_clone = database.get_ref().clone();
+    let db_path_clone = db_path.clone();
+    let user_prompt_clone = user_prompt.clone();
 
-    match agent.execute(&user_prompt, session_id).await {
-        Ok(result) => {
-            info!(result = %result, session_id = session_id, "Agent execution completed successfully");
-
-            if let Err(e) = database.complete_session(session_id, &result) {
-                error!(error = %e, session_id = session_id, "Failed to complete session");
+    tokio::spawn(async move {
+        let agent = match create_sqlite_agent(&llm_client_clone, &database_clone, &db_path_clone).await {
+            Ok(agent) => agent,
+            Err(e) => {
+                error!(error = %e, session_id = session_id, "Failed to create SQLite agent");
+                let _ = database_clone.fail_session(session_id, &format!("Failed to create agent: {}", e));
+                return;
             }
+        };
 
-            HttpResponse::Ok().json(AgentExecutionResponse {
-                session_id,
-                agent_name,
-                status: "completed".to_string(),
-                result,
-            })
+        match agent.execute(&user_prompt_clone, session_id).await {
+            Ok(result) => {
+                info!(result = %result, session_id = session_id, "Agent execution completed successfully");
+                if let Err(e) = database_clone.complete_session(session_id, &result) {
+                    error!(error = %e, session_id = session_id, "Failed to complete session");
+                }
+            }
+            Err(e) => {
+                error!(error = %e, session_id = session_id, "Agent execution failed");
+                let _ = database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
+            }
         }
-        Err(e) => {
-            error!(error = %e, session_id = session_id, "Agent execution failed");
-            let _ = database.fail_session(session_id, &format!("Execution failed: {}", e));
-            HttpResponse::InternalServerError().json(ErrorResponse {
-                error: format!("Agent execution failed: {}", e),
-            })
-        }
-    }
+    });
+
+    HttpResponse::Ok().json(AgentExecutionResponse {
+        session_id,
+        agent_name,
+        status: "running".to_string(),
+        result: String::new(),
+    })
 }
 
 #[post("/agents/codebase-analysis/execute")]
@@ -141,38 +143,41 @@ pub async fn execute_codebase_analysis_agent(
         }
     };
 
-    let tool_executor = Arc::new(
-        manager_tools::ToolExecutor::new(std::path::PathBuf::from(path.clone()))
-            .with_max_file_size(10 * 1024 * 1024),
-    );
+    // Return immediately with session_id and spawn background task
+    let llm_client_clone = llm_client.get_ref().clone();
+    let database_clone = database.get_ref().clone();
+    let user_prompt_clone = user_prompt.clone();
 
-    let agent = CodebaseAnalysisAgent::new(
-        llm_client.get_ref().clone(),
-        database.get_ref().clone(),
-        tool_executor,
-    );
+    tokio::spawn(async move {
+        let tool_executor = Arc::new(
+            manager_tools::ToolExecutor::new(std::path::PathBuf::from(path.clone()))
+                .with_max_file_size(10 * 1024 * 1024),
+        );
 
-    match agent.execute(&user_prompt, session_id).await {
-        Ok(result) => {
-            info!(result = %result, session_id = session_id, "Agent execution completed successfully");
+        let agent = CodebaseAnalysisAgent::new(
+            llm_client_clone,
+            database_clone.clone(),
+            tool_executor,
+        );
 
-            if let Err(e) = database.complete_session(session_id, &result) {
-                error!(error = %e, session_id = session_id, "Failed to complete session");
+        match agent.execute(&user_prompt_clone, session_id).await {
+            Ok(result) => {
+                info!(result = %result, session_id = session_id, "Agent execution completed successfully");
+                if let Err(e) = database_clone.complete_session(session_id, &result) {
+                    error!(error = %e, session_id = session_id, "Failed to complete session");
+                }
             }
+            Err(e) => {
+                error!(error = %e, session_id = session_id, "Agent execution failed");
+                let _ = database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
+            }
+        }
+    });
 
-            HttpResponse::Ok().json(AgentExecutionResponse {
-                session_id,
-                agent_name,
-                status: "completed".to_string(),
-                result: result.to_string(),
-            })
-        }
-        Err(e) => {
-            error!(error = %e, session_id = session_id, "Agent execution failed");
-            let _ = database.fail_session(session_id, &format!("Execution failed: {}", e));
-            HttpResponse::InternalServerError().json(ErrorResponse {
-                error: format!("Agent execution failed: {}", e),
-            })
-        }
-    }
+    HttpResponse::Ok().json(AgentExecutionResponse {
+        session_id,
+        agent_name,
+        status: "running".to_string(),
+        result: String::new(),
+    })
 }

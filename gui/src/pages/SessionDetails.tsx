@@ -1,4 +1,11 @@
-import { createSignal, onMount, type Component, For, Show } from 'solid-js';
+import {
+  createSignal,
+  onMount,
+  onCleanup,
+  type Component,
+  For,
+  Show,
+} from 'solid-js';
 import { useParams } from '@solidjs/router';
 import type { SessionResponse } from '../../api-types/types';
 
@@ -7,8 +14,9 @@ const SessionDetails: Component = () => {
   const [session, setSession] = createSignal<SessionResponse | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+  let pollInterval: number | undefined;
 
-  onMount(async () => {
+  const fetchSession = async () => {
     try {
       const sessionId = params.id;
       const response = await fetch(
@@ -19,10 +27,36 @@ const SessionDetails: Component = () => {
       }
       const data: SessionResponse = await response.json();
       setSession(data);
+      setLoading(false);
+      setError(null);
+
+      // Stop polling if session is completed or failed
+      if (data.status === 'completed' || data.status === 'failed') {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = undefined;
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch session');
-    } finally {
       setLoading(false);
+    }
+  };
+
+  onMount(async () => {
+    // Initial fetch
+    await fetchSession();
+
+    // Start polling every 2 seconds if session is running
+    const currentSession = session();
+    if (currentSession && currentSession.status === 'running') {
+      pollInterval = setInterval(fetchSession, 2000) as unknown as number;
+    }
+  });
+
+  onCleanup(() => {
+    if (pollInterval) {
+      clearInterval(pollInterval);
     }
   });
 
@@ -83,8 +117,13 @@ const SessionDetails: Component = () => {
                 </div>
                 <div>
                   <p class="text-sm text-base-content/70">Status</p>
-                  <div class={getStatusBadgeClass(session()!.status)}>
-                    {session()!.status}
+                  <div class="flex items-center gap-2">
+                    <div class={getStatusBadgeClass(session()!.status)}>
+                      {session()!.status}
+                    </div>
+                    {session()!.status === 'running' && (
+                      <span class="loading loading-spinner loading-sm"></span>
+                    )}
                   </div>
                 </div>
                 <div>
