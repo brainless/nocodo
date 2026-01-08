@@ -1,5 +1,6 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 pub mod agent;
 pub mod auth;
@@ -125,6 +126,12 @@ pub struct ServerStatus {
     pub status: String,
     pub version: String,
     pub uptime: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ErrorResponse {
+    pub error: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

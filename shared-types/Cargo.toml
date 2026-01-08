@@ -6,9 +6,16 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "generate_api_types"
+path = "src/bin/generate_api_types.rs"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 schemars = "0.8"
+ts-rs = "8.0"
+inventory = "0.3"
+tempfile = "3"
