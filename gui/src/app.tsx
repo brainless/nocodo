@@ -3,6 +3,7 @@ import { Router, Route, A } from '@solidjs/router';
 import Agents from './pages/Agents';
 import Home from './pages/Home';
 import Settings from './pages/Settings';
+import SessionDetails from './pages/SessionDetails';
 
 const Layout: ParentComponent = (props) => {
   return (
@@ -45,6 +46,7 @@ const App: Component = () => {
       <Route path="/" component={Home} />
       <Route path="/agents" component={Agents} />
       <Route path="/settings" component={Settings} />
+      <Route path="/session/:id" component={SessionDetails} />
     </Router>
   );
 };

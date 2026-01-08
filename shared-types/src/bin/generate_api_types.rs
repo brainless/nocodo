@@ -14,6 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(AgentExecutionRequest::export_to_string()?));
     types.push(clean_type(AgentsResponse::export_to_string()?));
     types.push(clean_type(AgentExecutionResponse::export_to_string()?));
+    types.push(clean_type(SessionMessage::export_to_string()?));
+    types.push(clean_type(SessionToolCall::export_to_string()?));
+    types.push(clean_type(SessionResponse::export_to_string()?));
+    types.push(clean_type(SessionListItem::export_to_string()?));
+    types.push(clean_type(SessionListResponse::export_to_string()?));
     types.push(clean_type(ErrorResponse::export_to_string()?));
     types.push(clean_type(ApiKeyConfig::export_to_string()?));
     types.push(clean_type(SettingsResponse::export_to_string()?));

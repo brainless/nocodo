@@ -45,6 +45,43 @@ export type AgentExecutionResponse = {
   result: string;
 };
 
+export type SessionMessage = {
+  role: string;
+  content: string;
+  created_at: bigint;
+};
+
+export type SessionToolCall = {
+  tool_name: string;
+  request: any;
+  response: any;
+  status: string;
+  execution_time_ms: bigint | null;
+};
+
+export type SessionResponse = {
+  id: bigint;
+  agent_name: string;
+  provider: string;
+  model: string;
+  system_prompt: string | null;
+  user_prompt: string;
+  config: any;
+  status: string;
+  result: string | null;
+  messages: Array<SessionMessage>;
+  tool_calls: Array<SessionToolCall>;
+};
+
+export type SessionListItem = {
+  id: bigint;
+  agent_name: string;
+  user_prompt: string;
+  started_at: bigint;
+};
+
+export type SessionListResponse = { sessions: Array<SessionListItem> };
+
 export type ErrorResponse = { error: string };
 
 /**
