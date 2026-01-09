@@ -1,6 +1,7 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::database::Database;
 use crate::sqlite_analysis::SqliteAnalysisAgent;
+use crate::tesseract::TesseractAgent;
 use crate::Agent;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
@@ -11,6 +12,8 @@ use std::sync::Arc;
 pub enum AgentType {
     /// Agent for analyzing codebase structure and architecture
     CodebaseAnalysis,
+    /// Agent for extracting text from images using Tesseract OCR
+    Tesseract,
 }
 
 /// Factory for creating AI agents with shared dependencies
@@ -41,6 +44,23 @@ impl AgentFactory {
             self.database.clone(),
             self.tool_executor.clone(),
         )
+    }
+
+    /// Create a TesseractAgent for OCR tasks
+    ///
+    /// # Arguments
+    /// * `base_path` - Working directory for file operations
+    ///
+    /// # Examples
+    /// ```rust
+    /// let factory = AgentFactory::new(/* config */)?;
+    /// let agent = factory.create_tesseract_agent(PathBuf::from("/path/to/images"))?;
+    /// ```
+    pub fn create_tesseract_agent(
+        &self,
+        base_path: std::path::PathBuf,
+    ) -> anyhow::Result<TesseractAgent> {
+        TesseractAgent::new(self.llm_client.clone(), self.database.clone(), base_path)
     }
 }
 
@@ -104,6 +124,11 @@ pub fn create_agent_with_tools(
         AgentType::CodebaseAnalysis => {
             Box::new(CodebaseAnalysisAgent::new(client, database, tool_executor))
         }
+        AgentType::Tesseract => {
+            // For Tesseract, we need a specific base path. Use current directory as default
+            let base_path = std::env::current_dir().unwrap_or_default();
+            Box::new(TesseractAgent::new(client, database, base_path).unwrap())
+        }
     }
 }
 
@@ -148,6 +173,27 @@ pub async fn create_sqlite_analysis_agent(
 ) -> anyhow::Result<(SqliteAnalysisAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
     let agent = SqliteAnalysisAgent::new(client, database.clone(), tool_executor, db_path).await?;
+    Ok((agent, database))
+}
+
+/// Create a TesseractAgent with tool executor support
+///
+/// Uses an in-memory database by default for session persistence
+///
+/// # Arguments
+///
+/// * `client` - The LLM client to use for the agent
+/// * `base_path` - Working directory for file operations
+///
+/// # Returns
+///
+/// A TesseractAgent instance
+pub fn create_tesseract_agent(
+    client: Arc<dyn LlmClient>,
+    base_path: std::path::PathBuf,
+) -> anyhow::Result<(TesseractAgent, Arc<Database>)> {
+    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+    let agent = TesseractAgent::new(client, database.clone(), base_path)?;
     Ok((agent, database))
 }
 

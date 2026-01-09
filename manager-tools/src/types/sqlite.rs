@@ -19,7 +19,9 @@ pub enum SqliteMode {
         )]
         target: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        #[schemars(description = "Optional: specific table name for table_info and foreign_keys modes")]
+        #[schemars(
+            description = "Optional: specific table name for table_info and foreign_keys modes"
+        )]
         table_name: Option<String>,
     },
 }

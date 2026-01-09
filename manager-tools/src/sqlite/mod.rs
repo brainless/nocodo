@@ -806,7 +806,9 @@ mod tests {
         .unwrap();
         drop(conn);
 
-        let table_names = get_table_names(temp_file.path().to_str().unwrap()).await.unwrap();
+        let table_names = get_table_names(temp_file.path().to_str().unwrap())
+            .await
+            .unwrap();
 
         assert_eq!(table_names.len(), 3);
         assert!(table_names.contains(&"users".to_string()));
@@ -821,7 +823,9 @@ mod tests {
 
         drop(conn);
 
-        let table_names = get_table_names(temp_file.path().to_str().unwrap()).await.unwrap();
+        let table_names = get_table_names(temp_file.path().to_str().unwrap())
+            .await
+            .unwrap();
 
         assert_eq!(table_names.len(), 0);
     }
