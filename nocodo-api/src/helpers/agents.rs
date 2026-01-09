@@ -19,6 +19,14 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
                     .to_string(),
             enabled: true,
         },
+        AgentInfo {
+            id: "tesseract".to_string(),
+            name: "Tesseract OCR Agent".to_string(),
+            description:
+                "Agent for extracting text from images using Tesseract OCR with AI-powered cleaning"
+                    .to_string(),
+            enabled: true,
+        },
     ]
 }
 
@@ -50,6 +58,31 @@ pub async fn create_sqlite_agent(
         db_path.to_string(),
     )
     .await?;
+
+    Ok(agent)
+}
+
+/// Creates a Tesseract OCR agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+/// * `image_path` - Path to the image file to process
+///
+/// # Returns
+///
+/// A Tesseract OCR agent instance
+pub async fn create_tesseract_agent(
+    llm_client: &Arc<dyn LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+    image_path: &str,
+) -> anyhow::Result<nocodo_agents::tesseract::TesseractAgent> {
+    let agent = nocodo_agents::tesseract::TesseractAgent::new(
+        llm_client.clone(),
+        database.clone(),
+        std::path::PathBuf::from(image_path),
+    )?;
 
     Ok(agent)
 }

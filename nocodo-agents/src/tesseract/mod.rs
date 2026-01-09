@@ -17,8 +17,10 @@ pub struct TesseractAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
     tool_executor: Arc<ToolExecutor>,
-    #[allow(dead_code)] // Used for file path restrictions
-    base_path: PathBuf,
+    #[allow(dead_code)] // Stored for reference, used during construction
+    image_path: PathBuf,
+    #[allow(dead_code)] // Used in system prompt generation during construction
+    image_filename: String,
     system_prompt: String,
 }
 
@@ -28,22 +30,40 @@ impl TesseractAgent {
     /// # Arguments
     /// * `client` - LLM client for AI inference
     /// * `database` - Database for session/message tracking
-    /// * `base_path` - Working directory for file operations
+    /// * `image_path` - Path to the image file to process
     ///
     /// # Security
     /// The agent is configured with restricted bash access:
     /// - Only the `tesseract` command is allowed
     /// - All other bash commands are denied
-    /// - File operations are restricted to base_path
+    /// - File operations are restricted to the image's directory
     ///
     /// # Pre-conditions
     /// - Tesseract OCR must be installed on the system
     /// - Run `tesseract --version` to verify installation
+    /// - The image file must exist
     pub fn new(
         client: Arc<dyn LlmClient>,
         database: Arc<Database>,
-        base_path: PathBuf,
+        image_path: PathBuf,
     ) -> anyhow::Result<Self> {
+        // Validate image path exists
+        if !image_path.exists() {
+            anyhow::bail!("Image file does not exist: {}", image_path.display());
+        }
+
+        // Extract filename and directory
+        let image_filename = image_path
+            .file_name()
+            .ok_or_else(|| anyhow::anyhow!("Invalid image path - no filename"))?
+            .to_string_lossy()
+            .to_string();
+
+        let base_path = image_path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Invalid image path - no parent directory"))?
+            .to_path_buf();
+
         // Create restricted bash permissions (only tesseract command)
         let bash_perms = BashPermissions::minimal(vec!["tesseract"]);
         let bash_executor = BashExecutor::new(bash_perms, 120)?;
@@ -51,18 +71,19 @@ impl TesseractAgent {
         // Create tool executor with restricted bash
         let tool_executor = Arc::new(
             ToolExecutor::builder()
-                .base_path(base_path.clone())
+                .base_path(base_path)
                 .bash_executor(Some(Box::new(bash_executor)))
                 .build(),
         );
 
-        let system_prompt = generate_system_prompt();
+        let system_prompt = generate_system_prompt(&image_filename);
 
         Ok(Self {
             client,
             database,
             tool_executor,
-            base_path,
+            image_path,
+            image_filename,
             system_prompt,
         })
     }
@@ -269,18 +290,22 @@ impl Agent for TesseractAgent {
 }
 
 /// Generate system prompt for TesseractAgent
-fn generate_system_prompt() -> String {
-    r#"You are a Tesseract OCR specialist. Your task is to extract text from images and
-optionally clean and format the extracted text.
+fn generate_system_prompt(image_filename: &str) -> String {
+    format!(
+        r#"You are a Tesseract OCR specialist. Your task is to extract text from the image file "{}" and optionally clean and format the extracted text.
 
 You have access to these tools:
 1. bash - ONLY for running tesseract command
 2. read_file - To read tesseract output files
-3. write_file - To write cleaned results
+3. write_file - To write cleaned results (optional)
+
+# Image File
+
+The image file to process is: {}
 
 # Tesseract Command Format
 
-tesseract <input_image> <output_base> [options]
+tesseract {} <output_base> [options]
 
 Common options:
 - -l <lang> - Language (eng, spa, fra, deu, etc.)
@@ -298,43 +323,48 @@ Common options:
 
 # Workflow
 
-1. Run tesseract command to extract text from image
+1. Run tesseract command to extract text from the image
+   Example: tesseract {} output -l eng --psm 3
 2. Read the output file (tesseract adds .txt automatically)
+   Example: read_file output.txt
 3. Analyze the extracted text
-4. If requested, clean and format the text:
+4. If the user requests cleaning or formatting:
    - Fix OCR errors (common misrecognitions like l/I, O/0, etc.)
    - Improve formatting and structure
    - Remove noise/artifacts
    - Preserve intended structure (paragraphs, lists, tables)
-5. Write the final result to output file if requested
+5. Present the result to the user
+6. Optionally write cleaned result to a file if requested
 
-# Example Workflow
+# Example Interactions
 
-User: "Extract text from invoice.png"
-
-1. Run: tesseract invoice.png output -l eng --psm 6
+User: "Extract text from this image"
+1. Run: tesseract {} output -l eng
 2. Read: output.txt
 3. Present the extracted text to user
 
-User: "Extract and clean text from document.png"
-
-1. Run: tesseract document.png output -l eng
+User: "Extract and clean the text"
+1. Run: tesseract {} output -l eng --psm 6
 2. Read: output.txt
-3. Analyze the text and clean it:
-   - Fix common OCR mistakes
-   - Improve formatting
-   - Structure paragraphs properly
+3. Analyze and clean the text (fix OCR errors, improve formatting)
 4. Present cleaned text to user
+
+User: "Extract text in Spanish"
+1. Run: tesseract {} output -l spa
+2. Read: output.txt
+3. Present the extracted text to user
 
 # Important Notes
 
-- You can ONLY run tesseract command (no other bash commands will work)
+- You can ONLY run the tesseract command (no other bash commands will work)
+- The image file is: {}
 - Tesseract automatically adds .txt extension to output files
-- For PDF files, you may need to specify page ranges
-- If OCR quality is poor, suggest trying different --psm values
-- Always validate that input files exist before running tesseract
-"#
-    .to_string()
+- For PDF files, tesseract can process them directly
+- If OCR quality is poor, try different --psm values (6 for single block, 11 for sparse text)
+- Choose appropriate language with -l flag if the image contains non-English text
+"#,
+        image_filename, image_filename, image_filename, image_filename, image_filename, image_filename, image_filename, image_filename
+    )
 }
 
 /// Helper function to extract text from content blocks

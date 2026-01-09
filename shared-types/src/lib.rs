@@ -8,7 +8,7 @@ pub mod session;
 
 pub use agent::{
     AgentConfig, AgentExecutionRequest, AgentInfo, AgentsResponse, CodebaseAnalysisAgentConfig,
-    SqliteAgentConfig,
+    SqliteAgentConfig, TesseractAgentConfig,
 };
 pub use auth::{
     AddAuthorizedSshKeyRequest, AddAuthorizedSshKeyResponse, CreateUserRequest,
