@@ -28,6 +28,11 @@ impl ToolExecutor {
         }
     }
 
+    /// Start building a ToolExecutor with custom configuration
+    pub fn builder() -> ToolExecutorBuilder {
+        ToolExecutorBuilder::default()
+    }
+
     pub fn with_bash_executor(
         mut self,
         bash_executor: Box<dyn BashExecutorTrait + Send + Sync>,
@@ -150,5 +155,73 @@ impl ToolExecutor {
         }
 
         regex
+    }
+}
+
+/// Builder for creating a ToolExecutor with custom configuration
+#[derive(Default)]
+pub struct ToolExecutorBuilder {
+    base_path: Option<PathBuf>,
+    max_file_size: Option<u64>,
+    bash_executor: Option<Option<Box<dyn BashExecutorTrait + Send + Sync>>>,
+}
+
+impl ToolExecutorBuilder {
+    /// Set the base path for file operations
+    pub fn base_path(mut self, path: PathBuf) -> Self {
+        self.base_path = Some(path);
+        self
+    }
+
+    /// Set the maximum file size for file operations
+    pub fn max_file_size(mut self, size: u64) -> Self {
+        self.max_file_size = Some(size);
+        self
+    }
+
+    /// Set a custom bash executor with specific permissions
+    ///
+    /// # Examples
+    ///
+    /// ## With custom bash executor
+    /// ```rust
+    /// use manager_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
+    /// use std::path::PathBuf;
+    ///
+    /// let perms = BashPermissions::only_allow(vec!["tesseract*"]);
+    /// let bash = BashExecutor::new(perms, 120)?;
+    ///
+    /// let executor = ToolExecutor::builder()
+    ///     .base_path(PathBuf::from("."))
+    ///     .bash_executor(Some(Box::new(bash)))
+    ///     .build();
+    /// ```
+    ///
+    /// ## Without bash executor (disable bash tool)
+    /// ```rust
+    /// let executor = ToolExecutor::builder()
+    ///     .base_path(PathBuf::from("."))
+    ///     .bash_executor(None)
+    ///     .build();
+    /// ```
+    pub fn bash_executor(
+        mut self,
+        executor: Option<Box<dyn BashExecutorTrait + Send + Sync>>,
+    ) -> Self {
+        self.bash_executor = Some(executor);
+        self
+    }
+
+    /// Build the ToolExecutor
+    pub fn build(self) -> ToolExecutor {
+        let base_path = self.base_path.unwrap_or_else(|| PathBuf::from("."));
+        let max_file_size = self.max_file_size.unwrap_or(1024 * 1024); // 1MB default
+        let bash_executor = self.bash_executor.unwrap_or(None);
+
+        ToolExecutor {
+            base_path,
+            max_file_size,
+            bash_executor,
+        }
     }
 }

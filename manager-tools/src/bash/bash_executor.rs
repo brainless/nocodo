@@ -18,6 +18,34 @@ pub struct BashExecutor {
 
 #[allow(dead_code)]
 impl BashExecutor {
+    /// Create a new BashExecutor with custom permissions
+    ///
+    /// # Arguments
+    /// * `permissions` - Custom bash permission rules
+    /// * `timeout_secs` - Command timeout in seconds (default: 120)
+    ///
+    /// # Examples
+    ///
+    /// ## Default permissions (backward compatible)
+    /// ```rust
+    /// use manager_tools::bash::{BashExecutor, BashPermissions};
+    ///
+    /// let executor = BashExecutor::new(
+    ///     BashPermissions::default(),
+    ///     120
+    /// )?;
+    /// ```
+    ///
+    /// ## Restricted to specific command
+    /// ```rust
+    /// use manager_tools::bash::{BashExecutor, BashPermissions, PermissionRule};
+    ///
+    /// let mut perms = BashPermissions::new();
+    /// perms.add_rule(PermissionRule::allow("tesseract*").unwrap());
+    /// perms.add_rule(PermissionRule::deny("*").unwrap());
+    ///
+    /// let executor = BashExecutor::new(perms, 120)?;
+    /// ```
     pub fn new(permissions: BashPermissions, default_timeout_secs: u64) -> Result<Self> {
         let default_timeout = Duration::from_secs(default_timeout_secs);
 
@@ -30,6 +58,14 @@ impl BashExecutor {
             permissions,
             default_timeout,
         })
+    }
+
+    /// Create a BashExecutor with default permissions
+    ///
+    /// This is a convenience method that uses the default permission set,
+    /// which includes common safe commands (ls, cat, git, etc.)
+    pub fn with_default_permissions() -> Result<Self> {
+        Self::new(BashPermissions::default(), 120)
     }
 
     pub async fn execute(

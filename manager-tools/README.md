@@ -118,6 +118,27 @@ let executor = ToolExecutor::new(base_path)
     .with_bash_executor(Box::new(MyBashExecutor));
 ```
 
+#### Builder Pattern
+
+```rust
+pub fn builder() -> ToolExecutorBuilder
+```
+
+Creates a builder for configuring a ToolExecutor with custom settings, including bash permissions.
+
+**Example:**
+```rust
+use manager_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
+
+let executor = ToolExecutor::builder()
+    .base_path(PathBuf::from("."))
+    .max_file_size(10 * 1024 * 1024)
+    .bash_executor(Some(Box::new(
+        BashExecutor::with_default_permissions()?
+    )))
+    .build();
+```
+
 ### Core Methods
 
 #### `execute`
@@ -276,6 +297,108 @@ let request = ToolRequest::Bash(BashRequest {
 ```
 
 **Note:** Requires a bash executor to be configured for permission checking.
+
+## Bash Tool Configuration
+
+### Default Permissions
+
+By default, the bash tool allows safe commands like `ls`, `cat`, `git`, `npm`, etc. and denies dangerous commands like `rm -rf /`, `sudo`, etc.
+
+### Custom Permissions
+
+You can create agents with restricted bash access using the builder pattern:
+
+#### Example: Tesseract-Only Agent
+
+```rust
+use manager_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
+use std::path::PathBuf;
+
+// Create permissions that only allow tesseract command
+let perms = BashPermissions::minimal(vec!["tesseract"]);
+
+// Create bash executor with restricted permissions
+let bash_executor = BashExecutor::new(perms, 120)?;
+
+// Create tool executor with custom bash
+let tool_executor = ToolExecutor::builder()
+    .base_path(PathBuf::from("."))
+    .bash_executor(Some(Box::new(bash_executor)))
+    .build();
+
+// Use with agent
+let agent = TesseractAgent::new(/* ... */, tool_executor);
+```
+
+#### Example: Read-Only Bash
+
+```rust
+use manager_tools::bash::BashPermissions;
+
+// Only allow read operations
+let perms = BashPermissions::read_only();
+let bash_executor = BashExecutor::new(perms, 120)?;
+```
+
+#### Example: Multiple Specific Commands
+
+```rust
+use manager_tools::bash::BashPermissions;
+
+// Allow tesseract and convert commands (for image processing agent)
+let perms = BashPermissions::only_allow(vec!["tesseract*", "convert*"]);
+let bash_executor = BashExecutor::new(perms, 120)?;
+```
+
+#### Example: Disable Bash Tool
+
+```rust
+// Create tool executor without bash access
+let tool_executor = ToolExecutor::builder()
+    .base_path(PathBuf::from("."))
+    .bash_executor(None)  // No bash tool
+    .build();
+```
+
+### Permission Helper Methods
+
+#### `BashPermissions::minimal(commands)`
+Creates the most restrictive permissions - only allows the exact commands specified.
+
+```rust
+// Only allow tesseract command
+let perms = BashPermissions::minimal(vec!["tesseract"]);
+```
+
+#### `BashPermissions::only_allow(commands)`
+Allows specific commands but denies everything else.
+
+```rust
+// Allow multiple commands with patterns
+let perms = BashPermissions::only_allow(vec!["tesseract*", "convert*"]);
+```
+
+#### `BashPermissions::read_only()`
+Allows only read-safe commands (ls, cat, grep, etc.).
+
+```rust
+let perms = BashPermissions::read_only();
+```
+
+#### `BashPermissions::default()`
+Provides a balanced set of safe commands for general development.
+
+```rust
+let perms = BashPermissions::default();
+```
+
+### Security Notes
+
+- Command restrictions are evaluated using glob patterns
+- First matching rule wins (allow or deny)
+- Always add a catch-all deny rule at the end for restricted executors
+- Sandboxing (via Codex) still applies regardless of permissions
+- Working directory restrictions are also enforced
 
 ### User Interaction Tools
 
