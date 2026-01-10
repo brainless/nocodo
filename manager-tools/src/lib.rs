@@ -8,9 +8,11 @@ pub mod tool_executor;
 pub mod types;
 pub mod user_interaction;
 
-pub use bash::{BashExecutionResult, BashExecutorTrait};
+pub use bash::{
+    BashExecutionResult, BashExecutor, BashExecutorTrait, BashPermissions, PermissionRule,
+};
 pub use tool_error::ToolError;
-pub use tool_executor::ToolExecutor;
+pub use tool_executor::{ToolExecutor, ToolExecutorBuilder};
 pub use types::*;
 
 #[cfg(test)]

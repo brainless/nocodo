@@ -21,9 +21,15 @@ export type CodebaseAnalysisAgentConfig = {
   max_depth: number | null;
 };
 
+/**
+ * Configuration for Tesseract OCR agent
+ */
+export type TesseractAgentConfig = { image_path: string };
+
 export type AgentConfig =
   | ({ type: 'sqlite' } & SqliteAgentConfig)
-  | ({ type: 'codebase-analysis' } & CodebaseAnalysisAgentConfig);
+  | ({ type: 'codebase-analysis' } & CodebaseAnalysisAgentConfig)
+  | ({ type: 'tesseract' } & TesseractAgentConfig);
 
 /**
  * Generic agent execution request with type-safe config

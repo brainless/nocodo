@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(AgentInfo::export_to_string()?));
     types.push(clean_type(SqliteAgentConfig::export_to_string()?));
     types.push(clean_type(CodebaseAnalysisAgentConfig::export_to_string()?));
+    types.push(clean_type(TesseractAgentConfig::export_to_string()?));
     types.push(clean_type(AgentConfig::export_to_string()?));
     types.push(clean_type(AgentExecutionRequest::export_to_string()?));
     types.push(clean_type(AgentsResponse::export_to_string()?));

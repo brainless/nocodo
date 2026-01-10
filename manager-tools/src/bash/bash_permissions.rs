@@ -204,6 +204,71 @@ impl BashPermissions {
         self.allowed_working_dirs.retain(|d| d != dir);
         self.allowed_working_dirs.len() != initial_len
     }
+
+    /// Create permissions that only allow specific commands
+    ///
+    /// # Arguments
+    /// * `commands` - List of command patterns to allow (e.g., "tesseract*")
+    ///
+    /// # Examples
+    /// ```rust
+    /// let perms = BashPermissions::only_allow(vec!["tesseract*", "ls*"]);
+    /// ```
+    pub fn only_allow(commands: Vec<&str>) -> Self {
+        let mut perms = Self::new(vec![]);
+
+        // Add allow rules for specified commands
+        for cmd in commands {
+            perms.add_rule(PermissionRule::allow(cmd).unwrap());
+        }
+
+        // Deny everything else
+        perms.add_rule(PermissionRule::deny("*").unwrap());
+
+        perms
+    }
+
+    /// Create read-only permissions (ls, cat, grep, etc.)
+    pub fn read_only() -> Self {
+        let mut perms = Self::new(vec![]);
+
+        perms.add_rule(PermissionRule::allow("ls*").unwrap());
+        perms.add_rule(PermissionRule::allow("cat*").unwrap());
+        perms.add_rule(PermissionRule::allow("head*").unwrap());
+        perms.add_rule(PermissionRule::allow("tail*").unwrap());
+        perms.add_rule(PermissionRule::allow("grep*").unwrap());
+        perms.add_rule(PermissionRule::allow("find*").unwrap());
+        perms.add_rule(PermissionRule::allow("wc*").unwrap());
+        perms.add_rule(PermissionRule::allow("pwd").unwrap());
+
+        perms.add_rule(PermissionRule::deny("*").unwrap());
+
+        perms
+    }
+
+    /// Create minimal permissions (only the specified command, no utilities)
+    ///
+    /// This is the most restrictive option - only the exact command(s) specified
+    ///
+    /// # Examples
+    /// ```rust
+    /// // Only allow tesseract command
+    /// let perms = BashPermissions::minimal(vec!["tesseract"]);
+    /// ```
+    pub fn minimal(commands: Vec<&str>) -> Self {
+        let mut perms = Self::new(vec![]);
+
+        for cmd in commands {
+            // Allow exact command and with arguments
+            let pattern = format!("{}*", cmd);
+            perms.add_rule(PermissionRule::allow(&pattern).unwrap());
+        }
+
+        // Deny everything else
+        perms.add_rule(PermissionRule::deny("*").unwrap());
+
+        perms
+    }
 }
 
 impl Default for BashPermissions {
@@ -319,6 +384,45 @@ impl Default for BashPermissions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_only_allow() {
+        let perms = BashPermissions::only_allow(vec!["tesseract*", "ls*"]);
+
+        // Should allow specified commands
+        assert!(perms.check_command("tesseract input.png output").is_ok());
+        assert!(perms.check_command("ls -la").is_ok());
+
+        // Should deny others
+        assert!(perms.check_command("cat file.txt").is_err());
+        assert!(perms.check_command("rm file.txt").is_err());
+    }
+
+    #[test]
+    fn test_read_only() {
+        let perms = BashPermissions::read_only();
+
+        // Should allow read commands
+        assert!(perms.check_command("ls -la").is_ok());
+        assert!(perms.check_command("cat file.txt").is_ok());
+        assert!(perms.check_command("grep pattern file.txt").is_ok());
+
+        // Should deny write commands
+        assert!(perms.check_command("echo test > file.txt").is_err());
+        assert!(perms.check_command("rm file.txt").is_err());
+    }
+
+    #[test]
+    fn test_minimal() {
+        let perms = BashPermissions::minimal(vec!["tesseract"]);
+
+        // Should allow only specified command
+        assert!(perms.check_command("tesseract input.png output").is_ok());
+
+        // Should deny everything else, including safe commands
+        assert!(perms.check_command("ls -la").is_err());
+        assert!(perms.check_command("cat file.txt").is_err());
+    }
 
     #[test]
     fn test_permission_rule_creation() {

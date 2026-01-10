@@ -19,6 +19,7 @@ const Home: Component = () => {
   const [selectedAgentId, setSelectedAgentId] = createSignal<string>('');
   const [dbPath, setDbPath] = createSignal('');
   const [codebasePath, setCodebasePath] = createSignal('');
+  const [imagePath, setImagePath] = createSignal('');
 
   onMount(async () => {
     try {
@@ -75,6 +76,15 @@ const Home: Component = () => {
           max_depth: null,
         };
         endpoint = 'http://127.0.0.1:8080/agents/codebase-analysis/execute';
+      } else if (agentId === 'tesseract') {
+        if (!imagePath().trim()) {
+          throw new Error('Please enter an image path');
+        }
+        config = {
+          type: 'tesseract',
+          image_path: imagePath(),
+        };
+        endpoint = 'http://127.0.0.1:8080/agents/tesseract/execute';
       } else {
         throw new Error('Unknown agent type');
       }
@@ -193,6 +203,22 @@ const Home: Component = () => {
                   class="input input-bordered w-full"
                   value={codebasePath()}
                   onInput={(e) => setCodebasePath(e.currentTarget.value)}
+                  disabled={executing()}
+                />
+              </div>
+            </Show>
+
+            <Show when={selectedAgentId() === 'tesseract'}>
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text">Image Path</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter image path (PNG, JPG, PDF, TIFF)"
+                  class="input input-bordered w-full"
+                  value={imagePath()}
+                  onInput={(e) => setImagePath(e.currentTarget.value)}
                   disabled={executing()}
                 />
               </div>

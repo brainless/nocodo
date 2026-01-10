@@ -26,6 +26,13 @@ pub struct CodebaseAnalysisAgentConfig {
     pub max_depth: Option<usize>,
 }
 
+/// Configuration for Tesseract OCR agent
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TesseractAgentConfig {
+    pub image_path: String,
+}
+
 /// Variant-specific agent configurations
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -35,6 +42,8 @@ pub enum AgentConfig {
     Sqlite(SqliteAgentConfig),
     #[serde(rename = "codebase-analysis")]
     CodebaseAnalysis(CodebaseAnalysisAgentConfig),
+    #[serde(rename = "tesseract")]
+    Tesseract(TesseractAgentConfig),
 }
 
 /// Generic agent execution request with type-safe config
