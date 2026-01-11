@@ -11,6 +11,9 @@ const Navigation = () => {
           <li>
             <A href="/sessions">Sessions</A>
           </li>
+          <li>
+            <A href="/projects">Projects</A>
+          </li>
         </ul>
         <input
           type="text"

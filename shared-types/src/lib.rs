@@ -4,6 +4,7 @@ use ts_rs::TS;
 
 pub mod agent;
 pub mod auth;
+pub mod project_management;
 pub mod session;
 
 pub use agent::{
@@ -15,6 +16,10 @@ pub use auth::{
     CurrentUserTeamsResponse, LoginRequest, LoginResponse, Permission, PermissionItem, SearchQuery,
     Team, TeamItem, TeamListItem, TeamListResponse, UpdateTeamRequest, UpdateUserRequest, User,
     UserDetailResponse, UserInfo, UserListItem, UserListResponse, UserResponse, UserWithTeams,
+};
+pub use project_management::{
+    Project as PMProject, SaveWorkflowRequest, Workflow, WorkflowStep, WorkflowStepData,
+    WorkflowWithSteps,
 };
 pub use session::{
     AgentExecutionResponse, SessionListItem, SessionListResponse, SessionMessage, SessionResponse,

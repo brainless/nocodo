@@ -3,7 +3,7 @@
 @source "../index.html";
 
 @plugin "daisyui" {
-  themes: dracula, light, dark;
+  themes: cupcake, light, dark;
 }
 
 /*

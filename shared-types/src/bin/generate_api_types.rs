@@ -24,6 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(ApiKeyConfig::export_to_string()?));
     types.push(clean_type(SettingsResponse::export_to_string()?));
     types.push(clean_type(UpdateApiKeysRequest::export_to_string()?));
+    types.push(clean_type(PMProject::export_to_string()?));
+    types.push(clean_type(Workflow::export_to_string()?));
+    types.push(clean_type(WorkflowStep::export_to_string()?));
+    types.push(clean_type(WorkflowWithSteps::export_to_string()?));
+    types.push(clean_type(SaveWorkflowRequest::export_to_string()?));
+    types.push(clean_type(WorkflowStepData::export_to_string()?));
 
     let output_dir = Path::new("../gui/api-types");
     fs::create_dir_all(output_dir)?;

@@ -118,3 +118,58 @@ export type UpdateApiKeysRequest = {
   zai_api_key: string | null;
   zai_coding_plan: boolean | null;
 };
+
+/**
+ * Project entity for project management
+ */
+export type Project = {
+  id: number;
+  name: string;
+  description: string;
+  created_at: bigint;
+};
+
+/**
+ * Workflow entity
+ */
+export type Workflow = {
+  id: number;
+  project_id: number;
+  name: string;
+  parent_workflow_id: number | null;
+  branch_condition: string | null;
+  created_at: bigint;
+};
+
+/**
+ * Workflow step entity
+ */
+export type WorkflowStep = {
+  id: number;
+  workflow_id: number;
+  step_number: number;
+  description: string;
+  created_at: bigint;
+};
+
+/**
+ * Response containing a single workflow with its steps
+ */
+export type WorkflowWithSteps = {
+  workflow: Workflow;
+  steps: Array<WorkflowStep>;
+};
+
+/**
+ * Response for saving workflow
+ */
+export type SaveWorkflowRequest = { workflow: Array<WorkflowStepData> };
+
+/**
+ * Workflow step data for saving
+ */
+export type WorkflowStepData = {
+  id: number;
+  step_number: number;
+  description: string;
+};
