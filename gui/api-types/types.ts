@@ -26,10 +26,19 @@ export type CodebaseAnalysisAgentConfig = {
  */
 export type TesseractAgentConfig = { image_path: string };
 
+/**
+ * Configuration for Structured JSON agent
+ */
+export type StructuredJsonAgentConfig = {
+  type_names: Array<string>;
+  domain_description: string;
+};
+
 export type AgentConfig =
   | ({ type: 'sqlite' } & SqliteAgentConfig)
   | ({ type: 'codebase-analysis' } & CodebaseAnalysisAgentConfig)
-  | ({ type: 'tesseract' } & TesseractAgentConfig);
+  | ({ type: 'tesseract' } & TesseractAgentConfig)
+  | ({ type: 'structured-json' } & StructuredJsonAgentConfig);
 
 /**
  * Generic agent execution request with type-safe config
@@ -87,8 +96,6 @@ export type SessionListItem = {
 };
 
 export type SessionListResponse = { sessions: Array<SessionListItem> };
-
-export type ErrorResponse = { error: string };
 
 /**
  * API key configuration for the settings page

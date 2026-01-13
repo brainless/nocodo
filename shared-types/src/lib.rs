@@ -13,8 +13,7 @@ pub use agent::{
     SqliteAgentConfig, StructuredJsonAgentConfig, TesseractAgentConfig,
 };
 pub use project_management::{
-    Project as PMProject, SaveWorkflowRequest, Workflow, WorkflowStep, WorkflowStepData,
-    WorkflowWithSteps,
+    Project, SaveWorkflowRequest, Workflow, WorkflowStep, WorkflowStepData, WorkflowWithSteps,
 };
 pub use session::{
     AgentExecutionResponse, SessionListItem, SessionListResponse, SessionMessage, SessionResponse,

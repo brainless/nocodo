@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(ApiKeyConfig::export_to_string()?));
     types.push(clean_type(SettingsResponse::export_to_string()?));
     types.push(clean_type(UpdateApiKeysRequest::export_to_string()?));
-    types.push(clean_type(PMProject::export_to_string()?));
+    types.push(clean_type(Project::export_to_string()?));
     types.push(clean_type(Workflow::export_to_string()?));
     types.push(clean_type(WorkflowStep::export_to_string()?));
     types.push(clean_type(WorkflowWithSteps::export_to_string()?));

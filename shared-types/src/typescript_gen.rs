@@ -39,11 +39,7 @@ fn export_type(name: &str) -> Result<String, Box<dyn std::error::Error>> {
         "SessionListResponse" => SessionListResponse::export_to_string()?,
         "AgentExecutionResponse" => AgentExecutionResponse::export_to_string()?,
 
-        "PMProject" | "Project" => {
-            let mut result = PMProject::export_to_string()?;
-            result = result.replace("export type Project", "export type PMProject");
-            result
-        }
+        "Project" => Project::export_to_string()?,
         "Workflow" => Workflow::export_to_string()?,
         "WorkflowStep" => WorkflowStep::export_to_string()?,
         "WorkflowWithSteps" => WorkflowWithSteps::export_to_string()?,
@@ -90,15 +86,15 @@ mod tests {
 
     #[test]
     fn test_generate_single_type() {
-        let result = generate_typescript_definitions(&["PMProject"]).unwrap();
-        assert!(result.contains("PMProject"));
+        let result = generate_typescript_definitions(&["Project"]).unwrap();
+        assert!(result.contains("Project"));
         assert!(result.contains("id: number"));
     }
 
     #[test]
     fn test_generate_multiple_types() {
-        let result = generate_typescript_definitions(&["PMProject", "Workflow"]).unwrap();
-        assert!(result.contains("PMProject"));
+        let result = generate_typescript_definitions(&["Project", "Workflow"]).unwrap();
+        assert!(result.contains("Project"));
         assert!(result.contains("Workflow"));
     }
 
@@ -117,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_cleaned_output() {
-        let result = generate_typescript_definitions(&["PMProject"]).unwrap();
+        let result = generate_typescript_definitions(&["Project"]).unwrap();
         assert!(!result.contains("import type"));
         assert!(!result.contains("This file was generated"));
     }
