@@ -9,6 +9,9 @@ use std::sync::Arc;
 mod validator;
 use validator::TypeValidator;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone)]
 pub struct StructuredJsonAgentConfig {
     pub type_names: Vec<String>,
@@ -18,9 +21,11 @@ pub struct StructuredJsonAgentConfig {
 pub struct StructuredJsonAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
+    #[allow(dead_code)]
     tool_executor: Arc<ToolExecutor>,
     validator: TypeValidator,
     system_prompt: String,
+    #[allow(dead_code)]
     config: StructuredJsonAgentConfig,
 }
 
@@ -235,7 +240,7 @@ impl Agent for StructuredJsonAgent {
     }
 }
 
-fn extract_text_from_content(content: &[ContentBlock]) -> String {
+pub(crate) fn extract_text_from_content(content: &[ContentBlock]) -> String {
     content
         .iter()
         .filter_map(|block| match block {
@@ -244,42 +249,4 @@ fn extract_text_from_content(content: &[ContentBlock]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_generate_system_prompt() {
-        let type_defs = "interface Test { id: number; }";
-        let domain = "Test domain";
-        let prompt = StructuredJsonAgent::generate_system_prompt(type_defs, domain);
-
-        assert!(prompt.contains("structured JSON"));
-        assert!(prompt.contains("Test domain"));
-        assert!(prompt.contains("Test { id: number; }"));
-    }
-
-    #[test]
-    fn test_extract_text_from_content() {
-        let content = vec![
-            ContentBlock::Text {
-                text: "Hello".to_string(),
-            },
-            ContentBlock::Text {
-                text: "World".to_string(),
-            },
-        ];
-
-        let text = extract_text_from_content(&content);
-        assert_eq!(text, "Hello\nWorld");
-    }
-
-    #[test]
-    fn test_extract_text_from_content_empty() {
-        let content: Vec<ContentBlock> = vec![];
-        let text = extract_text_from_content(&content);
-        assert_eq!(text, "");
-    }
 }

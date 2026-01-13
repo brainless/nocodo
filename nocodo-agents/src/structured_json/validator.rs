@@ -25,14 +25,6 @@ impl TypeValidator {
         })
     }
 
-    pub fn type_names(&self) -> &[String] {
-        &self.type_names
-    }
-
-    pub fn type_definitions(&self) -> &[String] {
-        &self.type_definitions
-    }
-
     pub fn get_type_definitions(&self) -> String {
         self.type_definitions.join("\n\n")
     }
@@ -46,7 +38,6 @@ impl TypeValidator {
             Ok(value) => Ok(value),
             Err(e) => Err(ValidationError {
                 message: format!("Invalid JSON syntax: {}", e),
-                expected_types: self.type_names.clone(),
             }),
         }
     }
@@ -65,10 +56,10 @@ impl TypeValidator {
                 "JSON structure does not match any of the expected types: {}",
                 self.get_expected_types_summary()
             ),
-            expected_types: self.type_names.clone(),
         })
     }
 
+    #[allow(dead_code)]
     fn extract_type_name(type_def: &str) -> String {
         type_def
             .lines()
@@ -131,6 +122,7 @@ impl TypeValidator {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TypeField {
     name: String,
     optional: bool,
@@ -140,7 +132,6 @@ struct TypeField {
 #[derive(Debug)]
 pub struct ValidationError {
     pub message: String,
-    pub expected_types: Vec<String>,
 }
 
 impl std::fmt::Display for ValidationError {
@@ -196,7 +187,7 @@ mod tests {
         ];
 
         let validator = TypeValidator::new(type_names.clone(), type_definitions).unwrap();
-        assert_eq!(validator.type_names(), &type_names);
+        assert_eq!(validator.get_expected_types_summary(), "PMProject, Workflow");
     }
 
     #[test]

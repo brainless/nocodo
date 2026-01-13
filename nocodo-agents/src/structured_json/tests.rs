@@ -225,3 +225,36 @@ async fn test_agent_no_tools() {
     let tools = agent.tools();
     assert!(tools.is_empty());
 }
+
+#[test]
+fn test_generate_system_prompt() {
+    let type_defs = "interface Test { id: number; }";
+    let domain = "Test domain";
+    let prompt = StructuredJsonAgent::generate_system_prompt(type_defs, domain);
+
+    assert!(prompt.contains("structured JSON"));
+    assert!(prompt.contains("Test domain"));
+    assert!(prompt.contains("Test { id: number; }"));
+}
+
+#[test]
+fn test_extract_text_from_content() {
+    let content = vec![
+        ContentBlock::Text {
+            text: "Hello".to_string(),
+        },
+        ContentBlock::Text {
+            text: "World".to_string(),
+        },
+    ];
+
+    let text = super::extract_text_from_content(&content);
+    assert_eq!(text, "Hello\nWorld");
+}
+
+#[test]
+fn test_extract_text_from_content_empty() {
+    let content: Vec<ContentBlock> = vec![];
+    let text = super::extract_text_from_content(&content);
+    assert_eq!(text, "");
+}

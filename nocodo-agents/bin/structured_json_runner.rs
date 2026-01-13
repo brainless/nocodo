@@ -1,5 +1,5 @@
 use clap::Parser;
-use nocodo_agents::factory::{AgentFactory, AgentType};
+use nocodo_agents::factory::AgentFactory;
 use nocodo_agents::structured_json::StructuredJsonAgentConfig;
 use nocodo_agents::Agent;
 use nocodo_llm_sdk::claude::ClaudeClient;

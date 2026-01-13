@@ -28,6 +28,7 @@ fn export_type(name: &str) -> Result<String, Box<dyn std::error::Error>> {
         "SqliteAgentConfig" => SqliteAgentConfig::export_to_string()?,
         "CodebaseAnalysisAgentConfig" => CodebaseAnalysisAgentConfig::export_to_string()?,
         "TesseractAgentConfig" => TesseractAgentConfig::export_to_string()?,
+        "StructuredJsonAgentConfig" => StructuredJsonAgentConfig::export_to_string()?,
         "AgentExecutionRequest" => AgentExecutionRequest::export_to_string()?,
         "AgentsResponse" => AgentsResponse::export_to_string()?,
 
