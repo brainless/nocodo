@@ -50,8 +50,6 @@ fn export_type(name: &str) -> Result<String, Box<dyn std::error::Error>> {
         "SaveWorkflowRequest" => SaveWorkflowRequest::export_to_string()?,
         "WorkflowStepData" => WorkflowStepData::export_to_string()?,
 
-        "ErrorResponse" => ErrorResponse::export_to_string()?,
-
         "ApiKeyConfig" => ApiKeyConfig::export_to_string()?,
         "SettingsResponse" => SettingsResponse::export_to_string()?,
         "UpdateApiKeysRequest" => UpdateApiKeysRequest::export_to_string()?,

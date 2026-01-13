@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(SqliteAgentConfig::export_to_string()?));
     types.push(clean_type(CodebaseAnalysisAgentConfig::export_to_string()?));
     types.push(clean_type(TesseractAgentConfig::export_to_string()?));
+    types.push(clean_type(StructuredJsonAgentConfig::export_to_string()?));
     types.push(clean_type(AgentConfig::export_to_string()?));
     types.push(clean_type(AgentExecutionRequest::export_to_string()?));
     types.push(clean_type(AgentsResponse::export_to_string()?));
@@ -20,7 +21,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(SessionResponse::export_to_string()?));
     types.push(clean_type(SessionListItem::export_to_string()?));
     types.push(clean_type(SessionListResponse::export_to_string()?));
-    types.push(clean_type(ErrorResponse::export_to_string()?));
     types.push(clean_type(ApiKeyConfig::export_to_string()?));
     types.push(clean_type(SettingsResponse::export_to_string()?));
     types.push(clean_type(UpdateApiKeysRequest::export_to_string()?));
