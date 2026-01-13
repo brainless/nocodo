@@ -2,6 +2,7 @@ pub mod codebase_analysis;
 pub mod database;
 pub mod factory;
 pub mod sqlite_analysis;
+pub mod structured_json;
 pub mod tesseract;
 pub mod tools;
 

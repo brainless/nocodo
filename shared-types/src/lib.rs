@@ -12,7 +12,7 @@ pub use typescript_gen::generate_typescript_definitions;
 
 pub use agent::{
     AgentConfig, AgentExecutionRequest, AgentInfo, AgentsResponse, CodebaseAnalysisAgentConfig,
-    SqliteAgentConfig, TesseractAgentConfig,
+    SqliteAgentConfig, StructuredJsonAgentConfig, TesseractAgentConfig,
 };
 pub use auth::{
     AddAuthorizedSshKeyRequest, AddAuthorizedSshKeyResponse, CreateUserRequest,

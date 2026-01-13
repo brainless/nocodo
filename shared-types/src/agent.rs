@@ -33,6 +33,14 @@ pub struct TesseractAgentConfig {
     pub image_path: String,
 }
 
+/// Configuration for Structured JSON agent
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct StructuredJsonAgentConfig {
+    pub type_names: Vec<String>,
+    pub domain_description: String,
+}
+
 /// Variant-specific agent configurations
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -44,6 +52,8 @@ pub enum AgentConfig {
     CodebaseAnalysis(CodebaseAnalysisAgentConfig),
     #[serde(rename = "tesseract")]
     Tesseract(TesseractAgentConfig),
+    #[serde(rename = "structured-json")]
+    StructuredJson(StructuredJsonAgentConfig),
 }
 
 /// Generic agent execution request with type-safe config

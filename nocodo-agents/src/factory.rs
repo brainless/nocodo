@@ -1,6 +1,7 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::database::Database;
 use crate::sqlite_analysis::SqliteAnalysisAgent;
+use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
 use crate::Agent;
 use manager_tools::ToolExecutor;
@@ -14,6 +15,8 @@ pub enum AgentType {
     CodebaseAnalysis,
     /// Agent for extracting text from images using Tesseract OCR
     Tesseract,
+    /// Agent for generating structured JSON conforming to TypeScript types
+    StructuredJson,
 }
 
 /// Factory for creating AI agents with shared dependencies
@@ -61,6 +64,33 @@ impl AgentFactory {
         base_path: std::path::PathBuf,
     ) -> anyhow::Result<TesseractAgent> {
         TesseractAgent::new(self.llm_client.clone(), self.database.clone(), base_path)
+    }
+
+    /// Create a StructuredJsonAgent for generating type-safe JSON
+    ///
+    /// # Arguments
+    /// * `type_names` - List of TypeScript type names to include in the prompt
+    /// * `domain_description` - Description of the domain for the agent
+    ///
+    /// # Examples
+    /// ```rust
+    /// let factory = AgentFactory::new(/* config */)?;
+    /// let config = nocodo_agents::structured_json::StructuredJsonAgentConfig {
+    ///     type_names: vec!["PMProject".to_string(), "Workflow".to_string()],
+    ///     domain_description: "Project management".to_string(),
+    /// };
+    /// let agent = factory.create_structured_json_agent(config)?;
+    /// ```
+    pub fn create_structured_json_agent(
+        &self,
+        config: crate::structured_json::StructuredJsonAgentConfig,
+    ) -> anyhow::Result<StructuredJsonAgent> {
+        StructuredJsonAgent::new(
+            self.llm_client.clone(),
+            self.database.clone(),
+            self.tool_executor.clone(),
+            config,
+        )
     }
 }
 
@@ -128,6 +158,18 @@ pub fn create_agent_with_tools(
             // For Tesseract, we need a specific base path. Use current directory as default
             let base_path = std::env::current_dir().unwrap_or_default();
             Box::new(TesseractAgent::new(client, database, base_path).unwrap())
+        }
+        AgentType::StructuredJson => {
+            // For StructuredJson, use default types
+            let config = crate::structured_json::StructuredJsonAgentConfig {
+                type_names: vec![
+                    "PMProject".to_string(),
+                    "Workflow".to_string(),
+                    "WorkflowStep".to_string(),
+                ],
+                domain_description: "Structured data generation".to_string(),
+            };
+            Box::new(StructuredJsonAgent::new(client, database, tool_executor, config).unwrap())
         }
     }
 }

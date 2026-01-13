@@ -36,3 +36,7 @@ path = "bin/codebase_analysis_runner.rs"
 [[bin]]
 name = "sqlite-analysis-runner"
 path = "bin/sqlite_analysis_runner.rs"
+
+[[bin]]
+name = "structured-json-runner"
+path = "bin/structured_json_runner.rs"
