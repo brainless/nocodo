@@ -27,6 +27,14 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
                     .to_string(),
             enabled: true,
         },
+        AgentInfo {
+            id: "workflow-creation".to_string(),
+            name: "Workflow Creation Agent".to_string(),
+            description:
+                "Agent for generating workflow and workflow step structures from natural language descriptions"
+                    .to_string(),
+            enabled: true,
+        },
     ]
 }
 
@@ -82,6 +90,44 @@ pub async fn create_tesseract_agent(
         llm_client.clone(),
         database.clone(),
         std::path::PathBuf::from(image_path),
+    )?;
+
+    Ok(agent)
+}
+
+/// Creates a Structured JSON agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+/// * `type_names` - List of TypeScript type names to use for validation
+/// * `domain_description` - Description of the domain context
+///
+/// # Returns
+///
+/// A Structured JSON agent instance
+pub fn create_structured_json_agent(
+    llm_client: &Arc<dyn LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+    type_names: Vec<String>,
+    domain_description: String,
+) -> anyhow::Result<nocodo_agents::structured_json::StructuredJsonAgent> {
+    let tool_executor = Arc::new(
+        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+            .with_max_file_size(10 * 1024 * 1024),
+    );
+
+    let config = nocodo_agents::structured_json::StructuredJsonAgentConfig {
+        type_names,
+        domain_description,
+    };
+
+    let agent = nocodo_agents::structured_json::StructuredJsonAgent::new(
+        llm_client.clone(),
+        database.clone(),
+        tool_executor,
+        config,
     )?;
 
     Ok(agent)

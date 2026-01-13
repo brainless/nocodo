@@ -1,3 +1,5 @@
+pub mod workflow_creation_agent;
+
 use crate::helpers::agents::{create_sqlite_agent, create_tesseract_agent};
 use crate::models::ErrorResponse;
 use actix_web::{post, web, HttpResponse, Responder};
@@ -62,14 +64,16 @@ pub async fn execute_sqlite_agent(
     let user_prompt_clone = user_prompt.clone();
 
     tokio::spawn(async move {
-        let agent = match create_sqlite_agent(&llm_client_clone, &database_clone, &db_path_clone).await {
-            Ok(agent) => agent,
-            Err(e) => {
-                error!(error = %e, session_id = session_id, "Failed to create SQLite agent");
-                let _ = database_clone.fail_session(session_id, &format!("Failed to create agent: {}", e));
-                return;
-            }
-        };
+        let agent =
+            match create_sqlite_agent(&llm_client_clone, &database_clone, &db_path_clone).await {
+                Ok(agent) => agent,
+                Err(e) => {
+                    error!(error = %e, session_id = session_id, "Failed to create SQLite agent");
+                    let _ = database_clone
+                        .fail_session(session_id, &format!("Failed to create agent: {}", e));
+                    return;
+                }
+            };
 
         match agent.execute(&user_prompt_clone, session_id).await {
             Ok(result) => {
@@ -80,7 +84,8 @@ pub async fn execute_sqlite_agent(
             }
             Err(e) => {
                 error!(error = %e, session_id = session_id, "Agent execution failed");
-                let _ = database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
+                let _ =
+                    database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
             }
         }
     });
@@ -154,11 +159,8 @@ pub async fn execute_codebase_analysis_agent(
                 .with_max_file_size(10 * 1024 * 1024),
         );
 
-        let agent = CodebaseAnalysisAgent::new(
-            llm_client_clone,
-            database_clone.clone(),
-            tool_executor,
-        );
+        let agent =
+            CodebaseAnalysisAgent::new(llm_client_clone, database_clone.clone(), tool_executor);
 
         match agent.execute(&user_prompt_clone, session_id).await {
             Ok(result) => {
@@ -169,7 +171,8 @@ pub async fn execute_codebase_analysis_agent(
             }
             Err(e) => {
                 error!(error = %e, session_id = session_id, "Agent execution failed");
-                let _ = database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
+                let _ =
+                    database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
             }
         }
     });
@@ -236,14 +239,18 @@ pub async fn execute_tesseract_agent(
     let user_prompt_clone = user_prompt.clone();
 
     tokio::spawn(async move {
-        let agent = match create_tesseract_agent(&llm_client_clone, &database_clone, &image_path_clone).await {
-            Ok(agent) => agent,
-            Err(e) => {
-                error!(error = %e, session_id = session_id, "Failed to create Tesseract agent");
-                let _ = database_clone.fail_session(session_id, &format!("Failed to create agent: {}", e));
-                return;
-            }
-        };
+        let agent =
+            match create_tesseract_agent(&llm_client_clone, &database_clone, &image_path_clone)
+                .await
+            {
+                Ok(agent) => agent,
+                Err(e) => {
+                    error!(error = %e, session_id = session_id, "Failed to create Tesseract agent");
+                    let _ = database_clone
+                        .fail_session(session_id, &format!("Failed to create agent: {}", e));
+                    return;
+                }
+            };
 
         match agent.execute(&user_prompt_clone, session_id).await {
             Ok(result) => {
@@ -254,7 +261,8 @@ pub async fn execute_tesseract_agent(
             }
             Err(e) => {
                 error!(error = %e, session_id = session_id, "Agent execution failed");
-                let _ = database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
+                let _ =
+                    database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
             }
         }
     });
