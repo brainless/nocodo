@@ -6,6 +6,9 @@ pub mod agent;
 pub mod auth;
 pub mod project_management;
 pub mod session;
+pub mod typescript_gen;
+
+pub use typescript_gen::generate_typescript_definitions;
 
 pub use agent::{
     AgentConfig, AgentExecutionRequest, AgentInfo, AgentsResponse, CodebaseAnalysisAgentConfig,
