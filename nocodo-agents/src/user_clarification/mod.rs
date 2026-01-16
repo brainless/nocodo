@@ -26,30 +26,30 @@ impl UserClarificationAgent {
     }
 
     fn generate_system_prompt() -> String {
-        String::from(
+        let type_defs = shared_types::generate_typescript_definitions(&[
+            "AskUserRequest",
+            "UserQuestion",
+            "QuestionType",
+        ])
+        .unwrap_or_else(|_| "// Failed to generate type definitions".to_string());
+
+        format!(
             r#"You are a JSON API that analyzes if user requests need clarification.
 
-Your entire output MUST be a valid JSON object with this field:
-- "questions": An array of question objects (empty array if no clarification needed)
+Your entire output MUST be a valid JSON object matching this TypeScript type:
 
-Each question must have:
-- "id": "q1", "q2", etc.
-- "question": The clarifying question
-- "type": "text"
+<TYPE_DEFINITIONS>
+{type_defs}
+</TYPE_DEFINITIONS>
 
-Examples:
-
-Input: Build me a website
-Output: {"questions": [{"id": "q1", "question": "What is the website's purpose?", "type": "text"}]}
-
-Input: Add 2 plus 2
-Output: {"questions": []}
-
-Return ONLY the JSON object. No markdown, no code blocks."#,
+Return ONLY the JSON object. No markdown, no code blocks, no explanation text."#
         )
     }
 
     async fn call_llm(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
+        let system_prompt = Self::generate_system_prompt();
+        tracing::info!("System prompt:\n{}", system_prompt);
+
         let messages = vec![Message {
             role: Role::User,
             content: vec![ContentBlock::Text {
@@ -64,13 +64,13 @@ Return ONLY the JSON object. No markdown, no code blocks."#,
             messages,
             max_tokens: 2000,
             model: self.client.model_name().to_string(),
-            system: Some(Self::generate_system_prompt()),
+            system: Some(system_prompt),
             temperature: Some(0.3),
             top_p: None,
             stop_sequences: None,
             tools: None,
             tool_choice: None,
-            response_format: Some(nocodo_llm_sdk::types::ResponseFormat::JsonObject),
+            response_format: None,
         };
 
         let response = self.client.complete(request).await?;
@@ -82,86 +82,113 @@ Return ONLY the JSON object. No markdown, no code blocks."#,
         Ok(text)
     }
 
-    fn parse_response(&self, response: &str) -> anyhow::Result<AskUserRequest> {
-        let json_str = self.extract_json(response)?;
+    async fn validate_and_retry(
+        &self,
+        user_prompt: &str,
+        session_id: i64,
+        max_retries: u32,
+    ) -> anyhow::Result<AskUserRequest> {
+        let mut attempt = 0;
+        let mut conversation_context = vec![];
 
-        let parsed: AskUserRequest = serde_json::from_str(&json_str).map_err(|e| {
-            anyhow::anyhow!("Failed to parse LLM response as AskUserRequest: {}", e)
-        })?;
+        loop {
+            attempt += 1;
+            if attempt > max_retries {
+                return Err(anyhow::anyhow!(
+                    "Failed to get valid AskUserRequest after {} attempts",
+                    max_retries
+                ));
+            }
 
-        for question in &parsed.questions {
-            match question.response_type {
-                QuestionType::Text => {}
+            let messages = self.build_messages(user_prompt, &conversation_context, session_id)?;
+
+            let request = CompletionRequest {
+                messages,
+                max_tokens: 2000,
+                model: self.client.model_name().to_string(),
+                system: Some(Self::generate_system_prompt()),
+                temperature: Some(0.3),
+                top_p: None,
+                stop_sequences: None,
+                tools: None,
+                tool_choice: None,
+                response_format: Some(nocodo_llm_sdk::types::ResponseFormat::JsonObject),
+            };
+
+            let response = self.client.complete(request).await?;
+            let text = extract_text_from_content(&response.content);
+
+            self.database
+                .create_message(session_id, "assistant", &text)?;
+
+            match self.parse_response(&text) {
+                Ok(ask_user_request) => {
+                    return Ok(ask_user_request);
+                }
+                Err(parse_error) => {
+                    tracing::warn!(
+                        attempt,
+                        error = %parse_error,
+                        "JSON parsing failed, retrying"
+                    );
+
+                    conversation_context.push((Role::Assistant, text.clone()));
+
+                    let error_msg = format!(
+                        "Your response was not valid JSON matching the AskUserRequest type. Error: {}\n\nPlease provide valid JSON matching this structure:\n{{\"questions\": [{{\"id\": \"q1\", \"question\": \"question text\", \"type\": \"text\"}}]}}",
+                        parse_error
+                    );
+
+                    conversation_context.push((Role::User, error_msg.clone()));
+                    self.database
+                        .create_message(session_id, "user", &error_msg)?;
+                }
             }
         }
+    }
+
+    fn build_messages(
+        &self,
+        user_prompt: &str,
+        conversation_context: &[(Role, String)],
+        _session_id: i64,
+    ) -> anyhow::Result<Vec<Message>> {
+        let mut messages = Vec::new();
+
+        for (role, content) in conversation_context {
+            messages.push(Message {
+                role: role.clone(),
+                content: vec![ContentBlock::Text {
+                    text: content.clone(),
+                }],
+            });
+        }
+
+        messages.push(Message {
+            role: Role::User,
+            content: vec![ContentBlock::Text {
+                text: format!(
+                    "Analyze this user request and determine if clarification is needed:\n\n{}",
+                    user_prompt
+                ),
+            }],
+        });
+
+        Ok(messages)
+    }
+
+    fn parse_response(&self, response: &str) -> anyhow::Result<AskUserRequest> {
+        tracing::debug!("Parsing response: {}", response);
+
+        let parsed: AskUserRequest = serde_json::from_str(response).map_err(|e| {
+            anyhow::anyhow!("Failed to parse LLM response as AskUserRequest: {}", e)
+        })?;
 
         parsed
             .validate()
             .map_err(|e| anyhow::anyhow!("Invalid AskUserRequest: {}", e))?;
 
         Ok(parsed)
-    }
-
-    fn extract_json(&self, response: &str) -> anyhow::Result<String> {
-        let trimmed = response.trim();
-
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
-            return self.convert_to_ask_user(v);
-        }
-
-        let markdown_json_pattern = r#"```(?:json)?\s*([\s\S]*?)\s*```"#;
-        if let Some(caps) = regex::Regex::new(markdown_json_pattern)
-            .unwrap()
-            .captures(trimmed)
-        {
-            if let Some(json_match) = caps.get(1) {
-                let json_candidate = json_match.as_str().trim();
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(json_candidate) {
-                    return self.convert_to_ask_user(v);
-                }
-            }
-        }
-
-        let brace_patterns = [r#"\{[\s\S]*\}"#, r#"\{[\s\S]*"questions"[\s\S]*\}"#];
-
-        for pattern in brace_patterns {
-            if let Some(caps) = regex::Regex::new(pattern).unwrap().captures(trimmed) {
-                let json_candidate = caps.get(0).unwrap().as_str();
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(json_candidate) {
-                    return self.convert_to_ask_user(v);
-                }
-            }
-        }
-
-        Err(anyhow::anyhow!(
-            "Could not extract valid JSON from response"
-        ))
-    }
-
-    fn convert_to_ask_user(&self, value: serde_json::Value) -> anyhow::Result<String> {
-        // Handle case where LLM returns {"answer": "..."} format
-        if let Some(answer) = value.get("answer") {
-            let answer_text = answer.as_str().unwrap_or("");
-            let questions = vec![serde_json::json!({
-                "id": "q1",
-                "question": answer_text,
-                "type": "text"
-            })];
-
-            let result = serde_json::json!({
-                "questions": questions
-            });
-
-            return Ok(serde_json::to_string(&result)?);
-        }
-
-        // If it has "questions" field, pass through; otherwise wrap it
-        if value.get("questions").is_some() {
-            Ok(serde_json::to_string(&value)?)
-        } else {
-            // Unexpected format, wrap empty
-            Ok(r#"{"questions":[]}"#.to_string())
-        }
     }
 }
 
@@ -183,8 +210,7 @@ impl Agent for UserClarificationAgent {
         self.database
             .create_message(session_id, "user", user_prompt)?;
 
-        let response = self.call_llm(user_prompt, session_id).await?;
-        let ask_user_request = self.parse_response(&response)?;
+        let ask_user_request = self.validate_and_retry(user_prompt, session_id, 3).await?;
 
         let result = serde_json::to_string_pretty(&ask_user_request)?;
         self.database.complete_session(session_id, &result)?;
