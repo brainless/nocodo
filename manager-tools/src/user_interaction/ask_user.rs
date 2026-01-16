@@ -30,12 +30,6 @@ pub async fn ask_user(request: AskUserRequest) -> Result<ToolResponse> {
     let mut responses = Vec::new();
     let mut all_valid = true;
 
-    // Display the prompt
-    if !request.prompt.is_empty() {
-        println!("\n{}", request.prompt);
-        println!("{}", "=".repeat(request.prompt.len()));
-    }
-
     // Ask each question
     for question in &request.questions {
         let answer = prompt_question(question)?;
@@ -55,12 +49,11 @@ pub async fn ask_user(request: AskUserRequest) -> Result<ToolResponse> {
     }
 
     let response_time = start_time.elapsed().as_secs_f64();
-    let completed = request.required.unwrap_or(true) && all_valid;
 
     Ok(ToolResponse::AskUser(AskUserResponse {
-        completed,
+        completed: all_valid,
         responses,
-        message: if completed {
+        message: if all_valid {
             "All questions answered successfully".to_string()
         } else {
             "Some questions have invalid responses".to_string()
@@ -147,8 +140,7 @@ fn validate_response(question: &UserQuestion, response: &str) -> Result<(), Stri
                         ));
                     }
                 }
-            }
-            // TODO: Enable other types when needed
+            } // TODO: Enable other types when needed
         }
 
         // Pattern validation
@@ -174,7 +166,6 @@ mod tests {
     fn test_ask_user_request_validation() {
         // Valid request with questions
         let valid_request = AskUserRequest {
-            prompt: "Test prompt".to_string(),
             questions: vec![UserQuestion {
                 id: "q1".to_string(),
                 question: "What is your name?".to_string(),
@@ -184,23 +175,15 @@ mod tests {
                 description: None,
                 validation: None,
             }],
-            required: Some(true),
-            timeout_secs: None,
         };
         assert!(valid_request.validate().is_ok());
 
         // Empty questions is valid - means no clarifications needed
-        let empty_request = AskUserRequest {
-            prompt: "Test prompt".to_string(),
-            questions: vec![],
-            required: Some(true),
-            timeout_secs: None,
-        };
+        let empty_request = AskUserRequest { questions: vec![] };
         assert!(empty_request.validate().is_ok());
 
         // Duplicate question IDs
         let duplicate_request = AskUserRequest {
-            prompt: "Test prompt".to_string(),
             questions: vec![
                 UserQuestion {
                     id: "q1".to_string(),
@@ -221,8 +204,6 @@ mod tests {
                     validation: None,
                 },
             ],
-            required: Some(true),
-            timeout_secs: None,
         };
         assert!(duplicate_request.validate().is_err());
     }

@@ -3,6 +3,7 @@ use crate::database::Database;
 use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
+use crate::user_clarification::UserClarificationAgent;
 use crate::Agent;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
@@ -17,6 +18,8 @@ pub enum AgentType {
     Tesseract,
     /// Agent for generating structured JSON conforming to TypeScript types
     StructuredJson,
+    /// Agent for analyzing user requests and determining if clarification is needed
+    UserClarification,
 }
 
 /// Factory for creating AI agents with shared dependencies
@@ -91,6 +94,14 @@ impl AgentFactory {
             self.tool_executor.clone(),
             config,
         )
+    }
+
+    /// Create a UserClarificationAgent for analyzing user requests
+    ///
+    /// This agent determines if a user's request needs clarification
+    /// before proceeding with the task.
+    pub fn create_user_clarification_agent(&self) -> UserClarificationAgent {
+        UserClarificationAgent::new(self.llm_client.clone(), self.database.clone())
     }
 }
 
@@ -171,6 +182,7 @@ pub fn create_agent_with_tools(
             };
             Box::new(StructuredJsonAgent::new(client, database, tool_executor, config).unwrap())
         }
+        AgentType::UserClarification => Box::new(UserClarificationAgent::new(client, database)),
     }
 }
 
@@ -236,6 +248,25 @@ pub fn create_tesseract_agent(
 ) -> anyhow::Result<(TesseractAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
     let agent = TesseractAgent::new(client, database.clone(), base_path)?;
+    Ok((agent, database))
+}
+
+/// Create a UserClarificationAgent with tool executor support
+///
+/// Uses an in-memory database by default for session persistence
+///
+/// # Arguments
+///
+/// * `client` - The LLM client to use for the agent
+///
+/// # Returns
+///
+/// A UserClarificationAgent instance and its database
+pub fn create_user_clarification_agent(
+    client: Arc<dyn LlmClient>,
+) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
+    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+    let agent = UserClarificationAgent::new(client, database.clone());
     Ok((agent, database))
 }
 

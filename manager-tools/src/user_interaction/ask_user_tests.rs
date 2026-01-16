@@ -6,7 +6,6 @@ mod tests {
     async fn test_ask_user_validation() {
         // Test valid request with Text questions only
         let valid_request = AskUserRequest {
-            prompt: "Please answer the following questions:".to_string(),
             questions: vec![
                 UserQuestion {
                     id: "name".to_string(),
@@ -27,8 +26,6 @@ mod tests {
                     validation: None,
                 },
             ],
-            required: Some(true),
-            timeout_secs: Some(300),
         };
 
         assert!(valid_request.validate().is_ok());
@@ -37,12 +34,7 @@ mod tests {
     #[tokio::test]
     async fn test_ask_user_empty_questions_is_valid() {
         // Empty questions is valid - means no clarifications needed
-        let empty_questions = AskUserRequest {
-            prompt: "Test".to_string(),
-            questions: vec![],
-            required: Some(true),
-            timeout_secs: None,
-        };
+        let empty_questions = AskUserRequest { questions: vec![] };
         assert!(empty_questions.validate().is_ok());
     }
 
@@ -50,7 +42,6 @@ mod tests {
     async fn test_ask_user_invalid_requests() {
         // Duplicate question IDs
         let duplicate_ids = AskUserRequest {
-            prompt: "Test".to_string(),
             questions: vec![
                 UserQuestion {
                     id: "duplicate".to_string(),
@@ -71,8 +62,6 @@ mod tests {
                     validation: None,
                 },
             ],
-            required: Some(true),
-            timeout_secs: None,
         };
         assert!(duplicate_ids.validate().is_err());
     }

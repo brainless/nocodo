@@ -29,9 +29,8 @@ impl UserClarificationAgent {
         String::from(
             r#"You are a JSON API that analyzes if user requests need clarification.
 
-Your entire output MUST be a valid JSON object with these two fields:
-1. "prompt": A brief summary of what you understood
-2. "questions": An array of question objects (empty if no clarification needed)
+Your entire output MUST be a valid JSON object with this field:
+- "questions": An array of question objects (empty array if no clarification needed)
 
 Each question must have:
 - "id": "q1", "q2", etc.
@@ -41,10 +40,10 @@ Each question must have:
 Examples:
 
 Input: Build me a website
-Output: {"prompt": "You want to build a website", "questions": [{"id": "q1", "question": "What is the website's purpose?", "type": "text"}]}
+Output: {"questions": [{"id": "q1", "question": "What is the website's purpose?", "type": "text"}]}
 
 Input: Add 2 plus 2
-Output: {"prompt": "You want to add 2 and 2", "questions": []}
+Output: {"questions": []}
 
 Return ONLY the JSON object. No markdown, no code blocks."#,
         )
@@ -140,9 +139,9 @@ Return ONLY the JSON object. No markdown, no code blocks."#,
     }
 
     fn convert_to_ask_user(&self, value: serde_json::Value) -> anyhow::Result<String> {
+        // Handle case where LLM returns {"answer": "..."} format
         if let Some(answer) = value.get("answer") {
             let answer_text = answer.as_str().unwrap_or("");
-            let prompt = "I need clarification to proceed";
             let questions = vec![serde_json::json!({
                 "id": "q1",
                 "question": answer_text,
@@ -150,14 +149,19 @@ Return ONLY the JSON object. No markdown, no code blocks."#,
             })];
 
             let result = serde_json::json!({
-                "prompt": prompt,
                 "questions": questions
             });
 
             return Ok(serde_json::to_string(&result)?);
         }
 
-        Ok(serde_json::to_string(&value)?)
+        // If it has "questions" field, pass through; otherwise wrap it
+        if value.get("questions").is_some() {
+            Ok(serde_json::to_string(&value)?)
+        } else {
+            // Unexpected format, wrap empty
+            Ok(r#"{"questions":[]}"#.to_string())
+        }
     }
 }
 

@@ -53,7 +53,6 @@ fn setup_test_agent(
 async fn test_user_clarification_agent_returns_questions_when_needed() {
     // Mock LLM response with clarifying questions
     let mock_response = r#"{
-        "prompt": "You want to build a website. I need some clarification.",
         "questions": [
             {
                 "id": "q1",
@@ -90,10 +89,6 @@ async fn test_user_clarification_agent_returns_questions_when_needed() {
     // Parse the result to verify it's valid AskUserRequest
     let parsed: AskUserRequest = serde_json::from_str(&result).unwrap();
 
-    assert_eq!(
-        parsed.prompt,
-        "You want to build a website. I need some clarification."
-    );
     assert_eq!(parsed.questions.len(), 2);
     assert_eq!(parsed.questions[0].id, "q1");
     assert_eq!(

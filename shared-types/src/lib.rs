@@ -21,8 +21,7 @@ pub use session::{
     SessionToolCall,
 };
 pub use user_interaction::{
-    AskUserRequest, AskUserResponse, QuestionType, QuestionValidation, UserQuestion,
-    UserQuestionResponse,
+    AskUserRequest, AskUserResponse, QuestionType, UserQuestion, UserQuestionResponse,
 };
 
 // Shared models for nocodo API and desktop-app

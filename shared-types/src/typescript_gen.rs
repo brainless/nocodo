@@ -55,7 +55,6 @@ fn export_type(name: &str) -> Result<String, Box<dyn std::error::Error>> {
         "UserQuestion" => UserQuestion::export_to_string()?,
         "UserQuestionResponse" => UserQuestionResponse::export_to_string()?,
         "QuestionType" => QuestionType::export_to_string()?,
-        "QuestionValidation" => QuestionValidation::export_to_string()?,
 
         _ => {
             return Err(format!(
@@ -136,7 +135,9 @@ mod tests {
 
     #[test]
     fn test_workflow_all_types_definition() {
-        let result = generate_typescript_definitions(&["Workflow", "WorkflowStep", "WorkflowWithSteps"]).unwrap();
+        let result =
+            generate_typescript_definitions(&["Workflow", "WorkflowStep", "WorkflowWithSteps"])
+                .unwrap();
         println!("\n\n=== Complete Workflow TypeScript Definitions ===");
         println!("{}", result);
         println!("=== End ===\n\n");

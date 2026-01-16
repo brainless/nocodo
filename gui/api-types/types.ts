@@ -186,21 +186,9 @@ export type WorkflowStepData = {
  */
 export type AskUserRequest = {
   /**
-   * The main prompt or context for the questions
-   */
-  prompt: string;
-  /**
    * List of questions to ask the user
    */
   questions: Array<UserQuestion>;
-  /**
-   * Whether the user responses are required (true) or optional (false)
-   */
-  required: boolean | null;
-  /**
-   * Optional timeout in seconds for user response
-   */
-  timeout_secs: bigint | null;
 };
 
 /**
@@ -219,10 +207,6 @@ export type AskUserResponse = {
    * Any error or status message
    */
   message: string;
-  /**
-   * How long the user took to respond (in seconds)
-   */
-  response_time_secs: number | null;
 };
 
 /**
@@ -253,10 +237,6 @@ export type UserQuestion = {
    * Additional description or help text for the question
    */
   description: string | null;
-  /**
-   * Validation rules for the response
-   */
-  validation: QuestionValidation | null;
 };
 
 /**
@@ -271,44 +251,6 @@ export type UserQuestionResponse = {
    * The user's answer
    */
   answer: string;
-  /**
-   * Whether the response is valid according to validation rules
-   */
-  valid: boolean;
-  /**
-   * Validation error message if response is invalid
-   */
-  validation_error: string | null;
 };
 
 export type QuestionType = 'text';
-
-/**
- * Validation rules for question responses
- */
-export type QuestionValidation = {
-  /**
-   * Minimum length for text responses
-   */
-  min_length: number | null;
-  /**
-   * Maximum length for text responses
-   */
-  max_length: number | null;
-  /**
-   * Minimum value for numeric responses
-   */
-  min_value: number | null;
-  /**
-   * Maximum value for numeric responses
-   */
-  max_value: number | null;
-  /**
-   * Regular expression pattern for text validation
-   */
-  pattern: string | null;
-  /**
-   * Custom validation error message
-   */
-  error_message: string | null;
-};
