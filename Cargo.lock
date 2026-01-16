@@ -3326,6 +3326,7 @@ dependencies = [
  "home",
  "manager-tools",
  "nocodo-llm-sdk",
+ "regex",
  "rusqlite",
  "schemars 0.8.22",
  "serde",

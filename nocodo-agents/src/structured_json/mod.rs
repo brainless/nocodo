@@ -126,6 +126,7 @@ When responding:
                 stop_sequences: None,
                 tools: None,
                 tool_choice: None,
+                response_format: None,
             };
 
             let response = self.client.complete(request).await?;

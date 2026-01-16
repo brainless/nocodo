@@ -1,7 +1,7 @@
 use clap::Parser;
-use manager_tools::ToolExecutor;
-use nocodo_agents::{config, factory::create_sqlite_analysis_agent, Agent};
-use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
+use nocodo_agents::config;
+use nocodo_agents::user_clarification::create_user_clarification_agent;
+use nocodo_agents::Agent;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -9,17 +9,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// User prompt for the agent
-    #[arg(short, long)]
+    /// User prompt for the agent (default: "Build me a website")
+    #[arg(short, long, default_value = "Build me a website")]
     prompt: String,
 
     /// Path to config file containing API keys
     #[arg(short, long)]
     config: PathBuf,
-
-    /// Path to SQLite database to analyze
-    #[arg(long)]
-    db_path: String,
 }
 
 #[tokio::main]
@@ -38,23 +34,18 @@ async fn main() -> anyhow::Result<()> {
     let config = config::load_config(&args.config)?;
     let zai_config = config::get_zai_config(&config)?;
 
-    let client = ZaiGlmClient::with_coding_plan(zai_config.api_key, zai_config.coding_plan)?;
-    let client: Arc<dyn nocodo_llm_sdk::client::LlmClient> = Arc::new(client);
+    let client = Arc::new(nocodo_llm_sdk::glm::zai::ZaiGlmClient::with_coding_plan(
+        zai_config.api_key,
+        zai_config.coding_plan,
+    )?);
 
-    let tool_executor =
-        Arc::new(ToolExecutor::new(std::env::current_dir()?).with_max_file_size(10 * 1024 * 1024));
-
-    let (agent, database) =
-        create_sqlite_analysis_agent(client, tool_executor, args.db_path).await?;
-
-    tracing::info!("System prompt:\n{}", agent.system_prompt());
+    let (agent, database) = create_user_clarification_agent(client)?;
 
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 
-    // For standalone runner, create a dummy session
     let session_id = database.create_session(
-        "sqlite-analysis",
+        "user-clarification",
         "standalone",
         "standalone",
         Some(&agent.system_prompt()),

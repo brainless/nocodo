@@ -1,8 +1,9 @@
 use clap::Parser;
+use nocodo_agents::config;
 use nocodo_agents::factory::AgentFactory;
 use nocodo_agents::structured_json::StructuredJsonAgentConfig;
 use nocodo_agents::Agent;
-use nocodo_llm_sdk::claude::ClaudeClient;
+use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -36,17 +37,13 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config_path = PathBuf::from(&args.config);
-    let config_content = std::fs::read_to_string(&config_path)?;
+    let config = config::load_config(&config_path)?;
+    let zai_config = config::get_zai_config(&config)?;
 
-    let toml_config: toml::Value = toml::from_str(&config_content)?;
-
-    let api_key = toml_config
-        .get("anthropic")
-        .and_then(|v| v.get("api_key"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing anthropic.api_key in config file"))?;
-
-    let client = Arc::new(ClaudeClient::new(api_key)?);
+    let client = Arc::new(ZaiGlmClient::with_coding_plan(
+        zai_config.api_key,
+        zai_config.coding_plan,
+    )?);
 
     let db_path = config_path
         .parent()

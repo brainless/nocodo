@@ -258,6 +258,7 @@ impl Agent for TesseractAgent {
                 stop_sequences: None,
                 tools: Some(tools.clone()),
                 tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
             };
 
             // 6. Call LLM

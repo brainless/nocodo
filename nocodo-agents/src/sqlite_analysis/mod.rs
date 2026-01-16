@@ -216,6 +216,7 @@ impl Agent for SqliteAnalysisAgent {
                 stop_sequences: None,
                 tools: Some(tools.clone()),
                 tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
             };
 
             let response = self.client.complete(request).await?;
