@@ -5,6 +5,7 @@ pub mod agent;
 pub mod project_management;
 pub mod session;
 pub mod typescript_gen;
+pub mod user_interaction;
 
 pub use typescript_gen::generate_typescript_definitions;
 
@@ -18,6 +19,10 @@ pub use project_management::{
 pub use session::{
     AgentExecutionResponse, SessionListItem, SessionListResponse, SessionMessage, SessionResponse,
     SessionToolCall,
+};
+pub use user_interaction::{
+    AskUserRequest, AskUserResponse, QuestionType, QuestionValidation, UserQuestion,
+    UserQuestionResponse,
 };
 
 // Shared models for nocodo API and desktop-app

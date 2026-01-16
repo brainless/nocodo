@@ -31,6 +31,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(SaveWorkflowRequest::export_to_string()?));
     types.push(clean_type(WorkflowStepData::export_to_string()?));
 
+    // User interaction types
+    types.push(clean_type(AskUserRequest::export_to_string()?));
+    types.push(clean_type(AskUserResponse::export_to_string()?));
+    types.push(clean_type(UserQuestion::export_to_string()?));
+    types.push(clean_type(UserQuestionResponse::export_to_string()?));
+    types.push(clean_type(QuestionType::export_to_string()?));
+    types.push(clean_type(QuestionValidation::export_to_string()?));
+
     let output_dir = Path::new("../gui/api-types");
     fs::create_dir_all(output_dir)?;
 

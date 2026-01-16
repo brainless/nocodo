@@ -16,6 +16,16 @@ pub async fn ask_user(request: AskUserRequest) -> Result<ToolResponse> {
         }));
     }
 
+    // Handle empty questions - no clarifications needed
+    if request.questions.is_empty() {
+        return Ok(ToolResponse::AskUser(AskUserResponse {
+            completed: true,
+            responses: vec![],
+            message: "No clarifications needed".to_string(),
+            response_time_secs: Some(0.0),
+        }));
+    }
+
     let start_time = std::time::Instant::now();
     let mut responses = Vec::new();
     let mut all_valid = true;
@@ -74,36 +84,18 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
         prompt_parts.push(format!("  {}", description));
     }
 
-    // Add options for select/multiselect questions
-    if let Some(options) = &question.options {
-        match question.response_type {
-            QuestionType::Select => {
-                prompt_parts.push("  Options:".to_string());
-                for (i, option) in options.iter().enumerate() {
-                    prompt_parts.push(format!("    {}. {}", i + 1, option));
-                }
-            }
-            QuestionType::Multiselect => {
-                prompt_parts.push("  Options (select multiple, comma-separated):".to_string());
-                for (i, option) in options.iter().enumerate() {
-                    prompt_parts.push(format!("    {}. {}", i + 1, option));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Add response type indicator
+    // Add response type indicator - currently only Text is supported
     let response_indicator = match question.response_type {
         QuestionType::Text => " (text)",
-        QuestionType::Number => " (number)",
-        QuestionType::Boolean => " (yes/no)",
-        QuestionType::Select => " (enter number)",
-        QuestionType::Multiselect => " (enter numbers, comma-separated)",
-        QuestionType::Password => " (password - will be hidden)",
-        QuestionType::FilePath => " (file path)",
-        QuestionType::Email => " (email)",
-        QuestionType::Url => " (url)",
+        // TODO: Enable other types when needed
+        // QuestionType::Number => " (number)",
+        // QuestionType::Boolean => " (yes/no)",
+        // QuestionType::Select => " (enter number)",
+        // QuestionType::Multiselect => " (enter numbers, comma-separated)",
+        // QuestionType::Password => " (password - will be hidden)",
+        // QuestionType::FilePath => " (file path)",
+        // QuestionType::Email => " (email)",
+        // QuestionType::Url => " (url)",
     };
 
     // Combine all parts
@@ -120,17 +112,7 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
     print!("A{}{}: ", response_indicator, default_indicator);
     io::stdout().flush()?;
 
-    // Handle different input types
-    match question.response_type {
-        QuestionType::Password => {
-            // For password input, we'll just read normally since we can't easily hide input in this context
-            // In a real implementation, you might use a library like rpassword
-            input = read_password_input()?;
-        }
-        _ => {
-            io::stdin().read_line(&mut input)?;
-        }
-    }
+    io::stdin().read_line(&mut input)?;
 
     // Handle empty input with default
     let trimmed = input.trim();
@@ -140,56 +122,7 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
         trimmed.to_string()
     };
 
-    // Process select/multiselect responses
-    match question.response_type {
-        QuestionType::Select => {
-            if let Some(options) = &question.options {
-                if let Ok(index) = response.parse::<usize>() {
-                    if index >= 1 && index <= options.len() {
-                        return Ok(options[index - 1].clone());
-                    }
-                }
-                return Err(anyhow::anyhow!(
-                    "Invalid selection. Please enter a number between 1 and {}",
-                    options.len()
-                ));
-            }
-        }
-        QuestionType::Multiselect => {
-            if let Some(options) = &question.options {
-                let mut selected = Vec::new();
-                for part in response.split(',') {
-                    if let Ok(index) = part.trim().parse::<usize>() {
-                        if index >= 1 && index <= options.len() {
-                            selected.push(options[index - 1].clone());
-                        }
-                    }
-                }
-                if selected.is_empty() {
-                    return Err(anyhow::anyhow!("No valid selections made"));
-                }
-                return Ok(selected.join(", "));
-            }
-        }
-        QuestionType::Boolean => {
-            let response_lower = response.to_lowercase();
-            match response_lower.as_str() {
-                "y" | "yes" | "true" | "1" => return Ok("true".to_string()),
-                "n" | "no" | "false" | "0" => return Ok("false".to_string()),
-                _ => return Err(anyhow::anyhow!("Please answer 'yes' or 'no'")),
-            }
-        }
-        _ => {}
-    }
-
     Ok(response)
-}
-
-/// Read password input (simplified version - in reality you'd want to hide the input)
-fn read_password_input() -> Result<String> {
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(input.trim().to_string())
 }
 
 /// Validate a response against the question's validation rules
@@ -197,10 +130,7 @@ fn validate_response(question: &UserQuestion, response: &str) -> Result<(), Stri
     if let Some(validation) = &question.validation {
         // Length validation for text responses
         match question.response_type {
-            QuestionType::Text
-            | QuestionType::Email
-            | QuestionType::Url
-            | QuestionType::FilePath => {
+            QuestionType::Text => {
                 if let Some(min_length) = validation.min_length {
                     if response.len() < min_length {
                         return Err(format!(
@@ -218,23 +148,7 @@ fn validate_response(question: &UserQuestion, response: &str) -> Result<(), Stri
                     }
                 }
             }
-            QuestionType::Number => {
-                if let Ok(num) = response.parse::<f64>() {
-                    if let Some(min_value) = validation.min_value {
-                        if num < min_value {
-                            return Err(format!("Number too small (minimum {})", min_value));
-                        }
-                    }
-                    if let Some(max_value) = validation.max_value {
-                        if num > max_value {
-                            return Err(format!("Number too large (maximum {})", max_value));
-                        }
-                    }
-                } else {
-                    return Err("Invalid number format".to_string());
-                }
-            }
-            _ => {}
+            // TODO: Enable other types when needed
         }
 
         // Pattern validation
@@ -249,23 +163,6 @@ fn validate_response(question: &UserQuestion, response: &str) -> Result<(), Stri
         }
     }
 
-    // Type-specific validation
-    match question.response_type {
-        QuestionType::Email => {
-            // Simple email validation
-            if !response.contains('@') || !response.contains('.') {
-                return Err("Invalid email format".to_string());
-            }
-        }
-        QuestionType::Url => {
-            // Simple URL validation
-            if !response.starts_with("http://") && !response.starts_with("https://") {
-                return Err("URL must start with http:// or https://".to_string());
-            }
-        }
-        _ => {}
-    }
-
     Ok(())
 }
 
@@ -275,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_ask_user_request_validation() {
-        // Valid request
+        // Valid request with questions
         let valid_request = AskUserRequest {
             prompt: "Test prompt".to_string(),
             questions: vec![UserQuestion {
@@ -292,14 +189,14 @@ mod tests {
         };
         assert!(valid_request.validate().is_ok());
 
-        // Empty questions
-        let invalid_request = AskUserRequest {
+        // Empty questions is valid - means no clarifications needed
+        let empty_request = AskUserRequest {
             prompt: "Test prompt".to_string(),
             questions: vec![],
             required: Some(true),
             timeout_secs: None,
         };
-        assert!(invalid_request.validate().is_err());
+        assert!(empty_request.validate().is_ok());
 
         // Duplicate question IDs
         let duplicate_request = AskUserRequest {

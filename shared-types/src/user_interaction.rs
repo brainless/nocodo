@@ -1,11 +1,13 @@
-// Tool request and response types for user interaction
+// User interaction types shared between agents, api and gui
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
+use ts_rs::TS;
 
 /// Ask the user a list of questions to gather information or confirm actions
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, TS)]
+#[ts(export)]
 pub struct AskUserRequest {
     /// The main prompt or context for the questions
     pub prompt: String,
@@ -20,7 +22,8 @@ pub struct AskUserRequest {
 }
 
 /// Individual question to ask the user
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, TS)]
+#[ts(export)]
 pub struct UserQuestion {
     /// Unique identifier for this question
     pub id: String,
@@ -44,31 +47,34 @@ pub struct UserQuestion {
 }
 
 /// Type of question and expected response format
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestionType {
     /// Simple text input
     Text,
-    /// Numeric input (integer or float)
-    Number,
-    /// Yes/No boolean question
-    Boolean,
-    /// Single choice from multiple options
-    Select,
-    /// Multiple choices from options
-    Multiselect,
-    /// Password input (masked)
-    Password,
-    /// File path input
-    FilePath,
-    /// Email address input
-    Email,
-    /// URL input
-    Url,
+    // TODO: Enable these variants when needed
+    // /// Numeric input (integer or float)
+    // Number,
+    // /// Yes/No boolean question
+    // Boolean,
+    // /// Single choice from multiple options
+    // Select,
+    // /// Multiple choices from options
+    // Multiselect,
+    // /// Password input (masked)
+    // Password,
+    // /// File path input
+    // FilePath,
+    // /// Email address input
+    // Email,
+    // /// URL input
+    // Url,
 }
 
 /// Validation rules for question responses
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, TS)]
+#[ts(export)]
 pub struct QuestionValidation {
     /// Minimum length for text responses
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,7 +97,8 @@ pub struct QuestionValidation {
 }
 
 /// Response from the ask_user tool containing user answers
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct AskUserResponse {
     /// Whether the user responded to all required questions
     pub completed: bool,
@@ -105,7 +112,8 @@ pub struct AskUserResponse {
 }
 
 /// Individual user response to a question
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct UserQuestionResponse {
     /// ID of the question being answered
     pub question_id: String,
@@ -145,7 +153,7 @@ impl AskUserRequest {
                             "type": {
                                 "type": "string",
                                 "description": "Type of response expected",
-                                "enum": ["text", "number", "boolean", "select", "multiselect", "password", "file_path", "email", "url"]
+                                "enum": ["text"]
                             },
                             "default": {
                                 "type": "string",
@@ -212,8 +220,9 @@ impl AskUserRequest {
 
     /// Validate the request parameters
     pub fn validate(&self) -> Result<(), String> {
+        // Empty questions list is now valid - means no clarifications needed
         if self.questions.is_empty() {
-            return Err("At least one question must be provided".to_string());
+            return Ok(());
         }
 
         let mut question_ids = std::collections::HashSet::new();
@@ -234,22 +243,22 @@ impl AskUserRequest {
             }
             question_ids.insert(question.id.clone());
 
-            // Validate select/multiselect questions have options
-            match question.response_type {
-                QuestionType::Select | QuestionType::Multiselect => {
-                    if question
-                        .options
-                        .as_ref()
-                        .map_or(true, |opts| opts.is_empty())
-                    {
-                        return Err(format!(
-                            "Question '{}' of type {:?} requires at least one option",
-                            question.id, question.response_type
-                        ));
-                    }
-                }
-                _ => {}
-            }
+            // TODO: Re-enable validation for select/multiselect when those types are enabled
+            // match question.response_type {
+            //     QuestionType::Select | QuestionType::Multiselect => {
+            //         if question
+            //             .options
+            //             .as_ref()
+            //             .map_or(true, |opts| opts.is_empty())
+            //         {
+            //             return Err(format!(
+            //                 "Question '{}' of type {:?} requires at least one option",
+            //                 question.id, question.response_type
+            //             ));
+            //         }
+            //     }
+            //     _ => {}
+            // }
         }
 
         Ok(())

@@ -50,6 +50,13 @@ fn export_type(name: &str) -> Result<String, Box<dyn std::error::Error>> {
         "SettingsResponse" => SettingsResponse::export_to_string()?,
         "UpdateApiKeysRequest" => UpdateApiKeysRequest::export_to_string()?,
 
+        "AskUserRequest" => AskUserRequest::export_to_string()?,
+        "AskUserResponse" => AskUserResponse::export_to_string()?,
+        "UserQuestion" => UserQuestion::export_to_string()?,
+        "UserQuestionResponse" => UserQuestionResponse::export_to_string()?,
+        "QuestionType" => QuestionType::export_to_string()?,
+        "QuestionValidation" => QuestionValidation::export_to_string()?,
+
         _ => {
             return Err(format!(
                 "Unknown type: '{}'. Available types can be found in shared-types/src/",

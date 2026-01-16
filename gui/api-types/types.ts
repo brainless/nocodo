@@ -180,3 +180,135 @@ export type WorkflowStepData = {
   step_number: number;
   description: string;
 };
+
+/**
+ * Ask the user a list of questions to gather information or confirm actions
+ */
+export type AskUserRequest = {
+  /**
+   * The main prompt or context for the questions
+   */
+  prompt: string;
+  /**
+   * List of questions to ask the user
+   */
+  questions: Array<UserQuestion>;
+  /**
+   * Whether the user responses are required (true) or optional (false)
+   */
+  required: boolean | null;
+  /**
+   * Optional timeout in seconds for user response
+   */
+  timeout_secs: bigint | null;
+};
+
+/**
+ * Response from the ask_user tool containing user answers
+ */
+export type AskUserResponse = {
+  /**
+   * Whether the user responded to all required questions
+   */
+  completed: boolean;
+  /**
+   * User's responses to each question
+   */
+  responses: Array<UserQuestionResponse>;
+  /**
+   * Any error or status message
+   */
+  message: string;
+  /**
+   * How long the user took to respond (in seconds)
+   */
+  response_time_secs: number | null;
+};
+
+/**
+ * Individual question to ask the user
+ */
+export type UserQuestion = {
+  /**
+   * Unique identifier for this question
+   */
+  id: string;
+  /**
+   * The question text to display to the user
+   */
+  question: string;
+  /**
+   * Type of response expected
+   */
+  type: QuestionType;
+  /**
+   * Default value if user doesn't provide one
+   */
+  default: string | null;
+  /**
+   * List of possible options for multiple choice or select questions
+   */
+  options: Array<string> | null;
+  /**
+   * Additional description or help text for the question
+   */
+  description: string | null;
+  /**
+   * Validation rules for the response
+   */
+  validation: QuestionValidation | null;
+};
+
+/**
+ * Individual user response to a question
+ */
+export type UserQuestionResponse = {
+  /**
+   * ID of the question being answered
+   */
+  question_id: string;
+  /**
+   * The user's answer
+   */
+  answer: string;
+  /**
+   * Whether the response is valid according to validation rules
+   */
+  valid: boolean;
+  /**
+   * Validation error message if response is invalid
+   */
+  validation_error: string | null;
+};
+
+export type QuestionType = 'text';
+
+/**
+ * Validation rules for question responses
+ */
+export type QuestionValidation = {
+  /**
+   * Minimum length for text responses
+   */
+  min_length: number | null;
+  /**
+   * Maximum length for text responses
+   */
+  max_length: number | null;
+  /**
+   * Minimum value for numeric responses
+   */
+  min_value: number | null;
+  /**
+   * Maximum value for numeric responses
+   */
+  max_value: number | null;
+  /**
+   * Regular expression pattern for text validation
+   */
+  pattern: string | null;
+  /**
+   * Custom validation error message
+   */
+  error_message: string | null;
+};

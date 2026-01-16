@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use shared_types::{AskUserRequest, AskUserResponse};
 
 /// Tool request enum containing all possible tool operations
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -18,7 +19,7 @@ pub enum ToolRequest {
     #[serde(rename = "bash")]
     Bash(super::bash::BashRequest),
     #[serde(rename = "ask_user")]
-    AskUser(super::user_interaction::AskUserRequest),
+    AskUser(AskUserRequest),
     #[serde(rename = "sqlite3_reader")]
     Sqlite3Reader(super::sqlite::Sqlite3ReaderRequest),
     #[serde(rename = "hackernews_request")]
@@ -42,7 +43,7 @@ pub enum ToolResponse {
     #[serde(rename = "bash")]
     Bash(super::bash::BashResponse),
     #[serde(rename = "ask_user")]
-    AskUser(super::user_interaction::AskUserResponse),
+    AskUser(AskUserResponse),
     #[serde(rename = "sqlite3_reader")]
     Sqlite3Reader(super::sqlite::Sqlite3ReaderResponse),
     #[serde(rename = "hackernews_response")]
