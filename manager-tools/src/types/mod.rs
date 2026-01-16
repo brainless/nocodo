@@ -19,6 +19,5 @@ pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 
 // Re-export user interaction types from shared-types
 pub use shared_types::{
-    AskUserRequest, AskUserResponse, QuestionType, QuestionValidation, UserQuestion,
-    UserQuestionResponse,
+    AskUserRequest, AskUserResponse, QuestionType, UserQuestion, UserQuestionResponse,
 };

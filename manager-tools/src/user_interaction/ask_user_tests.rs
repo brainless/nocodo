@@ -14,7 +14,6 @@ mod tests {
                     default: None,
                     options: None,
                     description: None,
-                    validation: None,
                 },
                 UserQuestion {
                     id: "details".to_string(),
@@ -23,7 +22,6 @@ mod tests {
                     default: Some("general help".to_string()),
                     options: None,
                     description: Some("Describe what you need help with".to_string()),
-                    validation: None,
                 },
             ],
         };
@@ -50,7 +48,6 @@ mod tests {
                     default: None,
                     options: None,
                     description: None,
-                    validation: None,
                 },
                 UserQuestion {
                     id: "duplicate".to_string(),
@@ -59,7 +56,6 @@ mod tests {
                     default: None,
                     options: None,
                     description: None,
-                    validation: None,
                 },
             ],
         };

@@ -3,7 +3,6 @@ use crate::types::{
     UserQuestionResponse,
 };
 use anyhow::Result;
-use regex;
 use std::io::{self, Write};
 
 pub async fn ask_user(request: AskUserRequest) -> Result<ToolResponse> {
@@ -22,43 +21,25 @@ pub async fn ask_user(request: AskUserRequest) -> Result<ToolResponse> {
             completed: true,
             responses: vec![],
             message: "No clarifications needed".to_string(),
-            response_time_secs: Some(0.0),
         }));
     }
 
-    let start_time = std::time::Instant::now();
     let mut responses = Vec::new();
-    let mut all_valid = true;
 
     // Ask each question
     for question in &request.questions {
         let answer = prompt_question(question)?;
-        let validation_result = validate_response(question, &answer);
-        let is_valid = validation_result.is_ok();
 
         responses.push(UserQuestionResponse {
             question_id: question.id.clone(),
             answer: answer.clone(),
-            valid: is_valid,
-            validation_error: validation_result.err(),
         });
-
-        if !is_valid {
-            all_valid = false;
-        }
     }
 
-    let response_time = start_time.elapsed().as_secs_f64();
-
     Ok(ToolResponse::AskUser(AskUserResponse {
-        completed: all_valid,
+        completed: true,
         responses,
-        message: if all_valid {
-            "All questions answered successfully".to_string()
-        } else {
-            "Some questions have invalid responses".to_string()
-        },
-        response_time_secs: Some(response_time),
+        message: "All questions answered successfully".to_string(),
     }))
 }
 
@@ -118,46 +99,6 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
     Ok(response)
 }
 
-/// Validate a response against the question's validation rules
-fn validate_response(question: &UserQuestion, response: &str) -> Result<(), String> {
-    if let Some(validation) = &question.validation {
-        // Length validation for text responses
-        match question.response_type {
-            QuestionType::Text => {
-                if let Some(min_length) = validation.min_length {
-                    if response.len() < min_length {
-                        return Err(format!(
-                            "Response too short (minimum {} characters)",
-                            min_length
-                        ));
-                    }
-                }
-                if let Some(max_length) = validation.max_length {
-                    if response.len() > max_length {
-                        return Err(format!(
-                            "Response too long (maximum {} characters)",
-                            max_length
-                        ));
-                    }
-                }
-            } // TODO: Enable other types when needed
-        }
-
-        // Pattern validation
-        if let Some(pattern) = &validation.pattern {
-            if let Ok(regex) = regex::Regex::new(pattern) {
-                if !regex.is_match(response) {
-                    return Err(validation.error_message.clone().unwrap_or_else(|| {
-                        format!("Response does not match required pattern: {}", pattern)
-                    }));
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,7 +114,6 @@ mod tests {
                 default: None,
                 options: None,
                 description: None,
-                validation: None,
             }],
         };
         assert!(valid_request.validate().is_ok());
@@ -192,7 +132,6 @@ mod tests {
                     default: None,
                     options: None,
                     description: None,
-                    validation: None,
                 },
                 UserQuestion {
                     id: "q1".to_string(),
@@ -201,7 +140,6 @@ mod tests {
                     default: None,
                     options: None,
                     description: None,
-                    validation: None,
                 },
             ],
         };
