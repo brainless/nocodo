@@ -31,6 +31,8 @@ nocodo uses a multi-agent pattern where each agent is focused on a simple, speci
 - **Codebase Analysis** - Explore code repositories to understand structure, patterns, and dependencies
 - **File & Folder Analysis** - Navigate and analyze local file systems
 
+![Multiple agents in nocodo](./website/src/assets/nocodo_Multiple_Agents.png "Multiple agents in nocodo")
+
 ### Document Processing Agents
 - **PDF to Text** - Extract and process text content from PDF documents
 - **Excel to Text** - Read and convert spreadsheet data for analysis
@@ -42,6 +44,8 @@ nocodo supports multiple AI providers through a unified interface:
 - **OpenAI** - GPT-4o, GPT-4, GPT-3.5
 - **xAI** - Grok models
 - **Cerebras** - Llama and GLM models
+
+![Multiple models in nocodo](./website/src/assets/nocodo_Multiple_Models.png "Multiple models in nocodo")
 
 Choose the model that fits your needs for cost, speed, or capability.
 
