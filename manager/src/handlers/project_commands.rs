@@ -2,9 +2,10 @@ use crate::command_discovery::CommandDiscovery;
 use crate::error::AppError;
 use crate::handlers::main_handlers::AppState;
 use crate::models::{
-    CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest, ProjectCommand, ProjectCommandExecution,
-    ProjectCommandExecutionListResponse, ProjectCommandExecutionResponse,
-    ProjectCommandFilterQuery, ProjectCommandResponse, UpdateProjectCommandRequest,
+    CreateProjectCommandRequest, DiscoveryOptionsQuery, ExecuteProjectCommandRequest,
+    ProjectCommand, ProjectCommandExecution, ProjectCommandExecutionListResponse,
+    ProjectCommandExecutionResponse, ProjectCommandFilterQuery, ProjectCommandResponse,
+    UpdateProjectCommandRequest,
 };
 use actix_web::{web, HttpResponse, Result};
 use chrono::Utc;
@@ -451,10 +452,7 @@ pub async fn discover_project_commands(
 ) -> Result<HttpResponse, AppError> {
     let project_id = project_id.into_inner();
 
-    info!(
-        "Discovering commands for project {}",
-        project_id
-    );
+    info!("Discovering commands for project {}", project_id);
 
     // Get project
     let project = data

@@ -187,7 +187,10 @@ mod tests {
         ];
 
         let validator = TypeValidator::new(type_names.clone(), type_definitions).unwrap();
-        assert_eq!(validator.get_expected_types_summary(), "PMProject, Workflow");
+        assert_eq!(
+            validator.get_expected_types_summary(),
+            "PMProject, Workflow"
+        );
     }
 
     #[test]

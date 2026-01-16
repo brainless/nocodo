@@ -13,8 +13,10 @@ pub async fn execute_workflow_creation_agent(
     llm_client: web::Data<Arc<dyn nocodo_llm_sdk::client::LlmClient>>,
     database: web::Data<Arc<nocodo_agents::database::Database>>,
 ) -> impl Responder {
-    let domain_description = match &req.config {
-        AgentConfig::StructuredJson(config) => config.domain_description.clone(),
+    let (type_names, domain_description) = match &req.config {
+        AgentConfig::StructuredJson(config) => {
+            (config.type_names.clone(), config.domain_description.clone())
+        }
         _ => {
             error!(config_type = ?req.config, "Invalid config type for Workflow Creation agent");
             return HttpResponse::BadRequest().json(ErrorResponse {
@@ -56,12 +58,13 @@ pub async fn execute_workflow_creation_agent(
     let llm_client_clone = llm_client.get_ref().clone();
     let database_clone = database.get_ref().clone();
     let user_prompt_clone = user_prompt.clone();
+    let type_names_clone = type_names.clone();
 
     tokio::spawn(async move {
         let agent = match create_structured_json_agent(
             &llm_client_clone,
             &database_clone,
-            vec!["Workflow".to_string(), "WorkflowStep".to_string()],
+            type_names_clone,
             domain_description,
         ) {
             Ok(agent) => agent,

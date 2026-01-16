@@ -2,8 +2,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use nocodo_manager::database::Database;
 use nocodo_manager::models::{
-    AiSession, AiSessionOutput, AiSessionResult, MessageAuthorType, MessageContentType,
-    Permission, Project, ProjectComponent, Team, User, Work, WorkMessage,
+    AiSession, AiSessionOutput, AiSessionResult, MessageAuthorType, MessageContentType, Permission,
+    Project, ProjectComponent, Team, User, Work, WorkMessage,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);

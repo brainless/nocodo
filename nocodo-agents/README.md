@@ -4,7 +4,17 @@ A collection of AI agents for various software development tasks.
 
 ## Available Agents
 
-- **codebase-analysis**: Analyzes codebase structure and identifies architectural patterns
+| Agent | Description | Required Input |
+|-------|-------------|----------------|
+| **codebase-analysis** | Analyzes codebase structure, identifies architectural patterns, and provides insights about code organization | Path to codebase directory |
+| **sqlite** | Analyzes SQLite databases, explores schema, and runs SQL queries to answer questions about the data | Path to SQLite database file |
+| **tesseract** | Extracts text from images using Tesseract OCR, with AI-powered cleaning and formatting of the extracted content | Path to image file |
+| **structured-json** | Generates structured JSON that conforms to specified TypeScript types, useful for creating type-safe data from natural language | TypeScript type names and domain description |
+
+All agents share a common execution pattern:
+- Session tracking in SQLite (messages, tool calls, results)
+- Iterative LLM calls with tool execution
+- Typed tool requests/responses via `manager-tools`
 
 ## Quick Start
 

@@ -1,6 +1,19 @@
-import { createSignal, type Component, For } from 'solid-js';
+import {
+  createSignal,
+  type Component,
+  For,
+  onMount,
+  onCleanup,
+  Show,
+} from 'solid-js';
+import { useSearchParams } from '@solidjs/router';
 import WorkflowStepItem from '../components/WorkflowStepItem';
-import type { Workflow, WorkflowStep } from '../../api-types/types';
+import type {
+  Workflow,
+  WorkflowStep,
+  SessionResponse,
+  WorkflowWithSteps,
+} from '../../api-types/types';
 
 interface WorkflowBranch {
   parentWorkflowId: number | null;
@@ -15,6 +28,12 @@ interface SiblingBranch {
 }
 
 const ProjectWorkflow: Component = () => {
+  const [searchParams] = useSearchParams();
+  const [isLoadingSession, setIsLoadingSession] = createSignal(false);
+  const [sessionError, setSessionError] = createSignal<string | null>(null);
+  const [workflowName, setWorkflowName] = createSignal('Order Handler');
+  let pollInterval: number | undefined;
+
   const [branchInfo, setBranchInfo] = createSignal<WorkflowBranch>({
     parentWorkflowId: 1,
     parentWorkflowName: 'Incoming Message Handler',
@@ -26,6 +45,80 @@ const ProjectWorkflow: Component = () => {
     { id: 3, name: 'Greeting Response', condition: 'Greeting Detected' },
     { id: 4, name: 'Spam Filter', condition: 'Spam/Invalid Message' },
   ]);
+
+  const fetchSession = async (sessionId: string) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8080/agents/sessions/${sessionId}`
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: SessionResponse = await response.json();
+
+      // Stop polling if session is completed or failed
+      if (data.status === 'completed' || data.status === 'failed') {
+        setIsLoadingSession(false);
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = undefined;
+        }
+
+        if (data.status === 'completed' && data.result) {
+          // Parse the JSON result and update the workflow
+          try {
+            const workflowData = JSON.parse(data.result) as WorkflowWithSteps;
+            setWorkflowName(workflowData.workflow.name);
+
+            // Convert the steps to the format expected by the UI
+            const convertedSteps = workflowData.steps.map((step) => ({
+              id: step.id,
+              workflow_id: step.workflow_id,
+              step_number: step.step_number,
+              description: step.description,
+              created_at: BigInt(step.created_at),
+            }));
+            setSteps(convertedSteps);
+            setNextId(Math.max(...convertedSteps.map((s) => s.id), 0) + 1);
+          } catch (parseError) {
+            setSessionError('Failed to parse workflow data');
+            console.error('Parse error:', parseError);
+          }
+        } else if (data.status === 'failed') {
+          setSessionError('Agent execution failed');
+        }
+      }
+    } catch (e) {
+      setSessionError(
+        e instanceof Error ? e.message : 'Failed to fetch session'
+      );
+      setIsLoadingSession(false);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = undefined;
+      }
+    }
+  };
+
+  onMount(() => {
+    const sessionId = searchParams.session_id;
+    if (sessionId) {
+      setIsLoadingSession(true);
+      // Initial fetch
+      fetchSession(sessionId);
+      // Start polling every 2 seconds
+      pollInterval = setInterval(
+        () => fetchSession(sessionId),
+        2000
+      ) as unknown as number;
+    }
+  });
+
+  onCleanup(() => {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+    }
+  });
 
   const [steps, setSteps] = createSignal<WorkflowStep[]>([
     {
@@ -134,135 +227,166 @@ const ProjectWorkflow: Component = () => {
     <div class="card bg-base-100 shadow-xl max-w-3xl">
       <div class="card-body">
         <h1 class="text-3xl font-bold">Workflow</h1>
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold">Order Handler</h2>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onClick={addStep}
-          >
-            Add Step
-          </button>
-        </div>
 
-        {branchInfo().parentWorkflowId && (
-          <div class="mb-6">
-            <div class="alert alert-info">
-              <div class="flex items-start gap-4 w-full">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  class="stroke-current shrink-0 w-6 h-6"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                    <span class="font-medium">Branched from:</span>
-                    <a href="#" class="link link-hover font-semibold">
-                      {branchInfo().parentWorkflowName}
-                    </a>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm">Triggered when:</span>
-                    <span class="badge badge-primary badge-sm">
-                      {branchInfo().branchCondition}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <details class="collapse collapse-arrow bg-base-200 mt-2">
-              <summary class="collapse-title text-sm font-medium">
-                Other branches from "{branchInfo().parentWorkflowName}"
-              </summary>
-              <div class="collapse-content">
-                <div class="space-y-2 pt-2">
-                  <For each={siblingBranches()}>
-                    {(branch) => (
-                      <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
-                        <div class="flex items-center gap-2">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4 text-base-content/50"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fill-rule="evenodd"
-                              d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                              clip-rule="evenodd"
-                            />
-                          </svg>
-                          <a href="#" class="link link-hover text-sm">
-                            {branch.name}
-                          </a>
-                        </div>
-                        <span class="badge badge-outline badge-xs">
-                          {branch.condition}
-                        </span>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </div>
-            </details>
+        <Show when={isLoadingSession()}>
+          <div class="flex flex-col items-center justify-center py-12">
+            <span class="loading loading-spinner loading-lg mb-4"></span>
+            <p class="text-base-content/70">
+              Generating workflow with AI agent...
+            </p>
           </div>
-        )}
+        </Show>
 
-        <div>
-          <h2 class="card-title mb-2">Workflow Steps</h2>
-          <p class="text-sm text-base-content/70 mb-6">
-            Define the steps of your workflow. Describe how tools, agents, and
-            user interactions work together in your process.
-          </p>
-
-          <div class="space-y-4">
-            <For each={steps()}>
-              {(step) => (
-                <WorkflowStepItem
-                  stepNumber={step.step_number}
-                  description={step.description}
-                  canRemove={steps().length > 1}
-                  onUpdate={(description) => updateStep(step.id, description)}
-                  onRemove={() => removeStep(step.id)}
-                />
-              )}
-            </For>
+        <Show when={sessionError()}>
+          <div class="alert alert-error mb-6">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="stroke-current shrink-0 h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>{sessionError()}</span>
           </div>
+        </Show>
 
-          <div class="card-actions justify-end mt-6">
-            <button type="button" class="btn btn-outline">
-              Cancel
-            </button>
+        <Show when={!isLoadingSession() && !sessionError()}>
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold">{workflowName()}</h2>
             <button
               type="button"
-              class="btn btn-primary"
-              onClick={saveWorkflow}
+              class="btn btn-primary btn-sm"
+              onClick={addStep}
             >
-              Save Workflow
+              Add Step
             </button>
           </div>
-        </div>
+
+          {branchInfo().parentWorkflowId && (
+            <div class="mb-6">
+              <div class="alert alert-info">
+                <div class="flex items-start gap-4 w-full">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    class="stroke-current shrink-0 w-6 h-6"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      <span class="font-medium">Branched from:</span>
+                      <a href="#" class="link link-hover font-semibold">
+                        {branchInfo().parentWorkflowName}
+                      </a>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm">Triggered when:</span>
+                      <span class="badge badge-primary badge-sm">
+                        {branchInfo().branchCondition}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <details class="collapse collapse-arrow bg-base-200 mt-2">
+                <summary class="collapse-title text-sm font-medium">
+                  Other branches from "{branchInfo().parentWorkflowName}"
+                </summary>
+                <div class="collapse-content">
+                  <div class="space-y-2 pt-2">
+                    <For each={siblingBranches()}>
+                      {(branch) => (
+                        <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
+                          <div class="flex items-center gap-2">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-4 w-4 text-base-content/50"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                                clip-rule="evenodd"
+                              />
+                            </svg>
+                            <a href="#" class="link link-hover text-sm">
+                              {branch.name}
+                            </a>
+                          </div>
+                          <span class="badge badge-outline badge-xs">
+                            {branch.condition}
+                          </span>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </details>
+            </div>
+          )}
+
+          <div>
+            <h2 class="card-title mb-2">Workflow Steps</h2>
+            <p class="text-sm text-base-content/70 mb-6">
+              Define the steps of your workflow. Describe how tools, agents, and
+              user interactions work together in your process.
+            </p>
+
+            <div class="space-y-4">
+              <For each={steps()}>
+                {(step) => (
+                  <WorkflowStepItem
+                    stepNumber={step.step_number}
+                    description={step.description}
+                    canRemove={steps().length > 1}
+                    onUpdate={(description) => updateStep(step.id, description)}
+                    onRemove={() => removeStep(step.id)}
+                  />
+                )}
+              </For>
+            </div>
+
+            <div class="card-actions justify-end mt-6">
+              <button type="button" class="btn btn-outline">
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                onClick={saveWorkflow}
+              >
+                Save Workflow
+              </button>
+            </div>
+          </div>
+        </Show>
       </div>
     </div>
   );

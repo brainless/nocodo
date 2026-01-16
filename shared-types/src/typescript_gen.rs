@@ -117,4 +117,24 @@ mod tests {
         assert!(!result.contains("import type"));
         assert!(!result.contains("This file was generated"));
     }
+
+    #[test]
+    fn test_workflow_with_steps_definition() {
+        let result = generate_typescript_definitions(&["WorkflowWithSteps"]).unwrap();
+        println!("\n\n=== WorkflowWithSteps TypeScript Definition ===");
+        println!("{}", result);
+        println!("=== End ===\n\n");
+        assert!(result.contains("WorkflowWithSteps"));
+    }
+
+    #[test]
+    fn test_workflow_all_types_definition() {
+        let result = generate_typescript_definitions(&["Workflow", "WorkflowStep", "WorkflowWithSteps"]).unwrap();
+        println!("\n\n=== Complete Workflow TypeScript Definitions ===");
+        println!("{}", result);
+        println!("=== End ===\n\n");
+        assert!(result.contains("WorkflowWithSteps"));
+        assert!(result.contains("id: number"));
+        assert!(result.contains("workflow_id: number"));
+    }
 }
