@@ -3,7 +3,7 @@ use anyhow;
 use async_trait::async_trait;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
-use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, ResponseFormat, Role};
 use std::sync::Arc;
 
 mod validator;
@@ -126,7 +126,7 @@ When responding:
                 stop_sequences: None,
                 tools: None,
                 tool_choice: None,
-                response_format: None,
+                response_format: Some(ResponseFormat::JsonObject),
             };
 
             let response = self.client.complete(request).await?;

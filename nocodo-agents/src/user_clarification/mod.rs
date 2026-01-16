@@ -3,7 +3,7 @@ use anyhow;
 use async_trait::async_trait;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
-use shared_types::user_interaction::{AskUserRequest, QuestionType};
+use shared_types::user_interaction::AskUserRequest;
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -44,42 +44,6 @@ Your entire output MUST be a valid JSON object matching this TypeScript type:
 
 Return ONLY the JSON object. No markdown, no code blocks, no explanation text."#
         )
-    }
-
-    async fn call_llm(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        let system_prompt = Self::generate_system_prompt();
-        tracing::info!("System prompt:\n{}", system_prompt);
-
-        let messages = vec![Message {
-            role: Role::User,
-            content: vec![ContentBlock::Text {
-                text: format!(
-                    "Analyze this user request and determine if clarification is needed:\n\n{}",
-                    user_prompt
-                ),
-            }],
-        }];
-
-        let request = CompletionRequest {
-            messages,
-            max_tokens: 2000,
-            model: self.client.model_name().to_string(),
-            system: Some(system_prompt),
-            temperature: Some(0.3),
-            top_p: None,
-            stop_sequences: None,
-            tools: None,
-            tool_choice: None,
-            response_format: None,
-        };
-
-        let response = self.client.complete(request).await?;
-        let text = extract_text_from_content(&response.content);
-
-        self.database
-            .create_message(session_id, "assistant", &text)?;
-
-        Ok(text)
     }
 
     async fn validate_and_retry(
