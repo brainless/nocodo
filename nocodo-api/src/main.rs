@@ -69,10 +69,10 @@ async fn main() -> Result<(), anyhow::Error> {
             }))
             .service(handlers::llm_providers::list_providers)
             .service(handlers::agents::list_agents)
-            .service(handlers::agent_execution::execute_sqlite_agent)
-            .service(handlers::agent_execution::execute_codebase_analysis_agent)
-            .service(handlers::agent_execution::execute_tesseract_agent)
-            .service(handlers::agent_execution::execute_user_clarification_agent)
+            .service(handlers::agent_execution::sqlite_agent::execute_sqlite_agent)
+            .service(handlers::agent_execution::codebase_analysis_agent::execute_codebase_analysis_agent)
+            .service(handlers::agent_execution::tesseract_agent::execute_tesseract_agent)
+            .service(handlers::agent_execution::user_clarification_agent::execute_user_clarification_agent)
             .service(
                 handlers::agent_execution::workflow_creation_agent::execute_workflow_creation_agent,
             )
