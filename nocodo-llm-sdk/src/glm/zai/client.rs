@@ -200,7 +200,12 @@ impl crate::glm::builder::GlmClientTrait for ZaiGlmClient {
             tools: request.tools,
             tool_choice: request.tool_choice,
             stop: request.stop,
-            response_format: None, // Can be added later if needed
+            response_format: request.response_format.map(|rf| match rf.format_type {
+                crate::glm::types::GlmResponseFormatType::Text => ZaiResponseFormat::text(),
+                crate::glm::types::GlmResponseFormatType::JsonObject => {
+                    ZaiResponseFormat::json_object()
+                }
+            }),
             user_id: None,
         };
 
