@@ -15,7 +15,7 @@ The Apache 2.0 license text is available in `LICENSES/Apache-2.0.txt`.
 
 ### Usage
 
-The `codex-apply-patch` crate is used in the nocodo manager to provide file patching capabilities for the LLM agent tools. It enables creating, modifying, deleting, and moving files using a unified diff format.
+The `codex-apply-patch` crate is used in nocodo agents to provide file patching capabilities for the LLM agent tools. It enables creating, modifying, deleting, and moving files using a unified diff format.
 
 ---
 
