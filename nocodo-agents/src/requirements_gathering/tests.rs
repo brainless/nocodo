@@ -2,18 +2,42 @@ use super::*;
 use crate::database::Database;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::error::LlmError;
+use nocodo_llm_sdk::tools::ToolCall;
 use nocodo_llm_sdk::types::{CompletionRequest, CompletionResponse, ContentBlock, Role, Usage};
-use shared_types::user_interaction::{AskUserRequest, QuestionType};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 struct MockLlmClient {
     response_content: String,
+    include_tool_call: bool,
+    call_count: Arc<AtomicUsize>,
 }
 
 #[async_trait::async_trait]
 impl LlmClient for MockLlmClient {
     async fn complete(&self, _request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+        let count = self.call_count.fetch_add(1, Ordering::SeqCst);
+
+        let tool_calls = if self.include_tool_call && count == 0 {
+            Some(vec![ToolCall::new(
+                "call_123".to_string(),
+                "ask_user".to_string(),
+                serde_json::json!({
+                    "questions": [
+                        {
+                            "id": "q1",
+                            "question": "What is the primary purpose of the website?",
+                            "type": "text",
+                            "description": "e.g., portfolio, e-commerce, blog"
+                        }
+                    ]
+                }),
+            )])
+        } else {
+            None
+        };
+
         Ok(CompletionResponse {
             content: vec![ContentBlock::Text {
                 text: self.response_content.clone(),
@@ -24,7 +48,7 @@ impl LlmClient for MockLlmClient {
                 output_tokens: 20,
             },
             stop_reason: Some("end_turn".to_string()),
-            tool_calls: None,
+            tool_calls,
         })
     }
 
@@ -39,37 +63,27 @@ impl LlmClient for MockLlmClient {
 
 fn setup_test_agent(
     response_content: &str,
+    include_tool_call: bool,
 ) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
+    let call_count = Arc::new(AtomicUsize::new(0));
     let client: Arc<dyn LlmClient> = Arc::new(MockLlmClient {
         response_content: response_content.to_string(),
+        include_tool_call,
+        call_count,
     });
 
     let database = Arc::new(Database::new(&PathBuf::from(":memory:"))?);
-    let agent = UserClarificationAgent::new(client, database.clone());
+    let tool_executor = Arc::new(manager_tools::ToolExecutor::new(PathBuf::from(".")));
+    let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
 
     Ok((agent, database))
 }
 
 #[tokio::test]
-async fn test_user_clarification_agent_returns_questions_when_needed() {
-    // Mock LLM response with clarifying questions
-    let mock_response = r#"{
-        "questions": [
-            {
-                "id": "q1",
-                "question": "What is the primary purpose of the website?",
-                "type": "text",
-                "description": "e.g., portfolio, e-commerce, blog"
-            },
-            {
-                "id": "q2",
-                "question": "Do you have any technology preferences?",
-                "type": "text"
-            }
-        ]
-    }"#;
+async fn test_user_clarification_agent_uses_ask_user_tool() {
+    let mock_response = "I need to gather some information about your requirements.";
 
-    let (agent, database) = setup_test_agent(mock_response).unwrap();
+    let (agent, database) = setup_test_agent(mock_response, true).unwrap();
 
     let session_id = database
         .create_session(
@@ -87,17 +101,13 @@ async fn test_user_clarification_agent_returns_questions_when_needed() {
         .await
         .unwrap();
 
-    // Parse the result to verify it's valid AskUserRequest
-    let parsed: AskUserRequest = serde_json::from_str(&result).unwrap();
+    assert!(result.contains("requirements") || result.contains("information"));
 
-    assert_eq!(parsed.questions.len(), 2);
-    assert_eq!(parsed.questions[0].id, "q1");
-    assert_eq!(
-        parsed.questions[0].question,
-        "What is the primary purpose of the website?"
+    let messages = database.get_messages(session_id).unwrap();
+    let tool_messages: Vec<_> = messages.iter().filter(|m| m.role == "tool").collect();
+
+    assert!(
+        !tool_messages.is_empty(),
+        "Expected at least one tool call message"
     );
-    assert!(matches!(
-        parsed.questions[0].response_type,
-        QuestionType::Text
-    ));
 }

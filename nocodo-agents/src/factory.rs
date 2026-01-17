@@ -1,9 +1,9 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::database::Database;
+use crate::requirements_gathering::UserClarificationAgent;
 use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
-use crate::requirements_gathering::UserClarificationAgent;
 use crate::Agent;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
@@ -99,9 +99,13 @@ impl AgentFactory {
     /// Create a UserClarificationAgent for analyzing user requests
     ///
     /// This agent determines if a user's request needs clarification
-    /// before proceeding with the task.
+    /// before proceeding with task.
     pub fn create_user_clarification_agent(&self) -> UserClarificationAgent {
-        UserClarificationAgent::new(self.llm_client.clone(), self.database.clone())
+        UserClarificationAgent::new(
+            self.llm_client.clone(),
+            self.database.clone(),
+            self.tool_executor.clone(),
+        )
     }
 }
 
@@ -182,7 +186,9 @@ pub fn create_agent_with_tools(
             };
             Box::new(StructuredJsonAgent::new(client, database, tool_executor, config).unwrap())
         }
-        AgentType::UserClarification => Box::new(UserClarificationAgent::new(client, database)),
+        AgentType::UserClarification => {
+            Box::new(UserClarificationAgent::new(client, database, tool_executor))
+        }
     }
 }
 
@@ -266,7 +272,8 @@ pub fn create_user_clarification_agent(
     client: Arc<dyn LlmClient>,
 ) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let agent = UserClarificationAgent::new(client, database.clone());
+    let tool_executor = Arc::new(ToolExecutor::new(std::path::PathBuf::from(".")));
+    let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
     Ok((agent, database))
 }
 

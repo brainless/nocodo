@@ -1,10 +1,12 @@
 use crate::{database::Database, Agent, AgentTool};
 use anyhow;
 use async_trait::async_trait;
+use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
+use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
-use shared_types::user_interaction::AskUserRequest;
 use std::sync::Arc;
+use std::time::Instant;
 
 #[cfg(test)]
 mod tests;
@@ -18,147 +20,145 @@ mod tests;
 pub struct UserClarificationAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
+    tool_executor: Arc<ToolExecutor>,
 }
 
 impl UserClarificationAgent {
-    pub fn new(client: Arc<dyn LlmClient>, database: Arc<Database>) -> Self {
-        Self { client, database }
+    pub fn new(
+        client: Arc<dyn LlmClient>,
+        database: Arc<Database>,
+        tool_executor: Arc<ToolExecutor>,
+    ) -> Self {
+        Self {
+            client,
+            database,
+            tool_executor,
+        }
     }
 
     fn generate_system_prompt() -> String {
-        let type_defs = shared_types::generate_typescript_definitions(&[
-            "AskUserRequest",
-            "UserQuestion",
-            "QuestionType",
-        ])
-        .unwrap_or_else(|_| "// Failed to generate type definitions".to_string());
+        r#"You are a requirements gathering specialist for business process automation.
+Your role is to analyze user requests and determine if clarification is needed before implementation.
 
-        format!(
-            r#"You are a JSON API that analyzes if user requests need clarification.
+CONTEXT:
 You are part of a system that helps users define their business processes and automate workflows.
-Users will share access to their data sources, from databases to APIs, as and when needed.
-You can ask about the source names or types but at a high level, not authentication details.
-You can ask specific examples of emails or messages that may need to be processed.
-You should ask about the goal of the process that the user wants to automate.
-If the user did not share a process that can be automated with software, then you should respond with an empty array of questions.
+Users will share access to their data sources (databases, APIs, etc.) as needed.
 
-Your entire output MUST be a valid JSON object matching this TypeScript type:
+YOUR CAPABILITIES:
+- You can ask clarifying questions using the ask_user tool
+- You should focus on high-level process understanding, not technical implementation details
+- You can ask about data source types/names (not authentication details)
+- You can request specific examples (e.g., sample emails, messages to process)
+- You should understand the goal and desired outcome of the automation
 
-<TYPE_DEFINITIONS>
-{type_defs}
-</TYPE_DEFINITIONS>
+WHEN TO ASK QUESTIONS:
+- The user's goal is unclear or ambiguous
+- Critical information about data sources is missing
+- The scope of the automation needs definition
+- Specific examples would help clarify requirements
 
-Return ONLY the JSON object. No markdown, no code blocks, no explanation text."#
-        )
+WHEN NOT TO ASK QUESTIONS:
+- The user has provided a clear, actionable request
+- The request is not about business process automation
+- You have sufficient information to proceed
+
+If the user's request is clear and describes an automatable software process, respond directly
+without using the ask_user tool. Explain that you understand the requirements.
+
+If the user did not share a process that can be automated with software, respond politely
+that you need more information about what they want to automate."#.to_string()
     }
 
-    async fn validate_and_retry(
+    async fn execute_tool_call(
         &self,
-        user_prompt: &str,
         session_id: i64,
-        max_retries: u32,
-    ) -> anyhow::Result<AskUserRequest> {
-        let mut attempt = 0;
-        let mut conversation_context = vec![];
+        message_id: Option<i64>,
+        tool_call: &ToolCall,
+    ) -> anyhow::Result<()> {
+        let tool_request =
+            AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
 
-        loop {
-            attempt += 1;
-            if attempt > max_retries {
-                return Err(anyhow::anyhow!(
-                    "Failed to get valid AskUserRequest after {} attempts",
-                    max_retries
-                ));
+        let call_id = self.database.create_tool_call(
+            session_id,
+            message_id,
+            tool_call.id(),
+            tool_call.name(),
+            tool_call.arguments().clone(),
+        )?;
+
+        let start = Instant::now();
+        let result: anyhow::Result<manager_tools::types::ToolResponse> =
+            self.tool_executor.execute(tool_request).await;
+        let execution_time = start.elapsed().as_millis() as i64;
+
+        match result {
+            Ok(response) => {
+                let response_json = serde_json::to_value(&response)?;
+                self.database
+                    .complete_tool_call(call_id, response_json.clone(), execution_time)?;
+
+                let result_text = crate::format_tool_response(&response);
+                let message_to_llm = format!("Tool {} result:\n{}", tool_call.name(), result_text);
+
+                tracing::debug!(
+                    tool_name = tool_call.name(),
+                    tool_id = tool_call.id(),
+                    execution_time_ms = execution_time,
+                    "Tool execution completed successfully"
+                );
+
+                self.database
+                    .create_message(session_id, "tool", &message_to_llm)?;
             }
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                self.database.fail_tool_call(call_id, &error_msg)?;
 
-            let messages = self.build_messages(user_prompt, &conversation_context, session_id)?;
+                let error_message_to_llm =
+                    format!("Tool {} failed: {}", tool_call.name(), error_msg);
 
-            let request = CompletionRequest {
-                messages,
-                max_tokens: 2000,
-                model: self.client.model_name().to_string(),
-                system: Some(Self::generate_system_prompt()),
-                temperature: Some(0.3),
-                top_p: None,
-                stop_sequences: None,
-                tools: None,
-                tool_choice: None,
-                response_format: Some(nocodo_llm_sdk::types::ResponseFormat::JsonObject),
-            };
+                tracing::debug!(
+                    tool_name = tool_call.name(),
+                    tool_id = tool_call.id(),
+                    error = %error_msg,
+                    "Tool execution failed"
+                );
 
-            let response = self.client.complete(request).await?;
-            let text = extract_text_from_content(&response.content);
-
-            self.database
-                .create_message(session_id, "assistant", &text)?;
-
-            match self.parse_response(&text) {
-                Ok(ask_user_request) => {
-                    return Ok(ask_user_request);
-                }
-                Err(parse_error) => {
-                    tracing::warn!(
-                        attempt,
-                        error = %parse_error,
-                        "JSON parsing failed, retrying"
-                    );
-
-                    conversation_context.push((Role::Assistant, text.clone()));
-
-                    let error_msg = format!(
-                        "Your response was not valid JSON matching the AskUserRequest type. Error: {}\n\nPlease provide valid JSON matching this structure:\n{{\"questions\": [{{\"id\": \"q1\", \"question\": \"question text\", \"type\": \"text\"}}]}}",
-                        parse_error
-                    );
-
-                    conversation_context.push((Role::User, error_msg.clone()));
-                    self.database
-                        .create_message(session_id, "user", &error_msg)?;
-                }
+                self.database
+                    .create_message(session_id, "tool", &error_message_to_llm)?;
             }
         }
+
+        Ok(())
     }
 
-    fn build_messages(
-        &self,
-        user_prompt: &str,
-        conversation_context: &[(Role, String)],
-        _session_id: i64,
-    ) -> anyhow::Result<Vec<Message>> {
-        let mut messages = Vec::new();
-
-        for (role, content) in conversation_context {
-            messages.push(Message {
-                role: role.clone(),
-                content: vec![ContentBlock::Text {
-                    text: content.clone(),
-                }],
-            });
-        }
-
-        messages.push(Message {
-            role: Role::User,
-            content: vec![ContentBlock::Text {
-                text: format!(
-                    "Analyze this user request and determine if clarification is needed:\n\n{}",
-                    user_prompt
-                ),
-            }],
-        });
-
-        Ok(messages)
+    fn get_tool_definitions(&self) -> Vec<nocodo_llm_sdk::tools::Tool> {
+        self.tools()
+            .into_iter()
+            .map(|tool| tool.to_tool_definition())
+            .collect()
     }
 
-    fn parse_response(&self, response: &str) -> anyhow::Result<AskUserRequest> {
-        tracing::debug!("Parsing response: {}", response);
+    fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<Message>> {
+        let db_messages = self.database.get_messages(session_id)?;
 
-        let parsed: AskUserRequest = serde_json::from_str(response).map_err(|e| {
-            anyhow::anyhow!("Failed to parse LLM response as AskUserRequest: {}", e)
-        })?;
+        db_messages
+            .into_iter()
+            .map(|msg| {
+                let role = match msg.role.as_str() {
+                    "user" => Role::User,
+                    "assistant" => Role::Assistant,
+                    "system" => Role::System,
+                    "tool" => Role::User,
+                    _ => Role::User,
+                };
 
-        parsed
-            .validate()
-            .map_err(|e| anyhow::anyhow!("Invalid AskUserRequest: {}", e))?;
-
-        Ok(parsed)
+                Ok(Message {
+                    role,
+                    content: vec![ContentBlock::Text { text: msg.content }],
+                })
+            })
+            .collect()
     }
 }
 
@@ -173,19 +173,70 @@ impl Agent for UserClarificationAgent {
     }
 
     fn tools(&self) -> Vec<AgentTool> {
-        vec![]
+        vec![AgentTool::AskUser]
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
         self.database
             .create_message(session_id, "user", user_prompt)?;
 
-        let ask_user_request = self.validate_and_retry(user_prompt, session_id, 3).await?;
+        let tools = self.get_tool_definitions();
 
-        let result = serde_json::to_string_pretty(&ask_user_request)?;
-        self.database.complete_session(session_id, &result)?;
+        let mut iteration = 0;
+        let max_iterations = 10;
 
-        Ok(result)
+        loop {
+            iteration += 1;
+            if iteration > max_iterations {
+                let error = "Maximum iteration limit reached";
+                self.database.fail_session(session_id, error)?;
+                return Err(anyhow::anyhow!(error));
+            }
+
+            let messages = self.build_messages(session_id)?;
+
+            let request = CompletionRequest {
+                messages,
+                max_tokens: 2000,
+                model: self.client.model_name().to_string(),
+                system: Some(self.system_prompt()),
+                temperature: Some(0.3),
+                top_p: None,
+                stop_sequences: None,
+                tools: Some(tools.clone()),
+                tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
+            };
+
+            let response = self.client.complete(request).await?;
+
+            let text = extract_text_from_content(&response.content);
+
+            let text_to_save = if text.is_empty() && response.tool_calls.is_some() {
+                "[Using tools]"
+            } else {
+                &text
+            };
+
+            let message_id = self
+                .database
+                .create_message(session_id, "assistant", text_to_save)?;
+
+            if let Some(tool_calls) = response.tool_calls {
+                if tool_calls.is_empty() {
+                    self.database.complete_session(session_id, &text)?;
+                    return Ok(text);
+                }
+
+                for tool_call in tool_calls {
+                    self.execute_tool_call(session_id, Some(message_id), &tool_call)
+                        .await?;
+                }
+            } else {
+                self.database.complete_session(session_id, &text)?;
+                return Ok(text);
+            }
+        }
     }
 }
 
@@ -206,6 +257,9 @@ pub fn create_user_clarification_agent(
     client: Arc<dyn LlmClient>,
 ) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let agent = UserClarificationAgent::new(client, database.clone());
+    let tool_executor = Arc::new(manager_tools::ToolExecutor::new(std::path::PathBuf::from(
+        ".",
+    )));
+    let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
     Ok((agent, database))
 }
