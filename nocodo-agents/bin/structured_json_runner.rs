@@ -62,9 +62,9 @@ async fn main() -> anyhow::Result<()> {
 
     let type_names = if args.types.is_empty() {
         vec![
-            "PMProject".to_string(),
             "Workflow".to_string(),
             "WorkflowStep".to_string(),
+            "WorkflowWithSteps".to_string(),
         ]
     } else {
         args.types.clone()
@@ -78,12 +78,14 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let agent = factory.create_structured_json_agent(agent_config)?;
+    let system_prompt = agent.system_prompt();
+    println!("\nSystem Prompt:\n{}", system_prompt);
 
     let session_id = database.create_session(
         "structured-json",
         "cli",
         &args.prompt,
-        Some(&agent.system_prompt()),
+        Some(&system_prompt),
         "structured-json-runner",
         None,
     )?;
