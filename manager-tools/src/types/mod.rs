@@ -3,7 +3,7 @@ pub mod core;
 pub mod filesystem;
 pub mod grep;
 pub mod hackernews;
-pub mod sqlite;
+pub mod sqlite_analysis;
 
 // Re-export commonly used types
 pub use bash::{BashRequest, BashResponse};
@@ -15,7 +15,7 @@ pub use filesystem::{
 };
 pub use grep::{GrepMatch, GrepRequest, GrepResponse};
 pub use hackernews::{DownloadState, FetchMode, HackerNewsRequest, HackerNewsResponse, StoryType};
-pub use sqlite::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
+pub use sqlite_analysis::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 
 // Re-export user interaction types from shared-types
 pub use shared_types::{

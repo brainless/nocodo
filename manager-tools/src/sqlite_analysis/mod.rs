@@ -71,7 +71,7 @@
 //!
 //! ```rust,no_run
 //! use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! use manager_tools::sqlite::execute_sqlite3_reader;
+//! use manager_tools::sqlite_analysis::execute_sqlite3_reader;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {

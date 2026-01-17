@@ -2,7 +2,7 @@ pub mod bash;
 pub mod filesystem;
 pub mod grep;
 pub mod hackernews;
-pub mod sqlite;
+pub mod sqlite_analysis;
 pub mod tool_error;
 pub mod tool_executor;
 pub mod types;
