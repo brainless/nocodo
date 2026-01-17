@@ -1,6 +1,6 @@
 use clap::Parser;
 use nocodo_agents::config;
-use nocodo_agents::user_clarification::create_user_clarification_agent;
+use nocodo_agents::requirements_gathering::create_user_clarification_agent;
 use nocodo_agents::Agent;
 use std::path::PathBuf;
 use std::sync::Arc;

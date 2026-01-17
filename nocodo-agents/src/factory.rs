@@ -3,7 +3,7 @@ use crate::database::Database;
 use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
-use crate::user_clarification::UserClarificationAgent;
+use crate::requirements_gathering::UserClarificationAgent;
 use crate::Agent;
 use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;

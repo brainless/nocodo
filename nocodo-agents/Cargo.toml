@@ -43,5 +43,5 @@ name = "structured-json-runner"
 path = "bin/structured_json_runner.rs"
 
 [[bin]]
-name = "user-clarification-runner"
-path = "bin/user_clarification_runner.rs"
+name = "requirements-gathering-runner"
+path = "bin/requirements_gathering_runner.rs"

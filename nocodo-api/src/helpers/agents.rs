@@ -154,8 +154,8 @@ pub fn create_structured_json_agent(
 pub fn create_user_clarification_agent(
     llm_client: &Arc<dyn LlmClient>,
     database: &Arc<nocodo_agents::database::Database>,
-) -> anyhow::Result<nocodo_agents::user_clarification::UserClarificationAgent> {
-    let agent = nocodo_agents::user_clarification::UserClarificationAgent::new(
+) -> anyhow::Result<nocodo_agents::requirements_gathering::UserClarificationAgent> {
+    let agent = nocodo_agents::requirements_gathering::UserClarificationAgent::new(
         llm_client.clone(),
         database.clone(),
     );
