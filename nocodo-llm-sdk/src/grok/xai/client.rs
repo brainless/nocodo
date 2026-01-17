@@ -3,7 +3,10 @@ use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
     error::LlmError,
-    grok::types::{GrokChatCompletionRequest, GrokChatCompletionResponse, GrokErrorResponse},
+    grok::types::{
+        GrokChatCompletionRequest, GrokChatCompletionResponse, GrokErrorResponse,
+        GrokResponseFormat,
+    },
 };
 
 /// xAI provider for Grok
@@ -212,6 +215,11 @@ impl crate::client::LlmClient for XaiGrokClient {
             })
             .collect::<Result<Vec<crate::grok::types::GrokMessage>, LlmError>>()?;
 
+        let response_format = request.response_format.map(|rf| match rf {
+            crate::types::ResponseFormat::Text => GrokResponseFormat::text(),
+            crate::types::ResponseFormat::JsonObject => GrokResponseFormat::json_object(),
+        });
+
         let grok_request = crate::grok::types::GrokChatCompletionRequest {
             model: request.model,
             messages: grok_messages,
@@ -222,6 +230,7 @@ impl crate::client::LlmClient for XaiGrokClient {
             stream: None, // Non-streaming for now
             tools: None,  // No tools for generic LlmClient interface
             tool_choice: None,
+            response_format,
         };
 
         // Send request and convert response

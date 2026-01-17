@@ -31,6 +31,9 @@ pub struct GlmChatCompletionRequest {
     /// Tool choice strategy
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,
+    /// Response format
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<GlmResponseFormat>,
 }
 
 /// A message in the GLM conversation
@@ -124,6 +127,36 @@ pub struct GlmError {
     /// Error type
     #[serde(rename = "type")]
     pub error_type: String,
+}
+
+/// Response format type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum GlmResponseFormatType {
+    /// Plain text response
+    Text,
+    /// JSON object response
+    JsonObject,
+}
+
+/// Response format configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GlmResponseFormat {
+    #[serde(rename = "type")]
+    pub format_type: GlmResponseFormatType,
+}
+
+impl GlmResponseFormat {
+    pub fn text() -> Self {
+        Self {
+            format_type: GlmResponseFormatType::Text,
+        }
+    }
+    pub fn json_object() -> Self {
+        Self {
+            format_type: GlmResponseFormatType::JsonObject,
+        }
+    }
 }
 
 /// GLM tool definition (OpenAI-compatible)

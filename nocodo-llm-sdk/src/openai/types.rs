@@ -121,6 +121,9 @@ pub struct OpenAIChatCompletionRequest {
     /// Whether to allow parallel tool calls
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
+    /// Response format (text or JSON object)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<OpenAIResponseFormat>,
 }
 
 /// A message in the OpenAI conversation
@@ -150,6 +153,36 @@ pub enum OpenAIRole {
     Assistant,
     /// Tool message
     Tool,
+}
+
+/// Response format type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenAIResponseFormatType {
+    /// Plain text response
+    Text,
+    /// JSON object response
+    JsonObject,
+}
+
+/// Response format configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OpenAIResponseFormat {
+    #[serde(rename = "type")]
+    pub format_type: OpenAIResponseFormatType,
+}
+
+impl OpenAIResponseFormat {
+    pub fn text() -> Self {
+        Self {
+            format_type: OpenAIResponseFormatType::Text,
+        }
+    }
+    pub fn json_object() -> Self {
+        Self {
+            format_type: OpenAIResponseFormatType::JsonObject,
+        }
+    }
 }
 
 /// OpenAI chat completion response

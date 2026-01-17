@@ -28,6 +28,9 @@ pub struct GrokChatCompletionRequest {
     /// Tool choice strategy
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,
+    /// Response format
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<GrokResponseFormat>,
 }
 
 /// A message in the Grok conversation
@@ -117,6 +120,36 @@ pub struct GrokError {
     /// Error type
     #[serde(rename = "type")]
     pub error_type: String,
+}
+
+/// Response format type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum GrokResponseFormatType {
+    /// Plain text response
+    Text,
+    /// JSON object response
+    JsonObject,
+}
+
+/// Response format configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GrokResponseFormat {
+    #[serde(rename = "type")]
+    pub format_type: GrokResponseFormatType,
+}
+
+impl GrokResponseFormat {
+    pub fn text() -> Self {
+        Self {
+            format_type: GrokResponseFormatType::Text,
+        }
+    }
+    pub fn json_object() -> Self {
+        Self {
+            format_type: GrokResponseFormatType::JsonObject,
+        }
+    }
 }
 
 /// Grok tool definition (OpenAI-compatible)

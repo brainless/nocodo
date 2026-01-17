@@ -4,7 +4,8 @@ use crate::{
         cerebras::CerebrasGlmClient,
         tools::GlmToolFormat,
         types::{
-            GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmRole, GlmTool,
+            GlmChatCompletionRequest, GlmChatCompletionResponse, GlmMessage, GlmResponseFormat,
+            GlmRole, GlmTool,
         },
         zen::ZenGlmClient,
     },
@@ -32,6 +33,7 @@ pub struct GlmMessageBuilder<'a, T: GlmClientTrait> {
     seed: Option<i32>,
     tools: Option<Vec<GlmTool>>,
     tool_choice: Option<serde_json::Value>,
+    response_format: Option<GlmResponseFormat>,
 }
 
 impl GlmClientTrait for CerebrasGlmClient {
@@ -67,6 +69,7 @@ impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
             seed: None,
             tools: None,
             tool_choice: None,
+            response_format: None,
         }
     }
 
@@ -168,6 +171,11 @@ impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
         self.tool_choice = Some(GlmToolFormat::to_provider_tool_choice(&choice));
         self
     }
+    /// Set the response format (text or JSON object)
+    pub fn response_format(mut self, format: GlmResponseFormat) -> Self {
+        self.response_format = Some(format);
+        self
+    }
 
     /// Add a tool result to continue the conversation
     pub fn tool_result(mut self, result: ToolResult) -> Self {
@@ -193,6 +201,7 @@ impl<'a, T: GlmClientTrait> GlmMessageBuilder<'a, T> {
             seed: self.seed,
             tools: self.tools,
             tool_choice: self.tool_choice,
+            response_format: self.response_format,
         };
 
         self.client.create_chat_completion(request).await

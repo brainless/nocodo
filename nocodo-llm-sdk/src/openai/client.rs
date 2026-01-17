@@ -430,6 +430,14 @@ impl crate::client::LlmClient for OpenAIClient {
                 tools: None,            // No tools for generic LlmClient interface
                 tool_choice: None,
                 parallel_tool_calls: None,
+                response_format: request.response_format.map(|rf| match rf {
+                    crate::types::ResponseFormat::Text => {
+                        crate::openai::types::OpenAIResponseFormat::text()
+                    }
+                    crate::types::ResponseFormat::JsonObject => {
+                        crate::openai::types::OpenAIResponseFormat::json_object()
+                    }
+                }),
             };
 
             // Send request and convert response

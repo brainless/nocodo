@@ -4,8 +4,8 @@ use crate::{
         client::OpenAIClient,
         tools::{OpenAIResponseToolFormat, OpenAIToolFormat},
         types::{
-            OpenAIChatCompletionRequest, OpenAIMessage, OpenAIResponseRequest, OpenAIResponseTool,
-            OpenAIRole,
+            OpenAIChatCompletionRequest, OpenAIMessage, OpenAIResponseFormat,
+            OpenAIResponseRequest, OpenAIResponseTool, OpenAIRole,
         },
     },
     tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
@@ -26,6 +26,7 @@ pub struct OpenAIMessageBuilder<'a> {
     tools: Option<Vec<OpenAIResponseTool>>,
     tool_choice: Option<serde_json::Value>,
     parallel_tool_calls: Option<bool>,
+    response_format: Option<OpenAIResponseFormat>,
 }
 
 impl<'a> OpenAIMessageBuilder<'a> {
@@ -45,6 +46,7 @@ impl<'a> OpenAIMessageBuilder<'a> {
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
+            response_format: None,
         }
     }
 
@@ -165,6 +167,12 @@ impl<'a> OpenAIMessageBuilder<'a> {
         self
     }
 
+    /// Set the response format (text or JSON object)
+    pub fn response_format(mut self, format: OpenAIResponseFormat) -> Self {
+        self.response_format = Some(format);
+        self
+    }
+
     /// Add a tool result to continue the conversation
     pub fn tool_result(mut self, result: ToolResult) -> Self {
         self.messages.push(OpenAIMessage::tool_result(
@@ -205,6 +213,7 @@ impl<'a> OpenAIMessageBuilder<'a> {
             tools: self.tools,
             tool_choice: self.tool_choice,
             parallel_tool_calls: self.parallel_tool_calls,
+            response_format: self.response_format,
         };
 
         self.client.create_chat_completion(request).await

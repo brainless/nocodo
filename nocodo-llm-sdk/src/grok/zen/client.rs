@@ -171,6 +171,13 @@ impl crate::client::LlmClient for ZenGrokClient {
             })
             .collect::<Result<Vec<crate::grok::types::GrokMessage>, LlmError>>()?;
 
+        let response_format = request.response_format.map(|rf| match rf {
+            crate::types::ResponseFormat::Text => crate::grok::types::GrokResponseFormat::text(),
+            crate::types::ResponseFormat::JsonObject => {
+                crate::grok::types::GrokResponseFormat::json_object()
+            }
+        });
+
         let grok_request = crate::grok::types::GrokChatCompletionRequest {
             model: request.model,
             messages: grok_messages,
@@ -181,6 +188,7 @@ impl crate::client::LlmClient for ZenGrokClient {
             stream: None, // Non-streaming for now
             tools: None,  // No tools for generic LlmClient interface
             tool_choice: None,
+            response_format,
         };
 
         // Send request and convert response

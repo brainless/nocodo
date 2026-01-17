@@ -3,7 +3,8 @@ use crate::{
     grok::{
         tools::GrokToolFormat,
         types::{
-            GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokRole, GrokTool,
+            GrokChatCompletionRequest, GrokChatCompletionResponse, GrokMessage, GrokResponseFormat,
+            GrokRole, GrokTool,
         },
         xai::XaiGrokClient,
         zen::ZenGrokClient,
@@ -31,6 +32,7 @@ pub struct GrokMessageBuilder<'a, T: GrokClientTrait> {
     stream: Option<bool>,
     tools: Option<Vec<GrokTool>>,
     tool_choice: Option<serde_json::Value>,
+    response_format: Option<GrokResponseFormat>,
 }
 
 impl GrokClientTrait for XaiGrokClient {
@@ -67,6 +69,7 @@ impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
             stream: None,
             tools: None,
             tool_choice: None,
+            response_format: None,
         }
     }
 
@@ -163,6 +166,12 @@ impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
         self
     }
 
+    /// Set the response format (text or JSON object)
+    pub fn response_format(mut self, format: GrokResponseFormat) -> Self {
+        self.response_format = Some(format);
+        self
+    }
+
     /// Add a tool result to continue the conversation
     pub fn tool_result(mut self, result: ToolResult) -> Self {
         self.messages.push(GrokMessage::tool_result(
@@ -186,6 +195,7 @@ impl<'a, T: GrokClientTrait> GrokMessageBuilder<'a, T> {
             stream: self.stream,
             tools: self.tools,
             tool_choice: self.tool_choice,
+            response_format: self.response_format,
         };
 
         self.client.create_chat_completion(request).await
