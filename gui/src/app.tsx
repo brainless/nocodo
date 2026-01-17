@@ -8,6 +8,7 @@ import Projects from './pages/Projects';
 import ProjectWorkflow from './pages/ProjectWorkflow';
 import ProjectProcess from './pages/ProjectProcess';
 import ProjectDataSources from './pages/ProjectDataSources';
+import ProjectSpecifications from './pages/ProjectSpecifications';
 import Settings from './pages/Settings';
 import SessionDetails from './pages/SessionDetails';
 import Sessions from './pages/Sessions';
@@ -32,6 +33,7 @@ const App: Component = () => {
         component={ProjectDetailsLayout}
         matchFilters={{ projectId: (id: string) => /^\d+$/.test(id) }}
       >
+        <Route path="/specifications" component={ProjectSpecifications} />
         <Route path="/workflow" component={ProjectWorkflow} />
         <Route path="/process" component={ProjectProcess} />
         <Route path="/data-sources" component={ProjectDataSources} />

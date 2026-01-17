@@ -38,7 +38,8 @@ export type AgentConfig =
   | ({ type: 'sqlite' } & SqliteAgentConfig)
   | ({ type: 'codebase-analysis' } & CodebaseAnalysisAgentConfig)
   | ({ type: 'tesseract' } & TesseractAgentConfig)
-  | ({ type: 'structured-json' } & StructuredJsonAgentConfig);
+  | ({ type: 'structured-json' } & StructuredJsonAgentConfig)
+  | { type: 'user-clarification' };
 
 /**
  * Generic agent execution request with type-safe config

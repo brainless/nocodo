@@ -1,9 +1,5 @@
 import { createSignal, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import type {
-  AgentExecutionRequest,
-  AgentExecutionResponse,
-} from '../../api-types/types';
 
 const Home: Component = () => {
   const [userPrompt, setUserPrompt] = createSignal('');
@@ -20,45 +16,11 @@ const Home: Component = () => {
       return;
     }
 
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const requestBody: AgentExecutionRequest = {
-        user_prompt: prompt,
-        config: {
-          type: 'structured-json',
-          type_names: ['Workflow', 'WorkflowStep', 'WorkflowWithSteps'],
-          domain_description: 'Workflow automation and task management',
-        },
-      };
-
-      const response = await fetch(
-        'http://127.0.0.1:8080/agents/workflow-creation/execute',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to start agent: ${response.statusText}`);
-      }
-
-      const result: AgentExecutionResponse = await response.json();
-
-      // Navigate to workflow page with session_id
-      // Use a dummy project_id=999 for demo purposes
-      navigate(`/projects/999/workflow?session_id=${result.session_id}`);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to generate workflow'
-      );
-      setIsSubmitting(false);
-    }
+    // Navigate to specifications page with prompt
+    // Use a dummy project_id=999 for demo purposes
+    navigate(
+      `/projects/999/specifications?prompt=${encodeURIComponent(prompt)}`
+    );
   };
 
   return (
@@ -98,10 +60,10 @@ const Home: Component = () => {
               {isSubmitting() ? (
                 <>
                   <span class="loading loading-spinner"></span>
-                  Generating Workflow...
+                  Starting...
                 </>
               ) : (
-                'Generate Agent'
+                'Start Project'
               )}
             </button>
           </div>
