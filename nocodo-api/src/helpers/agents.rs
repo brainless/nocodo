@@ -35,6 +35,14 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
                     .to_string(),
             enabled: true,
         },
+        AgentInfo {
+            id: "user-clarification".to_string(),
+            name: "User Clarification Agent".to_string(),
+            description:
+                "Agent for analyzing user requests and determining if clarification questions are needed"
+                    .to_string(),
+            enabled: true,
+        },
     ]
 }
 
@@ -129,6 +137,28 @@ pub fn create_structured_json_agent(
         tool_executor,
         config,
     )?;
+
+    Ok(agent)
+}
+
+/// Creates a User Clarification agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+///
+/// # Returns
+///
+/// A User Clarification agent instance
+pub fn create_user_clarification_agent(
+    llm_client: &Arc<dyn LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+) -> anyhow::Result<nocodo_agents::user_clarification::UserClarificationAgent> {
+    let agent = nocodo_agents::user_clarification::UserClarificationAgent::new(
+        llm_client.clone(),
+        database.clone(),
+    );
 
     Ok(agent)
 }

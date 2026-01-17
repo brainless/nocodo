@@ -3,6 +3,7 @@ use crate::database::Database;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::error::LlmError;
 use nocodo_llm_sdk::types::{CompletionRequest, CompletionResponse, ContentBlock, Role, Usage};
+use shared_types::user_interaction::{AskUserRequest, QuestionType};
 use std::path::PathBuf;
 use std::sync::Arc;
 

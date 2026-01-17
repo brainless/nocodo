@@ -41,6 +41,8 @@ async fn main() -> anyhow::Result<()> {
 
     let (agent, database) = create_user_clarification_agent(client)?;
 
+    tracing::debug!("System prompt:\n{}", agent.system_prompt());
+
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 

@@ -41,6 +41,13 @@ pub struct StructuredJsonAgentConfig {
     pub domain_description: String,
 }
 
+/// Configuration for User Clarification agent
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct UserClarificationAgentConfig {
+    // No configuration needed - agent just needs user prompt
+}
+
 /// Variant-specific agent configurations
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -54,6 +61,8 @@ pub enum AgentConfig {
     Tesseract(TesseractAgentConfig),
     #[serde(rename = "structured-json")]
     StructuredJson(StructuredJsonAgentConfig),
+    #[serde(rename = "user-clarification")]
+    UserClarification(UserClarificationAgentConfig),
 }
 
 /// Generic agent execution request with type-safe config
