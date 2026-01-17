@@ -78,6 +78,8 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .service(handlers::sessions::list_sessions)
             .service(handlers::sessions::get_session)
+            .service(handlers::sessions::get_pending_questions)
+            .service(handlers::sessions::submit_answers)
             .service(
                 web::scope("/settings")
                     .route("", web::get().to(handlers::settings::get_settings))

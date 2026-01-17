@@ -1,11 +1,14 @@
 use crate::models::ErrorResponse;
 use crate::DbConnection;
-use actix_web::{get, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
 use rusqlite::{params, Connection};
 use shared_types::{
     SessionListItem, SessionListResponse, SessionMessage, SessionResponse, SessionToolCall,
 };
 use tracing::{error, info, warn};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use nocodo_agents::Agent;
 
 #[get("/agents/sessions/{session_id}")]
 pub async fn get_session(
@@ -162,4 +165,162 @@ fn get_sessions_from_db(conn: &Connection) -> Result<Vec<SessionListItem>, anyho
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(sessions)
+}
+
+#[derive(Serialize)]
+pub struct QuestionsResponse {
+    pub questions: Vec<shared_types::user_interaction::UserQuestion>,
+}
+
+#[get("/agents/sessions/{session_id}/questions")]
+pub async fn get_pending_questions(
+    session_id: web::Path<i64>,
+    database: web::Data<std::sync::Arc<nocodo_agents::database::Database>>,
+) -> impl Responder {
+    let id = session_id.into_inner();
+    info!(session_id = id, "Retrieving pending questions");
+
+    match database.get_pending_questions(id) {
+        Ok(questions) => {
+            info!(session_id = id, question_count = questions.len(), "Retrieved pending questions");
+            HttpResponse::Ok().json(QuestionsResponse { questions })
+        }
+        Err(e) => {
+            error!(error = %e, session_id = id, "Failed to retrieve questions");
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: format!("Failed to retrieve questions: {}", e),
+            })
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SubmitAnswersRequest {
+    pub answers: HashMap<String, String>,
+}
+
+#[post("/agents/sessions/{session_id}/answers")]
+pub async fn submit_answers(
+    session_id: web::Path<i64>,
+    req: web::Json<SubmitAnswersRequest>,
+    database: web::Data<std::sync::Arc<nocodo_agents::database::Database>>,
+    llm_client: web::Data<std::sync::Arc<dyn nocodo_llm_sdk::client::LlmClient>>,
+) -> impl Responder {
+    let id = session_id.into_inner();
+    info!(session_id = id, answer_count = req.answers.len(), "Submitting answers");
+
+    // Store answers in database
+    if let Err(e) = database.store_answers(id, &req.answers) {
+        error!(error = %e, session_id = id, "Failed to store answers");
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: format!("Failed to store answers: {}", e),
+        });
+    }
+
+    // Build a message with the answered questions for the agent
+    let mut answers_text = String::from("User provided the following answers:\n\n");
+
+    // Get the answered questions from database (all questions for this session)
+    {
+        let conn = database.connection.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT question_id, question, answer
+                 FROM project_requirements_qna
+                 WHERE session_id = ?1 AND answer IS NOT NULL
+                 ORDER BY created_at ASC",
+            )
+            .map_err(|e| {
+                error!(error = %e, session_id = id, "Failed to prepare query");
+                e
+            })
+            .ok();
+
+        if let Some(ref mut stmt) = stmt {
+            let answered_questions = stmt
+                .query_map([id], |row| {
+                    let question: String = row.get(1)?;
+                    let answer: String = row.get(2)?;
+                    Ok((question, answer))
+                })
+                .ok();
+
+            if let Some(rows) = answered_questions {
+                for row in rows.flatten() {
+                    answers_text.push_str(&format!("Q: {}\nA: {}\n\n", row.0, row.1));
+                }
+            }
+        }
+    } // conn and stmt are dropped here
+
+    // Add the answers as a user message
+    if let Err(e) = database.create_message(id, "user", &answers_text) {
+        error!(error = %e, session_id = id, "Failed to create message with answers");
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: format!("Failed to create message: {}", e),
+        });
+    }
+
+    // Resume the session
+    if let Err(e) = database.resume_session(id) {
+        error!(error = %e, session_id = id, "Failed to resume session");
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: format!("Failed to resume session: {}", e),
+        });
+    }
+
+    // Spawn a background task to continue agent execution
+    let database_clone = database.get_ref().clone();
+    let llm_client_clone = llm_client.get_ref().clone();
+
+    tokio::spawn(async move {
+        info!(session_id = id, "Resuming agent execution with user answers");
+
+        // Create the agent
+        let agent = match crate::helpers::agents::create_user_clarification_agent(&llm_client_clone, &database_clone) {
+            Ok(agent) => agent,
+            Err(e) => {
+                error!(error = %e, session_id = id, "Failed to create agent for resumption");
+                let _ = database_clone.fail_session(id, &format!("Failed to create agent: {}", e));
+                return;
+            }
+        };
+
+        // Get the original user prompt from the session
+        let original_prompt = {
+            let conn = database_clone.connection.lock().unwrap();
+            conn.query_row(
+                "SELECT user_prompt FROM agent_sessions WHERE id = ?1",
+                params![id],
+                |row| row.get::<_, String>(0),
+            ).ok()
+        };
+
+        if let Some(prompt) = original_prompt {
+            // Continue execution - the agent will see the answers in the message history
+            match agent.execute(&prompt, id).await {
+                Ok(result) => {
+                    info!(session_id = id, "Agent resumed successfully");
+                    // Don't complete here if still waiting for more input
+                    if !result.contains("Waiting for user") {
+                        if let Err(e) = database_clone.complete_session(id, &result) {
+                            error!(error = %e, session_id = id, "Failed to complete session after resumption");
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(error = %e, session_id = id, "Agent execution failed after resumption");
+                    let _ = database_clone.fail_session(id, &format!("Execution failed: {}", e));
+                }
+            }
+        } else {
+            error!(session_id = id, "Failed to retrieve original prompt");
+            let _ = database_clone.fail_session(id, "Failed to retrieve original prompt");
+        }
+    });
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "resumed",
+        "message": "Session resumed with user answers"
+    }))
 }

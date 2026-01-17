@@ -229,8 +229,33 @@ impl Agent for UserClarificationAgent {
                 }
 
                 for tool_call in tool_calls {
-                    self.execute_tool_call(session_id, Some(message_id), &tool_call)
-                        .await?;
+                    // Special handling for ask_user tool - don't execute, just store questions
+                    if tool_call.name() == "ask_user" {
+                        tracing::info!(
+                            session_id = session_id,
+                            "Agent requesting user clarification"
+                        );
+
+                        // Parse the ask_user request
+                        let ask_user_request: shared_types::user_interaction::AskUserRequest =
+                            serde_json::from_value(tool_call.arguments().clone())?;
+
+                        // Store questions in database
+                        self.database
+                            .store_questions(session_id, &ask_user_request.questions)?;
+
+                        // Pause session to wait for user input
+                        self.database.pause_session_for_user_input(session_id)?;
+
+                        return Ok(format!(
+                            "Waiting for user to answer {} clarification questions",
+                            ask_user_request.questions.len()
+                        ));
+                    } else {
+                        // Execute other tools normally
+                        self.execute_tool_call(session_id, Some(message_id), &tool_call)
+                            .await?;
+                    }
                 }
             } else {
                 self.database.complete_session(session_id, &text)?;

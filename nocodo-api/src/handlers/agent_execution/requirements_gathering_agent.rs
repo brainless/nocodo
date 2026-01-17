@@ -75,8 +75,12 @@ pub async fn execute_user_clarification_agent(
         match agent.execute(&user_prompt_clone, session_id).await {
             Ok(result) => {
                 info!(result = %result, session_id = session_id, "Agent execution completed successfully");
-                if let Err(e) = database_clone.complete_session(session_id, &result) {
-                    error!(error = %e, session_id = session_id, "Failed to complete session");
+                // Check if agent is waiting for user input - if so, don't complete the session
+                // The agent already set the status to waiting_for_user_input
+                if !result.contains("Waiting for user") {
+                    if let Err(e) = database_clone.complete_session(session_id, &result) {
+                        error!(error = %e, session_id = session_id, "Failed to complete session");
+                    }
                 }
             }
             Err(e) => {

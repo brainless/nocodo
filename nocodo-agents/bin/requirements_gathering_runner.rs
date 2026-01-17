@@ -10,7 +10,15 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// User prompt for the agent (default: "Build me a website")
-    #[arg(short, long, default_value = "Build me a website")]
+    #[arg(
+        short,
+        long,
+        default_value = "I want to create a simple workflow to handle orders coming from emails.
+My b2b customers email me their requirements, mostly plain text with line item and counts.
+I check and block inventory in our inventory system, generate an invoice and email them.
+They pay (bank transfer). After I get notified from bank, I start shipment process.
+I want a workflow for the order handling part, checking with our inventory system, generate invoice"
+    )]
     prompt: String,
 
     /// Path to config file containing API keys

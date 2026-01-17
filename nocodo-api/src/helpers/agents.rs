@@ -155,9 +155,15 @@ pub fn create_user_clarification_agent(
     llm_client: &Arc<dyn LlmClient>,
     database: &Arc<nocodo_agents::database::Database>,
 ) -> anyhow::Result<nocodo_agents::requirements_gathering::UserClarificationAgent> {
+    let tool_executor = Arc::new(
+        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+            .with_max_file_size(10 * 1024 * 1024),
+    );
+
     let agent = nocodo_agents::requirements_gathering::UserClarificationAgent::new(
         llm_client.clone(),
         database.clone(),
+        tool_executor,
     );
 
     Ok(agent)

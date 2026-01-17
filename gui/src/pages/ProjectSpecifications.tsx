@@ -126,6 +126,36 @@ const ProjectSpecifications: Component = () => {
       }
       const data: SessionResponse = await response.json();
 
+      // Handle waiting_for_user_input status - fetch questions
+      if (data.status === 'waiting_for_user_input') {
+        setIsPolling(false);
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = undefined;
+        }
+
+        // Fetch questions from new endpoint
+        try {
+          const questionsResponse = await fetch(
+            `http://127.0.0.1:8080/agents/sessions/${sessionId}/questions`
+          );
+          if (!questionsResponse.ok) {
+            throw new Error(
+              `Failed to fetch questions: ${questionsResponse.statusText}`
+            );
+          }
+          const questionsData = await questionsResponse.json();
+          setQuestions(questionsData.questions);
+
+          // Reset answers for new questions
+          setAnswers(new Map());
+        } catch (questionsError) {
+          setError('Failed to fetch questions');
+          console.error('Questions fetch error:', questionsError);
+        }
+        return;
+      }
+
       // Stop polling if session is completed or failed
       if (data.status === 'completed' || data.status === 'failed') {
         setIsPolling(false);
@@ -134,19 +164,10 @@ const ProjectSpecifications: Component = () => {
           pollInterval = undefined;
         }
 
-        if (data.status === 'completed' && data.result) {
-          // Parse the JSON result and extract questions
-          try {
-            const askUserRequest = JSON.parse(data.result) as AskUserRequest;
-            setQuestions(askUserRequest.questions);
-            setIsCompleted(true);
-
-            // Reset answers for new questions
-            setAnswers(new Map());
-          } catch (parseError) {
-            setError('Failed to parse agent response');
-            console.error('Parse error:', parseError);
-          }
+        if (data.status === 'completed') {
+          setIsCompleted(true);
+          // No more questions - session completed
+          setQuestions([]);
         } else if (data.status === 'failed') {
           setError('Agent execution failed');
         }
@@ -161,26 +182,63 @@ const ProjectSpecifications: Component = () => {
     }
   };
 
-  const handleUpdateSpecifications = () => {
+  const handleUpdateSpecifications = async () => {
     if (!allQuestionsAnswered()) {
       setError('Please answer all questions before continuing');
       return;
     }
 
-    // Save current round to history
-    const currentRound: ClarificationRound = {
-      questions: questions(),
-      answers: new Map(answers()),
-    };
-    setClarificationHistory([...clarificationHistory(), currentRound]);
+    const currentSessionId = sessionId();
+    if (!currentSessionId) {
+      setError('No active session');
+      return;
+    }
 
-    // Build prompt with history
-    const promptWithHistory = buildPromptWithHistory();
+    try {
+      setError(null);
+      setIsPolling(true);
 
-    // Clear current questions and trigger agent again
-    setQuestions([]);
-    setIsCompleted(false);
-    triggerClarificationAgent(promptWithHistory);
+      // Save current round to history
+      const currentRound: ClarificationRound = {
+        questions: questions(),
+        answers: new Map(answers()),
+      };
+      setClarificationHistory([...clarificationHistory(), currentRound]);
+
+      // Convert Map to plain object for JSON
+      const answersObj: Record<string, string> = {};
+      answers().forEach((value, key) => {
+        answersObj[key] = value;
+      });
+
+      // Submit answers to API
+      const response = await fetch(
+        `http://127.0.0.1:8080/agents/sessions/${currentSessionId}/answers`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ answers: answersObj }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit answers: ${response.statusText}`);
+      }
+
+      // Clear current questions and start polling again
+      setQuestions([]);
+
+      // Start polling for next round of questions or completion
+      pollInterval = setInterval(
+        () => pollSession(currentSessionId),
+        2000
+      ) as unknown as number;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit answers');
+      setIsPolling(false);
+    }
   };
 
   onMount(() => {
