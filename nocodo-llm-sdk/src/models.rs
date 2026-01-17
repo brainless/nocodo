@@ -113,5 +113,63 @@ pub mod glm {
     pub const ZAI_GLM_4_6: &str = ZAI_GLM_4_6_ID;
 }
 
+/// Voyage AI embedding model constants
+pub mod voyage {
+    /// Voyage 4 Large - Highest accuracy embedding model
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    pub const VOYAGE_4_LARGE_ID: &str = "voyage-4-large";
+    pub const VOYAGE_4_LARGE_NAME: &str = "Voyage 4 Large";
+
+    /// Voyage 4 - Balanced performance embedding model
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    pub const VOYAGE_4_ID: &str = "voyage-4";
+    pub const VOYAGE_4_NAME: &str = "Voyage 4";
+
+    /// Voyage 4 Lite - Fast and cost-effective embedding model
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    /// Max tokens: 1M per batch
+    pub const VOYAGE_4_LITE_ID: &str = "voyage-4-lite";
+    pub const VOYAGE_4_LITE_NAME: &str = "Voyage 4 Lite";
+
+    /// Voyage 3 Large - Previous generation large model
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    pub const VOYAGE_3_LARGE_ID: &str = "voyage-3-large";
+    pub const VOYAGE_3_LARGE_NAME: &str = "Voyage 3 Large";
+
+    /// Voyage 3.5 - Previous generation balanced model
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    pub const VOYAGE_3_5_ID: &str = "voyage-3.5";
+    pub const VOYAGE_3_5_NAME: &str = "Voyage 3.5";
+
+    /// Voyage 3.5 Lite - Previous generation lite model
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    pub const VOYAGE_3_5_LITE_ID: &str = "voyage-3.5-lite";
+    pub const VOYAGE_3_5_LITE_NAME: &str = "Voyage 3.5 Lite";
+
+    /// Voyage Code 3 - Specialized for code embeddings
+    /// Default dimension: 1024, supports 256/512/1024/2048
+    pub const VOYAGE_CODE_3_ID: &str = "voyage-code-3";
+    pub const VOYAGE_CODE_3_NAME: &str = "Voyage Code 3";
+
+    /// Voyage Finance 2 - Specialized for finance domain
+    pub const VOYAGE_FINANCE_2_ID: &str = "voyage-finance-2";
+    pub const VOYAGE_FINANCE_2_NAME: &str = "Voyage Finance 2";
+
+    /// Voyage Law 2 - Specialized for legal domain
+    pub const VOYAGE_LAW_2_ID: &str = "voyage-law-2";
+    pub const VOYAGE_LAW_2_NAME: &str = "Voyage Law 2";
+
+    // Backwards compatibility
+    pub const VOYAGE_4_LARGE: &str = VOYAGE_4_LARGE_ID;
+    pub const VOYAGE_4: &str = VOYAGE_4_ID;
+    pub const VOYAGE_4_LITE: &str = VOYAGE_4_LITE_ID;
+    pub const VOYAGE_3_LARGE: &str = VOYAGE_3_LARGE_ID;
+    pub const VOYAGE_3_5: &str = VOYAGE_3_5_ID;
+    pub const VOYAGE_3_5_LITE: &str = VOYAGE_3_5_LITE_ID;
+    pub const VOYAGE_CODE_3: &str = VOYAGE_CODE_3_ID;
+    pub const VOYAGE_FINANCE_2: &str = VOYAGE_FINANCE_2_ID;
+    pub const VOYAGE_LAW_2: &str = VOYAGE_LAW_2_ID;
+}
+
 // Re-export for convenience
 pub use claude::*;
