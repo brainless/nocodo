@@ -1,4 +1,4 @@
-use nocodo_llm_sdk::gemini::{types::*, GeminiClient};
+use nocodo_llm_sdk::gemini::GeminiClient;
 use nocodo_llm_sdk::models::gemini::*;
 
 #[tokio::test]
@@ -8,11 +8,15 @@ async fn test_gemini_3_pro_simple_completion() {
 
     let client = GeminiClient::new(api_key).expect("Failed to create Gemini client");
 
+    // Note: No need to set max_output_tokens or thinking_level
+    // The model metadata will apply sensible defaults:
+    // - default_max_tokens: 1024 (enough for thinking + response)
+    // - default_thinking_level: "high"
+    // - default_temperature: 1.0
     let response = client
         .message_builder()
         .model(GEMINI_3_PRO)
         .user_message("What is 2+2? Answer in one word.")
-        .max_output_tokens(50)
         .send()
         .await
         .expect("Failed to get response");

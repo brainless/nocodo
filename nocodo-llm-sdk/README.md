@@ -10,10 +10,12 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Comprehensive error handling**: Detailed error types with context
 - **Tool/Function Calling**: Type-safe tool calling with automatic JSON Schema generation
 - **Claude support**: Full Messages API implementation
+- **Gemini support**: Google Gemini 3 Pro and Flash with reasoning capabilities
 - **Grok support**: xAI and Zen (free) Grok integration with OpenAI-compatible API
 - **GLM support**: Cerebras GLM models with OpenAI-compatible API
 - **Zen provider**: Free access to select models during beta
 - **OpenAI support**: GPT models including GPT-5 with Chat Completions API
+- **Voyage AI support**: Text embeddings with multiple specialized models
 - **Multi-provider**: Same models available from different providers
 - **Extensible**: Designed for easy addition of other LLM providers
 
@@ -35,6 +37,7 @@ pub trait LlmClient: Send + Sync {
 
 // Provider-specific implementations
 impl LlmClient for ClaudeClient { /* ... */ }
+impl LlmClient for GeminiClient { /* ... */ }
 impl LlmClient for GrokClient { /* ... */ }
 impl LlmClient for GlmClient { /* ... */ }
 impl LlmClient for OpenAIClient { /* ... */ }
@@ -90,6 +93,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     println!("Response: {}", response.content[0].text);
+    Ok(())
+}
+```
+
+### Gemini (Google)
+
+```rust
+use nocodo_llm_sdk::gemini::GeminiClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create client with your Google API key
+    let client = GeminiClient::new("your-google-api-key")?;
+
+    // Build and send a message
+    let response = client
+        .message_builder()
+        .model("gemini-3-pro-preview")
+        .system("You are a helpful assistant")
+        .user_message("Explain quantum entanglement briefly")
+        .thinking_level("high")  // Enable deep reasoning
+        .temperature(1.0)        // Recommended: keep at 1.0
+        .max_output_tokens(1024)
+        .send()
+        .await?;
+
+    // Extract and print the response
+    for candidate in &response.candidates {
+        for part in &candidate.content.parts {
+            if let Some(text) = &part.text {
+                println!("Gemini: {}", text);
+            }
+        }
+    }
+
+    // Print token usage
+    if let Some(usage) = response.usage_metadata {
+        println!(
+            "Usage: {} input, {} output, {} total tokens",
+            usage.prompt_token_count,
+            usage.candidates_token_count,
+            usage.total_token_count
+        );
+    }
+
     Ok(())
 }
 ```
@@ -248,6 +296,138 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Gemini (Google)
+
+Google's Gemini 3 models with reasoning capabilities and thinking level controls.
+
+### Gemini 3 Pro
+
+The most intelligent model for complex reasoning tasks.
+
+```rust
+use nocodo_llm_sdk::gemini::GeminiClient;
+use nocodo_llm_sdk::models::gemini::GEMINI_3_PRO;
+
+let client = GeminiClient::new("your-google-api-key")?;
+
+let response = client
+    .message_builder()
+    .model(GEMINI_3_PRO)
+    .system("You are a helpful assistant")
+    .user_message("Write a Rust function to calculate fibonacci numbers")
+    .thinking_level("high")  // Enable deep reasoning (default)
+    .temperature(1.0)        // Recommended: keep at 1.0
+    .max_output_tokens(1024)
+    .send()
+    .await?;
+
+// Extract response text
+for candidate in &response.candidates {
+    for part in &candidate.content.parts {
+        if let Some(text) = &part.text {
+            println!("{}", text);
+        }
+    }
+}
+```
+
+### Gemini 3 Flash
+
+Pro-level intelligence at Flash speed for faster responses.
+
+```rust
+use nocodo_llm_sdk::models::gemini::GEMINI_3_FLASH;
+
+let response = client
+    .message_builder()
+    .model(GEMINI_3_FLASH)
+    .thinking_level("low")  // Fast mode for quicker responses
+    .user_message("What is a REST API?")
+    .max_output_tokens(200)
+    .send()
+    .await?;
+```
+
+### Thinking Levels
+
+Gemini 3 supports dynamic thinking control to balance speed vs. reasoning depth:
+
+**Gemini 3 Pro**:
+- `low`: Faster responses with less reasoning
+- `high` (default): Maximum reasoning capability
+
+**Gemini 3 Flash**:
+- `minimal`: Fastest responses
+- `low`: Quick with basic reasoning
+- `medium`: Balanced speed and reasoning
+- `high` (default): Maximum reasoning
+
+```rust
+// Fast response mode
+let response = client
+    .message_builder()
+    .model(GEMINI_3_FLASH)
+    .thinking_level("minimal")
+    .user_message("Quick question...")
+    .send()
+    .await?;
+
+// Deep reasoning mode
+let response = client
+    .message_builder()
+    .model(GEMINI_3_PRO)
+    .thinking_level("high")
+    .user_message("Complex reasoning task...")
+    .send()
+    .await?;
+```
+
+### Multi-turn Conversations
+
+```rust
+let response = client
+    .message_builder()
+    .model(GEMINI_3_PRO)
+    .system("You are a helpful coding assistant")
+    .user_message("What's the best way to handle errors in Rust?")
+    .model_message("The best way is to use Result<T, E> for recoverable errors.")
+    .user_message("Can you show me an example?")
+    .send()
+    .await?;
+```
+
+### Key Features
+
+- ✅ **1M token context window** - Process large documents
+- ✅ **64k token output** - Generate long-form content
+- ✅ **Tool/function calling** - Integrate with external APIs
+- ✅ **Vision support** - Analyze images (multimodal)
+- ✅ **Structured outputs** - JSON response formatting
+- ✅ **Thinking level controls** - Adjust reasoning depth
+- ✅ **Thought signature preservation** - Maintains reasoning context for multi-step tasks
+
+### Model Specifications
+
+#### Gemini 3 Pro (`gemini-3-pro-preview`)
+- Context: 1M input / 64k output tokens
+- Knowledge cutoff: January 2025
+- Thinking levels: `low`, `high` (default)
+- Best for: Complex reasoning, autonomous coding, agentic workflows
+- Pricing: $2/1M input tokens (<200k), $12/1M output tokens
+
+#### Gemini 3 Flash (`gemini-3-flash-preview`)
+- Context: 1M input / 64k output tokens
+- Knowledge cutoff: January 2025
+- Thinking levels: `minimal`, `low`, `medium`, `high` (default)
+- Best for: Fast responses with Pro-level intelligence
+- Pricing: $0.50/1M input tokens, $3/1M output tokens
+
+### Important Notes
+
+**Temperature**: Gemini 3 documentation strongly recommends keeping temperature at `1.0` (default). Lowering temperature may cause looping or degraded performance. Use thinking level instead to control response quality/speed.
+
+**Thought Signatures**: For advanced tool calling with multi-step reasoning, Gemini 3 uses encrypted "thought signatures" to maintain reasoning context. The SDK automatically preserves these signatures across API calls.
+
 ## Advanced Usage
 
 ### Claude: Conversation with Multiple Messages
@@ -400,6 +580,12 @@ See `examples/tool_calling_*.rs` for complete examples.
 - `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
 - `message_builder() -> ClaudeMessageBuilder`: Start building a message request
 
+### GeminiClient
+
+- `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
+- `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
+- `message_builder() -> GeminiMessageBuilder`: Start building a message request
+
 ### GrokClient
 
 - `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
@@ -433,6 +619,22 @@ See `examples/tool_calling_*.rs` for complete examples.
 
 Note: Claude also supports `system()` for system prompts, while Grok uses `system_message()`.
 
+### MessageBuilder (Gemini)
+
+- `model(model: impl Into<String>) -> Self`: Set the model
+- `user_message(content: impl Into<String>) -> Self`: Add a user message
+- `model_message(content: impl Into<String>) -> Self`: Add a model (assistant) message
+- `content(content: GeminiContent) -> Self`: Add a complete content object
+- `system(text: impl Into<String>) -> Self`: Set system instruction
+- `thinking_level(level: impl Into<String>) -> Self`: Set thinking level (minimal/low/medium/high)
+- `temperature(temp: f32) -> Self`: Set temperature (recommended: 1.0)
+- `max_output_tokens(tokens: u32) -> Self`: Set maximum output tokens
+- `top_p(top_p: f32) -> Self`: Set top-p sampling
+- `top_k(top_k: u32) -> Self`: Set top-k sampling
+- `tool(tool: GeminiTool) -> Self`: Add a tool/function declaration
+- `tool_config(config: GeminiToolConfig) -> Self`: Configure tool calling behavior
+- `send() -> Result<GeminiGenerateContentResponse>`: Send the request
+
 ## Error Types
 
 - `AuthenticationError`: Invalid API key
@@ -459,6 +661,9 @@ Integration tests require valid API keys:
 # Claude integration tests
 ANTHROPIC_API_KEY=your-key-here cargo test --test claude_integration -- --ignored
 
+# Gemini integration tests
+GEMINI_API_KEY=your-key-here cargo test --test gemini_integration -- --ignored
+
 # Grok integration tests
 XAI_API_KEY=your-key-here cargo test --test grok_integration -- --ignored
 
@@ -471,8 +676,11 @@ CEREBRAS_API_KEY=your-key-here cargo test --test glm_integration -- --ignored
 See the `examples/` directory for complete working examples:
 
 - `simple_completion.rs`: Basic Claude usage
+- `gemini_simple.rs`: Gemini 3 Pro example with reasoning
+- `gemini_flash.rs`: Gemini 3 Flash fast response example
 - `grok_completion.rs`: Basic Grok usage
 - `glm_completion.rs`: Basic GLM usage
+- `voyage_embeddings.rs`: Text embeddings with Voyage AI
 - `tool_calling_weather.rs`: Simple tool calling example
 - `tool_calling_agent.rs`: Multi-tool agent example
 
@@ -483,11 +691,18 @@ This SDK is in active development. v0.1 provides Claude and Grok support with a 
 ### Supported Providers
 
 - **Claude** (Anthropic): Full Messages API implementation
-  - Models: claude-sonnet-4-5, claude-opus-4-5, etc.
+  - Models: claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5, etc.
+- **Gemini** (Google): Gemini API with reasoning capabilities
+  - Models: gemini-3-pro-preview, gemini-3-flash-preview
+  - Features: Thinking level controls, 1M context, tool calling
 - **Grok** (xAI): OpenAI-compatible API
-  - Models: grok-code-fast-1 (optimized for coding tasks)
+  - Models: grok-code-fast-1, grok-beta, grok-vision-beta
 - **GLM** (Cerebras): OpenAI-compatible API
-  - Models: zai-glm-4.6 (GLM 4.6 model)
+  - Models: zai-glm-4.6, llama-3.3-70b
+- **OpenAI**: Chat Completions and Responses API
+  - Models: gpt-4o, gpt-4o-mini, gpt-5.1, gpt-5-codex
+- **Voyage AI**: Text embeddings
+  - Models: voyage-4, voyage-4-large, voyage-4-lite, specialized domain models
 
 ### Future Plans (v0.2+)
 

@@ -25,9 +25,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nResponse:");
 
     for candidate in &response.candidates {
-        for part in &candidate.content.parts {
-            if let Some(text) = &part.text {
-                println!("{}", text);
+        if let Some(parts) = &candidate.content.parts {
+            for part in parts {
+                if let Some(text) = &part.text {
+                    println!("{}", text);
+                }
             }
         }
     }

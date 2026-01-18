@@ -24,6 +24,7 @@ fn main() {
     // Integration tests with conditional execution
     let tests = [
         ("claude_integration", "ANTHROPIC_API_KEY"),
+        ("gemini_integration", "GEMINI_API_KEY"),
         ("gpt_integration", "OPENAI_API_KEY"),
         ("grok_integration", "XAI_API_KEY"),
         ("glm_integration", "CEREBRAS_API_KEY"),

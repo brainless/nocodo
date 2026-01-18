@@ -26,7 +26,31 @@ impl<'a> MessageBuilder<'a> {
     }
 
     pub fn model(mut self, model: impl Into<String>) -> Self {
-        self.model = Some(model.into());
+        let model_id = model.into();
+
+        // Apply model-specific defaults from metadata
+        if let Some(metadata) = crate::model_metadata::get_model_metadata(&model_id) {
+            // Apply temperature default if not already set
+            if self.generation_config.temperature.is_none() {
+                self.generation_config.temperature = metadata.default_temperature;
+            }
+
+            // Apply max_output_tokens default if not already set
+            if self.generation_config.max_output_tokens.is_none() {
+                self.generation_config.max_output_tokens = metadata.default_max_tokens;
+            }
+
+            // Apply thinking_level default if not already set
+            if self.generation_config.thinking_config.is_none() {
+                if let Some(default_level) = metadata.default_thinking_level {
+                    self.generation_config.thinking_config = Some(ThinkingConfig {
+                        thinking_level: default_level.to_string(),
+                    });
+                }
+            }
+        }
+
+        self.model = Some(model_id);
         self
     }
 

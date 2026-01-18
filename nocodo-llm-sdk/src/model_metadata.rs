@@ -20,6 +20,7 @@ pub struct ModelMetadata {
     pub output_cost_per_token: Option<f64>,
     pub default_temperature: Option<f32>,
     pub default_max_tokens: Option<u32>,
+    pub default_thinking_level: Option<&'static str>,
 }
 
 /// Get all supported models with their metadata
@@ -39,6 +40,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000015),
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::ANTHROPIC,
@@ -53,6 +55,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000005),
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::ANTHROPIC,
@@ -67,6 +70,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000075),
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::ANTHROPIC,
@@ -81,6 +85,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000075),
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::ANTHROPIC,
@@ -95,6 +100,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000015),
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         // OpenAI models
         ModelMetadata {
@@ -110,6 +116,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.00001),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::OPENAI,
@@ -124,6 +131,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.0000006),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::OPENAI,
@@ -138,6 +146,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.00003),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::OPENAI,
@@ -152,6 +161,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.00006),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::OPENAI,
@@ -166,6 +176,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.0000015),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::OPENAI,
@@ -180,6 +191,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: None,
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::OPENAI,
@@ -194,6 +206,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: None,
             default_temperature: Some(1.0),
             default_max_tokens: Some(8192),
+            default_thinking_level: None,
         },
         // xAI/Grok models
         ModelMetadata {
@@ -209,6 +222,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000015),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::XAI,
@@ -223,6 +237,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000015),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::XAI,
@@ -237,6 +252,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.000015),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         // Cerebras/GLM models
         ModelMetadata {
@@ -252,6 +268,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.0000006),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         ModelMetadata {
             provider: providers::ZEN,
@@ -266,6 +283,7 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             output_cost_per_token: Some(0.0),
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
+            default_thinking_level: None,
         },
         // Google Gemini models
         ModelMetadata {
@@ -280,7 +298,8 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             input_cost_per_token: Some(0.000002),
             output_cost_per_token: Some(0.000012),
             default_temperature: Some(1.0),
-            default_max_tokens: Some(64_000),
+            default_max_tokens: Some(1024), // Sufficient for response + thinking tokens
+            default_thinking_level: Some("high"), // Default per Gemini docs
         },
         ModelMetadata {
             provider: providers::GOOGLE,
@@ -294,7 +313,8 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             input_cost_per_token: Some(0.0000005),
             output_cost_per_token: Some(0.000003),
             default_temperature: Some(1.0),
-            default_max_tokens: Some(64_000),
+            default_max_tokens: Some(512), // Can be lower due to less thinking overhead
+            default_thinking_level: Some("medium"), // Balance speed/quality
         },
     ]
 }

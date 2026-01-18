@@ -27,18 +27,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nResponse:");
 
     for candidate in &response.candidates {
-        for part in &candidate.content.parts {
-            if let Some(text) = &part.text {
-                println!("{}", text);
+        if let Some(parts) = &candidate.content.parts {
+            for part in parts {
+                if let Some(text) = &part.text {
+                    println!("{}", text);
+                }
             }
         }
     }
 
     if let Some(usage) = response.usage_metadata {
         println!("\n=== Token Usage ===");
-        println!("Prompt: {}", usage.prompt_token_count);
-        println!("Response: {}", usage.candidates_token_count);
-        println!("Total: {}", usage.total_token_count);
+        if let Some(prompt) = usage.prompt_token_count {
+            println!("Prompt: {}", prompt);
+        }
+        if let Some(response) = usage.candidates_token_count {
+            println!("Response: {}", response);
+        }
+        if let Some(total) = usage.total_token_count {
+            println!("Total: {}", total);
+        }
     }
 
     Ok(())
