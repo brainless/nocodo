@@ -9,7 +9,7 @@ pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
 use crate::hackernews;
-use crate::sqlite;
+use crate::sqlite_analysis;
 use crate::user_interaction;
 
 /// Tool executor that handles tool requests and responses
@@ -76,7 +76,7 @@ impl ToolExecutor {
                 .await
             }
             ToolRequest::AskUser(req) => user_interaction::ask_user(req).await,
-            ToolRequest::Sqlite3Reader(req) => sqlite::execute_sqlite3_reader(req)
+            ToolRequest::Sqlite3Reader(req) => sqlite_analysis::execute_sqlite3_reader(req)
                 .await
                 .map_err(|e| anyhow::anyhow!(e)),
             ToolRequest::HackerNewsRequest(req) => hackernews::execute_hackernews_request(req)

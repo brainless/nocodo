@@ -1,8 +1,14 @@
 import { type Component, type ParentComponent } from 'solid-js';
 import { Router, Route } from '@solidjs/router';
 import Navigation from './components/Navigation';
+import ProjectDetailsLayout from './components/ProjectDetailsLayout';
 import Agents from './pages/Agents';
 import Home from './pages/Home';
+import Projects from './pages/Projects';
+import ProjectWorkflow from './pages/ProjectWorkflow';
+import ProjectProcess from './pages/ProjectProcess';
+import ProjectDataSources from './pages/ProjectDataSources';
+import ProjectRequirements from './pages/ProjectSpecifications';
 import Settings from './pages/Settings';
 import SessionDetails from './pages/SessionDetails';
 import Sessions from './pages/Sessions';
@@ -21,6 +27,17 @@ const App: Component = () => {
     <Router root={Layout}>
       <Route path="/" component={Home} />
       <Route path="/sessions" component={Sessions} />
+      <Route path="/projects" component={Projects} />
+      <Route
+        path="/projects/:projectId"
+        component={ProjectDetailsLayout}
+        matchFilters={{ projectId: (id: string) => /^\d+$/.test(id) }}
+      >
+        <Route path="/requirements" component={ProjectRequirements} />
+        <Route path="/workflow" component={ProjectWorkflow} />
+        <Route path="/process" component={ProjectProcess} />
+        <Route path="/data-sources" component={ProjectDataSources} />
+      </Route>
       <Route path="/agents" component={Agents} />
       <Route path="/settings" component={Settings} />
       <Route path="/session/:id" component={SessionDetails} />

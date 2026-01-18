@@ -1,9 +1,7 @@
 use clap::Parser;
 use manager_tools::ToolExecutor;
-use nocodo_agents::{factory::create_sqlite_analysis_agent, Agent};
+use nocodo_agents::{config, factory::create_sqlite_analysis_agent, Agent};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
-use serde::Deserialize;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -24,35 +22,6 @@ struct Args {
     db_path: String,
 }
 
-#[derive(Deserialize)]
-struct Config {
-    #[serde(default)]
-    api_keys: HashMap<String, toml::Value>,
-}
-
-fn load_config(path: &PathBuf) -> anyhow::Result<Config> {
-    let content = std::fs::read_to_string(path)?;
-    let config: Config = toml::from_str(&content)?;
-    Ok(config)
-}
-
-fn get_api_key(config: &Config, key_name: &str) -> anyhow::Result<String> {
-    config
-        .api_keys
-        .get(key_name)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| anyhow::anyhow!("API key '{}' not found in config", key_name))
-}
-
-fn get_bool_option(config: &Config, key_name: &str, default: bool) -> bool {
-    config
-        .api_keys
-        .get(key_name)
-        .and_then(|v| v.as_bool())
-        .unwrap_or(default)
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
@@ -66,14 +35,10 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    let config = load_config(&args.config)?;
+    let config = config::load_config(&args.config)?;
+    let zai_config = config::get_zai_config(&config)?;
 
-    let zai_api_key =
-        get_api_key(&config, "zai_api_key").or_else(|_| get_api_key(&config, "ZAI_API_KEY"))?;
-
-    let coding_plan = get_bool_option(&config, "zai_coding_plan", true);
-
-    let client = ZaiGlmClient::with_coding_plan(zai_api_key, coding_plan)?;
+    let client = ZaiGlmClient::with_coding_plan(zai_config.api_key, zai_config.coding_plan)?;
     let client: Arc<dyn nocodo_llm_sdk::client::LlmClient> = Arc::new(client);
 
     let tool_executor =

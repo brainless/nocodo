@@ -119,10 +119,36 @@
 //!     Ok(())
 //! }
 //! ```
+//!
+//! ## Voyage AI Embeddings Example
+//!
+//! ```rust,no_run
+//! use nocodo_llm_sdk::voyage::{VoyageClient, VoyageInputType};
+//! use nocodo_llm_sdk::models::voyage::VOYAGE_4_LITE;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = VoyageClient::new("your-voyage-api-key")?;
+//!     let response = client
+//!         .embedding_builder()
+//!         .model(VOYAGE_4_LITE)
+//!         .input(vec!["Hello, world!", "Text embeddings are useful"])
+//!         .input_type(VoyageInputType::Document)
+//!         .output_dimension(1024)
+//!         .send()
+//!         .await?;
+//!
+//!     for embedding in &response.data {
+//!         println!("Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
+//!     }
+//!     Ok(())
+//! }
+//! ```
 
 pub mod claude;
 pub mod client;
 pub mod error;
+pub mod gemini;
 pub mod glm;
 pub mod grok;
 pub mod model_metadata;
@@ -131,8 +157,10 @@ pub mod openai;
 pub mod providers;
 pub mod tools;
 pub mod types;
+pub mod voyage;
 
 // Provider-specific exports
+pub use gemini::GeminiClient;
 pub use glm::cerebras::CerebrasGlmClient;
 pub use glm::zen::ZenGlmClient;
 pub use grok::xai::XaiGrokClient;
@@ -169,6 +197,7 @@ mod tests {
         client::OpenAIClient,
         types::{OpenAIMessage, OpenAIRole},
     };
+    use crate::voyage::client::VoyageClient;
 
     #[test]
     fn test_claude_client_creation() {
@@ -301,5 +330,29 @@ mod tests {
         let message = OpenAIMessage::user("Hello");
         assert_eq!(message.role, OpenAIRole::User);
         assert_eq!(message.content, "Hello");
+    }
+
+    #[test]
+    fn test_voyage_client_creation() {
+        let client = VoyageClient::new("test-key");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_voyage_client_creation_empty_key() {
+        let client = VoyageClient::new("");
+        assert!(client.is_err());
+    }
+
+    #[test]
+    fn test_voyage_embedding_builder() {
+        let client = VoyageClient::new("test-key").unwrap();
+        let _builder = client
+            .embedding_builder()
+            .model("voyage-4-lite")
+            .input("Hello");
+
+        // The builder should be created successfully
+        assert!(true); // Builder creation succeeded
     }
 }

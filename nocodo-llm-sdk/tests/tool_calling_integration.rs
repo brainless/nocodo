@@ -332,6 +332,7 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                     },
                 }]),
                 tool_choice: None,
+                response_format: None,
             };
 
             let response = client.create_chat_completion(request).await?;
@@ -434,6 +435,7 @@ async fn test_tool_calling(config: &TestConfig) -> Result<(), Box<dyn std::error
                     },
                 }]),
                 tool_choice: None,
+                response_format: None,
             };
 
             let response = client.create_chat_completion(request).await?;

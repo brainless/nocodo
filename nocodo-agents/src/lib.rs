@@ -1,14 +1,17 @@
 pub mod codebase_analysis;
+pub mod config;
 pub mod database;
 pub mod factory;
+pub mod requirements_gathering;
 pub mod sqlite_analysis;
+pub mod structured_json;
 pub mod tesseract;
 pub mod tools;
 
 use async_trait::async_trait;
 use manager_tools::types::filesystem::*;
-use manager_tools::types::user_interaction::*;
 use manager_tools::types::{ToolRequest, ToolResponse};
+use shared_types::user_interaction::*;
 
 /// Represents the types of tools available to agents
 #[derive(Debug, Clone, PartialEq)]

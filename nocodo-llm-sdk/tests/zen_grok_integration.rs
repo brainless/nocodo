@@ -23,6 +23,7 @@ async fn test_zen_grok_free_model() {
         stream: None,
         tools: None,
         tool_choice: None,
+        response_format: None,
     };
 
     let response = client
@@ -64,6 +65,7 @@ async fn test_zen_grok_with_api_key() {
         stream: None,
         tools: None,
         tool_choice: None,
+        response_format: None,
     };
 
     let response = client

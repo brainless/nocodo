@@ -29,7 +29,7 @@ impl SqliteAnalysisAgent {
     ) -> anyhow::Result<Self> {
         validate_db_path(&db_path)?;
 
-        let table_names = manager_tools::sqlite::get_table_names(&db_path).await?;
+        let table_names = manager_tools::sqlite_analysis::get_table_names(&db_path).await?;
 
         let db_name = std::path::Path::new(&db_path)
             .file_stem()
@@ -216,6 +216,7 @@ impl Agent for SqliteAnalysisAgent {
                 stop_sequences: None,
                 tools: Some(tools.clone()),
                 tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
             };
 
             let response = self.client.complete(request).await?;

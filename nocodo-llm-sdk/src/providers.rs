@@ -16,3 +16,9 @@ pub const CEREBRAS: &str = "cerebras";
 
 /// Zen provider (free tier for Grok and GLM)
 pub const ZEN: &str = "zen";
+
+/// Voyage AI provider (text embeddings)
+pub const VOYAGE: &str = "voyage";
+
+/// Google (Gemini models)
+pub const GOOGLE: &str = "google";

@@ -36,8 +36,8 @@ async fn test_sqlite_agent_execution_and_persistence() -> anyhow::Result<()> {
         panic!("Request failed with status: {}", status);
     }
 
-    let resp_value: serde_json::Value = serde_json::from_slice(&body_bytes)
-        .expect("Failed to parse response as JSON");
+    let resp_value: serde_json::Value =
+        serde_json::from_slice(&body_bytes).expect("Failed to parse response as JSON");
 
     assert_eq!(
         resp_value["status"], "completed",
@@ -51,7 +51,10 @@ async fn test_sqlite_agent_execution_and_persistence() -> anyhow::Result<()> {
         resp_value["agent_name"], "sqlite",
         "Expected agent_name to be sqlite"
     );
-    assert!(resp_value["result"].is_string(), "Expected result to be a string");
+    assert!(
+        resp_value["result"].is_string(),
+        "Expected result to be a string"
+    );
     assert!(
         !resp_value["result"].as_str().unwrap().is_empty(),
         "Expected result to not be empty"

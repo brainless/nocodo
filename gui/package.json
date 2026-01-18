@@ -16,6 +16,7 @@
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
+    "baseline-browser-mapping": "^2.9.15",
     "husky": "^9.1.7",
     "postcss": "^8.4.49",
     "prettier": "^3.7.4",

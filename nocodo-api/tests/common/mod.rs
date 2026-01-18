@@ -1,6 +1,6 @@
 use actix_web::{test, web, App};
 use nocodo_agents::database::Database;
-use nocodo_api::handlers::agent_execution::execute_sqlite_agent;
+use nocodo_api::handlers::agent_execution::sqlite_agent::execute_sqlite_agent;
 use nocodo_api::handlers::sessions::get_session;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::error::LlmError;

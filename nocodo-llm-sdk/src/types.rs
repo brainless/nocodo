@@ -92,6 +92,16 @@ pub struct Usage {
     pub output_tokens: u32,
 }
 
+/// Response format type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseFormat {
+    /// Plain text response
+    Text,
+    /// JSON object response
+    JsonObject,
+}
+
 /// Generic completion request (provider-agnostic)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletionRequest {
@@ -113,6 +123,8 @@ pub struct CompletionRequest {
     pub tools: Option<Vec<crate::tools::Tool>>,
     /// Tool choice strategy
     pub tool_choice: Option<crate::tools::ToolChoice>,
+    /// Response format (text or JSON object)
+    pub response_format: Option<ResponseFormat>,
 }
 
 /// Generic completion response (provider-agnostic)

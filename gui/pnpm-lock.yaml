@@ -23,6 +23,9 @@ importers:
       '@tailwindcss/postcss':
         specifier: ^4.1.13
         version: 4.1.13
+      baseline-browser-mapping:
+        specifier: ^2.9.15
+        version: 2.9.15
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -1103,10 +1106,10 @@ packages:
       solid-js:
         optional: true
 
-  baseline-browser-mapping@2.8.18:
+  baseline-browser-mapping@2.9.15:
     resolution:
       {
-        integrity: sha512-UYmTpOBwgPScZpS4A+YbapwWuBwasxvO/2IOHArSsAhL/+ZdmATBXTex3t+l2hXwLVYK382ibr/nKoY9GKe86w==,
+        integrity: sha512-kX8h7K2srmDyYnXRIppo4AH/wYgzWVCs+eKr3RusRSQ5PvRYoEFmR/I0PbdTjKFAoKqp5+kbxnNTFO9jOfSVJg==,
       }
     hasBin: true
 
@@ -2369,11 +2372,11 @@ snapshots:
     optionalDependencies:
       solid-js: 1.9.9
 
-  baseline-browser-mapping@2.8.18: {}
+  baseline-browser-mapping@2.9.15: {}
 
   browserslist@4.26.3:
     dependencies:
-      baseline-browser-mapping: 2.8.18
+      baseline-browser-mapping: 2.9.15
       caniuse-lite: 1.0.30001751
       electron-to-chromium: 1.5.237
       node-releases: 2.0.25

@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stream: None,
         tools: None,
         tool_choice: None,
+        response_format: None,
     };
 
     println!("Sending request to Zen Grok...");

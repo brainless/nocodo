@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(SqliteAgentConfig::export_to_string()?));
     types.push(clean_type(CodebaseAnalysisAgentConfig::export_to_string()?));
     types.push(clean_type(TesseractAgentConfig::export_to_string()?));
+    types.push(clean_type(StructuredJsonAgentConfig::export_to_string()?));
     types.push(clean_type(AgentConfig::export_to_string()?));
     types.push(clean_type(AgentExecutionRequest::export_to_string()?));
     types.push(clean_type(AgentsResponse::export_to_string()?));
@@ -20,12 +21,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(SessionResponse::export_to_string()?));
     types.push(clean_type(SessionListItem::export_to_string()?));
     types.push(clean_type(SessionListResponse::export_to_string()?));
-    types.push(clean_type(ErrorResponse::export_to_string()?));
     types.push(clean_type(ApiKeyConfig::export_to_string()?));
     types.push(clean_type(SettingsResponse::export_to_string()?));
     types.push(clean_type(UpdateApiKeysRequest::export_to_string()?));
+    types.push(clean_type(Project::export_to_string()?));
+    types.push(clean_type(Workflow::export_to_string()?));
+    types.push(clean_type(WorkflowStep::export_to_string()?));
+    types.push(clean_type(WorkflowWithSteps::export_to_string()?));
+    types.push(clean_type(SaveWorkflowRequest::export_to_string()?));
+    types.push(clean_type(WorkflowStepData::export_to_string()?));
 
-    let output_dir = Path::new("../gui/api-types");
+    // User interaction types
+    types.push(clean_type(AskUserRequest::export_to_string()?));
+    types.push(clean_type(AskUserResponse::export_to_string()?));
+    types.push(clean_type(UserQuestion::export_to_string()?));
+    types.push(clean_type(UserQuestionResponse::export_to_string()?));
+    types.push(clean_type(QuestionType::export_to_string()?));
+
+    let output_dir = Path::new("gui/api-types");
     fs::create_dir_all(output_dir)?;
 
     let output_path = output_dir.join("types.ts");

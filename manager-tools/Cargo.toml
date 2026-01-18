@@ -28,9 +28,9 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 glob = "0.3"
 schemars = "0.8"
-codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch" }
-codex-core = { git = "https://github.com/openai/codex", package = "codex-core" }
-codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening" }
+codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-apply-patch", rev = "6951872" }
+codex-core = { git = "https://github.com/openai/codex", package = "codex-core", rev = "6951872" }
+codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening", rev = "6951872" }
 shared-types = { path = "../shared-types" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 sqlparser = "0.51"

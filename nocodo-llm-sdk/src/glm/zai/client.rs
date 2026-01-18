@@ -200,7 +200,12 @@ impl crate::glm::builder::GlmClientTrait for ZaiGlmClient {
             tools: request.tools,
             tool_choice: request.tool_choice,
             stop: request.stop,
-            response_format: None, // Can be added later if needed
+            response_format: request.response_format.map(|rf| match rf.format_type {
+                crate::glm::types::GlmResponseFormatType::Text => ZaiResponseFormat::text(),
+                crate::glm::types::GlmResponseFormatType::JsonObject => {
+                    ZaiResponseFormat::json_object()
+                }
+            }),
             user_id: None,
         };
 
@@ -597,7 +602,7 @@ impl crate::client::LlmClient for ZaiGlmClient {
             request_id: None,
             do_sample: Some(true),
             stream: None,
-            thinking: None,
+            thinking: Some(ZaiThinking::disabled()),
             temperature: request.temperature,
             top_p: request.top_p,
             max_tokens: Some(request.max_tokens),
@@ -612,7 +617,10 @@ impl crate::client::LlmClient for ZaiGlmClient {
                 }
             }),
             stop: request.stop_sequences,
-            response_format: None,
+            response_format: request.response_format.map(|rf| match rf {
+                crate::types::ResponseFormat::Text => ZaiResponseFormat::text(),
+                crate::types::ResponseFormat::JsonObject => ZaiResponseFormat::json_object(),
+            }),
             user_id: None,
         };
 

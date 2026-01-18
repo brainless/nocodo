@@ -220,6 +220,13 @@ impl crate::client::LlmClient for CerebrasGlmClient {
             })
             .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
 
+        let response_format = request.response_format.map(|rf| match rf {
+            crate::types::ResponseFormat::Text => crate::glm::types::GlmResponseFormat::text(),
+            crate::types::ResponseFormat::JsonObject => {
+                crate::glm::types::GlmResponseFormat::json_object()
+            }
+        });
+
         let glm_request = crate::glm::types::GlmChatCompletionRequest {
             model: request.model,
             messages: glm_messages,
@@ -231,6 +238,7 @@ impl crate::client::LlmClient for CerebrasGlmClient {
             seed: None,
             tools: None, // No tools for generic LlmClient interface
             tool_choice: None,
+            response_format,
         };
 
         // Send request and convert response

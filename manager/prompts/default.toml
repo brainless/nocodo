@@ -1,2 +1,0 @@
-[tech_stack_analysis]
-prompt = "What is the tech stack of this project, including programming languages, databases, frameworks? Please list files and examine config files like package.json, pyproject.toml, manage.py, requirements.txt, etc. before providing your final answer. Read each file you deem necessary. Only return a list of technologies"

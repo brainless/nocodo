@@ -258,6 +258,7 @@ impl Agent for TesseractAgent {
                 stop_sequences: None,
                 tools: Some(tools.clone()),
                 tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
             };
 
             // 6. Call LLM
@@ -363,7 +364,14 @@ User: "Extract text in Spanish"
 - If OCR quality is poor, try different --psm values (6 for single block, 11 for sparse text)
 - Choose appropriate language with -l flag if the image contains non-English text
 "#,
-        image_filename, image_filename, image_filename, image_filename, image_filename, image_filename, image_filename, image_filename
+        image_filename,
+        image_filename,
+        image_filename,
+        image_filename,
+        image_filename,
+        image_filename,
+        image_filename,
+        image_filename
     )
 }
 
@@ -441,10 +449,11 @@ mod tests {
 
     #[test]
     fn test_system_prompt_generation() {
-        let prompt = generate_system_prompt();
+        let prompt = generate_system_prompt("test.png");
         assert!(prompt.contains("tesseract"));
         assert!(prompt.contains("OCR"));
         assert!(prompt.contains("--psm"));
+        assert!(prompt.contains("test.png"));
     }
 
     #[test]

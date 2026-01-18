@@ -1,5 +1,8 @@
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 
+mod json_mode_helper;
+use json_mode_helper::{expected_values, json_mode_prompt, validate_person_info_json};
+
 #[tokio::test]
 #[ignore] // Requires ZAI_API_KEY environment variable
 async fn test_zai_glm_regular_mode() {
@@ -199,4 +202,36 @@ async fn test_zai_glm_thinking_mode() {
     );
 
     println!("Z.AI GLM thinking mode response: {}", response_text);
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_zai_glm_json_mode() {
+    let api_key = std::env::var("ZAI_API_KEY").expect("ZAI_API_KEY not set");
+
+    let client = nocodo_llm_sdk::glm::zai::ZaiGlmClient::new(api_key).unwrap();
+    let response = client
+        .message_builder()
+        .model("glm-4.6")
+        .max_tokens(100)
+        .response_format(nocodo_llm_sdk::glm::types::GlmResponseFormat::json_object())
+        .user_message(&json_mode_prompt())
+        .send()
+        .await;
+
+    assert!(response.is_ok());
+    let response = response.unwrap();
+    let content = response.choices[0].message.get_text();
+
+    // Validate JSON structure
+    validate_person_info_json(&content).expect("Response should be valid JSON");
+
+    // Parse and check expected values
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let (exp_name, exp_age, exp_city, exp_occupation) = expected_values();
+
+    assert_eq!(json["name"].as_str(), Some(exp_name.as_str()));
+    assert_eq!(json["age"].as_i64(), Some(exp_age));
+    assert_eq!(json["city"].as_str(), Some(exp_city.as_str()));
+    assert_eq!(json["occupation"].as_str(), Some(exp_occupation.as_str()));
 }
