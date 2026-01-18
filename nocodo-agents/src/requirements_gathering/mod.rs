@@ -1,3 +1,9 @@
+pub mod database;
+pub mod models;
+
+#[cfg(test)]
+mod migrations_test;
+
 use crate::{database::Database, Agent, AgentTool};
 use anyhow;
 use async_trait::async_trait;

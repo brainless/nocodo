@@ -1,101 +1,54 @@
-use rusqlite::Connection;
+use refinery::embed_migrations;
 
-/// Run migrations on an external database connection
-/// This allows other projects to use nocodo-agents migrations
-pub fn run_agent_migrations(conn: &Connection) -> anyhow::Result<()> {
-    conn.execute("PRAGMA foreign_keys = ON", [])?;
+// Embed migrations from the migrations directory
+embed_migrations!("src/database/migrations");
 
-    // Create agent_sessions table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS agent_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_name TEXT NOT NULL,
-            provider TEXT NOT NULL,
-            model TEXT NOT NULL,
-            system_prompt TEXT,
-            user_prompt TEXT NOT NULL,
-            config TEXT,
-            status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed')),
-            started_at INTEGER NOT NULL,
-            ended_at INTEGER,
-            result TEXT,
-            error TEXT
-        )",
-        [],
-    )?;
-
-    // Add config column if it doesn't exist (for existing databases)
-    let has_config: bool = conn
-        .query_row(
-            "SELECT COUNT(*) FROM pragma_table_info('agent_sessions') WHERE name = 'config'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0)
-        == 1;
-
-    if !has_config {
-        conn.execute("ALTER TABLE agent_sessions ADD COLUMN config TEXT", [])?;
-    }
-
-    // Create agent_messages table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS agent_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
-            content TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            FOREIGN KEY (session_id) REFERENCES agent_sessions (id) ON DELETE CASCADE
-        )",
-        [],
-    )?;
-
-    // Create agent_tool_calls table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS agent_tool_calls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER NOT NULL,
-            message_id INTEGER,
-            tool_call_id TEXT NOT NULL,
-            tool_name TEXT NOT NULL,
-            request TEXT NOT NULL,
-            response TEXT,
-            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'executing', 'completed', 'failed')),
-            created_at INTEGER NOT NULL,
-            completed_at INTEGER,
-            execution_time_ms INTEGER,
-            error_details TEXT,
-            FOREIGN KEY (session_id) REFERENCES agent_sessions (id) ON DELETE CASCADE,
-            FOREIGN KEY (message_id) REFERENCES agent_messages (id) ON DELETE SET NULL
-        )",
-        [],
-    )?;
-
-    // Create indexes for performance
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_agent_messages_session_created
-            ON agent_messages(session_id, created_at)",
-        [],
-    )?;
-
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_session
-            ON agent_tool_calls(session_id)",
-        [],
-    )?;
-
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_status
-            ON agent_tool_calls(session_id, status)",
-        [],
-    )?;
-
+/// Run agent core migrations on a database connection
+///
+/// This function runs migrations for the core agent tables:
+/// - agent_sessions: Tracks agent execution sessions
+/// - agent_messages: Stores conversation messages
+/// - agent_tool_calls: Tracks tool executions
+///
+/// This function is public so that external projects can run these migrations
+/// on their own database connections. It works with any database that Refinery
+/// supports (SQLite, PostgreSQL, MySQL, SQL Server).
+///
+/// Currently generates SQLite dialect only. Support for other databases
+/// can be added by creating database-specific migration modules.
+///
+/// # Arguments
+/// * `conn` - A mutable reference to any database connection that implements refinery::migrate::Migrate
+///
+/// # Example with SQLite
+/// ```no_run
+/// use rusqlite::Connection;
+/// use nocodo_agents::database::migrations::run_agent_migrations;
+///
+/// let mut conn = Connection::open("mydb.db")?;
+/// run_agent_migrations(&mut conn)?;
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+///
+/// # Example with PostgreSQL
+/// ```no_run
+/// use postgres::Client;
+/// use nocodo_agents::database::migrations::run_agent_migrations;
+///
+/// let mut client = Client::connect("postgresql://localhost/mydb", postgres::NoTls)?;
+/// run_agent_migrations(&mut client)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn run_agent_migrations<C>(conn: &mut C) -> anyhow::Result<()>
+where
+    C: refinery::Migrate,
+{
+    migrations::runner().run(conn)?;
     Ok(())
 }
 
 /// Check if agent tables exist in database
-pub fn has_agent_schema(conn: &Connection) -> anyhow::Result<bool> {
+pub fn has_agent_schema(conn: &rusqlite::Connection) -> anyhow::Result<bool> {
     let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_sessions'")?;
     Ok(stmt.exists([])?)
