@@ -21,7 +21,7 @@ interface ClarificationRound {
   answers: Map<string, string>;
 }
 
-const ProjectSpecifications: Component = () => {
+const ProjectRequirements: Component = () => {
   const [searchParams] = useSearchParams();
 
   // Session tracking
@@ -261,7 +261,7 @@ const ProjectSpecifications: Component = () => {
   return (
     <div class="card bg-base-100 shadow-xl max-w-3xl">
       <div class="card-body">
-        <h1 class="text-3xl font-bold mb-4">Project Specifications</h1>
+        <h1 class="text-3xl font-bold mb-4">Project Requirements</h1>
 
         <div class="mb-6">
           <h2 class="text-lg font-semibold mb-2">Original Prompt:</h2>
@@ -336,7 +336,7 @@ const ProjectSpecifications: Component = () => {
                 disabled={isPolling() || !allQuestionsAnswered()}
                 onClick={handleUpdateSpecifications}
               >
-                Update Specifications
+                Update Requirements
               </button>
             </div>
           </div>
@@ -358,7 +358,7 @@ const ProjectSpecifications: Component = () => {
               />
             </svg>
             <span>
-              All clarifications complete! Your specifications are ready.
+              All clarifications complete! Your requirements are ready.
             </span>
           </div>
         </Show>
@@ -406,4 +406,4 @@ const ProjectSpecifications: Component = () => {
   );
 };
 
-export default ProjectSpecifications;
+export default ProjectRequirements;

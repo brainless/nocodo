@@ -15,8 +15,8 @@ const ProjectDetailsLayout: ParentComponent = (props) => {
 
         <ul class="menu bg-base-100 rounded-box w-full">
           <li>
-            <A href={`/projects/${params.projectId}/specifications`}>
-              Specifications
+            <A href={`/projects/${params.projectId}/requirements`}>
+              Requirements
             </A>
           </li>
           <li>

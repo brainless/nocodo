@@ -16,11 +16,9 @@ const Home: Component = () => {
       return;
     }
 
-    // Navigate to specifications page with prompt
+    // Navigate to requirements page with prompt
     // Use a dummy project_id=999 for demo purposes
-    navigate(
-      `/projects/999/specifications?prompt=${encodeURIComponent(prompt)}`
-    );
+    navigate(`/projects/999/requirements?prompt=${encodeURIComponent(prompt)}`);
   };
 
   return (
