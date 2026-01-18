@@ -169,6 +169,7 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS project_requirements_qna (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id INTEGER NOT NULL,
+                tool_call_id INTEGER,
                 question_id TEXT NOT NULL,
                 question TEXT NOT NULL,
                 description TEXT,
@@ -176,10 +177,29 @@ impl Database {
                 answer TEXT,
                 created_at INTEGER NOT NULL,
                 answered_at INTEGER,
-                FOREIGN KEY (session_id) REFERENCES agent_sessions (id) ON DELETE CASCADE
+                FOREIGN KEY (session_id) REFERENCES agent_sessions (id) ON DELETE CASCADE,
+                FOREIGN KEY (tool_call_id) REFERENCES agent_tool_calls (id) ON DELETE CASCADE
             )",
             [],
         )?;
+
+        // Add tool_call_id column if it doesn't exist (for existing databases)
+        let has_tool_call_id: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('project_requirements_qna') WHERE name = 'tool_call_id'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+            == 1;
+
+        if !has_tool_call_id {
+            tracing::info!("Adding tool_call_id column to project_requirements_qna table");
+            conn.execute(
+                "ALTER TABLE project_requirements_qna ADD COLUMN tool_call_id INTEGER REFERENCES agent_tool_calls(id) ON DELETE CASCADE",
+                [],
+            )?;
+        }
 
         // Create indexes for performance
         conn.execute(
@@ -289,6 +309,7 @@ impl Database {
     pub fn store_questions(
         &self,
         session_id: i64,
+        tool_call_id: Option<i64>,
         questions: &[shared_types::user_interaction::UserQuestion],
     ) -> anyhow::Result<()> {
         let conn = self.connection.lock().unwrap();
@@ -296,10 +317,11 @@ impl Database {
 
         for question in questions {
             conn.execute(
-                "INSERT INTO project_requirements_qna (session_id, question_id, question, description, response_type, created_at)
-                    VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO project_requirements_qna (session_id, tool_call_id, question_id, question, description, response_type, created_at)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
                     session_id,
+                    tool_call_id,
                     &question.id,
                     &question.question,
                     &question.description,

@@ -240,9 +240,37 @@ impl Agent for UserClarificationAgent {
                         let ask_user_request: shared_types::user_interaction::AskUserRequest =
                             serde_json::from_value(tool_call.arguments().clone())?;
 
-                        // Store questions in database
+                        // Create tool call record in agent_tool_calls table
+                        let start = Instant::now();
+                        let tool_call_id = self.database.create_tool_call(
+                            session_id,
+                            Some(message_id),
+                            tool_call.id(),
+                            tool_call.name(),
+                            tool_call.arguments().clone(),
+                        )?;
+                        let execution_time = start.elapsed().as_millis() as i64;
+
+                        // Store questions in database with reference to tool call
                         self.database
-                            .store_questions(session_id, &ask_user_request.questions)?;
+                            .store_questions(session_id, Some(tool_call_id), &ask_user_request.questions)?;
+
+                        // Mark the tool call as completed with the questions as response
+                        let response = serde_json::json!({
+                            "status": "questions_stored",
+                            "question_count": ask_user_request.questions.len()
+                        });
+                        self.database
+                            .complete_tool_call(tool_call_id, response, execution_time)?;
+
+                        // Create a tool result message for the conversation
+                        let message_to_llm = format!(
+                            "Tool {} result:\nStored {} clarification questions. Waiting for user answers.",
+                            tool_call.name(),
+                            ask_user_request.questions.len()
+                        );
+                        self.database
+                            .create_message(session_id, "tool", &message_to_llm)?;
 
                         // Pause session to wait for user input
                         self.database.pause_session_for_user_input(session_id)?;
