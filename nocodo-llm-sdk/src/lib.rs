@@ -148,6 +148,7 @@
 pub mod claude;
 pub mod client;
 pub mod error;
+pub mod gemini;
 pub mod glm;
 pub mod grok;
 pub mod model_metadata;
@@ -159,6 +160,7 @@ pub mod types;
 pub mod voyage;
 
 // Provider-specific exports
+pub use gemini::GeminiClient;
 pub use glm::cerebras::CerebrasGlmClient;
 pub use glm::zen::ZenGlmClient;
 pub use grok::xai::XaiGrokClient;

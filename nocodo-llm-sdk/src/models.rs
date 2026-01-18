@@ -171,5 +171,22 @@ pub mod voyage {
     pub const VOYAGE_LAW_2: &str = VOYAGE_LAW_2_ID;
 }
 
+/// Google Gemini model constants
+pub mod gemini {
+    /// Gemini 3 Pro - Most intelligent model for complex reasoning
+    /// Released: Preview, Context: 1M/64k, Thinking: low/high
+    pub const GEMINI_3_PRO_ID: &str = "gemini-3-pro-preview";
+    pub const GEMINI_3_PRO_NAME: &str = "Gemini 3 Pro";
+
+    /// Gemini 3 Flash - Pro-level intelligence at Flash speed
+    /// Released: Preview, Context: 1M/64k, Thinking: minimal/low/medium/high
+    pub const GEMINI_3_FLASH_ID: &str = "gemini-3-flash-preview";
+    pub const GEMINI_3_FLASH_NAME: &str = "Gemini 3 Flash";
+
+    // Backwards compatibility
+    pub const GEMINI_3_PRO: &str = GEMINI_3_PRO_ID;
+    pub const GEMINI_3_FLASH: &str = GEMINI_3_FLASH_ID;
+}
+
 // Re-export for convenience
 pub use claude::*;

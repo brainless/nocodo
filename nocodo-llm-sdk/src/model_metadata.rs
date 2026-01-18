@@ -267,6 +267,35 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             default_temperature: Some(1.0),
             default_max_tokens: Some(4096),
         },
+        // Google Gemini models
+        ModelMetadata {
+            provider: providers::GOOGLE,
+            model_id: models::gemini::GEMINI_3_PRO_ID,
+            name: models::gemini::GEMINI_3_PRO_NAME,
+            context_length: 1_000_000,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.000002),
+            output_cost_per_token: Some(0.000012),
+            default_temperature: Some(1.0),
+            default_max_tokens: Some(64_000),
+        },
+        ModelMetadata {
+            provider: providers::GOOGLE,
+            model_id: models::gemini::GEMINI_3_FLASH_ID,
+            name: models::gemini::GEMINI_3_FLASH_NAME,
+            context_length: 1_000_000,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.0000005),
+            output_cost_per_token: Some(0.000003),
+            default_temperature: Some(1.0),
+            default_max_tokens: Some(64_000),
+        },
     ]
 }
 
