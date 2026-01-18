@@ -53,6 +53,7 @@ async fn test_grok_providers() -> Result<(), Box<dyn std::error::Error>> {
         tools: None,
         tool_choice: None,
         stream: None,
+        response_format: None,
     };
 
     match zen_client.create_chat_completion(request).await {
@@ -85,6 +86,7 @@ async fn test_grok_providers() -> Result<(), Box<dyn std::error::Error>> {
             stream: None,
             tools: None,
             tool_choice: None,
+            response_format: None,
         };
 
         match xai_client.create_chat_completion(request).await {
@@ -124,6 +126,7 @@ async fn test_glm_providers() -> Result<(), Box<dyn std::error::Error>> {
             seed: None,
             tools: None,
             tool_choice: None,
+            response_format: None,
         };
 
         match cerebras_client.create_chat_completion(request).await {

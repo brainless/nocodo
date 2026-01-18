@@ -606,6 +606,7 @@ async fn test_zen_multi_turn(
                 },
             ]),
             tool_choice: None,
+            response_format: None,
         };
 
         let response = grok_client.create_chat_completion(request).await?;
@@ -660,6 +661,7 @@ async fn test_zen_multi_turn(
                 },
             ]),
             tool_choice: None,
+            response_format: None,
         };
 
         let response = glm_client.create_chat_completion(request).await?;

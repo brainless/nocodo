@@ -18,10 +18,18 @@ async fn test_gemini_3_pro_simple_completion() {
         .expect("Failed to get response");
 
     assert!(!response.candidates.is_empty());
-    let text = response.candidates[0].content.parts[0]
-        .text
-        .as_ref()
-        .expect("Expected text response");
+    let content = &response.candidates[0].content;
+
+    let text = if let Some(parts) = &content.parts {
+        parts[0].text.as_ref().expect("Expected text response")
+    } else if let Some(text) = &content.text {
+        text
+    } else {
+        panic!(
+            "No text found in response. This might indicate API access issues with Gemini 3 Pro."
+        );
+    };
+
     assert!(text.contains("4") || text.to_lowercase().contains("four"));
 }
 

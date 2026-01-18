@@ -32,22 +32,24 @@ impl<'a> MessageBuilder<'a> {
 
     pub fn user_message(mut self, text: impl Into<String>) -> Self {
         self.contents.push(GeminiContent {
-            role: GeminiRole::User,
-            parts: vec![GeminiPart {
+            role: Some(GeminiRole::User),
+            parts: Some(vec![GeminiPart {
                 text: Some(text.into()),
                 ..Default::default()
-            }],
+            }]),
+            text: None,
         });
         self
     }
 
     pub fn model_message(mut self, text: impl Into<String>) -> Self {
         self.contents.push(GeminiContent {
-            role: GeminiRole::Model,
-            parts: vec![GeminiPart {
+            role: Some(GeminiRole::Model),
+            parts: Some(vec![GeminiPart {
                 text: Some(text.into()),
                 ..Default::default()
-            }],
+            }]),
+            text: None,
         });
         self
     }
@@ -113,11 +115,12 @@ impl<'a> MessageBuilder<'a> {
         let request = GeminiGenerateContentRequest {
             contents: self.contents,
             system_instruction: self.system_instruction.map(|text| GeminiContent {
-                role: GeminiRole::User,
-                parts: vec![GeminiPart {
+                role: Some(GeminiRole::User),
+                parts: Some(vec![GeminiPart {
                     text: Some(text),
                     ..Default::default()
-                }],
+                }]),
+                text: None,
             }),
             tools: if self.tools.is_empty() {
                 None

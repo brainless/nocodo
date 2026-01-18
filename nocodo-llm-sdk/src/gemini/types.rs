@@ -32,8 +32,12 @@ pub struct GeminiPart {
 /// Content object representing a turn in conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeminiContent {
-    pub role: GeminiRole,
-    pub parts: Vec<GeminiPart>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<GeminiRole>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parts: Option<Vec<GeminiPart>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
 }
 
 /// Thinking configuration for Gemini 3 models
@@ -115,9 +119,12 @@ pub struct GeminiCandidate {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeminiUsageMetadata {
-    pub prompt_token_count: u32,
-    pub candidates_token_count: u32,
-    pub total_token_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_token_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidates_token_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_token_count: Option<u32>,
 }
 
 /// Main response structure

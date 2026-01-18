@@ -19,6 +19,7 @@ async fn test_zen_glm_big_pickle_free_model() {
         seed: None,
         tools: None,
         tool_choice: None,
+        response_format: None,
     };
 
     let response = client
@@ -61,6 +62,7 @@ async fn test_zen_glm_with_api_key() {
         seed: None,
         tools: None,
         tool_choice: None,
+        response_format: None,
     };
 
     let response = client
