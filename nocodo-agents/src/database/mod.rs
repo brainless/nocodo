@@ -85,7 +85,9 @@ impl Database {
         };
 
         if needs_migration {
-            tracing::info!("Migrating agent_sessions table to support waiting_for_user_input status");
+            tracing::info!(
+                "Migrating agent_sessions table to support waiting_for_user_input status"
+            );
 
             // Temporarily disable foreign keys for migration
             conn.execute("PRAGMA foreign_keys = OFF", [])?;
@@ -122,7 +124,10 @@ impl Database {
             conn.execute("DROP TABLE agent_sessions", [])?;
 
             // Rename new table
-            conn.execute("ALTER TABLE agent_sessions_new RENAME TO agent_sessions", [])?;
+            conn.execute(
+                "ALTER TABLE agent_sessions_new RENAME TO agent_sessions",
+                [],
+            )?;
 
             // Re-enable foreign keys
             conn.execute("PRAGMA foreign_keys = ON", [])?;

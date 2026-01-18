@@ -1,12 +1,11 @@
+use nocodo_llm_sdk::models::voyage::{VOYAGE_4, VOYAGE_4_LITE, VOYAGE_CODE_3};
 use nocodo_llm_sdk::voyage::{VoyageClient, VoyageInputType, VoyageOutputDtype};
-use nocodo_llm_sdk::models::voyage::{VOYAGE_4_LITE, VOYAGE_4, VOYAGE_CODE_3};
 use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get API key from environment variable
-    let api_key = env::var("VOYAGE_API_KEY")
-        .expect("VOYAGE_API_KEY environment variable not set");
+    let api_key = env::var("VOYAGE_API_KEY").expect("VOYAGE_API_KEY environment variable not set");
 
     let client = VoyageClient::new(api_key)?;
 
@@ -24,8 +23,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Model: {}", response.model);
     println!("   Total tokens: {}", response.usage.total_tokens);
     for embedding in &response.data {
-        println!("   Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
-        println!("   First 5 values: {:?}", &embedding.embedding[..5.min(embedding.embedding.len())]);
+        println!(
+            "   Embedding {}: {} dimensions",
+            embedding.index,
+            embedding.embedding.len()
+        );
+        println!(
+            "   First 5 values: {:?}",
+            &embedding.embedding[..5.min(embedding.embedding.len())]
+        );
     }
     println!();
 
@@ -37,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .input(vec![
             "What is machine learning?",
             "How does neural network training work?",
-            "Explain gradient descent algorithm"
+            "Explain gradient descent algorithm",
         ])
         .input_type(VoyageInputType::Query)
         .send()
@@ -47,7 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Total tokens: {}", response.usage.total_tokens);
     println!("   Number of embeddings: {}", response.data.len());
     for embedding in &response.data {
-        println!("   Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
+        println!(
+            "   Embedding {}: {} dimensions",
+            embedding.index,
+            embedding.embedding.len()
+        );
     }
     println!();
 
@@ -59,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .input(vec![
             "Machine learning is a subset of artificial intelligence.",
             "Deep learning uses neural networks with multiple layers.",
-            "Natural language processing enables computers to understand text."
+            "Natural language processing enables computers to understand text.",
         ])
         .input_type(VoyageInputType::Document)
         .output_dimension(512)
@@ -69,7 +79,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Model: {}", response.model);
     println!("   Total tokens: {}", response.usage.total_tokens);
     for embedding in &response.data {
-        println!("   Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
+        println!(
+            "   Embedding {}: {} dimensions",
+            embedding.index,
+            embedding.embedding.len()
+        );
     }
     println!();
 
@@ -81,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .input(vec![
             "fn add(a: i32, b: i32) -> i32 { a + b }",
             "function multiply(x, y) { return x * y; }",
-            "def subtract(a, b): return a - b"
+            "def subtract(a, b): return a - b",
         ])
         .input_type(VoyageInputType::Document)
         .send()
@@ -90,7 +104,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Model: {}", response.model);
     println!("   Total tokens: {}", response.usage.total_tokens);
     for embedding in &response.data {
-        println!("   Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
+        println!(
+            "   Embedding {}: {} dimensions",
+            embedding.index,
+            embedding.embedding.len()
+        );
     }
     println!();
 
@@ -107,7 +125,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Model: {}", response.model);
     println!("   Total tokens: {}", response.usage.total_tokens);
     for embedding in &response.data {
-        println!("   Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
+        println!(
+            "   Embedding {}: {} dimensions",
+            embedding.index,
+            embedding.embedding.len()
+        );
     }
     println!();
 
@@ -119,7 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .input(vec![
             "Compact representation for fast similarity search",
             "Lower dimensional embeddings use less memory",
-            "Trade-off between dimension and accuracy"
+            "Trade-off between dimension and accuracy",
         ])
         .output_dimension(256)
         .truncation(true)
@@ -129,7 +151,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Model: {}", response.model);
     println!("   Total tokens: {}", response.usage.total_tokens);
     for embedding in &response.data {
-        println!("   Embedding {}: {} dimensions", embedding.index, embedding.embedding.len());
+        println!(
+            "   Embedding {}: {} dimensions",
+            embedding.index,
+            embedding.embedding.len()
+        );
     }
     println!();
 

@@ -252,8 +252,11 @@ impl Agent for UserClarificationAgent {
                         let execution_time = start.elapsed().as_millis() as i64;
 
                         // Store questions in database with reference to tool call
-                        self.database
-                            .store_questions(session_id, Some(tool_call_id), &ask_user_request.questions)?;
+                        self.database.store_questions(
+                            session_id,
+                            Some(tool_call_id),
+                            &ask_user_request.questions,
+                        )?;
 
                         // Mark the tool call as completed with the questions as response
                         let response = serde_json::json!({

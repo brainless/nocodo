@@ -1,14 +1,14 @@
 use crate::models::ErrorResponse;
 use crate::DbConnection;
 use actix_web::{get, post, web, HttpResponse, Responder};
+use nocodo_agents::Agent;
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use shared_types::{
     SessionListItem, SessionListResponse, SessionMessage, SessionResponse, SessionToolCall,
 };
-use tracing::{error, info, warn};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use nocodo_agents::Agent;
+use tracing::{error, info, warn};
 
 #[get("/agents/sessions/{session_id}")]
 pub async fn get_session(
@@ -182,7 +182,11 @@ pub async fn get_pending_questions(
 
     match database.get_pending_questions(id) {
         Ok(questions) => {
-            info!(session_id = id, question_count = questions.len(), "Retrieved pending questions");
+            info!(
+                session_id = id,
+                question_count = questions.len(),
+                "Retrieved pending questions"
+            );
             HttpResponse::Ok().json(QuestionsResponse { questions })
         }
         Err(e) => {
@@ -207,7 +211,11 @@ pub async fn submit_answers(
     llm_client: web::Data<std::sync::Arc<dyn nocodo_llm_sdk::client::LlmClient>>,
 ) -> impl Responder {
     let id = session_id.into_inner();
-    info!(session_id = id, answer_count = req.answers.len(), "Submitting answers");
+    info!(
+        session_id = id,
+        answer_count = req.answers.len(),
+        "Submitting answers"
+    );
 
     // Store answers in database
     if let Err(e) = database.store_answers(id, &req.answers) {
@@ -274,10 +282,16 @@ pub async fn submit_answers(
     let llm_client_clone = llm_client.get_ref().clone();
 
     tokio::spawn(async move {
-        info!(session_id = id, "Resuming agent execution with user answers");
+        info!(
+            session_id = id,
+            "Resuming agent execution with user answers"
+        );
 
         // Create the agent
-        let agent = match crate::helpers::agents::create_user_clarification_agent(&llm_client_clone, &database_clone) {
+        let agent = match crate::helpers::agents::create_user_clarification_agent(
+            &llm_client_clone,
+            &database_clone,
+        ) {
             Ok(agent) => agent,
             Err(e) => {
                 error!(error = %e, session_id = id, "Failed to create agent for resumption");
@@ -293,7 +307,8 @@ pub async fn submit_answers(
                 "SELECT user_prompt FROM agent_sessions WHERE id = ?1",
                 params![id],
                 |row| row.get::<_, String>(0),
-            ).ok()
+            )
+            .ok()
         };
 
         if let Some(prompt) = original_prompt {

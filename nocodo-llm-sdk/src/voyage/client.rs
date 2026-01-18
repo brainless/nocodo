@@ -111,10 +111,7 @@ impl VoyageClient {
                     reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
                         Err(LlmError::api_error(500, error_response.detail))
                     }
-                    _ => Err(LlmError::api_error(
-                        status.as_u16(),
-                        error_response.detail,
-                    )),
+                    _ => Err(LlmError::api_error(status.as_u16(), error_response.detail)),
                 }
             } else {
                 // Fallback for non-standard error responses
