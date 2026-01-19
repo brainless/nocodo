@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let database = Arc::new(nocodo_agents::database::Database::new(&db_path)?);
 
     let tool_executor = Arc::new(
-        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+        nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 

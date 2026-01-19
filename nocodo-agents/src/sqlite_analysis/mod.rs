@@ -1,10 +1,10 @@
 use crate::{database::Database, Agent, AgentTool};
 use anyhow::{self};
 use async_trait::async_trait;
-use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_tools::ToolExecutor;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
@@ -29,7 +29,7 @@ impl SqliteAnalysisAgent {
     ) -> anyhow::Result<Self> {
         validate_db_path(&db_path)?;
 
-        let table_names = manager_tools::sqlite_analysis::get_table_names(&db_path).await?;
+        let table_names = nocodo_tools::sqlite_analysis::get_table_names(&db_path).await?;
 
         let db_name = std::path::Path::new(&db_path)
             .file_stem()
@@ -110,7 +110,7 @@ impl SqliteAnalysisAgent {
         let mut tool_request =
             AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
 
-        if let manager_tools::types::ToolRequest::Sqlite3Reader(ref mut req) = tool_request {
+        if let nocodo_tools::types::ToolRequest::Sqlite3Reader(ref mut req) = tool_request {
             req.db_path = self.db_path.clone();
             tracing::debug!(
                 db_path = %self.db_path,
@@ -127,7 +127,7 @@ impl SqliteAnalysisAgent {
         )?;
 
         let start = Instant::now();
-        let result: anyhow::Result<manager_tools::types::ToolResponse> =
+        let result: anyhow::Result<nocodo_tools::types::ToolResponse> =
             self.tool_executor.execute(tool_request).await;
         let execution_time = start.elapsed().as_millis() as i64;
 

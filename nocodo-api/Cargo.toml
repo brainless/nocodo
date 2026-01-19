@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 nocodo-llm-sdk = { path = "../nocodo-llm-sdk" }
 nocodo-agents = { path = "../nocodo-agents" }
-manager-tools = { path = "../manager-tools" }
+nocodo-tools = { path = "../nocodo-tools" }
 shared-types = { path = "../shared-types" }
 actix-web.workspace = true
 actix-cors = "0.7"

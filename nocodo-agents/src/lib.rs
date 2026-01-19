@@ -10,8 +10,8 @@ pub mod tesseract;
 pub mod tools;
 
 use async_trait::async_trait;
-use manager_tools::types::filesystem::*;
-use manager_tools::types::{ToolRequest, ToolResponse};
+use nocodo_tools::types::filesystem::*;
+use nocodo_tools::types::{ToolRequest, ToolResponse};
 use serde::{Deserialize, Serialize};
 use shared_types::user_interaction::*;
 
@@ -68,7 +68,7 @@ impl AgentTool {
                 ToolRequest::WriteFile(req)
             }
             "grep" => {
-                let req: manager_tools::types::GrepRequest = serde_json::from_value(arguments)?;
+                let req: nocodo_tools::types::GrepRequest = serde_json::from_value(arguments)?;
                 ToolRequest::Grep(req)
             }
             "apply_patch" => {
@@ -76,7 +76,7 @@ impl AgentTool {
                 ToolRequest::ApplyPatch(req)
             }
             "bash" => {
-                let req: manager_tools::types::BashRequest = serde_json::from_value(arguments)?;
+                let req: nocodo_tools::types::BashRequest = serde_json::from_value(arguments)?;
                 ToolRequest::Bash(req)
             }
             "ask_user" => {
@@ -97,9 +97,9 @@ impl AgentTool {
                     .and_then(|v| v.as_u64())
                     .map(|v| v as usize);
 
-                ToolRequest::Sqlite3Reader(manager_tools::types::Sqlite3ReaderRequest {
+                ToolRequest::Sqlite3Reader(nocodo_tools::types::Sqlite3ReaderRequest {
                     db_path: String::new(),
-                    mode: manager_tools::types::SqliteMode::Query { query },
+                    mode: nocodo_tools::types::SqliteMode::Query { query },
                     limit,
                 })
             }
@@ -111,7 +111,7 @@ impl AgentTool {
 }
 
 /// Format ToolResponse for display to LLM
-pub fn format_tool_response(response: &manager_tools::types::ToolResponse) -> String {
+pub fn format_tool_response(response: &nocodo_tools::types::ToolResponse) -> String {
     match response {
         ToolResponse::ListFiles(r) => format!("Found {} files:\n{}", r.files.len(), r.files),
         ToolResponse::ReadFile(r) => {

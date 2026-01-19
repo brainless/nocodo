@@ -1,6 +1,6 @@
-use manager_tools::types::filesystem::*;
-use manager_tools::types::{BashRequest, GrepRequest};
 use nocodo_llm_sdk::tools::Tool;
+use nocodo_tools::types::filesystem::*;
+use nocodo_tools::types::{BashRequest, GrepRequest};
 use shared_types::user_interaction::*;
 
 /// Create tool definitions for LLM using manager-models types

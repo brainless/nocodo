@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 nocodo-llm-sdk = { path = "../nocodo-llm-sdk", features = ["ffi"] }
 shared-types = { path = "../shared-types" }
-manager-tools = { path = "../manager-tools" }
+nocodo-tools = { path = "../nocodo-tools" }
 anyhow = { workspace = true }
 async-trait = "0.1"
 tokio = { version = "1.0", features = ["full"] }
