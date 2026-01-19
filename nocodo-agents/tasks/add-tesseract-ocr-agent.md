@@ -535,7 +535,7 @@ Add module declaration:
 pub mod codebase_analysis;
 pub mod database;
 pub mod factory;
-pub mod sqlite_analysis;
+pub mod sqlite_reader;
 pub mod tesseract;  // ← ADD THIS
 pub mod tools;
 ```
@@ -844,7 +844,7 @@ The agent uses `BashPermissions::minimal(vec!["tesseract"])`:
 ## Notes
 
 - Testing deferred due to complexity of mocking multi-turn tool calling and external dependencies
-- Agent follows same pattern as SqliteAnalysisAgent and CodebaseAnalysisAgent for consistency
+- Agent follows same pattern as SqliteReaderAgent and CodebaseAnalysisAgent for consistency
 - Tesseract must be installed on system - agent will provide helpful error messages if missing
 - The agent is secure by design - restricted bash access and file path validation
 - LLM cleaning is a key differentiator - not just running tesseract, but intelligently processing output

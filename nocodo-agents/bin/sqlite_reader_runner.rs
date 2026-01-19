@@ -1,5 +1,5 @@
 use clap::Parser;
-use nocodo_agents::{config, factory::create_sqlite_analysis_agent, Agent};
+use nocodo_agents::{config, factory::create_sqlite_reader_agent, Agent};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use nocodo_tools::ToolExecutor;
 use std::path::PathBuf;
@@ -44,8 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let tool_executor =
         Arc::new(ToolExecutor::new(std::env::current_dir()?).with_max_file_size(10 * 1024 * 1024));
 
-    let (agent, database) =
-        create_sqlite_analysis_agent(client, tool_executor, args.db_path).await?;
+    let (agent, database) = create_sqlite_reader_agent(client, tool_executor, args.db_path).await?;
 
     tracing::info!("System prompt:\n{}", agent.system_prompt());
 
@@ -54,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
 
     // For standalone runner, create a dummy session
     let session_id = database.create_session(
-        "sqlite-analysis",
+        "sqlite-reader",
         "standalone",
         "standalone",
         Some(&agent.system_prompt()),

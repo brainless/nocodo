@@ -4,7 +4,7 @@ pub mod database;
 pub mod factory;
 pub mod requirements_gathering;
 pub mod settings_management;
-pub mod sqlite_analysis;
+pub mod sqlite_reader;
 pub mod structured_json;
 pub mod tesseract;
 pub mod tools;
@@ -207,7 +207,7 @@ pub struct SettingDefinition {
 pub struct AgentSettingsSchema {
     /// Name of the agent (for display purposes)
     pub agent_name: String,
-    /// Section name in the TOML file (e.g., "sqlite_analysis", "api_client")
+    /// Section name in the TOML file (e.g., "sqlite_reader", "api_client")
     pub section_name: String,
     /// List of settings this agent needs
     pub settings: Vec<SettingDefinition>,

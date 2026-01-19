@@ -23,7 +23,7 @@
 //! 3  | Carol | carol@example.com
 //! ```
 
-pub fn format_query_result(result: &crate::sqlite_analysis::executor::QueryResult) -> String {
+pub fn format_query_result(result: &crate::sqlite_reader::executor::QueryResult) -> String {
     if result.row_count == 0 {
         return "Query executed successfully but returned no rows.".to_string();
     }
@@ -116,7 +116,7 @@ fn format_cell_value(value: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sqlite_analysis::executor::QueryResult;
+    use crate::sqlite_reader::executor::QueryResult;
     use serde_json::Value;
 
     #[test]

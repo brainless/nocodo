@@ -12,7 +12,7 @@ use std::time::Instant;
 #[cfg(test)]
 mod tests;
 
-pub struct SqliteAnalysisAgent {
+pub struct SqliteReaderAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
     tool_executor: Arc<ToolExecutor>,
@@ -20,7 +20,7 @@ pub struct SqliteAnalysisAgent {
     system_prompt: String,
 }
 
-impl SqliteAnalysisAgent {
+impl SqliteReaderAgent {
     pub async fn new(
         client: Arc<dyn LlmClient>,
         database: Arc<Database>,
@@ -29,7 +29,7 @@ impl SqliteAnalysisAgent {
     ) -> anyhow::Result<Self> {
         validate_db_path(&db_path)?;
 
-        let table_names = nocodo_tools::sqlite_analysis::get_table_names(&db_path).await?;
+        let table_names = nocodo_tools::sqlite_reader::get_table_names(&db_path).await?;
 
         let db_name = std::path::Path::new(&db_path)
             .file_stem()
@@ -174,7 +174,7 @@ impl SqliteAnalysisAgent {
 }
 
 #[async_trait]
-impl Agent for SqliteAnalysisAgent {
+impl Agent for SqliteReaderAgent {
     fn objective(&self) -> &str {
         "Analyze SQLite database structure and contents"
     }
@@ -190,7 +190,7 @@ impl Agent for SqliteAnalysisAgent {
     fn settings_schema(&self) -> crate::AgentSettingsSchema {
         Self::static_settings_schema().unwrap_or_else(|| crate::AgentSettingsSchema {
             agent_name: "SQLite Analysis Agent".to_string(),
-            section_name: "sqlite_analysis".to_string(),
+            section_name: "sqlite_reader".to_string(),
             settings: vec![],
         })
     }
@@ -198,7 +198,7 @@ impl Agent for SqliteAnalysisAgent {
     fn static_settings_schema() -> Option<crate::AgentSettingsSchema> {
         Some(crate::AgentSettingsSchema {
             agent_name: "SQLite Analysis Agent".to_string(),
-            section_name: "sqlite_analysis".to_string(),
+            section_name: "sqlite_reader".to_string(),
             settings: vec![crate::SettingDefinition {
                 name: "db_path".to_string(),
                 label: "Database Path".to_string(),

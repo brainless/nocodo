@@ -8,10 +8,10 @@ Updated the SQLite analysis agent to use the new reflect mode for schema discove
 
 ## Changes Made
 
-### 1. Agent Initialization (nocodo-agents/src/sqlite_analysis/mod.rs)
+### 1. Agent Initialization (nocodo-agents/src/sqlite_reader/mod.rs)
 
 #### Made Constructor Async
-- Changed `SqliteAnalysisAgent::new()` from sync to `async fn`
+- Changed `SqliteReaderAgent::new()` from sync to `async fn`
 - Allows schema discovery to happen during initialization
 
 #### Added Schema Discovery
@@ -46,16 +46,16 @@ Updated the SQLite analysis agent to use the new reflect mode for schema discove
 ### 2. Factory Update (nocodo-agents/src/factory.rs)
 
 #### Made Factory Function Async
-- Changed `create_sqlite_analysis_agent()` to `pub async fn`
+- Changed `create_sqlite_reader_agent()` to `pub async fn`
 - Now awaits the agent's async initialization
 
-### 3. CLI Runner Update (nocodo-agents/bin/sqlite_analysis_runner.rs)
+### 3. CLI Runner Update (nocodo-agents/bin/sqlite_reader_runner.rs)
 
 #### Added Async Await
 - Updated agent creation to use `.await`
 - Properly handles async factory function
 
-### 4. Test Coverage (nocodo-agents/src/sqlite_analysis/tests.rs)
+### 4. Test Coverage (nocodo-agents/src/sqlite_reader/tests.rs)
 
 Added comprehensive unit tests:
 
@@ -165,7 +165,7 @@ This task depends on:
 Run the CLI to test with a real database:
 
 ```bash
-cargo run --bin sqlite-analysis-runner \
+cargo run --bin sqlite-reader-runner \
   --prompt "Show me all tables and their schemas" \
   --config path/to/config.toml \
   --db-path /path/to/database.db
@@ -173,10 +173,10 @@ cargo run --bin sqlite-analysis-runner \
 
 ## Files Modified
 
-1. `nocodo-agents/src/sqlite_analysis/mod.rs` - Core agent implementation
+1. `nocodo-agents/src/sqlite_reader/mod.rs` - Core agent implementation
 2. `nocodo-agents/src/factory.rs` - Factory function
-3. `nocodo-agents/bin/sqlite_analysis_runner.rs` - CLI runner
-4. `nocodo-agents/src/sqlite_analysis/tests.rs` - Unit tests
+3. `nocodo-agents/bin/sqlite_reader_runner.rs` - CLI runner
+4. `nocodo-agents/src/sqlite_reader/tests.rs` - Unit tests
 
 ## Lines Changed
 

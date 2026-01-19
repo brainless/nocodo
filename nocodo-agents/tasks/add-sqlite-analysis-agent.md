@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a specialized AI agent (`SqliteAnalysisAgent`) for analyzing SQLite databases. This agent uses the sqlite3_reader tool to query databases, explore schemas, and answer user questions about database contents. The agent will be reusable across projects (manager, Indistocks, etc.).
+Add a specialized AI agent (`SqliteReaderAgent`) for analyzing SQLite databases. This agent uses the sqlite3_reader tool to query databases, explore schemas, and answer user questions about database contents. The agent will be reusable across projects (manager, Indistocks, etc.).
 
 ## Problem Statement
 
@@ -20,7 +20,7 @@ Currently, there's no agent specialized for database analysis in nocodo-agents.
 
 ## Goals
 
-1. **Create SqliteAnalysisAgent**: Specialized agent for SQLite database analysis
+1. **Create SqliteReaderAgent**: Specialized agent for SQLite database analysis
 2. **Database path configuration**: Agent configured with specific database at construction
 3. **System prompt includes path**: Override Agent trait to return String containing db_path
 4. **Path injection**: Automatically inject db_path into sqlite3_reader tool calls
@@ -43,7 +43,7 @@ Currently, there's no agent specialized for database analysis in nocodo-agents.
 ### Agent Structure
 
 ```rust
-pub struct SqliteAnalysisAgent {
+pub struct SqliteReaderAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,           // Session tracking (separate from analyzed DB)
     tool_executor: Arc<ToolExecutor>,
@@ -236,20 +236,20 @@ pub fn create_tool_definitions() -> Vec<Tool> {
 }
 ```
 
-### Phase 2: Create SqliteAnalysisAgent Module
+### Phase 2: Create SqliteReaderAgent Module
 
 #### 2.1 Create Module Structure
 
 Create new directory and files:
 ```
 nocodo-agents/src/
-  sqlite_analysis/
+  sqlite_reader/
     mod.rs          # Main agent implementation
 ```
 
-#### 2.2 Implement SqliteAnalysisAgent
+#### 2.2 Implement SqliteReaderAgent
 
-**File**: `nocodo-agents/src/sqlite_analysis/mod.rs`
+**File**: `nocodo-agents/src/sqlite_reader/mod.rs`
 
 ```rust
 use crate::{database::Database, Agent, AgentTool};
@@ -264,7 +264,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 /// Agent specialized in analyzing SQLite databases
-pub struct SqliteAnalysisAgent {
+pub struct SqliteReaderAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
     tool_executor: Arc<ToolExecutor>,
@@ -272,8 +272,8 @@ pub struct SqliteAnalysisAgent {
     system_prompt: String,
 }
 
-impl SqliteAnalysisAgent {
-    /// Create a new SqliteAnalysisAgent
+impl SqliteReaderAgent {
+    /// Create a new SqliteReaderAgent
     ///
     /// # Arguments
     /// * `client` - LLM client for AI inference
@@ -417,7 +417,7 @@ impl SqliteAnalysisAgent {
 }
 
 #[async_trait]
-impl Agent for SqliteAnalysisAgent {
+impl Agent for SqliteReaderAgent {
     fn objective(&self) -> &str {
         "Analyze SQLite database structure and contents"
     }
@@ -591,30 +591,30 @@ Add module declaration:
 pub mod codebase_analysis;
 pub mod database;
 pub mod factory;
-pub mod sqlite_analysis;  // ← ADD THIS
+pub mod sqlite_reader;  // ← ADD THIS
 pub mod tools;
 ```
 
 ### Phase 3: Update Agent Factory
 
-#### 3.1 Add SqliteAnalysisAgent to Factory
+#### 3.1 Add SqliteReaderAgent to Factory
 
 **File**: `nocodo-agents/src/factory.rs`
 
-Add factory method for creating SqliteAnalysisAgent:
+Add factory method for creating SqliteReaderAgent:
 
 ```rust
-use crate::sqlite_analysis::SqliteAnalysisAgent;
+use crate::sqlite_reader::SqliteReaderAgent;
 
 impl AgentFactory {
     // ... existing methods
 
-    /// Create a SqliteAnalysisAgent for analyzing a specific database
-    pub fn create_sqlite_analysis_agent(
+    /// Create a SqliteReaderAgent for analyzing a specific database
+    pub fn create_sqlite_reader_agent(
         &self,
         db_path: String,
-    ) -> anyhow::Result<SqliteAnalysisAgent> {
-        SqliteAnalysisAgent::new(
+    ) -> anyhow::Result<SqliteReaderAgent> {
+        SqliteReaderAgent::new(
             self.llm_client.clone(),
             self.database.clone(),
             self.tool_executor.clone(),
@@ -627,13 +627,13 @@ impl AgentFactory {
 ## Files Changed
 
 ### New Files
-- `nocodo-agents/src/sqlite_analysis/mod.rs` - SqliteAnalysisAgent implementation
+- `nocodo-agents/src/sqlite_reader/mod.rs` - SqliteReaderAgent implementation
 - `nocodo-agents/tasks/add-sqlite-analysis-agent.md` - This task document
 
 ### Modified Files
-- `nocodo-agents/src/lib.rs` - Add Sqlite3Reader to AgentTool, export sqlite_analysis module, change Agent trait
+- `nocodo-agents/src/lib.rs` - Add Sqlite3Reader to AgentTool, export sqlite_reader module, change Agent trait
 - `nocodo-agents/src/tools/llm_schemas.rs` - Add sqlite3_reader tool schema
-- `nocodo-agents/src/factory.rs` - Add factory method for SqliteAnalysisAgent
+- `nocodo-agents/src/factory.rs` - Add factory method for SqliteReaderAgent
 - `nocodo-agents/src/codebase_analysis/mod.rs` - Update system_prompt to return String
 
 ## Build & Quality Checks
@@ -660,7 +660,7 @@ cargo check
 ### Basic Usage
 
 ```rust
-use nocodo_agents::sqlite_analysis::SqliteAnalysisAgent;
+use nocodo_agents::sqlite_reader::SqliteReaderAgent;
 use nocodo_agents::{Agent, database::Database};
 use nocodo_llm_sdk::client::LlmClient;
 use manager_tools::ToolExecutor;
@@ -673,7 +673,7 @@ let database = Arc::new(Database::new(&PathBuf::from("agent-session.db"))?);
 let tool_executor = Arc::new(ToolExecutor::new(PathBuf::from(".")));
 
 // Create agent for specific database
-let agent = SqliteAnalysisAgent::new(
+let agent = SqliteReaderAgent::new(
     llm_client,
     database,
     tool_executor,
@@ -697,7 +697,7 @@ use nocodo_agents::Agent;
 
 let factory = AgentFactory::new(/* config */)?;
 
-let agent = factory.create_sqlite_analysis_agent(
+let agent = factory.create_sqlite_reader_agent(
     "/Users/user/Projects/Indistocks/data/stocks.db".to_string()
 )?;
 
@@ -710,9 +710,9 @@ let analysis = agent.execute(
 
 ```rust
 // In manager project
-use nocodo_agents::sqlite_analysis::SqliteAnalysisAgent;
+use nocodo_agents::sqlite_reader::SqliteReaderAgent;
 
-let agent = SqliteAnalysisAgent::new(
+let agent = SqliteReaderAgent::new(
     llm_client,
     session_db,
     tool_executor,
@@ -777,11 +777,11 @@ fn validate_db_path(db_path: &str) -> anyhow::Result<()> {
 - [ ] CodebaseAnalysisAgent updated to work with new trait signature
 - [ ] Sqlite3Reader added to AgentTool enum
 - [ ] Sqlite3Reader tool schema registered in llm_schemas.rs
-- [ ] SqliteAnalysisAgent module created with full implementation
+- [ ] SqliteReaderAgent module created with full implementation
 - [ ] Database path validation implemented (absolute paths, existence, file type)
 - [ ] Path injection working in execute_tool_call method
 - [ ] System prompt includes database path
-- [ ] Factory method added for creating SqliteAnalysisAgent
+- [ ] Factory method added for creating SqliteReaderAgent
 - [ ] Code compiles without errors
 - [ ] No clippy warnings
 - [ ] Code properly formatted

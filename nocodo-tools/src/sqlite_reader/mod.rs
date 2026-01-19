@@ -71,7 +71,7 @@
 //!
 //! ```rust,no_run
 //! use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! use nocodo_tools::sqlite_analysis::execute_sqlite3_reader;
+//! use nocodo_tools::sqlite_reader::execute_sqlite3_reader;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {

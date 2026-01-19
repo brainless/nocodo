@@ -99,7 +99,7 @@ tempfile = "3.0"
 ```
 
 ### Test Database Pattern
-Follow the pattern from `nocodo-agents/src/sqlite_analysis/tests.rs`:
+Follow the pattern from `nocodo-agents/src/sqlite_reader/tests.rs`:
 - Use `tempfile::NamedTempFile` for temporary SQLite databases
 - Use in-memory database for nocodo database: `Database::new(&PathBuf::from(":memory:"))?`
 - Clean up resources after test
@@ -178,5 +178,5 @@ let resp = test::call_service(&app, req).await;
 ## References
 - Agent execution handler: `nocodo-api/src/handlers/agent_execution.rs`
 - Database implementation: `nocodo-agents/src/database/mod.rs`
-- Existing test pattern: `nocodo-agents/src/sqlite_analysis/tests.rs`
+- Existing test pattern: `nocodo-agents/src/sqlite_reader/tests.rs`
 - Mock LLM pattern: `nocodo-agents/src/factory.rs:158-187`
