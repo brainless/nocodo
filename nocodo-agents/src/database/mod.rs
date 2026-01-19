@@ -24,8 +24,8 @@ impl Database {
         let mut conn = Connection::open(db_path)?;
         conn.execute("PRAGMA foreign_keys = ON", [])?;
 
-        // Run migrations using Refinery
-        migrations::run_agent_migrations(&mut conn)?;
+        // Run migrations using Refinery (with legacy database support)
+        migrations::run_agent_migrations_sqlite(&mut conn)?;
 
         Ok(Database {
             connection: Arc::new(Mutex::new(conn)),
