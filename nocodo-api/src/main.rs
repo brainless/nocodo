@@ -5,20 +5,55 @@ mod models;
 
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
+use clap::Parser;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use tracing::info;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(long)]
+    log_file_path: Option<String>,
+}
 
 pub type DbConnection = Arc<Mutex<Connection>>;
 
 #[actix_web::main]
 async fn main() -> Result<(), anyhow::Error> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    let args = Args::parse();
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    if let Some(log_path) = args.log_file_path {
+        let log_path = std::path::Path::new(&log_path);
+        let file_appender = tracing_appender::rolling::never(
+            log_path.parent().unwrap_or(std::path::Path::new(".")),
+            log_path
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("nocodo-api.log")),
+        );
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        std::mem::forget(guard);
+
+        tracing_subscriber::registry()
+            .with(env_filter.clone())
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_ansi(true)
+                    .with_writer(std::io::stdout),
+            )
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_ansi(false)
+                    .with_writer(non_blocking),
+            )
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    }
 
     let (api_config, config_path) = config::ApiConfig::load().expect("Failed to load config");
     info!("Loaded config from: {}", config_path.display());
@@ -28,9 +63,10 @@ async fn main() -> Result<(), anyhow::Error> {
         .read()
         .expect("Failed to acquire config read lock");
     let llm_client = helpers::llm::create_llm_client(&config).expect("Failed to create LLM client");
+    let db_path = config.database.path.clone();
     drop(config);
     let (db_conn, db) =
-        helpers::database::initialize_database().expect("Failed to initialize database");
+        helpers::database::initialize_database(&db_path).expect("Failed to initialize database");
 
     let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);
@@ -72,7 +108,10 @@ async fn main() -> Result<(), anyhow::Error> {
             .service(handlers::agent_execution::sqlite_agent::execute_sqlite_agent)
             .service(handlers::agent_execution::codebase_analysis_agent::execute_codebase_analysis_agent)
             .service(handlers::agent_execution::tesseract_agent::execute_tesseract_agent)
-            .service(handlers::agent_execution::requirements_gathering_agent::execute_user_clarification_agent)
+            .service(handlers::agent_execution::requirements_gathering_agent::execute_requirements_gathering_agent)
+            .service(
+                handlers::agent_execution::settings_management_agent::execute_settings_management_agent,
+            )
             .service(
                 handlers::agent_execution::workflow_creation_agent::execute_workflow_creation_agent,
             )

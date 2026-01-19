@@ -51,14 +51,14 @@ pub enum QuestionType {
     // Select,
     // /// Multiple choices from options
     // Multiselect,
-    // /// Password input (masked)
-    // Password,
-    // /// File path input
-    // FilePath,
-    // /// Email address input
-    // Email,
-    // /// URL input
-    // Url,
+    /// Password input (masked)
+    Password,
+    /// File path input
+    FilePath,
+    /// Email address input
+    Email,
+    /// URL input
+    Url,
 }
 
 /// Response from the ask_user tool containing user answers
@@ -106,7 +106,7 @@ impl AskUserRequest {
                             "type": {
                                 "type": "string",
                                 "description": "Type of response expected",
-                                "enum": ["text"]
+                                "enum": ["text", "password", "file_path", "email", "url"]
                             },
                             "default": {
                                 "type": "string",

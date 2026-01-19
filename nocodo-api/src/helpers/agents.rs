@@ -36,10 +36,18 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
             enabled: true,
         },
         AgentInfo {
-            id: "user-clarification".to_string(),
-            name: "User Clarification Agent".to_string(),
+            id: "requirements-gathering".to_string(),
+            name: "Requirements Gathering Agent".to_string(),
             description:
                 "Agent for analyzing user requests and determining if clarification questions are needed"
+                    .to_string(),
+            enabled: true,
+        },
+        AgentInfo {
+            id: "settings-management".to_string(),
+            name: "Settings Management Agent".to_string(),
+            description:
+                "Agent for collecting and managing settings required for workflow automation"
                     .to_string(),
             enabled: true,
         },
@@ -169,30 +177,36 @@ pub fn create_user_clarification_agent(
     Ok(agent)
 }
 
-/// Returns the path to the nocodo-api database based on the operating system
+/// Creates a Settings Management agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+/// * `settings_file_path` - Path to the TOML settings file
+/// * `agent_schemas` - List of agent settings schemas
 ///
 /// # Returns
 ///
-/// A PathBuf pointing to the API database file
-///
-/// # Platform-specific paths
-///
-/// - **macOS**: `~/Library/Application Support/nocodo/nocodo-api.db`
-/// - **Linux**: `~/.local/share/nocodo/nocodo-api.db`
-/// - **Windows**: `{FOLDERPATH}\nocodo\nocodo-api.db` (where FOLDERPATH is typically `C:\Users\<username>\AppData\Local`)
-pub fn get_api_db_path() -> anyhow::Result<std::path::PathBuf> {
-    let home =
-        home::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
+/// A Settings Management agent instance
+pub fn create_settings_management_agent(
+    llm_client: &Arc<dyn LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+    settings_file_path: &str,
+    agent_schemas: Vec<nocodo_agents::AgentSettingsSchema>,
+) -> anyhow::Result<nocodo_agents::settings_management::SettingsManagementAgent> {
+    let tool_executor = Arc::new(
+        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+            .with_max_file_size(10 * 1024 * 1024),
+    );
 
-    let db_path = if cfg!(target_os = "macos") {
-        home.join("Library/Application Support/nocodo/nocodo-api.db")
-    } else if cfg!(target_os = "linux") {
-        home.join(".local/share/nocodo/nocodo-api.db")
-    } else if cfg!(windows) {
-        home.join("AppData/Local/nocodo-api.db")
-    } else {
-        anyhow::bail!("Unsupported operating system");
-    };
+    let agent = nocodo_agents::settings_management::SettingsManagementAgent::new(
+        llm_client.clone(),
+        database.clone(),
+        tool_executor,
+        std::path::PathBuf::from(settings_file_path),
+        agent_schemas,
+    );
 
-    Ok(db_path)
+    Ok(agent)
 }

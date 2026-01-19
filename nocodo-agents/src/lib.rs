@@ -3,6 +3,7 @@ pub mod config;
 pub mod database;
 pub mod factory;
 pub mod requirements_gathering;
+pub mod settings_management;
 pub mod sqlite_analysis;
 pub mod structured_json;
 pub mod tesseract;
@@ -11,6 +12,7 @@ pub mod tools;
 use async_trait::async_trait;
 use manager_tools::types::filesystem::*;
 use manager_tools::types::{ToolRequest, ToolResponse};
+use serde::{Deserialize, Serialize};
 use shared_types::user_interaction::*;
 
 /// Represents the types of tools available to agents
@@ -152,4 +154,61 @@ pub trait Agent: Send + Sync {
     async fn execute(&self, _user_prompt: &str, _session_id: i64) -> anyhow::Result<String> {
         anyhow::bail!("Execute method not implemented for this agent")
     }
+
+    /// Returns the settings schema for this agent
+    /// Default implementation returns an empty schema (no settings needed)
+    fn settings_schema(&self) -> AgentSettingsSchema {
+        AgentSettingsSchema {
+            agent_name: self.objective().to_string(),
+            section_name: "".to_string(),
+            settings: vec![],
+        }
+    }
+
+    /// Static method to get the settings schema without requiring an agent instance
+    /// Default implementation returns an empty schema
+    /// Override this in agents that need settings to avoid chicken-and-egg instantiation
+    fn static_settings_schema() -> Option<AgentSettingsSchema> {
+        None
+    }
+}
+
+/// Type of a setting value
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum SettingType {
+    Text,
+    Password,
+    FilePath,
+    Email,
+    Url,
+    Boolean,
+}
+
+/// Definition of a single setting that an agent needs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SettingDefinition {
+    /// Name of the setting (e.g., "db_path", "api_key")
+    pub name: String,
+    /// Human-readable label for the setting
+    pub label: String,
+    /// Description explaining what this setting is for
+    pub description: String,
+    /// Type of the setting value
+    pub setting_type: SettingType,
+    /// Whether this setting is required (true) or optional (false)
+    pub required: bool,
+    /// Default value if the setting is optional
+    pub default_value: Option<String>,
+}
+
+/// Schema describing all settings an agent needs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSettingsSchema {
+    /// Name of the agent (for display purposes)
+    pub agent_name: String,
+    /// Section name in the TOML file (e.g., "sqlite_analysis", "api_client")
+    pub section_name: String,
+    /// List of settings this agent needs
+    pub settings: Vec<SettingDefinition>,
 }

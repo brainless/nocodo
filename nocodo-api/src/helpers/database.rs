@@ -1,11 +1,11 @@
 use crate::DbConnection;
 use rusqlite::Connection;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub fn initialize_database(
+    db_path: &PathBuf,
 ) -> anyhow::Result<(DbConnection, Arc<nocodo_agents::database::Database>)> {
-    let db_path = super::agents::get_api_db_path()?;
-
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }

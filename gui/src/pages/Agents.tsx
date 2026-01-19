@@ -6,6 +6,7 @@ import type {
   AgentConfig,
   AgentExecutionRequest,
   AgentExecutionResponse,
+  SettingsManagementAgentConfig,
 } from '../../api-types/types';
 
 const Agents: Component = () => {
@@ -20,6 +21,9 @@ const Agents: Component = () => {
   const [dbPath, setDbPath] = createSignal('');
   const [codebasePath, setCodebasePath] = createSignal('');
   const [imagePath, setImagePath] = createSignal('');
+  const [typeNames, setTypeNames] = createSignal('');
+  const [domainDescription, setDomainDescription] = createSignal('');
+  const [settingsFilePath, setSettingsFilePath] = createSignal('');
 
   onMount(async () => {
     try {
@@ -85,6 +89,41 @@ const Agents: Component = () => {
           image_path: imagePath(),
         };
         endpoint = 'http://127.0.0.1:8080/agents/tesseract/execute';
+      } else if (agentId === 'workflow-creation') {
+        if (!typeNames().trim()) {
+          throw new Error(
+            'Please enter type names for Workflow Creation agent'
+          );
+        }
+        if (!domainDescription().trim()) {
+          throw new Error(
+            'Please enter a domain description for Workflow Creation agent'
+          );
+        }
+        config = {
+          type: 'structured-json',
+          type_names: typeNames()
+            .split(',')
+            .map((t) => t.trim()),
+          domain_description: domainDescription(),
+        };
+        endpoint = 'http://127.0.0.1:8080/agents/workflow-creation/execute';
+      } else if (agentId === 'requirements-gathering') {
+        config = {
+          type: 'requirements-gathering',
+        };
+        endpoint =
+          'http://127.0.0.1:8080/agents/requirements-gathering/execute';
+      } else if (agentId === 'settings-management') {
+        if (!settingsFilePath().trim()) {
+          throw new Error('Please enter a settings file path');
+        }
+        config = {
+          type: 'settings-management',
+          settings_file_path: settingsFilePath(),
+          agent_schemas: [],
+        };
+        endpoint = 'http://127.0.0.1:8080/agents/settings-management/execute';
       } else {
         throw new Error('Unknown agent type');
       }
@@ -214,6 +253,51 @@ const Agents: Component = () => {
                 class="input input-bordered w-full"
                 value={imagePath()}
                 onInput={(e) => setImagePath(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+          </Show>
+
+          <Show when={selectedAgentId() === 'workflow-creation'}>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Type Names</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter TypeScript type names (comma-separated, e.g., Workflow, WorkflowStep)"
+                class="input input-bordered w-full"
+                value={typeNames()}
+                onInput={(e) => setTypeNames(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Domain Description</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter domain description (e.g., Project management workflow)"
+                class="input input-bordered w-full"
+                value={domainDescription()}
+                onInput={(e) => setDomainDescription(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+          </Show>
+
+          <Show when={selectedAgentId() === 'settings-management'}>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Settings File Path</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter TOML settings file path (e.g., ./settings.toml)"
+                class="input input-bordered w-full"
+                value={settingsFilePath()}
+                onInput={(e) => setSettingsFilePath(e.currentTarget.value)}
                 disabled={executing()}
               />
             </div>

@@ -1,3 +1,9 @@
+pub mod database;
+pub mod models;
+
+#[cfg(test)]
+mod migrations_test;
+
 use crate::{database::Database, Agent, AgentTool};
 use anyhow;
 use async_trait::async_trait;
@@ -236,9 +242,21 @@ impl Agent for UserClarificationAgent {
                             "Agent requesting user clarification"
                         );
 
+                        // Log the raw arguments for debugging
+                        let args_pretty = serde_json::to_string_pretty(tool_call.arguments())
+                            .unwrap_or_else(|_| format!("{:?}", tool_call.arguments()));
+                        tracing::info!("Raw ask_user tool call arguments:\n{}", args_pretty);
+
                         // Parse the ask_user request
                         let ask_user_request: shared_types::user_interaction::AskUserRequest =
-                            serde_json::from_value(tool_call.arguments().clone())?;
+                            serde_json::from_value(tool_call.arguments().clone()).map_err(|e| {
+                                tracing::error!(
+                                    error = %e,
+                                    "Failed to deserialize ask_user request. JSON:\n{}",
+                                    args_pretty
+                                );
+                                e
+                            })?;
 
                         // Create tool call record in agent_tool_calls table
                         let start = Instant::now();

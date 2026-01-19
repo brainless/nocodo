@@ -58,18 +58,18 @@ fn prompt_question(question: &UserQuestion) -> Result<String> {
         prompt_parts.push(format!("  {}", description));
     }
 
-    // Add response type indicator - currently only Text is supported
+    // Add response type indicator
     let response_indicator = match question.response_type {
         QuestionType::Text => " (text)",
+        QuestionType::Password => " (password - will be hidden)",
+        QuestionType::FilePath => " (file path)",
+        QuestionType::Email => " (email)",
+        QuestionType::Url => " (url)",
         // TODO: Enable other types when needed
         // QuestionType::Number => " (number)",
         // QuestionType::Boolean => " (yes/no)",
         // QuestionType::Select => " (enter number)",
         // QuestionType::Multiselect => " (enter numbers, comma-separated)",
-        // QuestionType::Password => " (password - will be hidden)",
-        // QuestionType::FilePath => " (file path)",
-        // QuestionType::Email => " (email)",
-        // QuestionType::Url => " (url)",
     };
 
     // Combine all parts

@@ -34,12 +34,58 @@ export type StructuredJsonAgentConfig = {
   domain_description: string;
 };
 
+/**
+ * Configuration for Requirements Gathering agent
+ */
+export type RequirementsGatheringAgentConfig = Record<string, never>;
+
+/**
+ * Configuration for Settings Management agent
+ */
+export type SettingsManagementAgentConfig = {
+  settings_file_path: string;
+  agent_schemas: Array<AgentSettingsSchema>;
+};
+
+/**
+ * Schema describing all settings an agent needs
+ */
+export type AgentSettingsSchema = {
+  agent_name: string;
+  section_name: string;
+  settings: Array<SettingDefinition>;
+};
+
+/**
+ * Definition of a single setting that an agent needs
+ */
+export type SettingDefinition = {
+  name: string;
+  label: string;
+  description: string;
+  setting_type: SettingType;
+  required: boolean;
+  default_value: string | null;
+};
+
+/**
+ * Type of setting value
+ */
+export type SettingType =
+  | 'Text'
+  | 'Password'
+  | 'FilePath'
+  | 'Email'
+  | 'Url'
+  | 'Boolean';
+
 export type AgentConfig =
   | ({ type: 'sqlite' } & SqliteAgentConfig)
   | ({ type: 'codebase-analysis' } & CodebaseAnalysisAgentConfig)
   | ({ type: 'tesseract' } & TesseractAgentConfig)
   | ({ type: 'structured-json' } & StructuredJsonAgentConfig)
-  | { type: 'user-clarification' };
+  | ({ type: 'requirements-gathering' } & RequirementsGatheringAgentConfig)
+  | ({ type: 'settings-management' } & SettingsManagementAgentConfig);
 
 /**
  * Generic agent execution request with type-safe config
@@ -254,4 +300,4 @@ export type UserQuestionResponse = {
   answer: string;
 };
 
-export type QuestionType = 'text';
+export type QuestionType = 'text' | 'password' | 'file_path' | 'email' | 'url';

@@ -1,6 +1,7 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::database::Database;
 use crate::requirements_gathering::UserClarificationAgent;
+use crate::settings_management::SettingsManagementAgent;
 use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
@@ -20,6 +21,8 @@ pub enum AgentType {
     StructuredJson,
     /// Agent for analyzing user requests and determining if clarification is needed
     UserClarification,
+    /// Agent for collecting and managing settings required for workflow automation
+    SettingsManagement,
 }
 
 /// Factory for creating AI agents with shared dependencies
@@ -107,6 +110,28 @@ impl AgentFactory {
             self.tool_executor.clone(),
         )
     }
+
+    /// Create a SettingsManagementAgent for collecting workflow settings
+    ///
+    /// This agent collects API keys, file paths, URLs, and other settings
+    /// needed for workflow automation.
+    ///
+    /// # Arguments
+    /// * `settings_file_path` - Path where collected settings will be saved
+    /// * `agent_schemas` - List of agent schemas defining what settings are needed
+    pub fn create_settings_management_agent(
+        &self,
+        settings_file_path: std::path::PathBuf,
+        agent_schemas: Vec<crate::AgentSettingsSchema>,
+    ) -> SettingsManagementAgent {
+        SettingsManagementAgent::new(
+            self.llm_client.clone(),
+            self.database.clone(),
+            self.tool_executor.clone(),
+            settings_file_path,
+            agent_schemas,
+        )
+    }
 }
 
 /// Factory function to create an agent of the specified type
@@ -189,6 +214,14 @@ pub fn create_agent_with_tools(
         AgentType::UserClarification => {
             Box::new(UserClarificationAgent::new(client, database, tool_executor))
         }
+        AgentType::SettingsManagement => {
+            panic!(
+                "SettingsManagement agent cannot be created via create_by_type. \
+                 Use AgentFactory::create_settings_management_agent() or \
+                 create_settings_management_agent() function instead, which require \
+                 settings_file_path and agent_schemas parameters."
+            )
+        }
     }
 }
 
@@ -267,13 +300,43 @@ pub fn create_tesseract_agent(
 ///
 /// # Returns
 ///
-/// A UserClarificationAgent instance and its database
+/// A UserClarificationAgent instance
 pub fn create_user_clarification_agent(
     client: Arc<dyn LlmClient>,
 ) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
     let tool_executor = Arc::new(ToolExecutor::new(std::path::PathBuf::from(".")));
     let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
+    Ok((agent, database))
+}
+
+/// Create a SettingsManagementAgent with tool executor support
+///
+/// Uses an in-memory database by default for session persistence
+///
+/// # Arguments
+///
+/// * `client` - The LLM client to use for the agent
+/// * `settings_file_path` - Path where collected settings will be saved
+/// * `agent_schemas` - List of agent schemas defining what settings are needed
+///
+/// # Returns
+///
+/// A SettingsManagementAgent instance
+pub fn create_settings_management_agent(
+    client: Arc<dyn LlmClient>,
+    settings_file_path: std::path::PathBuf,
+    agent_schemas: Vec<crate::AgentSettingsSchema>,
+) -> anyhow::Result<(SettingsManagementAgent, Arc<Database>)> {
+    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+    let tool_executor = Arc::new(ToolExecutor::new(std::path::PathBuf::from(".")));
+    let agent = SettingsManagementAgent::new(
+        client,
+        database.clone(),
+        tool_executor,
+        settings_file_path,
+        agent_schemas,
+    );
     Ok((agent, database))
 }
 

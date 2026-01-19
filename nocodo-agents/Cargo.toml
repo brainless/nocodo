@@ -26,6 +26,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 schemars = { version = "0.8", features = ["preserve_order"] }
 serde_json = "1.0"
+refinery = { version = "0.9", features = ["rusqlite"] }
 
 [dev-dependencies]
 tempfile = "3.0"
@@ -45,3 +46,7 @@ path = "bin/structured_json_runner.rs"
 [[bin]]
 name = "requirements-gathering-runner"
 path = "bin/requirements_gathering_runner.rs"
+
+[[bin]]
+name = "settings-management-runner"
+path = "bin/settings_management_runner.rs"
