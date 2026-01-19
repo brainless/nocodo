@@ -269,7 +269,7 @@ cargo test --lib codebase_analysis
 Key dependencies:
 - **nocodo-llm-sdk**: LLM client abstraction (ZAI, Claude, OpenAI)
 - **manager-models**: Tool request/response types
-- **manager-tools**: Tool execution engine
+- **nocodo-tools**: Tool execution engine
 - **rusqlite**: SQLite database for session tracking
 - **tokio**: Async runtime
 

@@ -253,7 +253,7 @@ impl BashExecutor {
     }
 }
 
-// Implement the BashExecutorTrait for manager-tools integration
+// Implement the BashExecutorTrait for nocodo-tools integration
 impl BashExecutorTrait for BashExecutor {
     fn execute_with_cwd(
         &self,
