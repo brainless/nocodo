@@ -28,9 +28,10 @@ async fn main() -> Result<(), anyhow::Error> {
         .read()
         .expect("Failed to acquire config read lock");
     let llm_client = helpers::llm::create_llm_client(&config).expect("Failed to create LLM client");
+    let db_path = config.database.path.clone();
     drop(config);
     let (db_conn, db) =
-        helpers::database::initialize_database().expect("Failed to initialize database");
+        helpers::database::initialize_database(&db_path).expect("Failed to initialize database");
 
     let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);

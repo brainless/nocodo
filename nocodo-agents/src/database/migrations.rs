@@ -101,38 +101,40 @@ fn initialize_schema_history_for_legacy_db(conn: &mut rusqlite::Connection) -> a
         [],
     )?;
 
-    // Get the list of migrations
-    let migration_list = vec![
-        ("V1__create_agent_sessions", 1),
-        ("V2__create_agent_messages", 2),
-        ("V3__create_agent_tool_calls", 3),
-        ("V4__create_project_requirements_qna", 4),
-        ("V5__create_project_settings", 5),
+    // Get migrations from the runner to get proper checksums
+    let runner = migrations::runner();
+    let all_migrations = runner.get_migrations();
+
+    // Map of version to (name, checksum, table_name)
+    let migration_info = vec![
+        (1, "agent_sessions"),
+        (2, "agent_messages"),
+        (3, "agent_tool_calls"),
+        (4, "project_requirements_qna"),
+        (5, "project_settings"),
     ];
 
     // Mark all migrations as applied
     let applied_on = chrono::Utc::now().to_rfc3339();
-    for (name, version) in migration_list {
-        // Check if the corresponding table exists before marking as applied
-        let table_name = match version {
-            1 => "agent_sessions",
-            2 => "agent_messages",
-            3 => "agent_tool_calls",
-            4 => "project_requirements_qna",
-            5 => "project_settings",
-            _ => continue,
-        };
 
+    for (version, table_name) in migration_info {
+        // Check if the corresponding table exists before marking as applied
         let mut stmt = conn.prepare(&format!(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='{}'",
             table_name
         ))?;
 
         if stmt.exists([])? {
-            conn.execute(
-                "INSERT INTO refinery_schema_history (version, name, applied_on, checksum) VALUES (?1, ?2, ?3, '')",
-                rusqlite::params![version, name, &applied_on],
-            )?;
+            // Find the migration with matching version to get name and checksum
+            if let Some(migration) = all_migrations.iter().find(|m| m.version() == version) {
+                let name = migration.name();
+                let checksum = migration.checksum().to_string();
+
+                conn.execute(
+                    "INSERT INTO refinery_schema_history (version, name, applied_on, checksum) VALUES (?1, ?2, ?3, ?4)",
+                    rusqlite::params![version, name, &applied_on, checksum],
+                )?;
+            }
         }
     }
 

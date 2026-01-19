@@ -168,31 +168,3 @@ pub fn create_user_clarification_agent(
 
     Ok(agent)
 }
-
-/// Returns the path to the nocodo-api database based on the operating system
-///
-/// # Returns
-///
-/// A PathBuf pointing to the API database file
-///
-/// # Platform-specific paths
-///
-/// - **macOS**: `~/Library/Application Support/nocodo/nocodo-api.db`
-/// - **Linux**: `~/.local/share/nocodo/nocodo-api.db`
-/// - **Windows**: `{FOLDERPATH}\nocodo\nocodo-api.db` (where FOLDERPATH is typically `C:\Users\<username>\AppData\Local`)
-pub fn get_api_db_path() -> anyhow::Result<std::path::PathBuf> {
-    let home =
-        home::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
-
-    let db_path = if cfg!(target_os = "macos") {
-        home.join("Library/Application Support/nocodo/nocodo-api.db")
-    } else if cfg!(target_os = "linux") {
-        home.join(".local/share/nocodo/nocodo-api.db")
-    } else if cfg!(windows) {
-        home.join("AppData/Local/nocodo-api.db")
-    } else {
-        anyhow::bail!("Unsupported operating system");
-    };
-
-    Ok(db_path)
-}

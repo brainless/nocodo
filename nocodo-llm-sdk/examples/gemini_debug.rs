@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .message_builder()
         .model(GEMINI_3_PRO)
         .user_message("What is 2+2? Answer in one word.")
-        .max_output_tokens(100)  // Increased from 50
+        .max_output_tokens(100) // Increased from 50
         .send()
         .await?;
 
@@ -42,8 +42,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("    Has text: {}", part.text.is_some());
                 println!("    Has inline_data: {}", part.inline_data.is_some());
                 println!("    Has function_call: {}", part.function_call.is_some());
-                println!("    Has function_response: {}", part.function_response.is_some());
-                println!("    Has thought_signature: {}", part.thought_signature.is_some());
+                println!(
+                    "    Has function_response: {}",
+                    part.function_response.is_some()
+                );
+                println!(
+                    "    Has thought_signature: {}",
+                    part.thought_signature.is_some()
+                );
 
                 if let Some(text) = &part.text {
                     println!("    Text content: '{}'", text);
