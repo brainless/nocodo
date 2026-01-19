@@ -28,7 +28,7 @@ impl BashExecutor {
     ///
     /// ## Default permissions (backward compatible)
     /// ```rust
-    /// use manager_tools::bash::{BashExecutor, BashPermissions};
+    /// use nocodo_tools::bash::{BashExecutor, BashPermissions};
     ///
     /// let executor = BashExecutor::new(
     ///     BashPermissions::default(),
@@ -38,7 +38,7 @@ impl BashExecutor {
     ///
     /// ## Restricted to specific command
     /// ```rust
-    /// use manager_tools::bash::{BashExecutor, BashPermissions, PermissionRule};
+    /// use nocodo_tools::bash::{BashExecutor, BashPermissions, PermissionRule};
     ///
     /// let mut perms = BashPermissions::new();
     /// perms.add_rule(PermissionRule::allow("tesseract*").unwrap());

@@ -1,6 +1,6 @@
 //! Example showing how to create tool executors with custom bash permissions
 
-use manager_tools::{
+use nocodo_tools::{
     bash::{BashExecutor, BashPermissions},
     types::{BashRequest, ToolRequest},
     ToolExecutor,

@@ -185,7 +185,7 @@ impl ToolExecutorBuilder {
     ///
     /// ## With custom bash executor
     /// ```rust
-    /// use manager_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
+    /// use nocodo_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
     /// use std::path::PathBuf;
     ///
     /// let perms = BashPermissions::only_allow(vec!["tesseract*"]);
