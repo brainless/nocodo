@@ -26,7 +26,8 @@ mod tests {
             "INSERT INTO agent_sessions (agent_name, provider, model, user_prompt, started_at)
              VALUES ('test', 'openai', 'gpt-4', 'test prompt', 1234567890)",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         let session_id: i64 = conn.last_insert_rowid();
 
@@ -37,7 +38,9 @@ mod tests {
         ).unwrap();
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM project_requirements_qna", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM project_requirements_qna", [], |row| {
+                row.get(0)
+            })
             .unwrap();
 
         assert_eq!(count, 1);

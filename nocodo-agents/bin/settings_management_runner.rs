@@ -13,13 +13,17 @@ struct Args {
     #[arg(
         short,
         long,
-        default_value = "I want to create a workflow that connects to a REST API to fetch customer data, processes it, and saves results to a database. The API requires authentication and I need to provide database connection details."
+        default_value = "I want to analyze a SQLite database"
     )]
     prompt: String,
 
     /// Path to config file containing API keys
     #[arg(short, long)]
     config: PathBuf,
+
+    /// Path to settings file where collected settings will be saved
+    #[arg(short, long, default_value = "workflow_settings.toml")]
+    settings_file: PathBuf,
 }
 
 #[tokio::main]
@@ -43,7 +47,29 @@ async fn main() -> anyhow::Result<()> {
         zai_config.coding_plan,
     )?);
 
-    let (agent, database) = create_settings_management_agent(client)?;
+    // Collect settings schemas from available agents
+    // Define schemas for agents that need settings
+    let agent_schemas = vec![
+        // SQLite Analysis Agent schema
+        nocodo_agents::AgentSettingsSchema {
+            agent_name: "SQLite Analysis Agent".to_string(),
+            section_name: "sqlite_analysis".to_string(),
+            settings: vec![nocodo_agents::SettingDefinition {
+                name: "db_path".to_string(),
+                label: "Database Path".to_string(),
+                description: "Path to the SQLite database file to analyze".to_string(),
+                setting_type: nocodo_agents::SettingType::FilePath,
+                required: true,
+                default_value: None,
+            }],
+        },
+    ];
+
+    let (agent, database) = create_settings_management_agent(
+        client,
+        args.settings_file.clone(),
+        agent_schemas,
+    )?;
 
     tracing::debug!("System prompt:\n{}", agent.system_prompt());
 
@@ -62,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
     let result = agent.execute(&args.prompt, session_id).await?;
 
     println!("\n--- Agent Result ---\n{}", result);
+    println!("\nSettings saved to: {}", args.settings_file.display());
 
     Ok(())
 }

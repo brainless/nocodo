@@ -115,11 +115,21 @@ impl AgentFactory {
     ///
     /// This agent collects API keys, file paths, URLs, and other settings
     /// needed for workflow automation.
-    pub fn create_settings_management_agent(&self) -> SettingsManagementAgent {
+    ///
+    /// # Arguments
+    /// * `settings_file_path` - Path where collected settings will be saved
+    /// * `agent_schemas` - List of agent schemas defining what settings are needed
+    pub fn create_settings_management_agent(
+        &self,
+        settings_file_path: std::path::PathBuf,
+        agent_schemas: Vec<crate::AgentSettingsSchema>,
+    ) -> SettingsManagementAgent {
         SettingsManagementAgent::new(
             self.llm_client.clone(),
             self.database.clone(),
             self.tool_executor.clone(),
+            settings_file_path,
+            agent_schemas,
         )
     }
 }
@@ -204,11 +214,14 @@ pub fn create_agent_with_tools(
         AgentType::UserClarification => {
             Box::new(UserClarificationAgent::new(client, database, tool_executor))
         }
-        AgentType::SettingsManagement => Box::new(SettingsManagementAgent::new(
-            client,
-            database,
-            tool_executor,
-        )),
+        AgentType::SettingsManagement => {
+            panic!(
+                "SettingsManagement agent cannot be created via create_by_type. \
+                 Use AgentFactory::create_settings_management_agent() or \
+                 create_settings_management_agent() function instead, which require \
+                 settings_file_path and agent_schemas parameters."
+            )
+        }
     }
 }
 
@@ -304,16 +317,26 @@ pub fn create_user_clarification_agent(
 /// # Arguments
 ///
 /// * `client` - The LLM client to use for the agent
+/// * `settings_file_path` - Path where collected settings will be saved
+/// * `agent_schemas` - List of agent schemas defining what settings are needed
 ///
 /// # Returns
 ///
 /// A SettingsManagementAgent instance
 pub fn create_settings_management_agent(
     client: Arc<dyn LlmClient>,
+    settings_file_path: std::path::PathBuf,
+    agent_schemas: Vec<crate::AgentSettingsSchema>,
 ) -> anyhow::Result<(SettingsManagementAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
     let tool_executor = Arc::new(ToolExecutor::new(std::path::PathBuf::from(".")));
-    let agent = SettingsManagementAgent::new(client, database.clone(), tool_executor);
+    let agent = SettingsManagementAgent::new(
+        client,
+        database.clone(),
+        tool_executor,
+        settings_file_path,
+        agent_schemas,
+    );
     Ok((agent, database))
 }
 

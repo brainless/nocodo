@@ -187,6 +187,21 @@ impl Agent for SqliteAnalysisAgent {
         vec![AgentTool::Sqlite3Reader]
     }
 
+    fn settings_schema(&self) -> crate::AgentSettingsSchema {
+        crate::AgentSettingsSchema {
+            agent_name: "SQLite Analysis Agent".to_string(),
+            section_name: "sqlite_analysis".to_string(),
+            settings: vec![crate::SettingDefinition {
+                name: "db_path".to_string(),
+                label: "Database Path".to_string(),
+                description: "Path to the SQLite database file to analyze".to_string(),
+                setting_type: crate::SettingType::FilePath,
+                required: true,
+                default_value: None,
+            }],
+        }
+    }
+
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
         self.database
             .create_message(session_id, "user", user_prompt)?;
