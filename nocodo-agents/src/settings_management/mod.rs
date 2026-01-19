@@ -71,6 +71,17 @@ COLLECTION STRATEGY:
    For example, if collecting the "db_path" setting for the "sqlite_analysis" agent, use ID "sqlite_analysis.db_path"
 4. Settings will automatically be saved to the TOML file in the correct sections
 
+WHEN TO USE THE ask_user TOOL:
+- The user describes a workflow that requires agents with required settings
+- You have identified one or more agents that need configuration
+- There are settings without default values that the user must provide
+- You need to collect sensitive information (API keys, passwords, etc.)
+
+WHEN NOT TO USE THE ask_user TOOL:
+- The user's request doesn't involve any agents that need settings
+- All required settings have default values and the user hasn't asked to customize them
+- The user explicitly states they already have everything configured
+
 "#.to_string();
 
         if !agent_schemas.is_empty() {
@@ -110,7 +121,11 @@ COLLECTION STRATEGY:
         prompt.push_str(
             r#"
 When the user describes their workflow, identify which agents they need and collect
-the required settings. If no settings are needed, explain that no configuration is required."#,
+the required settings. If no settings are needed, explain that no configuration is required.
+
+IMPORTANT: If you identify that the user needs settings, you MUST use the ask_user tool
+to collect them. Do not just describe what settings are needed - actively collect them
+using the tool."#,
         );
 
         prompt

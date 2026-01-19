@@ -44,22 +44,12 @@ async fn main() -> anyhow::Result<()> {
     )?);
 
     // Collect settings schemas from available agents
-    // Define schemas for agents that need settings
-    let agent_schemas = vec![
-        // SQLite Analysis Agent schema
-        nocodo_agents::AgentSettingsSchema {
-            agent_name: "SQLite Analysis Agent".to_string(),
-            section_name: "sqlite_analysis".to_string(),
-            settings: vec![nocodo_agents::SettingDefinition {
-                name: "db_path".to_string(),
-                label: "Database Path".to_string(),
-                description: "Path to the SQLite database file to analyze".to_string(),
-                setting_type: nocodo_agents::SettingType::FilePath,
-                required: true,
-                default_value: None,
-            }],
-        },
-    ];
+    // Use static schemas to avoid circular dependency (can't instantiate SqliteAnalysisAgent
+    // without db_path, which is what we're trying to collect)
+    let agent_schemas =
+        nocodo_agents::sqlite_analysis::SqliteAnalysisAgent::static_settings_schema()
+            .map(|schema| vec![schema])
+            .unwrap_or_default();
 
     let (agent, database) =
         create_settings_management_agent(client, args.settings_file.clone(), agent_schemas)?;

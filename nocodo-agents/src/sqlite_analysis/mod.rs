@@ -188,7 +188,15 @@ impl Agent for SqliteAnalysisAgent {
     }
 
     fn settings_schema(&self) -> crate::AgentSettingsSchema {
-        crate::AgentSettingsSchema {
+        Self::static_settings_schema().unwrap_or_else(|| crate::AgentSettingsSchema {
+            agent_name: "SQLite Analysis Agent".to_string(),
+            section_name: "sqlite_analysis".to_string(),
+            settings: vec![],
+        })
+    }
+
+    fn static_settings_schema() -> Option<crate::AgentSettingsSchema> {
+        Some(crate::AgentSettingsSchema {
             agent_name: "SQLite Analysis Agent".to_string(),
             section_name: "sqlite_analysis".to_string(),
             settings: vec![crate::SettingDefinition {
@@ -199,7 +207,7 @@ impl Agent for SqliteAnalysisAgent {
                 required: true,
                 default_value: None,
             }],
-        }
+        })
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
