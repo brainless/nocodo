@@ -10,11 +10,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// User prompt describing the workflow that needs settings
-    #[arg(
-        short,
-        long,
-        default_value = "I want to analyze a SQLite database"
-    )]
+    #[arg(short, long, default_value = "I want to analyze a SQLite database")]
     prompt: String,
 
     /// Path to config file containing API keys
@@ -65,11 +61,8 @@ async fn main() -> anyhow::Result<()> {
         },
     ];
 
-    let (agent, database) = create_settings_management_agent(
-        client,
-        args.settings_file.clone(),
-        agent_schemas,
-    )?;
+    let (agent, database) =
+        create_settings_management_agent(client, args.settings_file.clone(), agent_schemas)?;
 
     tracing::debug!("System prompt:\n{}", agent.system_prompt());
 

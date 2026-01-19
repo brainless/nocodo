@@ -79,10 +79,19 @@ COLLECTION STRATEGY:
                 if schema.settings.is_empty() {
                     continue;
                 }
-                prompt.push_str(&format!("\n[{}] - {}\n", schema.section_name, schema.agent_name));
+                prompt.push_str(&format!(
+                    "\n[{}] - {}\n",
+                    schema.section_name, schema.agent_name
+                ));
                 for setting in &schema.settings {
-                    let required_label = if setting.required { "required" } else { "optional" };
-                    let default_str = setting.default_value.as_ref()
+                    let required_label = if setting.required {
+                        "required"
+                    } else {
+                        "optional"
+                    };
+                    let default_str = setting
+                        .default_value
+                        .as_ref()
                         .map(|v| format!(", default: {}", v))
                         .unwrap_or_default();
                     prompt.push_str(&format!(
@@ -98,9 +107,11 @@ COLLECTION STRATEGY:
             }
         }
 
-        prompt.push_str(r#"
+        prompt.push_str(
+            r#"
 When the user describes their workflow, identify which agents they need and collect
-the required settings. If no settings are needed, explain that no configuration is required."#);
+the required settings. If no settings are needed, explain that no configuration is required."#,
+        );
 
         prompt
     }
@@ -216,7 +227,8 @@ the required settings. If no settings are needed, explain that no configuration 
         };
 
         // Ensure we have a table structure
-        let table = toml_value.as_table_mut()
+        let table = toml_value
+            .as_table_mut()
             .ok_or_else(|| anyhow::anyhow!("TOML root must be a table"))?;
 
         // Get or create the section for this agent
@@ -343,14 +355,20 @@ impl Agent for SettingsManagementAgent {
                         let execution_time = start.elapsed().as_millis() as i64;
 
                         // Extract responses from tool_response
-                        if let manager_tools::types::ToolResponse::AskUser(ask_user_response) = &tool_response {
+                        if let manager_tools::types::ToolResponse::AskUser(ask_user_response) =
+                            &tool_response
+                        {
                             // Group responses by section name (parsed from question IDs like "section.key")
-                            let mut sections: std::collections::HashMap<String, std::collections::HashMap<String, String>> =
-                                std::collections::HashMap::new();
+                            let mut sections: std::collections::HashMap<
+                                String,
+                                std::collections::HashMap<String, String>,
+                            > = std::collections::HashMap::new();
 
                             for response in &ask_user_response.responses {
                                 // Parse question_id to extract section and setting name
-                                if let Some((section_name, setting_name)) = response.question_id.split_once('.') {
+                                if let Some((section_name, setting_name)) =
+                                    response.question_id.split_once('.')
+                                {
                                     sections
                                         .entry(section_name.to_string())
                                         .or_insert_with(std::collections::HashMap::new)
@@ -371,7 +389,11 @@ impl Agent for SettingsManagementAgent {
 
                             // Mark tool call as completed
                             let response_json = serde_json::to_value(&tool_response)?;
-                            self.database.complete_tool_call(tool_call_id, response_json, execution_time)?;
+                            self.database.complete_tool_call(
+                                tool_call_id,
+                                response_json,
+                                execution_time,
+                            )?;
 
                             // Create success message
                             let message_to_llm = format!(
@@ -380,9 +402,12 @@ impl Agent for SettingsManagementAgent {
                                 ask_user_response.responses.len(),
                                 self.settings_file_path.display()
                             );
-                            self.database.create_message(session_id, "tool", &message_to_llm)?;
+                            self.database
+                                .create_message(session_id, "tool", &message_to_llm)?;
                         } else {
-                            return Err(anyhow::anyhow!("Expected AskUser response from ask_user tool"));
+                            return Err(anyhow::anyhow!(
+                                "Expected AskUser response from ask_user tool"
+                            ));
                         }
                     } else {
                         // Execute other tools normally

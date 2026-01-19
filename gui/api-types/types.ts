@@ -34,12 +34,17 @@ export type StructuredJsonAgentConfig = {
   domain_description: string;
 };
 
+/**
+ * Configuration for Requirements Gathering agent
+ */
+export type RequirementsGatheringAgentConfig = {};
+
 export type AgentConfig =
   | ({ type: 'sqlite' } & SqliteAgentConfig)
   | ({ type: 'codebase-analysis' } & CodebaseAnalysisAgentConfig)
   | ({ type: 'tesseract' } & TesseractAgentConfig)
   | ({ type: 'structured-json' } & StructuredJsonAgentConfig)
-  | { type: 'user-clarification' };
+  | ({ type: 'requirements-gathering' } & RequirementsGatheringAgentConfig);
 
 /**
  * Generic agent execution request with type-safe config

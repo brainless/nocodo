@@ -1,3 +1,4 @@
+use shared_types::agent::RequirementsGatheringAgentConfig;
 use shared_types::*;
 use std::fs;
 use std::path::Path;
@@ -12,6 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(CodebaseAnalysisAgentConfig::export_to_string()?));
     types.push(clean_type(TesseractAgentConfig::export_to_string()?));
     types.push(clean_type(StructuredJsonAgentConfig::export_to_string()?));
+    types.push(clean_type(
+        RequirementsGatheringAgentConfig::export_to_string()?,
+    ));
     types.push(clean_type(AgentConfig::export_to_string()?));
     types.push(clean_type(AgentExecutionRequest::export_to_string()?));
     types.push(clean_type(AgentsResponse::export_to_string()?));

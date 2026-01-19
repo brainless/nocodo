@@ -36,8 +36,8 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
             enabled: true,
         },
         AgentInfo {
-            id: "user-clarification".to_string(),
-            name: "User Clarification Agent".to_string(),
+            id: "requirements-gathering".to_string(),
+            name: "Requirements Gathering Agent".to_string(),
             description:
                 "Agent for analyzing user requests and determining if clarification questions are needed"
                     .to_string(),

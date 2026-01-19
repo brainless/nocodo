@@ -7,32 +7,32 @@ use shared_types::{AgentConfig, AgentExecutionRequest, AgentExecutionResponse};
 use std::sync::Arc;
 use tracing::{error, info};
 
-#[post("/agents/user-clarification/execute")]
-pub async fn execute_user_clarification_agent(
+#[post("/agents/requirements-gathering/execute")]
+pub async fn execute_requirements_gathering_agent(
     req: web::Json<AgentExecutionRequest>,
     llm_client: web::Data<Arc<dyn nocodo_llm_sdk::client::LlmClient>>,
     database: web::Data<Arc<nocodo_agents::database::Database>>,
 ) -> impl Responder {
     // Validate config type
     match &req.config {
-        AgentConfig::UserClarification(_config) => {
+        AgentConfig::RequirementsGathering(_config) => {
             // Config is empty struct, nothing to extract
         }
         _ => {
-            error!(config_type = ?req.config, "Invalid config type for User Clarification agent");
+            error!(config_type = ?req.config, "Invalid config type for Requirements Gathering agent");
             return HttpResponse::BadRequest().json(ErrorResponse {
-                error: "Expected User Clarification agent config".to_string(),
+                error: "Expected Requirements Gathering agent config".to_string(),
             });
         }
     };
 
     info!(
         user_prompt = %req.user_prompt,
-        "Executing User Clarification agent"
+        "Executing Requirements Gathering agent"
     );
 
     let user_prompt = req.user_prompt.clone();
-    let agent_name = "user-clarification".to_string();
+    let agent_name = "requirements-gathering".to_string();
 
     let config = json!(&req.config);
 
@@ -65,7 +65,7 @@ pub async fn execute_user_clarification_agent(
         let agent = match create_user_clarification_agent(&llm_client_clone, &database_clone) {
             Ok(agent) => agent,
             Err(e) => {
-                error!(error = %e, session_id = session_id, "Failed to create User Clarification agent");
+                error!(error = %e, session_id = session_id, "Failed to create Requirements Gathering agent");
                 let _ = database_clone
                     .fail_session(session_id, &format!("Failed to create agent: {}", e));
                 return;
