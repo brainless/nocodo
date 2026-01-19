@@ -43,6 +43,14 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
                     .to_string(),
             enabled: true,
         },
+        AgentInfo {
+            id: "settings-management".to_string(),
+            name: "Settings Management Agent".to_string(),
+            description:
+                "Agent for collecting and managing settings required for workflow automation"
+                    .to_string(),
+            enabled: true,
+        },
     ]
 }
 
@@ -164,6 +172,40 @@ pub fn create_user_clarification_agent(
         llm_client.clone(),
         database.clone(),
         tool_executor,
+    );
+
+    Ok(agent)
+}
+
+/// Creates a Settings Management agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+/// * `settings_file_path` - Path to the TOML settings file
+/// * `agent_schemas` - List of agent settings schemas
+///
+/// # Returns
+///
+/// A Settings Management agent instance
+pub fn create_settings_management_agent(
+    llm_client: &Arc<dyn LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+    settings_file_path: &str,
+    agent_schemas: Vec<nocodo_agents::AgentSettingsSchema>,
+) -> anyhow::Result<nocodo_agents::settings_management::SettingsManagementAgent> {
+    let tool_executor = Arc::new(
+        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+            .with_max_file_size(10 * 1024 * 1024),
+    );
+
+    let agent = nocodo_agents::settings_management::SettingsManagementAgent::new(
+        llm_client.clone(),
+        database.clone(),
+        tool_executor,
+        std::path::PathBuf::from(settings_file_path),
+        agent_schemas,
     );
 
     Ok(agent)

@@ -6,6 +6,7 @@ import type {
   AgentConfig,
   AgentExecutionRequest,
   AgentExecutionResponse,
+  SettingsManagementAgentConfig,
 } from '../../api-types/types';
 
 const Agents: Component = () => {
@@ -22,6 +23,7 @@ const Agents: Component = () => {
   const [imagePath, setImagePath] = createSignal('');
   const [typeNames, setTypeNames] = createSignal('');
   const [domainDescription, setDomainDescription] = createSignal('');
+  const [settingsFilePath, setSettingsFilePath] = createSignal('');
 
   onMount(async () => {
     try {
@@ -112,6 +114,16 @@ const Agents: Component = () => {
         };
         endpoint =
           'http://127.0.0.1:8080/agents/requirements-gathering/execute';
+      } else if (agentId === 'settings-management') {
+        if (!settingsFilePath().trim()) {
+          throw new Error('Please enter a settings file path');
+        }
+        config = {
+          type: 'settings-management',
+          settings_file_path: settingsFilePath(),
+          agent_schemas: [],
+        };
+        endpoint = 'http://127.0.0.1:8080/agents/settings-management/execute';
       } else {
         throw new Error('Unknown agent type');
       }
@@ -270,6 +282,22 @@ const Agents: Component = () => {
                 class="input input-bordered w-full"
                 value={domainDescription()}
                 onInput={(e) => setDomainDescription(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+          </Show>
+
+          <Show when={selectedAgentId() === 'settings-management'}>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Settings File Path</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter TOML settings file path (e.g., ./settings.toml)"
+                class="input input-bordered w-full"
+                value={settingsFilePath()}
+                onInput={(e) => setSettingsFilePath(e.currentTarget.value)}
                 disabled={executing()}
               />
             </div>

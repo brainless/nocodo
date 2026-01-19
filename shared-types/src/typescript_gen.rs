@@ -29,6 +29,10 @@ fn export_type(name: &str) -> Result<String, Box<dyn std::error::Error>> {
         "CodebaseAnalysisAgentConfig" => CodebaseAnalysisAgentConfig::export_to_string()?,
         "TesseractAgentConfig" => TesseractAgentConfig::export_to_string()?,
         "StructuredJsonAgentConfig" => StructuredJsonAgentConfig::export_to_string()?,
+        "SettingsManagementAgentConfig" => SettingsManagementAgentConfig::export_to_string()?,
+        "AgentSettingsSchema" => AgentSettingsSchema::export_to_string()?,
+        "SettingDefinition" => SettingDefinition::export_to_string()?,
+        "SettingType" => SettingType::export_to_string()?,
         "AgentExecutionRequest" => AgentExecutionRequest::export_to_string()?,
         "AgentsResponse" => AgentsResponse::export_to_string()?,
 

@@ -110,6 +110,9 @@ async fn main() -> Result<(), anyhow::Error> {
             .service(handlers::agent_execution::tesseract_agent::execute_tesseract_agent)
             .service(handlers::agent_execution::requirements_gathering_agent::execute_requirements_gathering_agent)
             .service(
+                handlers::agent_execution::settings_management_agent::execute_settings_management_agent,
+            )
+            .service(
                 handlers::agent_execution::workflow_creation_agent::execute_workflow_creation_agent,
             )
             .service(handlers::sessions::list_sessions)

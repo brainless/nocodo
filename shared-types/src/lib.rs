@@ -10,7 +10,8 @@ pub mod user_interaction;
 pub use typescript_gen::generate_typescript_definitions;
 
 pub use agent::{
-    AgentConfig, AgentExecutionRequest, AgentInfo, AgentsResponse, CodebaseAnalysisAgentConfig,
+    AgentConfig, AgentExecutionRequest, AgentInfo, AgentSettingsSchema, AgentsResponse,
+    CodebaseAnalysisAgentConfig, SettingDefinition, SettingType, SettingsManagementAgentConfig,
     SqliteAgentConfig, StructuredJsonAgentConfig, TesseractAgentConfig,
 };
 pub use project_management::{

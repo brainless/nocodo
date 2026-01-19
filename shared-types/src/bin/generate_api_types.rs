@@ -16,6 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(
         RequirementsGatheringAgentConfig::export_to_string()?,
     ));
+    types.push(clean_type(
+        SettingsManagementAgentConfig::export_to_string()?
+    ));
+    types.push(clean_type(AgentSettingsSchema::export_to_string()?));
+    types.push(clean_type(SettingDefinition::export_to_string()?));
+    types.push(clean_type(SettingType::export_to_string()?));
     types.push(clean_type(AgentConfig::export_to_string()?));
     types.push(clean_type(AgentExecutionRequest::export_to_string()?));
     types.push(clean_type(AgentsResponse::export_to_string()?));
