@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
-use manager_tools::hackernews::execute_hackernews_request;
-use manager_tools::types::{FetchMode, HackerNewsRequest, StoryType};
+use nocodo_tools::hackernews::execute_hackernews_request;
+use nocodo_tools::types::{FetchMode, HackerNewsRequest, StoryType};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -122,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = execute_hackernews_request(request).await?;
     let duration = start.elapsed();
 
-    if let manager_tools::ToolResponse::HackerNewsResponse(hn_response) = response {
+    if let nocodo_tools::ToolResponse::HackerNewsResponse(hn_response) = response {
         tracing::info!("\n{}", "=".repeat(60));
         tracing::info!("Download Complete!");
         tracing::info!("{}", "=".repeat(60));

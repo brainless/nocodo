@@ -70,8 +70,8 @@
 //! ## Query Mode - Basic SELECT
 //!
 //! ```rust,no_run
-//! use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! use manager_tools::sqlite_analysis::execute_sqlite3_reader;
+//! use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! use nocodo_tools::sqlite_analysis::execute_sqlite3_reader;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {
@@ -90,8 +90,8 @@
 //! ## Query Mode - PRAGMA Statements
 //!
 //! ```rust,no_run
-//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use nocodo_tools::sqlite::execute_sqlite3_reader;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
@@ -109,8 +109,8 @@
 //! ## Reflect Mode - Discover Tables
 //!
 //! ```rust,no_run
-//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use nocodo_tools::sqlite::execute_sqlite3_reader;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
@@ -129,8 +129,8 @@
 //! ## Reflect Mode - Inspect Table Schema
 //!
 //! ```rust,no_run
-//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use nocodo_tools::sqlite::execute_sqlite3_reader;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
@@ -149,8 +149,8 @@
 //! ## Reflect Mode - Check Foreign Keys
 //!
 //! ```rust,no_run
-//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use nocodo_tools::sqlite::execute_sqlite3_reader;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),
@@ -169,8 +169,8 @@
 //! ## Reflect Mode - Database Statistics
 //!
 //! ```rust,no_run
-//! # use manager_tools::types::{Sqlite3ReaderRequest, SqliteMode};
-//! # use manager_tools::sqlite::execute_sqlite3_reader;
+//! # use nocodo_tools::types::{Sqlite3ReaderRequest, SqliteMode};
+//! # use nocodo_tools::sqlite::execute_sqlite3_reader;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let request = Sqlite3ReaderRequest {
 //!     db_path: "/path/to/database.db".to_string(),

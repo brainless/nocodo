@@ -1,5 +1,5 @@
 [package]
-name = "manager-tools"
+ name = "nocodo-tools"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -8,7 +8,7 @@ repository.workspace = true
 description = "Tool execution utilities for nocodo manager"
 
 [lib]
-name = "manager_tools"
+ name = "nocodo_tools"
 path = "src/lib.rs"
 
 [[bin]]

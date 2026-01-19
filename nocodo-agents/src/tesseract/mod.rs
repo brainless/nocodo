@@ -1,13 +1,13 @@
 use crate::{database::Database, Agent, AgentTool};
 use anyhow::{self, Context};
 use async_trait::async_trait;
-use manager_tools::{
-    bash::{BashExecutor, BashPermissions},
-    ToolExecutor,
-};
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_tools::{
+    bash::{BashExecutor, BashPermissions},
+    ToolExecutor,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -141,7 +141,7 @@ impl TesseractAgent {
 
         // 3. Execute tool
         let start = Instant::now();
-        let result: anyhow::Result<manager_tools::types::ToolResponse> =
+        let result: anyhow::Result<nocodo_tools::types::ToolResponse> =
             self.tool_executor.execute(tool_request).await;
         let execution_time = start.elapsed().as_millis() as i64;
 

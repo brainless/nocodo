@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
-members = [
-    "shared-types",
-    "manager-tools",
-    "nocodo-llm-sdk", "nocodo-agents",
-    "nocodo-api",
-]
+ members = [
+     "shared-types",
+     "nocodo-tools",
+     "nocodo-llm-sdk", "nocodo-agents",
+     "nocodo-api",
+ ]
 # nocodo-github-actions temporarily removed from workspace due to missing directory
 exclude = [
     "manager-web"

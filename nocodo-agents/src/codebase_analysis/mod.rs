@@ -1,11 +1,11 @@
 use crate::{database::Database, Agent, AgentTool};
 use anyhow;
 use async_trait::async_trait;
-use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::tools::ToolCall;
 use nocodo_llm_sdk::tools::ToolChoice;
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_tools::ToolExecutor;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -173,7 +173,7 @@ impl CodebaseAnalysisAgent {
 
         // 3. Execute tool with typed request ✅
         let start = Instant::now();
-        let result: anyhow::Result<manager_tools::types::ToolResponse> = self
+        let result: anyhow::Result<nocodo_tools::types::ToolResponse> = self
             .tool_executor
             .execute(tool_request) // ✅ Typed execution
             .await;

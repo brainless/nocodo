@@ -35,7 +35,7 @@ impl LlmClient for MockLlmClient {
 
 fn create_test_agent() -> CodebaseAnalysisAgent {
     use crate::database::Database;
-    use manager_tools::ToolExecutor;
+    use nocodo_tools::ToolExecutor;
     use std::path::PathBuf;
 
     let client: Arc<dyn LlmClient> = Arc::new(MockLlmClient);

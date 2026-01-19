@@ -71,7 +71,7 @@ pub async fn create_sqlite_agent(
     db_path: &str,
 ) -> anyhow::Result<nocodo_agents::sqlite_analysis::SqliteAnalysisAgent> {
     let tool_executor = Arc::new(
-        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+        nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 
@@ -130,7 +130,7 @@ pub fn create_structured_json_agent(
     domain_description: String,
 ) -> anyhow::Result<nocodo_agents::structured_json::StructuredJsonAgent> {
     let tool_executor = Arc::new(
-        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+        nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 
@@ -164,7 +164,7 @@ pub fn create_user_clarification_agent(
     database: &Arc<nocodo_agents::database::Database>,
 ) -> anyhow::Result<nocodo_agents::requirements_gathering::UserClarificationAgent> {
     let tool_executor = Arc::new(
-        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+        nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 
@@ -196,7 +196,7 @@ pub fn create_settings_management_agent(
     agent_schemas: Vec<nocodo_agents::AgentSettingsSchema>,
 ) -> anyhow::Result<nocodo_agents::settings_management::SettingsManagementAgent> {
     let tool_executor = Arc::new(
-        manager_tools::ToolExecutor::new(std::env::current_dir()?)
+        nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 

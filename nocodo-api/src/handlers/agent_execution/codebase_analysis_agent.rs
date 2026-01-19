@@ -64,7 +64,7 @@ pub async fn execute_codebase_analysis_agent(
 
     tokio::spawn(async move {
         let tool_executor = Arc::new(
-            manager_tools::ToolExecutor::new(std::path::PathBuf::from(path.clone()))
+            nocodo_tools::ToolExecutor::new(std::path::PathBuf::from(path.clone()))
                 .with_max_file_size(10 * 1024 * 1024),
         );
 

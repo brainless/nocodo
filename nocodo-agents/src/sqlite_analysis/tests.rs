@@ -1,7 +1,7 @@
 use super::*;
 use crate::database::Database;
-use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::claude::ClaudeClient;
+use nocodo_tools::ToolExecutor;
 use rusqlite::Connection;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;

@@ -7,10 +7,10 @@ mod migrations_test;
 use crate::{database::Database, Agent, AgentTool};
 use anyhow;
 use async_trait::async_trait;
-use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_tools::ToolExecutor;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -93,7 +93,7 @@ that you need more information about what they want to automate."#.to_string()
         )?;
 
         let start = Instant::now();
-        let result: anyhow::Result<manager_tools::types::ToolResponse> =
+        let result: anyhow::Result<nocodo_tools::types::ToolResponse> =
             self.tool_executor.execute(tool_request).await;
         let execution_time = start.elapsed().as_millis() as i64;
 
@@ -331,7 +331,7 @@ pub fn create_user_clarification_agent(
     client: Arc<dyn LlmClient>,
 ) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let tool_executor = Arc::new(manager_tools::ToolExecutor::new(std::path::PathBuf::from(
+    let tool_executor = Arc::new(nocodo_tools::ToolExecutor::new(std::path::PathBuf::from(
         ".",
     )));
     let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);

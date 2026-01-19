@@ -1,9 +1,9 @@
 use super::*;
 use crate::database::Database;
-use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
 use nocodo_llm_sdk::error::LlmError;
 use nocodo_llm_sdk::types::{CompletionRequest, CompletionResponse, ContentBlock, Role, Usage};
+use nocodo_tools::ToolExecutor;
 use std::path::PathBuf;
 use std::sync::Arc;
 

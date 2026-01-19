@@ -6,8 +6,8 @@ use crate::sqlite_analysis::SqliteAnalysisAgent;
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
 use crate::Agent;
-use manager_tools::ToolExecutor;
 use nocodo_llm_sdk::client::LlmClient;
+use nocodo_tools::ToolExecutor;
 use std::sync::Arc;
 
 /// Enum representing the available agent types

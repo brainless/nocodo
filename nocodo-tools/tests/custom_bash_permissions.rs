@@ -1,4 +1,4 @@
-use manager_tools::{
+use nocodo_tools::{
     bash::{BashExecutor, BashPermissions},
     types::{BashRequest, ToolRequest, ToolResponse},
     ToolExecutor,

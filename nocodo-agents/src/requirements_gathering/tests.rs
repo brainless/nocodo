@@ -73,7 +73,7 @@ fn setup_test_agent(
     });
 
     let database = Arc::new(Database::new(&PathBuf::from(":memory:"))?);
-    let tool_executor = Arc::new(manager_tools::ToolExecutor::new(PathBuf::from(".")));
+    let tool_executor = Arc::new(nocodo_tools::ToolExecutor::new(PathBuf::from(".")));
     let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
 
     Ok((agent, database))
