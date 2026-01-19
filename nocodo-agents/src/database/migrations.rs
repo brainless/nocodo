@@ -67,7 +67,7 @@ pub fn run_agent_migrations_sqlite(conn: &mut rusqlite::Connection) -> anyhow::R
 fn is_legacy_database(conn: &rusqlite::Connection) -> anyhow::Result<bool> {
     // Check if refinery_schema_history table exists and has records
     let mut stmt = conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='refinery_schema_history'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='refinery_schema_history'",
     )?;
     let has_history_table = stmt.exists([])?;
 
@@ -81,9 +81,8 @@ fn is_legacy_database(conn: &rusqlite::Connection) -> anyhow::Result<bool> {
     }
 
     // Check if agent_sessions table exists (indicating a legacy database)
-    let mut stmt = conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='agent_sessions'"
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_sessions'")?;
     let has_agent_tables = stmt.exists([])?;
 
     Ok(has_agent_tables)
@@ -108,6 +107,7 @@ fn initialize_schema_history_for_legacy_db(conn: &mut rusqlite::Connection) -> a
         ("V2__create_agent_messages", 2),
         ("V3__create_agent_tool_calls", 3),
         ("V4__create_project_requirements_qna", 4),
+        ("V5__create_project_settings", 5),
     ];
 
     // Mark all migrations as applied
@@ -119,6 +119,7 @@ fn initialize_schema_history_for_legacy_db(conn: &mut rusqlite::Connection) -> a
             2 => "agent_messages",
             3 => "agent_tool_calls",
             4 => "project_requirements_qna",
+            5 => "project_settings",
             _ => continue,
         };
 

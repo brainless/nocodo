@@ -46,3 +46,7 @@ path = "bin/structured_json_runner.rs"
 [[bin]]
 name = "requirements-gathering-runner"
 path = "bin/requirements_gathering_runner.rs"
+
+[[bin]]
+name = "settings-management-runner"
+path = "bin/settings_management_runner.rs"

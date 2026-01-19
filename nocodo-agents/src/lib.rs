@@ -3,6 +3,7 @@ pub mod config;
 pub mod database;
 pub mod factory;
 pub mod requirements_gathering;
+pub mod settings_management;
 pub mod sqlite_analysis;
 pub mod structured_json;
 pub mod tesseract;

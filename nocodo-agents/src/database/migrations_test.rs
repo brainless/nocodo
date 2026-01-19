@@ -22,6 +22,8 @@ mod tests {
         assert!(tables.contains(&"agent_sessions".to_string()));
         assert!(tables.contains(&"agent_messages".to_string()));
         assert!(tables.contains(&"agent_tool_calls".to_string()));
+        assert!(tables.contains(&"project_requirements_qna".to_string()));
+        assert!(tables.contains(&"project_settings".to_string()));
         assert!(tables.contains(&"refinery_schema_history".to_string()));
 
         // Verify we can insert data
@@ -29,7 +31,8 @@ mod tests {
             "INSERT INTO agent_sessions (agent_name, provider, model, user_prompt, started_at)
              VALUES ('test', 'openai', 'gpt-4', 'test prompt', 1234567890)",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM agent_sessions", [], |row| row.get(0))
@@ -48,9 +51,11 @@ mod tests {
 
         // Verify migrations were only applied once
         let migration_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM refinery_schema_history", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM refinery_schema_history", [], |row| {
+                row.get(0)
+            })
             .unwrap();
 
-        assert_eq!(migration_count, 4); // We have 4 migration files (3 core + 1 requirements)
+        assert_eq!(migration_count, 5); // We have 5 migration files (3 core + 1 requirements + 1 settings)
     }
 }

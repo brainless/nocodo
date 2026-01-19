@@ -49,6 +49,10 @@ impl Database {
             let response_type_str: String = row.get(3)?;
             let response_type = match response_type_str.as_str() {
                 "text" => shared_types::user_interaction::QuestionType::Text,
+                "password" => shared_types::user_interaction::QuestionType::Password,
+                "file_path" => shared_types::user_interaction::QuestionType::FilePath,
+                "email" => shared_types::user_interaction::QuestionType::Email,
+                "url" => shared_types::user_interaction::QuestionType::Url,
                 _ => shared_types::user_interaction::QuestionType::Text,
             };
 
