@@ -5,20 +5,55 @@ mod models;
 
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
+use clap::Parser;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use tracing::info;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(long)]
+    log_file_path: Option<String>,
+}
 
 pub type DbConnection = Arc<Mutex<Connection>>;
 
 #[actix_web::main]
 async fn main() -> Result<(), anyhow::Error> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    let args = Args::parse();
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    if let Some(log_path) = args.log_file_path {
+        let log_path = std::path::Path::new(&log_path);
+        let file_appender = tracing_appender::rolling::never(
+            log_path.parent().unwrap_or(std::path::Path::new(".")),
+            log_path
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("nocodo-api.log")),
+        );
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        std::mem::forget(guard);
+
+        tracing_subscriber::registry()
+            .with(env_filter.clone())
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_ansi(true)
+                    .with_writer(std::io::stdout),
+            )
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_ansi(false)
+                    .with_writer(non_blocking),
+            )
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    }
 
     let (api_config, config_path) = config::ApiConfig::load().expect("Failed to load config");
     info!("Loaded config from: {}", config_path.display());
