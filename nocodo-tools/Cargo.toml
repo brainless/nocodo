@@ -37,6 +37,10 @@ sqlparser = "0.51"
 reqwest = { version = "0.12", features = ["json", "charset"] }
 home = "0.5"
 clap = { workspace = true }
+imap = { version = "3.0.0-alpha.15", default-features = false, features = ["rustls-tls"] }
+imap-proto = "0.16.1"
+rustls-connector = "0.19.0"
+mail-parser = "0.9"
 
 [dev-dependencies]
 tempfile = "3.12"
