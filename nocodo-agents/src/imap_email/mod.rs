@@ -11,6 +11,8 @@ use nocodo_tools::ToolExecutor;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use tempfile::NamedTempFile;
+use std::io::Write;
 
 #[cfg(test)]
 mod tests;
@@ -122,10 +124,8 @@ pub struct ImapEmailAgent {
 
 struct ImapConfig {
     host: String,
-    #[allow(dead_code)]
     port: u16,
     username: String,
-    #[allow(dead_code)]
     password: String,
 }
 
@@ -228,15 +228,50 @@ impl ImapEmailAgent {
         let mut tool_request =
             AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
 
-        if let ToolRequest::ImapReader(ref mut req) = tool_request {
+        // Handle credential injection for IMAP tool
+        let _temp_config_file = if let ToolRequest::ImapReader(ref mut req) = tool_request {
             if req.config_path.is_none() {
                 tracing::debug!(
                     host = %self.imap_config.host,
                     username = %self.imap_config.username,
                     "Injecting IMAP credentials into tool call"
                 );
+
+                // Create temporary config file with credentials
+                let mut temp_file = NamedTempFile::new()
+                    .context("Failed to create temporary config file")?;
+
+                let config_json = serde_json::json!({
+                    "host": self.imap_config.host,
+                    "port": self.imap_config.port,
+                    "username": self.imap_config.username,
+                    "password": self.imap_config.password,
+                });
+
+                temp_file.write_all(config_json.to_string().as_bytes())
+                    .context("Failed to write IMAP config to temp file")?;
+                temp_file.flush()
+                    .context("Failed to flush temp file")?;
+
+                // Get the path and inject it into the request
+                let config_path = temp_file.path().to_str()
+                    .context("Failed to get temp file path")?
+                    .to_string();
+
+                req.config_path = Some(config_path);
+
+                tracing::debug!(
+                    config_path = ?req.config_path,
+                    "Injected IMAP config file path"
+                );
+
+                Some(temp_file) // Keep file alive for the duration of tool execution
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
         let call_id = self.database.create_tool_call(
             session_id,
