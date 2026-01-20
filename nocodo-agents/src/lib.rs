@@ -168,7 +168,10 @@ pub trait Agent: Send + Sync {
     /// Static method to get the settings schema without requiring an agent instance
     /// Default implementation returns an empty schema
     /// Override this in agents that need settings to avoid chicken-and-egg instantiation
-    fn static_settings_schema() -> Option<AgentSettingsSchema> {
+    fn static_settings_schema() -> Option<AgentSettingsSchema>
+    where
+        Self: Sized,
+    {
         None
     }
 }
