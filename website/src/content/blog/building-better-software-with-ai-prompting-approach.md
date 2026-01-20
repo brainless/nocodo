@@ -42,7 +42,7 @@ It doesn't matter which coding agent you use - Cursor, Lovable for UI work, anyt
 
 ## Module Structure Benefits
 
-When breaking modules apart, ensure you think through the naming. In my case, `manager-tools` contains all the tools that agents use. For example: talking to APIs, local files, listing files, searching files - all these are specific tools.
+When breaking modules apart, ensure you think through the naming. In my case, `nocodo-tools` contains all the tools that agents use. For example: talking to APIs, local files, listing files, searching files - all these are specific tools.
 
 All source code is open source, so feel free to check the repository. Within tools, everything is in its own folder. Everything related to the file system - reading files, searching files, listing files - is in the `filesystem` folder.
 
@@ -56,7 +56,7 @@ You can do this in any programming language - TypeScript, Python, Ruby. What mat
 
 ## Agent Architecture
 
-As you can see, I have `manager-tools` and then `nocodo-agents`. Agents is a completely new sub-project I'm building. What are agents? Agents are code that has autonomy - it can create its own memory, keep track of resources, and use tools and AI models to run in a loop.
+As you can see, I have `nocodo-tools` and then `nocodo-agents`. Agents is a completely new sub-project I'm building. What are agents? Agents are code that has autonomy - it can create its own memory, keep track of resources, and use tools and AI models to run in a loop.
 
 For example, waiting for customer messages: an agent comes in, looks at the customer, figures out their ID, checks the database, makes decisions with AI about whether to answer immediately, gather extra data, or call the manager.
 

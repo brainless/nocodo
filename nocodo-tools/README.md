@@ -1,10 +1,10 @@
-# Manager Tools
+# Nocodo Tools
 
 A robust tool execution library for AI agents, providing type-safe execution of filesystem operations, shell commands, code patches, and user interactions.
 
 ## Overview
 
-`manager-tools` provides a unified interface for executing various development tools through the `ToolExecutor` struct. All tools use typed request/response patterns defined in `manager-models`, ensuring compile-time safety and structured error handling.
+`nocodo-tools` provides a unified interface for executing various development tools through the `ToolExecutor` struct. All tools use typed request/response patterns defined in `manager-models`, ensuring compile-time safety and structured error handling.
 
 ## Features
 
@@ -21,14 +21,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-manager-tools = { path = "../manager-tools" }
+nocodo-tools = { path = "../nocodo-tools" }
 manager-models = { path = "../manager-models" }
 ```
 
 ## Quick Start
 
 ```rust
-use manager_tools::ToolExecutor;
+use nocodo_tools::ToolExecutor;
 use manager_models::{ToolRequest, ToolResponse};
 use manager_models::tools::filesystem::ReadFileRequest;
 use std::path::PathBuf;
@@ -103,7 +103,7 @@ Sets a custom bash executor that implements permission checking and command vali
 
 **Example:**
 ```rust
-use manager_tools::BashExecutorTrait;
+use nocodo_tools::BashExecutorTrait;
 
 struct MyBashExecutor;
 
@@ -128,7 +128,7 @@ Creates a builder for configuring a ToolExecutor with custom settings, including
 
 **Example:**
 ```rust
-use manager_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
+use nocodo_tools::{ToolExecutor, bash::{BashExecutor, BashPermissions}};
 
 let executor = ToolExecutor::builder()
     .base_path(PathBuf::from("."))
@@ -479,10 +479,10 @@ match executor.execute(request).await {
 
 ## Integration with AI Agents
 
-`manager-tools` is designed to work seamlessly with AI agents through the `manager-models` type system:
+`nocodo-tools` is designed to work seamlessly with AI agents through the `manager-models` type system:
 
 ```rust
-use manager_tools::ToolExecutor;
+use nocodo_tools::ToolExecutor;
 use manager_models::{ToolRequest, ToolResponse};
 
 // Agent receives tool call from LLM
@@ -573,7 +573,7 @@ impl BashExecutorTrait for SafeBashExecutor {
 ## Related Crates
 
 - **manager-models**: Type definitions for tools (`ToolRequest`, `ToolResponse`)
-- **nocodo-agents**: AI agents that use manager-tools for execution
+- **nocodo-agents**: AI agents that use nocodo-tools for execution
 - **nocodo-llm-sdk**: LLM client integration
 
 ## License

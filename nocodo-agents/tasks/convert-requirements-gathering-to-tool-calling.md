@@ -6,7 +6,7 @@
 
 ## Summary
 
-Convert the `requirements_gathering` module from using typed JSON responses (`response_format: JsonObject`) to using tool/function calling with an agentic loop pattern. This aligns it with the `sqlite_analysis` agent architecture and provides more flexibility in how the agent interacts with users.
+Convert the `requirements_gathering` module from using typed JSON responses (`response_format: JsonObject`) to using tool/function calling with an agentic loop pattern. This aligns it with the `sqlite_reader` agent architecture and provides more flexibility in how the agent interacts with users.
 
 ## Problem Statement
 
@@ -26,7 +26,7 @@ The `UserClarificationAgent` currently:
 - No extensibility for adding more tools later
 
 ### Desired Approach (Tool Calling)
-Following the `sqlite_analysis` pattern:
+Following the `sqlite_reader` pattern:
 - Uses `tools` + `tool_choice: Auto` in CompletionRequest
 - System prompt describes agent capabilities and objectives
 - Agentic loop (up to N iterations) for multi-turn interactions
@@ -44,7 +44,7 @@ Following the `sqlite_analysis` pattern:
 ## Goals
 
 1. Convert agent from JSON-forcing to tool calling pattern
-2. Implement agentic loop similar to `sqlite_analysis`
+2. Implement agentic loop similar to `sqlite_reader`
 3. Add `ToolExecutor` dependency for tool execution
 4. Update existing test to work with agentic loop pattern
 5. Update `requirements_gathering_runner.rs` binary to instantiate `ToolExecutor`
@@ -648,6 +648,6 @@ cargo run --bin requirements_gathering_runner -- \
 
 ## References
 
-- **sqlite_analysis agent**: Reference implementation for tool calling pattern (nocodo-agents/src/sqlite_analysis/mod.rs)
+- **sqlite_reader agent**: Reference implementation for tool calling pattern (nocodo-agents/src/sqlite_reader/mod.rs)
 - **AgentTool enum**: Tool definitions and parsing (nocodo-agents/src/lib.rs:18-109)
 - **Current implementation**: JSON-based agent (nocodo-agents/src/requirements_gathering/mod.rs)

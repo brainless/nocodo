@@ -555,6 +555,6 @@ jsonschema = "0.18"
 ## References
 
 - Prerequisite task: `shared-types/tasks/add-typescript-generation-function.md`
-- Existing agents: `nocodo-agents/src/sqlite_analysis/mod.rs`
+- Existing agents: `nocodo-agents/src/sqlite_reader/mod.rs`
 - Agent trait: `nocodo-agents/src/lib.rs`
 - Tool schemas: `nocodo-agents/src/tools/llm_schemas.rs`

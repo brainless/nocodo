@@ -68,7 +68,7 @@ COLLECTION STRATEGY:
 2. Gather all required settings for those agents
 3. Use ask_user to collect the setting values from the user
    IMPORTANT: When creating questions, use namespaced question IDs in the format "section_name.setting_name"
-   For example, if collecting the "db_path" setting for the "sqlite_analysis" agent, use ID "sqlite_analysis.db_path"
+   For example, if collecting the "db_path" setting for the "sqlite_reader" agent, use ID "sqlite_reader.db_path"
 4. Settings will automatically be saved to the TOML file in the correct sections
 
 WHEN TO USE THE ask_user TOOL:

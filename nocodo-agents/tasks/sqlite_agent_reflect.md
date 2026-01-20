@@ -9,11 +9,11 @@ Update the SQLite analysis agent to use the new reflect mode for schema discover
 
 ## Files to Modify
 
-### 1. `nocodo-agents/src/sqlite_analysis/mod.rs`
+### 1. `nocodo-agents/src/sqlite_reader/mod.rs`
 
 #### Current Agent Structure
 ```rust
-pub struct SqliteAnalysisAgent {
+pub struct SqliteReaderAgent {
     client: Arc<dyn LlmClient>,
     database: Arc<Database>,
     tool_executor: Arc<ToolExecutor>,
@@ -21,7 +21,7 @@ pub struct SqliteAnalysisAgent {
     system_prompt: String,
 }
 
-impl SqliteAnalysisAgent {
+impl SqliteReaderAgent {
     pub fn new(
         client: Arc<dyn LlmClient>,
         database: Arc<Database>,
@@ -47,7 +47,7 @@ impl SqliteAnalysisAgent {
 **Change `new()` to `async`** to allow calling reflect mode during initialization:
 
 ```rust
-impl SqliteAnalysisAgent {
+impl SqliteReaderAgent {
     pub async fn new(
         client: Arc<dyn LlmClient>,
         database: Arc<Database>,
@@ -232,14 +232,14 @@ Update the factory function to handle async initialization:
 
 **Current:**
 ```rust
-pub fn create_sqlite_analysis_agent(
+pub fn create_sqlite_reader_agent(
     llm_client: Arc<dyn LlmClient>,
     db_path: String,
 ) -> anyhow::Result<Box<dyn Agent>> {
     let database = Arc::new(Database::new(None)?);
     let tool_executor = Arc::new(ToolExecutor::new());
 
-    let agent = SqliteAnalysisAgent::new(
+    let agent = SqliteReaderAgent::new(
         llm_client,
         database,
         tool_executor,
@@ -252,14 +252,14 @@ pub fn create_sqlite_analysis_agent(
 
 **New:**
 ```rust
-pub async fn create_sqlite_analysis_agent(
+pub async fn create_sqlite_reader_agent(
     llm_client: Arc<dyn LlmClient>,
     db_path: String,
 ) -> anyhow::Result<Box<dyn Agent>> {
     let database = Arc::new(Database::new(None)?);
     let tool_executor = Arc::new(ToolExecutor::new());
 
-    let agent = SqliteAnalysisAgent::new(
+    let agent = SqliteReaderAgent::new(
         llm_client,
         database,
         tool_executor,
@@ -377,7 +377,7 @@ AgentTool::Sqlite3Reader => {
 
 ### 4. Update CLI Runner (if needed)
 
-**File:** `nocodo-agents/bin/sqlite_analysis_runner.rs`
+**File:** `nocodo-agents/bin/sqlite_reader_runner.rs`
 
 If the factory becomes async, update the runner to await:
 
@@ -386,7 +386,7 @@ If the factory becomes async, update the runner to await:
 async fn main() -> anyhow::Result<()> {
     // ... setup code ...
 
-    let agent = create_sqlite_analysis_agent(
+    let agent = create_sqlite_reader_agent(
         llm_client,
         db_path,
     ).await?;  // Add .await
@@ -402,7 +402,7 @@ async fn main() -> anyhow::Result<()> {
 3. Implement `parse_schema_response()` to extract table info
 4. Update `generate_system_prompt()` to `generate_system_prompt_with_schema()`
 5. Add `extract_columns_from_ddl()` helper (can be simple initially)
-6. Make `SqliteAnalysisAgent::new()` async
+6. Make `SqliteReaderAgent::new()` async
 7. Update factory to handle async initialization
 8. Update LLM tool schema to expose both modes
 9. Update CLI runner if needed

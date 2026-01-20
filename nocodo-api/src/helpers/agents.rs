@@ -69,13 +69,13 @@ pub async fn create_sqlite_agent(
     llm_client: &Arc<dyn LlmClient>,
     database: &Arc<nocodo_agents::database::Database>,
     db_path: &str,
-) -> anyhow::Result<nocodo_agents::sqlite_analysis::SqliteAnalysisAgent> {
+) -> anyhow::Result<nocodo_agents::sqlite_reader::SqliteReaderAgent> {
     let tool_executor = Arc::new(
         nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 
-    let agent = nocodo_agents::sqlite_analysis::SqliteAnalysisAgent::new(
+    let agent = nocodo_agents::sqlite_reader::SqliteReaderAgent::new(
         llm_client.clone(),
         database.clone(),
         tool_executor,

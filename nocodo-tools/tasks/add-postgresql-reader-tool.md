@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a read-only PostgreSQL database query tool (`postgresql_reader`) to manager-tools, modeled after the proven `sqlite_analysis` implementation. This tool will enable AI agents to safely query PostgreSQL databases for analysis purposes with strict read-only guarantees.
+Add a read-only PostgreSQL database query tool (`postgresql_reader`) to manager-tools, modeled after the proven `sqlite_reader` implementation. This tool will enable AI agents to safely query PostgreSQL databases for analysis purposes with strict read-only guarantees.
 
 ## Problem Statement
 
@@ -29,7 +29,7 @@ Without a dedicated tool:
 3. **Connection-based access**: Support standard PostgreSQL connection parameters
 4. **Schema introspection**: Support information_schema queries for schema discovery
 5. **Security first**: Comprehensive SQL injection protection and validation
-6. **Proven architecture**: Follow the battle-tested sqlite_analysis design
+6. **Proven architecture**: Follow the battle-tested sqlite_reader design
 
 ## Architecture Overview
 
@@ -48,7 +48,7 @@ Without a dedicated tool:
 ### Tool Interface
 
 ```rust
-// Request - supports two modes similar to sqlite_analysis
+// Request - supports two modes similar to sqlite_reader
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PostgresqlReaderRequest {
     /// Connection parameters
@@ -133,7 +133,7 @@ manager-tools/
 
 **File**: `manager-tools/src/postgresql_reader/executor.rs`
 
-Core structure similar to `sqlite_analysis/executor.rs`:
+Core structure similar to `sqlite_reader/executor.rs`:
 
 ```rust
 use tokio_postgres::{Client, NoTls};
@@ -306,7 +306,7 @@ impl PostgresqlExecutor {
     }
 
     // Helper methods similar to sqlite (validate_query_body, validate_table_factor, etc.)
-    // ... (implementation details similar to sqlite_analysis/executor.rs)
+    // ... (implementation details similar to sqlite_reader/executor.rs)
 }
 
 /// Convert PostgreSQL value to JSON
@@ -450,8 +450,8 @@ The formatter can be shared between sqlite and postgresql:
 **File**: `manager-tools/src/postgresql_reader/formatter.rs`
 
 ```rust
-// Re-export formatter from sqlite_analysis
-pub use crate::sqlite_analysis::formatter::*;
+// Re-export formatter from sqlite_reader
+pub use crate::sqlite_reader::formatter::*;
 ```
 
 ### Phase 2: Integrate with manager-tools Type System
@@ -674,7 +674,7 @@ tokio-postgres = "0.7"
 postgres-types = "0.2"
 ```
 
-Note: `sqlparser` is already a dependency from sqlite_analysis.
+Note: `sqlparser` is already a dependency from sqlite_reader.
 
 ### Phase 5: Security Considerations
 
@@ -761,7 +761,7 @@ mod tests {
 
 **File**: `manager-tools/src/postgresql_reader/mod.rs`
 
-Add comprehensive module documentation similar to sqlite_analysis:
+Add comprehensive module documentation similar to sqlite_reader:
 - Security model
 - Usage examples
 - Supported reflection targets
@@ -920,7 +920,7 @@ cargo build
 
 ## References
 
-- **Similar implementation**: `manager-tools/src/sqlite_analysis/`
+- **Similar implementation**: `manager-tools/src/sqlite_reader/`
 - **tokio-postgres docs**: https://docs.rs/tokio-postgres/
 - **PostgreSQL information_schema**: https://www.postgresql.org/docs/current/information-schema.html
 - **sqlparser docs**: https://docs.rs/sqlparser/
@@ -929,7 +929,7 @@ cargo build
 
 - This is a pure addition - no breaking changes to existing tools
 - The tool is designed for analysis, not data modification
-- Follows proven architecture from sqlite_analysis
+- Follows proven architecture from sqlite_reader
 - SSL/TLS support enables production use
 - information_schema provides standard schema introspection
 - Password security: connections are short-lived, passwords not logged

@@ -2,7 +2,7 @@ use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::database::Database;
 use crate::requirements_gathering::UserClarificationAgent;
 use crate::settings_management::SettingsManagementAgent;
-use crate::sqlite_analysis::SqliteAnalysisAgent;
+use crate::sqlite_reader::SqliteReaderAgent;
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
 use crate::Agent;
@@ -246,7 +246,7 @@ pub fn create_codebase_analysis_agent(
     (agent, database)
 }
 
-/// Create a SqliteAnalysisAgent with tool executor support
+/// Create a SqliteReaderAgent with tool executor support
 ///
 /// Uses an in-memory database by default for session persistence
 ///
@@ -258,14 +258,14 @@ pub fn create_codebase_analysis_agent(
 ///
 /// # Returns
 ///
-/// A SqliteAnalysisAgent instance
-pub async fn create_sqlite_analysis_agent(
+/// A SqliteReaderAgent instance
+pub async fn create_sqlite_reader_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,
     db_path: String,
-) -> anyhow::Result<(SqliteAnalysisAgent, Arc<Database>)> {
+) -> anyhow::Result<(SqliteReaderAgent, Arc<Database>)> {
     let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let agent = SqliteAnalysisAgent::new(client, database.clone(), tool_executor, db_path).await?;
+    let agent = SqliteReaderAgent::new(client, database.clone(), tool_executor, db_path).await?;
     Ok((agent, database))
 }
 

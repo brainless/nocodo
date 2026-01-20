@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     let client: Arc<dyn nocodo_llm_sdk::client::LlmClient> = Arc::new(client);
 
     let base_path = get_base_path(&args.base_path)?;
-    // Create tool executor with manager-tools (supports more configuration)
+    // Create tool executor with nocodo-tools (supports more configuration)
     let tool_executor = Arc::new(
         ToolExecutor::new(base_path.clone()).with_max_file_size(10 * 1024 * 1024), // max_file_size: 10MB
     );

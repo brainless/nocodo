@@ -14,7 +14,7 @@ A collection of AI agents for various software development tasks.
 All agents share a common execution pattern:
 - Session tracking in SQLite (messages, tool calls, results)
 - Iterative LLM calls with tool execution
-- Typed tool requests/responses via `manager-tools`
+- Typed tool requests/responses via `nocodo-tools`
 
 ## Quick Start
 
@@ -102,7 +102,7 @@ Future versions will allow configuring the LLM provider and model through comman
 
 ### Tool Execution
 
-Agents use the `manager-tools` crate for executing development tools. All tool execution is:
+Agents use the `nocodo-tools` crate for executing development tools. All tool execution is:
 
 - **Type-safe**: Uses typed `ToolRequest` → `ToolResponse` pattern from `manager-models`
 - **Sandboxed**: All file operations are relative to the configured base path
@@ -112,7 +112,7 @@ Agents use the `manager-tools` crate for executing development tools. All tool e
 **Tool Executor Configuration:**
 
 ```rust
-use manager_tools::ToolExecutor;
+use nocodo_tools::ToolExecutor;
 
 let executor = ToolExecutor::new(base_path)
     .with_max_file_size(10 * 1024 * 1024);  // 10MB limit
@@ -150,19 +150,19 @@ sqlite3 ~/.local/share/nocodo/agents.db "SELECT * FROM agent_sessions ORDER BY s
 
 ### Agent Execution Flow
 
-1. **Initialize** - Create session in database
-2. **Loop** (max 10 iterations):
-   - Build LLM request with conversation history and tool definitions
-   - Call LLM and save assistant response
-   - If tool calls present:
-     - Parse LLM tool call → typed `ToolRequest`
-     - Execute tool using `manager-tools::ToolExecutor`
-     - Save typed `ToolResponse` to database
-     - Add tool result to conversation history
-     - Continue loop
-   - If no tool calls:
-     - Mark session as complete
-     - Return result
+    1. **Initialize** - Create session in database
+    2. **Loop** (max 10 iterations):
+       - Build LLM request with conversation history and tool definitions
+       - Call LLM and save assistant response
+       - If tool calls present:
+         - Parse LLM tool call → typed `ToolRequest`
+         - Execute tool using `nocodo-tools::ToolExecutor`
+         - Save typed `ToolResponse` to database
+         - Add tool result to conversation history
+         - Continue loop
+       - If no tool calls:
+         - Mark session as complete
+         - Return result
 
 ## Development
 
@@ -179,7 +179,7 @@ See `src/codebase_analysis/mod.rs` for an example implementation.
 
 ```rust
 use crate::{Agent, AgentTool, database::Database};
-use manager_tools::ToolExecutor;
+use nocodo_tools::ToolExecutor;
 use async_trait::async_trait;
 use nocodo_llm_sdk::client::LlmClient;
 use std::sync::Arc;
@@ -227,7 +227,7 @@ impl Agent for MyAgent {
 
 ### Tool Integration
 
-Agents integrate with `manager-tools` through typed requests:
+Agents integrate with `nocodo-tools` through typed requests:
 
 ```rust
 use manager_models::{ToolRequest, ToolResponse};
@@ -269,7 +269,7 @@ cargo test --lib codebase_analysis
 Key dependencies:
 - **nocodo-llm-sdk**: LLM client abstraction (ZAI, Claude, OpenAI)
 - **manager-models**: Tool request/response types
-- **manager-tools**: Tool execution engine
+- **nocodo-tools**: Tool execution engine
 - **rusqlite**: SQLite database for session tracking
 - **tokio**: Async runtime
 

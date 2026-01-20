@@ -91,7 +91,7 @@ nocodo is self-hosted, giving you full control over your data and processes.
 
 - `nocodo-agents` - Agent definitions and execution logic
 - `nocodo-llm-sdk` - Unified interface for multiple AI providers
-- `manager-tools` - Tools that agents use (file operations, database queries, etc.)
+- `nocodo-tools` - Tools that agents use (file operations, database queries, etc.)
 - `gui` - Web interface for creating and managing workflows
 
 ---
