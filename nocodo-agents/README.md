@@ -7,6 +7,7 @@ A collection of AI agents for various software development tasks.
 | Agent | Description | Required Input |
 |-------|-------------|----------------|
 | **codebase-analysis** | Analyzes codebase structure, identifies architectural patterns, and provides insights about code organization | Path to codebase directory |
+| **imap-email** | Reads and analyzes emails from IMAP mailboxes with intelligent triage and information extraction | IMAP server credentials (host, port, username, password) |
 | **sqlite** | Analyzes SQLite databases, explores schema, and runs SQL queries to answer questions about the data | Path to SQLite database file |
 | **tesseract** | Extracts text from images using Tesseract OCR, with AI-powered cleaning and formatting of the extracted content | Path to image file |
 | **structured-json** | Generates structured JSON that conforms to specified TypeScript types, useful for creating type-safe data from natural language | TypeScript type names and domain description |

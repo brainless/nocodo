@@ -3,6 +3,10 @@ use nocodo_tools::types::filesystem::*;
 use nocodo_tools::types::{BashRequest, GrepRequest};
 use shared_types::user_interaction::*;
 
+fn default_true() -> bool {
+    true
+}
+
 /// Create tool definitions for LLM using manager-models types
 pub fn create_tool_definitions() -> Vec<Tool> {
     let sqlite_schema = serde_json::json!({
@@ -22,6 +26,101 @@ pub fn create_tool_definitions() -> Vec<Tool> {
         "Read-only SQLite database tool. Use SELECT queries to retrieve data and PRAGMA statements to inspect database schema (tables, columns, indexes, foreign keys). The database path is pre-configured.".to_string(),
         sqlite_schema,
     ).expect("Failed to create sqlite3_reader tool schema");
+
+    let imap_schema = serde_json::json!({
+        "type": "object",
+        "required": ["operation"],
+        "properties": {
+            "config_path": {
+                "type": "string",
+                "description": "Optional path to IMAP config file. If not provided, credentials from agent settings are used."
+            },
+            "operation": {
+                "type": "object",
+                "description": "The IMAP operation to execute. Each operation type has its own schema.",
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {
+                            "type": {"const": "list_mailboxes"},
+                            "pattern": {
+                                "type": "string",
+                                "description": "Mailbox pattern (e.g., '*' for all, 'INBOX/*' for INBOX subfolders)"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": ["type", "mailbox"],
+                        "properties": {
+                            "type": {"const": "mailbox_status"},
+                            "mailbox": {
+                                "type": "string",
+                                "description": "Mailbox name (e.g., 'INBOX')"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": ["type", "mailbox", "criteria"],
+                        "properties": {
+                            "type": {"const": "search"},
+                            "mailbox": {
+                                "type": "string",
+                                "description": "Mailbox to search (e.g., 'INBOX')"
+                            },
+                            "criteria": {
+                                "type": "object",
+                                "description": "Search criteria",
+                                "properties": {
+                                    "from": {"type": "string", "description": "Filter by sender email/name"},
+                                    "to": {"type": "string", "description": "Filter by recipient email/name"},
+                                    "subject": {"type": "string", "description": "Filter by subject text"},
+                                    "since_date": {"type": "string", "description": "Emails on or after date (RFC3501 format: DD-MMM-YYYY, e.g., '15-JAN-2026')"},
+                                    "before_date": {"type": "string", "description": "Emails before date (RFC3501 format)"},
+                                    "unseen_only": {"type": "boolean", "description": "Only return unread emails", "default": false},
+                                    "raw_query": {"type": "string", "description": "Raw IMAP search query (advanced users only)"}
+                                }
+                            },
+                            "limit": {"type": "integer", "description": "Maximum number of UIDs to return"}
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": ["type", "mailbox", "message_uids"],
+                        "properties": {
+                            "type": {"const": "fetch_headers"},
+                            "mailbox": {"type": "string", "description": "Mailbox name"},
+                            "message_uids": {
+                                "type": "array",
+                                "items": {"type": "integer"},
+                                "description": "List of message UIDs to fetch"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": ["type", "mailbox", "message_uid"],
+                        "properties": {
+                            "type": {"const": "fetch_email"},
+                            "mailbox": {"type": "string", "description": "Mailbox name"},
+                            "message_uid": {"type": "integer", "description": "Message UID to fetch"},
+                            "include_html": {"type": "boolean", "description": "Include HTML body if available", "default": false},
+                            "include_text": {"type": "boolean", "description": "Include text body", "default": true}
+                        }
+                    }
+                ]
+            },
+            "timeout_seconds": {"type": "integer", "description": "Operation timeout in seconds. Defaults to 30."}
+        }
+    });
+
+    let imap_tool = Tool::from_json_schema(
+        "imap_reader".to_string(),
+        "Read emails from IMAP mailboxes. Supports listing mailboxes, searching emails, fetching headers, and downloading email content. Always fetch headers first to analyze metadata before downloading full emails. This tool is READ-ONLY.".to_string(),
+        imap_schema,
+    ).expect("Failed to create imap_reader tool schema");
 
     vec![
         Tool::from_type::<ListFilesRequest>()
@@ -55,6 +154,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
             )
             .build(),
         sqlite_tool,
+        imap_tool,
     ]
 }
 
