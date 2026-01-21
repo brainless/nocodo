@@ -6,6 +6,7 @@ import type {
   AgentConfig,
   AgentExecutionRequest,
   AgentExecutionResponse,
+  ImapAgentConfig,
   SettingsManagementAgentConfig,
 } from '../../api-types/types';
 
@@ -24,6 +25,10 @@ const Agents: Component = () => {
   const [typeNames, setTypeNames] = createSignal('');
   const [domainDescription, setDomainDescription] = createSignal('');
   const [settingsFilePath, setSettingsFilePath] = createSignal('');
+  const [imapHost, setImapHost] = createSignal('');
+  const [imapPort, setImapPort] = createSignal('993');
+  const [imapUsername, setImapUsername] = createSignal('');
+  const [imapPassword, setImapPassword] = createSignal('');
 
   onMount(async () => {
     try {
@@ -124,6 +129,28 @@ const Agents: Component = () => {
           agent_schemas: [],
         };
         endpoint = 'http://127.0.0.1:8080/agents/settings-management/execute';
+      } else if (agentId === 'imap') {
+        if (!imapHost().trim()) {
+          throw new Error('Please enter an IMAP server host');
+        }
+        if (!imapUsername().trim()) {
+          throw new Error('Please enter an IMAP username');
+        }
+        if (!imapPassword().trim()) {
+          throw new Error('Please enter an IMAP password');
+        }
+        const port = parseInt(imapPort(), 10);
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          throw new Error('Please enter a valid port number (1-65535)');
+        }
+        config = {
+          type: 'imap',
+          host: imapHost(),
+          port: port,
+          username: imapUsername(),
+          password: imapPassword(),
+        };
+        endpoint = 'http://127.0.0.1:8080/agents/imap/execute';
       } else {
         throw new Error('Unknown agent type');
       }
@@ -298,6 +325,61 @@ const Agents: Component = () => {
                 class="input input-bordered w-full"
                 value={settingsFilePath()}
                 onInput={(e) => setSettingsFilePath(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+          </Show>
+
+          <Show when={selectedAgentId() === 'imap'}>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">IMAP Server Host</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter IMAP server hostname (e.g., imap.gmail.com)"
+                class="input input-bordered w-full"
+                value={imapHost()}
+                onInput={(e) => setImapHost(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Port</span>
+              </label>
+              <input
+                type="text"
+                placeholder="IMAP port (default: 993)"
+                class="input input-bordered w-full"
+                value={imapPort()}
+                onInput={(e) => setImapPort(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Email Address</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your email address"
+                class="input input-bordered w-full"
+                value={imapUsername()}
+                onInput={(e) => setImapUsername(e.currentTarget.value)}
+                disabled={executing()}
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Password</span>
+              </label>
+              <input
+                type="password"
+                placeholder="Enter IMAP password or app-specific password"
+                class="input input-bordered w-full"
+                value={imapPassword()}
+                onInput={(e) => setImapPassword(e.currentTarget.value)}
                 disabled={executing()}
               />
             </div>

@@ -2,6 +2,7 @@ pub mod codebase_analysis;
 pub mod config;
 pub mod database;
 pub mod factory;
+pub mod imap_email;
 pub mod requirements_gathering;
 pub mod settings_management;
 pub mod sqlite_reader;
@@ -26,6 +27,7 @@ pub enum AgentTool {
     Bash,
     AskUser,
     Sqlite3Reader,
+    ImapReader,
 }
 
 impl AgentTool {
@@ -40,6 +42,7 @@ impl AgentTool {
             AgentTool::Bash => "bash",
             AgentTool::AskUser => "ask_user",
             AgentTool::Sqlite3Reader => "sqlite3_reader",
+            AgentTool::ImapReader => "imap_reader",
         }
     }
 
@@ -103,6 +106,11 @@ impl AgentTool {
                     limit,
                 })
             }
+            "imap_reader" => {
+                let req: nocodo_tools::types::imap::ImapReaderRequest =
+                    serde_json::from_value(arguments)?;
+                ToolRequest::ImapReader(req)
+            }
             _ => anyhow::bail!("Unknown tool: {}", name),
         };
 
@@ -127,6 +135,22 @@ pub fn format_tool_response(response: &nocodo_tools::types::ToolResponse) -> Str
         ToolResponse::AskUser(r) => format!("User response: {:?}", r.responses),
         ToolResponse::Sqlite3Reader(r) => r.formatted_output.clone(),
         ToolResponse::HackerNewsResponse(r) => r.message.clone(),
+        ToolResponse::ImapReader(r) => {
+            if r.success {
+                format!(
+                    "IMAP {} operation successful:\n{}",
+                    r.operation_type,
+                    serde_json::to_string_pretty(&r.data)
+                        .unwrap_or_else(|_| format!("{:?}", r.data))
+                )
+            } else {
+                format!(
+                    "IMAP {} operation failed: {}",
+                    r.operation_type,
+                    r.message.as_deref().unwrap_or("Unknown error")
+                )
+            }
+        }
         ToolResponse::Error(e) => format!("Error: {}", e.message),
     }
 }

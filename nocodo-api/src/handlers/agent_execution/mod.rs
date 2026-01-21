@@ -1,4 +1,5 @@
 pub mod codebase_analysis_agent;
+pub mod imap_email_agent;
 pub mod requirements_gathering_agent;
 pub mod settings_management_agent;
 pub mod sqlite_agent;

@@ -48,6 +48,16 @@ export type SettingsManagementAgentConfig = {
 };
 
 /**
+ * Configuration for IMAP Email agent
+ */
+export type ImapAgentConfig = {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+};
+
+/**
  * Schema describing all settings an agent needs
  */
 export type AgentSettingsSchema = {
@@ -85,7 +95,8 @@ export type AgentConfig =
   | ({ type: 'tesseract' } & TesseractAgentConfig)
   | ({ type: 'structured-json' } & StructuredJsonAgentConfig)
   | ({ type: 'requirements-gathering' } & RequirementsGatheringAgentConfig)
-  | ({ type: 'settings-management' } & SettingsManagementAgentConfig);
+  | ({ type: 'settings-management' } & SettingsManagementAgentConfig)
+  | ({ type: 'imap' } & ImapAgentConfig);
 
 /**
  * Generic agent execution request with type-safe config

@@ -79,7 +79,7 @@ async fn test_count_users_integration() -> anyhow::Result<()> {
     let tool_executor = Arc::new(ToolExecutor::new(PathBuf::from(".")));
 
     // Create agent
-    let agent = SqliteAnalysisAgent::new_for_testing(
+    let agent = SqliteReaderAgent::new_for_testing(
         llm_client,
         session_db.clone(),
         tool_executor,
@@ -142,7 +142,7 @@ async fn test_latest_user_registration_integration() -> anyhow::Result<()> {
     let tool_executor = Arc::new(ToolExecutor::new(PathBuf::from(".")));
 
     // Create agent
-    let agent = SqliteAnalysisAgent::new_for_testing(
+    let agent = SqliteReaderAgent::new_for_testing(
         llm_client,
         session_db.clone(),
         tool_executor,

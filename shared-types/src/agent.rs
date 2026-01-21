@@ -56,6 +56,16 @@ pub struct SettingsManagementAgentConfig {
     pub agent_schemas: Vec<AgentSettingsSchema>,
 }
 
+/// Configuration for IMAP Email agent
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ImapAgentConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+}
+
 /// Type of setting value
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -106,6 +116,8 @@ pub enum AgentConfig {
     RequirementsGathering(RequirementsGatheringAgentConfig),
     #[serde(rename = "settings-management")]
     SettingsManagement(SettingsManagementAgentConfig),
+    #[serde(rename = "imap")]
+    Imap(ImapAgentConfig),
 }
 
 /// Generic agent execution request with type-safe config

@@ -9,6 +9,7 @@ pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
 use crate::hackernews;
+use crate::imap;
 use crate::sqlite_reader;
 use crate::user_interaction;
 
@@ -82,6 +83,9 @@ impl ToolExecutor {
             ToolRequest::HackerNewsRequest(req) => hackernews::execute_hackernews_request(req)
                 .await
                 .map_err(|e| anyhow::anyhow!(e)),
+            ToolRequest::ImapReader(req) => imap::execute_imap_reader(req)
+                .await
+                .map_err(|e| anyhow::anyhow!(e)),
         }
     }
 
@@ -101,6 +105,7 @@ impl ToolExecutor {
             ToolResponse::AskUser(response) => serde_json::to_value(response)?,
             ToolResponse::Sqlite3Reader(response) => serde_json::to_value(response)?,
             ToolResponse::HackerNewsResponse(response) => serde_json::to_value(response)?,
+            ToolResponse::ImapReader(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 
