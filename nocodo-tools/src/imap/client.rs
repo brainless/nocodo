@@ -21,8 +21,8 @@ impl ImapClient {
             .context("Failed to establish TCP connection to IMAP server")?;
 
         // Wrap with TLS using rustls
-        let tls_connector = RustlsConnector::new_with_native_certs()
-            .context("Failed to create TLS connector")?;
+        let tls_connector =
+            RustlsConnector::new_with_native_certs().context("Failed to create TLS connector")?;
 
         let tls_stream = tls_connector
             .connect(host, tcp_stream)

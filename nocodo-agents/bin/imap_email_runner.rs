@@ -79,7 +79,10 @@ async fn main() -> anyhow::Result<()> {
     println!("🔍 Testing IMAP connection...");
     match test_imap_connection(&args.host, args.port, &args.username, &password).await {
         Ok(mailbox_count) => {
-            println!("✅ Connection successful! Found {} mailboxes\n", mailbox_count);
+            println!(
+                "✅ Connection successful! Found {} mailboxes\n",
+                mailbox_count
+            );
         }
         Err(e) => {
             eprintln!("❌ IMAP connection test failed: {}\n", e);
@@ -238,7 +241,8 @@ async fn test_imap_connection(
         .map_err(|e| anyhow::anyhow!("Authentication failed: {}", e.0))?;
 
     // Try to list mailboxes as a connection test
-    let mailboxes = session.list(None, Some("*"))
+    let mailboxes = session
+        .list(None, Some("*"))
         .map_err(|e| anyhow::anyhow!("Failed to list mailboxes: {}", e))?;
 
     let count = mailboxes.len();

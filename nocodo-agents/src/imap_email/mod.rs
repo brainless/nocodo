@@ -9,10 +9,10 @@ use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
 use nocodo_tools::types::ToolRequest;
 use nocodo_tools::ToolExecutor;
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Instant;
 use tempfile::NamedTempFile;
-use std::io::Write;
 
 #[cfg(test)]
 mod tests;
@@ -238,8 +238,8 @@ impl ImapEmailAgent {
                 );
 
                 // Create temporary config file with credentials
-                let mut temp_file = NamedTempFile::new()
-                    .context("Failed to create temporary config file")?;
+                let mut temp_file =
+                    NamedTempFile::new().context("Failed to create temporary config file")?;
 
                 let config_json = serde_json::json!({
                     "host": self.imap_config.host,
@@ -248,13 +248,15 @@ impl ImapEmailAgent {
                     "password": self.imap_config.password,
                 });
 
-                temp_file.write_all(config_json.to_string().as_bytes())
+                temp_file
+                    .write_all(config_json.to_string().as_bytes())
                     .context("Failed to write IMAP config to temp file")?;
-                temp_file.flush()
-                    .context("Failed to flush temp file")?;
+                temp_file.flush().context("Failed to flush temp file")?;
 
                 // Get the path and inject it into the request
-                let config_path = temp_file.path().to_str()
+                let config_path = temp_file
+                    .path()
+                    .to_str()
                     .context("Failed to get temp file path")?
                     .to_string();
 
