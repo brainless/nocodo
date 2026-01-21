@@ -11,8 +11,9 @@ pub use typescript_gen::generate_typescript_definitions;
 
 pub use agent::{
     AgentConfig, AgentExecutionRequest, AgentInfo, AgentSettingsSchema, AgentsResponse,
-    CodebaseAnalysisAgentConfig, SettingDefinition, SettingType, SettingsManagementAgentConfig,
-    SqliteAgentConfig, StructuredJsonAgentConfig, TesseractAgentConfig,
+    CodebaseAnalysisAgentConfig, ImapAgentConfig, SettingDefinition, SettingType,
+    SettingsManagementAgentConfig, SqliteAgentConfig, StructuredJsonAgentConfig,
+    TesseractAgentConfig,
 };
 pub use project_management::{
     Project, SaveWorkflowRequest, Workflow, WorkflowStep, WorkflowStepData, WorkflowWithSteps,

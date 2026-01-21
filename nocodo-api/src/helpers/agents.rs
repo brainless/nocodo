@@ -51,6 +51,14 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
                     .to_string(),
             enabled: true,
         },
+        AgentInfo {
+            id: "imap".to_string(),
+            name: "IMAP Email Agent".to_string(),
+            description:
+                "Agent for reading and analyzing emails from IMAP mailboxes with intelligent triage and information extraction"
+                    .to_string(),
+            enabled: true,
+        },
     ]
 }
 
@@ -190,7 +198,7 @@ pub fn create_user_clarification_agent(
 ///
 /// A Settings Management agent instance
 pub fn create_settings_management_agent(
-    llm_client: &Arc<dyn LlmClient>,
+    llm_client: &Arc<dyn nocodo_llm_sdk::client::LlmClient>,
     database: &Arc<nocodo_agents::database::Database>,
     settings_file_path: &str,
     agent_schemas: Vec<nocodo_agents::AgentSettingsSchema>,
@@ -206,6 +214,46 @@ pub fn create_settings_management_agent(
         tool_executor,
         std::path::PathBuf::from(settings_file_path),
         agent_schemas,
+    );
+
+    Ok(agent)
+}
+
+/// Creates an IMAP Email agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+/// * `host` - IMAP server hostname
+/// * `port` - IMAP server port
+/// * `username` - IMAP username
+/// * `password` - IMAP password
+///
+/// # Returns
+///
+/// An IMAP Email agent instance
+pub fn create_imap_agent(
+    llm_client: &Arc<dyn nocodo_llm_sdk::client::LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+    host: &str,
+    port: u16,
+    username: &str,
+    password: &str,
+) -> anyhow::Result<nocodo_agents::imap_email::ImapEmailAgent> {
+    let tool_executor = Arc::new(
+        nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
+            .with_max_file_size(10 * 1024 * 1024),
+    );
+
+    let agent = nocodo_agents::imap_email::ImapEmailAgent::new(
+        llm_client.clone(),
+        database.clone(),
+        tool_executor,
+        host.to_string(),
+        port,
+        username.to_string(),
+        password.to_string(),
     );
 
     Ok(agent)

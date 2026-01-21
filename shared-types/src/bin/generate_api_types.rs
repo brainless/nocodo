@@ -1,4 +1,4 @@
-use shared_types::agent::RequirementsGatheringAgentConfig;
+use shared_types::agent::{ImapAgentConfig, RequirementsGatheringAgentConfig};
 use shared_types::*;
 use std::fs;
 use std::path::Path;
@@ -19,6 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     types.push(clean_type(
         SettingsManagementAgentConfig::export_to_string()?
     ));
+    types.push(clean_type(ImapAgentConfig::export_to_string()?));
     types.push(clean_type(AgentSettingsSchema::export_to_string()?));
     types.push(clean_type(SettingDefinition::export_to_string()?));
     types.push(clean_type(SettingType::export_to_string()?));

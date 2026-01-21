@@ -115,6 +115,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .service(
                 handlers::agent_execution::workflow_creation_agent::execute_workflow_creation_agent,
             )
+            .service(handlers::agent_execution::imap_email_agent::execute_imap_agent)
             .service(handlers::sessions::list_sessions)
             .service(handlers::sessions::get_session)
             .service(handlers::sessions::get_pending_questions)
