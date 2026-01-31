@@ -21,6 +21,7 @@ tracing-subscriber.workspace = true
 chrono.workspace = true
 anyhow.workspace = true
 home = "0.5"
+dirs.workspace = true
 rusqlite = { version = "0.37", features = ["bundled"] }
 toml = "0.9"
 config.workspace = true
