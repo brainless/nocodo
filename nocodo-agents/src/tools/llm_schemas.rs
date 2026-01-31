@@ -122,6 +122,49 @@ pub fn create_tool_definitions() -> Vec<Tool> {
         imap_schema,
     ).expect("Failed to create imap_reader tool schema");
 
+    let pdftotext_schema = serde_json::json!({
+        "type": "object",
+        "required": ["file_path"],
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "Path to the PDF file to extract text from"
+            },
+            "output_path": {
+                "type": "string",
+                "description": "Optional output file path. If not specified, text is returned in the response"
+            },
+            "preserve_layout": {
+                "type": "boolean",
+                "description": "Preserve original physical layout (default: true). Uses pdftotext -layout flag",
+                "default": true
+            },
+            "first_page": {
+                "type": "integer",
+                "description": "First page to convert (optional, 1-based index)"
+            },
+            "last_page": {
+                "type": "integer",
+                "description": "Last page to convert (optional, 1-based index)"
+            },
+            "encoding": {
+                "type": "string",
+                "description": "Output text encoding (default: UTF-8)"
+            },
+            "no_page_breaks": {
+                "type": "boolean",
+                "description": "Don't insert page breaks between pages (default: false)",
+                "default": false
+            }
+        }
+    });
+
+    let pdftotext_tool = Tool::from_json_schema(
+        "pdftotext".to_string(),
+        "Extract text from PDF files using pdftotext. Supports layout preservation, page range selection, and various encoding options. Use preserve_layout=true (default) to maintain formatting.".to_string(),
+        pdftotext_schema,
+    ).expect("Failed to create pdftotext tool schema");
+
     vec![
         Tool::from_type::<ListFilesRequest>()
             .name("list_files")
@@ -155,6 +198,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
             .build(),
         sqlite_tool,
         imap_tool,
+        pdftotext_tool,
     ]
 }
 

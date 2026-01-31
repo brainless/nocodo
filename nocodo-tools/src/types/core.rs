@@ -26,6 +26,8 @@ pub enum ToolRequest {
     HackerNewsRequest(super::hackernews::HackerNewsRequest),
     #[serde(rename = "imap_reader")]
     ImapReader(super::imap::ImapReaderRequest),
+    #[serde(rename = "pdftotext")]
+    PdfToText(super::pdftotext::PdfToTextRequest),
 }
 
 /// Tool response enum containing all possible tool results
@@ -52,6 +54,8 @@ pub enum ToolResponse {
     HackerNewsResponse(super::hackernews::HackerNewsResponse),
     #[serde(rename = "imap_reader")]
     ImapReader(super::imap::ImapReaderResponse),
+    #[serde(rename = "pdftotext")]
+    PdfToText(super::pdftotext::PdfToTextResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }
