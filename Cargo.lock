@@ -3050,6 +3050,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "dirs",
  "home",
  "nocodo-agents",
  "nocodo-llm-sdk",

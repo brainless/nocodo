@@ -75,13 +75,15 @@ impl ApiConfig {
 
         // Create default config file if it doesn't exist
         if !config_path.exists() {
-            let default_config = r#"
+            let default_db_path = get_default_db_path();
+            let default_config = format!(
+                r#"
 [server]
 host = "127.0.0.1"
 port = 8080
 
 [database]
-path = "~/.local/share/nocodo/api.db"
+path = "{}"
 
 [cors]
 allowed_origins = ["http://localhost:3000"]
@@ -97,7 +99,9 @@ allowed_origins = ["http://localhost:3000"]
 # zai_api_key = "your-zai-key"
 # zai_coding_plan = true
 # zen_api_key = "your-zen-key"
-"#;
+"#,
+                default_db_path.display()
+            );
             std::fs::write(&config_path, default_config).map_err(|e| {
                 ConfigError::Message(format!("Failed to write default config: {e}"))
             })?;
@@ -123,7 +127,9 @@ allowed_origins = ["http://localhost:3000"]
 }
 
 fn get_config_path() -> PathBuf {
-    if let Some(home) = home::home_dir() {
+    if let Some(config_dir) = dirs::config_dir() {
+        config_dir.join("nocodo/api.toml")
+    } else if let Some(home) = home::home_dir() {
         home.join(".config/nocodo/api.toml")
     } else {
         PathBuf::from("api.toml")
@@ -131,7 +137,9 @@ fn get_config_path() -> PathBuf {
 }
 
 fn get_default_db_path() -> PathBuf {
-    if let Some(home) = home::home_dir() {
+    if let Some(data_dir) = dirs::data_local_dir() {
+        data_dir.join("nocodo/api.db")
+    } else if let Some(home) = home::home_dir() {
         home.join(".local/share/nocodo/api.db")
     } else {
         PathBuf::from("api.db")
