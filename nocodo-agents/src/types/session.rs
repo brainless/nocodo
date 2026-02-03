@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
-    pub id: Option<String>,
+    pub id: Option<i64>,
     pub agent_name: String,
     pub provider: String,
     pub model: String,

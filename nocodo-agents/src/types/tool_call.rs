@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
-    pub id: Option<String>,
-    pub session_id: String,
-    pub message_id: Option<String>,
+    pub id: Option<i64>,
+    pub session_id: i64,
+    pub message_id: Option<i64>,
     pub tool_call_id: String,
     pub tool_name: String,
     pub request: serde_json::Value,

@@ -5,5 +5,6 @@ pub mod config;
 pub mod handlers;
 pub mod helpers;
 pub mod models;
+pub mod storage;
 
 pub type DbConnection = Arc<Mutex<Connection>>;

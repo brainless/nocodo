@@ -96,7 +96,7 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
         })
     }
 
-    async fn get_session(&self, session_id: &str) -> anyhow::Result<Session> {
+    async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
         self.storage
             .get_session(session_id)
             .await?
@@ -112,7 +112,7 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
     }
 
     /// Build messages from session history
-    async fn build_messages(&self, session_id: &str) -> anyhow::Result<Vec<LlmMessage>> {
+    async fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<LlmMessage>> {
         let db_messages = self.storage.get_messages(session_id).await?;
 
         db_messages
@@ -136,8 +136,8 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
     /// Execute a tool call
     async fn execute_tool_call(
         &self,
-        session_id: &str,
-        message_id: Option<&String>,
+        session_id: i64,
+        message_id: Option<i64>,
         tool_call: &LlmToolCall,
     ) -> anyhow::Result<()> {
         // 1. Parse LLM tool call into typed ToolRequest
@@ -147,8 +147,8 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
         // 2. Record tool call in storage
         let mut tool_call_record = StorageToolCall {
             id: None,
-            session_id: session_id.to_string(),
-            message_id: message_id.cloned(),
+            session_id,
+            message_id,
             tool_call_id: tool_call.id().to_string(),
             tool_name: tool_call.name().to_string(),
             request: tool_call.arguments().clone(),
@@ -190,7 +190,7 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
 
                 let tool_message = StorageMessage {
                     id: None,
-                    session_id: session_id.to_string(),
+                    session_id,
                     role: MessageRole::Tool,
                     content: message_to_llm,
                     created_at: chrono::Utc::now().timestamp(),
@@ -214,7 +214,7 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
 
                 let tool_message = StorageMessage {
                     id: None,
-                    session_id: session_id.to_string(),
+                    session_id,
                     role: MessageRole::Tool,
                     content: error_message_to_llm,
                     created_at: chrono::Utc::now().timestamp(),
@@ -257,12 +257,10 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        let session_id_str = session_id.to_string();
-
         // Create initial user message
         let user_message = StorageMessage {
             id: None,
-            session_id: session_id_str.clone(),
+            session_id,
             role: MessageRole::User,
             content: user_prompt.to_string(),
             created_at: chrono::Utc::now().timestamp(),
@@ -280,7 +278,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
             iteration += 1;
             if iteration > max_iterations {
                 let error = "Maximum iteration limit reached";
-                let mut session = self.get_session(&session_id_str).await?;
+                let mut session = self.get_session(session_id).await?;
                 session.status = SessionStatus::Failed;
                 session.error = Some(error.to_string());
                 session.ended_at = Some(chrono::Utc::now().timestamp());
@@ -289,7 +287,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
             }
 
             // Build request with conversation history
-            let messages = self.build_messages(&session_id_str).await?;
+            let messages = self.build_messages(session_id).await?;
 
             let request = CompletionRequest {
                 messages,
@@ -311,7 +309,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
             let text = extract_text_from_content(&response.content);
             let assistant_message = StorageMessage {
                 id: None,
-                session_id: session_id_str.clone(),
+                session_id,
                 role: MessageRole::Assistant,
                 content: text.clone(),
                 created_at: chrono::Utc::now().timestamp(),
@@ -321,7 +319,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
             // Check for tool calls
             if let Some(tool_calls) = response.tool_calls {
                 if tool_calls.is_empty() {
-                    let mut session = self.get_session(&session_id_str).await?;
+                    let mut session = self.get_session(session_id).await?;
                     session.status = SessionStatus::Completed;
                     session.result = Some(text.clone());
                     session.ended_at = Some(chrono::Utc::now().timestamp());
@@ -331,11 +329,11 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
 
                 // Execute tools
                 for tool_call in tool_calls {
-                    self.execute_tool_call(&session_id_str, Some(&message_id), &tool_call)
+                    self.execute_tool_call(session_id, Some(message_id), &tool_call)
                         .await?;
                 }
             } else {
-                let mut session = self.get_session(&session_id_str).await?;
+                let mut session = self.get_session(session_id).await?;
                 session.status = SessionStatus::Completed;
                 session.result = Some(text.clone());
                 session.ended_at = Some(chrono::Utc::now().timestamp());

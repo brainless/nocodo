@@ -1,7 +1,8 @@
 use crate::helpers::agents::create_user_clarification_agent;
 use crate::models::ErrorResponse;
+use crate::storage::SqliteAgentStorage;
 use actix_web::{post, web, HttpResponse, Responder};
-use nocodo_agents::Agent;
+use nocodo_agents::{Agent, AgentStorage, Session, SessionStatus};
 use serde_json::json;
 use shared_types::{AgentConfig, AgentExecutionRequest, AgentExecutionResponse};
 use std::sync::Arc;
@@ -11,7 +12,8 @@ use tracing::{error, info};
 pub async fn execute_requirements_gathering_agent(
     req: web::Json<AgentExecutionRequest>,
     llm_client: web::Data<Arc<dyn nocodo_llm_sdk::client::LlmClient>>,
-    database: web::Data<Arc<nocodo_agents::database::Database>>,
+    storage: web::Data<Arc<SqliteAgentStorage>>,
+    db: web::Data<crate::DbConnection>,
 ) -> impl Responder {
     // Validate config type
     match &req.config {
@@ -39,14 +41,22 @@ pub async fn execute_requirements_gathering_agent(
     let provider = llm_client.provider_name().to_string();
     let model = llm_client.model_name().to_string();
 
-    let session_id = match database.create_session(
-        &agent_name,
-        &provider,
-        &model,
-        None,
-        &user_prompt,
-        Some(config),
-    ) {
+    let session = Session {
+        id: None,
+        agent_name: agent_name.clone(),
+        provider: provider.clone(),
+        model: model.clone(),
+        system_prompt: None,
+        user_prompt: user_prompt.clone(),
+        config: config.clone(),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+
+    let session_id = match storage.create_session(session).await {
         Ok(id) => id,
         Err(e) => {
             error!(error = %e, "Failed to create session");
@@ -58,16 +68,34 @@ pub async fn execute_requirements_gathering_agent(
 
     // Return immediately with session_id and spawn background task
     let llm_client_clone = llm_client.get_ref().clone();
-    let database_clone = database.get_ref().clone();
+    let storage_clone = storage.get_ref().clone();
     let user_prompt_clone = user_prompt.clone();
+    let db_clone = db.get_ref().clone();
 
     tokio::spawn(async move {
-        let agent = match create_user_clarification_agent(&llm_client_clone, &database_clone) {
+        let agent = match create_user_clarification_agent(
+            &llm_client_clone,
+            &storage_clone,
+            &db_clone,
+        ) {
             Ok(agent) => agent,
             Err(e) => {
                 error!(error = %e, session_id = session_id, "Failed to create Requirements Gathering agent");
-                let _ = database_clone
-                    .fail_session(session_id, &format!("Failed to create agent: {}", e));
+                let mut session = Session {
+                    id: Some(session_id),
+                    agent_name: "requirements-gathering".to_string(),
+                    provider,
+                    model,
+                    system_prompt: None,
+                    user_prompt: user_prompt_clone,
+                    config,
+                    status: SessionStatus::Failed,
+                    started_at: 0,
+                    ended_at: Some(chrono::Utc::now().timestamp()),
+                    result: None,
+                    error: Some(format!("Failed to create agent: {}", e)),
+                };
+                let _ = storage_clone.update_session(session).await;
                 return;
             }
         };
@@ -78,15 +106,42 @@ pub async fn execute_requirements_gathering_agent(
                 // Check if agent is waiting for user input - if so, don't complete the session
                 // The agent already set the status to waiting_for_user_input
                 if !result.contains("Waiting for user") {
-                    if let Err(e) = database_clone.complete_session(session_id, &result) {
+                    let mut session = Session {
+                        id: Some(session_id),
+                        agent_name: "requirements-gathering".to_string(),
+                        provider,
+                        model,
+                        system_prompt: None,
+                        user_prompt: user_prompt_clone,
+                        config,
+                        status: SessionStatus::Completed,
+                        started_at: 0,
+                        ended_at: Some(chrono::Utc::now().timestamp()),
+                        result: Some(result.clone()),
+                        error: None,
+                    };
+                    if let Err(e) = storage_clone.update_session(session).await {
                         error!(error = %e, session_id = session_id, "Failed to complete session");
                     }
                 }
             }
             Err(e) => {
                 error!(error = %e, session_id = session_id, "Agent execution failed");
-                let _ =
-                    database_clone.fail_session(session_id, &format!("Execution failed: {}", e));
+                let mut session = Session {
+                    id: Some(session_id),
+                    agent_name: "requirements-gathering".to_string(),
+                    provider,
+                    model,
+                    system_prompt: None,
+                    user_prompt: user_prompt_clone,
+                    config,
+                    status: SessionStatus::Failed,
+                    started_at: 0,
+                    ended_at: Some(chrono::Utc::now().timestamp()),
+                    result: None,
+                    error: Some(format!("Execution failed: {}", e)),
+                };
+                let _ = storage_clone.update_session(session).await;
             }
         }
     });

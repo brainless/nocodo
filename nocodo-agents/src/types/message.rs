@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    pub id: Option<String>,
-    pub session_id: String,
+    pub id: Option<i64>,
+    pub session_id: i64,
     pub role: MessageRole,
     pub content: String,
     pub created_at: i64,

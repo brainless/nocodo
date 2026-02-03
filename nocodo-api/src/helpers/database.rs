@@ -1,3 +1,5 @@
+use crate::storage::migrations;
+use crate::storage::SqliteAgentStorage;
 use crate::DbConnection;
 use rusqlite::Connection;
 use std::path::PathBuf;
@@ -5,15 +7,18 @@ use std::sync::{Arc, Mutex};
 
 pub fn initialize_database(
     db_path: &PathBuf,
-) -> anyhow::Result<(DbConnection, Arc<nocodo_agents::database::Database>)> {
+) -> anyhow::Result<(DbConnection, Arc<SqliteAgentStorage>)> {
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    let conn = Connection::open(&db_path)?;
+    let mut conn = Connection::open(&db_path)?;
     conn.execute("PRAGMA foreign_keys = ON", [])?;
 
-    let db = Arc::new(nocodo_agents::database::Database::new(&db_path)?);
+    migrations::run_migrations(&mut conn)?;
 
-    Ok((Arc::new(Mutex::new(conn)), db))
+    let db_connection = Arc::new(Mutex::new(conn));
+    let storage = Arc::new(SqliteAgentStorage::new(db_connection.clone()));
+
+    Ok((db_connection, storage))
 }

@@ -92,10 +92,7 @@ async fn main() -> anyhow::Result<()> {
         result: None,
         error: None,
     };
-    let session_id_str = storage.create_session(session).await?;
-
-    // Parse session ID as i64 for agent.execute()
-    let session_id = session_id_str.parse::<i64>().unwrap_or_else(|_| 1);
+    let session_id = storage.create_session(session).await?;
 
     // Execute agent
     let result = agent.execute(&args.prompt, session_id).await?;

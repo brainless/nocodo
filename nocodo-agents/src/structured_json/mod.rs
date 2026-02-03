@@ -71,7 +71,7 @@ impl<S: AgentStorage> StructuredJsonAgent<S> {
         })
     }
 
-    async fn get_session(&self, session_id: &str) -> anyhow::Result<Session> {
+    async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
         self.storage
             .get_session(session_id)
             .await?
@@ -112,7 +112,7 @@ When responding:
     async fn validate_and_retry(
         &self,
         user_prompt: &str,
-        session_id: &str,
+        session_id: i64,
         max_retries: u32,
     ) -> anyhow::Result<serde_json::Value> {
         let mut attempt = 0;
@@ -147,7 +147,7 @@ When responding:
             let text = extract_text_from_content(&response.content);
             let assistant_message = StorageMessage {
                 id: None,
-                session_id: session_id.to_string(),
+                session_id,
                 role: MessageRole::Assistant,
                 content: text.clone(),
                 created_at: chrono::Utc::now().timestamp(),
@@ -179,7 +179,7 @@ When responding:
                         conversation_context.push((Role::User, error_msg.clone()));
                         let error_message = StorageMessage {
                             id: None,
-                            session_id: session_id.to_string(),
+                            session_id,
                             role: MessageRole::User,
                             content: error_msg,
                             created_at: chrono::Utc::now().timestamp(),
@@ -205,7 +205,7 @@ When responding:
                     conversation_context.push((Role::User, error_msg.clone()));
                     let error_message = StorageMessage {
                         id: None,
-                        session_id: session_id.to_string(),
+                        session_id,
                         role: MessageRole::User,
                         content: error_msg,
                         created_at: chrono::Utc::now().timestamp(),
@@ -258,21 +258,20 @@ impl<S: AgentStorage> Agent for StructuredJsonAgent<S> {
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        let session_id_str = session_id.to_string();
         let user_message = StorageMessage {
             id: None,
-            session_id: session_id_str.clone(),
+            session_id,
             role: MessageRole::User,
             content: user_prompt.to_string(),
             created_at: chrono::Utc::now().timestamp(),
         };
         self.storage.create_message(user_message).await?;
 
-        let json_value = self.validate_and_retry(user_prompt, &session_id_str, 3).await?;
+        let json_value = self.validate_and_retry(user_prompt, session_id, 3).await?;
 
         let formatted = serde_json::to_string_pretty(&json_value)?;
 
-        let mut session = self.get_session(&session_id_str).await?;
+        let mut session = self.get_session(session_id).await?;
         session.status = SessionStatus::Completed;
         session.result = Some(formatted.clone());
         session.ended_at = Some(chrono::Utc::now().timestamp());

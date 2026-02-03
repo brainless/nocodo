@@ -154,10 +154,7 @@ async fn run_single_query<S: AgentStorage>(
         result: None,
         error: None,
     };
-    let session_id_str = storage.create_session(session).await?;
-
-    // Parse session ID as i64 for agent.execute()
-    let session_id = session_id_str.parse::<i64>().unwrap_or_else(|_| 1);
+    let session_id = storage.create_session(session).await?;
 
     // Execute agent
     let result = agent.execute(prompt, session_id).await?;
@@ -187,10 +184,7 @@ async fn run_interactive_mode<S: AgentStorage>(
         result: None,
         error: None,
     };
-    let session_id_str = storage.create_session(session).await?;
-
-    // Parse session ID as i64 for agent.execute()
-    let session_id = session_id_str.parse::<i64>().unwrap_or_else(|_| 1);
+    let session_id = storage.create_session(session).await?;
 
     println!("🔄 Interactive mode enabled - session ID: {}", session_id);
     println!("💡 Type your queries. Type 'quit' or 'exit' to end the session.\n");

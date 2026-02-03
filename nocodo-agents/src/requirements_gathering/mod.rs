@@ -87,8 +87,8 @@ that you need more information about what they want to automate."#.to_string()
 
     async fn execute_tool_call(
         &self,
-        session_id: &str,
-        message_id: Option<&String>,
+        session_id: i64,
+        message_id: Option<i64>,
         tool_call: &LlmToolCall,
     ) -> anyhow::Result<()> {
         let tool_request =
@@ -96,8 +96,8 @@ that you need more information about what they want to automate."#.to_string()
 
         let mut tool_call_record = StorageToolCall {
             id: None,
-            session_id: session_id.to_string(),
-            message_id: message_id.cloned(),
+            session_id,
+            message_id,
             tool_call_id: tool_call.id().to_string(),
             tool_name: tool_call.name().to_string(),
             request: tool_call.arguments().clone(),
@@ -137,7 +137,7 @@ that you need more information about what they want to automate."#.to_string()
 
                 let tool_message = Message {
                     id: None,
-                    session_id: session_id.to_string(),
+                    session_id,
                     role: MessageRole::Tool,
                     content: message_to_llm,
                     created_at: chrono::Utc::now().timestamp(),
@@ -162,7 +162,7 @@ that you need more information about what they want to automate."#.to_string()
 
                 let tool_error_message = Message {
                     id: None,
-                    session_id: session_id.to_string(),
+                    session_id,
                     role: MessageRole::Tool,
                     content: error_message_to_llm,
                     created_at: chrono::Utc::now().timestamp(),
@@ -181,7 +181,7 @@ that you need more information about what they want to automate."#.to_string()
             .collect()
     }
 
-    async fn build_messages(&self, session_id: &str) -> anyhow::Result<Vec<LlmMessage>> {
+    async fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<LlmMessage>> {
         let db_messages = self.storage.get_messages(session_id).await?;
 
         db_messages
@@ -202,7 +202,7 @@ that you need more information about what they want to automate."#.to_string()
             .collect()
     }
 
-    async fn get_session(&self, session_id: &str) -> anyhow::Result<Session> {
+    async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
         self.storage
             .get_session(session_id)
             .await?
@@ -225,10 +225,9 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        let session_id_str = session_id.to_string();
         let user_message = Message {
             id: None,
-            session_id: session_id_str.clone(),
+            session_id,
             role: MessageRole::User,
             content: user_prompt.to_string(),
             created_at: chrono::Utc::now().timestamp(),
@@ -244,7 +243,7 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
             iteration += 1;
             if iteration > max_iterations {
                 let error = "Maximum iteration limit reached";
-                let mut session = self.get_session(&session_id_str).await?;
+                let mut session = self.get_session(session_id).await?;
                 session.status = SessionStatus::Failed;
                 session.error = Some(error.to_string());
                 session.ended_at = Some(chrono::Utc::now().timestamp());
@@ -252,7 +251,7 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
                 return Err(anyhow::anyhow!(error));
             }
 
-            let messages = self.build_messages(&session_id_str).await?;
+            let messages = self.build_messages(session_id).await?;
 
             let request = CompletionRequest {
                 messages,
@@ -279,7 +278,7 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
 
             let assistant_message = Message {
                 id: None,
-                session_id: session_id_str.clone(),
+                session_id,
                 role: MessageRole::Assistant,
                 content: text_to_save,
                 created_at: chrono::Utc::now().timestamp(),
@@ -288,7 +287,7 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
 
             if let Some(tool_calls) = response.tool_calls {
                 if tool_calls.is_empty() {
-                    let mut session = self.get_session(&session_id_str).await?;
+                    let mut session = self.get_session(session_id).await?;
                     session.status = SessionStatus::Completed;
                     session.result = Some(text.clone());
                     session.ended_at = Some(chrono::Utc::now().timestamp());
@@ -320,8 +319,8 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
                         let start = Instant::now();
                         let mut tool_call_record = StorageToolCall {
                             id: None,
-                            session_id: session_id_str.clone(),
-                            message_id: Some(message_id.clone()),
+                            session_id,
+                            message_id: Some(message_id),
                             tool_call_id: tool_call.id().to_string(),
                             tool_name: tool_call.name().to_string(),
                             request: tool_call.arguments().clone(),
@@ -340,8 +339,8 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
 
                         self.requirements_storage
                             .store_questions(
-                                &session_id_str,
-                                Some(&tool_call_id_str),
+                                session_id,
+                                Some(tool_call_id_str),
                                 &ask_user_request.questions,
                             )
                             .await?;
@@ -361,14 +360,14 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
                         );
                         let tool_message = Message {
                             id: None,
-                            session_id: session_id_str.clone(),
+                            session_id,
                             role: MessageRole::Tool,
                             content: message_to_llm,
                             created_at: chrono::Utc::now().timestamp(),
                         };
                         self.storage.create_message(tool_message).await?;
 
-                        let mut session = self.get_session(&session_id_str).await?;
+                        let mut session = self.get_session(session_id).await?;
                         session.status = SessionStatus::WaitingForUserInput;
                         self.storage.update_session(session).await?;
 
@@ -377,12 +376,12 @@ impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S
                             ask_user_request.questions.len()
                         ));
                     } else {
-                        self.execute_tool_call(&session_id_str, Some(&message_id), &tool_call)
+                        self.execute_tool_call(session_id, Some(message_id), &tool_call)
                             .await?;
                     }
                 }
             } else {
-                let mut session = self.get_session(&session_id_str).await?;
+                let mut session = self.get_session(session_id).await?;
                 session.status = SessionStatus::Completed;
                 session.result = Some(text.clone());
                 session.ended_at = Some(chrono::Utc::now().timestamp());
