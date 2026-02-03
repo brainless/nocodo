@@ -32,7 +32,9 @@ pub struct AgentFactory<S: AgentStorage> {
     tool_executor: Arc<ToolExecutor>,
 }
 
-impl<S: AgentStorage + 'static> AgentFactory<S> {
+impl<S: AgentStorage + 'static + crate::requirements_gathering::storage::RequirementsStorage>
+    AgentFactory<S>
+{
     /// Create a new AgentFactory with the given dependencies
     pub fn new(
         llm_client: Arc<dyn LlmClient>,
@@ -212,14 +214,12 @@ pub fn create_agent_with_tools(
             };
             Box::new(StructuredJsonAgent::new(client, storage, tool_executor, config).unwrap())
         }
-        AgentType::UserClarification => {
-            Box::new(UserClarificationAgent::new(
-                client,
-                storage.clone(),
-                storage,
-                tool_executor,
-            ))
-        }
+        AgentType::UserClarification => Box::new(UserClarificationAgent::new(
+            client,
+            storage.clone(),
+            storage,
+            tool_executor,
+        )),
         AgentType::SettingsManagement => {
             panic!(
                 "SettingsManagement agent cannot be created via create_by_type. \

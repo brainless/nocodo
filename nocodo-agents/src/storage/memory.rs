@@ -53,11 +53,12 @@ impl AgentStorage for InMemoryStorage {
 
     async fn create_message(&self, message: Message) -> Result<String, StorageError> {
         let message_id = uuid::Uuid::new_v4().to_string();
+        let session_id = message.session_id.clone();
         let mut message_with_id = message;
         message_with_id.id = Some(message_id.clone());
         let mut messages = self.messages.lock().unwrap();
         messages
-            .entry(message.session_id.clone())
+            .entry(session_id)
             .or_insert_with(Vec::new)
             .push(message_with_id);
         Ok(message_id)
@@ -75,11 +76,12 @@ impl AgentStorage for InMemoryStorage {
 
     async fn create_tool_call(&self, tool_call: ToolCall) -> Result<String, StorageError> {
         let tool_call_id = uuid::Uuid::new_v4().to_string();
+        let session_id = tool_call.session_id.clone();
         let mut tool_call_with_id = tool_call;
         tool_call_with_id.id = Some(tool_call_id.clone());
         let mut tool_calls = self.tool_calls.lock().unwrap();
         tool_calls
-            .entry(tool_call.session_id.clone())
+            .entry(session_id)
             .or_insert_with(Vec::new)
             .push(tool_call_with_id);
         Ok(tool_call_id)

@@ -1,7 +1,11 @@
 use clap::Parser;
-use nocodo_agents::config;
-use nocodo_agents::settings_management::create_settings_management_agent;
-use nocodo_agents::Agent;
+use nocodo_agents::{
+    config,
+    factory::create_settings_management_agent,
+    storage::AgentStorage,
+    types::{Session, SessionStatus},
+    Agent,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -46,26 +50,39 @@ async fn main() -> anyhow::Result<()> {
     // Collect settings schemas from available agents
     // Use static schemas to avoid circular dependency (can't instantiate SqliteReaderAgent
     // without db_path, which is what we're trying to collect)
-    let agent_schemas = nocodo_agents::sqlite_reader::SqliteReaderAgent::static_settings_schema()
-        .map(|schema| vec![schema])
-        .unwrap_or_default();
+    let agent_schemas = nocodo_agents::sqlite_reader::SqliteReaderAgent::<
+        nocodo_agents::storage::InMemoryStorage,
+    >::static_settings_schema()
+    .map(|schema| vec![schema])
+    .unwrap_or_default();
 
-    let (agent, database) =
-        create_settings_management_agent(client, args.settings_file.clone(), agent_schemas)?;
+    let agent = create_settings_management_agent(client, args.settings_file.clone(), agent_schemas);
 
     tracing::debug!("System prompt:\n{}", agent.system_prompt());
 
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 
-    let session_id = database.create_session(
-        "settings-management",
-        "standalone",
-        "standalone",
-        Some(&agent.system_prompt()),
-        &args.prompt,
-        None,
-    )?;
+    // Create session
+    let storage = Arc::new(nocodo_agents::storage::InMemoryStorage::new());
+    let session = Session {
+        id: None,
+        agent_name: "settings-management".to_string(),
+        provider: "standalone".to_string(),
+        model: "standalone".to_string(),
+        system_prompt: Some(agent.system_prompt()),
+        user_prompt: args.prompt.clone(),
+        config: serde_json::json!({}),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+    let session_id_str = storage.create_session(session).await?;
+
+    // Parse session ID as i64 for agent.execute()
+    let session_id = session_id_str.parse::<i64>().unwrap_or_else(|_| 1);
 
     let result = agent.execute(&args.prompt, session_id).await?;
 

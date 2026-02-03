@@ -1,5 +1,11 @@
 use clap::Parser;
-use nocodo_agents::{config, database::Database, imap_email::ImapEmailAgent, Agent};
+use nocodo_agents::{
+    config,
+    imap_email::ImapEmailAgent,
+    storage::AgentStorage,
+    types::{Session, SessionStatus},
+    Agent,
+};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use nocodo_tools::ToolExecutor;
 use std::collections::HashMap;
@@ -72,8 +78,8 @@ async fn main() -> anyhow::Result<()> {
     let tool_executor =
         Arc::new(ToolExecutor::new(std::env::current_dir()?).with_max_file_size(10 * 1024 * 1024));
 
-    // Create database for session management
-    let database = Arc::new(Database::new(&PathBuf::from(":memory:"))?);
+    // Create storage for session management
+    let storage = Arc::new(nocodo_agents::storage::InMemoryStorage::new());
 
     // Test IMAP connection before creating agent/loading LLM
     println!("🔍 Testing IMAP connection...");
@@ -104,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
 
     let agent = ImapEmailAgent::from_settings(
         client.clone(),
-        database.clone(),
+        storage.clone(),
         tool_executor.clone(),
         &settings,
     )?;
@@ -116,32 +122,42 @@ async fn main() -> anyhow::Result<()> {
 
     if args.interactive {
         // Interactive mode - multiple queries in same session
-        run_interactive_mode(&agent, &database, &args.prompt).await?;
+        run_interactive_mode(&agent, &storage, &args.prompt).await?;
     } else {
         // Single query mode
-        run_single_query(&agent, &database, &args.prompt).await?;
+        run_single_query(&agent, &storage, &args.prompt).await?;
     }
 
     Ok(())
 }
 
-async fn run_single_query(
-    agent: &ImapEmailAgent,
-    database: &Arc<Database>,
+async fn run_single_query<S: AgentStorage>(
+    agent: &ImapEmailAgent<S>,
+    storage: &Arc<S>,
     prompt: &str,
 ) -> anyhow::Result<()> {
     println!("💬 User prompt: {}\n", prompt);
     println!("⏳ Processing...\n");
 
     // Create session
-    let session_id = database.create_session(
-        "imap-email",
-        "standalone",
-        "standalone",
-        Some(&agent.system_prompt()),
-        prompt,
-        None,
-    )?;
+    let session = Session {
+        id: None,
+        agent_name: "imap-email".to_string(),
+        provider: "standalone".to_string(),
+        model: "standalone".to_string(),
+        system_prompt: Some(agent.system_prompt()),
+        user_prompt: prompt.to_string(),
+        config: serde_json::json!({}),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+    let session_id_str = storage.create_session(session).await?;
+
+    // Parse session ID as i64 for agent.execute()
+    let session_id = session_id_str.parse::<i64>().unwrap_or_else(|_| 1);
 
     // Execute agent
     let result = agent.execute(prompt, session_id).await?;
@@ -151,20 +167,30 @@ async fn run_single_query(
     Ok(())
 }
 
-async fn run_interactive_mode(
-    agent: &ImapEmailAgent,
-    database: &Arc<Database>,
+async fn run_interactive_mode<S: AgentStorage>(
+    agent: &ImapEmailAgent<S>,
+    storage: &Arc<S>,
     initial_prompt: &str,
 ) -> anyhow::Result<()> {
     // Create a single session for the entire interaction
-    let session_id = database.create_session(
-        "imap-email",
-        "standalone",
-        "standalone",
-        Some(&agent.system_prompt()),
-        initial_prompt,
-        None,
-    )?;
+    let session = Session {
+        id: None,
+        agent_name: "imap-email".to_string(),
+        provider: "standalone".to_string(),
+        model: "standalone".to_string(),
+        system_prompt: Some(agent.system_prompt()),
+        user_prompt: initial_prompt.to_string(),
+        config: serde_json::json!({}),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+    let session_id_str = storage.create_session(session).await?;
+
+    // Parse session ID as i64 for agent.execute()
+    let session_id = session_id_str.parse::<i64>().unwrap_or_else(|_| 1);
 
     println!("🔄 Interactive mode enabled - session ID: {}", session_id);
     println!("💡 Type your queries. Type 'quit' or 'exit' to end the session.\n");

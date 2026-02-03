@@ -1,4 +1,3 @@
-pub mod database;
 pub mod models;
 
 use crate::{
@@ -161,7 +160,10 @@ using the tool."#,
             completed_at: None,
             error_details: None,
         };
-        let call_id = self.storage.create_tool_call(tool_call_record.clone()).await?;
+        let call_id = self
+            .storage
+            .create_tool_call(tool_call_record.clone())
+            .await?;
         tool_call_record.id = Some(call_id);
 
         let start = Instant::now();
@@ -422,7 +424,10 @@ impl<S: AgentStorage> Agent for SettingsManagementAgent<S> {
                             completed_at: None,
                             error_details: None,
                         };
-                        let tool_call_id = self.storage.create_tool_call(tool_call_record.clone()).await?;
+                        let tool_call_id = self
+                            .storage
+                            .create_tool_call(tool_call_record.clone())
+                            .await?;
                         tool_call_record.id = Some(tool_call_id);
 
                         // Execute the ask_user tool to get responses from user
