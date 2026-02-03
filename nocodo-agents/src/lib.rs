@@ -7,9 +7,11 @@ pub mod pdftotext;
 pub mod requirements_gathering;
 pub mod settings_management;
 pub mod sqlite_reader;
+pub mod storage;
 pub mod structured_json;
 pub mod tesseract;
 pub mod tools;
+pub mod types;
 
 use async_trait::async_trait;
 use nocodo_tools::types::filesystem::*;
@@ -115,8 +117,7 @@ impl AgentTool {
                 ToolRequest::ImapReader(req)
             }
             "pdftotext" => {
-                let req: nocodo_tools::types::PdfToTextRequest =
-                    serde_json::from_value(arguments)?;
+                let req: nocodo_tools::types::PdfToTextRequest = serde_json::from_value(arguments)?;
                 ToolRequest::PdfToText(req)
             }
             _ => anyhow::bail!("Unknown tool: {}", name),
@@ -264,3 +265,6 @@ pub struct AgentSettingsSchema {
     /// List of settings this agent needs
     pub settings: Vec<SettingDefinition>,
 }
+
+pub use storage::{AgentStorage, StorageError};
+pub use types::{Message, MessageRole, Session, SessionStatus, ToolCall, ToolCallStatus};
