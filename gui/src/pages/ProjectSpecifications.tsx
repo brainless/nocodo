@@ -81,12 +81,12 @@ const ProjectRequirements: Component = () => {
       const requestBody: AgentExecutionRequest = {
         user_prompt: prompt,
         config: {
-          type: 'user-clarification',
+          type: 'requirements-gathering',
         },
       };
 
       const response = await fetch(
-        'http://127.0.0.1:8080/agents/user-clarification/execute',
+        'http://127.0.0.1:8080/agents/requirements-gathering/execute',
         {
           method: 'POST',
           headers: {

@@ -129,8 +129,6 @@ allowed_origins = ["http://localhost:3000"]
 fn get_config_path() -> PathBuf {
     if let Some(config_dir) = dirs::config_dir() {
         config_dir.join("nocodo/api.toml")
-    } else if let Some(home) = home::home_dir() {
-        home.join(".config/nocodo/api.toml")
     } else {
         PathBuf::from("api.toml")
     }
@@ -139,8 +137,6 @@ fn get_config_path() -> PathBuf {
 fn get_default_db_path() -> PathBuf {
     if let Some(data_dir) = dirs::data_local_dir() {
         data_dir.join("nocodo/api.db")
-    } else if let Some(home) = home::home_dir() {
-        home.join(".local/share/nocodo/api.db")
     } else {
         PathBuf::from("api.db")
     }
