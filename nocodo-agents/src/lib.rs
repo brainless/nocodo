@@ -5,6 +5,7 @@ pub mod imap_email;
 pub mod pdftotext;
 pub mod requirements_gathering;
 pub mod settings_management;
+#[cfg(feature = "sqlite")]
 pub mod sqlite_reader;
 pub mod storage;
 pub mod structured_json;
@@ -28,6 +29,7 @@ pub enum AgentTool {
     ApplyPatch,
     Bash,
     AskUser,
+    #[cfg(feature = "sqlite")]
     Sqlite3Reader,
     ImapReader,
     PdfToText,
@@ -44,6 +46,7 @@ impl AgentTool {
             AgentTool::ApplyPatch => "apply_patch",
             AgentTool::Bash => "bash",
             AgentTool::AskUser => "ask_user",
+            #[cfg(feature = "sqlite")]
             AgentTool::Sqlite3Reader => "sqlite3_reader",
             AgentTool::ImapReader => "imap_reader",
             AgentTool::PdfToText => "pdftotext",
@@ -90,6 +93,7 @@ impl AgentTool {
                 let req: AskUserRequest = serde_json::from_value(arguments)?;
                 ToolRequest::AskUser(req)
             }
+            #[cfg(feature = "sqlite")]
             "sqlite3_reader" => {
                 let value: serde_json::Value = arguments;
 
@@ -141,7 +145,9 @@ pub fn format_tool_response(response: &nocodo_tools::types::ToolResponse) -> Str
             r.exit_code, r.stdout, r.stderr
         ),
         ToolResponse::AskUser(r) => format!("User response: {:?}", r.responses),
+        #[cfg(feature = "sqlite")]
         ToolResponse::Sqlite3Reader(r) => r.formatted_output.clone(),
+        #[cfg(feature = "sqlite")]
         ToolResponse::HackerNewsResponse(r) => r.message.clone(),
         ToolResponse::ImapReader(r) => {
             if r.success {

@@ -9,6 +9,7 @@ fn default_true() -> bool {
 
 /// Create tool definitions for LLM using manager-models types
 pub fn create_tool_definitions() -> Vec<Tool> {
+    #[cfg(feature = "sqlite")]
     let sqlite_schema = serde_json::json!({
         "type": "object",
         "required": ["query"],
@@ -21,6 +22,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
         }
     });
 
+    #[cfg(feature = "sqlite")]
     let sqlite_tool = Tool::from_json_schema(
         "sqlite3_reader".to_string(),
         "Read-only SQLite database tool. Use SELECT queries to retrieve data and PRAGMA statements to inspect database schema (tables, columns, indexes, foreign keys). The database path is pre-configured.".to_string(),
@@ -196,6 +198,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
                 "Ask the user a list of questions to gather information or confirm actions",
             )
             .build(),
+        #[cfg(feature = "sqlite")]
         sqlite_tool,
         imap_tool,
         pdftotext_tool,

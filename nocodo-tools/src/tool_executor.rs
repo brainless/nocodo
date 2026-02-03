@@ -8,9 +8,11 @@ use crate::bash;
 pub use crate::bash::{BashExecutionResult, BashExecutorTrait};
 use crate::filesystem::{apply_patch, list_files, read_file, write_file};
 use crate::grep;
+#[cfg(feature = "sqlite")]
 use crate::hackernews;
 use crate::imap;
 use crate::pdftotext;
+#[cfg(feature = "sqlite")]
 use crate::sqlite_reader;
 use crate::user_interaction;
 
@@ -78,9 +80,11 @@ impl ToolExecutor {
                 .await
             }
             ToolRequest::AskUser(req) => user_interaction::ask_user(req).await,
+            #[cfg(feature = "sqlite")]
             ToolRequest::Sqlite3Reader(req) => sqlite_reader::execute_sqlite3_reader(req)
                 .await
                 .map_err(|e| anyhow::anyhow!(e)),
+            #[cfg(feature = "sqlite")]
             ToolRequest::HackerNewsRequest(req) => hackernews::execute_hackernews_request(req)
                 .await
                 .map_err(|e| anyhow::anyhow!(e)),
@@ -107,7 +111,9 @@ impl ToolExecutor {
             ToolResponse::ApplyPatch(response) => serde_json::to_value(response)?,
             ToolResponse::Bash(response) => serde_json::to_value(response)?,
             ToolResponse::AskUser(response) => serde_json::to_value(response)?,
+            #[cfg(feature = "sqlite")]
             ToolResponse::Sqlite3Reader(response) => serde_json::to_value(response)?,
+            #[cfg(feature = "sqlite")]
             ToolResponse::HackerNewsResponse(response) => serde_json::to_value(response)?,
             ToolResponse::ImapReader(response) => serde_json::to_value(response)?,
             ToolResponse::PdfToText(response) => serde_json::to_value(response)?,

@@ -1,9 +1,11 @@
 pub mod bash;
 pub mod filesystem;
 pub mod grep;
+#[cfg(feature = "sqlite")]
 pub mod hackernews;
 pub mod imap;
 pub mod pdftotext;
+#[cfg(feature = "sqlite")]
 pub mod sqlite_reader;
 pub mod tool_error;
 pub mod tool_executor;

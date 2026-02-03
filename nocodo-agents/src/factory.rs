@@ -1,6 +1,7 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::requirements_gathering::UserClarificationAgent;
 use crate::settings_management::SettingsManagementAgent;
+#[cfg(feature = "sqlite")]
 use crate::sqlite_reader::SqliteReaderAgent;
 use crate::storage::{AgentStorage, InMemoryStorage};
 use crate::structured_json::StructuredJsonAgent;
@@ -264,6 +265,7 @@ pub fn create_codebase_analysis_agent(
 /// # Returns
 ///
 /// A SqliteReaderAgent instance
+#[cfg(feature = "sqlite")]
 pub async fn create_sqlite_reader_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,

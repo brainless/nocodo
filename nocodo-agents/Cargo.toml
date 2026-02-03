@@ -35,6 +35,10 @@ uuid = { version = "1.0", features = ["v4"] }
 [dev-dependencies]
 tempfile = "3.0"
 
+[features]
+default = []
+sqlite = ["nocodo-tools/sqlite"]
+
 [[bin]]
 name = "codebase-analysis-runner"
 path = "bin/codebase_analysis_runner.rs"
@@ -42,6 +46,7 @@ path = "bin/codebase_analysis_runner.rs"
 [[bin]]
 name = "sqlite-reader-runner"
 path = "bin/sqlite_reader_runner.rs"
+required-features = ["sqlite"]
 
 [[bin]]
 name = "structured-json-runner"
