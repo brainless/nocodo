@@ -964,7 +964,7 @@ dependencies = [
  "codex-utils-tokenizer",
  "codex-windows-sandbox",
  "core-foundation 0.9.4",
- "dirs",
+ "dirs 6.0.0",
  "dunce",
  "env-flags",
  "eventsource-stream",
@@ -1106,7 +1106,7 @@ dependencies = [
  "axum",
  "codex-keyring-store",
  "codex-protocol",
- "dirs",
+ "dirs 6.0.0",
  "futures",
  "keyring",
  "mcp-types",
@@ -1490,11 +1490,20 @@ dependencies = [
 
 [[package]]
 name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.5.0",
 ]
 
 [[package]]
@@ -1505,6 +1514,18 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users 0.4.6",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -3050,7 +3071,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
- "dirs",
+ "dirs 5.0.1",
  "home",
  "nocodo-agents",
  "nocodo-llm-sdk",
