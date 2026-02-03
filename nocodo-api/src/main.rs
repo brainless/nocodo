@@ -64,11 +64,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("Failed to acquire config read lock");
     let llm_client = helpers::llm::create_llm_client(&config).expect("Failed to create LLM client");
     let db_path = config.database.path.clone();
+    let bind_addr = format!("{}:{}", config.server.host, config.server.port);
     drop(config);
     let (db_conn, db) =
         helpers::database::initialize_database(&db_path).expect("Failed to initialize database");
 
-    let bind_addr = "127.0.0.1:8080";
     info!("Starting nocodo-api server at http://{}", bind_addr);
 
     let cors_config = app_config
@@ -116,6 +116,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 handlers::agent_execution::workflow_creation_agent::execute_workflow_creation_agent,
             )
             .service(handlers::agent_execution::imap_email_agent::execute_imap_agent)
+            .service(handlers::agent_execution::pdftotext_agent::execute_pdftotext_agent)
             .service(handlers::sessions::list_sessions)
             .service(handlers::sessions::get_session)
             .service(handlers::sessions::get_pending_questions)

@@ -66,6 +66,13 @@ pub struct ImapAgentConfig {
     pub password: String,
 }
 
+/// Configuration for PDF to Text agent
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PdfToTextAgentConfig {
+    pub pdf_path: String,
+}
+
 /// Type of setting value
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -118,6 +125,8 @@ pub enum AgentConfig {
     SettingsManagement(SettingsManagementAgentConfig),
     #[serde(rename = "imap")]
     Imap(ImapAgentConfig),
+    #[serde(rename = "pdftotext")]
+    PdfToText(PdfToTextAgentConfig),
 }
 
 /// Generic agent execution request with type-safe config

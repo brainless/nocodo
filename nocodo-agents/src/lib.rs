@@ -3,6 +3,7 @@ pub mod config;
 pub mod database;
 pub mod factory;
 pub mod imap_email;
+pub mod pdftotext;
 pub mod requirements_gathering;
 pub mod settings_management;
 pub mod sqlite_reader;
@@ -28,6 +29,7 @@ pub enum AgentTool {
     AskUser,
     Sqlite3Reader,
     ImapReader,
+    PdfToText,
 }
 
 impl AgentTool {
@@ -43,6 +45,7 @@ impl AgentTool {
             AgentTool::AskUser => "ask_user",
             AgentTool::Sqlite3Reader => "sqlite3_reader",
             AgentTool::ImapReader => "imap_reader",
+            AgentTool::PdfToText => "pdftotext",
         }
     }
 
@@ -111,6 +114,11 @@ impl AgentTool {
                     serde_json::from_value(arguments)?;
                 ToolRequest::ImapReader(req)
             }
+            "pdftotext" => {
+                let req: nocodo_tools::types::PdfToTextRequest =
+                    serde_json::from_value(arguments)?;
+                ToolRequest::PdfToText(req)
+            }
             _ => anyhow::bail!("Unknown tool: {}", name),
         };
 
@@ -149,6 +157,23 @@ pub fn format_tool_response(response: &nocodo_tools::types::ToolResponse) -> Str
                     r.operation_type,
                     r.message.as_deref().unwrap_or("Unknown error")
                 )
+            }
+        }
+        ToolResponse::PdfToText(r) => {
+            if r.success {
+                if let Some(content) = &r.content {
+                    format!("PDF text extraction successful:\n{}", content)
+                } else if let Some(output_path) = &r.output_path {
+                    format!(
+                        "PDF text extraction successful: {} bytes written to {}",
+                        r.bytes_written.unwrap_or(0),
+                        output_path
+                    )
+                } else {
+                    r.message.clone()
+                }
+            } else {
+                format!("PDF text extraction failed: {}", r.message)
             }
         }
         ToolResponse::Error(e) => format!("Error: {}", e.message),

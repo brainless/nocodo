@@ -59,6 +59,14 @@ pub fn list_supported_agents() -> Vec<AgentInfo> {
                     .to_string(),
             enabled: true,
         },
+        AgentInfo {
+            id: "pdftotext".to_string(),
+            name: "PDF to Text Agent".to_string(),
+            description:
+                "Agent for extracting text from PDF files using pdftotext with layout preservation and page selection capabilities"
+                    .to_string(),
+            enabled: true,
+        },
     ]
 }
 
@@ -255,6 +263,31 @@ pub fn create_imap_agent(
         username.to_string(),
         password.to_string(),
     );
+
+    Ok(agent)
+}
+
+/// Creates a PDF to Text agent
+///
+/// # Arguments
+///
+/// * `llm_client` - The LLM client to use for the agent
+/// * `database` - Shared database for session persistence
+/// * `pdf_path` - Path to the PDF file to process
+///
+/// # Returns
+///
+/// A PDF to Text agent instance
+pub async fn create_pdftotext_agent(
+    llm_client: &Arc<dyn LlmClient>,
+    database: &Arc<nocodo_agents::database::Database>,
+    pdf_path: &str,
+) -> anyhow::Result<nocodo_agents::pdftotext::PdfToTextAgent> {
+    let agent = nocodo_agents::pdftotext::PdfToTextAgent::new(
+        llm_client.clone(),
+        database.clone(),
+        std::path::PathBuf::from(pdf_path),
+    )?;
 
     Ok(agent)
 }

@@ -3,6 +3,7 @@ pub mod filesystem;
 pub mod grep;
 pub mod hackernews;
 pub mod imap;
+pub mod pdftotext;
 pub mod sqlite_reader;
 pub mod tool_error;
 pub mod tool_executor;
