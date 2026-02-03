@@ -1,6 +1,6 @@
 pub mod database;
 pub mod models;
-mod storage;
+pub mod storage;
 
 #[cfg(test)]
 mod migrations_test;

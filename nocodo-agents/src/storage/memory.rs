@@ -1,5 +1,6 @@
 use crate::storage::{AgentStorage, StorageError};
 use crate::types::{Message, Session, ToolCall};
+use shared_types::user_interaction::UserQuestion;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -8,6 +9,8 @@ pub struct InMemoryStorage {
     sessions: Arc<Mutex<HashMap<String, Session>>>,
     messages: Arc<Mutex<HashMap<String, Vec<Message>>>>,
     tool_calls: Arc<Mutex<HashMap<String, Vec<ToolCall>>>>,
+    questions: Arc<Mutex<HashMap<String, Vec<UserQuestion>>>>,
+    answers: Arc<Mutex<HashMap<String, HashMap<String, String>>>>,
 }
 
 impl InMemoryStorage {
@@ -16,6 +19,8 @@ impl InMemoryStorage {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             messages: Arc::new(Mutex::new(HashMap::new())),
             tool_calls: Arc::new(Mutex::new(HashMap::new())),
+            questions: Arc::new(Mutex::new(HashMap::new())),
+            answers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -121,5 +126,56 @@ impl AgentStorage for InMemoryStorage {
             .into_iter()
             .filter(|c| matches!(c.status, crate::types::ToolCallStatus::Pending))
             .collect())
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::requirements_gathering::storage::RequirementsStorage for InMemoryStorage {
+    async fn store_questions(
+        &self,
+        session_id: &str,
+        _tool_call_id: Option<&str>,
+        questions: &[UserQuestion],
+    ) -> Result<(), StorageError> {
+        let mut question_store = self.questions.lock().unwrap();
+        question_store
+            .entry(session_id.to_string())
+            .or_insert_with(Vec::new)
+            .extend(questions.iter().cloned());
+        Ok(())
+    }
+
+    async fn get_pending_questions(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<UserQuestion>, StorageError> {
+        let questions = self.questions.lock().unwrap();
+        let answers = self.answers.lock().unwrap();
+
+        let session_answers = answers.get(session_id);
+        let session_questions = questions.get(session_id).cloned().unwrap_or_default();
+
+        // Filter out questions that have been answered
+        Ok(session_questions
+            .into_iter()
+            .filter(|q| {
+                session_answers
+                    .map(|ans| !ans.contains_key(&q.id))
+                    .unwrap_or(true)
+            })
+            .collect())
+    }
+
+    async fn store_answers(
+        &self,
+        session_id: &str,
+        answers: &std::collections::HashMap<String, String>,
+    ) -> Result<(), StorageError> {
+        let mut answer_store = self.answers.lock().unwrap();
+        answer_store
+            .entry(session_id.to_string())
+            .or_insert_with(HashMap::new)
+            .extend(answers.clone());
+        Ok(())
     }
 }

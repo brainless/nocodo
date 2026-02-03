@@ -1,6 +1,5 @@
 pub mod codebase_analysis;
 pub mod config;
-pub mod database;
 pub mod factory;
 pub mod imap_email;
 pub mod pdftotext;

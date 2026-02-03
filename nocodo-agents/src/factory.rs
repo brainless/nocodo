@@ -1,8 +1,8 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
-use crate::database::Database;
 use crate::requirements_gathering::UserClarificationAgent;
 use crate::settings_management::SettingsManagementAgent;
 use crate::sqlite_reader::SqliteReaderAgent;
+use crate::storage::{AgentStorage, InMemoryStorage};
 use crate::structured_json::StructuredJsonAgent;
 use crate::tesseract::TesseractAgent;
 use crate::Agent;
@@ -26,31 +26,31 @@ pub enum AgentType {
 }
 
 /// Factory for creating AI agents with shared dependencies
-pub struct AgentFactory {
+pub struct AgentFactory<S: AgentStorage> {
     llm_client: Arc<dyn LlmClient>,
-    database: Arc<Database>,
+    storage: Arc<S>,
     tool_executor: Arc<ToolExecutor>,
 }
 
-impl AgentFactory {
+impl<S: AgentStorage + 'static> AgentFactory<S> {
     /// Create a new AgentFactory with the given dependencies
     pub fn new(
         llm_client: Arc<dyn LlmClient>,
-        database: Arc<Database>,
+        storage: Arc<S>,
         tool_executor: Arc<ToolExecutor>,
     ) -> Self {
         Self {
             llm_client,
-            database,
+            storage,
             tool_executor,
         }
     }
 
     /// Create a CodebaseAnalysisAgent
-    pub fn create_codebase_analysis_agent(&self) -> CodebaseAnalysisAgent {
+    pub fn create_codebase_analysis_agent(&self) -> CodebaseAnalysisAgent<S> {
         CodebaseAnalysisAgent::new(
             self.llm_client.clone(),
-            self.database.clone(),
+            self.storage.clone(),
             self.tool_executor.clone(),
         )
     }
@@ -68,8 +68,8 @@ impl AgentFactory {
     pub fn create_tesseract_agent(
         &self,
         base_path: std::path::PathBuf,
-    ) -> anyhow::Result<TesseractAgent> {
-        TesseractAgent::new(self.llm_client.clone(), self.database.clone(), base_path)
+    ) -> anyhow::Result<TesseractAgent<S>> {
+        TesseractAgent::new(self.llm_client.clone(), self.storage.clone(), base_path)
     }
 
     /// Create a StructuredJsonAgent for generating type-safe JSON
@@ -90,10 +90,10 @@ impl AgentFactory {
     pub fn create_structured_json_agent(
         &self,
         config: crate::structured_json::StructuredJsonAgentConfig,
-    ) -> anyhow::Result<StructuredJsonAgent> {
+    ) -> anyhow::Result<StructuredJsonAgent<S>> {
         StructuredJsonAgent::new(
             self.llm_client.clone(),
-            self.database.clone(),
+            self.storage.clone(),
             self.tool_executor.clone(),
             config,
         )
@@ -103,10 +103,11 @@ impl AgentFactory {
     ///
     /// This agent determines if a user's request needs clarification
     /// before proceeding with task.
-    pub fn create_user_clarification_agent(&self) -> UserClarificationAgent {
+    pub fn create_user_clarification_agent(&self) -> UserClarificationAgent<S, S> {
         UserClarificationAgent::new(
             self.llm_client.clone(),
-            self.database.clone(),
+            self.storage.clone(),
+            self.storage.clone(),
             self.tool_executor.clone(),
         )
     }
@@ -123,10 +124,10 @@ impl AgentFactory {
         &self,
         settings_file_path: std::path::PathBuf,
         agent_schemas: Vec<crate::AgentSettingsSchema>,
-    ) -> SettingsManagementAgent {
+    ) -> SettingsManagementAgent<S> {
         SettingsManagementAgent::new(
             self.llm_client.clone(),
-            self.database.clone(),
+            self.storage.clone(),
             self.tool_executor.clone(),
             settings_file_path,
             agent_schemas,
@@ -164,21 +165,21 @@ impl AgentFactory {
 /// ```
 pub fn create_agent(agent_type: AgentType, client: Arc<dyn LlmClient>) -> Box<dyn Agent> {
     // This is a legacy function - for now create dummy components
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:")).unwrap());
+    let storage = Arc::new(InMemoryStorage::new());
     let tool_executor = Arc::new(
         ToolExecutor::new(std::env::current_dir().unwrap()).with_max_file_size(10 * 1024 * 1024), // 10MB
     );
 
-    create_agent_with_tools(agent_type, client, database, tool_executor)
+    create_agent_with_tools(agent_type, client, storage, tool_executor)
 }
 
-/// Factory function to create an agent with database and tool executor support
+/// Factory function to create an agent with storage and tool executor support
 ///
 /// # Arguments
 ///
 /// * `agent_type` - The type of agent to create
 /// * `client` - The LLM client to use for agent
-/// * `database` - Database for session persistence
+/// * `storage` - Storage for session persistence
 /// * `tool_executor` - Tool executor for running tools
 ///
 /// # Returns
@@ -187,17 +188,17 @@ pub fn create_agent(agent_type: AgentType, client: Arc<dyn LlmClient>) -> Box<dy
 pub fn create_agent_with_tools(
     agent_type: AgentType,
     client: Arc<dyn LlmClient>,
-    database: Arc<Database>,
+    storage: Arc<InMemoryStorage>,
     tool_executor: Arc<ToolExecutor>,
 ) -> Box<dyn Agent> {
     match agent_type {
         AgentType::CodebaseAnalysis => {
-            Box::new(CodebaseAnalysisAgent::new(client, database, tool_executor))
+            Box::new(CodebaseAnalysisAgent::new(client, storage, tool_executor))
         }
         AgentType::Tesseract => {
             // For Tesseract, we need a specific base path. Use current directory as default
             let base_path = std::env::current_dir().unwrap_or_default();
-            Box::new(TesseractAgent::new(client, database, base_path).unwrap())
+            Box::new(TesseractAgent::new(client, storage, base_path).unwrap())
         }
         AgentType::StructuredJson => {
             // For StructuredJson, use default types
@@ -209,10 +210,15 @@ pub fn create_agent_with_tools(
                 ],
                 domain_description: "Structured data generation".to_string(),
             };
-            Box::new(StructuredJsonAgent::new(client, database, tool_executor, config).unwrap())
+            Box::new(StructuredJsonAgent::new(client, storage, tool_executor, config).unwrap())
         }
         AgentType::UserClarification => {
-            Box::new(UserClarificationAgent::new(client, database, tool_executor))
+            Box::new(UserClarificationAgent::new(
+                client,
+                storage.clone(),
+                storage,
+                tool_executor,
+            ))
         }
         AgentType::SettingsManagement => {
             panic!(
@@ -227,7 +233,7 @@ pub fn create_agent_with_tools(
 
 /// Create a CodebaseAnalysisAgent with tool executor support
 ///
-/// Uses an in-memory database by default for session persistence
+/// Uses in-memory storage by default for session persistence
 ///
 /// # Arguments
 ///
@@ -240,15 +246,14 @@ pub fn create_agent_with_tools(
 pub fn create_codebase_analysis_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,
-) -> (CodebaseAnalysisAgent, Arc<Database>) {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:")).unwrap());
-    let agent = CodebaseAnalysisAgent::new(client, database.clone(), tool_executor);
-    (agent, database)
+) -> CodebaseAnalysisAgent<InMemoryStorage> {
+    let storage = Arc::new(InMemoryStorage::new());
+    CodebaseAnalysisAgent::new(client, storage, tool_executor)
 }
 
 /// Create a SqliteReaderAgent with tool executor support
 ///
-/// Uses an in-memory database by default for session persistence
+/// Uses in-memory storage by default for session persistence
 ///
 /// # Arguments
 ///
@@ -263,15 +268,15 @@ pub async fn create_sqlite_reader_agent(
     client: Arc<dyn LlmClient>,
     tool_executor: Arc<ToolExecutor>,
     db_path: String,
-) -> anyhow::Result<(SqliteReaderAgent, Arc<Database>)> {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let agent = SqliteReaderAgent::new(client, database.clone(), tool_executor, db_path).await?;
-    Ok((agent, database))
+) -> anyhow::Result<SqliteReaderAgent<InMemoryStorage>> {
+    let storage = Arc::new(InMemoryStorage::new());
+    let agent = SqliteReaderAgent::new(client, storage, tool_executor, db_path).await?;
+    Ok(agent)
 }
 
 /// Create a TesseractAgent with tool executor support
 ///
-/// Uses an in-memory database by default for session persistence
+/// Uses in-memory storage by default for session persistence
 ///
 /// # Arguments
 ///
@@ -284,15 +289,15 @@ pub async fn create_sqlite_reader_agent(
 pub fn create_tesseract_agent(
     client: Arc<dyn LlmClient>,
     base_path: std::path::PathBuf,
-) -> anyhow::Result<(TesseractAgent, Arc<Database>)> {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let agent = TesseractAgent::new(client, database.clone(), base_path)?;
-    Ok((agent, database))
+) -> anyhow::Result<TesseractAgent<InMemoryStorage>> {
+    let storage = Arc::new(InMemoryStorage::new());
+    let agent = TesseractAgent::new(client, storage, base_path)?;
+    Ok(agent)
 }
 
 /// Create a UserClarificationAgent with tool executor support
 ///
-/// Uses an in-memory database by default for session persistence
+/// Uses in-memory storage by default for session persistence
 ///
 /// # Arguments
 ///
@@ -303,16 +308,15 @@ pub fn create_tesseract_agent(
 /// A UserClarificationAgent instance
 pub fn create_user_clarification_agent(
     client: Arc<dyn LlmClient>,
-) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+) -> UserClarificationAgent<InMemoryStorage, InMemoryStorage> {
+    let storage = Arc::new(InMemoryStorage::new());
     let tool_executor = Arc::new(ToolExecutor::new(std::path::PathBuf::from(".")));
-    let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
-    Ok((agent, database))
+    UserClarificationAgent::new(client, storage.clone(), storage, tool_executor)
 }
 
 /// Create a SettingsManagementAgent with tool executor support
 ///
-/// Uses an in-memory database by default for session persistence
+/// Uses in-memory storage by default for session persistence
 ///
 /// # Arguments
 ///
@@ -327,17 +331,16 @@ pub fn create_settings_management_agent(
     client: Arc<dyn LlmClient>,
     settings_file_path: std::path::PathBuf,
     agent_schemas: Vec<crate::AgentSettingsSchema>,
-) -> anyhow::Result<(SettingsManagementAgent, Arc<Database>)> {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+) -> SettingsManagementAgent<InMemoryStorage> {
+    let storage = Arc::new(InMemoryStorage::new());
     let tool_executor = Arc::new(ToolExecutor::new(std::path::PathBuf::from(".")));
-    let agent = SettingsManagementAgent::new(
+    SettingsManagementAgent::new(
         client,
-        database.clone(),
+        storage,
         tool_executor,
         settings_file_path,
         agent_schemas,
-    );
-    Ok((agent, database))
+    )
 }
 
 #[cfg(test)]

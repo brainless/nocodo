@@ -1,11 +1,16 @@
 use crate::{
-    database::Database, Agent, AgentSettingsSchema, AgentTool, SettingDefinition, SettingType,
+    storage::AgentStorage,
+    types::{
+        Message as StorageMessage, MessageRole, Session, SessionStatus,
+        ToolCall as StorageToolCall, ToolCallStatus,
+    },
+    Agent, AgentSettingsSchema, AgentTool, SettingDefinition, SettingType,
 };
 use anyhow::{self, Context};
 use async_trait::async_trait;
 use nocodo_llm_sdk::client::LlmClient;
-use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
-use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_llm_sdk::tools::{ToolCall as LlmToolCall, ToolChoice};
+use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message as LlmMessage, Role};
 use nocodo_tools::types::ToolRequest;
 use nocodo_tools::ToolExecutor;
 use std::collections::HashMap;
@@ -114,9 +119,9 @@ If operations fail:
 Always provide helpful context when errors occur so users can resolve issues.
 "#;
 
-pub struct ImapEmailAgent {
+pub struct ImapEmailAgent<S: AgentStorage> {
     client: Arc<dyn LlmClient>,
-    database: Arc<Database>,
+    storage: Arc<S>,
     tool_executor: Arc<ToolExecutor>,
     imap_config: ImapConfig,
     system_prompt: String,
@@ -129,10 +134,10 @@ struct ImapConfig {
     password: String,
 }
 
-impl ImapEmailAgent {
+impl<S: AgentStorage> ImapEmailAgent<S> {
     pub fn new(
         client: Arc<dyn LlmClient>,
-        database: Arc<Database>,
+        storage: Arc<S>,
         tool_executor: Arc<ToolExecutor>,
         host: String,
         port: u16,
@@ -141,7 +146,7 @@ impl ImapEmailAgent {
     ) -> Self {
         Self {
             client,
-            database,
+            storage,
             tool_executor,
             imap_config: ImapConfig {
                 host,
@@ -155,7 +160,7 @@ impl ImapEmailAgent {
 
     pub fn from_settings(
         client: Arc<dyn LlmClient>,
-        database: Arc<Database>,
+        storage: Arc<S>,
         tool_executor: Arc<ToolExecutor>,
         settings: &HashMap<String, String>,
     ) -> anyhow::Result<Self> {
@@ -181,13 +186,20 @@ impl ImapEmailAgent {
 
         Ok(Self::new(
             client,
-            database,
+            storage,
             tool_executor,
             host,
             port,
             username,
             password,
         ))
+    }
+
+    async fn get_session(&self, session_id: &str) -> anyhow::Result<Session> {
+        self.storage
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))
     }
 
     fn get_tool_definitions(&self) -> Vec<nocodo_llm_sdk::tools::Tool> {
@@ -197,21 +209,20 @@ impl ImapEmailAgent {
             .collect()
     }
 
-    fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<Message>> {
-        let db_messages = self.database.get_messages(session_id)?;
+    async fn build_messages(&self, session_id: &str) -> anyhow::Result<Vec<LlmMessage>> {
+        let db_messages = self.storage.get_messages(session_id).await?;
 
         db_messages
             .into_iter()
             .map(|msg| {
-                let role = match msg.role.as_str() {
-                    "user" => Role::User,
-                    "assistant" => Role::Assistant,
-                    "system" => Role::System,
-                    "tool" => Role::User,
-                    _ => Role::User,
+                let role = match msg.role {
+                    MessageRole::User => Role::User,
+                    MessageRole::Assistant => Role::Assistant,
+                    MessageRole::System => Role::System,
+                    MessageRole::Tool => Role::User,
                 };
 
-                Ok(Message {
+                Ok(LlmMessage {
                     role,
                     content: vec![ContentBlock::Text { text: msg.content }],
                 })
@@ -221,9 +232,9 @@ impl ImapEmailAgent {
 
     async fn execute_tool_call(
         &self,
-        session_id: i64,
-        message_id: Option<i64>,
-        tool_call: &ToolCall,
+        session_id: &str,
+        message_id: Option<&String>,
+        tool_call: &LlmToolCall,
     ) -> anyhow::Result<()> {
         let mut tool_request =
             AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
@@ -275,13 +286,22 @@ impl ImapEmailAgent {
             None
         };
 
-        let call_id = self.database.create_tool_call(
-            session_id,
-            message_id,
-            tool_call.id(),
-            tool_call.name(),
-            tool_call.arguments().clone(),
-        )?;
+        let mut tool_call_record = StorageToolCall {
+            id: None,
+            session_id: session_id.to_string(),
+            message_id: message_id.cloned(),
+            tool_call_id: tool_call.id().to_string(),
+            tool_name: tool_call.name().to_string(),
+            request: tool_call.arguments().clone(),
+            response: None,
+            status: ToolCallStatus::Pending,
+            execution_time_ms: None,
+            created_at: chrono::Utc::now().timestamp(),
+            completed_at: None,
+            error_details: None,
+        };
+        let call_id = self.storage.create_tool_call(tool_call_record.clone()).await?;
+        tool_call_record.id = Some(call_id);
 
         let start = Instant::now();
         let result: anyhow::Result<nocodo_tools::types::ToolResponse> =
@@ -291,8 +311,8 @@ impl ImapEmailAgent {
         match result {
             Ok(response) => {
                 let response_json = serde_json::to_value(&response)?;
-                self.database
-                    .complete_tool_call(call_id, response_json.clone(), execution_time)?;
+                tool_call_record.complete(response_json.clone(), execution_time);
+                self.storage.update_tool_call(tool_call_record).await?;
 
                 let result_text = crate::format_tool_response(&response);
                 let message_to_llm = format!("Tool {} result:\n{}", tool_call.name(), result_text);
@@ -304,12 +324,19 @@ impl ImapEmailAgent {
                     "Tool execution completed successfully"
                 );
 
-                self.database
-                    .create_message(session_id, "tool", &message_to_llm)?;
+                let tool_message = StorageMessage {
+                    id: None,
+                    session_id: session_id.to_string(),
+                    role: MessageRole::Tool,
+                    content: message_to_llm,
+                    created_at: chrono::Utc::now().timestamp(),
+                };
+                self.storage.create_message(tool_message).await?;
             }
             Err(e) => {
                 let error_msg = format!("{:?}", e);
-                self.database.fail_tool_call(call_id, &error_msg)?;
+                tool_call_record.fail(error_msg.clone());
+                self.storage.update_tool_call(tool_call_record).await?;
 
                 let error_message_to_llm =
                     format!("Tool {} failed: {}", tool_call.name(), error_msg);
@@ -321,8 +348,14 @@ impl ImapEmailAgent {
                     "Tool execution failed"
                 );
 
-                self.database
-                    .create_message(session_id, "tool", &error_message_to_llm)?;
+                let tool_message = StorageMessage {
+                    id: None,
+                    session_id: session_id.to_string(),
+                    role: MessageRole::Tool,
+                    content: error_message_to_llm,
+                    created_at: chrono::Utc::now().timestamp(),
+                };
+                self.storage.create_message(tool_message).await?;
             }
         }
 
@@ -355,7 +388,7 @@ impl ImapEmailAgent {
 }
 
 #[async_trait]
-impl Agent for ImapEmailAgent {
+impl<S: AgentStorage> Agent for ImapEmailAgent<S> {
     fn objective(&self) -> &str {
         "Analyze and manage emails via IMAP"
     }
@@ -421,8 +454,15 @@ impl Agent for ImapEmailAgent {
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        self.database
-            .create_message(session_id, "user", user_prompt)?;
+        let session_id_str = session_id.to_string();
+        let user_message = StorageMessage {
+            id: None,
+            session_id: session_id_str.clone(),
+            role: MessageRole::User,
+            content: user_prompt.to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        };
+        self.storage.create_message(user_message).await?;
 
         let tools = self.get_tool_definitions();
 
@@ -433,11 +473,15 @@ impl Agent for ImapEmailAgent {
             iteration += 1;
             if iteration > max_iterations {
                 let error = "Maximum iteration limit reached";
-                self.database.fail_session(session_id, error)?;
+                let mut session = self.get_session(&session_id_str).await?;
+                session.status = SessionStatus::Failed;
+                session.error = Some(error.to_string());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                self.storage.update_session(session).await?;
                 return Err(anyhow::anyhow!(error));
             }
 
-            let messages = self.build_messages(session_id)?;
+            let messages = self.build_messages(&session_id_str).await?;
 
             let request = CompletionRequest {
                 messages,
@@ -457,27 +501,40 @@ impl Agent for ImapEmailAgent {
             let text = extract_text_from_content(&response.content);
 
             let text_to_save = if text.is_empty() && response.tool_calls.is_some() {
-                "[Using tools]"
+                "[Using tools]".to_string()
             } else {
-                &text
+                text.clone()
             };
 
-            let message_id = self
-                .database
-                .create_message(session_id, "assistant", text_to_save)?;
+            let assistant_message = StorageMessage {
+                id: None,
+                session_id: session_id_str.clone(),
+                role: MessageRole::Assistant,
+                content: text_to_save,
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            let message_id = self.storage.create_message(assistant_message).await?;
 
             if let Some(tool_calls) = response.tool_calls {
                 if tool_calls.is_empty() {
-                    self.database.complete_session(session_id, &text)?;
+                    let mut session = self.get_session(&session_id_str).await?;
+                    session.status = SessionStatus::Completed;
+                    session.result = Some(text.clone());
+                    session.ended_at = Some(chrono::Utc::now().timestamp());
+                    self.storage.update_session(session).await?;
                     return Ok(text);
                 }
 
                 for tool_call in tool_calls {
-                    self.execute_tool_call(session_id, Some(message_id), &tool_call)
+                    self.execute_tool_call(&session_id_str, Some(&message_id), &tool_call)
                         .await?;
                 }
             } else {
-                self.database.complete_session(session_id, &text)?;
+                let mut session = self.get_session(&session_id_str).await?;
+                session.status = SessionStatus::Completed;
+                session.result = Some(text.clone());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                self.storage.update_session(session).await?;
                 return Ok(text);
             }
         }
