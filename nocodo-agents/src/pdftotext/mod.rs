@@ -38,12 +38,13 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
     /// * `client` - LLM client for AI inference
     /// * `storage` - Storage for session/message tracking
     /// * `pdf_path` - Path to the PDF file to process
+    /// * `allowed_working_dirs` - Optional list of allowed working directories. Defaults to ["/tmp", "/home", "/workspace", "/project"]
     ///
     /// # Security
     /// The agent is configured with restricted bash access:
     /// - Only the `pdftotext` and `qpdf` commands are allowed
     /// - All other bash commands are denied
-    /// - File operations are restricted to the PDF's directory
+    /// - File operations are restricted to the allowed working directories
     ///
     /// # Pre-conditions
     /// - pdftotext (poppler-utils) must be installed on the system
@@ -54,6 +55,7 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
         client: Arc<dyn LlmClient>,
         storage: Arc<S>,
         pdf_path: PathBuf,
+        allowed_working_dirs: Option<Vec<String>>,
     ) -> anyhow::Result<Self> {
         // Validate PDF path exists
         if !pdf_path.exists() {
@@ -73,7 +75,10 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
             .to_path_buf();
 
         // Create restricted bash permissions (only pdftotext and qpdf commands)
-        let bash_perms = BashPermissions::minimal(vec!["pdftotext", "qpdf"]);
+        let bash_perms = BashPermissions::minimal(vec!["pdftotext", "qpdf"])
+            .with_allowed_working_dirs(
+                allowed_working_dirs.unwrap_or_else(|| vec!["/tmp".to_string()]),
+            );
         let bash_executor = BashExecutor::new(bash_perms, 120)?;
 
         // Create tool executor with restricted bash
