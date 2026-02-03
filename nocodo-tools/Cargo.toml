@@ -32,8 +32,8 @@ codex-apply-patch = { git = "https://github.com/openai/codex", package = "codex-
 codex-core = { git = "https://github.com/openai/codex", package = "codex-core", rev = "6951872" }
 codex-process-hardening = { git = "https://github.com/openai/codex", package = "codex-process-hardening", rev = "6951872" }
 shared-types = { path = "../shared-types" }
-rusqlite = { version = "0.37", features = ["bundled"] }
-sqlparser = "0.51"
+rusqlite = { version = "0.37", features = ["bundled"], optional = true }
+sqlparser = { version = "0.51", optional = true }
 reqwest = { version = "0.12", features = ["json", "charset"] }
 home = "0.5"
 clap = { workspace = true }
@@ -41,6 +41,10 @@ imap = { version = "3.0.0-alpha.15", default-features = false, features = ["rust
 imap-proto = "0.16.1"
 rustls-connector = "0.19.0"
 mail-parser = "0.9"
+
+[features]
+default = []
+sqlite = ["rusqlite", "sqlparser"]
 
 [dev-dependencies]
 tempfile = "3.12"

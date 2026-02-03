@@ -1,13 +1,15 @@
 use crate::models::ErrorResponse;
+use crate::storage::SqliteAgentStorage;
 use crate::DbConnection;
 use actix_web::{get, post, web, HttpResponse, Responder};
-use nocodo_agents::Agent;
+use nocodo_agents::{Agent, AgentStorage};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use shared_types::{
     SessionListItem, SessionListResponse, SessionMessage, SessionResponse, SessionToolCall,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 #[get("/agents/sessions/{session_id}")]
@@ -175,27 +177,62 @@ pub struct QuestionsResponse {
 #[get("/agents/sessions/{session_id}/questions")]
 pub async fn get_pending_questions(
     session_id: web::Path<i64>,
-    database: web::Data<std::sync::Arc<nocodo_agents::database::Database>>,
+    db: web::Data<DbConnection>,
 ) -> impl Responder {
     let id = session_id.into_inner();
     info!(session_id = id, "Retrieving pending questions");
 
-    match database.get_pending_questions(id) {
-        Ok(questions) => {
-            info!(
-                session_id = id,
-                question_count = questions.len(),
-                "Retrieved pending questions"
-            );
-            HttpResponse::Ok().json(QuestionsResponse { questions })
-        }
+    // Get pending questions from project_requirements_qna table
+    let conn = db.lock().unwrap();
+
+    let questions: Vec<shared_types::user_interaction::UserQuestion> = match conn.prepare(
+        "SELECT question_id, question, description, response_type
+             FROM project_requirements_qna
+             WHERE session_id = ?1 AND answer IS NULL
+             ORDER BY created_at ASC",
+    ) {
+        Ok(mut stmt) => stmt
+            .query_map(params![id], |row| {
+                let response_type_str: String = row.get(3)?;
+                let response_type = match response_type_str.as_str() {
+                    "text" => shared_types::user_interaction::QuestionType::Text,
+                    "password" => shared_types::user_interaction::QuestionType::Password,
+                    "file_path" => shared_types::user_interaction::QuestionType::FilePath,
+                    "email" => shared_types::user_interaction::QuestionType::Email,
+                    "url" => shared_types::user_interaction::QuestionType::Url,
+                    _ => shared_types::user_interaction::QuestionType::Text,
+                };
+
+                Ok(shared_types::user_interaction::UserQuestion {
+                    id: row.get(0)?,
+                    question: row.get(1)?,
+                    description: row.get(2)?,
+                    response_type,
+                    default: None,
+                    options: None,
+                })
+            })
+            .map_err(|e| {
+                error!(error = %e, session_id = id, "Query map failed");
+                rusqlite::Error::InvalidQuery
+            })
+            .ok()
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default(),
         Err(e) => {
             error!(error = %e, session_id = id, "Failed to retrieve questions");
-            HttpResponse::InternalServerError().json(ErrorResponse {
+            return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: format!("Failed to retrieve questions: {}", e),
-            })
+            });
         }
-    }
+    };
+
+    info!(
+        session_id = id,
+        question_count = questions.len(),
+        "Retrieved pending questions"
+    );
+    HttpResponse::Ok().json(QuestionsResponse { questions })
 }
 
 #[derive(Deserialize)]
@@ -207,7 +244,8 @@ pub struct SubmitAnswersRequest {
 pub async fn submit_answers(
     session_id: web::Path<i64>,
     req: web::Json<SubmitAnswersRequest>,
-    database: web::Data<std::sync::Arc<nocodo_agents::database::Database>>,
+    db: web::Data<DbConnection>,
+    storage: web::Data<Arc<SqliteAgentStorage>>,
     llm_client: web::Data<std::sync::Arc<dyn nocodo_llm_sdk::client::LlmClient>>,
 ) -> impl Responder {
     let id = session_id.into_inner();
@@ -218,11 +256,20 @@ pub async fn submit_answers(
     );
 
     // Store answers in database
-    if let Err(e) = database.store_answers(id, &req.answers) {
-        error!(error = %e, session_id = id, "Failed to store answers");
-        return HttpResponse::InternalServerError().json(ErrorResponse {
-            error: format!("Failed to store answers: {}", e),
-        });
+    {
+        let conn = db.lock().unwrap();
+        let now = chrono::Utc::now().timestamp();
+        for (question_id, answer) in &req.answers {
+            if let Err(e) = conn.execute(
+                "UPDATE project_requirements_qna SET answer = ?1, answered_at = ?2 WHERE session_id = ?3 AND question_id = ?4",
+                params![answer, now, id, question_id],
+            ) {
+                error!(error = %e, session_id = id, question_id = %question_id, "Failed to store answer");
+                return HttpResponse::InternalServerError().json(ErrorResponse {
+                    error: format!("Failed to store answer: {}", e),
+                });
+            }
+        }
     }
 
     // Build a message with the answered questions for the agent
@@ -230,7 +277,7 @@ pub async fn submit_answers(
 
     // Get the answered questions from database (all questions for this session)
     {
-        let conn = database.connection.lock().unwrap();
+        let conn = db.lock().unwrap();
         let mut stmt = conn
             .prepare(
                 "SELECT question_id, question, answer
@@ -259,27 +306,41 @@ pub async fn submit_answers(
                 }
             }
         }
-    } // conn and stmt are dropped here
-
-    // Add the answers as a user message
-    if let Err(e) = database.create_message(id, "user", &answers_text) {
-        error!(error = %e, session_id = id, "Failed to create message with answers");
-        return HttpResponse::InternalServerError().json(ErrorResponse {
-            error: format!("Failed to create message: {}", e),
-        });
     }
 
-    // Resume the session
-    if let Err(e) = database.resume_session(id) {
-        error!(error = %e, session_id = id, "Failed to resume session");
-        return HttpResponse::InternalServerError().json(ErrorResponse {
-            error: format!("Failed to resume session: {}", e),
-        });
+    // Add the answers as a user message
+    {
+        let now = chrono::Utc::now().timestamp();
+        let message = nocodo_agents::Message {
+            id: None,
+            session_id: id,
+            role: nocodo_agents::MessageRole::User,
+            content: answers_text.clone(),
+            created_at: now,
+        };
+        if let Err(e) = storage.create_message(message).await {
+            error!(error = %e, session_id = id, "Failed to create message with answers");
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: format!("Failed to create message: {}", e),
+            });
+        }
+    }
+
+    // Update session to running status
+    if let Ok(Some(mut session)) = storage.get_session(id).await {
+        session.status = nocodo_agents::SessionStatus::Running;
+        if let Err(e) = storage.update_session(session).await {
+            error!(error = %e, session_id = id, "Failed to resume session");
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: format!("Failed to resume session: {}", e),
+            });
+        }
     }
 
     // Spawn a background task to continue agent execution
-    let database_clone = database.get_ref().clone();
+    let storage_clone = storage.get_ref().clone();
     let llm_client_clone = llm_client.get_ref().clone();
+    let db_clone = db.get_ref().clone();
 
     tokio::spawn(async move {
         info!(
@@ -287,22 +348,28 @@ pub async fn submit_answers(
             "Resuming agent execution with user answers"
         );
 
-        // Create the agent
+        // Create an agent
         let agent = match crate::helpers::agents::create_user_clarification_agent(
             &llm_client_clone,
-            &database_clone,
+            &storage_clone,
+            &db_clone,
         ) {
             Ok(agent) => agent,
             Err(e) => {
                 error!(error = %e, session_id = id, "Failed to create agent for resumption");
-                let _ = database_clone.fail_session(id, &format!("Failed to create agent: {}", e));
+                if let Ok(Some(mut session)) = storage_clone.get_session(id).await {
+                    session.status = nocodo_agents::SessionStatus::Failed;
+                    session.error = Some(format!("Failed to create agent: {}", e));
+                    session.ended_at = Some(chrono::Utc::now().timestamp());
+                    let _ = storage_clone.update_session(session).await;
+                }
                 return;
             }
         };
 
         // Get the original user prompt from the session
         let original_prompt = {
-            let conn = database_clone.connection.lock().unwrap();
+            let conn = db_clone.lock().unwrap();
             conn.query_row(
                 "SELECT user_prompt FROM agent_sessions WHERE id = ?1",
                 params![id],
@@ -318,19 +385,37 @@ pub async fn submit_answers(
                     info!(session_id = id, "Agent resumed successfully");
                     // Don't complete here if still waiting for more input
                     if !result.contains("Waiting for user") {
-                        if let Err(e) = database_clone.complete_session(id, &result) {
-                            error!(error = %e, session_id = id, "Failed to complete session after resumption");
+                        if let Ok(Some(mut session)) =
+                            storage_clone.get_session(id).await
+                        {
+                            session.status = nocodo_agents::SessionStatus::Completed;
+                            session.result = Some(result.clone());
+                            session.ended_at = Some(chrono::Utc::now().timestamp());
+                            if let Err(e) = storage_clone.update_session(session).await {
+                                error!(error = %e, session_id = id, "Failed to complete session after resumption");
+                            }
                         }
                     }
                 }
                 Err(e) => {
                     error!(error = %e, session_id = id, "Agent execution failed after resumption");
-                    let _ = database_clone.fail_session(id, &format!("Execution failed: {}", e));
+                    if let Ok(Some(mut session)) = storage_clone.get_session(id).await
+                    {
+                        session.status = nocodo_agents::SessionStatus::Failed;
+                        session.error = Some(format!("Execution failed: {}", e));
+                        session.ended_at = Some(chrono::Utc::now().timestamp());
+                        let _ = storage_clone.update_session(session).await;
+                    }
                 }
             }
         } else {
             error!(session_id = id, "Failed to retrieve original prompt");
-            let _ = database_clone.fail_session(id, "Failed to retrieve original prompt");
+            if let Ok(Some(mut session)) = storage_clone.get_session(id).await {
+                session.status = nocodo_agents::SessionStatus::Failed;
+                session.error = Some("Failed to retrieve original prompt".to_string());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                let _ = storage_clone.update_session(session).await;
+            }
         }
     });
 

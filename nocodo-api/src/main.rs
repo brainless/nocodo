@@ -2,6 +2,7 @@ mod config;
 mod handlers;
 mod helpers;
 mod models;
+mod storage;
 
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
@@ -66,7 +67,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let db_path = config.database.path.clone();
     let bind_addr = format!("{}:{}", config.server.host, config.server.port);
     drop(config);
-    let (db_conn, db) =
+    let (db_conn, storage) =
         helpers::database::initialize_database(&db_path).expect("Failed to initialize database");
 
     info!("Starting nocodo-api server at http://{}", bind_addr);
@@ -99,7 +100,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .wrap(cors)
             .app_data(web::Data::new(llm_client.clone()))
             .app_data(web::Data::new(db_conn.clone()))
-            .app_data(web::Data::new(db.clone()))
+            .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(handlers::settings::SettingsAppState {
                 config: app_config.clone(),
             }))

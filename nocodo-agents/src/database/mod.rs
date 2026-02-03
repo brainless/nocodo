@@ -4,6 +4,10 @@ pub mod models;
 #[cfg(test)]
 mod migrations_test;
 
+use crate::storage::AgentStorage;
+use crate::storage::StorageError;
+use crate::types::{Message, MessageRole, Session, SessionStatus, ToolCall, ToolCallStatus};
+use async_trait::async_trait;
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

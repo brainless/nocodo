@@ -2,9 +2,11 @@ pub mod bash;
 pub mod core;
 pub mod filesystem;
 pub mod grep;
+#[cfg(feature = "sqlite")]
 pub mod hackernews;
 pub mod imap;
 pub mod pdftotext;
+#[cfg(feature = "sqlite")]
 pub mod sqlite_reader;
 
 // Re-export commonly used types
@@ -16,9 +18,11 @@ pub use filesystem::{
     WriteFileResponse,
 };
 pub use grep::{GrepMatch, GrepRequest, GrepResponse};
+#[cfg(feature = "sqlite")]
 pub use hackernews::{DownloadState, FetchMode, HackerNewsRequest, HackerNewsResponse, StoryType};
 pub use imap::{ImapOperation, ImapReaderRequest, ImapReaderResponse, SearchCriteria};
 pub use pdftotext::{PdfToTextRequest, PdfToTextResponse};
+#[cfg(feature = "sqlite")]
 pub use sqlite_reader::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 
 // Re-export user interaction types from shared-types

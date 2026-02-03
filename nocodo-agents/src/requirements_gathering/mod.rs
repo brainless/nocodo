@@ -1,43 +1,53 @@
-pub mod database;
 pub mod models;
+pub mod storage;
 
 #[cfg(test)]
 mod migrations_test;
 
-use crate::{database::Database, Agent, AgentTool};
+use crate::{
+    storage::AgentStorage,
+    types::{
+        Message, MessageRole, Session, SessionStatus, ToolCall as StorageToolCall, ToolCallStatus,
+    },
+    Agent, AgentTool,
+};
 use anyhow;
 use async_trait::async_trait;
 use nocodo_llm_sdk::client::LlmClient;
-use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
-use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_llm_sdk::tools::{ToolCall as LlmToolCall, ToolChoice};
+use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message as LlmMessage, Role};
 use nocodo_tools::ToolExecutor;
 use std::sync::Arc;
 use std::time::Instant;
+use storage::RequirementsStorage;
 
 #[cfg(test)]
 mod tests;
 
 /// Agent that analyzes user requests and determines if clarification is needed.
 ///
-/// This agent takes the user's original prompt and asks the LLM to determine
+/// This agent takes user's original prompt and asks the LLM to determine
 /// if any clarifying questions are needed before proceeding. It returns an
 /// `AskUserRequest` with the clarifying questions, or an empty questions list
 /// if no clarification is needed.
-pub struct UserClarificationAgent {
+pub struct UserClarificationAgent<S: AgentStorage, R: RequirementsStorage> {
     client: Arc<dyn LlmClient>,
-    database: Arc<Database>,
+    storage: Arc<S>,
+    requirements_storage: Arc<R>,
     tool_executor: Arc<ToolExecutor>,
 }
 
-impl UserClarificationAgent {
+impl<S: AgentStorage, R: RequirementsStorage> UserClarificationAgent<S, R> {
     pub fn new(
         client: Arc<dyn LlmClient>,
-        database: Arc<Database>,
+        storage: Arc<S>,
+        requirements_storage: Arc<R>,
         tool_executor: Arc<ToolExecutor>,
     ) -> Self {
         Self {
             client,
-            database,
+            storage,
+            requirements_storage,
             tool_executor,
         }
     }
@@ -51,11 +61,11 @@ You are part of a system that helps users define their business processes and au
 Users will share access to their data sources (databases, APIs, etc.) as needed.
 
 YOUR CAPABILITIES:
-- You can ask clarifying questions using the ask_user tool
+- You can ask clarifying questions using ask_user tool
 - You should focus on high-level process understanding, not technical implementation details
 - You can ask about data source types/names (not authentication details)
 - You can request specific examples (e.g., sample emails, messages to process)
-- You should understand the goal and desired outcome of the automation
+- You should understand goal and desired outcome of automation
 
 WHEN TO ASK QUESTIONS:
 - The user's goal is unclear or ambiguous
@@ -79,18 +89,29 @@ that you need more information about what they want to automate."#.to_string()
         &self,
         session_id: i64,
         message_id: Option<i64>,
-        tool_call: &ToolCall,
+        tool_call: &LlmToolCall,
     ) -> anyhow::Result<()> {
         let tool_request =
             AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
 
-        let call_id = self.database.create_tool_call(
+        let mut tool_call_record = StorageToolCall {
+            id: None,
             session_id,
             message_id,
-            tool_call.id(),
-            tool_call.name(),
-            tool_call.arguments().clone(),
-        )?;
+            tool_call_id: tool_call.id().to_string(),
+            tool_name: tool_call.name().to_string(),
+            request: tool_call.arguments().clone(),
+            response: None,
+            status: ToolCallStatus::Pending,
+            execution_time_ms: None,
+            created_at: chrono::Utc::now().timestamp(),
+            completed_at: None,
+            error_details: None,
+        };
+        let call_id = self
+            .storage
+            .create_tool_call(tool_call_record.clone())
+            .await?;
 
         let start = Instant::now();
         let result: anyhow::Result<nocodo_tools::types::ToolResponse> =
@@ -100,8 +121,9 @@ that you need more information about what they want to automate."#.to_string()
         match result {
             Ok(response) => {
                 let response_json = serde_json::to_value(&response)?;
-                self.database
-                    .complete_tool_call(call_id, response_json.clone(), execution_time)?;
+                tool_call_record.complete(response_json, execution_time);
+                tool_call_record.id = Some(call_id);
+                self.storage.update_tool_call(tool_call_record).await?;
 
                 let result_text = crate::format_tool_response(&response);
                 let message_to_llm = format!("Tool {} result:\n{}", tool_call.name(), result_text);
@@ -113,12 +135,20 @@ that you need more information about what they want to automate."#.to_string()
                     "Tool execution completed successfully"
                 );
 
-                self.database
-                    .create_message(session_id, "tool", &message_to_llm)?;
+                let tool_message = Message {
+                    id: None,
+                    session_id,
+                    role: MessageRole::Tool,
+                    content: message_to_llm,
+                    created_at: chrono::Utc::now().timestamp(),
+                };
+                self.storage.create_message(tool_message).await?;
             }
             Err(e) => {
                 let error_msg = format!("{:?}", e);
-                self.database.fail_tool_call(call_id, &error_msg)?;
+                tool_call_record.fail(error_msg.clone());
+                tool_call_record.id = Some(call_id);
+                self.storage.update_tool_call(tool_call_record).await?;
 
                 let error_message_to_llm =
                     format!("Tool {} failed: {}", tool_call.name(), error_msg);
@@ -130,8 +160,14 @@ that you need more information about what they want to automate."#.to_string()
                     "Tool execution failed"
                 );
 
-                self.database
-                    .create_message(session_id, "tool", &error_message_to_llm)?;
+                let tool_error_message = Message {
+                    id: None,
+                    session_id,
+                    role: MessageRole::Tool,
+                    content: error_message_to_llm,
+                    created_at: chrono::Utc::now().timestamp(),
+                };
+                self.storage.create_message(tool_error_message).await?;
             }
         }
 
@@ -145,31 +181,37 @@ that you need more information about what they want to automate."#.to_string()
             .collect()
     }
 
-    fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<Message>> {
-        let db_messages = self.database.get_messages(session_id)?;
+    async fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<LlmMessage>> {
+        let db_messages = self.storage.get_messages(session_id).await?;
 
         db_messages
             .into_iter()
             .map(|msg| {
-                let role = match msg.role.as_str() {
-                    "user" => Role::User,
-                    "assistant" => Role::Assistant,
-                    "system" => Role::System,
-                    "tool" => Role::User,
-                    _ => Role::User,
+                let role = match msg.role {
+                    MessageRole::User => Role::User,
+                    MessageRole::Assistant => Role::Assistant,
+                    MessageRole::System => Role::System,
+                    MessageRole::Tool => Role::User,
                 };
 
-                Ok(Message {
+                Ok(LlmMessage {
                     role,
                     content: vec![ContentBlock::Text { text: msg.content }],
                 })
             })
             .collect()
     }
+
+    async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
+        self.storage
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))
+    }
 }
 
 #[async_trait]
-impl Agent for UserClarificationAgent {
+impl<S: AgentStorage, R: RequirementsStorage> Agent for UserClarificationAgent<S, R> {
     fn objective(&self) -> &str {
         "Analyze user requests and determine if clarification is needed"
     }
@@ -183,8 +225,14 @@ impl Agent for UserClarificationAgent {
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        self.database
-            .create_message(session_id, "user", user_prompt)?;
+        let user_message = Message {
+            id: None,
+            session_id,
+            role: MessageRole::User,
+            content: user_prompt.to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        };
+        self.storage.create_message(user_message).await?;
 
         let tools = self.get_tool_definitions();
 
@@ -195,11 +243,15 @@ impl Agent for UserClarificationAgent {
             iteration += 1;
             if iteration > max_iterations {
                 let error = "Maximum iteration limit reached";
-                self.database.fail_session(session_id, error)?;
+                let mut session = self.get_session(session_id).await?;
+                session.status = SessionStatus::Failed;
+                session.error = Some(error.to_string());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                self.storage.update_session(session).await?;
                 return Err(anyhow::anyhow!(error));
             }
 
-            let messages = self.build_messages(session_id)?;
+            let messages = self.build_messages(session_id).await?;
 
             let request = CompletionRequest {
                 messages,
@@ -219,35 +271,41 @@ impl Agent for UserClarificationAgent {
             let text = extract_text_from_content(&response.content);
 
             let text_to_save = if text.is_empty() && response.tool_calls.is_some() {
-                "[Using tools]"
+                "[Using tools]".to_string()
             } else {
-                &text
+                text.clone()
             };
 
-            let message_id = self
-                .database
-                .create_message(session_id, "assistant", text_to_save)?;
+            let assistant_message = Message {
+                id: None,
+                session_id,
+                role: MessageRole::Assistant,
+                content: text_to_save,
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            let message_id = self.storage.create_message(assistant_message).await?;
 
             if let Some(tool_calls) = response.tool_calls {
                 if tool_calls.is_empty() {
-                    self.database.complete_session(session_id, &text)?;
+                    let mut session = self.get_session(session_id).await?;
+                    session.status = SessionStatus::Completed;
+                    session.result = Some(text.clone());
+                    session.ended_at = Some(chrono::Utc::now().timestamp());
+                    self.storage.update_session(session).await?;
                     return Ok(text);
                 }
 
                 for tool_call in tool_calls {
-                    // Special handling for ask_user tool - don't execute, just store questions
                     if tool_call.name() == "ask_user" {
                         tracing::info!(
                             session_id = session_id,
                             "Agent requesting user clarification"
                         );
 
-                        // Log the raw arguments for debugging
                         let args_pretty = serde_json::to_string_pretty(tool_call.arguments())
                             .unwrap_or_else(|_| format!("{:?}", tool_call.arguments()));
                         tracing::info!("Raw ask_user tool call arguments:\n{}", args_pretty);
 
-                        // Parse the ask_user request
                         let ask_user_request: shared_types::user_interaction::AskUserRequest =
                             serde_json::from_value(tool_call.arguments().clone()).map_err(|e| {
                                 tracing::error!(
@@ -258,56 +316,76 @@ impl Agent for UserClarificationAgent {
                                 e
                             })?;
 
-                        // Create tool call record in agent_tool_calls table
                         let start = Instant::now();
-                        let tool_call_id = self.database.create_tool_call(
+                        let mut tool_call_record = StorageToolCall {
+                            id: None,
                             session_id,
-                            Some(message_id),
-                            tool_call.id(),
-                            tool_call.name(),
-                            tool_call.arguments().clone(),
-                        )?;
+                            message_id: Some(message_id),
+                            tool_call_id: tool_call.id().to_string(),
+                            tool_name: tool_call.name().to_string(),
+                            request: tool_call.arguments().clone(),
+                            response: None,
+                            status: ToolCallStatus::Pending,
+                            execution_time_ms: None,
+                            created_at: chrono::Utc::now().timestamp(),
+                            completed_at: None,
+                            error_details: None,
+                        };
+                        let tool_call_id_str = self
+                            .storage
+                            .create_tool_call(tool_call_record.clone())
+                            .await?;
                         let execution_time = start.elapsed().as_millis() as i64;
 
-                        // Store questions in database with reference to tool call
-                        self.database.store_questions(
-                            session_id,
-                            Some(tool_call_id),
-                            &ask_user_request.questions,
-                        )?;
+                        self.requirements_storage
+                            .store_questions(
+                                session_id,
+                                Some(tool_call_id_str),
+                                &ask_user_request.questions,
+                            )
+                            .await?;
 
-                        // Mark the tool call as completed with the questions as response
                         let response = serde_json::json!({
                             "status": "questions_stored",
                             "question_count": ask_user_request.questions.len()
                         });
-                        self.database
-                            .complete_tool_call(tool_call_id, response, execution_time)?;
+                        tool_call_record.complete(response, execution_time);
+                        tool_call_record.id = Some(tool_call_id_str);
+                        self.storage.update_tool_call(tool_call_record).await?;
 
-                        // Create a tool result message for the conversation
                         let message_to_llm = format!(
                             "Tool {} result:\nStored {} clarification questions. Waiting for user answers.",
                             tool_call.name(),
                             ask_user_request.questions.len()
                         );
-                        self.database
-                            .create_message(session_id, "tool", &message_to_llm)?;
+                        let tool_message = Message {
+                            id: None,
+                            session_id,
+                            role: MessageRole::Tool,
+                            content: message_to_llm,
+                            created_at: chrono::Utc::now().timestamp(),
+                        };
+                        self.storage.create_message(tool_message).await?;
 
-                        // Pause session to wait for user input
-                        self.database.pause_session_for_user_input(session_id)?;
+                        let mut session = self.get_session(session_id).await?;
+                        session.status = SessionStatus::WaitingForUserInput;
+                        self.storage.update_session(session).await?;
 
                         return Ok(format!(
                             "Waiting for user to answer {} clarification questions",
                             ask_user_request.questions.len()
                         ));
                     } else {
-                        // Execute other tools normally
                         self.execute_tool_call(session_id, Some(message_id), &tool_call)
                             .await?;
                     }
                 }
             } else {
-                self.database.complete_session(session_id, &text)?;
+                let mut session = self.get_session(session_id).await?;
+                session.status = SessionStatus::Completed;
+                session.result = Some(text.clone());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                self.storage.update_session(session).await?;
                 return Ok(text);
             }
         }
@@ -324,16 +402,4 @@ fn extract_text_from_content(content: &[ContentBlock]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-/// Create a UserClarificationAgent with an in-memory database
-pub fn create_user_clarification_agent(
-    client: Arc<dyn LlmClient>,
-) -> anyhow::Result<(UserClarificationAgent, Arc<Database>)> {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
-    let tool_executor = Arc::new(nocodo_tools::ToolExecutor::new(std::path::PathBuf::from(
-        ".",
-    )));
-    let agent = UserClarificationAgent::new(client, database.clone(), tool_executor);
-    Ok((agent, database))
 }

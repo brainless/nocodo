@@ -20,8 +20,10 @@ pub enum ToolRequest {
     Bash(super::bash::BashRequest),
     #[serde(rename = "ask_user")]
     AskUser(AskUserRequest),
+    #[cfg(feature = "sqlite")]
     #[serde(rename = "sqlite3_reader")]
     Sqlite3Reader(super::sqlite_reader::Sqlite3ReaderRequest),
+    #[cfg(feature = "sqlite")]
     #[serde(rename = "hackernews_request")]
     HackerNewsRequest(super::hackernews::HackerNewsRequest),
     #[serde(rename = "imap_reader")]
@@ -48,8 +50,10 @@ pub enum ToolResponse {
     Bash(super::bash::BashResponse),
     #[serde(rename = "ask_user")]
     AskUser(AskUserResponse),
+    #[cfg(feature = "sqlite")]
     #[serde(rename = "sqlite3_reader")]
     Sqlite3Reader(super::sqlite_reader::Sqlite3ReaderResponse),
+    #[cfg(feature = "sqlite")]
     #[serde(rename = "hackernews_response")]
     HackerNewsResponse(super::hackernews::HackerNewsResponse),
     #[serde(rename = "imap_reader")]

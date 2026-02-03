@@ -1,5 +1,11 @@
 use clap::Parser;
-use nocodo_agents::{config, factory::create_codebase_analysis_agent, Agent};
+use nocodo_agents::{
+    config,
+    factory::create_codebase_analysis_agent,
+    storage::AgentStorage,
+    types::{Session, SessionStatus},
+    Agent,
+};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use nocodo_tools::ToolExecutor;
 use std::path::PathBuf;
@@ -65,20 +71,28 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // Create codebase analysis agent
-    let (agent, database) = create_codebase_analysis_agent(client, tool_executor);
+    let agent = create_codebase_analysis_agent(client, tool_executor);
 
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 
     // Create session
-    let session_id = database.create_session(
-        "codebase-analysis",
-        "standalone",
-        "standalone",
-        Some(&agent.system_prompt()),
-        &args.prompt,
-        None,
-    )?;
+    let storage = Arc::new(nocodo_agents::storage::InMemoryStorage::new());
+    let session = Session {
+        id: None,
+        agent_name: "codebase-analysis".to_string(),
+        provider: "standalone".to_string(),
+        model: "standalone".to_string(),
+        system_prompt: Some(agent.system_prompt()),
+        user_prompt: args.prompt.clone(),
+        config: serde_json::json!({}),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+    let session_id = storage.create_session(session).await?;
 
     // Execute agent
     let result = agent.execute(&args.prompt, session_id).await?;

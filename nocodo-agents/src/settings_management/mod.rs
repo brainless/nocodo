@@ -1,12 +1,18 @@
-pub mod database;
 pub mod models;
 
-use crate::{database::Database, Agent, AgentTool};
+use crate::{
+    storage::AgentStorage,
+    types::{
+        Message as StorageMessage, MessageRole, Session, SessionStatus,
+        ToolCall as StorageToolCall, ToolCallStatus,
+    },
+    Agent, AgentTool,
+};
 use anyhow;
 use async_trait::async_trait;
 use nocodo_llm_sdk::client::LlmClient;
-use nocodo_llm_sdk::tools::{ToolCall, ToolChoice};
-use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, Role};
+use nocodo_llm_sdk::tools::{ToolCall as LlmToolCall, ToolChoice};
+use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message as LlmMessage, Role};
 use nocodo_tools::ToolExecutor;
 use std::sync::Arc;
 use std::time::Instant;
@@ -16,25 +22,25 @@ use std::time::Instant;
 /// This agent gathers settings from agents/tools based on their SettingsSchema,
 /// collects values from the user using the ask_user tool, and writes them to
 /// a TOML settings file.
-pub struct SettingsManagementAgent {
+pub struct SettingsManagementAgent<S: AgentStorage> {
     client: Arc<dyn LlmClient>,
-    database: Arc<Database>,
+    storage: Arc<S>,
     tool_executor: Arc<ToolExecutor>,
     settings_file_path: std::path::PathBuf,
     agent_schemas: Vec<crate::AgentSettingsSchema>,
 }
 
-impl SettingsManagementAgent {
+impl<S: AgentStorage> SettingsManagementAgent<S> {
     pub fn new(
         client: Arc<dyn LlmClient>,
-        database: Arc<Database>,
+        storage: Arc<S>,
         tool_executor: Arc<ToolExecutor>,
         settings_file_path: std::path::PathBuf,
         agent_schemas: Vec<crate::AgentSettingsSchema>,
     ) -> Self {
         Self {
             client,
-            database,
+            storage,
             tool_executor,
             settings_file_path,
             agent_schemas,
@@ -135,18 +141,30 @@ using the tool."#,
         &self,
         session_id: i64,
         message_id: Option<i64>,
-        tool_call: &ToolCall,
+        tool_call: &LlmToolCall,
     ) -> anyhow::Result<()> {
         let tool_request =
             AgentTool::parse_tool_call(tool_call.name(), tool_call.arguments().clone())?;
 
-        let call_id = self.database.create_tool_call(
+        let mut tool_call_record = StorageToolCall {
+            id: None,
             session_id,
             message_id,
-            tool_call.id(),
-            tool_call.name(),
-            tool_call.arguments().clone(),
-        )?;
+            tool_call_id: tool_call.id().to_string(),
+            tool_name: tool_call.name().to_string(),
+            request: tool_call.arguments().clone(),
+            response: None,
+            status: ToolCallStatus::Pending,
+            execution_time_ms: None,
+            created_at: chrono::Utc::now().timestamp(),
+            completed_at: None,
+            error_details: None,
+        };
+        let call_id = self
+            .storage
+            .create_tool_call(tool_call_record.clone())
+            .await?;
+        tool_call_record.id = Some(call_id);
 
         let start = Instant::now();
         let result: anyhow::Result<nocodo_tools::types::ToolResponse> =
@@ -156,8 +174,8 @@ using the tool."#,
         match result {
             Ok(response) => {
                 let response_json = serde_json::to_value(&response)?;
-                self.database
-                    .complete_tool_call(call_id, response_json.clone(), execution_time)?;
+                tool_call_record.complete(response_json.clone(), execution_time);
+                self.storage.update_tool_call(tool_call_record).await?;
 
                 let result_text = crate::format_tool_response(&response);
                 let message_to_llm = format!("Tool {} result:\n{}", tool_call.name(), result_text);
@@ -169,12 +187,19 @@ using the tool."#,
                     "Tool execution completed successfully"
                 );
 
-                self.database
-                    .create_message(session_id, "tool", &message_to_llm)?;
+                let tool_message = StorageMessage {
+                    id: None,
+                    session_id,
+                    role: MessageRole::Tool,
+                    content: message_to_llm,
+                    created_at: chrono::Utc::now().timestamp(),
+                };
+                self.storage.create_message(tool_message).await?;
             }
             Err(e) => {
                 let error_msg = format!("{:?}", e);
-                self.database.fail_tool_call(call_id, &error_msg)?;
+                tool_call_record.fail(error_msg.clone());
+                self.storage.update_tool_call(tool_call_record).await?;
 
                 let error_message_to_llm =
                     format!("Tool {} failed: {}", tool_call.name(), error_msg);
@@ -186,8 +211,14 @@ using the tool."#,
                     "Tool execution failed"
                 );
 
-                self.database
-                    .create_message(session_id, "tool", &error_message_to_llm)?;
+                let tool_message = StorageMessage {
+                    id: None,
+                    session_id,
+                    role: MessageRole::Tool,
+                    content: error_message_to_llm,
+                    created_at: chrono::Utc::now().timestamp(),
+                };
+                self.storage.create_message(tool_message).await?;
             }
         }
 
@@ -201,26 +232,32 @@ using the tool."#,
             .collect()
     }
 
-    fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<Message>> {
-        let db_messages = self.database.get_messages(session_id)?;
+    async fn build_messages(&self, session_id: i64) -> anyhow::Result<Vec<LlmMessage>> {
+        let db_messages = self.storage.get_messages(session_id).await?;
 
         db_messages
             .into_iter()
             .map(|msg| {
-                let role = match msg.role.as_str() {
-                    "user" => Role::User,
-                    "assistant" => Role::Assistant,
-                    "system" => Role::System,
-                    "tool" => Role::User,
-                    _ => Role::User,
+                let role = match msg.role {
+                    MessageRole::User => Role::User,
+                    MessageRole::Assistant => Role::Assistant,
+                    MessageRole::System => Role::System,
+                    MessageRole::Tool => Role::User,
                 };
 
-                Ok(Message {
+                Ok(LlmMessage {
                     role,
                     content: vec![ContentBlock::Text { text: msg.content }],
                 })
             })
             .collect()
+    }
+
+    async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
+        self.storage
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))
     }
 
     /// Write settings to TOML file
@@ -281,7 +318,7 @@ using the tool."#,
 }
 
 #[async_trait]
-impl Agent for SettingsManagementAgent {
+impl<S: AgentStorage> Agent for SettingsManagementAgent<S> {
     fn objective(&self) -> &str {
         "Collect and manage settings required for workflow automation"
     }
@@ -295,8 +332,14 @@ impl Agent for SettingsManagementAgent {
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        self.database
-            .create_message(session_id, "user", user_prompt)?;
+        let user_message = StorageMessage {
+            id: None,
+            session_id,
+            role: MessageRole::User,
+            content: user_prompt.to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        };
+        self.storage.create_message(user_message).await?;
 
         let tools = self.get_tool_definitions();
 
@@ -307,11 +350,15 @@ impl Agent for SettingsManagementAgent {
             iteration += 1;
             if iteration > max_iterations {
                 let error = "Maximum iteration limit reached";
-                self.database.fail_session(session_id, error)?;
+                let mut session = self.get_session(session_id).await?;
+                session.status = SessionStatus::Failed;
+                session.error = Some(error.to_string());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                self.storage.update_session(session).await?;
                 return Err(anyhow::anyhow!(error));
             }
 
-            let messages = self.build_messages(session_id)?;
+            let messages = self.build_messages(session_id).await?;
 
             let request = CompletionRequest {
                 messages,
@@ -331,35 +378,56 @@ impl Agent for SettingsManagementAgent {
             let text = extract_text_from_content(&response.content);
 
             let text_to_save = if text.is_empty() && response.tool_calls.is_some() {
-                "[Using tools]"
+                "[Using tools]".to_string()
             } else {
-                &text
+                text.clone()
             };
 
-            let message_id = self
-                .database
-                .create_message(session_id, "assistant", text_to_save)?;
+            let assistant_message = StorageMessage {
+                id: None,
+                session_id,
+                role: MessageRole::Assistant,
+                content: text_to_save,
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            let message_id = self.storage.create_message(assistant_message).await?;
 
             if let Some(tool_calls) = response.tool_calls {
                 if tool_calls.is_empty() {
-                    self.database.complete_session(session_id, &text)?;
+                    let mut session = self.get_session(session_id).await?;
+                    session.status = SessionStatus::Completed;
+                    session.result = Some(text.clone());
+                    session.ended_at = Some(chrono::Utc::now().timestamp());
+                    self.storage.update_session(session).await?;
                     return Ok(text);
                 }
 
                 for tool_call in tool_calls {
                     // Special handling for ask_user tool - collect settings and write to TOML
                     if tool_call.name() == "ask_user" {
-                        tracing::info!(session_id = session_id, "Agent requesting user settings");
+                        tracing::info!(session_id = %session_id, "Agent requesting user settings");
 
                         // Create tool call record in agent_tool_calls table
                         let start = Instant::now();
-                        let tool_call_id = self.database.create_tool_call(
+                        let mut tool_call_record = StorageToolCall {
+                            id: None,
                             session_id,
-                            Some(message_id),
-                            tool_call.id(),
-                            tool_call.name(),
-                            tool_call.arguments().clone(),
-                        )?;
+                            message_id: Some(message_id),
+                            tool_call_id: tool_call.id().to_string(),
+                            tool_name: tool_call.name().to_string(),
+                            request: tool_call.arguments().clone(),
+                            response: None,
+                            status: ToolCallStatus::Pending,
+                            execution_time_ms: None,
+                            created_at: chrono::Utc::now().timestamp(),
+                            completed_at: None,
+                            error_details: None,
+                        };
+                        let tool_call_id = self
+                            .storage
+                            .create_tool_call(tool_call_record.clone())
+                            .await?;
+                        tool_call_record.id = Some(tool_call_id);
 
                         // Execute the ask_user tool to get responses from user
                         let tool_request = crate::AgentTool::parse_tool_call(
@@ -404,11 +472,8 @@ impl Agent for SettingsManagementAgent {
 
                             // Mark tool call as completed
                             let response_json = serde_json::to_value(&tool_response)?;
-                            self.database.complete_tool_call(
-                                tool_call_id,
-                                response_json,
-                                execution_time,
-                            )?;
+                            tool_call_record.complete(response_json, execution_time);
+                            self.storage.update_tool_call(tool_call_record).await?;
 
                             // Create success message
                             let message_to_llm = format!(
@@ -417,8 +482,14 @@ impl Agent for SettingsManagementAgent {
                                 ask_user_response.responses.len(),
                                 self.settings_file_path.display()
                             );
-                            self.database
-                                .create_message(session_id, "tool", &message_to_llm)?;
+                            let tool_message = StorageMessage {
+                                id: None,
+                                session_id,
+                                role: MessageRole::Tool,
+                                content: message_to_llm,
+                                created_at: chrono::Utc::now().timestamp(),
+                            };
+                            self.storage.create_message(tool_message).await?;
                         } else {
                             return Err(anyhow::anyhow!(
                                 "Expected AskUser response from ask_user tool"
@@ -431,7 +502,11 @@ impl Agent for SettingsManagementAgent {
                     }
                 }
             } else {
-                self.database.complete_session(session_id, &text)?;
+                let mut session = self.get_session(session_id).await?;
+                session.status = SessionStatus::Completed;
+                session.result = Some(text.clone());
+                session.ended_at = Some(chrono::Utc::now().timestamp());
+                self.storage.update_session(session).await?;
                 return Ok(text);
             }
         }
@@ -450,22 +525,22 @@ fn extract_text_from_content(content: &[ContentBlock]) -> String {
         .join("\n")
 }
 
-/// Create a SettingsManagementAgent with an in-memory database
+/// Create a SettingsManagementAgent with in-memory storage
 pub fn create_settings_management_agent(
     client: Arc<dyn LlmClient>,
     settings_file_path: std::path::PathBuf,
     agent_schemas: Vec<crate::AgentSettingsSchema>,
-) -> anyhow::Result<(SettingsManagementAgent, Arc<Database>)> {
-    let database = Arc::new(Database::new(&std::path::PathBuf::from(":memory:"))?);
+) -> anyhow::Result<SettingsManagementAgent<crate::storage::InMemoryStorage>> {
+    let storage = Arc::new(crate::storage::InMemoryStorage::new());
     let tool_executor = Arc::new(nocodo_tools::ToolExecutor::new(std::path::PathBuf::from(
         ".",
     )));
     let agent = SettingsManagementAgent::new(
         client,
-        database.clone(),
+        storage,
         tool_executor,
         settings_file_path,
         agent_schemas,
     );
-    Ok((agent, database))
+    Ok(agent)
 }

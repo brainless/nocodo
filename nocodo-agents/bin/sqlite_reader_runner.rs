@@ -1,5 +1,11 @@
 use clap::Parser;
-use nocodo_agents::{config, factory::create_sqlite_reader_agent, Agent};
+use nocodo_agents::{
+    config,
+    factory::create_sqlite_reader_agent,
+    storage::AgentStorage,
+    types::{Session, SessionStatus},
+    Agent,
+};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use nocodo_tools::ToolExecutor;
 use std::path::PathBuf;
@@ -44,22 +50,30 @@ async fn main() -> anyhow::Result<()> {
     let tool_executor =
         Arc::new(ToolExecutor::new(std::env::current_dir()?).with_max_file_size(10 * 1024 * 1024));
 
-    let (agent, database) = create_sqlite_reader_agent(client, tool_executor, args.db_path).await?;
+    let storage = Arc::new(nocodo_agents::storage::InMemoryStorage::new());
+    let agent = create_sqlite_reader_agent(client, tool_executor, args.db_path).await?;
 
     tracing::info!("System prompt:\n{}", agent.system_prompt());
 
     println!("Running agent: {}", agent.objective());
     println!("User prompt: {}\n", args.prompt);
 
-    // For standalone runner, create a dummy session
-    let session_id = database.create_session(
-        "sqlite-reader",
-        "standalone",
-        "standalone",
-        Some(&agent.system_prompt()),
-        &args.prompt,
-        None,
-    )?;
+    // Create session
+    let session = Session {
+        id: None,
+        agent_name: "sqlite-reader".to_string(),
+        provider: "standalone".to_string(),
+        model: "standalone".to_string(),
+        system_prompt: Some(agent.system_prompt()),
+        user_prompt: args.prompt.clone(),
+        config: serde_json::json!({}),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+    let session_id = storage.create_session(session).await?;
 
     let result = agent.execute(&args.prompt, session_id).await?;
 

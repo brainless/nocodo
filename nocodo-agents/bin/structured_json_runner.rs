@@ -1,8 +1,12 @@
 use clap::Parser;
-use nocodo_agents::config;
-use nocodo_agents::factory::AgentFactory;
-use nocodo_agents::structured_json::StructuredJsonAgentConfig;
-use nocodo_agents::Agent;
+use nocodo_agents::{
+    config,
+    factory::AgentFactory,
+    storage::AgentStorage,
+    structured_json::StructuredJsonAgentConfig,
+    types::{Session, SessionStatus},
+    Agent,
+};
 use nocodo_llm_sdk::glm::zai::ZaiGlmClient;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -45,20 +49,14 @@ async fn main() -> anyhow::Result<()> {
         zai_config.coding_plan,
     )?);
 
-    let db_path = config_path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("agent_sessions.db");
-
-    let database = Arc::new(nocodo_agents::database::Database::new(&db_path)?);
+    let storage = Arc::new(nocodo_agents::storage::InMemoryStorage::new());
 
     let tool_executor = Arc::new(
         nocodo_tools::ToolExecutor::new(std::env::current_dir()?)
             .with_max_file_size(10 * 1024 * 1024),
     );
 
-    let factory = AgentFactory::new(client.clone(), database.clone(), tool_executor);
+    let factory = AgentFactory::new(client.clone(), storage.clone(), tool_executor);
 
     let type_names = if args.types.is_empty() {
         vec![
@@ -81,14 +79,21 @@ async fn main() -> anyhow::Result<()> {
     let system_prompt = agent.system_prompt();
     println!("\nSystem Prompt:\n{}", system_prompt);
 
-    let session_id = database.create_session(
-        "structured-json",
-        "cli",
-        &args.prompt,
-        Some(&system_prompt),
-        "structured-json-runner",
-        None,
-    )?;
+    let session = Session {
+        id: None,
+        agent_name: "structured-json".to_string(),
+        provider: "cli".to_string(),
+        model: "cli".to_string(),
+        system_prompt: Some(system_prompt),
+        user_prompt: args.prompt.clone(),
+        config: serde_json::json!({}),
+        status: SessionStatus::Running,
+        started_at: chrono::Utc::now().timestamp(),
+        ended_at: None,
+        result: None,
+        error: None,
+    };
+    let session_id = storage.create_session(session).await?;
 
     match agent.execute(&args.prompt, session_id).await {
         Ok(result) => {

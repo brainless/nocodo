@@ -1,8 +1,14 @@
-use crate::{database::Database, Agent};
+use crate::{
+    storage::AgentStorage,
+    types::{Message as StorageMessage, MessageRole, Session, SessionStatus},
+    Agent,
+};
 use anyhow;
 use async_trait::async_trait;
 use nocodo_llm_sdk::client::LlmClient;
-use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message, ResponseFormat, Role};
+use nocodo_llm_sdk::types::{
+    CompletionRequest, ContentBlock, Message as LlmMessage, ResponseFormat, Role,
+};
 use nocodo_tools::ToolExecutor;
 use std::sync::Arc;
 
@@ -18,9 +24,9 @@ pub struct StructuredJsonAgentConfig {
     pub domain_description: String,
 }
 
-pub struct StructuredJsonAgent {
+pub struct StructuredJsonAgent<S: AgentStorage> {
     client: Arc<dyn LlmClient>,
-    database: Arc<Database>,
+    storage: Arc<S>,
     #[allow(dead_code)]
     tool_executor: Arc<ToolExecutor>,
     validator: TypeValidator,
@@ -29,10 +35,10 @@ pub struct StructuredJsonAgent {
     config: StructuredJsonAgentConfig,
 }
 
-impl StructuredJsonAgent {
+impl<S: AgentStorage> StructuredJsonAgent<S> {
     pub fn new(
         client: Arc<dyn LlmClient>,
-        database: Arc<Database>,
+        storage: Arc<S>,
         tool_executor: Arc<ToolExecutor>,
         config: StructuredJsonAgentConfig,
     ) -> anyhow::Result<Self> {
@@ -57,12 +63,19 @@ impl StructuredJsonAgent {
 
         Ok(Self {
             client,
-            database,
+            storage,
             tool_executor,
             validator,
             system_prompt,
             config,
         })
+    }
+
+    async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
+        self.storage
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))
     }
 
     fn generate_system_prompt(type_defs: &str, domain_desc: &str) -> String {
@@ -114,7 +127,7 @@ When responding:
                 ));
             }
 
-            let messages = self.build_messages(user_prompt, &conversation_context, session_id)?;
+            let messages = self.build_messages(user_prompt, &conversation_context)?;
 
             let request = CompletionRequest {
                 messages,
@@ -132,8 +145,14 @@ When responding:
             let response = self.client.complete(request).await?;
 
             let text = extract_text_from_content(&response.content);
-            self.database
-                .create_message(session_id, "assistant", &text)?;
+            let assistant_message = StorageMessage {
+                id: None,
+                session_id,
+                role: MessageRole::Assistant,
+                content: text.clone(),
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            self.storage.create_message(assistant_message).await?;
 
             let json_result = self.validator.validate_json_syntax(&text);
 
@@ -158,8 +177,14 @@ When responding:
                             );
 
                         conversation_context.push((Role::User, error_msg.clone()));
-                        self.database
-                            .create_message(session_id, "user", &error_msg)?;
+                        let error_message = StorageMessage {
+                            id: None,
+                            session_id,
+                            role: MessageRole::User,
+                            content: error_msg,
+                            created_at: chrono::Utc::now().timestamp(),
+                        };
+                        self.storage.create_message(error_message).await?;
                     }
                 },
                 Err(syntax_error) => {
@@ -178,8 +203,14 @@ When responding:
                     );
 
                     conversation_context.push((Role::User, error_msg.clone()));
-                    self.database
-                        .create_message(session_id, "user", &error_msg)?;
+                    let error_message = StorageMessage {
+                        id: None,
+                        session_id,
+                        role: MessageRole::User,
+                        content: error_msg,
+                        created_at: chrono::Utc::now().timestamp(),
+                    };
+                    self.storage.create_message(error_message).await?;
                 }
             }
         }
@@ -189,12 +220,11 @@ When responding:
         &self,
         user_prompt: &str,
         conversation_context: &[(Role, String)],
-        _session_id: i64,
-    ) -> anyhow::Result<Vec<Message>> {
+    ) -> anyhow::Result<Vec<LlmMessage>> {
         let mut messages = Vec::new();
 
         for (role, content) in conversation_context {
-            messages.push(Message {
+            messages.push(LlmMessage {
                 role: role.clone(),
                 content: vec![ContentBlock::Text {
                     text: content.clone(),
@@ -202,7 +232,7 @@ When responding:
             });
         }
 
-        messages.push(Message {
+        messages.push(LlmMessage {
             role: Role::User,
             content: vec![ContentBlock::Text {
                 text: user_prompt.to_string(),
@@ -214,7 +244,7 @@ When responding:
 }
 
 #[async_trait]
-impl Agent for StructuredJsonAgent {
+impl<S: AgentStorage> Agent for StructuredJsonAgent<S> {
     fn objective(&self) -> &str {
         "Generate structured JSON responses conforming to specified TypeScript types"
     }
@@ -228,14 +258,24 @@ impl Agent for StructuredJsonAgent {
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
-        self.database
-            .create_message(session_id, "user", user_prompt)?;
+        let user_message = StorageMessage {
+            id: None,
+            session_id,
+            role: MessageRole::User,
+            content: user_prompt.to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        };
+        self.storage.create_message(user_message).await?;
 
         let json_value = self.validate_and_retry(user_prompt, session_id, 3).await?;
 
         let formatted = serde_json::to_string_pretty(&json_value)?;
 
-        self.database.complete_session(session_id, &formatted)?;
+        let mut session = self.get_session(session_id).await?;
+        session.status = SessionStatus::Completed;
+        session.result = Some(formatted.clone());
+        session.ended_at = Some(chrono::Utc::now().timestamp());
+        self.storage.update_session(session).await?;
 
         Ok(formatted)
     }

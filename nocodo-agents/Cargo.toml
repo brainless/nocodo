@@ -23,17 +23,21 @@ imap = { version = "3.0.0-alpha.15", default-features = false, features = ["rust
 rustls-connector = "0.19.0"
 
 # New for tool execution
-rusqlite = { version = "0.37", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 schemars = { version = "0.8", features = ["preserve_order"] }
 serde_json = "1.0"
-refinery = { version = "0.9", features = ["rusqlite"] }
 tempfile = "3.0"
+thiserror = { workspace = true }
+uuid = { version = "1.0", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3.0"
+
+[features]
+default = []
+sqlite = ["nocodo-tools/sqlite"]
 
 [[bin]]
 name = "codebase-analysis-runner"
@@ -42,6 +46,7 @@ path = "bin/codebase_analysis_runner.rs"
 [[bin]]
 name = "sqlite-reader-runner"
 path = "bin/sqlite_reader_runner.rs"
+required-features = ["sqlite"]
 
 [[bin]]
 name = "structured-json-runner"
