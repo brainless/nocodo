@@ -51,7 +51,7 @@ impl Default for ApiConfig {
                 port: 8080,
             },
             database: DatabaseConfig {
-                path: get_default_db_path(),
+                path: get_default_db_path().expect("Failed to detect OS data directory"),
             },
             api_keys: None,
             llm: None,
@@ -64,7 +64,7 @@ impl Default for ApiConfig {
 
 impl ApiConfig {
     pub fn load() -> Result<(Self, PathBuf), ConfigError> {
-        let config_path = get_config_path();
+        let config_path = get_config_path()?;
 
         // Create config directory if it doesn't exist
         if let Some(parent) = config_path.parent() {
@@ -75,7 +75,7 @@ impl ApiConfig {
 
         // Create default config file if it doesn't exist
         if !config_path.exists() {
-            let default_db_path = get_default_db_path();
+            let default_db_path = get_default_db_path()?;
             let default_config = format!(
                 r#"
 [server]
@@ -126,18 +126,14 @@ allowed_origins = ["http://localhost:3000"]
     }
 }
 
-fn get_config_path() -> PathBuf {
-    if let Some(config_dir) = dirs::config_dir() {
-        config_dir.join("nocodo/api.toml")
-    } else {
-        PathBuf::from("api.toml")
-    }
+fn get_config_path() -> Result<PathBuf, ConfigError> {
+    dirs::config_dir()
+        .map(|dir| dir.join("nocodo/api.toml"))
+        .ok_or_else(|| ConfigError::Message("Failed to detect OS config directory".to_string()))
 }
 
-fn get_default_db_path() -> PathBuf {
-    if let Some(data_dir) = dirs::data_local_dir() {
-        data_dir.join("nocodo/api.db")
-    } else {
-        PathBuf::from("api.db")
-    }
+fn get_default_db_path() -> Result<PathBuf, ConfigError> {
+    dirs::data_local_dir()
+        .map(|dir| dir.join("nocodo/api.db"))
+        .ok_or_else(|| ConfigError::Message("Failed to detect OS data directory".to_string()))
 }
