@@ -75,10 +75,14 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
             .to_path_buf();
 
         // Create restricted bash permissions (only pdftotext and qpdf commands)
+        let allowed_dirs = allowed_working_dirs.unwrap_or_else(|| vec!["/tmp".to_string()]);
+        tracing::info!(
+            "Creating bash executor with allowed working dirs: {:?}",
+            allowed_dirs
+        );
+        tracing::info!("PDF base path: {:?}", base_path);
         let bash_perms = BashPermissions::minimal(vec!["pdftotext", "qpdf"])
-            .with_allowed_working_dirs(
-                allowed_working_dirs.unwrap_or_else(|| vec!["/tmp".to_string()]),
-            );
+            .with_allowed_working_dirs(allowed_dirs);
         let bash_executor = BashExecutor::new(bash_perms, 120)?;
 
         // Create tool executor with restricted bash
@@ -274,6 +278,10 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
 
         // Get tool definitions
         let tools = self.get_tool_definitions();
+        tracing::info!(
+            "Tool definitions sent to LLM: {:?}",
+            tools.iter().map(|t| t.name()).collect::<Vec<_>>()
+        );
 
         // Execution loop (max 30 iterations)
         let mut iteration = 0;
@@ -303,7 +311,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
                 top_p: None,
                 stop_sequences: None,
                 tools: Some(tools.clone()),
-                tool_choice: Some(ToolChoice::Auto),
+                tool_choice: Some(ToolChoice::Required),
                 response_format: None,
             };
 

@@ -63,3 +63,7 @@ path = "bin/settings_management_runner.rs"
 [[bin]]
 name = "imap-email-runner"
 path = "bin/imap_email_runner.rs"
+
+[[bin]]
+name = "pdftotext-runner"
+path = "bin/pdftotext_runner.rs"

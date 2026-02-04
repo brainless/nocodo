@@ -170,14 +170,17 @@ impl BashExecutor {
         // Check working directory permissions
         if let Err(denied_reason) = self.permissions.check_working_directory(working_dir) {
             warn!(
-                "Working directory denied: {:?} - {}",
-                working_dir, denied_reason
+                "Working directory denied: {:?} - {}. Allowed dirs: {:?}",
+                working_dir,
+                denied_reason,
+                self.permissions.get_allowed_working_dirs()
             );
             return Err(anyhow::anyhow!(
                 "Working directory denied: {}",
                 denied_reason
             ));
         }
+        debug!("Working directory check passed: {:?}", working_dir);
 
         // Create exec env for command with custom working directory
         let exec_env = ExecEnv {

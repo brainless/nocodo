@@ -581,8 +581,26 @@ impl crate::client::LlmClient for ZaiGlmClient {
             })
             .collect::<Result<Vec<crate::glm::types::GlmMessage>, LlmError>>()?;
 
+        // Add system message at the beginning if provided
+        let mut glm_messages = if let Some(system_prompt) = &request.system {
+            let system_message = crate::glm::types::GlmMessage {
+                role: crate::glm::types::GlmRole::System,
+                content: Some(system_prompt.clone()),
+                reasoning: None,
+                tool_calls: None,
+                tool_call_id: None,
+            };
+            let mut msgs = vec![system_message];
+            msgs.extend(glm_messages);
+            msgs
+        } else {
+            glm_messages
+        };
+
         // Convert tools to ZAI format
+        tracing::debug!("request.tools.is_some(): {}", request.tools.is_some());
         let tools = request.tools.map(|tools| {
+            tracing::debug!("Converting {} tools to ZAI format", tools.len());
             tools
                 .into_iter()
                 .map(|tool| crate::glm::types::GlmTool {
@@ -623,6 +641,25 @@ impl crate::client::LlmClient for ZaiGlmClient {
             }),
             user_id: None,
         };
+
+        if let Some(ref tools) = zai_request.tools {
+            tracing::debug!("Sending tools to ZAI: {} tools", tools.len());
+            for tool in tools {
+                tracing::debug!(
+                    "  - {} (desc: {})",
+                    tool.function.name,
+                    tool.function.description
+                );
+            }
+        }
+        tracing::debug!("Tool choice: {:?}", zai_request.tool_choice);
+
+        // Log the request JSON for debugging
+        if tracing::level_enabled!(tracing::Level::DEBUG) {
+            let request_json = serde_json::to_string_pretty(&zai_request)
+                .unwrap_or_else(|e| format!("Failed to serialize: {}", e));
+            tracing::debug!("ZAI Request JSON:\n{}", request_json);
+        }
 
         // Send request and convert response
         let zai_response = self.create_chat_completion(zai_request).await?;

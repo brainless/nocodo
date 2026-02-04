@@ -84,7 +84,26 @@ impl BashPermissions {
     }
 
     pub fn with_allowed_working_dirs(mut self, dirs: Vec<String>) -> Self {
-        self.allowed_working_dirs = dirs;
+        // Expand ~ to home directory in each path
+        self.allowed_working_dirs = dirs
+            .into_iter()
+            .map(|dir| {
+                if dir.starts_with("~/") {
+                    if let Some(home) = std::env::var_os("HOME") {
+                        let expanded = format!("{}/{}", home.to_string_lossy(), &dir[2..]);
+                        debug!("Expanded allowed working dir: {} -> {}", dir, expanded);
+                        expanded
+                    } else {
+                        dir
+                    }
+                } else if dir == "~" {
+                    std::env::var("HOME").unwrap_or(dir)
+                } else {
+                    dir
+                }
+            })
+            .collect();
+        debug!("Set allowed working dirs: {:?}", self.allowed_working_dirs);
         self
     }
 
@@ -135,12 +154,23 @@ impl BashPermissions {
 
     pub fn check_working_directory(&self, working_dir: &Path) -> Result<()> {
         let working_dir_str = working_dir.to_string_lossy();
+
+        // If no working dirs specified, allow any directory (for backward compatibility)
+        // But this is discouraged - explicit permissions are better
+        if self.allowed_working_dirs.is_empty() {
+            debug!(
+                "No working directory restrictions configured, allowing: {}",
+                working_dir_str
+            );
+            return Ok(());
+        }
+
         debug!(
-            "Checking working directory permissions: {}",
-            working_dir_str
+            "Checking working directory: '{}'. Allowed dirs: {:?}",
+            working_dir_str, self.allowed_working_dirs
         );
 
-        // Check if directory is in allowed list
+        // Check if working directory is in allowed list
         let is_allowed = self
             .allowed_working_dirs
             .iter()
@@ -148,24 +178,25 @@ impl BashPermissions {
 
         if !is_allowed {
             warn!("Working directory not in allowed list: {}", working_dir_str);
-            return Err(anyhow!(
-                "Working directory '{}' not in allowed list",
-                working_dir_str
+            return Err(anyhow::anyhow!(
+                "Working directory '{}' is not in allowed list. Allowed directories: {:?}",
+                working_dir_str,
+                self.allowed_working_dirs
             ));
         }
 
-        // Check for sensitive directories
+        // Check if working directory is a sensitive directory
         if self.deny_changing_to_sensitive_dirs {
             let sensitive_dirs = [
                 "/etc", "/boot", "/sys", "/proc", "/dev", "/root", "/var/run", "/var/log",
             ];
-
             for sensitive in &sensitive_dirs {
                 if working_dir_str.starts_with(sensitive) {
                     warn!("Access to sensitive directory denied: {}", working_dir_str);
-                    return Err(anyhow!(
-                        "Access to sensitive directory '{}' is denied",
-                        working_dir_str
+                    return Err(anyhow::anyhow!(
+                        "Working directory '{}' is a sensitive directory ({}). Access denied.",
+                        working_dir_str,
+                        sensitive
                     ));
                 }
             }
