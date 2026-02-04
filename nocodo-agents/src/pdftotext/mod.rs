@@ -110,8 +110,9 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
             "Creating bash executor with allowed working dir: {:?}",
             allowed_dirs
         );
-        let bash_perms = BashPermissions::minimal(vec!["pdftotext", "qpdf", "ls", "wc", "pwd"])
-            .with_allowed_working_dirs(allowed_dirs);
+        let bash_perms =
+            BashPermissions::minimal(vec!["pdftotext", "qpdf", "ls", "wc", "pwd", "head"])
+                .with_allowed_working_dirs(allowed_dirs);
         let bash_executor = BashExecutor::new(bash_perms, 120)?;
 
         // Create tool executor with bash, base path is the temp directory
@@ -420,166 +421,45 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
 /// Generate system prompt for PdfToTextAgent
 fn generate_system_prompt(pdf_filename: &str, work_dir: &PathBuf, txt_filename: &str) -> String {
     format!(
-        r#"You are a PDF text extraction specialist. Your task is to extract text from the PDF file "{}" and optionally clean and format the extracted text.
+        r#"You are a PDF text extraction assistant.
 
-You have access to these tools:
-1. bash - ONLY for running pdftotext, qpdf, ls, wc, and pwd commands
-2. read_file - To read extracted text files
-3. write_file - To write cleaned results (optional)
-4. confirm_extraction - Confirm the extraction looks correct and complete the task
-
-# PDF File and Current State
-
-The PDF file to process is: {}
-Working directory: {}
-
-**IMPORTANT**: The PDF and extracted text file are already present in the working directory:
+# Current State
+The PDF file has already been pre-extracted with layout preservation:
+- Working directory: {}
 - PDF file: {}
 - Extracted text: {}
 
-You should first read the extracted text to verify it looks correct. If you need to extract specific pages or re-extract with different options, you can use pdftotext or qpdf.
-
-# Available Commands
-
-## pdftotext - Extract text from PDF
-
-Basic usage:
-pdftotext [options] {} <output_base>
-
-Key options:
-- -layout              : Maintain original physical layout (RECOMMENDED for preserving formatting)
-- -f <n>               : First page to convert
-- -l <n>               : Last page to convert
-- -nopgbrk             : Don't insert page breaks between pages
-- -enc <encoding>      : Output text encoding (default: UTF-8)
-- -raw                 : Keep strings in content stream order (alternative to -layout)
-
-The -layout flag is HIGHLY RECOMMENDED as it preserves the original formatting, tables, and structure.
-
-Examples:
-- Extract all pages with layout: pdftotext -layout {} output.txt
-- Extract pages 1-5: pdftotext -layout -f 1 -l 5 {} output.txt
-- Extract without page breaks: pdftotext -layout -nopgbrk {} output.txt
-
-## qpdf - Extract specific pages to a new PDF
-
-Use qpdf when the user wants to extract specific pages BEFORE text extraction.
-
-Basic usage:
-qpdf {} --pages . <page-range> -- output.pdf
-
-Page range syntax:
-- Single page: 1
-- Range: 1-5
-- Multiple ranges: 1-3,7-10
-- From end: r1 (last page), r2 (second to last)
-- Last page: z
-
-Examples:
-- Extract pages 1-5: qpdf {} --pages . 1-5 -- pages_1-5.pdf
-- Extract pages 2,4,6: qpdf {} --pages . 2,4,6 -- selected_pages.pdf
-- Extract last 3 pages: qpdf {} --pages . r3-r1 -- last_3_pages.pdf
-
-## ls, wc, pwd - File and directory commands
-
-- ls: List files in the current directory
-- wc: Count lines, words, and bytes in a file
-- pwd: Show the current working directory
-
-# Workflow
-
-## Default workflow (most common):
+# Your Task
 1. Read the pre-extracted text file: {}
 2. Verify the extraction looks correct
-3. If satisfied, use confirm_extraction to complete the task
+3. Use confirm_extraction to complete the task
 4. Present the extracted text to the user
 
-## Re-extract with different options (if user requests):
-Option A: Use pdftotext -f and -l flags directly
-1. Run: pdftotext -layout -f 1 -l 5 {} output.txt
-2. Read: output.txt
-3. Present the extracted text
+# Available Tools
+- read_file: Read extracted text files
+- write_file: Write cleaned results (optional, if user requests)
+- confirm_extraction: Confirm the extraction looks correct
+- bash: pdftotext, qpdf, ls, wc, pwd (available ONLY if you think the existing extraction is not good or incorrect)
 
-Option B: Use qpdf first, then pdftotext
-1. Run: qpdf {} --pages . 1-5 -- pages_1-5.pdf
-2. Run: pdftotext -layout pages_1-5.pdf output.txt
-3. Read: output.txt
-4. Present the extracted text
+# Critical: Chat Responses Are Invisible
+- Chat responses and text outputs are NOT visible to the user at all
+- ONLY tool call results are visible to the user
+- Present the extracted text ONLY through the confirm_extraction tool
+- Do NOT provide any extracted text in chat responses - it will be lost
 
-## Clean and format (if user requests):
-1. Read the pre-extracted text file
-2. Analyze and clean the text:
-    - Fix common extraction errors
-    - Improve formatting and structure
-    - Remove artifacts or noise
-    - Preserve intended structure (tables, paragraphs, lists)
-3. Present cleaned text to user
-4. Optionally write cleaned result to a file if requested
-5. Use confirm_extraction to complete the task
-
-# Example Interactions
-
-User: "Extract text from this PDF"
-1. Read: {}
-2. Verify extraction quality
-3. Use confirm_extraction
-4. Present the extracted text
-
-User: "Extract text from pages 1-10"
-1. Run: pdftotext -layout -f 1 -l 10 {} output.txt
-2. Read: output.txt
-3. Use confirm_extraction
-4. Present the extracted text
-
-User: "Extract and clean the text from pages 5-15"
-1. Run: pdftotext -layout -f 5 -l 15 {} output.txt
-2. Read: output.txt
-3. Analyze and clean the text
-4. Use confirm_extraction
-5. Present cleaned text to user
-
-User: "Extract page 3 only"
-1. Run: pdftotext -layout -f 3 -l 3 {} page_3.txt
-2. Read: page_3.txt
-3. Use confirm_extraction
-4. Present the extracted text
-
-# Important Notes
-
-- You can ONLY run pdftotext, qpdf, ls, wc, and pwd commands (no other bash commands will work)
-- The working directory is: {}
-- The PDF file is: {}
-- The pre-extracted text file is: {}
-- ALWAYS use -layout flag with pdftotext to preserve formatting (unless user explicitly asks not to)
-- pdftotext creates output files automatically (don't need to redirect with >)
-- Page numbers start at 1
-- For page extraction, using pdftotext -f/-l is usually simpler than qpdf
-- Use qpdf when you need complex page selection (e.g., non-contiguous pages like 1,5,10)
-- Use confirm_extraction when you are satisfied with the extracted text to complete the task
+# Important
+- The text is already extracted - just verify and confirm it looks correct
+- Confirm as quickly as possible using confirm_extraction tool once you verify the extraction is correct
+- Do not summarize the extracted text when the extraction is correct, use confirm_extraction tool
+- Only use bash/PDF commands if the existing extraction appears incorrect, incomplete, or has poor quality
+- Only re-extract if the user explicitly requests different pages or options
+- Working directory: {}
 "#,
-        pdf_filename,
         work_dir.display(),
         pdf_filename,
         txt_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
-        pdf_filename,
         txt_filename,
-        work_dir.display(),
-        pdf_filename,
-        txt_filename
+        work_dir.display()
     )
 }
 
