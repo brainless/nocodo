@@ -347,6 +347,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
         // Execution loop (max 30 iterations)
         let mut iteration = 0;
         let max_iterations = 30;
+        let mut confirm_extraction_count = 0;
 
         loop {
             iteration += 1;
@@ -372,7 +373,7 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
                 top_p: None,
                 stop_sequences: None,
                 tools: Some(tools.clone()),
-                tool_choice: Some(ToolChoice::Required),
+                tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
             };
 
@@ -399,6 +400,27 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
                     session.ended_at = Some(chrono::Utc::now().timestamp());
                     self.storage.update_session(session).await?;
                     return Ok(text);
+                }
+
+                // Check if confirm_extraction is called repeatedly (GLM-4.6 loop detection)
+                let confirm_call = tool_calls.iter().find(|t| t.name() == "confirm_extraction");
+                if confirm_call.is_some() {
+                    confirm_extraction_count += 1;
+                    tracing::info!(
+                        "confirm_extraction called {} times",
+                        confirm_extraction_count
+                    );
+
+                    // If confirm_extraction is called 3+ times, stop and return current text
+                    if confirm_extraction_count >= 3 && !text.trim().is_empty() {
+                        tracing::info!("Stopping after repeated confirm_extraction calls");
+                        let mut session = self.get_session(session_id).await?;
+                        session.status = SessionStatus::Completed;
+                        session.result = Some(text.clone());
+                        session.ended_at = Some(chrono::Utc::now().timestamp());
+                        self.storage.update_session(session).await?;
+                        return Ok(text);
+                    }
                 }
 
                 // Execute tools
