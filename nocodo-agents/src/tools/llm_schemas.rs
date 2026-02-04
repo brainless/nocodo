@@ -167,6 +167,18 @@ pub fn create_tool_definitions() -> Vec<Tool> {
         pdftotext_schema,
     ).expect("Failed to create pdftotext tool schema");
 
+    let confirm_extraction_schema = serde_json::json!({
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+    });
+
+    let confirm_extraction_tool = Tool::from_json_schema(
+        "confirm_extraction".to_string(),
+        "Confirm that the PDF text extraction looks correct and there are no errors. This tool takes no arguments and should be called when you are satisfied with the extracted text. Call this tool to complete the task.".to_string(),
+        confirm_extraction_schema,
+    ).expect("Failed to create confirm_extraction tool schema");
+
     vec![
         Tool::from_type::<ListFilesRequest>()
             .name("list_files")
@@ -202,6 +214,7 @@ pub fn create_tool_definitions() -> Vec<Tool> {
         sqlite_tool,
         imap_tool,
         pdftotext_tool,
+        confirm_extraction_tool,
     ]
 }
 

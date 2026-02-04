@@ -33,6 +33,7 @@ pub enum AgentTool {
     Sqlite3Reader,
     ImapReader,
     PdfToText,
+    ConfirmExtraction,
 }
 
 impl AgentTool {
@@ -50,6 +51,7 @@ impl AgentTool {
             AgentTool::Sqlite3Reader => "sqlite3_reader",
             AgentTool::ImapReader => "imap_reader",
             AgentTool::PdfToText => "pdftotext",
+            AgentTool::ConfirmExtraction => "confirm_extraction",
         }
     }
 
@@ -123,6 +125,10 @@ impl AgentTool {
                 let req: nocodo_tools::types::PdfToTextRequest = serde_json::from_value(arguments)?;
                 ToolRequest::PdfToText(req)
             }
+            "confirm_extraction" => {
+                let _value: serde_json::Value = arguments;
+                ToolRequest::ConfirmExtraction(nocodo_tools::types::ConfirmExtractionRequest {})
+            }
             _ => anyhow::bail!("Unknown tool: {}", name),
         };
 
@@ -180,6 +186,13 @@ pub fn format_tool_response(response: &nocodo_tools::types::ToolResponse) -> Str
                 }
             } else {
                 format!("PDF text extraction failed: {}", r.message)
+            }
+        }
+        ToolResponse::ConfirmExtraction(r) => {
+            if r.success {
+                r.message.clone()
+            } else {
+                format!("Extraction confirmation failed: {}", r.message)
             }
         }
         ToolResponse::Error(e) => format!("Error: {}", e.message),

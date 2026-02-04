@@ -30,6 +30,8 @@ pub enum ToolRequest {
     ImapReader(super::imap::ImapReaderRequest),
     #[serde(rename = "pdftotext")]
     PdfToText(super::pdftotext::PdfToTextRequest),
+    #[serde(rename = "confirm_extraction")]
+    ConfirmExtraction(super::pdftotext::ConfirmExtractionRequest),
 }
 
 /// Tool response enum containing all possible tool results
@@ -60,6 +62,8 @@ pub enum ToolResponse {
     ImapReader(super::imap::ImapReaderResponse),
     #[serde(rename = "pdftotext")]
     PdfToText(super::pdftotext::PdfToTextResponse),
+    #[serde(rename = "confirm_extraction")]
+    ConfirmExtraction(super::pdftotext::ConfirmExtractionResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }

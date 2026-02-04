@@ -94,6 +94,9 @@ impl ToolExecutor {
             ToolRequest::PdfToText(req) => pdftotext::execute_pdftotext(req)
                 .map(ToolResponse::PdfToText)
                 .map_err(|e| anyhow::anyhow!(e)),
+            ToolRequest::ConfirmExtraction(req) => pdftotext::execute_confirm_extraction(req)
+                .map(ToolResponse::ConfirmExtraction)
+                .map_err(|e| anyhow::anyhow!(e)),
         }
     }
 
@@ -117,6 +120,7 @@ impl ToolExecutor {
             ToolResponse::HackerNewsResponse(response) => serde_json::to_value(response)?,
             ToolResponse::ImapReader(response) => serde_json::to_value(response)?,
             ToolResponse::PdfToText(response) => serde_json::to_value(response)?,
+            ToolResponse::ConfirmExtraction(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 

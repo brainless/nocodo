@@ -55,3 +55,17 @@ pub struct PdfToTextResponse {
     /// Any error or informational message
     pub message: String,
 }
+
+/// Request to confirm that PDF text extraction looks correct
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ConfirmExtractionRequest {}
+
+/// Response confirming PDF text extraction
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfirmExtractionResponse {
+    /// Success status
+    pub success: bool,
+
+    /// Confirmation message
+    pub message: String,
+}

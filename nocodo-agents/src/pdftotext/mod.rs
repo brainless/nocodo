@@ -13,11 +13,13 @@ use nocodo_llm_sdk::tools::{ToolCall as LlmToolCall, ToolChoice};
 use nocodo_llm_sdk::types::{CompletionRequest, ContentBlock, Message as LlmMessage, Role};
 use nocodo_tools::{
     bash::{BashExecutor, BashPermissions},
+    pdftotext::execute_pdftotext,
     ToolExecutor,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
+use uuid::Uuid;
 
 /// Agent specialized in extracting text from PDFs using pdftotext and qpdf
 pub struct PdfToTextAgent<S: AgentStorage> {
@@ -29,6 +31,8 @@ pub struct PdfToTextAgent<S: AgentStorage> {
     #[allow(dead_code)] // Used in system prompt generation during construction
     pdf_filename: String,
     system_prompt: String,
+    #[allow(dead_code)] // Temp directory used during construction and system prompt
+    work_dir: PathBuf,
 }
 
 impl<S: AgentStorage> PdfToTextAgent<S> {
@@ -38,13 +42,13 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
     /// * `client` - LLM client for AI inference
     /// * `storage` - Storage for session/message tracking
     /// * `pdf_path` - Path to the PDF file to process
-    /// * `allowed_working_dirs` - Optional list of allowed working directories. Defaults to ["/tmp", "/home", "/workspace", "/project"]
+    /// * `allowed_working_dirs` - This parameter is ignored. A temp directory is always created in /tmp
     ///
     /// # Security
     /// The agent is configured with restricted bash access:
-    /// - Only the `pdftotext` and `qpdf` commands are allowed
+    /// - Only the `pdftotext`, `qpdf`, `ls`, `wc`, and `pwd` commands are allowed
     /// - All other bash commands are denied
-    /// - File operations are restricted to the allowed working directories
+    /// - File operations are restricted to the created temp directory in /tmp
     ///
     /// # Pre-conditions
     /// - pdftotext (poppler-utils) must be installed on the system
@@ -55,45 +59,70 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
         client: Arc<dyn LlmClient>,
         storage: Arc<S>,
         pdf_path: PathBuf,
-        allowed_working_dirs: Option<Vec<String>>,
+        _allowed_working_dirs: Option<Vec<String>>,
     ) -> anyhow::Result<Self> {
         // Validate PDF path exists
         if !pdf_path.exists() {
             anyhow::bail!("PDF file does not exist: {}", pdf_path.display());
         }
 
-        // Extract filename and directory
+        // Extract filename
         let pdf_filename = pdf_path
             .file_name()
             .ok_or_else(|| anyhow::anyhow!("Invalid PDF path - no filename"))?
             .to_string_lossy()
             .to_string();
 
-        let base_path = pdf_path
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("Invalid PDF path - no parent directory"))?
-            .to_path_buf();
+        // Create a temp directory in /tmp with random name
+        let work_dir = PathBuf::from(format!("/tmp/nocodo-pdftotext-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&work_dir).context("Failed to create temp directory")?;
 
-        // Create restricted bash permissions (only pdftotext and qpdf commands)
-        let allowed_dirs = allowed_working_dirs.unwrap_or_else(|| vec!["/tmp".to_string()]);
+        tracing::info!("Created temp directory: {:?}", work_dir);
+
+        // Copy the PDF to the temp directory
+        let pdf_copy_path = work_dir.join(&pdf_filename);
+        std::fs::copy(&pdf_path, &pdf_copy_path).context("Failed to copy PDF to temp directory")?;
+        tracing::info!("Copied PDF to: {:?}", pdf_copy_path);
+
+        // Extract text to the temp directory
+        let txt_filename = format!(
+            "{}.txt",
+            pdf_filename.strip_suffix(".pdf").unwrap_or(&pdf_filename)
+        );
+        let txt_path = work_dir.join(&txt_filename);
+
+        let pdftotext_request = nocodo_tools::types::PdfToTextRequest {
+            file_path: pdf_copy_path.to_string_lossy().to_string(),
+            output_path: Some(txt_path.to_string_lossy().to_string()),
+            preserve_layout: true,
+            first_page: None,
+            last_page: None,
+            encoding: None,
+            no_page_breaks: false,
+        };
+
+        execute_pdftotext(pdftotext_request).context("Failed to extract text from PDF")?;
+        tracing::info!("Extracted text to: {:?}", txt_path);
+
+        // Create bash permissions (pdftotext, qpdf, ls, wc, pwd)
+        let allowed_dirs = vec![work_dir.to_string_lossy().to_string()];
         tracing::info!(
-            "Creating bash executor with allowed working dirs: {:?}",
+            "Creating bash executor with allowed working dir: {:?}",
             allowed_dirs
         );
-        tracing::info!("PDF base path: {:?}", base_path);
-        let bash_perms = BashPermissions::minimal(vec!["pdftotext", "qpdf"])
+        let bash_perms = BashPermissions::minimal(vec!["pdftotext", "qpdf", "ls", "wc", "pwd"])
             .with_allowed_working_dirs(allowed_dirs);
         let bash_executor = BashExecutor::new(bash_perms, 120)?;
 
-        // Create tool executor with restricted bash
+        // Create tool executor with bash, base path is the temp directory
         let tool_executor = Arc::new(
             ToolExecutor::builder()
-                .base_path(base_path)
+                .base_path(work_dir.clone())
                 .bash_executor(Some(Box::new(bash_executor)))
                 .build(),
         );
 
-        let system_prompt = generate_system_prompt(&pdf_filename);
+        let system_prompt = generate_system_prompt(&pdf_filename, &work_dir, &txt_filename);
 
         Ok(Self {
             client,
@@ -102,9 +131,26 @@ impl<S: AgentStorage> PdfToTextAgent<S> {
             pdf_path,
             pdf_filename,
             system_prompt,
+            work_dir,
         })
     }
+}
 
+impl<S: AgentStorage> Drop for PdfToTextAgent<S> {
+    fn drop(&mut self) {
+        if let Err(e) = std::fs::remove_dir_all(&self.work_dir) {
+            tracing::warn!(
+                "Failed to clean up temp directory {:?}: {:?}",
+                self.work_dir,
+                e
+            );
+        } else {
+            tracing::info!("Cleaned up temp directory: {:?}", self.work_dir);
+        }
+    }
+}
+
+impl<S: AgentStorage> PdfToTextAgent<S> {
     async fn get_session(&self, session_id: i64) -> anyhow::Result<Session> {
         self.storage
             .get_session(session_id)
@@ -259,19 +305,33 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
 
     fn tools(&self) -> Vec<AgentTool> {
         vec![
-            AgentTool::Bash,      // Only pdftotext and qpdf commands allowed
-            AgentTool::ReadFile,  // Read extracted text
-            AgentTool::WriteFile, // Write cleaned results
+            AgentTool::Bash,              // Only pdftotext and qpdf commands allowed
+            AgentTool::ReadFile,          // Read extracted text
+            AgentTool::WriteFile,         // Write cleaned results
+            AgentTool::ConfirmExtraction, // Confirm extraction looks correct
         ]
     }
 
     async fn execute(&self, user_prompt: &str, session_id: i64) -> anyhow::Result<String> {
+        let txt_filename = format!(
+            "{}.txt",
+            self.pdf_filename
+                .strip_suffix(".pdf")
+                .unwrap_or(&self.pdf_filename)
+        );
+
+        let mut user_content = user_prompt.to_string();
+        user_content.push_str(&format!(
+            "\n\nNote: The PDF has already been pre-extracted to: {}\nYou can read this file to verify the extraction quality.",
+            txt_filename
+        ));
+
         // Create initial user message
         let user_message = StorageMessage {
             id: None,
             session_id,
             role: MessageRole::User,
-            content: user_prompt.to_string(),
+            content: user_content,
             created_at: chrono::Utc::now().timestamp(),
         };
         self.storage.create_message(user_message).await?;
@@ -358,18 +418,26 @@ impl<S: AgentStorage> Agent for PdfToTextAgent<S> {
 }
 
 /// Generate system prompt for PdfToTextAgent
-fn generate_system_prompt(pdf_filename: &str) -> String {
+fn generate_system_prompt(pdf_filename: &str, work_dir: &PathBuf, txt_filename: &str) -> String {
     format!(
         r#"You are a PDF text extraction specialist. Your task is to extract text from the PDF file "{}" and optionally clean and format the extracted text.
 
 You have access to these tools:
-1. bash - ONLY for running pdftotext and qpdf commands
+1. bash - ONLY for running pdftotext, qpdf, ls, wc, and pwd commands
 2. read_file - To read extracted text files
 3. write_file - To write cleaned results (optional)
+4. confirm_extraction - Confirm the extraction looks correct and complete the task
 
-# PDF File
+# PDF File and Current State
 
 The PDF file to process is: {}
+Working directory: {}
+
+**IMPORTANT**: The PDF and extracted text file are already present in the working directory:
+- PDF file: {}
+- Extracted text: {}
+
+You should first read the extracted text to verify it looks correct. If you need to extract specific pages or re-extract with different options, you can use pdftotext or qpdf.
 
 # Available Commands
 
@@ -412,14 +480,21 @@ Examples:
 - Extract pages 2,4,6: qpdf {} --pages . 2,4,6 -- selected_pages.pdf
 - Extract last 3 pages: qpdf {} --pages . r3-r1 -- last_3_pages.pdf
 
+## ls, wc, pwd - File and directory commands
+
+- ls: List files in the current directory
+- wc: Count lines, words, and bytes in a file
+- pwd: Show the current working directory
+
 # Workflow
 
-## Simple extraction (most common):
-1. Run: pdftotext -layout {} output.txt
-2. Read: output.txt
-3. Present the extracted text to the user
+## Default workflow (most common):
+1. Read the pre-extracted text file: {}
+2. Verify the extraction looks correct
+3. If satisfied, use confirm_extraction to complete the task
+4. Present the extracted text to the user
 
-## Extract specific pages (if user requests):
+## Re-extract with different options (if user requests):
 Option A: Use pdftotext -f and -l flags directly
 1. Run: pdftotext -layout -f 1 -l 5 {} output.txt
 2. Read: output.txt
@@ -432,50 +507,60 @@ Option B: Use qpdf first, then pdftotext
 4. Present the extracted text
 
 ## Clean and format (if user requests):
-1. Extract text using pdftotext
-2. Read the output file
-3. Analyze and clean the text:
-   - Fix common extraction errors
-   - Improve formatting and structure
-   - Remove artifacts or noise
-   - Preserve intended structure (tables, paragraphs, lists)
-4. Present cleaned text to user
-5. Optionally write cleaned result to a file if requested
+1. Read the pre-extracted text file
+2. Analyze and clean the text:
+    - Fix common extraction errors
+    - Improve formatting and structure
+    - Remove artifacts or noise
+    - Preserve intended structure (tables, paragraphs, lists)
+3. Present cleaned text to user
+4. Optionally write cleaned result to a file if requested
+5. Use confirm_extraction to complete the task
 
 # Example Interactions
 
 User: "Extract text from this PDF"
-1. Run: pdftotext -layout {} output.txt
-2. Read: output.txt
-3. Present the extracted text
+1. Read: {}
+2. Verify extraction quality
+3. Use confirm_extraction
+4. Present the extracted text
 
 User: "Extract text from pages 1-10"
 1. Run: pdftotext -layout -f 1 -l 10 {} output.txt
 2. Read: output.txt
-3. Present the extracted text
+3. Use confirm_extraction
+4. Present the extracted text
 
 User: "Extract and clean the text from pages 5-15"
 1. Run: pdftotext -layout -f 5 -l 15 {} output.txt
 2. Read: output.txt
 3. Analyze and clean the text
-4. Present cleaned text to user
+4. Use confirm_extraction
+5. Present cleaned text to user
 
 User: "Extract page 3 only"
 1. Run: pdftotext -layout -f 3 -l 3 {} page_3.txt
 2. Read: page_3.txt
-3. Present the extracted text
+3. Use confirm_extraction
+4. Present the extracted text
 
 # Important Notes
 
-- You can ONLY run pdftotext and qpdf commands (no other bash commands will work)
+- You can ONLY run pdftotext, qpdf, ls, wc, and pwd commands (no other bash commands will work)
+- The working directory is: {}
 - The PDF file is: {}
+- The pre-extracted text file is: {}
 - ALWAYS use -layout flag with pdftotext to preserve formatting (unless user explicitly asks not to)
 - pdftotext creates output files automatically (don't need to redirect with >)
 - Page numbers start at 1
 - For page extraction, using pdftotext -f/-l is usually simpler than qpdf
 - Use qpdf when you need complex page selection (e.g., non-contiguous pages like 1,5,10)
+- Use confirm_extraction when you are satisfied with the extracted text to complete the task
 "#,
         pdf_filename,
+        work_dir.display(),
+        pdf_filename,
+        txt_filename,
         pdf_filename,
         pdf_filename,
         pdf_filename,
@@ -491,8 +576,10 @@ User: "Extract page 3 only"
         pdf_filename,
         pdf_filename,
         pdf_filename,
+        txt_filename,
+        work_dir.display(),
         pdf_filename,
-        pdf_filename
+        txt_filename
     )
 }
 

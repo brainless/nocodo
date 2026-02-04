@@ -21,7 +21,9 @@ pub use grep::{GrepMatch, GrepRequest, GrepResponse};
 #[cfg(feature = "sqlite")]
 pub use hackernews::{DownloadState, FetchMode, HackerNewsRequest, HackerNewsResponse, StoryType};
 pub use imap::{ImapOperation, ImapReaderRequest, ImapReaderResponse, SearchCriteria};
-pub use pdftotext::{PdfToTextRequest, PdfToTextResponse};
+pub use pdftotext::{
+    ConfirmExtractionRequest, ConfirmExtractionResponse, PdfToTextRequest, PdfToTextResponse,
+};
 #[cfg(feature = "sqlite")]
 pub use sqlite_reader::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 

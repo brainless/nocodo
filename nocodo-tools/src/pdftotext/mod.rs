@@ -1,5 +1,7 @@
 use crate::tool_error::ToolError;
-use crate::types::{PdfToTextRequest, PdfToTextResponse};
+use crate::types::{
+    ConfirmExtractionRequest, ConfirmExtractionResponse, PdfToTextRequest, PdfToTextResponse,
+};
 use std::path::Path;
 use std::process::Command;
 
@@ -89,17 +91,22 @@ pub fn execute_pdftotext(request: PdfToTextRequest) -> Result<PdfToTextResponse,
             output_path: Some(output_path.clone()),
             bytes_written: Some(bytes_written),
             success: true,
-            message: format!("Successfully wrote {} bytes to {}", bytes_written, output_path),
+            message: format!(
+                "Successfully wrote {} bytes to {}",
+                bytes_written, output_path
+            ),
         })
     }
 }
 
 /// Verify that pdftotext is installed
 pub fn verify_pdftotext_installation() -> anyhow::Result<String> {
-    let output = Command::new("pdftotext")
-        .arg("-v")
-        .output()
-        .map_err(|e| anyhow::anyhow!("Failed to execute 'pdftotext -v'. Is pdftotext installed? Error: {}", e))?;
+    let output = Command::new("pdftotext").arg("-v").output().map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to execute 'pdftotext -v'. Is pdftotext installed? Error: {}",
+            e
+        )
+    })?;
 
     // pdftotext -v outputs to stderr
     let version_info = String::from_utf8_lossy(&output.stderr).to_string();
@@ -116,7 +123,12 @@ pub fn verify_qpdf_installation() -> anyhow::Result<String> {
     let output = Command::new("qpdf")
         .arg("--version")
         .output()
-        .map_err(|e| anyhow::anyhow!("Failed to execute 'qpdf --version'. Is qpdf installed? Error: {}", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to execute 'qpdf --version'. Is qpdf installed? Error: {}",
+                e
+            )
+        })?;
 
     if !output.status.success() {
         anyhow::bail!(
@@ -128,6 +140,40 @@ pub fn verify_qpdf_installation() -> anyhow::Result<String> {
     let version_info = String::from_utf8_lossy(&output.stdout).to_string();
 
     Ok(version_info)
+}
+
+/// Check if a PDF is a single page
+pub fn is_single_page_pdf(pdf_path: &Path) -> anyhow::Result<bool> {
+    let output = Command::new("qpdf")
+        .arg("--show-npages")
+        .arg(pdf_path)
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to execute qpdf to check page count: {}", e))?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "qpdf --show-npages failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let page_count_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let page_count: u32 = page_count_str
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Failed to parse page count '{}': {}", page_count_str, e))?;
+
+    Ok(page_count == 1)
+}
+
+/// Execute confirm_extraction - confirms the PDF text extraction looks correct
+pub fn execute_confirm_extraction(
+    _request: ConfirmExtractionRequest,
+) -> Result<ConfirmExtractionResponse, ToolError> {
+    Ok(ConfirmExtractionResponse {
+        success: true,
+        message: "PDF text extraction confirmed. The extraction looks correct with no errors."
+            .to_string(),
+    })
 }
 
 #[cfg(test)]
