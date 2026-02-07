@@ -32,6 +32,9 @@ pub enum ToolRequest {
     PdfToText(super::pdftotext::PdfToTextRequest),
     #[serde(rename = "confirm_extraction")]
     ConfirmExtraction(super::pdftotext::ConfirmExtractionRequest),
+    #[cfg(feature = "postgres")]
+    #[serde(rename = "postgres_reader")]
+    PostgresReader(super::postgres_reader::PostgresReaderRequest),
 }
 
 /// Tool response enum containing all possible tool results
@@ -64,6 +67,9 @@ pub enum ToolResponse {
     PdfToText(super::pdftotext::PdfToTextResponse),
     #[serde(rename = "confirm_extraction")]
     ConfirmExtraction(super::pdftotext::ConfirmExtractionResponse),
+    #[cfg(feature = "postgres")]
+    #[serde(rename = "postgres_reader")]
+    PostgresReader(super::postgres_reader::PostgresReaderResponse),
     #[serde(rename = "error")]
     Error(ToolErrorResponse),
 }

@@ -29,6 +29,59 @@ pub fn create_tool_definitions() -> Vec<Tool> {
         sqlite_schema,
     ).expect("Failed to create sqlite3_reader tool schema");
 
+    #[cfg(feature = "postgres")]
+    let postgres_schema = serde_json::json!({
+        "type": "object",
+        "required": ["mode"],
+        "properties": {
+            "mode": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": ["type", "query"],
+                        "properties": {
+                            "type": {"const": "query"},
+                            "query": {
+                                "type": "string",
+                                "description": "SQL SELECT query to execute. Only SELECT queries are allowed. For schema information, use reflect mode instead."
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": ["type", "target"],
+                        "properties": {
+                            "type": {"const": "reflect"},
+                            "target": {
+                                "type": "string",
+                                "description": "Reflection target: 'schema' (list schemas), 'tables' (list tables), 'table_info' (column details, requires table_name), 'indexes' (list indexes), 'views' (list views), 'foreign_keys' (FK relationships, requires table_name), 'constraints' (all constraints, requires table_name), 'stats' (table statistics)"
+                            },
+                            "schema_name": {
+                                "type": "string",
+                                "description": "Schema name to query (defaults to 'public')"
+                            },
+                            "table_name": {
+                                "type": "string",
+                                "description": "Specific table name (required for table_info, foreign_keys, and constraints targets)"
+                            }
+                        }
+                    }
+                ]
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of rows to return. Defaults to 100, maximum 1000."
+            }
+        }
+    });
+
+    #[cfg(feature = "postgres")]
+    let postgres_tool = Tool::from_json_schema(
+        "postgres_reader".to_string(),
+        "Read-only PostgreSQL database tool. Use SELECT queries to retrieve data or reflection mode to inspect schema. Reflection targets: schema (list schemas), tables (list tables), table_info (column info), indexes, views, foreign_keys, constraints, stats. The connection string is pre-configured.".to_string(),
+        postgres_schema,
+    ).expect("Failed to create postgres_reader tool schema");
+
     let imap_schema = serde_json::json!({
         "type": "object",
         "required": ["operation"],
@@ -212,6 +265,8 @@ pub fn create_tool_definitions() -> Vec<Tool> {
             .build(),
         #[cfg(feature = "sqlite")]
         sqlite_tool,
+        #[cfg(feature = "postgres")]
+        postgres_tool,
         imap_tool,
         pdftotext_tool,
         confirm_extraction_tool,

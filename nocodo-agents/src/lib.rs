@@ -3,6 +3,8 @@ pub mod config;
 pub mod factory;
 pub mod imap_email;
 pub mod pdftotext;
+#[cfg(feature = "postgres")]
+pub mod postgres_reader;
 pub mod requirements_gathering;
 pub mod settings_management;
 #[cfg(feature = "sqlite")]
@@ -31,6 +33,8 @@ pub enum AgentTool {
     AskUser,
     #[cfg(feature = "sqlite")]
     Sqlite3Reader,
+    #[cfg(feature = "postgres")]
+    PostgresReader,
     ImapReader,
     PdfToText,
     ConfirmExtraction,
@@ -49,6 +53,8 @@ impl AgentTool {
             AgentTool::AskUser => "ask_user",
             #[cfg(feature = "sqlite")]
             AgentTool::Sqlite3Reader => "sqlite3_reader",
+            #[cfg(feature = "postgres")]
+            AgentTool::PostgresReader => "postgres_reader",
             AgentTool::ImapReader => "imap_reader",
             AgentTool::PdfToText => "pdftotext",
             AgentTool::ConfirmExtraction => "confirm_extraction",
@@ -116,6 +122,27 @@ impl AgentTool {
                     limit,
                 })
             }
+            #[cfg(feature = "postgres")]
+            "postgres_reader" => {
+                let value: serde_json::Value = arguments;
+
+                let mode_value = value
+                    .get("mode")
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'mode' field in postgres_reader call"))?;
+
+                let mode = serde_json::from_value::<nocodo_tools::types::PostgresMode>(mode_value.clone())?;
+
+                let limit = value
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+
+                ToolRequest::PostgresReader(nocodo_tools::types::PostgresReaderRequest {
+                    connection_string: String::new(),
+                    mode,
+                    limit,
+                })
+            }
             "imap_reader" => {
                 let req: nocodo_tools::types::imap::ImapReaderRequest =
                     serde_json::from_value(arguments)?;
@@ -155,6 +182,8 @@ pub fn format_tool_response(response: &nocodo_tools::types::ToolResponse) -> Str
         ToolResponse::Sqlite3Reader(r) => r.formatted_output.clone(),
         #[cfg(feature = "sqlite")]
         ToolResponse::HackerNewsResponse(r) => r.message.clone(),
+        #[cfg(feature = "postgres")]
+        ToolResponse::PostgresReader(r) => r.formatted_output.clone(),
         ToolResponse::ImapReader(r) => {
             if r.success {
                 format!(

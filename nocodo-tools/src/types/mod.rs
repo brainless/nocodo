@@ -6,6 +6,8 @@ pub mod grep;
 pub mod hackernews;
 pub mod imap;
 pub mod pdftotext;
+#[cfg(feature = "postgres")]
+pub mod postgres_reader;
 #[cfg(feature = "sqlite")]
 pub mod sqlite_reader;
 
@@ -24,6 +26,8 @@ pub use imap::{ImapOperation, ImapReaderRequest, ImapReaderResponse, SearchCrite
 pub use pdftotext::{
     ConfirmExtractionRequest, ConfirmExtractionResponse, PdfToTextRequest, PdfToTextResponse,
 };
+#[cfg(feature = "postgres")]
+pub use postgres_reader::{PostgresMode, PostgresReaderRequest, PostgresReaderResponse};
 #[cfg(feature = "sqlite")]
 pub use sqlite_reader::{Sqlite3ReaderRequest, Sqlite3ReaderResponse, SqliteMode};
 

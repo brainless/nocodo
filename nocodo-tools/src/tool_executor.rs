@@ -12,6 +12,8 @@ use crate::grep;
 use crate::hackernews;
 use crate::imap;
 use crate::pdftotext;
+#[cfg(feature = "postgres")]
+use crate::postgres_reader;
 #[cfg(feature = "sqlite")]
 use crate::sqlite_reader;
 use crate::user_interaction;
@@ -97,6 +99,10 @@ impl ToolExecutor {
             ToolRequest::ConfirmExtraction(req) => pdftotext::execute_confirm_extraction(req)
                 .map(ToolResponse::ConfirmExtraction)
                 .map_err(|e| anyhow::anyhow!(e)),
+            #[cfg(feature = "postgres")]
+            ToolRequest::PostgresReader(req) => postgres_reader::execute_postgres_reader(req)
+                .await
+                .map_err(|e| anyhow::anyhow!(e)),
         }
     }
 
@@ -121,6 +127,8 @@ impl ToolExecutor {
             ToolResponse::ImapReader(response) => serde_json::to_value(response)?,
             ToolResponse::PdfToText(response) => serde_json::to_value(response)?,
             ToolResponse::ConfirmExtraction(response) => serde_json::to_value(response)?,
+            #[cfg(feature = "postgres")]
+            ToolResponse::PostgresReader(response) => serde_json::to_value(response)?,
             ToolResponse::Error(response) => serde_json::to_value(response)?,
         };
 

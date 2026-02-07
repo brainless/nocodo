@@ -5,6 +5,8 @@ pub mod grep;
 pub mod hackernews;
 pub mod imap;
 pub mod pdftotext;
+#[cfg(feature = "postgres")]
+pub mod postgres_reader;
 #[cfg(feature = "sqlite")]
 pub mod sqlite_reader;
 pub mod tool_error;
