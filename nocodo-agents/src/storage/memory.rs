@@ -113,10 +113,7 @@ impl AgentStorage for InMemoryStorage {
             .unwrap_or_default())
     }
 
-    async fn get_pending_tool_calls(
-        &self,
-        session_id: i64,
-    ) -> Result<Vec<ToolCall>, StorageError> {
+    async fn get_pending_tool_calls(&self, session_id: i64) -> Result<Vec<ToolCall>, StorageError> {
         Ok(self
             .tool_calls
             .lock()

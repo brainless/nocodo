@@ -158,7 +158,10 @@ impl<S: AgentStorage> TesseractAgent<S> {
             completed_at: None,
             error_details: None,
         };
-        let call_id = self.storage.create_tool_call(tool_call_record.clone()).await?;
+        let call_id = self
+            .storage
+            .create_tool_call(tool_call_record.clone())
+            .await?;
         tool_call_record.id = Some(call_id);
 
         // 3. Execute tool

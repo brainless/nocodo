@@ -2,6 +2,10 @@ use super::types::*;
 use crate::error::LlmError;
 use crate::tools::ProviderToolFormat;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static LOGGED_TOOL_DEFS: AtomicBool = AtomicBool::new(false);
+static LOGGED_SYSTEM_PROMPT: AtomicBool = AtomicBool::new(false);
 
 /// Google Gemini API client
 pub struct GeminiClient {
@@ -19,6 +23,7 @@ impl GeminiClient {
 
         let http_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(300))
+            .no_proxy()
             .build()
             .map_err(|e| LlmError::Network { source: e })?;
 
@@ -51,12 +56,15 @@ impl GeminiClient {
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         if should_log_payloads() {
-            if let Ok(payload) = serde_json::to_string_pretty(&request) {
-                tracing::debug!(
-                    target: "nocodo_llm_sdk::gemini",
-                    "Gemini request payload: {}",
-                    truncate_payload(&payload)
-                );
+            if let Ok(mut payload) = serde_json::to_value(&request) {
+                maybe_redact_tools(&mut payload);
+                if let Ok(payload) = serde_json::to_string_pretty(&payload) {
+                    tracing::debug!(
+                        target: "nocodo_llm_sdk::gemini",
+                        "Gemini request payload: {}",
+                        truncate_payload(&payload)
+                    );
+                }
             }
         }
 
@@ -138,6 +146,34 @@ fn truncate_payload(payload: &str) -> String {
         let mut truncated = payload[..MAX_LEN].to_string();
         truncated.push_str("\n...<truncated>...");
         truncated
+    }
+}
+
+fn maybe_redact_tools(payload: &mut serde_json::Value) {
+    let Some(obj) = payload.as_object_mut() else { return };
+    if obj.get("tools").is_some() {
+        let already_logged = LOGGED_TOOL_DEFS.load(Ordering::Relaxed);
+        if already_logged {
+            obj.insert("tools".to_string(), serde_json::Value::String("<omitted>".to_string()));
+            obj.insert(
+                "toolConfig".to_string(),
+                serde_json::Value::String("<omitted>".to_string()),
+            );
+        } else {
+            LOGGED_TOOL_DEFS.store(true, Ordering::Relaxed);
+        }
+    }
+
+    if obj.get("systemInstruction").is_some() {
+        let already_logged = LOGGED_SYSTEM_PROMPT.load(Ordering::Relaxed);
+        if already_logged {
+            obj.insert(
+                "systemInstruction".to_string(),
+                serde_json::Value::String("<omitted>".to_string()),
+            );
+        } else {
+            LOGGED_SYSTEM_PROMPT.store(true, Ordering::Relaxed);
+        }
     }
 }
 
