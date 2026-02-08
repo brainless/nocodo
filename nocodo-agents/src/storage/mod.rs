@@ -17,8 +17,7 @@ pub trait AgentStorage: Send + Sync {
     async fn create_tool_call(&self, tool_call: ToolCall) -> Result<i64, StorageError>;
     async fn update_tool_call(&self, tool_call: ToolCall) -> Result<(), StorageError>;
     async fn get_tool_calls(&self, session_id: i64) -> Result<Vec<ToolCall>, StorageError>;
-    async fn get_pending_tool_calls(&self, session_id: i64)
-        -> Result<Vec<ToolCall>, StorageError>;
+    async fn get_pending_tool_calls(&self, session_id: i64) -> Result<Vec<ToolCall>, StorageError>;
 }
 
 #[derive(Debug, thiserror::Error)]

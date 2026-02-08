@@ -31,6 +31,7 @@ serde_json = "1.0"
 tempfile = "3.0"
 thiserror = { workspace = true }
 uuid = { version = "1.0", features = ["v4"] }
+url = "2.5"
 
 [dev-dependencies]
 tempfile = "3.0"
@@ -38,6 +39,7 @@ tempfile = "3.0"
 [features]
 default = []
 sqlite = ["nocodo-tools/sqlite"]
+postgres = ["nocodo-tools/postgres"]
 
 [[bin]]
 name = "codebase-analysis-runner"
@@ -59,6 +61,7 @@ path = "bin/requirements_gathering_runner.rs"
 [[bin]]
 name = "settings-management-runner"
 path = "bin/settings_management_runner.rs"
+required-features = ["sqlite"]
 
 [[bin]]
 name = "imap-email-runner"
@@ -67,3 +70,8 @@ path = "bin/imap_email_runner.rs"
 [[bin]]
 name = "pdftotext-runner"
 path = "bin/pdftotext_runner.rs"
+
+[[bin]]
+name = "postgres-reader-runner"
+path = "bin/postgres_reader_runner.rs"
+required-features = ["postgres"]

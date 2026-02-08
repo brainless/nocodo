@@ -1,6 +1,8 @@
 use crate::codebase_analysis::CodebaseAnalysisAgent;
 use crate::requirements_gathering::UserClarificationAgent;
 use crate::settings_management::SettingsManagementAgent;
+#[cfg(feature = "postgres")]
+use crate::postgres_reader::PostgresReaderAgent;
 #[cfg(feature = "sqlite")]
 use crate::sqlite_reader::SqliteReaderAgent;
 use crate::storage::{AgentStorage, InMemoryStorage};
@@ -273,6 +275,30 @@ pub async fn create_sqlite_reader_agent(
 ) -> anyhow::Result<SqliteReaderAgent<InMemoryStorage>> {
     let storage = Arc::new(InMemoryStorage::new());
     let agent = SqliteReaderAgent::new(client, storage, tool_executor, db_path).await?;
+    Ok(agent)
+}
+
+/// Create a PostgresReaderAgent with tool executor support
+///
+/// Uses in-memory storage by default for session persistence
+///
+/// # Arguments
+///
+/// * `client` - The LLM client to use for the agent
+/// * `tool_executor` - Tool executor for running tools
+/// * `connection_string` - PostgreSQL connection string (postgresql://user:password@host:port/database)
+///
+/// # Returns
+///
+/// A PostgresReaderAgent instance
+#[cfg(feature = "postgres")]
+pub async fn create_postgres_reader_agent(
+    client: Arc<dyn LlmClient>,
+    tool_executor: Arc<ToolExecutor>,
+    connection_string: String,
+) -> anyhow::Result<PostgresReaderAgent<InMemoryStorage>> {
+    let storage = Arc::new(InMemoryStorage::new());
+    let agent = PostgresReaderAgent::new(client, storage, tool_executor, connection_string).await?;
     Ok(agent)
 }
 
