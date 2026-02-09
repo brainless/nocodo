@@ -13,6 +13,8 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Gemini support**: Google Gemini 3 Pro and Flash with reasoning capabilities
 - **Grok support**: xAI and Zen (free) Grok integration with OpenAI-compatible API
 - **GLM support**: Cerebras GLM models with OpenAI-compatible API
+- **Ollama support**: Local models via Ollama `/api/chat`
+- **llama.cpp support**: Local models via OpenAI-compatible API
 - **Zen provider**: Free access to select models during beta
 - **OpenAI support**: GPT models including GPT-5 with Chat Completions API
 - **Voyage AI support**: Text embeddings with multiple specialized models
@@ -195,6 +197,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Usage: {} input tokens, {} output tokens",
         response.usage.prompt_tokens, response.usage.completion_tokens
     );
+    Ok(())
+}
+```
+
+### Ollama (Local)
+
+```rust
+use nocodo_llm_sdk::ollama::OllamaClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Defaults to http://localhost:11434
+    let client = OllamaClient::new()?;
+
+    let response = client
+        .message_builder()
+        .model("llama3.1")
+        .user_message("Hello from Ollama!")
+        .send()
+        .await?;
+
+    println!("Ollama: {}", response.message.content);
+    Ok(())
+}
+```
+
+### llama.cpp (Local)
+
+```rust
+use nocodo_llm_sdk::llama_cpp::LlamaCppClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Defaults to http://localhost:8080
+    let client = LlamaCppClient::new()?;
+
+    let response = client
+        .message_builder()
+        .model("gpt-3.5-turbo")
+        .user_message("Hello from llama.cpp!")
+        .send()
+        .await?;
+
+    println!("llama.cpp: {}", response.choices[0].message.content.clone().unwrap_or_default());
     Ok(())
 }
 ```
@@ -604,6 +650,19 @@ See `examples/tool_calling_*.rs` for complete examples.
 - `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
 - `message_builder() -> OpenAIMessageBuilder`: Start building a message request
 
+### OllamaClient
+
+- `new() -> Result<Self>`: Create a new client (no API key required)
+- `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
+- `message_builder() -> OllamaMessageBuilder`: Start building a message request
+
+### LlamaCppClient
+
+- `new() -> Result<Self>`: Create a new client (no API key required)
+- `with_api_key(api_key: impl Into<String>) -> Self`: Set optional API key
+- `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
+- `message_builder() -> LlamaCppMessageBuilder`: Start building a message request
+
 ### MessageBuilder (Claude, Grok & GLM)
 
 - `model(model: impl Into<String>) -> Self`: Set the model
@@ -699,6 +758,10 @@ This SDK is in active development. v0.1 provides Claude and Grok support with a 
   - Models: grok-code-fast-1, grok-beta, grok-vision-beta
 - **GLM** (Cerebras): OpenAI-compatible API
   - Models: zai-glm-4.6, llama-3.3-70b
+- **Ollama** (Local): `/api/chat` endpoint
+  - Models: local models installed in Ollama
+- **llama.cpp** (Local): OpenAI-compatible API
+  - Models: local models served by llama-server
 - **OpenAI**: Chat Completions and Responses API
   - Models: gpt-4o, gpt-4o-mini, gpt-5.1, gpt-5-codex
 - **Voyage AI**: Text embeddings
