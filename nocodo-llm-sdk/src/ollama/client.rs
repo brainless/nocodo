@@ -48,6 +48,13 @@ impl OllamaClient {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
+        // Debug: log the request if env var is set
+        if std::env::var("NOCODO_LLM_LOG_PAYLOADS").is_ok() {
+            if let Ok(json_str) = serde_json::to_string_pretty(&request) {
+                eprintln!("=== Ollama Request ===\n{}\n=== End Request ===", json_str);
+            }
+        }
+
         let response = self
             .http_client
             .post(&url)
@@ -64,6 +71,14 @@ impl OllamaClient {
                 .json()
                 .await
                 .map_err(|e| LlmError::internal(format!("Failed to parse response: {}", e)))?;
+
+            // Debug: log the response if env var is set
+            if std::env::var("NOCODO_LLM_LOG_PAYLOADS").is_ok() {
+                if let Ok(json_str) = serde_json::to_string_pretty(&ollama_response) {
+                    eprintln!("=== Ollama Response ===\n{}\n=== End Response ===", json_str);
+                }
+            }
+
             Ok(ollama_response)
         } else {
             let error_text = response
@@ -97,7 +112,18 @@ impl crate::client::LlmClient for OllamaClient {
         &self,
         request: crate::types::CompletionRequest,
     ) -> Result<crate::types::CompletionResponse, LlmError> {
-        let messages = request
+        let mut messages = Vec::new();
+
+        // Add system message first if provided
+        if let Some(system_prompt) = request.system {
+            messages.push(crate::ollama::types::OllamaMessage::new(
+                OllamaRole::System,
+                system_prompt,
+            ));
+        }
+
+        // Convert and append the rest of the messages
+        let converted_messages = request
             .messages
             .into_iter()
             .map(|msg| {
@@ -123,6 +149,8 @@ impl crate::client::LlmClient for OllamaClient {
             })
             .collect::<Result<Vec<crate::ollama::types::OllamaMessage>, LlmError>>()?;
 
+        messages.extend(converted_messages);
+
         let mut options = crate::ollama::types::OllamaOptions::default();
         let mut has_options = false;
 
@@ -146,7 +174,26 @@ impl crate::client::LlmClient for OllamaClient {
         let tools = request.tools.as_ref().map(|tools| {
             tools
                 .iter()
-                .map(crate::ollama::tools::OllamaToolFormat::to_provider_tool)
+                .map(|tool| {
+                    use crate::ollama::tools::OllamaToolFormat;
+                    use crate::tools::ProviderToolFormat;
+
+                    let mut ollama_tool = OllamaToolFormat::to_provider_tool(tool);
+
+                    // Strip $schema field from parameters as it causes issues with Ollama
+                    // Convert RootSchema to Value, remove $schema, and convert back
+                    let params_value = serde_json::to_value(&ollama_tool.function.parameters)
+                        .unwrap_or(serde_json::json!({}));
+
+                    if let Some(mut params_obj) = params_value.as_object().cloned() {
+                        params_obj.remove("$schema");
+                        if let Ok(cleaned_schema) = serde_json::from_value(serde_json::Value::Object(params_obj)) {
+                            ollama_tool.function.parameters = cleaned_schema;
+                        }
+                    }
+
+                    ollama_tool
+                })
                 .collect::<Vec<_>>()
         });
 
@@ -161,7 +208,7 @@ impl crate::client::LlmClient for OllamaClient {
             tools,
             format,
             options: if has_options { Some(options) } else { None },
-            stream: None,
+            stream: Some(false), // Explicitly disable streaming to get a single JSON response
             think: None,
             keep_alive: None,
             logprobs: None,
