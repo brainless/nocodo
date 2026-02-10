@@ -22,3 +22,9 @@ pub const VOYAGE: &str = "voyage";
 
 /// Google (Gemini models)
 pub const GOOGLE: &str = "google";
+
+/// Ollama local provider
+pub const OLLAMA: &str = "ollama";
+
+/// llama.cpp local provider
+pub const LLAMA_CPP: &str = "llama_cpp";

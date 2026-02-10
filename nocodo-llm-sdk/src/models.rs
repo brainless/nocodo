@@ -188,5 +188,15 @@ pub mod gemini {
     pub const GEMINI_3_FLASH: &str = GEMINI_3_FLASH_ID;
 }
 
+/// Ollama local model constants
+pub mod ollama {
+    /// Ministral 3 3B (Ollama)
+    pub const MINISTRAL_3_3B_ID: &str = "ministral-3:3b";
+    pub const MINISTRAL_3_3B_NAME: &str = "Ministral 3 3B";
+
+    // Backwards compatibility
+    pub const MINISTRAL_3_3B: &str = MINISTRAL_3_3B_ID;
+}
+
 // Re-export for convenience
 pub use claude::*;

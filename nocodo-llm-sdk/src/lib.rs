@@ -151,8 +151,10 @@ pub mod error;
 pub mod gemini;
 pub mod glm;
 pub mod grok;
+pub mod llama_cpp;
 pub mod model_metadata;
 pub mod models;
+pub mod ollama;
 pub mod openai;
 pub mod providers;
 pub mod tools;
@@ -165,6 +167,8 @@ pub use glm::cerebras::CerebrasGlmClient;
 pub use glm::zen::ZenGlmClient;
 pub use grok::xai::XaiGrokClient;
 pub use grok::zen::ZenGrokClient;
+pub use llama_cpp::LlamaCppClient;
+pub use ollama::OllamaClient;
 
 // Tool exports
 pub use tools::{Tool, ToolCall, ToolChoice, ToolResult};
