@@ -208,6 +208,36 @@ pub fn get_all_models() -> Vec<ModelMetadata> {
             default_max_tokens: Some(8192),
             default_thinking_level: None,
         },
+        ModelMetadata {
+            provider: providers::OPENAI,
+            model_id: models::openai::GPT_5_NANO_ID,
+            name: models::openai::GPT_5_NANO_NAME,
+            context_length: 400_000,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.00000005), // $0.050 per million
+            output_cost_per_token: Some(0.0000004), // $0.400 per million
+            default_temperature: Some(1.0),
+            default_max_tokens: Some(4096),
+            default_thinking_level: None,
+        },
+        ModelMetadata {
+            provider: providers::OPENAI,
+            model_id: models::openai::GPT_5_MINI_ID,
+            name: models::openai::GPT_5_MINI_NAME,
+            context_length: 400_000,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            supports_vision: true,
+            supports_reasoning: true,
+            input_cost_per_token: Some(0.00000025), // $0.25 per million
+            output_cost_per_token: Some(0.000002), // $2.00 per million
+            default_temperature: Some(1.0),
+            default_max_tokens: Some(4096),
+            default_thinking_level: None,
+        },
         // xAI/Grok models
         ModelMetadata {
             provider: providers::XAI,

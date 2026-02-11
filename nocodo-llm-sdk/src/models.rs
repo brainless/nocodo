@@ -68,6 +68,16 @@ pub mod openai {
     pub const GPT_5_1_ID: &str = "gpt-5.1";
     pub const GPT_5_1_NAME: &str = "GPT-5.1";
 
+    /// GPT-5 nano - Compact GPT-5 model
+    /// Released: 2025-08-07
+    pub const GPT_5_NANO_ID: &str = "gpt-5-nano-2025-08-07";
+    pub const GPT_5_NANO_NAME: &str = "GPT-5 nano";
+
+    /// GPT-5 mini - Small GPT-5 model
+    /// Released: 2025-08-07
+    pub const GPT_5_MINI_ID: &str = "gpt-5-mini-2025-08-07";
+    pub const GPT_5_MINI_NAME: &str = "GPT-5 mini";
+
     // Backwards compatibility
     pub const GPT_4O: &str = GPT_4O_ID;
     pub const GPT_4O_MINI: &str = GPT_4O_MINI_ID;
@@ -76,6 +86,8 @@ pub mod openai {
     pub const GPT_3_5_TURBO: &str = GPT_3_5_TURBO_ID;
     pub const GPT_5_CODEX: &str = GPT_5_CODEX_ID;
     pub const GPT_5_1: &str = GPT_5_1_ID;
+    pub const GPT_5_NANO: &str = GPT_5_NANO_ID;
+    pub const GPT_5_MINI: &str = GPT_5_MINI_ID;
 }
 
 /// xAI/Grok model constants
