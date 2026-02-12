@@ -114,7 +114,7 @@ pub struct OpenAIChatCompletionRequest {
     pub reasoning_effort: Option<String>,
     /// Available tools for the model to use
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<OpenAIResponseTool>>,
+    pub tools: Option<Vec<OpenAITool>>,
     /// Tool choice strategy
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,

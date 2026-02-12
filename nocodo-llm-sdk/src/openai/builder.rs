@@ -5,7 +5,7 @@ use crate::{
         tools::{OpenAIResponseToolFormat, OpenAIToolFormat},
         types::{
             OpenAIChatCompletionRequest, OpenAIMessage, OpenAIResponseFormat,
-            OpenAIResponseRequest, OpenAIResponseTool, OpenAIRole,
+            OpenAIResponseRequest, OpenAIResponseTool, OpenAITool, OpenAIRole,
         },
     },
     tools::{ProviderToolFormat, Tool, ToolChoice, ToolResult},
@@ -23,7 +23,7 @@ pub struct OpenAIMessageBuilder<'a> {
     stop: Option<Vec<String>>,
     stream: Option<bool>,
     reasoning_effort: Option<String>,
-    tools: Option<Vec<OpenAIResponseTool>>,
+    tools: Option<Vec<OpenAITool>>,
     tool_choice: Option<serde_json::Value>,
     parallel_tool_calls: Option<bool>,
     response_format: Option<OpenAIResponseFormat>,
@@ -143,7 +143,7 @@ impl<'a> OpenAIMessageBuilder<'a> {
     /// Add a tool to the request
     pub fn tool(mut self, tool: Tool) -> Self {
         let tools = self.tools.get_or_insert_with(Vec::new);
-        tools.push(OpenAIResponseToolFormat::to_response_tool(&tool));
+        tools.push(OpenAIToolFormat::to_provider_tool(&tool));
         self
     }
 

@@ -3,10 +3,14 @@ use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
     error::LlmError,
-    openai::types::{
-        OpenAIChatCompletionRequest, OpenAIChatCompletionResponse, OpenAIErrorResponse,
-        OpenAIResponseRequest, OpenAIResponseResponse,
+    openai::{
+        tools::{OpenAIResponseToolFormat, OpenAIToolFormat},
+        types::{
+            OpenAIChatCompletionRequest, OpenAIChatCompletionResponse, OpenAIErrorResponse,
+            OpenAIResponseRequest, OpenAIResponseResponse,
+        },
     },
+    tools::ProviderToolFormat,
 };
 
 /// OpenAI LLM client
@@ -306,11 +310,23 @@ impl crate::client::LlmClient for OpenAIClient {
         &self,
         request: crate::types::CompletionRequest,
     ) -> Result<crate::types::CompletionResponse, LlmError> {
+        let crate::types::CompletionRequest {
+            messages,
+            max_tokens,
+            model,
+            system,
+            temperature,
+            top_p,
+            stop_sequences,
+            tools,
+            tool_choice,
+            response_format,
+        } = request;
+
         // Check if this is a GPT-5.1-Codex model that should use Responses API
-        if request.model.starts_with("gpt-5.1-codex") || request.model.starts_with("gpt-5.1") {
+        if model.starts_with("gpt-5.1-codex") || model.starts_with("gpt-5.1") {
             // Use Responses API for GPT-5.1 models
-            let input = request
-                .messages
+            let mut input = messages
                 .into_iter()
                 .map(|msg| {
                     // For now, only support text content
@@ -330,17 +346,26 @@ impl crate::client::LlmClient for OpenAIClient {
                 .into_iter()
                 .flatten()
                 .collect::<Vec<String>>()
-                .join("\n"); // Join all messages into single input
+                .join("\n");
+
+            if let Some(system_prompt) = system {
+                input = format!("System:\n{}\n\n{}", system_prompt, input);
+            }
 
             let openai_request = crate::openai::types::OpenAIResponseRequest {
-                model: request.model,
+                model,
                 input,
                 stream: None,
                 previous_response_id: None,
                 background: None,
                 prompt_cache_retention: None,
-                tools: None, // No tools for generic LlmClient interface
-                tool_choice: None,
+                tools: tools.map(|tools| {
+                    tools
+                        .into_iter()
+                        .map(|tool| OpenAIResponseToolFormat::to_response_tool(&tool))
+                        .collect()
+                }),
+                tool_choice: tool_choice.map(|choice| OpenAIToolFormat::to_provider_tool_choice(&choice)),
                 parallel_tool_calls: None,
             };
 
@@ -377,14 +402,18 @@ impl crate::client::LlmClient for OpenAIClient {
                         .unwrap_or(openai_response.usage.completion_tokens.unwrap_or(0)),
                 },
                 stop_reason: Some("completed".to_string()), // Responses API doesn't have finish_reason like Chat Completions
-                tool_calls: None, // TODO: Extract tool calls from OpenAI response
+                tool_calls: None, // TODO: Extract tool calls from OpenAI response function_call items
             };
 
             Ok(response)
         } else {
             // Use Chat Completions API for other models
-            let openai_messages = request
-                .messages
+            let mut openai_messages = Vec::new();
+            if let Some(system_prompt) = system {
+                openai_messages.push(crate::openai::types::OpenAIMessage::system(system_prompt));
+            }
+
+            let converted_messages = messages
                 .into_iter()
                 .map(|msg| {
                     let role = match msg.role {
@@ -416,21 +445,27 @@ impl crate::client::LlmClient for OpenAIClient {
                     })
                 })
                 .collect::<Result<Vec<crate::openai::types::OpenAIMessage>, LlmError>>()?;
+            openai_messages.extend(converted_messages);
 
             let openai_request = crate::openai::types::OpenAIChatCompletionRequest {
-                model: request.model,
+                model,
                 messages: openai_messages,
                 max_tokens: None, // Use max_completion_tokens instead
-                max_completion_tokens: Some(request.max_tokens),
-                temperature: request.temperature,
-                top_p: request.top_p,
-                stop: request.stop_sequences,
+                max_completion_tokens: Some(max_tokens),
+                temperature,
+                top_p,
+                stop: stop_sequences,
                 stream: None,           // Non-streaming for now
                 reasoning_effort: None, // Default reasoning effort
-                tools: None,            // No tools for generic LlmClient interface
-                tool_choice: None,
+                tools: tools.map(|tools| {
+                    tools
+                        .into_iter()
+                        .map(|tool| OpenAIToolFormat::to_provider_tool(&tool))
+                        .collect()
+                }),
+                tool_choice: tool_choice.map(|choice| OpenAIToolFormat::to_provider_tool_choice(&choice)),
                 parallel_tool_calls: None,
-                response_format: request.response_format.map(|rf| match rf {
+                response_format: response_format.map(|rf| match rf {
                     crate::types::ResponseFormat::Text => {
                         crate::openai::types::OpenAIResponseFormat::text()
                     }
@@ -452,9 +487,25 @@ impl crate::client::LlmClient for OpenAIClient {
                 text: choice.message.content.clone(),
             }];
 
+            let tool_calls = choice.message.tool_calls.as_ref().map(|calls| {
+                calls
+                    .iter()
+                    .map(|call| {
+                        let arguments: serde_json::Value =
+                            serde_json::from_str(&call.function.arguments)
+                                .unwrap_or(serde_json::Value::Null);
+                        crate::tools::ToolCall::new(
+                            call.id.clone(),
+                            call.function.name.clone(),
+                            arguments,
+                        )
+                    })
+                    .collect()
+            });
+
             let response = crate::types::CompletionResponse {
                 content,
-                role: match choice.message.role {
+                role: match &choice.message.role {
                     crate::openai::types::OpenAIRole::User => crate::types::Role::User,
                     crate::openai::types::OpenAIRole::Assistant => crate::types::Role::Assistant,
                     crate::openai::types::OpenAIRole::System => crate::types::Role::System,
@@ -471,7 +522,7 @@ impl crate::client::LlmClient for OpenAIClient {
                         .unwrap_or(openai_response.usage.output_tokens.unwrap_or(0)),
                 },
                 stop_reason: choice.finish_reason.clone(),
-                tool_calls: None, // TODO: Extract tool calls from OpenAI response
+                tool_calls,
             };
 
             Ok(response)
