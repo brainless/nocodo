@@ -1,46 +1,14 @@
-//! OpenAI API types for both Chat Completions and Responses APIs.
+//! OpenAI API types for the Responses API.
 //!
-//! OpenAI provides two different APIs with different capabilities:
+//! This module provides types for OpenAI's Responses API, which supports all GPT-5+ models
+//! including GPT-5, GPT-5 mini, GPT-5 nano, GPT-5.1, and GPT-5.1 Codex.
 //!
-//! ## Chat Completions API (Standard)
+//! ## Responses API
 //!
-//! The traditional OpenAI API for chat-based interactions.
-//!
-//! - **Endpoint:** `/v1/chat/completions`
-//! - **Models:** `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`, etc.
-//! - **Request Type:** [`OpenAIChatCompletionRequest`]
-//! - **Response Type:** [`OpenAIChatCompletionResponse`]
-//! - **Features:**
-//!   - Multi-turn conversations with message history
-//!   - Role-based messages (system, user, assistant, tool)
-//!   - Temperature, top-p, and stop sequences control
-//!   - Streaming support (via `stream` parameter)
-//!
-//! ### Example
-//!
-//! ```rust,no_run
-//! use nocodo_llm_sdk::openai::OpenAIClient;
-//!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let client = OpenAIClient::new("your-api-key")?;
-//! let response = client
-//!     .message_builder()
-//!     .model("gpt-4o")
-//!     .max_completion_tokens(1024)
-//!     .temperature(0.7)
-//!     .user_message("Hello!")
-//!     .send()
-//!     .await?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Responses API (GPT-5.1+)
-//!
-//! The newer API designed for GPT-5.1+ models with extended reasoning capabilities.
+//! The Responses API is the primary interface for all OpenAI models.
 //!
 //! - **Endpoint:** `/v1/responses`
-//! - **Models:** `gpt-5.1-codex`, `gpt-5.1`, `gpt-5.1-*`
+//! - **Models:** `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.1-codex`, `gpt-5.1`, etc.
 //! - **Request Type:** [`OpenAIResponseRequest`]
 //! - **Response Type:** [`OpenAIResponseResponse`]
 //! - **Features:**
@@ -49,6 +17,7 @@
 //!   - Conversation continuation via `previous_response_id`
 //!   - Prompt caching for efficiency
 //!   - Reasoning traces in output items
+//!   - Tool calling support
 //!
 //! ### Example
 //!
@@ -59,7 +28,7 @@
 //! let client = OpenAIClient::new("your-api-key")?;
 //! let response = client
 //!     .response_builder()
-//!     .model("gpt-5.1-codex")
+//!     .model("gpt-5-mini")
 //!     .input("Write a Python function to calculate fibonacci")
 //!     .send()
 //!     .await?;
@@ -67,64 +36,10 @@
 //! # }
 //! ```
 //!
-//! ## Automatic API Selection
-//!
-//! When using the [`crate::client::LlmClient`] trait, the SDK automatically routes
-//! requests to the appropriate API based on the model name:
-//!
-//! - Models starting with `gpt-5.1-codex` or `gpt-5.1` → Responses API
-//! - All other models → Chat Completions API
-//!
-//! See [`crate::openai::client::OpenAIClient`] for more details on automatic routing.
+//! See [`crate::openai::client::OpenAIClient`] for more details.
 
 use schemars::schema::RootSchema;
 use serde::{Deserialize, Serialize};
-
-/// OpenAI chat completion request for the Chat Completions API
-///
-/// Used with models like `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`, etc.
-///
-/// See module-level documentation for API selection guidance.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAIChatCompletionRequest {
-    /// The model to use for generation
-    pub model: String,
-    /// Input messages
-    pub messages: Vec<OpenAIMessage>,
-    /// Maximum number of tokens to generate (legacy, use max_completion_tokens)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
-    /// Maximum number of completion tokens to generate (recommended)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_completion_tokens: Option<u32>,
-    /// Temperature for randomness (0.0 to 2.0)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>,
-    /// Top-p sampling parameter
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_p: Option<f32>,
-    /// Custom stop sequences
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stop: Option<Vec<String>>,
-    /// Whether to stream the response
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream: Option<bool>,
-    /// Reasoning effort for GPT-5 models ("minimal", "low", "medium", "high")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
-    /// Available tools for the model to use
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<OpenAITool>>,
-    /// Tool choice strategy
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<serde_json::Value>,
-    /// Whether to allow parallel tool calls
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parallel_tool_calls: Option<bool>,
-    /// Response format (text or JSON object)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<OpenAIResponseFormat>,
-}
 
 /// A message in the OpenAI conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,73 +98,6 @@ impl OpenAIResponseFormat {
             format_type: OpenAIResponseFormatType::JsonObject,
         }
     }
-}
-
-/// OpenAI chat completion response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAIChatCompletionResponse {
-    /// Unique identifier for the response
-    pub id: String,
-    /// Object type (always "chat.completion")
-    pub object: String,
-    /// Unix timestamp of creation
-    pub created: u64,
-    /// Model used for generation
-    pub model: String,
-    /// Completion choices
-    pub choices: Vec<OpenAIChoice>,
-    /// Token usage information
-    pub usage: OpenAIUsage,
-    /// System fingerprint (for reproducibility)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub system_fingerprint: Option<String>,
-}
-
-/// A completion choice
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAIChoice {
-    /// Index of the choice
-    pub index: u32,
-    /// The message content
-    pub message: OpenAIMessage,
-    /// Reason why generation stopped
-    #[serde(rename = "finish_reason")]
-    pub finish_reason: Option<String>,
-    /// Log probability information (if requested)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logprobs: Option<OpenAILogProbs>,
-}
-
-/// Log probability information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAILogProbs {
-    /// Log probabilities for tokens
-    pub content: Vec<OpenAILogProb>,
-}
-
-/// Log probability for a token
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAILogProb {
-    /// The token
-    pub token: String,
-    /// Log probability of the token
-    pub logprob: f32,
-    /// Bytes representation
-    pub bytes: Option<Vec<u8>>,
-    /// Top log probabilities
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_logprobs: Option<Vec<OpenAITopLogProb>>,
-}
-
-/// Top log probability
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAITopLogProb {
-    /// The token
-    pub token: String,
-    /// Log probability
-    pub logprob: f32,
-    /// Bytes representation
-    pub bytes: Option<Vec<u8>>,
 }
 
 /// Token usage information
@@ -396,6 +244,7 @@ pub struct OpenAIError {
 }
 
 /// OpenAI tool definition for Chat Completions API
+/// Note: This type is kept for backward compatibility with other providers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAITool {
     /// Type of tool (always "function")

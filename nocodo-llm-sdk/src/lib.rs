@@ -68,28 +68,7 @@
 //! }
 //! ```
 //!
-//! ## OpenAI Chat Completions Example
-//!
-//! ```rust,no_run
-//! use nocodo_llm_sdk::openai::OpenAIClient;
-//!
-//! #[tokio::main]
-//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = OpenAIClient::new("your-openai-api-key")?;
-//!     let response = client
-//!         .message_builder()
-//!         .model("gpt-4o")
-//!         .max_completion_tokens(1024)
-//!         .user_message("Hello, GPT!")
-//!         .send()
-//!         .await?;
-//!
-//!     println!("Response: {}", response.choices[0].message.content);
-//!     Ok(())
-//! }
-//! ```
-//!
-//! ## OpenAI Responses API Example (GPT-5.1-Codex)
+//! ## OpenAI Responses API Example
 //!
 //! ```rust,no_run
 //! use nocodo_llm_sdk::openai::OpenAIClient;
@@ -99,7 +78,7 @@
 //!     let client = OpenAIClient::new("your-openai-api-key")?;
 //!     let response = client
 //!         .response_builder()
-//!         .model("gpt-5.1-codex")
+//!         .model("gpt-5-mini")
 //!         .input("Write a Python function to calculate fibonacci numbers")
 //!         .send()
 //!         .await?;
@@ -317,13 +296,9 @@ mod tests {
     }
 
     #[test]
-    fn test_openai_message_builder() {
+    fn test_openai_response_builder() {
         let client = OpenAIClient::new("test-key").unwrap();
-        let _builder = client
-            .message_builder()
-            .model("gpt-5.1")
-            .max_completion_tokens(100)
-            .user_message("Hello");
+        let _builder = client.response_builder().model("gpt-5-mini").input("Hello");
 
         // The builder should be created successfully
         assert!(true); // Builder creation succeeded

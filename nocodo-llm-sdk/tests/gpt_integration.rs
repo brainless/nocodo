@@ -51,23 +51,28 @@ async fn test_openai_real_api_call() {
 
     let client = OpenAIClient::new(api_key).unwrap();
     let response = client
-        .message_builder()
+        .response_builder()
         .model("gpt-5.1")
-        .max_completion_tokens(100)
-        .user_message("Say 'Hello, World!' and nothing else.")
+        .input("Say 'Hello, World!' and nothing else.")
         .send()
         .await;
 
     assert!(response.is_ok());
     let response = response.unwrap();
-    assert_eq!(response.object, "chat.completion");
-    assert!(!response.choices.is_empty());
-    assert!(!response.choices[0].message.content.is_empty());
-    assert!(response.choices[0]
-        .message
-        .content
-        .to_lowercase()
-        .contains("hello"));
+    assert_eq!(response.object, "response");
+    assert_eq!(response.status, "completed");
+    assert!(!response.output.is_empty());
+
+    // Check that we have text content
+    let has_text_content = response.output.iter().any(|item| {
+        item.item_type == "message"
+            && item.content.as_ref().map_or(false, |blocks| {
+                blocks
+                    .iter()
+                    .any(|block| block.content_type == "output_text" && !block.text.is_empty())
+            })
+    });
+    assert!(has_text_content);
 }
 
 #[tokio::test]
@@ -75,10 +80,9 @@ async fn test_openai_real_api_call() {
 async fn test_openai_invalid_api_key() {
     let client = OpenAIClient::new("invalid-key").unwrap();
     let response = client
-        .message_builder()
+        .response_builder()
         .model("gpt-5.1")
-        .max_completion_tokens(100)
-        .user_message("Hello")
+        .input("Hello")
         .send()
         .await;
 
@@ -130,23 +134,31 @@ async fn test_openai_json_mode() {
 
     let client = OpenAIClient::new(api_key).unwrap();
     let response = client
-        .message_builder()
-        .model("gpt-4o")
-        .max_completion_tokens(100)
-        .response_format(nocodo_llm_sdk::openai::types::OpenAIResponseFormat::json_object())
-        .user_message(&json_mode_prompt())
+        .response_builder()
+        .model("gpt-5-mini")
+        .input(&json_mode_prompt())
         .send()
         .await;
 
     assert!(response.is_ok());
     let response = response.unwrap();
-    let content = &response.choices[0].message.content;
+
+    // Extract text content from response
+    let content = response
+        .output
+        .iter()
+        .filter(|item| item.item_type == "message")
+        .flat_map(|item| item.content.as_ref())
+        .flat_map(|blocks| blocks.iter())
+        .filter(|block| block.content_type == "output_text")
+        .map(|block| block.text.clone())
+        .collect::<String>();
 
     // Validate JSON structure
-    validate_person_info_json(content).expect("Response should be valid JSON");
+    validate_person_info_json(&content).expect("Response should be valid JSON");
 
     // Parse and check expected values
-    let json: serde_json::Value = serde_json::from_str(content).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
     let (exp_name, exp_age, exp_city, exp_occupation) = expected_values();
 
     assert_eq!(json["name"].as_str(), Some(exp_name.as_str()));

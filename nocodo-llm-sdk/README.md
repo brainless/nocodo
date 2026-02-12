@@ -16,7 +16,7 @@ A general-purpose LLM SDK for Rust with support for multiple LLM providers.
 - **Ollama support**: Local models via Ollama `/api/chat`
 - **llama.cpp support**: Local models via OpenAI-compatible API
 - **Zen provider**: Free access to select models during beta
-- **OpenAI support**: GPT models including GPT-5 with Chat Completions API
+- **OpenAI support**: GPT-5 models (GPT-5, GPT-5 mini, GPT-5 nano, GPT-5.1, GPT-5.1 Codex) via Responses API
 - **Voyage AI support**: Text embeddings with multiple specialized models
 - **Multi-provider**: Same models available from different providers
 - **Extensible**: Designed for easy addition of other LLM providers
@@ -323,20 +323,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create client with your OpenAI API key
     let client = OpenAIClient::new("your-openai-api-key")?;
 
-    // Build and send a message
+    // Build and send a response request
     let response = client
-        .message_builder()
-        .model("gpt-5.1")
-        .max_completion_tokens(1024)
-        .reasoning_effort("medium")  // For GPT-5 models
-        .user_message("Write a Python function to check if a number is prime.")
+        .response_builder()
+        .model("gpt-5-mini")
+        .input("Write a Python function to check if a number is prime.")
         .send()
         .await?;
 
-    println!("GPT: {}", response.choices[0].message.content);
+    // Extract text from response
+    let text_content: String = response
+        .output
+        .iter()
+        .filter(|item| item.item_type == "message")
+        .filter_map(|item| item.content.as_ref())
+        .flatten()
+        .filter(|block| block.content_type == "output_text")
+        .map(|block| block.text.clone())
+        .collect();
+
+    println!("GPT: {}", text_content);
     println!(
         "Usage: {} input tokens, {} output tokens",
-        response.usage.prompt_tokens, response.usage.completion_tokens
+        response.usage.input_tokens.unwrap_or(0),
+        response.usage.output_tokens.unwrap_or(0)
     );
     Ok(())
 }
@@ -648,7 +658,7 @@ See `examples/tool_calling_*.rs` for complete examples.
 
 - `new(api_key: impl Into<String>) -> Result<Self>`: Create a new client
 - `with_base_url(url: impl Into<String>) -> Self`: Set custom API base URL
-- `message_builder() -> OpenAIMessageBuilder`: Start building a message request
+- `response_builder() -> OpenAIResponseBuilder`: Start building a response request
 
 ### OllamaClient
 
@@ -762,8 +772,8 @@ This SDK is in active development. v0.1 provides Claude and Grok support with a 
   - Models: local models installed in Ollama
 - **llama.cpp** (Local): OpenAI-compatible API
   - Models: local models served by llama-server
-- **OpenAI**: Chat Completions and Responses API
-  - Models: gpt-4o, gpt-4o-mini, gpt-5.1, gpt-5-codex
+- **OpenAI**: Responses API
+  - Models: gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.1-codex
 - **Voyage AI**: Text embeddings
   - Models: voyage-4, voyage-4-large, voyage-4-lite, specialized domain models
 
