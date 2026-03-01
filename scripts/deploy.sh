@@ -46,11 +46,9 @@ tar -czf "$SRC_ARCHIVE" \
   --exclude='target' \
   --exclude='gui/node_modules' \
   --exclude='gui/dist' \
-  --exclude='admin-gui/node_modules' \
-  --exclude='admin-gui/dist' \
   --exclude='.git' \
   --exclude='.DS_Store' \
-  backend/ shared-types/ gui/ admin-gui/ scripts/ Cargo.toml README.md DEVELOP.md AGENTS.md project.conf.template
+  backend/ nocodo-core/ shared-types/ gui/ scripts/ Cargo.toml README.md DEVELOP.md AGENTS.md project.conf.template
 
 scp -o StrictHostKeyChecking=no "$SRC_ARCHIVE" "${SSH_USER}@${SERVER_IP}:~/"
 rm "$SRC_ARCHIVE"

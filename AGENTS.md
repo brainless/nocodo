@@ -29,9 +29,9 @@ This repository is a minimal template for coding-agent-driven fullstack developm
 Only maintain these parts:
 
 - `backend`
+- `nocodo-core`
 - `shared-types`
 - `gui`
-- `admin-gui`
 - `scripts`
 
 Do not add extra services/crates unless explicitly requested.

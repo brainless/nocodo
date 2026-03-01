@@ -1,12 +1,13 @@
-# App Template
+# nocodo: Build full-stack apps Template
 
 Minimal fullstack template for typed feature development with coding agents.
 
 ## Stack
 
 - Rust + Actix Web (`backend`)
+- Rust core domain/CLI crate (`nocodo-core`)
 - Rust shared types with TypeScript generation (`shared-types`)
-- TypeScript + SolidJS + Solid Router + Tailwind + DaisyUI (`gui`, `admin-gui`)
+- TypeScript + SolidJS + Solid Router + Tailwind + DaisyUI (`gui`)
 - Bash scripts for server setup and deploy (`scripts`)
 
 ## Name Configuration
@@ -44,11 +45,11 @@ scripts/init-project.sh
 ## What This Template Includes
 
 - `GET /api/heartbeat` in backend
+- `nocodo-core` CLI with `status` sub-command for effective runtime config
 - Startup DB schema migration execution (feature-gated by backend DB feature)
 - Shared `HeartbeatResponse` type defined in Rust
 - Generated TypeScript type consumed by GUI
 - `gui`: Hello World + heartbeat status
-- `admin-gui`: Hello World admin placeholder
 - `systemd` service template for backend
 - `nginx` site template for GUI + `/api` reverse proxy
 - certbot setup flow for TLS certificates
@@ -58,9 +59,9 @@ scripts/init-project.sh
 ## Project Layout
 
 - `backend/`: Actix API crate
+- `nocodo-core/`: core domain + CLI commands
 - `shared-types/`: canonical API types + TS generator
 - `gui/`: main SolidJS app
-- `admin-gui/`: admin SolidJS app
 - `scripts/`: setup, init, deploy, and server config templates
   - `scripts/init-project.sh`
   - `scripts/setup-server.sh`
@@ -80,10 +81,16 @@ cargo run -p shared-types --bin generate_api_types
 2. Run backend:
 
 ```bash
-cargo run -p app-backend
+cargo run -p nocodo-backend
 ```
 
-3. Run main GUI:
+3. Check effective config via core CLI:
+
+```bash
+cargo run -p nocodo-core -- status
+```
+
+4. Run main GUI:
 
 ```bash
 cd gui
@@ -91,18 +98,9 @@ npm install
 npm run dev
 ```
 
-4. Run admin GUI:
-
-```bash
-cd admin-gui
-npm install
-npm run dev
-```
-
 Open:
 
 - main GUI: `http://127.0.0.1:3030`
-- admin GUI: `http://127.0.0.1:3031`
 
 ## Git Hooks
 
@@ -119,7 +117,6 @@ Pre-commit checks:
 - `cargo check --workspace`
 - `cargo test --workspace`
 - `gui`: `prettier --check .` and `npm run build`
-- `admin-gui`: `prettier --check .` and `npm run build`
 
 ## Deploy Pattern
 

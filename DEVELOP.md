@@ -6,8 +6,9 @@ This template enforces a typed, shared-contract-first flow:
 
 1. Define API/domain types in `shared-types/src/*.rs`
 2. Export TypeScript types from the same Rust types
-3. Implement backend handlers using shared types
-4. Implement frontend features against generated types
+3. Implement core domain behavior and CLI workflows in `nocodo-core`
+4. Implement backend handlers using shared types and core behavior
+5. Implement frontend features against generated types
 
 A feature is complete only when backend + frontend apps compile against the same shared contract.
 
@@ -44,8 +45,9 @@ For each new feature:
 
 1. Add or extend types in `shared-types`.
 2. Regenerate TypeScript API types.
-3. Add backend endpoint in `backend` using shared types.
-4. Add UI and state in `gui` and/or `admin-gui` using generated types.
-5. Update docs for behavior and constraints.
+3. Add core domain logic and/or CLI behavior in `nocodo-core`.
+4. Add backend endpoint in `backend` using shared types and core logic.
+5. Add UI and state in `gui` using generated types.
+6. Update docs for behavior and constraints.
 
 Use strict shared contracts as the first design boundary, then implement backend and UI around those contracts.
