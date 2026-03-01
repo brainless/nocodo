@@ -1,0 +1,16 @@
+[Unit]
+Description={{PROJECT_NAME}} Backend API
+After=network.target
+
+[Service]
+Type=simple
+User={{SSH_USER}}
+Group={{SSH_USER}}
+WorkingDirectory=/opt/{{PROJECT_NAME}}
+ExecStart=/opt/{{PROJECT_NAME}}/{{PROJECT_NAME}}-backend
+Restart=always
+RestartSec=3
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=multi-user.target

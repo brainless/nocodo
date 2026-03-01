@@ -1,0 +1,10 @@
+# Copy to project.conf and customize.
+PROJECT_NAME=myapp
+PROJECT_TITLE=My App
+DB_KIND=sqlite
+
+SERVER_IP=203.0.113.10
+SSH_USER=deploy
+DOMAIN_NAME=example.com
+LETSENCRYPT_EMAIL=admin@example.com
+REMOTE_BASE_DIR=~/apps

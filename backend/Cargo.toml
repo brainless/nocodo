@@ -1,0 +1,18 @@
+[package]
+name = "app-backend"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["db-sqlite"]
+db-sqlite = ["dep:rusqlite", "refinery/rusqlite"]
+db-postgres = ["dep:postgres", "refinery/postgres"]
+
+[dependencies]
+actix-cors = "0.7"
+actix-web.workspace = true
+refinery = { version = "0.8", default-features = false }
+postgres = { version = "0.19", optional = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+serde.workspace = true
+shared-types = { path = "../shared-types" }

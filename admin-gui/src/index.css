@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+:root {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+}

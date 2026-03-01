@@ -1,0 +1,15 @@
+/target
+**/target
+
+# Node
+/gui/node_modules
+/gui/dist
+/admin-gui/node_modules
+/admin-gui/dist
+
+# Local config
+/project.conf
+
+# OS/editor
+.DS_Store
+*.swp
