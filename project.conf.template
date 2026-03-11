@@ -1,0 +1,20 @@
+# Copy to project.conf and customize.
+PROJECT_NAME=myapp
+PROJECT_TITLE=My App
+DB_KIND=sqlite
+# Local development DB only. Not used by deploy scripts — the server gets its
+# own DATABASE_URL written to /opt/$PROJECT_NAME/server.env by setup-server.sh.
+# sqlite example: DATABASE_URL=app.db
+# postgres example: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/myapp
+DATABASE_URL=app.db
+
+BACKEND_HOST=127.0.0.1
+BACKEND_PORT=8080
+GUI_PORT=3030
+ADMIN_GUI_PORT=3031
+
+SERVER_IP=203.0.113.10
+SSH_USER=deploy
+DOMAIN_NAME=example.com
+LETSENCRYPT_EMAIL=admin@example.com
+REMOTE_BASE_DIR=/home/${SSH_USER}/apps

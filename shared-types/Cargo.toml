@@ -1,0 +1,12 @@
+[package]
+name = "shared-types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+ts-rs.workspace = true
+
+[[bin]]
+name = "generate_api_types"
+path = "src/bin/generate_api_types.rs"

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "[pre-commit] authz: model/migration sync check"
+scripts/check-authz-version-sync.sh
+
+echo "[pre-commit] rust: cargo fmt --all --check"
+cargo fmt --all --check
+
+echo "[pre-commit] rust: cargo check --workspace"
+cargo check --workspace
+
+echo "[pre-commit] rust: cargo test --workspace"
+cargo test --workspace
+
+echo "[pre-commit] gui: prettier check"
+cd "$ROOT_DIR/gui"
+if [ ! -d node_modules ]; then
+  npm install
+fi
+npx prettier --check .
+
+echo "[pre-commit] gui: npm run build"
+npm run build
+
+echo "[pre-commit] admin-gui: prettier check"
+cd "$ROOT_DIR/admin-gui"
+if [ ! -d node_modules ]; then
+  npm install
+fi
+npx prettier --check .
+
+echo "[pre-commit] admin-gui: npm run build"
+npm run build
+
+echo "[pre-commit] all checks passed"
