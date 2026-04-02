@@ -4,7 +4,7 @@ This is a minimal template for fullstack development (human or agent). Shared Ru
 
 ## Scope
 
-Only maintain these parts: `backend`, `shared-types`, `gui`, `admin-gui`, `scripts`.
+Only maintain these parts: `backend`, `shared-types`, `gui`, `admin-gui`, `tauri`, `scripts`.
 Do not add extra services or crates unless explicitly requested.
 
 ## Type-Driven Workflow
@@ -34,6 +34,14 @@ Config is resolved in priority order: **env var → `project.conf` → `server.e
 Backend helper binaries (`src/bin/`) include both `config.rs` and `db.rs` via `#[path]` and resolve config through `read_project_conf`. No manual env setup needed on the server.
 
 Vite apps (`gui`, `admin-gui`) read `project.conf` at build/dev time via `vite.config.ts` — they do not use `server.env`.
+
+## Desktop (Tauri)
+
+- `tauri` wraps `admin-gui` and starts `nocodo-backend` as a sidecar (Dwata-style).
+- Dev run from repo root:
+  - `npm --prefix tauri install`
+  - `NOCODO_BACKEND_PATH="$(pwd)/target/debug/nocodo-backend" npm --prefix tauri run dev`
+- For compatibility with old scripts, `DWATA_API_PATH` is also accepted.
 
 ## Structure Rules
 

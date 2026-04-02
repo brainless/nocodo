@@ -1,4 +1,4 @@
-# App Template
+# Sheets Driven Development Template
 
 Minimal fullstack template for typed feature development with coding agents.
 
@@ -7,6 +7,7 @@ Minimal fullstack template for typed feature development with coding agents.
 - Rust + Actix Web (`backend`)
 - Rust shared types with TypeScript generation (`shared-types`)
 - TypeScript + SolidJS + Solid Router + Tailwind + DaisyUI (`gui`, `admin-gui`)
+- Tauri desktop shell using `admin-gui` (`tauri`)
 - Bash scripts for server setup and deploy (`scripts`)
 
 ## Name Configuration
@@ -62,6 +63,7 @@ scripts/init-project.sh
 - `shared-types/`: canonical API types + TS generator
 - `gui/`: main SolidJS app
 - `admin-gui/`: admin SolidJS app
+- `tauri/`: desktop app (Tauri) + backend sidecar runner
 - `scripts/`: setup, init, deploy, and server config templates
   - `scripts/init-project.sh`
   - `scripts/setup-server.sh`
@@ -81,8 +83,8 @@ cargo run -p shared-types --bin generate_api_types
 2. Run backend:
 
 ```bash
-cargo run -p app-backend --bin migrate
-cargo run -p app-backend
+cargo run -p nocodo-backend --bin migrate
+cargo run -p nocodo-backend
 ```
 
 `DATABASE_URL` is read from environment first, then `project.conf`.
@@ -105,8 +107,15 @@ npm run dev
 
 Open:
 
-- main GUI: `http://127.0.0.1:3030`
-- admin GUI: `http://127.0.0.1:3031`
+- main GUI: `http://127.0.0.1:${GUI_PORT}` from `project.conf` (current repo value: `6625`)
+- admin GUI: `http://127.0.0.1:${ADMIN_GUI_PORT}` from `project.conf` (current repo value: `6626`)
+
+5. Run desktop app (admin GUI in Tauri):
+
+```bash
+npm --prefix tauri install
+NOCODO_BACKEND_PATH="$(pwd)/target/debug/nocodo-backend" npm --prefix tauri run dev
+```
 
 ## Git Hooks
 

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nocodo",
+  "version": "0.1.0",
+  "identifier": "com.nocodo.app",
+  "build": {
+    "frontendDist": "../../admin-gui/dist",
+    "devUrl": "http://127.0.0.1:6626",
+    "beforeDevCommand": "cargo build -p nocodo-backend && npm --prefix ../admin-gui run dev -- --host 127.0.0.1",
+    "beforeBuildCommand": "npm --prefix ../admin-gui run build",
+    "removeUnusedCommands": true
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nocodo",
+        "width": 1100,
+        "height": 720,
+        "resizable": true
+      }
+    ]
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "externalBin": [
+      "../bin/nocodo-backend"
+    ],
+    "icon": []
+  }
+}
