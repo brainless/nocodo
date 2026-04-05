@@ -243,19 +243,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "app-backend"
-version = "0.1.0"
-dependencies = [
- "actix-cors",
- "actix-web",
- "postgres",
- "refinery",
- "rusqlite",
- "serde",
- "shared-types",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -942,6 +929,19 @@ dependencies = [
  "log",
  "wasi 0.11.1+wasi-snapshot-preview1",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "nocodo-backend"
+version = "0.1.0"
+dependencies = [
+ "actix-cors",
+ "actix-web",
+ "postgres",
+ "refinery",
+ "rusqlite",
+ "serde",
+ "shared-types",
 ]
 
 [[package]]
