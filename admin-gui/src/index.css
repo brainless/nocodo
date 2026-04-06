@@ -19,7 +19,7 @@ body {
 
 .sheet-app {
   display: grid;
-  grid-template-rows: 48px 1fr 48px;
+  grid-template-rows: 48px 1fr;
   height: 100vh;
   height: 100dvh;
   min-height: 100vh;
@@ -27,6 +27,30 @@ body {
   background:
     radial-gradient(circle at top right, rgb(187 211 255 / 45%), transparent 40%),
     linear-gradient(180deg, #eef2fa 0%, #e2e8f5 100%);
+}
+
+.drawer {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.drawer-content {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sheet-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  padding: 0.75rem;
+  gap: 0.75rem;
+  overflow: hidden;
 }
 
 .menu-strip {
@@ -86,9 +110,77 @@ body {
 
 .formula-strip {
   display: grid;
-  grid-template-columns: 74px 50px minmax(140px, 1fr);
+  grid-template-columns: auto 74px 50px minmax(140px, 1fr);
   align-items: center;
   gap: 0.55rem;
+}
+
+.chat-btn {
+  white-space: nowrap;
+}
+
+.chat-toggle-btn {
+  border-radius: 8px;
+  border: 1px solid #c0ccdf;
+  background: #fff;
+  color: #38537e;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+}
+
+.chat-toggle-btn:hover {
+  background: #f2f5fc;
+}
+
+.chat-close-btn {
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+  color: #334361;
+  cursor: pointer;
+}
+
+.chat-close-btn:hover {
+  background: #e7ecf8;
+}
+
+.chat-send-btn {
+  border-radius: 8px;
+  border: 1px solid #c0ccdf;
+  background: #fff;
+  color: #38537e;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.chat-send-btn:hover {
+  background: #f2f5fc;
+}
+
+.chat-input-field {
+  width: 100%;
+  border: 1px solid #c7d0e2;
+  background: #f8fafe;
+  border-radius: 8px;
+  min-height: 32px;
+  padding: 0 0.75rem;
+  font-size: 0.9rem;
+  color: #223149;
+  outline: none;
+}
+
+.chat-input-field:focus {
+  border-color: #6b89c4;
+  box-shadow: 0 0 0 2px rgb(107 137 196 / 16%);
 }
 
 .name-box,
@@ -152,6 +244,10 @@ body {
 
 .grid-corner {
   background: #e8edf9;
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 10;
 }
 
 .column-header,
@@ -163,6 +259,18 @@ body {
   color: #3f5070;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.column-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.row-header {
+  position: sticky;
+  left: 0;
+  z-index: 5;
 }
 
 .cell {
@@ -178,6 +286,102 @@ body {
   background: #edf3ff;
 }
 
+.chat-sidebar {
+  width: 320px;
+  height: 100%;
+  background: #f7f9ff;
+  border-right: 1px solid #c6cfdf;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 1rem;
+  border-bottom: 1px solid #c6cfdf;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f2f5fc;
+}
+
+.chat-header h3 {
+  font-weight: 600;
+  color: #304264;
+  font-size: 0.95rem;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.chat-message {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  max-width: 85%;
+}
+
+.chat-message-assistant {
+  background: #fff;
+  border: 1px solid #c6d1e4;
+  color: #2f3f5f;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-message-user {
+  background: #e8edf9;
+  border: 1px solid #c6d1e4;
+  color: #2e4a7c;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-input-area {
+  padding: 1rem;
+  border-top: 1px solid #c6cfdf;
+  background: #f2f5fc;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .menu-title {
+    display: none;
+  }
+
+  .menu-items {
+    gap: 0.15rem;
+    overflow-x: auto;
+  }
+
+  .formula-strip {
+    grid-template-columns: auto 64px 40px 1fr;
+  }
+
+  .grid-wrap {
+    grid-template-columns: 44px repeat(12, minmax(92px, 1fr));
+  }
+}
+
 .sheets-strip {
   display: flex;
   align-items: center;
@@ -185,6 +389,8 @@ body {
   border-top: 1px solid #c6cfdf;
   background: #f2f5fc;
   padding: 0 0.75rem;
+  height: 48px;
+  flex-shrink: 0;
 }
 
 .sheet-add {
@@ -234,7 +440,7 @@ body {
   }
 
   .formula-strip {
-    grid-template-columns: 64px 40px 1fr;
+    grid-template-columns: auto 64px 40px 1fr;
   }
 
   .grid-wrap {
