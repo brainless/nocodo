@@ -6,10 +6,51 @@ const rows = Array.from({ length: 28 }, (_, index) => index + 1);
 const sheets = ['Leads', 'Pipeline', 'Forecast', 'Invoices', 'Archive'];
 
 export default function App() {
+  const [selectedCell, setSelectedCell] = createSignal({ col: 'B', row: 6 });
+  // Store raw formulas/values for editing in the formula bar
+  const [cellFormulas, setCellFormulas] = createSignal<Record<string, string>>({
+    'A1': 'A Header',
+    'B1': 'B Header',
+    'C1': 'C Header',
+    'D1': 'D Header',
+    'E1': 'E Header',
+    'F1': 'F Header',
+    'G1': 'G Header',
+    'H1': 'H Header',
+    'I1': 'I Header',
+    'J1': 'J Header',
+    'K1': 'K Header',
+    'L1': 'L Header',
+    'B6': '=SUM(B2:B5)'
+  });
+  const [formulaValue, setFormulaValue] = createSignal('=SUM(B2:B5)');
   const [messages, setMessages] = createSignal<{role: 'user' | 'assistant', content: string}[]>([
     { role: 'assistant', content: 'Hello! I can help you with your spreadsheet. What would you like to do?' }
   ]);
   const [inputValue, setInputValue] = createSignal('');
+
+  const getCellKey = (col: string, row: number) => `${col}${row}`;
+
+  // Get the display value for a cell (computed value or the stored value)
+  const getCellDisplayValue = (col: string, row: number): string => {
+    const key = getCellKey(col, row);
+    const formula = cellFormulas()[key];
+    if (!formula) return '';
+    // For now, just return the formula/value as-is (in a real app, this would compute formulas)
+    return formula;
+  };
+
+  const handleCellClick = (col: string, row: number) => {
+    setSelectedCell({ col, row });
+    const key = getCellKey(col, row);
+    setFormulaValue(cellFormulas()[key] || '');
+  };
+
+  const handleFormulaChange = (value: string) => {
+    setFormulaValue(value);
+    const key = getCellKey(selectedCell().col, selectedCell().row);
+    setCellFormulas({ ...cellFormulas(), [key]: value });
+  };
 
   const handleSend = () => {
     if (!inputValue().trim()) return;
@@ -43,14 +84,15 @@ export default function App() {
               <label for="chat-drawer" class="chat-toggle-btn">
                 Chat
               </label>
-              <div class="name-box">B6</div>
+              <div class="name-box">{selectedCell().col}{selectedCell().row}</div>
               <label class="formula-label" for="formula-input">
                 fx
               </label>
               <input
                 id="formula-input"
                 class="formula-input"
-                value="=SUM(B2:B5)"
+                value={formulaValue()}
+                onInput={(e) => handleFormulaChange(e.currentTarget.value)}
                 aria-label="Formula bar"
               />
             </div>
@@ -67,8 +109,11 @@ export default function App() {
                     <div class="row-header">{row}</div>
                     <For each={columns}>
                       {(col) => (
-                        <div class={`cell${row === 6 && col === 'B' ? ' cell-active' : ''}`}>
-                          {row === 1 ? `${col} Header` : ''}
+                        <div 
+                          class={`cell${row === selectedCell().row && col === selectedCell().col ? ' cell-active' : ''}`}
+                          onClick={() => handleCellClick(col, row)}
+                        >
+                          {getCellDisplayValue(col, row)}
                         </div>
                       )}
                     </For>
