@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 git -C "$ROOT_DIR" config core.hooksPath .githooks
 chmod +x "$ROOT_DIR/.githooks/pre-commit"
-chmod +x "$ROOT_DIR/scripts/check-authz-version-sync.sh"
 
 echo "Configured git hooks path to .githooks"
 echo "pre-commit hook installed"

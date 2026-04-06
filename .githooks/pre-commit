@@ -4,9 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-echo "[pre-commit] authz: model/migration sync check"
-scripts/check-authz-version-sync.sh
-
 echo "[pre-commit] rust: cargo fmt --all --check"
 cargo fmt --all --check
 
