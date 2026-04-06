@@ -6,6 +6,15 @@
 /gui/dist
 /admin-gui/node_modules
 /admin-gui/dist
+/tauri/node_modules
+/tauri/dist
+
+# Binaries
+/tauri/bin/*
+!/tauri/bin/.gitkeep
+
+# TypeScript build info
+*.tsbuildinfo
 
 # Local config
 /project.conf
