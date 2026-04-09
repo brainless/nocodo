@@ -1,50 +1,67 @@
 # DEVELOP
 
-This is a minimal template for fullstack development (human or agent). Shared Rust types drive everything.
+Minimal template for fullstack development. Shared Rust types drive everything.
 
 ## Scope
 
-Only maintain these parts: `backend`, `shared-types`, `gui`, `admin-gui`, `tauri`, `scripts`.
-Do not add extra services or crates unless explicitly requested.
+Maintain: `backend`, `shared-types`, `agents`, `gui`, `admin-gui`, `tauri`, `scripts`.
+
+## Workspace
+
+- `backend` — Actix-web API with auto-migrations, CORS for gui/admin-gui origins
+- `agents` — LLM agent crate with SQLite-backed storage (schema designer agent active)
+- `shared-types` — API contract types with TypeScript generation
 
 ## Type-Driven Workflow
 
-1. Define API/domain types in `shared-types/src/*.rs`
-2. Regenerate TypeScript types: `cargo run -p shared-types --bin generate_api_types` → `gui/src/types/api.ts`
+1. Define types in `shared-types/src/*.rs`
+2. Regenerate TypeScript: `cargo run -p shared-types --bin generate_api_types` → `gui/src/types/api.ts`
 3. Implement backend handler using shared types
 4. Implement UI in `gui`/`admin-gui` against generated types
 
-A feature is complete only when backend + frontend compile against the same shared contract.
-Start from `shared-types`, never UI-first. Keep endpoints small and explicit. Prefer strict enums/newtypes over free-text states.
+A feature is complete only when backend + frontend compile against the same shared contract. Start from `shared-types`, never UI-first.
 
 ## Project Naming
 
 - Root config: `project.conf` (copy from `project.conf.template`)
 - Apply names: `scripts/init-project.sh`
-- Never hardcode app/repo names in scripts or configs — always parameterize by `PROJECT_NAME`.
+- Never hardcode app/repo names — always parameterize by `PROJECT_NAME`.
 
 ## Configuration
 
-Config is resolved in priority order: **env var → `project.conf` → `server.env`** (sibling to the binary on server).
+Resolved priority: **env var → `project.conf` → `server.env`** (sibling to binary on server).
 
-- `project.conf` — local development; read by backend and vite apps at dev/build time
+- `project.conf` — local development; read by backend and vite apps
 - env vars — override `project.conf`; injected by systemd on server
-- `server.env` — server-only secrets (e.g. `DATABASE_URL`); written by `setup-server.sh` to `DEPLOY_ROOT`, permissions `600`; auto-discovered by backend binaries via `current_exe()` path lookup
+- `server.env` — server-only secrets (e.g. `DATABASE_URL`); written by `setup-server.sh` to `DEPLOY_ROOT`, permissions `600`
 
-Backend helper binaries (`src/bin/`) include both `config.rs` and `db.rs` via `#[path]` and resolve config through `read_project_conf`. No manual env setup needed on the server.
+## Agents
 
-Vite apps (`gui`, `admin-gui`) read `project.conf` at build/dev time via `vite.config.ts` — they do not use `server.env`.
+- Active agent: `schema_designer` — designs SQLite schemas via LLM
+- Storage: SQLite (`nocodo.db`) with chat sessions and generated schemas
+- API endpoints:
+  - `POST /api/agents/schema-designer/chat` — send message, returns `{session_id, message_id}`
+  - `GET /api/agents/schema-designer/messages/{id}/response` — long-poll for response (text/schema/stopped)
+- Config: reads `AGENT_PROVIDER` and `AGENT_API_KEY` from env/project.conf
+- Backend auto-initializes agent state on startup; runs DB migrations and ensures default project exists
 
 ## Desktop (Tauri)
 
-- `tauri` wraps `admin-gui` and starts `nocodo-backend` as a sidecar (Dwata-style).
-- Dev run from repo root:
-  - `npm --prefix tauri install`
-  - `NOCODO_BACKEND_PATH="$(pwd)/target/debug/nocodo-backend" npm --prefix tauri run dev`
-- For compatibility with old scripts, `DWATA_API_PATH` is also accepted.
+Tauri wraps `admin-gui` and manages `nocodo-backend` as a sidecar binary.
+
+**Dev run from repo root:**
+```bash
+NOCODO_BACKEND_PATH="$(pwd)/target/debug/nocodo-backend" npm --prefix tauri run dev
+```
+
+- Tauri `beforeDevCommand` builds backend, copies to `tauri/bin/` with target triple, starts admin-gui dev server
+- Sidecar detection: `NOCODO_BACKEND_PATH` → `DWATA_API_PATH` (compat) → bundled binary → `target/debug/nocodo-backend`
+- Backend runs in its own process group (Unix) for clean shutdown on app exit
+- `tauri.conf.json` devUrl: `http://127.0.0.1:6626` (admin-gui dev server)
 
 ## Structure Rules
 
 - `shared-types` is the source of truth for API payloads
 - Avoid handwritten duplicate API types in frontend apps
 - Avoid premature abstractions — keep code minimal and typed
+- Agent processing runs in background tasks with in-memory response storage for long-polling

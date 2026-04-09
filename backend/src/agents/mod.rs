@@ -84,7 +84,7 @@ pub async fn send_chat_message(
     };
     
     // Mark as pending in response storage
-    state.response_storage.store_pending(user_msg_id);
+    state.response_storage.store_pending(user_msg_id).await;
     
     // Spawn the agent processing in a background task
     let response_storage = state.response_storage.clone();
@@ -96,7 +96,7 @@ pub async fn send_chat_message(
         let agent = match build_schema_designer(&config, &db_path, project_id) {
             Ok(agent) => agent,
             Err(e) => {
-                response_storage.store_text(user_msg_id, format!("Error: {}", e));
+                response_storage.store_text(user_msg_id, format!("Error: {}", e)).await;
                 return;
             }
         };
@@ -106,19 +106,19 @@ pub async fn send_chat_message(
             Ok((_, response)) => {
                 match response {
                     AgentResponse::Text(text) => {
-                        response_storage.store_text(user_msg_id, text);
+                        response_storage.store_text(user_msg_id, text).await;
                     }
                     AgentResponse::SchemaGenerated { text, schema, .. } => {
                         let schema_json = serde_json::to_string(&schema).unwrap_or_default();
-                        response_storage.store_schema(user_msg_id, text, schema_json);
+                        response_storage.store_schema(user_msg_id, text, schema_json).await;
                     }
                     AgentResponse::Stopped(text) => {
-                        response_storage.store_stopped(user_msg_id, text);
+                        response_storage.store_stopped(user_msg_id, text).await;
                     }
                 }
             }
             Err(e) => {
-                response_storage.store_text(user_msg_id, format!("Error: {}", e));
+                response_storage.store_text(user_msg_id, format!("Error: {}", e)).await;
             }
         }
     });
@@ -137,43 +137,51 @@ pub async fn send_chat_message(
 pub async fn get_message_response(
     state: web::Data<AgentState>,
     path: web::Path<i64>,
-) -> impl Responder {
+) -> HttpResponse {
     let message_id = path.into_inner();
     let max_wait = Duration::from_secs(60); // Browser-friendly timeout
-    let poll_interval = Duration::from_millis(100);
+    let poll_interval = Duration::from_millis(500);
     let start_time = std::time::Instant::now();
+    
+    log::info!("Polling for response for message_id: {}", message_id);
     
     // Poll for response with timeout
     loop {
-        if let Some(stored) = state.response_storage.get(message_id) {
-            let payload = match stored.response_type.as_str() {
-                "text" => AgentResponsePayload::Text { text: stored.text },
-                "schema_generated" => {
-                    let schema = stored.schema_json
-                        .and_then(|s| serde_json::from_str(&s).ok())
-                        .unwrap_or(serde_json::Value::Null);
-                    AgentResponsePayload::SchemaGenerated {
-                        text: stored.text,
-                        schema,
-                        preview: true,
+        match state.response_storage.get(message_id).await {
+            Some(stored) => {
+                log::info!("Found stored response for message_id: {} with type: {}", message_id, stored.response_type);
+                let payload = match stored.response_type.as_str() {
+                    "text" => AgentResponsePayload::Text { text: stored.text },
+                    "schema_generated" => {
+                        let schema = stored.schema_json
+                            .and_then(|s| serde_json::from_str(&s).ok())
+                            .unwrap_or(serde_json::Value::Null);
+                        AgentResponsePayload::SchemaGenerated {
+                            text: stored.text,
+                            schema,
+                            preview: true,
+                        }
                     }
+                    "stopped" => AgentResponsePayload::Stopped { text: stored.text },
+                    _ => AgentResponsePayload::Pending,
+                };
+                
+                return HttpResponse::Ok().json(MessageResponse {
+                    message_id,
+                    response: payload,
+                });
+            }
+            None => {
+                log::debug!("No response yet for message_id: {}", message_id);
+                // No response yet, check timeout
+                if start_time.elapsed() >= max_wait {
+                    log::info!("Polling timeout for message_id: {}", message_id);
+                    return HttpResponse::Ok().json(MessageResponse {
+                        message_id,
+                        response: AgentResponsePayload::Pending,
+                    });
                 }
-                "stopped" => AgentResponsePayload::Stopped { text: stored.text },
-                _ => AgentResponsePayload::Pending,
-            };
-            
-            return HttpResponse::Ok().json(MessageResponse {
-                message_id,
-                response: payload,
-            });
-        }
-        
-        // Check timeout
-        if start_time.elapsed() >= max_wait {
-            return HttpResponse::Ok().json(MessageResponse {
-                message_id,
-                response: AgentResponsePayload::Pending,
-            });
+            }
         }
         
         // Wait before next poll

@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use tokio::sync::RwLock;
 
 /// In-memory storage for agent responses that are pending or completed.
 pub struct ResponseStorage {
-    responses: Mutex<HashMap<i64, StoredResponse>>,
+    responses: RwLock<HashMap<i64, StoredResponse>>,
 }
 
 #[derive(Clone, Debug)]
@@ -18,12 +18,12 @@ pub struct StoredResponse {
 impl ResponseStorage {
     pub fn new() -> Self {
         Self {
-            responses: Mutex::new(HashMap::new()),
+            responses: RwLock::new(HashMap::new()),
         }
     }
 
-    pub fn store_pending(&self, message_id: i64) {
-        let mut responses = self.responses.lock().unwrap();
+    pub async fn store_pending(&self, message_id: i64) {
+        let mut responses = self.responses.write().await;
         responses.insert(
             message_id,
             StoredResponse {
@@ -35,8 +35,8 @@ impl ResponseStorage {
         );
     }
 
-    pub fn store_text(&self, message_id: i64, text: String) {
-        let mut responses = self.responses.lock().unwrap();
+    pub async fn store_text(&self, message_id: i64, text: String) {
+        let mut responses = self.responses.write().await;
         responses.insert(
             message_id,
             StoredResponse {
@@ -48,8 +48,8 @@ impl ResponseStorage {
         );
     }
 
-    pub fn store_schema(&self, message_id: i64, text: String, schema_json: String) {
-        let mut responses = self.responses.lock().unwrap();
+    pub async fn store_schema(&self, message_id: i64, text: String, schema_json: String) {
+        let mut responses = self.responses.write().await;
         responses.insert(
             message_id,
             StoredResponse {
@@ -61,8 +61,8 @@ impl ResponseStorage {
         );
     }
 
-    pub fn store_stopped(&self, message_id: i64, text: String) {
-        let mut responses = self.responses.lock().unwrap();
+    pub async fn store_stopped(&self, message_id: i64, text: String) {
+        let mut responses = self.responses.write().await;
         responses.insert(
             message_id,
             StoredResponse {
@@ -74,8 +74,8 @@ impl ResponseStorage {
         );
     }
 
-    pub fn get(&self, message_id: i64) -> Option<StoredResponse> {
-        let responses = self.responses.lock().unwrap();
+    pub async fn get(&self, message_id: i64) -> Option<StoredResponse> {
+        let responses = self.responses.read().await;
         responses.get(&message_id).cloned()
     }
 }

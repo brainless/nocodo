@@ -44,6 +44,7 @@ export default defineConfig({
   ],
   base: '/admin/',
   server: {
+    host: '127.0.0.1',
     port: adminGuiPort,
     proxy: {
       '/api': `http://127.0.0.1:${backendPort}`,
