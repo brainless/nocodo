@@ -5,7 +5,7 @@ const columns = Array.from({ length: 12 }, (_, index) => String.fromCharCode(65 
 const rows = Array.from({ length: 28 }, (_, index) => index + 1);
 const sheets = ['Leads', 'Pipeline', 'Forecast', 'Invoices', 'Archive'];
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = '';  // Use relative URLs to leverage Vite proxy
 const PROJECT_ID = 1; // Default project for now
 
 export default function App() {

@@ -6,14 +6,62 @@ use tauri::Manager;
 
 struct ApiChild(Mutex<Option<Child>>);
 
+fn get_project_root() -> Option<std::path::PathBuf> {
+    // Try to find project.conf by walking up from current dir
+    let current_dir = std::env::current_dir().ok()?;
+    let mut dir: &Path = current_dir.as_path();
+    for _ in 0..10 {
+        if dir.join("project.conf").exists() {
+            return Some(dir.to_path_buf());
+        }
+        dir = dir.parent()?;
+    }
+    None
+}
+
 fn start_api(app: &tauri::AppHandle) -> Result<Child, String> {
+    let project_root = get_project_root();
+
     if let Ok(path) = std::env::var("NOCODO_BACKEND_PATH") {
-        return Command::new(path)
+        let mut cmd = Command::new(&path);
+        // Set working directory to project root so backend can find project.conf
+        if let Some(ref root) = project_root {
+            cmd.current_dir(root);
+        }
+        // Create new process group on Unix so we can kill the entire group
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            unsafe {
+                cmd.pre_exec(|| {
+                    // Create new process group (sets PGID to PID)
+                    libc::setpgid(0, 0);
+                    Ok(())
+                });
+            }
+        }
+        return cmd
             .spawn()
             .map_err(|e| format!("failed to spawn NOCODO_BACKEND_PATH: {e}"));
     }
     if let Ok(path) = std::env::var("DWATA_API_PATH") {
-        return Command::new(path)
+        let mut cmd = Command::new(&path);
+        // Set working directory to project root so backend can find project.conf
+        if let Some(ref root) = project_root {
+            cmd.current_dir(root);
+        }
+        // Create new process group on Unix so we can kill the entire group
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            unsafe {
+                cmd.pre_exec(|| {
+                    libc::setpgid(0, 0);
+                    Ok(())
+                });
+            }
+        }
+        return cmd
             .spawn()
             .map_err(|e| format!("failed to spawn DWATA_API_PATH: {e}"));
     }
@@ -60,16 +108,58 @@ fn start_api(app: &tauri::AppHandle) -> Result<Child, String> {
         })?;
 
     eprintln!("[nocodo] starting backend from: {}", candidate.display());
-    Command::new(candidate)
-        .spawn()
+    let mut cmd = Command::new(&candidate);
+    // Set working directory to project root so backend can find project.conf
+    if let Some(ref root) = project_root {
+        cmd.current_dir(root);
+    }
+    // Create new process group on Unix so we can kill the entire group
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        unsafe {
+            cmd.pre_exec(|| {
+                libc::setpgid(0, 0);
+                Ok(())
+            });
+        }
+    }
+    cmd.spawn()
         .map_err(|e| format!("failed to spawn nocodo-backend sidecar: {e}"))
 }
 
 fn stop_api(app: &tauri::AppHandle) {
+    eprintln!("[nocodo] stopping backend...");
     if let Some(state) = app.try_state::<ApiChild>() {
         if let Some(mut child) = state.0.lock().ok().and_then(|mut g| g.take()) {
-            let _ = child.kill();
+            let pid = child.id() as i32;
+
+            #[cfg(unix)]
+            {
+                // On Unix, kill the process group to ensure all child processes are terminated
+                // The process group ID is the same as the child's PID since we called setpgid
+                unsafe {
+                    // Send SIGTERM to the process group (negative PID)
+                    libc::kill(-pid, libc::SIGTERM);
+                }
+
+                // Give it a moment to terminate gracefully
+                std::thread::sleep(std::time::Duration::from_millis(200));
+
+                // Force kill the process group if still running
+                unsafe {
+                    libc::kill(-pid, libc::SIGKILL);
+                }
+            }
+
+            #[cfg(not(unix))]
+            {
+                // On non-Unix systems, just kill the main process
+                let _ = child.kill();
+            }
+
             let _ = child.wait();
+            eprintln!("[nocodo] backend stopped");
         }
     }
 }
