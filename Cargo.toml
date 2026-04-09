@@ -1,5 +1,5 @@
 [workspace]
-members = ["backend", "shared-types"]
+members = ["backend", "shared-types", "agents"]
 exclude = ["gui"]
 resolver = "2"
 
