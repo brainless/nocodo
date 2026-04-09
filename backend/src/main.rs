@@ -5,6 +5,7 @@ use shared_types::HeartbeatResponse;
 mod agents;
 mod auth;
 mod config;
+mod db;
 
 #[get("/api/heartbeat")]
 async fn heartbeat() -> impl Responder {
@@ -18,6 +19,30 @@ async fn heartbeat() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Initialize logging
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_secs()
+        .init();
+    
+    // Run database migrations on startup
+    let database_url = std::env::var("DATABASE_URL")
+        .ok()
+        .or_else(|| config::read_project_conf("DATABASE_URL"))
+        .unwrap_or_else(|| "nocodo.db".to_string());
+    
+    if let Err(e) = db::run_startup_migrations(&database_url) {
+        eprintln!("Warning: Failed to run migrations: {}", e);
+    } else {
+        println!("Database migrations applied successfully");
+    }
+    
+    // Ensure a default project exists (needed for agent chat sessions)
+    if let Err(e) = db::ensure_default_project(&database_url) {
+        eprintln!("Warning: Failed to ensure default project: {}", e);
+    } else {
+        println!("Default project ready");
+    }
+    
     let backend_host = std::env::var("BACKEND_HOST")
         .ok()
         .or_else(|| config::read_project_conf("BACKEND_HOST"))

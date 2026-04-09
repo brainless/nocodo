@@ -69,12 +69,16 @@ impl SchemaDesignerAgent {
     /// Session is created automatically on first call and resumed on subsequent calls.
     /// Set `preview_mode=true` to return schema without persisting to DB.
     pub async fn chat(&self, user_text: &str, preview_mode: bool) -> Result<AgentResponse, AgentError> {
+        log::info!("[Agent] Starting chat for project={}, preview={}", self.project_id, preview_mode);
+        log::debug!("[Agent] User message: {}", user_text);
+        
         // Always resume the single session for this project + agent type.
         let session = self
             .storage
             .get_or_create_session(self.project_id, AGENT_TYPE)
             .await?;
         let session_id = session.id.expect("session must have id after get_or_create");
+        log::info!("[Agent] Using session_id={}", session_id);
 
         // Persist the incoming user message.
         let user_msg_id = self.storage
@@ -177,7 +181,12 @@ impl SchemaDesignerAgent {
                 response_format: None,
             };
 
+            log::debug!("[Agent] Sending {} messages to LLM", request.messages.len());
+            log::info!("[Agent] Calling LLM with model={}", self.model);
+            
             let response = self.llm_client.complete(request).await?;
+            
+            log::info!("[Agent] LLM response received, stop_reason={:?}", response.stop_reason);
 
             // Extract text content from the response.
             let assistant_text = response
@@ -210,11 +219,17 @@ impl SchemaDesignerAgent {
 
             // Handle tool calls.
             if let Some(tool_calls) = response.tool_calls {
+                log::info!("[Agent] LLM made {} tool call(s)", tool_calls.len());
                 for tool_call in tool_calls {
-                    match tool_call.name() {
+                    let tool_name = tool_call.name();
+                    let call_id = tool_call.id();
+                    log::info!("[Agent] Tool call: name={}, call_id={}", tool_name, call_id);
+                    match tool_name {
                         "generate_schema" => {
+                            log::info!("[Agent] Processing generate_schema tool call");
                             let params: GenerateSchemaParams =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            log::debug!("[Agent] Schema params parsed: {} tables", params.tables.len());
 
                             let schema_json = serde_json::to_string(&params)?;
 
@@ -251,12 +266,15 @@ impl SchemaDesignerAgent {
 
                             // Save schema to DB only if not in preview mode
                             let (schema_row_id, result_text) = if preview_mode {
+                                log::info!("[Agent] Schema generated in preview mode - not saving to DB");
                                 (0, "Schema generated (preview mode - not saved).".to_string())
                             } else {
+                                log::info!("[Agent] Saving schema to database...");
                                 let row_id = self
                                     .schema_storage
                                     .save_schema(self.project_id, session_id, &schema_json)
                                     .await?;
+                                log::info!("[Agent] Schema saved with row_id={}", row_id);
                                 (row_id, format!("Schema stored successfully as version {}.", row_id))
                             };
 
@@ -276,6 +294,7 @@ impl SchemaDesignerAgent {
                                 })
                                 .await?;
 
+                            log::info!("[Agent] Returning SchemaGenerated response");
                             return Ok(AgentResponse::SchemaGenerated {
                                 text: assistant_text,
                                 schema: params,
@@ -284,8 +303,10 @@ impl SchemaDesignerAgent {
                         }
 
                         "stop_agent" => {
+                            log::info!("[Agent] Processing stop_agent tool call");
                             let params: StopAgentParams =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            log::info!("[Agent] Stop reason: {}", params.reply);
 
                             // Persist the stop call.
                             let msg_id = match assistant_msg_id {
@@ -316,10 +337,12 @@ impl SchemaDesignerAgent {
                                 })
                                 .await?;
 
+                            log::info!("[Agent] Returning Stopped response");
                             return Ok(AgentResponse::Stopped(params.reply));
                         }
 
                         unknown => {
+                            log::error!("[Agent] Unknown tool called: {}", unknown);
                             return Err(AgentError::Other(format!(
                                 "Model called unknown tool: {}",
                                 unknown
@@ -331,12 +354,15 @@ impl SchemaDesignerAgent {
 
             // No tool call: if the model produced text we can return it.
             if !assistant_text.is_empty() {
+                log::info!("[Agent] Returning Text response ({} chars)", assistant_text.len());
                 return Ok(AgentResponse::Text(assistant_text));
             }
 
             // No text and no tool call — nudge the model.
             nudges += 1;
+            log::warn!("[Agent] No response from model, nudge {}/{}", nudges, MAX_NUDGES);
             if nudges >= MAX_NUDGES {
+                log::error!("[Agent] Max nudges reached, giving up");
                 return Err(AgentError::Other(
                     "Model did not produce a response after multiple nudges.".to_string(),
                 ));

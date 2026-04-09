@@ -87,16 +87,31 @@ fn read_conf_file(path: &Path, key: &str) -> Option<String> {
 }
 
 fn exe_dir() -> Option<PathBuf> {
-    std::env::current_exe().ok()?.parent().map(|p| p.to_path_buf())
+    std::env::current_exe()
+        .ok()?
+        .parent()
+        .map(|p| p.to_path_buf())
 }
 
 fn read_project_conf(key: &str) -> Option<String> {
     let mut candidates = vec![
         PathBuf::from("project.conf"),
         PathBuf::from("../project.conf"),
+        PathBuf::from("../../project.conf"),
     ];
+
+    // Check relative to executable (for Tauri apps)
     if let Some(dir) = exe_dir() {
         candidates.push(dir.join("server.env"));
+        candidates.push(dir.join("project.conf"));
+        candidates.push(dir.parent()?.join("project.conf"));
+        candidates.push(dir.parent()?.parent()?.join("project.conf"));
     }
+
+    // Allow PROJECT_ROOT env var to specify where project.conf lives
+    if let Ok(project_root) = std::env::var("PROJECT_ROOT") {
+        candidates.push(PathBuf::from(&project_root).join("project.conf"));
+    }
+
     candidates.iter().find_map(|p| read_conf_file(p, key))
 }

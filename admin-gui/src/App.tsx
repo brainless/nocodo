@@ -5,6 +5,9 @@ const columns = Array.from({ length: 12 }, (_, index) => String.fromCharCode(65 
 const rows = Array.from({ length: 28 }, (_, index) => index + 1);
 const sheets = ['Leads', 'Pipeline', 'Forecast', 'Invoices', 'Archive'];
 
+const API_BASE_URL = 'http://localhost:8080';
+const PROJECT_ID = 1; // Default project for now
+
 export default function App() {
   const [selectedCell, setSelectedCell] = createSignal({ col: 'B', row: 6 });
   // Store raw formulas/values for editing in the formula bar
@@ -28,6 +31,8 @@ export default function App() {
     { role: 'assistant', content: 'Hello! I can help you with your spreadsheet. What would you like to do?' }
   ]);
   const [inputValue, setInputValue] = createSignal('');
+  const [sessionId, setSessionId] = createSignal<number | null>(null);
+  const [isLoading, setIsLoading] = createSignal(false);
 
   const getCellKey = (col: string, row: number) => `${col}${row}`;
 
@@ -52,17 +57,102 @@ export default function App() {
     setCellFormulas({ ...cellFormulas(), [key]: value });
   };
 
-  const handleSend = () => {
-    if (!inputValue().trim()) return;
-    setMessages([...messages(), { role: 'user', content: inputValue() }]);
-    setInputValue('');
-    // Simulate AI response
-    setTimeout(() => {
+  const pollForResponse = async (messageId: number) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/agents/schema-designer/messages/${messageId}/response`,
+        { 
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.response && data.response.type === 'pending') {
+        // Still pending, poll again after a short delay
+        setTimeout(() => pollForResponse(messageId), 500);
+        return;
+      }
+      
+      // We have a response
+      if (data.response) {
+        const responseText = data.response.text || 'No response from agent';
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: responseText 
+        }]);
+      } else {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: 'No response received' 
+        }]);
+      }
+    } catch (error) {
+      console.error('Error polling for response:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'I received your message. How else can I help you?' 
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to get response'}` 
       }]);
-    }, 500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSend = async () => {
+    const message = inputValue().trim();
+    if (!message) return;
+    
+    // Add user message to UI immediately
+    setMessages([...messages(), { role: 'user', content: message }]);
+    setInputValue('');
+    setIsLoading(true);
+    
+    try {
+      // Send message to API
+      const response = await fetch(`${API_BASE_URL}/api/agents/schema-designer/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: PROJECT_ID,
+          session_id: sessionId(),
+          message: message
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Store session_id if this is a new session
+      if (data.session_id && !sessionId()) {
+        setSessionId(data.session_id);
+      }
+      
+      // Start polling for the response
+      if (data.message_id) {
+        pollForResponse(data.message_id);
+      } else {
+        setIsLoading(false);
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: 'Error: No message ID received' 
+        }]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsLoading(false);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to send message'}` 
+      }]);
+    }
   };
 
   return (
@@ -163,10 +253,11 @@ export default function App() {
                   class="chat-input-field"
                   value={inputValue()}
                   onInput={(e) => setInputValue(e.currentTarget.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  onKeyDown={(e) => e.key === 'Enter' && !isLoading() && handleSend()}
+                  disabled={isLoading()}
                 />
-                <button class="chat-send-btn" onClick={handleSend}>
-                  Send
+                <button class="chat-send-btn" onClick={handleSend} disabled={isLoading()}>
+                  {isLoading() ? '...' : 'Send'}
                 </button>
               </div>
             </div>
