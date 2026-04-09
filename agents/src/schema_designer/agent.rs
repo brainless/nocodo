@@ -67,7 +67,8 @@ impl SchemaDesignerAgent {
 
     /// Process one user message and return the agent's response.
     /// Session is created automatically on first call and resumed on subsequent calls.
-    pub async fn chat(&self, user_text: &str) -> Result<AgentResponse, AgentError> {
+    /// Set `preview_mode=true` to return schema without persisting to DB.
+    pub async fn chat(&self, user_text: &str, preview_mode: bool) -> Result<AgentResponse, AgentError> {
         // Always resume the single session for this project + agent type.
         let session = self
             .storage
@@ -76,7 +77,7 @@ impl SchemaDesignerAgent {
         let session_id = session.id.expect("session must have id after get_or_create");
 
         // Persist the incoming user message.
-        self.storage
+        let user_msg_id = self.storage
             .create_message(ChatMessage {
                 id: None,
                 session_id,
@@ -87,14 +88,43 @@ impl SchemaDesignerAgent {
             })
             .await?;
 
-        self.run_loop(session_id).await
+        self.run_loop(session_id, user_msg_id, preview_mode).await
+    }
+
+    /// Continue an existing chat session with a new user message.
+    /// Returns (session_id, user_message_id) for the API to track.
+    pub async fn chat_with_session(
+        &self,
+        session_id: i64,
+        user_text: &str,
+        preview_mode: bool,
+    ) -> Result<(i64, AgentResponse), AgentError> {
+        // Persist the incoming user message.
+        let user_msg_id = self.storage
+            .create_message(ChatMessage {
+                id: None,
+                session_id,
+                role: "user".to_string(),
+                content: user_text.to_string(),
+                tool_call_id: None,
+                created_at: 0,
+            })
+            .await?;
+
+        let response = self.run_loop(session_id, user_msg_id, preview_mode).await?;
+        Ok((user_msg_id, response))
     }
 
     // -----------------------------------------------------------------------
     // Internal: drive the LLM loop until a final response is produced.
     // -----------------------------------------------------------------------
 
-    async fn run_loop(&self, session_id: i64) -> Result<AgentResponse, AgentError> {
+    async fn run_loop(
+        &self,
+        session_id: i64,
+        _user_msg_id: i64,
+        preview_mode: bool,
+    ) -> Result<AgentResponse, AgentError> {
         let generate_schema_tool = Tool::from_type::<GenerateSchemaParams>()
             .name("generate_schema")
             .description(
@@ -219,16 +249,16 @@ impl SchemaDesignerAgent {
                                 })
                                 .await?;
 
-                            // Persist the schema.
-                            let schema_row_id = self
-                                .schema_storage
-                                .save_schema(self.project_id, session_id, &schema_json)
-                                .await?;
-
-                            let result_text = format!(
-                                "Schema stored successfully as version {}.",
-                                schema_row_id
-                            );
+                            // Save schema to DB only if not in preview mode
+                            let (schema_row_id, result_text) = if preview_mode {
+                                (0, "Schema generated (preview mode - not saved).".to_string())
+                            } else {
+                                let row_id = self
+                                    .schema_storage
+                                    .save_schema(self.project_id, session_id, &schema_json)
+                                    .await?;
+                                (row_id, format!("Schema stored successfully as version {}.", row_id))
+                            };
 
                             self.storage
                                 .update_tool_call_result(tc_id, &result_text)

@@ -1,0 +1,182 @@
+use actix_web::{get, post, web, HttpResponse, Responder};
+use std::sync::Arc;
+use nocodo_agents::{AgentConfig, AgentStorage, build_schema_designer};
+use nocodo_agents::storage::sqlite::SqliteAgentStorage;
+use nocodo_agents::schema_designer::AgentResponse;
+use std::time::Duration;
+
+use crate::config;
+
+mod types;
+use types::{ChatRequest, ChatResponse, MessageResponse, AgentResponsePayload, ResponseStorage};
+
+pub struct AgentState {
+    config: AgentConfig,
+    db_path: String,
+    response_storage: Arc<ResponseStorage>,
+}
+
+impl AgentState {
+    pub fn new() -> Result<Self, String> {
+        let config = AgentConfig::load().map_err(|e| format!("Failed to load agent config: {}", e))?;
+        let db_path = config::read_project_conf("DATABASE_URL")
+            .unwrap_or_else(|| "nocodo.db".to_string());
+        
+        Ok(Self {
+            config,
+            db_path,
+            response_storage: Arc::new(ResponseStorage::new()),
+        })
+    }
+}
+
+impl Default for AgentState {
+    fn default() -> Self {
+        Self::new().expect("Failed to initialize agent state")
+    }
+}
+
+/// POST /api/agents/schema-designer/chat
+/// Send a message to the schema designer agent.
+/// Creates a new session if session_id is None, or continues existing session.
+/// Returns immediately with session_id and message_id.
+#[post("/api/agents/schema-designer/chat")]
+pub async fn send_chat_message(
+    state: web::Data<AgentState>,
+    request: web::Json<ChatRequest>,
+) -> impl Responder {
+    let ChatRequest { project_id, session_id, message } = request.into_inner();
+    
+    // Get or create session to determine the actual session_id
+    let agent_storage = match SqliteAgentStorage::open(&state.db_path) {
+        Ok(storage) => storage,
+        Err(e) => return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Failed to open storage: {}", e)
+        })),
+    };
+    
+    let actual_session_id = match agent_storage
+        .get_or_create_session(project_id, "schema_designer")
+        .await 
+    {
+        Ok(session) => session.id.unwrap_or(0),
+        Err(e) => return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Session error: {}", e)
+        })),
+    };
+    
+    // Override with provided session_id if continuing existing session
+    let target_session_id = session_id.unwrap_or(actual_session_id);
+    
+    // Store user message and get message ID
+    let user_msg_id = match agent_storage.create_message(nocodo_agents::storage::ChatMessage {
+        id: None,
+        session_id: target_session_id,
+        role: "user".to_string(),
+        content: message.clone(),
+        tool_call_id: None,
+        created_at: 0,
+    }).await {
+        Ok(id) => id,
+        Err(e) => return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Failed to store message: {}", e)
+        })),
+    };
+    
+    // Mark as pending in response storage
+    state.response_storage.store_pending(user_msg_id);
+    
+    // Spawn the agent processing in a background task
+    let response_storage = state.response_storage.clone();
+    let config = state.config.clone();
+    let db_path = state.db_path.clone();
+    
+    actix_web::rt::spawn(async move {
+        // Build the agent
+        let agent = match build_schema_designer(&config, &db_path, project_id) {
+            Ok(agent) => agent,
+            Err(e) => {
+                response_storage.store_text(user_msg_id, format!("Error: {}", e));
+                return;
+            }
+        };
+        
+        // Run agent in preview mode
+        match agent.chat_with_session(target_session_id, &message, true).await {
+            Ok((_, response)) => {
+                match response {
+                    AgentResponse::Text(text) => {
+                        response_storage.store_text(user_msg_id, text);
+                    }
+                    AgentResponse::SchemaGenerated { text, schema, .. } => {
+                        let schema_json = serde_json::to_string(&schema).unwrap_or_default();
+                        response_storage.store_schema(user_msg_id, text, schema_json);
+                    }
+                    AgentResponse::Stopped(text) => {
+                        response_storage.store_stopped(user_msg_id, text);
+                    }
+                }
+            }
+            Err(e) => {
+                response_storage.store_text(user_msg_id, format!("Error: {}", e));
+            }
+        }
+    });
+    
+    HttpResponse::Ok().json(ChatResponse {
+        session_id: target_session_id,
+        message_id: user_msg_id,
+        status: "pending".to_string(),
+    })
+}
+
+/// GET /api/agents/schema-designer/messages/{message_id}/response
+/// Long-poll for the agent's response to a specific message.
+/// Returns immediately if response is ready, otherwise waits up to browser max timeout.
+#[get("/api/agents/schema-designer/messages/{message_id}/response")]
+pub async fn get_message_response(
+    state: web::Data<AgentState>,
+    path: web::Path<i64>,
+) -> impl Responder {
+    let message_id = path.into_inner();
+    let max_wait = Duration::from_secs(60); // Browser-friendly timeout
+    let poll_interval = Duration::from_millis(100);
+    let start_time = std::time::Instant::now();
+    
+    // Poll for response with timeout
+    loop {
+        if let Some(stored) = state.response_storage.get(message_id) {
+            let payload = match stored.response_type.as_str() {
+                "text" => AgentResponsePayload::Text { text: stored.text },
+                "schema_generated" => {
+                    let schema = stored.schema_json
+                        .and_then(|s| serde_json::from_str(&s).ok())
+                        .unwrap_or(serde_json::Value::Null);
+                    AgentResponsePayload::SchemaGenerated {
+                        text: stored.text,
+                        schema,
+                        preview: true,
+                    }
+                }
+                "stopped" => AgentResponsePayload::Stopped { text: stored.text },
+                _ => AgentResponsePayload::Pending,
+            };
+            
+            return HttpResponse::Ok().json(MessageResponse {
+                message_id,
+                response: payload,
+            });
+        }
+        
+        // Check timeout
+        if start_time.elapsed() >= max_wait {
+            return HttpResponse::Ok().json(MessageResponse {
+                message_id,
+                response: AgentResponsePayload::Pending,
+            });
+        }
+        
+        // Wait before next poll
+        actix_web::rt::time::sleep(poll_interval).await;
+    }
+}

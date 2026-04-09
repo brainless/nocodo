@@ -15,4 +15,7 @@ refinery = { version = "0.8", default-features = false }
 postgres = { version = "0.19", optional = true }
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 serde.workspace = true
+serde_json.workspace = true
 shared-types = { path = "../shared-types" }
+nocodo-agents = { path = "../agents" }
+tokio = { version = "1.0", features = ["sync"] }

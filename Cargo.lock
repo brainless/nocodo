@@ -1158,11 +1158,14 @@ version = "0.1.0"
 dependencies = [
  "actix-cors",
  "actix-web",
+ "nocodo-agents",
  "postgres",
  "refinery",
  "rusqlite",
  "serde",
+ "serde_json",
  "shared-types",
+ "tokio",
 ]
 
 [[package]]

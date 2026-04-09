@@ -2,6 +2,7 @@ use actix_cors::Cors;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use shared_types::HeartbeatResponse;
 
+mod agents;
 mod auth;
 mod config;
 
@@ -71,13 +72,25 @@ async fn main() -> std::io::Result<()> {
         }
 
         let cors = cors
-            .allowed_methods(vec!["GET"])
+            .allowed_methods(vec!["GET", "POST"])
             .allow_any_header();
+
+        // Initialize agent state
+        let agent_state = match agents::AgentState::new() {
+            Ok(state) => web::Data::new(state),
+            Err(e) => {
+                eprintln!("Warning: Failed to initialize agent state: {}", e);
+                web::Data::new(agents::AgentState::default())
+            }
+        };
 
         App::new()
             .wrap(cors)
             .app_data(web::JsonConfig::default())
+            .app_data(agent_state)
             .service(heartbeat)
+            .service(agents::send_chat_message)
+            .service(agents::get_message_response)
     })
     .bind((backend_host.as_str(), backend_port))?
     .run()
