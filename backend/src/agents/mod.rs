@@ -149,6 +149,19 @@ pub async fn get_message_response(
     loop {
         match state.response_storage.get(message_id).await {
             Some(stored) => {
+                if stored.response_type == "pending" {
+                    // Keep the HTTP request open while work is still pending.
+                    if start_time.elapsed() >= max_wait {
+                        log::info!("Polling timeout for pending message_id: {}", message_id);
+                        return HttpResponse::Ok().json(MessageResponse {
+                            message_id,
+                            response: AgentResponsePayload::Pending,
+                        });
+                    }
+                    actix_web::rt::time::sleep(poll_interval).await;
+                    continue;
+                }
+
                 log::info!("Found stored response for message_id: {} with type: {}", message_id, stored.response_type);
                 let payload = match stored.response_type.as_str() {
                     "text" => AgentResponsePayload::Text { text: stored.text },
@@ -165,7 +178,7 @@ pub async fn get_message_response(
                     "stopped" => AgentResponsePayload::Stopped { text: stored.text },
                     _ => AgentResponsePayload::Pending,
                 };
-                
+
                 return HttpResponse::Ok().json(MessageResponse {
                     message_id,
                     response: payload,

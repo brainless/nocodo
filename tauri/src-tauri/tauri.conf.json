@@ -6,7 +6,7 @@
   "build": {
     "frontendDist": "../../admin-gui/dist",
     "devUrl": "http://127.0.0.1:6626",
-    "beforeDevCommand": "cd .. && cargo build -p nocodo-backend && mkdir -p tauri/bin && cp target/debug/nocodo-backend tauri/bin/nocodo-backend-aarch64-apple-darwin && npm --prefix admin-gui run dev",
+    "beforeDevCommand": "cd .. && ./tauri/scripts/dev-admin-gui.sh",
     "beforeBuildCommand": "npm --prefix ../admin-gui run build",
     "removeUnusedCommands": true
   },

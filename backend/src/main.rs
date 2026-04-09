@@ -81,6 +81,15 @@ async fn main() -> std::io::Result<()> {
     let admin_origin_local = format!("http://localhost:{admin_gui_port}");
     let domain_origin_https = domain_name.as_deref().map(|d| format!("https://{d}"));
     let domain_origin_http = domain_name.as_deref().map(|d| format!("http://{d}"));
+    
+    // Create one shared agent state for all Actix workers.
+    let agent_state = match agents::AgentState::new() {
+        Ok(state) => web::Data::new(state),
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize agent state: {}", e);
+            web::Data::new(agents::AgentState::default())
+        }
+    };
 
     HttpServer::new(move || {
         let mut cors = Cors::default()
@@ -100,19 +109,10 @@ async fn main() -> std::io::Result<()> {
             .allowed_methods(vec!["GET", "POST"])
             .allow_any_header();
 
-        // Initialize agent state
-        let agent_state = match agents::AgentState::new() {
-            Ok(state) => web::Data::new(state),
-            Err(e) => {
-                eprintln!("Warning: Failed to initialize agent state: {}", e);
-                web::Data::new(agents::AgentState::default())
-            }
-        };
-
         App::new()
             .wrap(cors)
             .app_data(web::JsonConfig::default())
-            .app_data(agent_state)
+            .app_data(agent_state.clone())
             .service(heartbeat)
             .service(agents::send_chat_message)
             .service(agents::get_message_response)
