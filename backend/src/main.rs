@@ -23,26 +23,26 @@ async fn main() -> std::io::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_secs()
         .init();
-    
+
     // Run database migrations on startup
     let database_url = std::env::var("DATABASE_URL")
         .ok()
         .or_else(|| config::read_project_conf("DATABASE_URL"))
         .unwrap_or_else(|| "nocodo.db".to_string());
-    
+
     if let Err(e) = db::run_startup_migrations(&database_url) {
         eprintln!("Warning: Failed to run migrations: {}", e);
     } else {
         println!("Database migrations applied successfully");
     }
-    
+
     // Ensure a default project exists (needed for agent chat sessions)
     if let Err(e) = db::ensure_default_project(&database_url) {
         eprintln!("Warning: Failed to ensure default project: {}", e);
     } else {
         println!("Default project ready");
     }
-    
+
     let backend_host = std::env::var("BACKEND_HOST")
         .ok()
         .or_else(|| config::read_project_conf("BACKEND_HOST"))
@@ -81,7 +81,7 @@ async fn main() -> std::io::Result<()> {
     let admin_origin_local = format!("http://localhost:{admin_gui_port}");
     let domain_origin_https = domain_name.as_deref().map(|d| format!("https://{d}"));
     let domain_origin_http = domain_name.as_deref().map(|d| format!("http://{d}"));
-    
+
     // Create one shared agent state for all Actix workers.
     let agent_state = match agents::AgentState::new() {
         Ok(state) => web::Data::new(state),
@@ -105,9 +105,7 @@ async fn main() -> std::io::Result<()> {
             cors = cors.allowed_origin(origin);
         }
 
-        let cors = cors
-            .allowed_methods(vec!["GET", "POST"])
-            .allow_any_header();
+        let cors = cors.allowed_methods(vec!["GET", "POST"]).allow_any_header();
 
         App::new()
             .wrap(cors)
@@ -115,6 +113,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(agent_state.clone())
             .service(heartbeat)
             .service(agents::send_chat_message)
+            .service(agents::get_session_messages)
             .service(agents::get_message_response)
     })
     .bind((backend_host.as_str(), backend_port))?

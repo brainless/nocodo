@@ -38,10 +38,8 @@ pub fn build_schema_designer(
         ),
     };
 
-    let storage: Arc<dyn AgentStorage> =
-        Arc::new(SqliteAgentStorage::open(db_path)?);
-    let schema_storage: Arc<dyn SchemaStorage> =
-        Arc::new(SqliteSchemaStorage::open(db_path)?);
+    let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
+    let schema_storage: Arc<dyn SchemaStorage> = Arc::new(SqliteSchemaStorage::open(db_path)?);
 
     Ok(SchemaDesignerAgent::new(
         client,

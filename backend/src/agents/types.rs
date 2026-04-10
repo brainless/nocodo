@@ -122,3 +122,17 @@ pub struct MessageResponse {
     pub message_id: i64,
     pub response: AgentResponsePayload,
 }
+
+#[derive(Debug, Serialize)]
+pub struct ChatHistoryMessage {
+    pub id: i64,
+    pub role: String,
+    pub content: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ChatHistoryResponse {
+    pub session_id: i64,
+    pub messages: Vec<ChatHistoryMessage>,
+}

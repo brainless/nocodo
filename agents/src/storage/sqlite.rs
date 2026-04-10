@@ -32,6 +32,49 @@ impl SqliteAgentStorage {
         let conn = Connection::open(path)?;
         Ok(Self::new(conn))
     }
+
+    pub async fn create_session(
+        &self,
+        project_id: i64,
+        agent_type: &str,
+    ) -> Result<Session, AgentError> {
+        let created_at = now();
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO agent_chat_session (project_id, agent_type, created_at)
+             VALUES (?1, ?2, ?3)",
+            params![project_id, agent_type, created_at],
+        )?;
+        let id = conn.last_insert_rowid();
+        Ok(Session {
+            id: Some(id),
+            project_id,
+            agent_type: agent_type.to_string(),
+            created_at,
+        })
+    }
+
+    pub async fn get_session_by_id(&self, session_id: i64) -> Result<Option<Session>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let session = conn
+            .query_row(
+                "SELECT id, project_id, agent_type, created_at
+                 FROM agent_chat_session
+                 WHERE id = ?1
+                 LIMIT 1",
+                params![session_id],
+                |row| {
+                    Ok(Session {
+                        id: Some(row.get(0)?),
+                        project_id: row.get(1)?,
+                        agent_type: row.get(2)?,
+                        created_at: row.get(3)?,
+                    })
+                },
+            )
+            .optional()?;
+        Ok(session)
+    }
 }
 
 #[async_trait]
@@ -80,12 +123,22 @@ impl AgentStorage for SqliteAgentStorage {
     }
 
     async fn create_message(&self, msg: ChatMessage) -> Result<i64, AgentError> {
-        let created_at = if msg.created_at == 0 { now() } else { msg.created_at };
+        let created_at = if msg.created_at == 0 {
+            now()
+        } else {
+            msg.created_at
+        };
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO agent_chat_message (session_id, role, content, tool_call_id, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![msg.session_id, msg.role, msg.content, msg.tool_call_id, created_at],
+            params![
+                msg.session_id,
+                msg.role,
+                msg.content,
+                msg.tool_call_id,
+                created_at
+            ],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -116,7 +169,11 @@ impl AgentStorage for SqliteAgentStorage {
     }
 
     async fn create_tool_call(&self, record: ToolCallRecord) -> Result<i64, AgentError> {
-        let created_at = if record.created_at == 0 { now() } else { record.created_at };
+        let created_at = if record.created_at == 0 {
+            now()
+        } else {
+            record.created_at
+        };
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO agent_tool_call (message_id, call_id, tool_name, arguments, result, created_at)

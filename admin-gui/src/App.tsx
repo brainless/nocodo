@@ -8,6 +8,20 @@ const sheets = ['Leads', 'Pipeline', 'Forecast', 'Invoices', 'Archive'];
 const API_BASE_URL = '';  // Use relative URLs to leverage Vite proxy
 const PROJECT_ID = 1; // Default project for now
 
+type ChatRole = 'user' | 'assistant';
+type UiMessage = { role: ChatRole; content: string };
+type HistoryMessage = {
+  id: number;
+  role: string;
+  content: string;
+  created_at: number;
+};
+
+const defaultAssistantMessage: UiMessage = {
+  role: 'assistant',
+  content: 'Hello! I can help you with your spreadsheet. What would you like to do?'
+};
+
 export default function App() {
   const [selectedCell, setSelectedCell] = createSignal({ col: 'B', row: 6 });
   // Store raw formulas/values for editing in the formula bar
@@ -27,9 +41,7 @@ export default function App() {
     'B6': '=SUM(B2:B5)'
   });
   const [formulaValue, setFormulaValue] = createSignal('=SUM(B2:B5)');
-  const [messages, setMessages] = createSignal<{role: 'user' | 'assistant', content: string}[]>([
-    { role: 'assistant', content: 'Hello! I can help you with your spreadsheet. What would you like to do?' }
-  ]);
+  const [messages, setMessages] = createSignal<UiMessage[]>([defaultAssistantMessage]);
   const [inputValue, setInputValue] = createSignal('');
   const [sessionId, setSessionId] = createSignal<number | null>(null);
   const [isLoading, setIsLoading] = createSignal(false);
@@ -57,7 +69,28 @@ export default function App() {
     setCellFormulas({ ...cellFormulas(), [key]: value });
   };
 
-  const pollForResponse = async (messageId: number) => {
+  const loadSessionHistory = async (targetSessionId: number) => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/agents/schema-designer/sessions/${targetSessionId}/messages`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json() as { messages?: HistoryMessage[] };
+    const history = (data.messages || [])
+      .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+      .map((msg) => ({ role: msg.role as ChatRole, content: msg.content }));
+
+    setMessages(history.length > 0 ? history : [defaultAssistantMessage]);
+  };
+
+  const pollForResponse = async (messageId: number, targetSessionId: number) => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/agents/schema-designer/messages/${messageId}/response`,
@@ -75,23 +108,11 @@ export default function App() {
       
       if (data.response && data.response.type === 'pending') {
         // Still pending, poll again after a short delay
-        setTimeout(() => pollForResponse(messageId), 500);
+        setTimeout(() => pollForResponse(messageId, targetSessionId), 500);
         return;
       }
       
-      // We have a response
-      if (data.response) {
-        const responseText = data.response.text || 'No response from agent';
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: responseText 
-        }]);
-      } else {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: 'No response received' 
-        }]);
-      }
+      await loadSessionHistory(targetSessionId);
     } catch (error) {
       console.error('Error polling for response:', error);
       setMessages(prev => [...prev, { 
@@ -131,13 +152,17 @@ export default function App() {
       const data = await response.json();
       
       // Store session_id if this is a new session
-      if (data.session_id && !sessionId()) {
+      if (data.session_id && data.session_id !== sessionId()) {
         setSessionId(data.session_id);
       }
       
       // Start polling for the response
       if (data.message_id) {
-        pollForResponse(data.message_id);
+        const targetSessionId = data.session_id || sessionId();
+        if (!targetSessionId) {
+          throw new Error('No session ID received');
+        }
+        pollForResponse(data.message_id, targetSessionId);
       } else {
         setIsLoading(false);
         setMessages(prev => [...prev, { 
@@ -230,16 +255,18 @@ export default function App() {
         <div class="drawer-side z-50">
           <label for="chat-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
           <div class="chat-sidebar">
-            <div class="chat-header">
-              <h3>AI Assistant</h3>
-              <label for="chat-drawer" class="chat-close-btn">✕</label>
+            <div class="chat-panel-header">
+              <h3 class="text-sm font-semibold">AI Assistant</h3>
+              <label for="chat-drawer" class="btn btn-ghost btn-sm btn-square">✕</label>
             </div>
             
             <div class="chat-messages">
               <For each={messages()}>
                 {(msg) => (
-                  <div class={`chat-message ${msg.role === 'user' ? 'chat-message-user' : 'chat-message-assistant'}`}>
-                    {msg.content}
+                  <div class={`chat ${msg.role === 'user' ? 'chat-end' : 'chat-start'}`}>
+                    <div class={`chat-bubble whitespace-pre-wrap ${msg.role === 'user' ? 'chat-bubble-primary' : ''}`}>
+                      {msg.content}
+                    </div>
                   </div>
                 )}
               </For>
@@ -250,13 +277,13 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="Ask me anything..."
-                  class="chat-input-field"
+                  class="input input-bordered input-sm chat-input-field"
                   value={inputValue()}
                   onInput={(e) => setInputValue(e.currentTarget.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !isLoading() && handleSend()}
                   disabled={isLoading()}
                 />
-                <button class="chat-send-btn" onClick={handleSend} disabled={isLoading()}>
+                <button class="btn btn-primary btn-sm chat-send-btn" onClick={handleSend} disabled={isLoading()}>
                   {isLoading() ? '...' : 'Send'}
                 </button>
               </div>

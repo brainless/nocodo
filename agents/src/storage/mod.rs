@@ -60,11 +60,7 @@ pub trait AgentStorage: Send + Sync {
 
     async fn create_tool_call(&self, record: ToolCallRecord) -> Result<i64, AgentError>;
 
-    async fn update_tool_call_result(
-        &self,
-        id: i64,
-        result: &str,
-    ) -> Result<(), AgentError>;
+    async fn update_tool_call_result(&self, id: i64, result: &str) -> Result<(), AgentError>;
 }
 
 // ---------------------------------------------------------------------------

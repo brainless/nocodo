@@ -22,7 +22,10 @@ fn read_conf_file(path: &Path, key: &str) -> Option<String> {
 }
 
 fn exe_dir() -> Option<PathBuf> {
-    std::env::current_exe().ok()?.parent().map(|p| p.to_path_buf())
+    std::env::current_exe()
+        .ok()?
+        .parent()
+        .map(|p| p.to_path_buf())
 }
 
 pub fn read_project_conf(key: &str) -> Option<String> {
