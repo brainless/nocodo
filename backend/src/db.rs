@@ -38,7 +38,7 @@ mod sqlite {
                 .as_secs() as i64;
 
             conn.execute(
-                "INSERT INTO project (id, name, created_at) VALUES (1, 'Default Project', ?1)",
+                "INSERT INTO project (id, name, path, created_at) VALUES (1, 'Default Project', './projects/default', ?1)",
                 [now],
             )
             .map_err(io::Error::other)?;

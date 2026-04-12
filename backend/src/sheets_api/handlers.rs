@@ -2,13 +2,13 @@ use actix_web::{get, web, HttpResponse, Responder, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use shared_types::{
     GetSheetResponse, GetSheetTabDataResponse, GetSheetTabSchemaResponse, ListSheetsResponse,
-    Sheet, SheetTab, SheetTabColumn, SheetTabRow,
+    Project, Sheet, SheetTab, SheetTabColumn, SheetTabRow,
 };
 
 use crate::config;
 
 use super::sheet_record::{
-    list_records, AgentChatMessage, AgentChatSession, AgentToolCall, Project, SheetRecord,
+    list_records, AgentChatMessage, AgentChatSession, AgentToolCall, SheetRecord,
 };
 use super::types::{GetSheetTabDataQuery, ListSheetsQuery};
 

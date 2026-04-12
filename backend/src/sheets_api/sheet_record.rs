@@ -8,6 +8,7 @@
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
+use shared_types::Project;
 
 /// Trait for records that correspond to a sheet_tab
 ///
@@ -94,14 +95,6 @@ pub fn get_record_by_id<T: SheetRecord>(
 // Concrete implementations for existing tables
 // ============================================================================
 
-/// Project record - maps to `project` table and sheet_tab "Projects"
-#[derive(Debug, Clone, Serialize)]
-pub struct Project {
-    pub id: i64,
-    pub name: String,
-    pub created_at: i64,
-}
-
 impl SheetRecord for Project {
     fn sheet_tab_id() -> i64 {
         6 // Projects tab (Nocodo Internal sheet)
@@ -112,14 +105,15 @@ impl SheetRecord for Project {
     }
 
     fn column_names() -> &'static [&'static str] {
-        &["id", "name", "created_at"]
+        &["id", "name", "path", "created_at"]
     }
 
     fn from_row(row: &Row) -> Result<Self, rusqlite::Error> {
         Ok(Project {
             id: row.get(0)?,
             name: row.get(1)?,
-            created_at: row.get(2)?,
+            path: row.get(2)?,
+            created_at: row.get(3)?,
         })
     }
 
@@ -132,11 +126,12 @@ impl SheetRecord for Project {
     }
 
     fn to_column_json(&self) -> serde_json::Value {
-        // Column IDs for Projects tab: 10=ID, 11=Name, 12=Created At
+        // Column IDs for Projects tab: 10=ID, 11=Name, 12=Path, 13=Created At
         serde_json::json!({
             "10": self.id,
             "11": &self.name,
-            "12": self.created_at
+            "12": &self.path,
+            "13": self.created_at
         })
     }
 }
@@ -181,12 +176,12 @@ impl SheetRecord for AgentChatSession {
     }
 
     fn to_column_json(&self) -> serde_json::Value {
-        // Column IDs for Sessions tab: 13=ID, 14=Project, 15=Agent Type, 16=Created At
+        // Column IDs for Sessions tab: 14=ID, 15=Project, 16=Agent Type, 17=Created At
         serde_json::json!({
-            "13": self.id,
-            "14": self.project_id,
-            "15": &self.agent_type,
-            "16": self.created_at
+            "14": self.id,
+            "15": self.project_id,
+            "16": &self.agent_type,
+            "17": self.created_at
         })
     }
 }
@@ -233,13 +228,13 @@ impl SheetRecord for AgentChatMessage {
     }
 
     fn to_column_json(&self) -> serde_json::Value {
-        // Column IDs for Messages tab: 17=ID, 18=Session, 19=Role, 20=Content, 21=Created At
+        // Column IDs for Messages tab: 18=ID, 19=Session, 20=Role, 21=Content, 22=Created At
         serde_json::json!({
-            "17": self.id,
-            "18": self.session_id,
-            "19": &self.role,
-            "20": &self.content,
-            "21": self.created_at
+            "18": self.id,
+            "19": self.session_id,
+            "20": &self.role,
+            "21": &self.content,
+            "22": self.created_at
         })
     }
 }
@@ -298,18 +293,18 @@ impl SheetRecord for AgentToolCall {
     }
 
     fn to_column_json(&self) -> serde_json::Value {
-        // Column IDs for Tool Calls tab: 22=ID, 23=Message, 24=Call ID, 25=Tool Name,
-        // 26=Arguments, 27=Result, 28=Created At
+        // Column IDs for Tool Calls tab: 23=ID, 24=Message, 25=Call ID, 26=Tool Name,
+        // 27=Arguments, 28=Result, 29=Created At
         let mut json = serde_json::json!({
-            "22": self.id,
-            "23": self.message_id,
-            "24": &self.call_id,
-            "25": &self.tool_name,
-            "26": &self.arguments,
-            "28": self.created_at
+            "23": self.id,
+            "24": self.message_id,
+            "25": &self.call_id,
+            "26": &self.tool_name,
+            "27": &self.arguments,
+            "29": self.created_at
         });
         if let Some(ref result) = self.result {
-            json["27"] = serde_json::json!(result);
+            json["28"] = serde_json::json!(result);
         }
         json
     }

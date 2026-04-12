@@ -1,4 +1,15 @@
 /**
+ * A Project is a container for related sheets and agent chat sessions.
+ * It represents a workspace with its own data storage path.
+ */
+export type Project = { id: number, name: string, 
+/**
+ * Path to folder where project data is stored
+ */
+path: string, created_at: number, };
+
+
+/**
  * A Sheet is a collection of related tabs (like a database/schema)
  */
 export type Sheet = { id: number, project_id: number, name: string, created_at: number, updated_at: number, };

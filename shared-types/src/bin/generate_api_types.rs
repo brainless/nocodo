@@ -1,7 +1,7 @@
 use shared_types::{
     ColumnType, GetSheetResponse, GetSheetTabDataRequest, GetSheetTabDataResponse,
     GetSheetTabSchemaRequest, GetSheetTabSchemaResponse, HeartbeatResponse, ListSheetsRequest,
-    ListSheetsResponse, Sheet, SheetTab, SheetTabColumn, SheetTabRow,
+    ListSheetsResponse, Project, Sheet, SheetTab, SheetTabColumn, SheetTabRow,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Core types
+    export_type!(Project);
     export_type!(Sheet);
     export_type!(SheetTab);
     export_type!(SheetTabColumn);

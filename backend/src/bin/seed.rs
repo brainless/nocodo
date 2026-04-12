@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !project_exists {
         conn.execute(
-            "INSERT INTO project (id, name, created_at) VALUES (1, 'Default Project', ?1)",
+            "INSERT INTO project (id, name, path, created_at) VALUES (1, 'Default Project', './projects/default', ?1)",
             params![now_ts],
         )?;
         println!("Created default project");

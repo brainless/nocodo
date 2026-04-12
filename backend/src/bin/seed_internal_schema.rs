@@ -66,7 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let projects_columns = vec![
         ("ID", r#"{"type": "integer"}"#, 0, true, true),
         ("Name", r#"{"type": "text"}"#, 1, true, false),
-        ("Created At", r#"{"type": "date_time"}"#, 2, true, false),
+        ("Path", r#"{"type": "text"}"#, 2, true, false),
+        ("Created At", r#"{"type": "date_time"}"#, 3, true, false),
     ];
 
     for (name, col_type, order, required, unique) in &projects_columns {

@@ -2,6 +2,24 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 // ============================================================================
+// Core Project Types
+// ============================================================================
+
+/// A Project is a container for related sheets and agent chat sessions.
+/// It represents a workspace with its own data storage path.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Project {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub name: String,
+    /// Path to folder where project data is stored
+    pub path: String,
+    #[ts(type = "number")]
+    pub created_at: i64,
+}
+
+// ============================================================================
 // Core Sheet Types
 // ============================================================================
 
