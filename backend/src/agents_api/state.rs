@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
+use nocodo_agents::AgentConfig;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// In-memory storage for agent responses that are pending or completed.
@@ -86,53 +87,30 @@ impl Default for ResponseStorage {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ChatRequest {
-    pub project_id: i64,
-    pub session_id: Option<i64>,
-    pub message: String,
+/// Shared application state for agent handlers.
+pub struct AgentState {
+    pub config: AgentConfig,
+    pub db_path: String,
+    pub response_storage: Arc<ResponseStorage>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ChatResponse {
-    pub session_id: i64,
-    pub message_id: i64,
-    pub status: String,
-}
+impl AgentState {
+    pub fn new(db_path: String) -> Result<Self, String> {
+        let config =
+            AgentConfig::load().map_err(|e| format!("Failed to load agent config: {}", e))?;
 
-#[derive(Debug, Serialize)]
-#[serde(tag = "type")]
-pub enum AgentResponsePayload {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "schema_generated")]
-    SchemaGenerated {
-        text: String,
-        schema: serde_json::Value,
-        preview: bool,
-    },
-    #[serde(rename = "stopped")]
-    Stopped { text: String },
-    #[serde(rename = "pending")]
-    Pending,
-}
+        Ok(Self {
+            config,
+            db_path,
+            response_storage: Arc::new(ResponseStorage::new()),
+        })
+    }
 
-#[derive(Debug, Serialize)]
-pub struct MessageResponse {
-    pub message_id: i64,
-    pub response: AgentResponsePayload,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ChatHistoryMessage {
-    pub id: i64,
-    pub role: String,
-    pub content: String,
-    pub created_at: i64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ChatHistoryResponse {
-    pub session_id: i64,
-    pub messages: Vec<ChatHistoryMessage>,
+    pub fn with_config(config: AgentConfig, db_path: String) -> Self {
+        Self {
+            config,
+            db_path,
+            response_storage: Arc::new(ResponseStorage::new()),
+        }
+    }
 }

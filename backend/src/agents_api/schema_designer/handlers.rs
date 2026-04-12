@@ -1,41 +1,11 @@
-use crate::schema_designer::AgentResponse;
-use crate::storage::sqlite::SqliteAgentStorage;
-use crate::{build_schema_designer, AgentConfig, AgentStorage};
-use actix_web::{get, post, web, HttpResponse, Responder};
-use std::sync::Arc;
-use std::time::Duration;
-
-use crate::backend_api::types::{
+use crate::agents_api::state::AgentState;
+use crate::agents_api::schema_designer::types::{
     AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
-    MessageResponse, ResponseStorage,
+    MessageResponse,
 };
-
-pub struct AgentState {
-    config: AgentConfig,
-    db_path: String,
-    response_storage: Arc<ResponseStorage>,
-}
-
-impl AgentState {
-    pub fn new(db_path: String) -> Result<Self, String> {
-        let config =
-            AgentConfig::load().map_err(|e| format!("Failed to load agent config: {}", e))?;
-
-        Ok(Self {
-            config,
-            db_path,
-            response_storage: Arc::new(ResponseStorage::new()),
-        })
-    }
-
-    pub fn with_config(config: AgentConfig, db_path: String) -> Self {
-        Self {
-            config,
-            db_path,
-            response_storage: Arc::new(ResponseStorage::new()),
-        }
-    }
-}
+use actix_web::{get, post, web, HttpResponse, Responder};
+use nocodo_agents::{build_schema_designer, AgentResponse, AgentStorage, SqliteAgentStorage};
+use std::time::Duration;
 
 /// POST /api/agents/schema-designer/chat
 /// Send a message to the schema designer agent.
@@ -100,7 +70,7 @@ pub async fn send_chat_message(
 
     // Store user message and get message ID
     let user_msg_id = match agent_storage
-        .create_message(crate::storage::ChatMessage {
+        .create_message(nocodo_agents::storage::ChatMessage {
             id: None,
             session_id: target_session_id,
             role: "user".to_string(),
