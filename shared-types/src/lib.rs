@@ -84,6 +84,9 @@ pub struct SheetTabColumn {
     pub display_order: i32,
     #[ts(type = "number")]
     pub created_at: i64,
+    /// Column width in pixels (user-resizable), default 120
+    #[ts(type = "number")]
+    pub width: i32,
 }
 
 /// A row stores JSON data keyed by column_id

@@ -229,7 +229,7 @@ body {
   overflow: auto;
   background: #f7f9ff;
   display: grid;
-  grid-template-columns: 56px repeat(26, minmax(100px, 1fr));
+  /* grid-template-columns is set dynamically via inline style */
   grid-auto-rows: 36px;
   min-height: 0;
 }
@@ -278,6 +278,10 @@ body {
   padding: 0.45rem 0.55rem;
   font-size: 0.86rem;
   color: #2f3f5f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .cell-active {
@@ -371,10 +375,6 @@ body {
   .formula-strip {
     grid-template-columns: auto 64px 40px 1fr;
   }
-
-  .grid-wrap {
-    grid-template-columns: 44px repeat(26, minmax(80px, 1fr));
-  }
 }
 
 .sheets-strip {
@@ -422,23 +422,4 @@ body {
   border-color: #8ea9d8;
   color: #2e4a7c;
   font-weight: 600;
-}
-
-@media (max-width: 900px) {
-  .menu-title {
-    display: none;
-  }
-
-  .menu-items {
-    gap: 0.15rem;
-    overflow-x: auto;
-  }
-
-  .formula-strip {
-    grid-template-columns: auto 64px 40px 1fr;
-  }
-
-  .grid-wrap {
-    grid-template-columns: 44px repeat(26, minmax(80px, 1fr));
-  }
 }

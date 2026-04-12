@@ -13,7 +13,11 @@ export type SheetTab = { id: number, sheet_id: number, name: string, display_ord
 /**
  * Column definition (schema) for a sheet tab
  */
-export type SheetTabColumn = { id: number, sheet_tab_id: number, name: string, column_type: ColumnType, is_required: boolean, is_unique: boolean, default_value: string | null, display_order: number, created_at: number, };
+export type SheetTabColumn = { id: number, sheet_tab_id: number, name: string, column_type: ColumnType, is_required: boolean, is_unique: boolean, default_value: string | null, display_order: number, created_at: number, 
+/**
+ * Column width in pixels (user-resizable), default 120
+ */
+width: number, };
 
 
 /**

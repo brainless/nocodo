@@ -160,7 +160,7 @@ pub async fn get_sheet_tab_schema(sheet_tab_id: web::Path<i64>) -> Result<impl R
     // Get columns
     let mut stmt = conn
         .prepare(
-            "SELECT id, sheet_tab_id, name, column_type, is_required, is_unique, default_value, display_order, created_at 
+            "SELECT id, sheet_tab_id, name, column_type, is_required, is_unique, default_value, display_order, created_at, width 
              FROM sheet_tab_column 
              WHERE sheet_tab_id = ?1 
              ORDER BY display_order, id",
@@ -186,6 +186,7 @@ pub async fn get_sheet_tab_schema(sheet_tab_id: web::Path<i64>) -> Result<impl R
                 default_value: row.get(6)?,
                 display_order: row.get(7)?,
                 created_at: row.get(8)?,
+                width: row.get::<_, Option<i32>>(9)?.unwrap_or(120),
             })
         })
         .map_err(|e| {
