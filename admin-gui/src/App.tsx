@@ -1,9 +1,19 @@
-import { For, createSignal } from 'solid-js';
+import { For, Show, createSignal, onMount } from 'solid-js';
+import type { 
+  Sheet, 
+  SheetTab, 
+  SheetTabColumn, 
+  SheetTabRow,
+  ListSheetsResponse, 
+  GetSheetResponse, 
+  GetSheetTabSchemaResponse,
+  GetSheetTabDataResponse,
+  ColumnType 
+} from './types/api';
 
 const menuItems = ['File', 'Edit', 'View', 'Insert', 'Format', 'Data', 'Tools', 'Help'];
 const columns = Array.from({ length: 12 }, (_, index) => String.fromCharCode(65 + index));
 const rows = Array.from({ length: 28 }, (_, index) => index + 1);
-const sheets = ['Leads', 'Pipeline', 'Forecast', 'Invoices', 'Archive'];
 
 const API_BASE_URL = '';  // Use relative URLs to leverage Vite proxy
 const PROJECT_ID = 1; // Default project for now
@@ -23,8 +33,18 @@ const defaultAssistantMessage: UiMessage = {
 };
 
 export default function App() {
+  // Sheet state
+  const [sheets, setSheets] = createSignal<Sheet[]>([]);
+  const [currentSheet, setCurrentSheet] = createSignal<Sheet | null>(null);
+  const [sheetTabs, setSheetTabs] = createSignal<SheetTab[]>([]);
+  const [activeTabId, setActiveTabId] = createSignal<number | null>(null);
+  const [columns, setColumns] = createSignal<SheetTabColumn[]>([]);
+  const [rows, setRows] = createSignal<SheetTabRow[]>([]);
+  const [isLoadingSheets, setIsLoadingSheets] = createSignal(false);
+  const [sheetError, setSheetError] = createSignal<string | null>(null);
+
+  // Cell/Grid state
   const [selectedCell, setSelectedCell] = createSignal({ col: 'B', row: 6 });
-  // Store raw formulas/values for editing in the formula bar
   const [cellFormulas, setCellFormulas] = createSignal<Record<string, string>>({
     'A1': 'A Header',
     'B1': 'B Header',
@@ -41,21 +61,121 @@ export default function App() {
     'B6': '=SUM(B2:B5)'
   });
   const [formulaValue, setFormulaValue] = createSignal('=SUM(B2:B5)');
+
+  // Chat state
   const [messages, setMessages] = createSignal<UiMessage[]>([defaultAssistantMessage]);
   const [inputValue, setInputValue] = createSignal('');
   const [sessionId, setSessionId] = createSignal<number | null>(null);
   const [isLoading, setIsLoading] = createSignal(false);
 
-  const getCellKey = (col: string, row: number) => `${col}${row}`;
+  // Fetch sheets on mount
+  onMount(() => {
+    loadSheets();
+  });
 
-  // Get the display value for a cell (computed value or the stored value)
-  const getCellDisplayValue = (col: string, row: number): string => {
-    const key = getCellKey(col, row);
-    const formula = cellFormulas()[key];
-    if (!formula) return '';
-    // For now, just return the formula/value as-is (in a real app, this would compute formulas)
-    return formula;
+  // Load sheets for the project
+  const loadSheets = async () => {
+    setIsLoadingSheets(true);
+    setSheetError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sheets?project_id=${PROJECT_ID}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load sheets: ${response.status}`);
+      }
+      const data = await response.json() as ListSheetsResponse;
+      setSheets(data.sheets);
+      
+      // Load the first sheet if available
+      if (data.sheets.length > 0) {
+        await loadSheet(data.sheets[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading sheets:', error);
+      setSheetError(error instanceof Error ? error.message : 'Failed to load sheets');
+    } finally {
+      setIsLoadingSheets(false);
+    }
   };
+
+  // Load a specific sheet with its tabs
+  const loadSheet = async (sheetId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sheets/${sheetId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load sheet: ${response.status}`);
+      }
+      const data = await response.json() as GetSheetResponse;
+      setCurrentSheet(data.sheet);
+      setSheetTabs(data.sheet_tabs);
+      
+      // Load the first tab if available
+      if (data.sheet_tabs.length > 0) {
+        await loadTab(data.sheet_tabs[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading sheet:', error);
+      setSheetError(error instanceof Error ? error.message : 'Failed to load sheet');
+    }
+  };
+
+  // Load a tab's schema and data
+  const loadTab = async (tabId: number) => {
+    setActiveTabId(tabId);
+    try {
+      // Load schema (columns)
+      const schemaResponse = await fetch(`${API_BASE_URL}/api/sheet-tabs/${tabId}/schema`);
+      if (!schemaResponse.ok) {
+        throw new Error(`Failed to load tab schema: ${schemaResponse.status}`);
+      }
+      const schemaData = await schemaResponse.json() as GetSheetTabSchemaResponse;
+      setColumns(schemaData.columns);
+
+      // Load row data
+      const dataResponse = await fetch(`${API_BASE_URL}/api/sheet-tabs/${tabId}/data?limit=100`);
+      if (!dataResponse.ok) {
+        throw new Error(`Failed to load tab data: ${dataResponse.status}`);
+      }
+      const dataData = await dataResponse.json() as GetSheetTabDataResponse;
+      setRows(dataData.rows);
+    } catch (error) {
+      console.error('Error loading tab:', error);
+      setSheetError(error instanceof Error ? error.message : 'Failed to load tab');
+    }
+  };
+
+  // Get display value for a cell from the row data
+  const getCellDisplayValue = (colIndex: number, rowIndex: number): string => {
+    const cols = columns();
+    const rowData = rows()[rowIndex];
+    
+    if (!rowData || colIndex >= cols.length) return '';
+    
+    const column = cols[colIndex];
+    const data = JSON.parse(rowData.data || '{}');
+    const value = data[String(column.id)];
+    
+    if (value === null || value === undefined) return '';
+    return String(value);
+  };
+
+  // Get column header name
+  const getColumnHeader = (colIndex: number): string => {
+    const cols = columns();
+    if (colIndex < cols.length) {
+      return cols[colIndex].name;
+    }
+    return String.fromCharCode(65 + colIndex);
+  };
+
+  // Check if a column is a relation type
+  const isRelationColumn = (colIndex: number): boolean => {
+    const cols = columns();
+    if (colIndex >= cols.length) return false;
+    const colType = cols[colIndex].column_type;
+    return typeof colType === 'object' && colType !== null && 'type' in colType && colType.type === 'relation';
+  };
+
+  const getCellKey = (col: string, row: number) => `${col}${row}`;
 
   const handleCellClick = (col: string, row: number) => {
     setSelectedCell({ col, row });
@@ -107,7 +227,6 @@ export default function App() {
       const data = await response.json();
       
       if (data.response && data.response.type === 'pending') {
-        // Still pending, poll again after a short delay
         setTimeout(() => pollForResponse(messageId, targetSessionId), 500);
         return;
       }
@@ -128,13 +247,11 @@ export default function App() {
     const message = inputValue().trim();
     if (!message) return;
     
-    // Add user message to UI immediately
     setMessages([...messages(), { role: 'user', content: message }]);
     setInputValue('');
     setIsLoading(true);
     
     try {
-      // Send message to API
       const response = await fetch(`${API_BASE_URL}/api/agents/schema-designer/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,12 +268,10 @@ export default function App() {
       
       const data = await response.json();
       
-      // Store session_id if this is a new session
       if (data.session_id && data.session_id !== sessionId()) {
         setSessionId(data.session_id);
       }
       
-      // Start polling for the response
       if (data.message_id) {
         const targetSessionId = data.session_id || sessionId();
         if (!targetSessionId) {
@@ -183,11 +298,18 @@ export default function App() {
   return (
     <main class="sheet-app">
       <header class="menu-strip">
-        <div class="menu-title">Nocodo Sheets</div>
+        <div class="menu-title">
+          {currentSheet() ? currentSheet()!.name : 'Nocodo Sheets'}
+        </div>
         <nav class="menu-items">
           <For each={menuItems}>{(item) => <button class="menu-item">{item}</button>}</For>
         </nav>
-        <div class="menu-status">Synced</div>
+        <div class="menu-status">
+          <Show when={isLoadingSheets()}>
+            <span class="loading loading-spinner loading-xs mr-2"></span>
+          </Show>
+          {sheetError() ? 'Error' : 'Synced'}
+        </div>
       </header>
 
       <div class="drawer">
@@ -212,29 +334,74 @@ export default function App() {
               />
             </div>
 
+            <Show when={sheetError()}>
+              <div class="alert alert-error m-4">
+                <span>{sheetError()}</span>
+                <button class="btn btn-sm btn-ghost" onClick={loadSheets}>Retry</button>
+              </div>
+            </Show>
+
             <div class="grid-wrap">
               <div class="grid-corner" />
-              <For each={columns}>
-                {(col) => <div class="column-header">{col}</div>}
+              {/* Dynamic column headers from API */}
+              <For each={columns()}>
+                {(col, index) => <div class="column-header">{col.name}</div>}
+              </For>
+              {/* Fill remaining columns with letters */}
+              <For each={columns().length < 12 ? Array.from({ length: 12 - columns().length }, (_, i) => i) : []}>
+                {(i) => <div class="column-header">{String.fromCharCode(65 + columns().length + i)}</div>}
               </For>
 
-              <For each={rows}>
-                {(row) => (
+              {/* Grid data from API rows */}
+              <For each={rows()}>
+                {(row, rowIndex) => (
                   <>
-                    <div class="row-header">{row}</div>
-                    <For each={columns}>
-                      {(col) => (
+                    <div class="row-header">{rowIndex() + 1}</div>
+                    <For each={columns()}>
+                      {(col, colIndex) => (
                         <div 
-                          class={`cell${row === selectedCell().row && col === selectedCell().col ? ' cell-active' : ''}`}
-                          onClick={() => handleCellClick(col, row)}
+                          class={`cell${rowIndex() === selectedCell().row - 1 && colIndex() === columns().indexOf(col) ? ' cell-active' : ''}`}
+                          classList={{
+                            'text-blue-600 underline cursor-pointer': isRelationColumn(colIndex())
+                          }}
+                          onClick={() => handleCellClick(String.fromCharCode(65 + colIndex()), rowIndex() + 1)}
+                          title={isRelationColumn(colIndex()) ? 'Click to view related record' : undefined}
                         >
-                          {getCellDisplayValue(col, row)}
+                          {getCellDisplayValue(colIndex(), rowIndex())}
                         </div>
+                      )}
+                    </For>
+                    {/* Fill remaining columns */}
+                    <For each={columns().length < 12 ? Array.from({ length: 12 - columns().length }, (_, i) => i) : []}>
+                      {(i) => (
+                        <div 
+                          class={`cell${rowIndex() === selectedCell().row - 1 && columns().length + i === selectedCell().col.charCodeAt(0) - 65 ? ' cell-active' : ''}`}
+                          onClick={() => handleCellClick(String.fromCharCode(65 + columns().length + i), rowIndex() + 1)}
+                        />
                       )}
                     </For>
                   </>
                 )}
               </For>
+
+              {/* Empty rows if no data */}
+              <Show when={rows().length === 0}>
+                <For each={Array.from({ length: 10 }, (_, i) => i)}>
+                  {(rowIndex) => (
+                    <>
+                      <div class="row-header">{rowIndex + 1}</div>
+                      <For each={columns().length > 0 ? columns() : Array.from({ length: 12 }, (_, i) => ({ id: i, name: String.fromCharCode(65 + i), column_type: { type: 'text' } as ColumnType }))}>
+                        {(col, colIndex) => (
+                          <div 
+                            class={`cell${rowIndex === selectedCell().row - 1 && colIndex() === 0 ? ' cell-active' : ''}`}
+                            onClick={() => handleCellClick(String.fromCharCode(65 + colIndex()), rowIndex + 1)}
+                          />
+                        )}
+                      </For>
+                    </>
+                  )}
+                </For>
+              </Show>
             </div>
           </section>
 
@@ -243,9 +410,17 @@ export default function App() {
               +
             </button>
             <div class="sheet-list">
-              <For each={sheets}>
-                {(sheet, index) => (
-                  <button class={`sheet-tab${index() === 0 ? ' sheet-tab-active' : ''}`}>{sheet}</button>
+              <Show when={sheetTabs().length === 0}>
+                <span class="text-sm text-gray-500 px-2">No tabs available</span>
+              </Show>
+              <For each={sheetTabs()}>
+                {(tab) => (
+                  <button 
+                    class={`sheet-tab${tab.id === activeTabId() ? ' sheet-tab-active' : ''}`}
+                    onClick={() => loadTab(tab.id)}
+                  >
+                    {tab.name}
+                  </button>
                 )}
               </For>
             </div>

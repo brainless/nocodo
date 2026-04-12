@@ -6,6 +6,7 @@ mod agents_api;
 mod auth;
 mod config;
 mod db;
+mod sheets_api;
 
 #[get("/api/heartbeat")]
 async fn heartbeat() -> impl Responder {
@@ -112,9 +113,15 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::JsonConfig::default())
             .app_data(agent_state.clone())
             .service(heartbeat)
+            // Agent API routes
             .service(agents_api::schema_designer::send_chat_message)
             .service(agents_api::schema_designer::get_session_messages)
             .service(agents_api::schema_designer::get_message_response)
+            // Sheets API routes (read-only)
+            .service(sheets_api::handlers::list_sheets)
+            .service(sheets_api::handlers::get_sheet)
+            .service(sheets_api::handlers::get_sheet_tab_schema)
+            .service(sheets_api::handlers::get_sheet_tab_data)
     })
     .bind((backend_host.as_str(), backend_port))?
     .run()
