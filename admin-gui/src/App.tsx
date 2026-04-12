@@ -11,7 +11,7 @@ import type {
   ColumnType 
 } from './types/api';
 
-const menuItems = ['File', 'Edit', 'View', 'Insert', 'Format', 'Data', 'Tools', 'Help'];
+const menuItems: string[] = [];
 
 const API_BASE_URL = '';  // Use relative URLs to leverage Vite proxy
 const PROJECT_ID = 1; // Default project for now
@@ -333,9 +333,6 @@ export default function App() {
         <div class="menu-title">
           {currentSheet() ? currentSheet()!.name : 'Nocodo Sheets'}
         </div>
-        <nav class="menu-items">
-          <For each={menuItems}>{(item) => <button class="menu-item">{item}</button>}</For>
-        </nav>
         <div class="menu-status">
           <Show when={isLoadingSheets()}>
             <span class="loading loading-spinner loading-xs mr-2"></span>
