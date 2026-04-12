@@ -39,9 +39,12 @@ Resolved priority: **env var → `project.conf` → `server.env`** (sibling to b
 
 - Active agent: `schema_designer` — designs SQLite schemas via LLM
 - Storage: SQLite (`nocodo.db`) with chat sessions and generated schemas
+- Agent crate (`agents/`) — business logic only: agent implementations, storage traits, LLM integration
+- Backend crate (`backend/`) — HTTP layer: API endpoints live in `backend/src/agents_api/`
 - API endpoints:
   - `POST /api/agents/schema-designer/chat` — send message, returns `{session_id, message_id}`
   - `GET /api/agents/schema-designer/messages/{id}/response` — long-poll for response (text/schema/stopped)
+  - `GET /api/agents/schema-designer/sessions/{id}/messages` — fetch session history
 - Config: reads `AGENT_PROVIDER` and `AGENT_API_KEY` from env/project.conf
 - Backend auto-initializes agent state on startup; runs DB migrations and ensures default project exists
 
@@ -61,7 +64,9 @@ NOCODO_BACKEND_PATH="$(pwd)/target/debug/nocodo-backend" npm --prefix tauri run 
 
 ## Structure Rules
 
-- `shared-types` is the source of truth for API payloads
+- `shared-types` is the source of truth for cross-service API payloads (Rust ↔ TypeScript)
+- Agent-specific API types live in `backend/src/agents_api/{agent}/` close to their handlers
 - Avoid handwritten duplicate API types in frontend apps
 - Avoid premature abstractions — keep code minimal and typed
 - Agent processing runs in background tasks with in-memory response storage for long-polling
+- Business logic stays in `agents` crate; HTTP layer stays in `backend` crate
