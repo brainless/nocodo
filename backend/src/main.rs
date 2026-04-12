@@ -1,8 +1,8 @@
 use actix_cors::Cors;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use nocodo_agents::{get_message_response, get_session_messages, send_chat_message, AgentState};
 use shared_types::HeartbeatResponse;
 
-mod agents;
 mod auth;
 mod config;
 mod db;
@@ -83,11 +83,11 @@ async fn main() -> std::io::Result<()> {
     let domain_origin_http = domain_name.as_deref().map(|d| format!("http://{d}"));
 
     // Create one shared agent state for all Actix workers.
-    let agent_state = match agents::AgentState::new() {
+    let agent_state = match AgentState::new(database_url.clone()) {
         Ok(state) => web::Data::new(state),
         Err(e) => {
             eprintln!("Warning: Failed to initialize agent state: {}", e);
-            web::Data::new(agents::AgentState::default())
+            panic!("Failed to initialize agent state: {}", e);
         }
     };
 
@@ -112,9 +112,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::JsonConfig::default())
             .app_data(agent_state.clone())
             .service(heartbeat)
-            .service(agents::send_chat_message)
-            .service(agents::get_session_messages)
-            .service(agents::get_message_response)
+            .service(send_chat_message)
+            .service(get_session_messages)
+            .service(get_message_response)
     })
     .bind((backend_host.as_str(), backend_port))?
     .run()

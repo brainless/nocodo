@@ -1251,6 +1251,7 @@ dependencies = [
 name = "nocodo-agents"
 version = "0.1.0"
 dependencies = [
+ "actix-web",
  "async-trait",
  "llm-sdk",
  "log",

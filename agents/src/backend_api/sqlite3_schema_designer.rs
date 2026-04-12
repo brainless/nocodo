@@ -1,14 +1,11 @@
+use crate::schema_designer::AgentResponse;
+use crate::storage::sqlite::SqliteAgentStorage;
+use crate::{build_schema_designer, AgentConfig, AgentStorage};
 use actix_web::{get, post, web, HttpResponse, Responder};
-use nocodo_agents::schema_designer::AgentResponse;
-use nocodo_agents::storage::sqlite::SqliteAgentStorage;
-use nocodo_agents::{build_schema_designer, AgentConfig, AgentStorage};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::config;
-
-mod types;
-use types::{
+use crate::backend_api::types::{
     AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
     MessageResponse, ResponseStorage,
 };
@@ -20,11 +17,9 @@ pub struct AgentState {
 }
 
 impl AgentState {
-    pub fn new() -> Result<Self, String> {
+    pub fn new(db_path: String) -> Result<Self, String> {
         let config =
             AgentConfig::load().map_err(|e| format!("Failed to load agent config: {}", e))?;
-        let db_path =
-            config::read_project_conf("DATABASE_URL").unwrap_or_else(|| "nocodo.db".to_string());
 
         Ok(Self {
             config,
@@ -32,11 +27,13 @@ impl AgentState {
             response_storage: Arc::new(ResponseStorage::new()),
         })
     }
-}
 
-impl Default for AgentState {
-    fn default() -> Self {
-        Self::new().expect("Failed to initialize agent state")
+    pub fn with_config(config: AgentConfig, db_path: String) -> Self {
+        Self {
+            config,
+            db_path,
+            response_storage: Arc::new(ResponseStorage::new()),
+        }
     }
 }
 
@@ -103,7 +100,7 @@ pub async fn send_chat_message(
 
     // Store user message and get message ID
     let user_msg_id = match agent_storage
-        .create_message(nocodo_agents::storage::ChatMessage {
+        .create_message(crate::storage::ChatMessage {
             id: None,
             session_id: target_session_id,
             role: "user".to_string(),

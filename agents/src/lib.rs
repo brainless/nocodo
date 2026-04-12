@@ -1,8 +1,10 @@
+pub mod backend_api;
 pub mod config;
 pub mod error;
 pub mod schema_designer;
 pub mod storage;
 
+pub use backend_api::{get_message_response, get_session_messages, send_chat_message, AgentState};
 pub use config::AgentConfig;
 pub use error::AgentError;
 pub use schema_designer::{AgentResponse, SchemaDesignerAgent};
