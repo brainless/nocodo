@@ -7,6 +7,9 @@ use shared_types::{
 
 use crate::config;
 
+use super::sheet_record::{
+    list_records, AgentChatMessage, AgentChatSession, AgentToolCall, Project, SheetRecord,
+};
 use super::types::{GetSheetTabDataQuery, ListSheetsQuery};
 
 fn open_db() -> Result<Connection, rusqlite::Error> {
@@ -206,6 +209,9 @@ pub async fn get_sheet_tab_schema(sheet_tab_id: web::Path<i64>) -> Result<impl R
 
 /// GET /api/sheet-tabs/{id}/data?limit={n}&offset={n}
 /// Get row data for a sheet tab
+/// 
+/// Uses the SheetRecord trait to query actual SQL tables directly.
+/// Virtual sheet tab IDs: 6=Projects, 7=Sessions, 8=Messages, 9=Tool Calls
 #[get("/api/sheet-tabs/{sheet_tab_id}/data")]
 pub async fn get_sheet_tab_data(
     sheet_tab_id: web::Path<i64>,
@@ -219,52 +225,83 @@ pub async fn get_sheet_tab_data(
     let limit = query.limit.unwrap_or(100).clamp(1, 1000);
     let offset = query.offset.unwrap_or(0);
 
-    // Get total count
-    let total_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sheet_tab_row WHERE sheet_tab_id = ?1",
-            params![tab_id],
-            |row| row.get(0),
-        )
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Count error: {}", e))
-        })?;
+    // Route to the appropriate SheetRecord implementation
+    match tab_id {
+        6 => {
+            // Projects tab
+            let (records, total_count) =
+                list_records::<Project>(&conn, Some(limit), Some(offset)).map_err(|e| {
+                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
+                })?;
+            let rows = records_to_sheet_rows(tab_id, records);
+            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
+                sheet_tab_id: tab_id,
+                rows,
+                total_count,
+            }))
+        }
+        7 => {
+            // Sessions tab
+            let (records, total_count) =
+                list_records::<AgentChatSession>(&conn, Some(limit), Some(offset)).map_err(|e| {
+                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
+                })?;
+            let rows = records_to_sheet_rows(tab_id, records);
+            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
+                sheet_tab_id: tab_id,
+                rows,
+                total_count,
+            }))
+        }
+        8 => {
+            // Messages tab
+            let (records, total_count) =
+                list_records::<AgentChatMessage>(&conn, Some(limit), Some(offset)).map_err(|e| {
+                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
+                })?;
+            let rows = records_to_sheet_rows(tab_id, records);
+            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
+                sheet_tab_id: tab_id,
+                rows,
+                total_count,
+            }))
+        }
+        9 => {
+            // Tool Calls tab
+            let (records, total_count) =
+                list_records::<AgentToolCall>(&conn, Some(limit), Some(offset)).map_err(|e| {
+                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
+                })?;
+            let rows = records_to_sheet_rows(tab_id, records);
+            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
+                sheet_tab_id: tab_id,
+                rows,
+                total_count,
+            }))
+        }
+        _ => Err(actix_web::error::ErrorNotFound("Sheet tab not found")),
+    }
+}
 
-    // Get rows
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, sheet_tab_id, data, created_at, updated_at 
-             FROM sheet_tab_row 
-             WHERE sheet_tab_id = ?1 
-             ORDER BY id 
-             LIMIT ?2 OFFSET ?3",
-        )
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Prepare error: {}", e))
-        })?;
-
-    let rows = stmt
-        .query_map(params![tab_id, limit, offset], |row| {
-            Ok(SheetTabRow {
-                id: row.get(0)?,
-                sheet_tab_id: row.get(1)?,
-                data: row.get(2)?,
-                created_at: row.get(3)?,
-                updated_at: row.get(4)?,
-            })
+/// Convert SheetRecord structs to SheetTabRow format for API compatibility
+/// 
+/// The data field contains JSON with column_id -> value mapping.
+/// Uses the SheetRecord's to_column_json method to get properly keyed data.
+fn records_to_sheet_rows<T: SheetRecord>(sheet_tab_id: i64, records: Vec<T>) -> Vec<SheetTabRow> {
+    records
+        .into_iter()
+        .map(|record| {
+            let data = serde_json::to_string(&record.to_column_json())
+                .unwrap_or_else(|_| "{}".to_string());
+            let id = record.id();
+            let created_at = record.created_at();
+            SheetTabRow {
+                id,
+                sheet_tab_id,
+                data,
+                created_at,
+                updated_at: created_at, // Using created_at as updated_at for now
+            }
         })
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
-        })?;
-
-    let rows: Vec<SheetTabRow> = rows.collect::<Result<Vec<_>, _>>().map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Collect error: {}", e))
-    })?;
-
-    let response = GetSheetTabDataResponse {
-        sheet_tab_id: tab_id,
-        rows,
-        total_count,
-    };
-    Ok(HttpResponse::Ok().json(response))
+        .collect()
 }

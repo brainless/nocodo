@@ -15,6 +15,10 @@ path = "src/bin/migrate.rs"
 name = "seed"
 path = "src/bin/seed.rs"
 
+[[bin]]
+name = "seed-internal-schema"
+path = "src/bin/seed_internal_schema.rs"
+
 [features]
 default = ["db-sqlite"]
 db-sqlite = ["dep:rusqlite", "refinery/rusqlite"]

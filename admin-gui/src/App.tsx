@@ -69,8 +69,11 @@ export default function App() {
       const data = await response.json() as ListSheetsResponse;
       setSheets(data.sheets);
       
-      // Load the first sheet if available
-      if (data.sheets.length > 0) {
+      // Load "Nocodo Internal" sheet if available, otherwise first sheet
+      const nocodoInternal = data.sheets.find(s => s.name === 'Nocodo Internal');
+      if (nocodoInternal) {
+        await loadSheet(nocodoInternal.id);
+      } else if (data.sheets.length > 0) {
         await loadSheet(data.sheets[0].id);
       }
     } catch (error) {
