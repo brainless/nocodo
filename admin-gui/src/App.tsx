@@ -44,23 +44,9 @@ export default function App() {
   const [sheetError, setSheetError] = createSignal<string | null>(null);
 
   // Cell/Grid state
-  const [selectedCell, setSelectedCell] = createSignal({ col: 'B', row: 6 });
-  const [cellFormulas, setCellFormulas] = createSignal<Record<string, string>>({
-    'A1': 'A Header',
-    'B1': 'B Header',
-    'C1': 'C Header',
-    'D1': 'D Header',
-    'E1': 'E Header',
-    'F1': 'F Header',
-    'G1': 'G Header',
-    'H1': 'H Header',
-    'I1': 'I Header',
-    'J1': 'J Header',
-    'K1': 'K Header',
-    'L1': 'L Header',
-    'B6': '=SUM(B2:B5)'
-  });
-  const [formulaValue, setFormulaValue] = createSignal('=SUM(B2:B5)');
+  const [selectedCell, setSelectedCell] = createSignal({ col: 'A', row: 1 });
+  const [cellFormulas, setCellFormulas] = createSignal<Record<string, string>>({});
+  const [formulaValue, setFormulaValue] = createSignal('');
 
   // Chat state
   const [messages, setMessages] = createSignal<UiMessage[]>([defaultAssistantMessage]);
@@ -143,12 +129,43 @@ export default function App() {
     }
   };
 
-  // Get display value for a cell from the row data
+  // Get display value for a cell from the row data (rowIndex is 0-based data row)
   const getCellDisplayValue = (colIndex: number, rowIndex: number): string => {
     const cols = columns();
-    const rowData = rows()[rowIndex];
+    const rowData = rows()[rowIndex]; // rowIndex 0 = displayed row 2
     
     if (!rowData || colIndex >= cols.length) return '';
+    
+    const column = cols[colIndex];
+    const data = JSON.parse(rowData.data || '{}');
+    const value = data[String(column.id)];
+    
+    if (value === null || value === undefined) return '';
+    return String(value);
+  };
+
+  // Get the raw cell value for the formula bar
+  const getCellValue = (col: string, row: number): string => {
+    const colIndex = col.charCodeAt(0) - 65; // Convert 'A' -> 0, 'B' -> 1, etc.
+    const cols = columns();
+    
+    // First check if there's a user-entered formula
+    const key = getCellKey(col, row);
+    const formula = cellFormulas()[key];
+    if (formula !== undefined && formula !== '') {
+      return formula;
+    }
+    
+    // Row 1: show column names from schema
+    if (row === 1 && colIndex >= 0 && colIndex < cols.length) {
+      return cols[colIndex].name;
+    }
+    
+    // Data rows (2+): get value from API row data (row 2 = index 0)
+    const rowIndex = row - 2;
+    const rowData = rows()[rowIndex];
+    
+    if (!rowData || colIndex < 0 || colIndex >= cols.length) return '';
     
     const column = cols[colIndex];
     const data = JSON.parse(rowData.data || '{}');
@@ -179,14 +196,13 @@ export default function App() {
 
   const handleCellClick = (col: string, row: number) => {
     setSelectedCell({ col, row });
-    const key = getCellKey(col, row);
-    setFormulaValue(cellFormulas()[key] || '');
+    setFormulaValue(getCellValue(col, row));
   };
 
   const handleFormulaChange = (value: string) => {
     setFormulaValue(value);
     const key = getCellKey(selectedCell().col, selectedCell().row);
-    setCellFormulas({ ...cellFormulas(), [key]: value });
+    setCellFormulas(prev => ({ ...prev, [key]: value }));
   };
 
   const loadSessionHistory = async (targetSessionId: number) => {
@@ -343,63 +359,107 @@ export default function App() {
 
             <div class="grid-wrap">
               <div class="grid-corner" />
-              {/* Dynamic column headers from API */}
-              <For each={columns()}>
-                {(col, index) => <div class="column-header">{col.name}</div>}
-              </For>
-              {/* Fill remaining columns with letters */}
-              <For each={columns().length < 12 ? Array.from({ length: 12 - columns().length }, (_, i) => i) : []}>
-                {(i) => <div class="column-header">{String.fromCharCode(65 + columns().length + i)}</div>}
+              {/* Column headers: Always A, B, C... Z (26 columns) */}
+              <For each={Array.from({ length: 26 }, (_, i) => i)}>
+                {(i) => (
+                  <div class="column-header">
+                    {String.fromCharCode(65 + i)}
+                  </div>
+                )}
               </For>
 
-              {/* Grid data from API rows */}
+              {/* Row 1: Column names from API */}
+              <Show when={columns().length > 0}>
+                <div class="row-header">1</div>
+                <For each={columns()}>
+                  {(col, colIndex) => {
+                    const colLetter = String.fromCharCode(65 + colIndex());
+                    return (
+                      <div 
+                        class={`cell${1 === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
+                        onClick={() => handleCellClick(colLetter, 1)}
+                      >
+                        {col.name}
+                      </div>
+                    );
+                  }}
+                </For>
+                {/* Fill remaining columns in header row up to Z */}
+                <For each={columns().length < 26 ? Array.from({ length: 26 - columns().length }, (_, i) => i) : []}>
+                  {(i) => {
+                    const colLetter = String.fromCharCode(65 + columns().length + i);
+                    return (
+                      <div 
+                        class={`cell${1 === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
+                        onClick={() => handleCellClick(colLetter, 1)}
+                      />
+                    );
+                  }}
+                </For>
+              </Show>
+
+              {/* Data rows from API (starting from row 2) */}
               <For each={rows()}>
                 {(row, rowIndex) => (
                   <>
-                    <div class="row-header">{rowIndex() + 1}</div>
+                    <div class="row-header">{rowIndex() + 2}</div>
                     <For each={columns()}>
-                      {(col, colIndex) => (
-                        <div 
-                          class={`cell${rowIndex() === selectedCell().row - 1 && colIndex() === columns().indexOf(col) ? ' cell-active' : ''}`}
-                          classList={{
-                            'text-blue-600 underline cursor-pointer': isRelationColumn(colIndex())
-                          }}
-                          onClick={() => handleCellClick(String.fromCharCode(65 + colIndex()), rowIndex() + 1)}
-                          title={isRelationColumn(colIndex()) ? 'Click to view related record' : undefined}
-                        >
-                          {getCellDisplayValue(colIndex(), rowIndex())}
-                        </div>
-                      )}
+                      {(col, colIndex) => {
+                        const colLetter = String.fromCharCode(65 + colIndex());
+                        return (
+                          <div 
+                            class={`cell${rowIndex() + 2 === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
+                            classList={{
+                              'text-blue-600 underline cursor-pointer': isRelationColumn(colIndex())
+                            }}
+                            onClick={() => handleCellClick(colLetter, rowIndex() + 2)}
+                            title={isRelationColumn(colIndex()) ? 'Click to view related record' : undefined}
+                          >
+                            {getCellDisplayValue(colIndex(), rowIndex())}
+                          </div>
+                        );
+                      }}
                     </For>
-                    {/* Fill remaining columns */}
-                    <For each={columns().length < 12 ? Array.from({ length: 12 - columns().length }, (_, i) => i) : []}>
-                      {(i) => (
-                        <div 
-                          class={`cell${rowIndex() === selectedCell().row - 1 && columns().length + i === selectedCell().col.charCodeAt(0) - 65 ? ' cell-active' : ''}`}
-                          onClick={() => handleCellClick(String.fromCharCode(65 + columns().length + i), rowIndex() + 1)}
-                        />
-                      )}
+                    {/* Fill remaining columns up to Z */}
+                    <For each={columns().length < 26 ? Array.from({ length: 26 - columns().length }, (_, i) => i) : []}>
+                      {(i) => {
+                        const colLetter = String.fromCharCode(65 + columns().length + i);
+                        return (
+                          <div 
+                            class={`cell${rowIndex() + 2 === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
+                            onClick={() => handleCellClick(colLetter, rowIndex() + 2)}
+                          />
+                        );
+                      }}
                     </For>
                   </>
                 )}
               </For>
 
-              {/* Empty rows if no data */}
-              <Show when={rows().length === 0}>
-                <For each={Array.from({ length: 10 }, (_, i) => i)}>
-                  {(rowIndex) => (
-                    <>
-                      <div class="row-header">{rowIndex + 1}</div>
-                      <For each={columns().length > 0 ? columns() : Array.from({ length: 12 }, (_, i) => ({ id: i, name: String.fromCharCode(65 + i), column_type: { type: 'text' } as ColumnType }))}>
-                        {(col, colIndex) => (
-                          <div 
-                            class={`cell${rowIndex === selectedCell().row - 1 && colIndex() === 0 ? ' cell-active' : ''}`}
-                            onClick={() => handleCellClick(String.fromCharCode(65 + colIndex()), rowIndex + 1)}
-                          />
-                        )}
-                      </For>
-                    </>
-                  )}
+              {/* Empty rows to fill up to 100 total rows */}
+              <Show when={columns().length === 0 || rows().length < 99}>
+                <For each={Array.from({ length: columns().length > 0 ? 99 - rows().length : 100 }, (_, i) => i)}>
+                  {(rowOffset) => {
+                    // Start from row 2 if we have columns (row 1 has column names), else row 1
+                    const startRow = columns().length > 0 ? 2 : 1;
+                    const rowNum = rowOffset + startRow + rows().length;
+                    return (
+                      <>
+                        <div class="row-header">{rowNum}</div>
+                        <For each={Array.from({ length: 26 }, (_, i) => i)}>
+                          {(colIndex) => {
+                            const colLetter = String.fromCharCode(65 + colIndex);
+                            return (
+                              <div 
+                                class={`cell${rowNum === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
+                                onClick={() => handleCellClick(colLetter, rowNum)}
+                              />
+                            );
+                          }}
+                        </For>
+                      </>
+                    );
+                  }}
                 </For>
               </Show>
             </div>

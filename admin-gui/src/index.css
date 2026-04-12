@@ -229,7 +229,7 @@ body {
   overflow: auto;
   background: #f7f9ff;
   display: grid;
-  grid-template-columns: 56px repeat(12, minmax(120px, 1fr));
+  grid-template-columns: 56px repeat(26, minmax(100px, 1fr));
   grid-auto-rows: 36px;
   min-height: 0;
 }
@@ -373,7 +373,7 @@ body {
   }
 
   .grid-wrap {
-    grid-template-columns: 44px repeat(12, minmax(92px, 1fr));
+    grid-template-columns: 44px repeat(26, minmax(80px, 1fr));
   }
 }
 
@@ -439,6 +439,6 @@ body {
   }
 
   .grid-wrap {
-    grid-template-columns: 44px repeat(12, minmax(92px, 1fr));
+    grid-template-columns: 44px repeat(26, minmax(80px, 1fr));
   }
 }
