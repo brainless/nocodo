@@ -1,18 +1,15 @@
 use actix_web::{get, post, web, HttpResponse, Responder, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use shared_types::{
-    GetSheetDataResponse, GetSheetResponse, GetSheetTabDataResponse, GetSheetTabSchemaResponse,
-    ListSheetsResponse, PaginationInfo, Project, Sheet, SheetTab, SheetTabColumn,
-    SheetTabDataResult, SheetTabRow,
+    GetSheetDataResponse, GetSheetResponse, GetSheetTabSchemaResponse,
+    ListSheetsResponse, PaginationInfo, Sheet, SheetTab, SheetTabColumn,
+    SheetTabDataResult,
 };
 
 use crate::config;
 
 use super::schema_cache::SchemaCache;
-use super::sheet_record::{
-    list_records, AgentChatMessage, AgentChatSession, AgentToolCall, SheetRecord,
-};
-use super::types::{GetSheetDataQuery, GetSheetTabDataQuery, ListSheetsQuery};
+use super::types::{GetSheetDataQuery, ListSheetsQuery};
 
 fn open_db() -> Result<Connection, rusqlite::Error> {
     let database_url = std::env::var("DATABASE_URL")
@@ -209,110 +206,10 @@ pub async fn get_sheet_tab_schema(sheet_tab_id: web::Path<i64>) -> Result<impl R
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// GET /api/sheet-tabs/{id}/data?limit={n}&offset={n}
-/// Get row data for a sheet tab
-/// 
-/// Uses the SheetRecord trait to query actual SQL tables directly.
-/// Virtual sheet tab IDs: 6=Projects, 7=Sessions, 8=Messages, 9=Tool Calls
-#[get("/api/sheet-tabs/{sheet_tab_id}/data")]
-pub async fn get_sheet_tab_data(
-    sheet_tab_id: web::Path<i64>,
-    query: web::Query<GetSheetTabDataQuery>,
-) -> Result<impl Responder> {
-    let conn = open_db().map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-    })?;
-
-    let tab_id = sheet_tab_id.into_inner();
-    let limit = query.limit.unwrap_or(100).clamp(1, 1000);
-    let offset = query.offset.unwrap_or(0);
-
-    // Route to the appropriate SheetRecord implementation
-    match tab_id {
-        6 => {
-            // Projects tab
-            let (records, total_count) =
-                list_records::<Project>(&conn, Some(limit), Some(offset)).map_err(|e| {
-                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
-                })?;
-            let rows = records_to_sheet_rows(tab_id, records);
-            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
-                sheet_tab_id: tab_id,
-                rows,
-                total_count,
-            }))
-        }
-        7 => {
-            // Sessions tab
-            let (records, total_count) =
-                list_records::<AgentChatSession>(&conn, Some(limit), Some(offset)).map_err(|e| {
-                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
-                })?;
-            let rows = records_to_sheet_rows(tab_id, records);
-            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
-                sheet_tab_id: tab_id,
-                rows,
-                total_count,
-            }))
-        }
-        8 => {
-            // Messages tab
-            let (records, total_count) =
-                list_records::<AgentChatMessage>(&conn, Some(limit), Some(offset)).map_err(|e| {
-                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
-                })?;
-            let rows = records_to_sheet_rows(tab_id, records);
-            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
-                sheet_tab_id: tab_id,
-                rows,
-                total_count,
-            }))
-        }
-        9 => {
-            // Tool Calls tab
-            let (records, total_count) =
-                list_records::<AgentToolCall>(&conn, Some(limit), Some(offset)).map_err(|e| {
-                    actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
-                })?;
-            let rows = records_to_sheet_rows(tab_id, records);
-            Ok(HttpResponse::Ok().json(GetSheetTabDataResponse {
-                sheet_tab_id: tab_id,
-                rows,
-                total_count,
-            }))
-        }
-        _ => Err(actix_web::error::ErrorNotFound("Sheet tab not found")),
-    }
-}
-
-/// Convert SheetRecord structs to SheetTabRow format for API compatibility
-///
-/// The data field contains JSON with column_id -> value mapping.
-/// Uses the SheetRecord's to_column_json method to get properly keyed data.
-fn records_to_sheet_rows<T: SheetRecord>(sheet_tab_id: i64, records: Vec<T>) -> Vec<SheetTabRow> {
-    records
-        .into_iter()
-        .map(|record| {
-            let data = serde_json::to_string(&record.to_column_json())
-                .unwrap_or_else(|_| "{}".to_string());
-            let id = record.id();
-            let created_at = record.created_at();
-            SheetTabRow {
-                id,
-                sheet_tab_id,
-                data,
-                created_at,
-                updated_at: created_at, // Using created_at as updated_at for now
-            }
-        })
-        .collect()
-}
-
 /// POST /api/sheets/data
 /// Get row data for one or more sheet tabs using dynamic SQL queries
 ///
-/// This is an alternative to the trait-based get_sheet_tab_data endpoint.
-/// It queries actual SQL tables directly based on sheet/sheet_tab metadata.
+/// Queries actual SQL tables directly based on sheet/sheet_tab metadata.
 /// Returns positional row data (not column-id keyed) for flexible querying.
 #[post("/api/sheets/data")]
 pub async fn get_sheet_data(

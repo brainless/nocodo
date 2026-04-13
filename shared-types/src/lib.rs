@@ -108,23 +108,6 @@ pub struct SheetTabColumn {
     pub width: i32,
 }
 
-/// A row stores JSON data keyed by column_id
-/// Example: {"1": "Alice", "2": "Acme Inc", "3": "qualified"}
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct SheetTabRow {
-    #[ts(type = "number")]
-    pub id: i64,
-    #[ts(type = "number")]
-    pub sheet_tab_id: i64,
-    /// JSON map: column_id (as string) -> cell value
-    pub data: String,
-    #[ts(type = "number")]
-    pub created_at: i64,
-    #[ts(type = "number")]
-    pub updated_at: i64,
-}
-
 // ============================================================================
 // Read-Only Schema API Types
 // ============================================================================
@@ -173,30 +156,8 @@ pub struct GetSheetTabSchemaResponse {
     pub columns: Vec<SheetTabColumn>,
 }
 
-/// Get row data for a sheet tab (paginated)
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct GetSheetTabDataRequest {
-    #[ts(type = "number")]
-    pub sheet_tab_id: i64,
-    #[ts(type = "number | null")]
-    pub limit: Option<i64>,
-    #[ts(type = "number | null")]
-    pub offset: Option<i64>,
-}
-
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct GetSheetTabDataResponse {
-    #[ts(type = "number")]
-    pub sheet_tab_id: i64,
-    pub rows: Vec<SheetTabRow>,
-    #[ts(type = "number")]
-    pub total_count: i64,
-}
-
 // ============================================================================
-// Dynamic Data API Types (alternative to trait-based SheetRecord)
+// Dynamic Data API Types
 // ============================================================================
 
 /// Request data for one or more sheet tabs

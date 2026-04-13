@@ -1,8 +1,8 @@
 use shared_types::{
     ColumnType, GetSheetDataRequest, GetSheetDataResponse, GetSheetResponse,
-    GetSheetTabDataRequest, GetSheetTabDataResponse, GetSheetTabSchemaRequest,
-    GetSheetTabSchemaResponse, HeartbeatResponse, ListSheetsRequest, ListSheetsResponse,
-    PaginationInfo, Project, Sheet, SheetTab, SheetTabColumn, SheetTabDataResult, SheetTabRow,
+    GetSheetTabSchemaRequest, GetSheetTabSchemaResponse, HeartbeatResponse, ListSheetsRequest,
+    ListSheetsResponse, PaginationInfo, Project, Sheet, SheetTab, SheetTabColumn,
+    SheetTabDataResult,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,7 +26,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     export_type!(Sheet);
     export_type!(SheetTab);
     export_type!(SheetTabColumn);
-    export_type!(SheetTabRow);
     export_type!(ColumnType);
 
     // API request/response types
@@ -35,10 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     export_type!(GetSheetResponse);
     export_type!(GetSheetTabSchemaRequest);
     export_type!(GetSheetTabSchemaResponse);
-    export_type!(GetSheetTabDataRequest);
-    export_type!(GetSheetTabDataResponse);
 
-    // Dynamic data API types (alternative to trait-based)
+    // Dynamic data API types
     export_type!(GetSheetDataRequest);
     export_type!(GetSheetDataResponse);
     export_type!(SheetTabDataResult);

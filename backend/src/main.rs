@@ -137,7 +137,6 @@ async fn main() -> std::io::Result<()> {
             .service(sheets_api::handlers::list_sheets)
             .service(sheets_api::handlers::get_sheet)
             .service(sheets_api::handlers::get_sheet_tab_schema)
-            .service(sheets_api::handlers::get_sheet_tab_data)
             .service(sheets_api::handlers::get_sheet_data)
     })
     .bind((backend_host.as_str(), backend_port))?
