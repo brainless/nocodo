@@ -6,6 +6,7 @@ mod agents_api;
 mod auth;
 mod config;
 mod db;
+mod projects_api;
 mod sheets_api;
 
 #[get("/api/heartbeat")]
@@ -35,13 +36,6 @@ async fn main() -> std::io::Result<()> {
         eprintln!("Warning: Failed to run migrations: {}", e);
     } else {
         println!("Database migrations applied successfully");
-    }
-
-    // Ensure a default project exists (needed for agent chat sessions)
-    if let Err(e) = db::ensure_default_project(&database_url) {
-        eprintln!("Warning: Failed to ensure default project: {}", e);
-    } else {
-        println!("Default project ready");
     }
 
     let backend_host = std::env::var("BACKEND_HOST")
@@ -133,6 +127,9 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::schema_designer::send_chat_message)
             .service(agents_api::schema_designer::get_session_messages)
             .service(agents_api::schema_designer::get_message_response)
+            // Project API routes
+            .service(projects_api::handlers::list_projects)
+            .service(projects_api::handlers::create_project)
             // Sheets API routes (read-only)
             .service(sheets_api::handlers::list_sheets)
             .service(sheets_api::handlers::get_sheet)

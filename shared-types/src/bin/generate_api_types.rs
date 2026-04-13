@@ -1,8 +1,8 @@
 use shared_types::{
-    ColumnType, GetSheetDataRequest, GetSheetDataResponse, GetSheetResponse,
-    GetSheetTabSchemaRequest, GetSheetTabSchemaResponse, HeartbeatResponse, ListSheetsRequest,
-    ListSheetsResponse, PaginationInfo, Project, Sheet, SheetTab, SheetTabColumn,
-    SheetTabDataResult,
+    ColumnType, CreateProjectRequest, CreateProjectResponse, GetSheetDataRequest,
+    GetSheetDataResponse, GetSheetResponse, GetSheetTabSchemaRequest, GetSheetTabSchemaResponse,
+    HeartbeatResponse, ListProjectsResponse, ListSheetsRequest, ListSheetsResponse, PaginationInfo,
+    Project, Sheet, SheetTab, SheetTabColumn, SheetTabDataResult,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -27,6 +27,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     export_type!(SheetTab);
     export_type!(SheetTabColumn);
     export_type!(ColumnType);
+
+    // Project API types
+    export_type!(CreateProjectRequest);
+    export_type!(CreateProjectResponse);
+    export_type!(ListProjectsResponse);
 
     // API request/response types
     export_type!(ListSheetsRequest);

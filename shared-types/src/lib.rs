@@ -212,6 +212,32 @@ pub struct GetSheetDataResponse {
 }
 
 // ============================================================================
+// Project API Types
+// ============================================================================
+
+/// Create a new project
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateProjectRequest {
+    pub name: String,
+    /// Path to folder where project data is stored (optional, auto-generated if not provided)
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateProjectResponse {
+    pub project: Project,
+}
+
+/// List all projects
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ListProjectsResponse {
+    pub projects: Vec<Project>,
+}
+
+// ============================================================================
 // Legacy Types
 // ============================================================================
 

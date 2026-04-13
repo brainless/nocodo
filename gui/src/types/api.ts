@@ -38,6 +38,25 @@ export type ColumnType = { "type": "text" } | { "type": "number" } | { "type": "
 
 
 /**
+ * Create a new project
+ */
+export type CreateProjectRequest = { name: string, 
+/**
+ * Path to folder where project data is stored (optional, auto-generated if not provided)
+ */
+path: string | null, };
+
+
+export type CreateProjectResponse = { project: Project, };
+
+
+/**
+ * List all projects
+ */
+export type ListProjectsResponse = { projects: Array<Project>, };
+
+
+/**
  * List all sheets in a project
  */
 export type ListSheetsRequest = { project_id: number, };

@@ -1,4 +1,5 @@
 import { For, Show, createSignal, onMount } from 'solid-js';
+import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import type {
   Sheet,
   SheetTab,
@@ -14,7 +15,6 @@ import type {
 const menuItems: string[] = [];
 
 const API_BASE_URL = '';  // Use relative URLs to leverage Vite proxy
-const PROJECT_ID = 1; // Default project for now
 
 type ChatRole = 'user' | 'assistant';
 type UiMessage = { role: ChatRole; content: string };
@@ -30,7 +30,151 @@ const defaultAssistantMessage: UiMessage = {
   content: 'Hello! I can help you with your spreadsheet. What would you like to do?'
 };
 
-export default function App() {
+// Project Selector Component
+function ProjectSelector() {
+  const { projects, currentProject, setCurrentProject, isLoading, createProject } = useProject();
+  const [isDropdownOpen, setIsDropdownOpen] = createSignal(false);
+  const [isModalOpen, setIsModalOpen] = createSignal(false);
+  const [newProjectName, setNewProjectName] = createSignal('');
+  const [isCreating, setIsCreating] = createSignal(false);
+
+  const handleCreateProject = async () => {
+    const name = newProjectName().trim();
+    if (!name) return;
+    
+    setIsCreating(true);
+    const project = await createProject(name);
+    setIsCreating(false);
+    
+    if (project) {
+      setNewProjectName('');
+      setIsModalOpen(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Project Selector Dropdown */}
+      <div class="dropdown dropdown-bottom">
+        <button
+          class="btn btn-ghost btn-sm gap-2"
+          onClick={() => setIsDropdownOpen(!isDropdownOpen())}
+        >
+          <Show when={isLoading()}>
+            <span class="loading loading-spinner loading-xs"></span>
+          </Show>
+          <span class="font-semibold">{currentProject()?.name ?? 'Select Project'}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        
+        <Show when={isDropdownOpen()}>
+          <div class="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-56 mt-2 border border-base-300">
+            <div class="px-3 py-2 text-xs font-semibold text-base-content/60 uppercase tracking-wider">
+              Projects
+            </div>
+            <For each={projects()}>
+              {(project) => (
+                <button
+                  class={`btn btn-ghost btn-sm justify-start ${project.id === currentProject()?.id ? 'btn-active' : ''}`}
+                  onClick={() => {
+                    setCurrentProject(project);
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  <span class="truncate">{project.name}</span>
+                </button>
+              )}
+            </For>
+            
+            <div class="divider my-1"></div>
+            
+            <button
+              class="btn btn-ghost btn-sm justify-start text-primary"
+              onClick={() => {
+                setIsDropdownOpen(false);
+                setIsModalOpen(true);
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              Create Project
+            </button>
+          </div>
+        </Show>
+        
+        {/* Backdrop to close dropdown */}
+        <Show when={isDropdownOpen()}>
+          <div 
+            class="fixed inset-0 z-[99]" 
+            onClick={() => setIsDropdownOpen(false)}
+          />
+        </Show>
+      </div>
+
+      {/* Create Project Modal */}
+      <Show when={isModalOpen()}>
+        <div class="modal modal-open z-[200]">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Create New Project</h3>
+            
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Project Name</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter project name"
+                class="input input-bordered"
+                value={newProjectName()}
+                onInput={(e) => setNewProjectName(e.currentTarget.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
+                disabled={isCreating()}
+              />
+            </div>
+            
+            <div class="modal-action">
+              <button 
+                class="btn btn-ghost" 
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setNewProjectName('');
+                }}
+                disabled={isCreating()}
+              >
+                Cancel
+              </button>
+              <button 
+                class="btn btn-primary" 
+                onClick={handleCreateProject}
+                disabled={!newProjectName().trim() || isCreating()}
+              >
+                <Show when={isCreating()}>
+                  <span class="loading loading-spinner loading-xs mr-2"></span>
+                </Show>
+                Create
+              </button>
+            </div>
+          </div>
+          
+          {/* Backdrop */}
+          <div 
+            class="modal-backdrop" 
+            onClick={() => {
+              if (!isCreating()) {
+                setIsModalOpen(false);
+                setNewProjectName('');
+              }
+            }}
+          />
+        </div>
+      </Show>
+    </>
+  );
+}
+
+// Main App Content Component
+function AppContent() {
+  const { currentProject } = useProject();
+
   // Sheet state
   const [sheets, setSheets] = createSignal<Sheet[]>([]);
   const [currentSheet, setCurrentSheet] = createSignal<Sheet | null>(null);
@@ -53,17 +197,15 @@ export default function App() {
   const [sessionId, setSessionId] = createSignal<number | null>(null);
   const [isLoading, setIsLoading] = createSignal(false);
 
-  // Fetch sheets on mount
-  onMount(() => {
-    loadSheets();
-  });
-
-  // Load sheets for the project
+  // Fetch sheets when project changes
   const loadSheets = async () => {
+    const projectId = currentProject()?.id;
+    if (!projectId) return;
+
     setIsLoadingSheets(true);
     setSheetError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sheets?project_id=${PROJECT_ID}`);
+      const response = await fetch(`${API_BASE_URL}/api/sheets?project_id=${projectId}`);
       if (!response.ok) {
         throw new Error(`Failed to load sheets: ${response.status}`);
       }
@@ -76,6 +218,11 @@ export default function App() {
         await loadSheet(nocodoInternal.id);
       } else if (data.sheets.length > 0) {
         await loadSheet(data.sheets[0].id);
+      } else {
+        setCurrentSheet(null);
+        setSheetTabs([]);
+        setColumns([]);
+        setRows([]);
       }
     } catch (error) {
       console.error('Error loading sheets:', error);
@@ -84,6 +231,17 @@ export default function App() {
       setIsLoadingSheets(false);
     }
   };
+
+  // Load sheets when project changes
+  onMount(() => {
+    loadSheets();
+  });
+
+  // Reload sheets when current project changes
+  const projectId = currentProject()?.id;
+  if (projectId) {
+    loadSheets();
+  }
 
   // Load a specific sheet with its tabs
   const loadSheet = async (sheetId: number) => {
@@ -294,6 +452,15 @@ export default function App() {
     const message = inputValue().trim();
     if (!message) return;
     
+    const projectId = currentProject()?.id;
+    if (!projectId) {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Error: No project selected' 
+      }]);
+      return;
+    }
+    
     setMessages([...messages(), { role: 'user', content: message }]);
     setInputValue('');
     setIsLoading(true);
@@ -303,7 +470,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          project_id: PROJECT_ID,
+          project_id: projectId,
           session_id: sessionId(),
           message: message
         })
@@ -345,6 +512,7 @@ export default function App() {
   return (
     <main class="sheet-app">
       <header class="menu-strip">
+        <ProjectSelector />
         <div class="menu-title">
           {currentSheet() ? currentSheet()!.name : 'Nocodo Sheets'}
         </div>
@@ -557,5 +725,14 @@ export default function App() {
         </div>
       </div>
     </main>
+  );
+}
+
+// Root App component with Provider
+export default function App() {
+  return (
+    <ProjectProvider>
+      <AppContent />
+    </ProjectProvider>
   );
 }

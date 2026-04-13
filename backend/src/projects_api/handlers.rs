@@ -1,0 +1,115 @@
+use actix_web::{get, post, web, HttpResponse, Responder, Result};
+use rusqlite::{params, Connection};
+use shared_types::{CreateProjectRequest, CreateProjectResponse, ListProjectsResponse, Project};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::config;
+
+fn open_db() -> Result<Connection, rusqlite::Error> {
+    let database_url = std::env::var("DATABASE_URL")
+        .ok()
+        .or_else(|| config::read_project_conf("DATABASE_URL"))
+        .unwrap_or_else(|| "nocodo.db".to_string());
+    Connection::open(&database_url)
+}
+
+fn generate_project_path(name: &str) -> String {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let sanitized_name = name
+        .to_lowercase()
+        .replace(' ', "-")
+        .replace(|c: char| !c.is_alphanumeric() && c != '-', "");
+    format!("./projects/{}-{}", sanitized_name, timestamp)
+}
+
+/// GET /api/projects
+/// List all projects
+#[get("/api/projects")]
+pub async fn list_projects() -> Result<impl Responder> {
+    let conn = open_db().map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+    })?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, path, created_at 
+             FROM project 
+             ORDER BY created_at DESC",
+        )
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Prepare error: {}", e))
+        })?;
+
+    let projects = stmt
+        .query_map([], |row| {
+            Ok(Project {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                path: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
+        })?;
+
+    let projects: Vec<Project> = projects.collect::<Result<Vec<_>, _>>().map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Collect error: {}", e))
+    })?;
+
+    let response = ListProjectsResponse { projects };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// POST /api/projects
+/// Create a new project
+#[post("/api/projects")]
+pub async fn create_project(body: web::Json<CreateProjectRequest>) -> Result<impl Responder> {
+    let conn = open_db().map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+    })?;
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let path = body
+        .path
+        .clone()
+        .unwrap_or_else(|| generate_project_path(&body.name));
+
+    // Create the project directory if it doesn't exist
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        return Err(actix_web::error::ErrorInternalServerError(format!(
+            "Failed to create project directory: {}",
+            e
+        )));
+    }
+
+    let result = conn.execute(
+        "INSERT INTO project (name, path, created_at) VALUES (?1, ?2, ?3)",
+        params![&body.name, &path, now],
+    );
+
+    match result {
+        Ok(_) => {
+            let project_id = conn.last_insert_rowid();
+            let project = Project {
+                id: project_id,
+                name: body.name.clone(),
+                path,
+                created_at: now,
+            };
+            let response = CreateProjectResponse { project };
+            Ok(HttpResponse::Created().json(response))
+        }
+        Err(e) => Err(actix_web::error::ErrorInternalServerError(format!(
+            "Failed to create project: {}",
+            e
+        ))),
+    }
+}
