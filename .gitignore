@@ -8,6 +8,9 @@
 /admin-gui/dist
 /tauri/node_modules
 /tauri/dist
+/website/node_modules
+/website/dist
+/website/.astro
 
 # Binaries
 /tauri/bin/*
