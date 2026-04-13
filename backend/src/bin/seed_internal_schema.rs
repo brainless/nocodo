@@ -64,16 +64,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ============================================
     let projects_tab_id = tab_ids[0];
     let projects_columns = vec![
-        ("ID", r#"{"type": "integer"}"#, 0, true, true),
-        ("Name", r#"{"type": "text"}"#, 1, true, false),
-        ("Path", r#"{"type": "text"}"#, 2, true, false),
-        ("Created At", r#"{"type": "date_time"}"#, 3, true, false),
+        ("ID", "id", r#"{"type": "integer"}"#, 0, true, true),
+        ("Name", "name", r#"{"type": "text"}"#, 1, true, false),
+        ("Path", "path", r#"{"type": "text"}"#, 2, true, false),
+        (
+            "Created At",
+            "created_at",
+            r#"{"type": "date_time"}"#,
+            3,
+            true,
+            false,
+        ),
     ];
 
-    for (name, col_type, order, required, unique) in &projects_columns {
+    for (name, sql_name, col_type, order, required, unique) in &projects_columns {
         conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![projects_tab_id, name, col_type, order, *required as i64, *unique as i64, now_ts],
+            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![projects_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
         )?;
     }
     println!("Created {} columns in Projects tab", projects_columns.len());
@@ -87,10 +94,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         projects_tab_id
     );
     let sessions_columns = vec![
-        ("ID", r#"{"type": "integer"}"#.to_string(), 0, true, true),
-        ("Project", project_relation_type, 1, true, false),
+        (
+            "ID",
+            "id",
+            r#"{"type": "integer"}"#.to_string(),
+            0,
+            true,
+            true,
+        ),
+        (
+            "Project",
+            "project_id",
+            project_relation_type,
+            1,
+            true,
+            false,
+        ),
         (
             "Agent Type",
+            "agent_type",
             r#"{"type": "text"}"#.to_string(),
             2,
             true,
@@ -98,6 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         (
             "Created At",
+            "created_at",
             r#"{"type": "date_time"}"#.to_string(),
             3,
             true,
@@ -105,10 +128,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     ];
 
-    for (name, col_type, order, required, unique) in &sessions_columns {
+    for (name, sql_name, col_type, order, required, unique) in &sessions_columns {
         conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![sessions_tab_id, name, col_type, order, *required as i64, *unique as i64, now_ts],
+            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![sessions_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
         )?;
     }
     println!(
@@ -125,12 +148,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sessions_tab_id
     );
     let messages_columns = vec![
-        ("ID", r#"{"type": "integer"}"#.to_string(), 0, true, true),
-        ("Session", session_relation_type, 1, true, false),
-        ("Role", r#"{"type": "text"}"#.to_string(), 2, true, false),
-        ("Content", r#"{"type": "text"}"#.to_string(), 3, true, false),
+        (
+            "ID",
+            "id",
+            r#"{"type": "integer"}"#.to_string(),
+            0,
+            true,
+            true,
+        ),
+        (
+            "Session",
+            "session_id",
+            session_relation_type,
+            1,
+            true,
+            false,
+        ),
+        (
+            "Role",
+            "role",
+            r#"{"type": "text"}"#.to_string(),
+            2,
+            true,
+            false,
+        ),
+        (
+            "Content",
+            "content",
+            r#"{"type": "text"}"#.to_string(),
+            3,
+            true,
+            false,
+        ),
         (
             "Created At",
+            "created_at",
             r#"{"type": "date_time"}"#.to_string(),
             4,
             true,
@@ -138,10 +190,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     ];
 
-    for (name, col_type, order, required, unique) in &messages_columns {
+    for (name, sql_name, col_type, order, required, unique) in &messages_columns {
         conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![messages_tab_id, name, col_type, order, *required as i64, *unique as i64, now_ts],
+            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![messages_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
         )?;
     }
     println!(
@@ -158,11 +210,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         messages_tab_id
     );
     let tool_calls_columns = vec![
-        ("ID", r#"{"type": "integer"}"#.to_string(), 0, true, true),
-        ("Message", message_relation_type, 1, true, false),
-        ("Call ID", r#"{"type": "text"}"#.to_string(), 2, true, false),
+        (
+            "ID",
+            "id",
+            r#"{"type": "integer"}"#.to_string(),
+            0,
+            true,
+            true,
+        ),
+        (
+            "Message",
+            "message_id",
+            message_relation_type,
+            1,
+            true,
+            false,
+        ),
+        (
+            "Call ID",
+            "call_id",
+            r#"{"type": "text"}"#.to_string(),
+            2,
+            true,
+            false,
+        ),
         (
             "Tool Name",
+            "tool_name",
             r#"{"type": "text"}"#.to_string(),
             3,
             true,
@@ -170,14 +244,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         (
             "Arguments",
+            "arguments",
             r#"{"type": "json"}"#.to_string(),
             4,
             false,
             false,
         ),
-        ("Result", r#"{"type": "text"}"#.to_string(), 5, false, false),
+        (
+            "Result",
+            "result",
+            r#"{"type": "text"}"#.to_string(),
+            5,
+            false,
+            false,
+        ),
         (
             "Created At",
+            "created_at",
             r#"{"type": "date_time"}"#.to_string(),
             6,
             true,
@@ -185,10 +268,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     ];
 
-    for (name, col_type, order, required, unique) in &tool_calls_columns {
+    for (name, sql_name, col_type, order, required, unique) in &tool_calls_columns {
         conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![tool_calls_tab_id, name, col_type, order, *required as i64, *unique as i64, now_ts],
+            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![tool_calls_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
         )?;
     }
     println!(

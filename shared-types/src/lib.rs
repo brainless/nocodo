@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use ts_rs::TS;
 
 // ============================================================================
@@ -192,6 +193,61 @@ pub struct GetSheetTabDataResponse {
     pub rows: Vec<SheetTabRow>,
     #[ts(type = "number")]
     pub total_count: i64,
+}
+
+// ============================================================================
+// Dynamic Data API Types (alternative to trait-based SheetRecord)
+// ============================================================================
+
+/// Request data for one or more sheet tabs
+/// Returns positional row data (not column-id keyed) for flexible querying
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GetSheetDataRequest {
+    /// Sheet tab IDs to query (supports multi-table in future)
+    #[ts(type = "number[]")]
+    pub sheet_tab_ids: Vec<i64>,
+    #[ts(type = "number | null")]
+    pub limit: Option<i64>,
+    #[ts(type = "number | null")]
+    pub offset: Option<i64>,
+}
+
+/// Pagination metadata
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PaginationInfo {
+    #[ts(type = "number")]
+    pub total_count: i64,
+    #[ts(type = "number")]
+    pub limit: i64,
+    #[ts(type = "number")]
+    pub offset: i64,
+    #[ts(type = "boolean")]
+    pub has_more: bool,
+}
+
+/// Data result for a single sheet tab
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SheetTabDataResult {
+    #[ts(type = "number")]
+    pub sheet_tab_id: i64,
+    /// Column definitions (same order as row data)
+    pub columns: Vec<SheetTabColumn>,
+    /// Rows as positional arrays (not keyed by column_id)
+    /// Each inner array matches the order of `columns`
+    /// TypeScript: unknown[][] (any JSON value)
+    #[ts(type = "unknown[][]")]
+    pub rows: Vec<Vec<Value>>,
+    pub pagination: PaginationInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GetSheetDataResponse {
+    /// Results for each requested sheet_tab_id
+    pub results: Vec<SheetTabDataResult>,
 }
 
 // ============================================================================

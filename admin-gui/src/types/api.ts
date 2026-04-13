@@ -78,4 +78,44 @@ export type GetSheetTabDataRequest = { sheet_tab_id: number, limit: number | nul
 export type GetSheetTabDataResponse = { sheet_tab_id: number, rows: Array<SheetTabRow>, total_count: number, };
 
 
+/**
+ * Request data for one or more sheet tabs
+ * Returns positional row data (not column-id keyed) for flexible querying
+ */
+export type GetSheetDataRequest = { 
+/**
+ * Sheet tab IDs to query (supports multi-table in future)
+ */
+sheet_tab_ids: number[], limit: number | null, offset: number | null, };
+
+
+export type GetSheetDataResponse = { 
+/**
+ * Results for each requested sheet_tab_id
+ */
+results: Array<SheetTabDataResult>, };
+
+
+/**
+ * Data result for a single sheet tab
+ */
+export type SheetTabDataResult = { sheet_tab_id: number, 
+/**
+ * Column definitions (same order as row data)
+ */
+columns: Array<SheetTabColumn>, 
+/**
+ * Rows as positional arrays (not keyed by column_id)
+ * Each inner array matches the order of `columns`
+ * TypeScript: unknown[][] (any JSON value)
+ */
+rows: unknown[][], pagination: PaginationInfo, };
+
+
+/**
+ * Pagination metadata
+ */
+export type PaginationInfo = { total_count: number, limit: number, offset: number, has_more: boolean, };
+
+
 export type HeartbeatResponse = { status: string, service: string, };

@@ -1,14 +1,14 @@
 import { For, Show, createSignal, onMount } from 'solid-js';
-import type { 
-  Sheet, 
-  SheetTab, 
-  SheetTabColumn, 
-  SheetTabRow,
-  ListSheetsResponse, 
-  GetSheetResponse, 
+import type {
+  Sheet,
+  SheetTab,
+  SheetTabColumn,
+  ListSheetsResponse,
+  GetSheetResponse,
   GetSheetTabSchemaResponse,
-  GetSheetTabDataResponse,
-  ColumnType 
+  GetSheetDataResponse,
+  SheetTabDataResult,
+  ColumnType
 } from './types/api';
 
 const menuItems: string[] = [];
@@ -37,7 +37,8 @@ export default function App() {
   const [sheetTabs, setSheetTabs] = createSignal<SheetTab[]>([]);
   const [activeTabId, setActiveTabId] = createSignal<number | null>(null);
   const [columns, setColumns] = createSignal<SheetTabColumn[]>([]);
-  const [rows, setRows] = createSignal<SheetTabRow[]>([]);
+  const [rows, setRows] = createSignal<unknown[][]>([]);
+  const [pagination, setPagination] = createSignal<SheetTabDataResult['pagination'] | null>(null);
   const [isLoadingSheets, setIsLoadingSheets] = createSignal(false);
   const [sheetError, setSheetError] = createSignal<string | null>(null);
 
@@ -105,7 +106,7 @@ export default function App() {
     }
   };
 
-  // Load a tab's schema and data
+  // Load a tab's schema and data using the new dynamic endpoint
   const loadTab = async (tabId: number) => {
     setActiveTabId(tabId);
     try {
@@ -117,13 +118,27 @@ export default function App() {
       const schemaData = await schemaResponse.json() as GetSheetTabSchemaResponse;
       setColumns(schemaData.columns);
 
-      // Load row data
-      const dataResponse = await fetch(`${API_BASE_URL}/api/sheet-tabs/${tabId}/data?limit=100`);
+      // Load row data using the new dynamic endpoint
+      const dataResponse = await fetch(
+        `${API_BASE_URL}/api/sheets/data?sheet_tab_ids=${tabId}&limit=100`,
+        { method: 'POST' }
+      );
       if (!dataResponse.ok) {
         throw new Error(`Failed to load tab data: ${dataResponse.status}`);
       }
-      const dataData = await dataResponse.json() as GetSheetTabDataResponse;
-      setRows(dataData.rows);
+      const dataData = await dataResponse.json() as GetSheetDataResponse;
+
+      // Use the first result (we only requested one tab)
+      const result = dataData.results[0];
+      if (result) {
+        // Update columns from the result (includes column metadata from backend)
+        setColumns(result.columns);
+        setRows(result.rows);
+        setPagination(result.pagination);
+      } else {
+        setRows([]);
+        setPagination(null);
+      }
     } catch (error) {
       console.error('Error loading tab:', error);
       setSheetError(error instanceof Error ? error.message : 'Failed to load tab');
@@ -131,16 +146,14 @@ export default function App() {
   };
 
   // Get display value for a cell from the row data (rowIndex is 0-based data row)
+  // Uses positional array data from the new API (rows are unknown[][])
   const getCellDisplayValue = (colIndex: number, rowIndex: number): string => {
-    const cols = columns();
     const rowData = rows()[rowIndex]; // rowIndex 0 = displayed row 2
-    
-    if (!rowData || colIndex >= cols.length) return '';
-    
-    const column = cols[colIndex];
-    const data = JSON.parse(rowData.data || '{}');
-    const value = data[String(column.id)];
-    
+
+    if (!rowData || colIndex >= rowData.length) return '';
+
+    const value = rowData[colIndex];
+
     if (value === null || value === undefined) return '';
     return String(value);
   };
@@ -164,32 +177,31 @@ export default function App() {
   };
 
   // Get the raw cell value for the formula bar
+  // Uses positional array data from the new API
   const getCellValue = (col: string, row: number): string => {
     const colIndex = col.charCodeAt(0) - 65; // Convert 'A' -> 0, 'B' -> 1, etc.
     const cols = columns();
-    
+
     // First check if there's a user-entered formula
     const key = getCellKey(col, row);
     const formula = cellFormulas()[key];
     if (formula !== undefined && formula !== '') {
       return formula;
     }
-    
+
     // Row 1: show column names from schema
     if (row === 1 && colIndex >= 0 && colIndex < cols.length) {
       return cols[colIndex].name;
     }
-    
+
     // Data rows (2+): get value from API row data (row 2 = index 0)
     const rowIndex = row - 2;
     const rowData = rows()[rowIndex];
-    
-    if (!rowData || colIndex < 0 || colIndex >= cols.length) return '';
-    
-    const column = cols[colIndex];
-    const data = JSON.parse(rowData.data || '{}');
-    const value = data[String(column.id)];
-    
+
+    if (!rowData || colIndex < 0 || colIndex >= rowData.length) return '';
+
+    const value = rowData[colIndex];
+
     if (value === null || value === undefined) return '';
     return String(value);
   };

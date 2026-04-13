@@ -1,16 +1,18 @@
-use actix_web::{get, web, HttpResponse, Responder, Result};
+use actix_web::{get, post, web, HttpResponse, Responder, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use shared_types::{
-    GetSheetResponse, GetSheetTabDataResponse, GetSheetTabSchemaResponse, ListSheetsResponse,
-    Project, Sheet, SheetTab, SheetTabColumn, SheetTabRow,
+    GetSheetDataResponse, GetSheetResponse, GetSheetTabDataResponse, GetSheetTabSchemaResponse,
+    ListSheetsResponse, PaginationInfo, Project, Sheet, SheetTab, SheetTabColumn,
+    SheetTabDataResult, SheetTabRow,
 };
 
 use crate::config;
 
+use super::schema_cache::SchemaCache;
 use super::sheet_record::{
     list_records, AgentChatMessage, AgentChatSession, AgentToolCall, SheetRecord,
 };
-use super::types::{GetSheetTabDataQuery, ListSheetsQuery};
+use super::types::{GetSheetDataQuery, GetSheetTabDataQuery, ListSheetsQuery};
 
 fn open_db() -> Result<Connection, rusqlite::Error> {
     let database_url = std::env::var("DATABASE_URL")
@@ -284,7 +286,7 @@ pub async fn get_sheet_tab_data(
 }
 
 /// Convert SheetRecord structs to SheetTabRow format for API compatibility
-/// 
+///
 /// The data field contains JSON with column_id -> value mapping.
 /// Uses the SheetRecord's to_column_json method to get properly keyed data.
 fn records_to_sheet_rows<T: SheetRecord>(sheet_tab_id: i64, records: Vec<T>) -> Vec<SheetTabRow> {
@@ -304,4 +306,176 @@ fn records_to_sheet_rows<T: SheetRecord>(sheet_tab_id: i64, records: Vec<T>) -> 
             }
         })
         .collect()
+}
+
+/// POST /api/sheets/data
+/// Get row data for one or more sheet tabs using dynamic SQL queries
+///
+/// This is an alternative to the trait-based get_sheet_tab_data endpoint.
+/// It queries actual SQL tables directly based on sheet/sheet_tab metadata.
+/// Returns positional row data (not column-id keyed) for flexible querying.
+#[post("/api/sheets/data")]
+pub async fn get_sheet_data(
+    query: web::Query<GetSheetDataQuery>,
+    cache: web::Data<SchemaCache>,
+) -> Result<impl Responder> {
+    // Parse sheet_tab_ids from comma-separated string
+    let sheet_tab_ids: Vec<i64> = query
+        .sheet_tab_ids
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
+
+    if sheet_tab_ids.is_empty() {
+        return Err(actix_web::error::ErrorBadRequest(
+            "At least one sheet_tab_id is required",
+        ));
+    }
+
+    let limit = query.limit.unwrap_or(100).clamp(1, 1000);
+    let offset = query.offset.unwrap_or(0);
+
+    let conn = open_db().map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+    })?;
+
+    let mut results = Vec::new();
+
+    for tab_id in sheet_tab_ids {
+        // Get schema info from cache
+        let _tab = cache
+            .get_sheet_tab(tab_id)
+            .ok_or_else(|| actix_web::error::ErrorNotFound(format!("Sheet tab {} not found", tab_id)))?;
+
+        let columns = cache.get_tab_columns(tab_id);
+        if columns.is_empty() {
+            // Return empty result for tabs with no columns
+            results.push(SheetTabDataResult {
+                sheet_tab_id: tab_id,
+                columns: vec![],
+                rows: vec![],
+                pagination: PaginationInfo {
+                    total_count: 0,
+                    limit,
+                    offset,
+                    has_more: false,
+                },
+            });
+            continue;
+        }
+
+        // Get SQL table name
+        let table_name = cache
+            .get_sql_table_name(tab_id)
+            .ok_or_else(|| actix_web::error::ErrorInternalServerError(format!(
+                "Could not determine SQL table name for sheet tab {}",
+                tab_id
+            )))?;
+
+        // Build column list for SELECT using sql_name from cache
+        let sql_column_names = cache.get_tab_sql_column_names(tab_id);
+        let select_columns: String = sql_column_names.join(", ");
+
+        // Get total count
+        let total_count: i64 = conn
+            .query_row(
+                &format!("SELECT COUNT(*) FROM {}", table_name),
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Count query failed for {}: {}",
+                    table_name, e
+                ))
+            })?;
+
+        // Build and execute SELECT query
+        let sql = format!(
+            "SELECT {} FROM {} ORDER BY id LIMIT ?1 OFFSET ?2",
+            select_columns, table_name
+        );
+
+        let mut stmt = conn.prepare(&sql).map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!(
+                "Prepare failed for {}: {}",
+                table_name, e
+            ))
+        })?;
+
+        // Execute query and collect results as positional arrays
+        let rows = stmt
+            .query_map(params![limit, offset], |row| {
+                let mut values = Vec::with_capacity(columns.len());
+                for (i, col) in columns.iter().enumerate() {
+                    let value = match col.column_type {
+                        shared_types::ColumnType::Text => {
+                            let s: String = row.get(i)?;
+                            serde_json::json!(s)
+                        }
+                        shared_types::ColumnType::Number | shared_types::ColumnType::Currency => {
+                            let n: f64 = row.get(i)?;
+                            serde_json::json!(n)
+                        }
+                        shared_types::ColumnType::Integer => {
+                            let n: i64 = row.get(i)?;
+                            serde_json::json!(n)
+                        }
+                        shared_types::ColumnType::Boolean => {
+                            let b: i64 = row.get(i)?;
+                            serde_json::json!(b != 0)
+                        }
+                        shared_types::ColumnType::Date | shared_types::ColumnType::DateTime => {
+                            let n: i64 = row.get(i)?;
+                            serde_json::json!(n)
+                        }
+                        _ => {
+                            // For Relation, Lookup, Formula - get as text or number
+                            let s: Result<String, _> = row.get(i);
+                            match s {
+                                Ok(s) => serde_json::json!(s),
+                                Err(_) => {
+                                    let n: Result<i64, _> = row.get(i);
+                                    match n {
+                                        Ok(n) => serde_json::json!(n),
+                                        Err(_) => serde_json::Value::Null,
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    values.push(value);
+                }
+                Ok(values)
+            })
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Query failed for {}: {}",
+                    table_name, e
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Row mapping failed for {}: {}",
+                    table_name, e
+                ))
+            })?;
+
+        let has_more = (offset + rows.len() as i64) < total_count;
+
+        results.push(SheetTabDataResult {
+            sheet_tab_id: tab_id,
+            columns: columns.into_iter().cloned().collect(),
+            rows,
+            pagination: PaginationInfo {
+                total_count,
+                limit,
+                offset,
+                has_more,
+            },
+        });
+    }
+
+    Ok(HttpResponse::Ok().json(GetSheetDataResponse { results }))
 }

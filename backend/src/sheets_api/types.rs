@@ -14,3 +14,11 @@ pub struct GetSheetTabDataQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct GetSheetDataQuery {
+    /// Comma-separated list of sheet tab IDs
+    pub sheet_tab_ids: String,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}

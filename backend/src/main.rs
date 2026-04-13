@@ -92,6 +92,21 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    // Load schema cache for dynamic SQL queries
+    let schema_cache = {
+        let conn = rusqlite::Connection::open(&database_url).expect("Failed to open database");
+        match sheets_api::schema_cache::SchemaCache::load(&conn) {
+            Ok(cache) => {
+                println!("Schema cache loaded successfully");
+                web::Data::new(cache)
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to load schema cache: {}", e);
+                panic!("Failed to load schema cache: {}", e);
+            }
+        }
+    };
+
     HttpServer::new(move || {
         let mut cors = Cors::default()
             .allowed_origin(&gui_origin_ip)
@@ -112,6 +127,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(web::JsonConfig::default())
             .app_data(agent_state.clone())
+            .app_data(schema_cache.clone())
             .service(heartbeat)
             // Agent API routes
             .service(agents_api::schema_designer::send_chat_message)
@@ -122,6 +138,7 @@ async fn main() -> std::io::Result<()> {
             .service(sheets_api::handlers::get_sheet)
             .service(sheets_api::handlers::get_sheet_tab_schema)
             .service(sheets_api::handlers::get_sheet_tab_data)
+            .service(sheets_api::handlers::get_sheet_data)
     })
     .bind((backend_host.as_str(), backend_port))?
     .run()
