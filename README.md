@@ -1,146 +1,82 @@
-# Sheets Driven Development Template
+# nocodo
 
-Minimal fullstack template for typed feature development with coding agents.
+**Sheets Driven Development** — define your business workflow in a familiar spreadsheet UI, get a production-ready database and CRUD API automatically.
 
-## Stack
+> Website: [nocodo.com](https://nocodo.com) &nbsp;·&nbsp; Docs & support: [nocodo.com](https://nocodo.com)
 
-- Rust + Actix Web (`backend`)
-- Rust shared types with TypeScript generation (`shared-types`)
-- TypeScript + SolidJS + Solid Router + Tailwind + DaisyUI (`gui`, `admin-gui`)
-- Tauri desktop shell using `admin-gui` (`tauri`)
-- Bash scripts for server setup and deploy (`scripts`)
+---
 
-## Name Configuration
+## What is nocodo?
 
-This template uses one config at project root:
+nocodo lets you describe your application's data model and business logic the way you already think about it — in rows, columns, and sheets. From that definition, AI generates a real relational database schema and a full CRUD API. No boilerplate. No ORM config. No migrations written by hand.
 
-- `project.conf`
+It's a desktop app you run locally. Everything stays on your machine. When you're ready, self-host the generated backend or use nocodo's pay-as-you-go hosting with a custom domain.
 
-Start by copying:
+---
 
-```bash
-cp project.conf.template project.conf
-```
+## Features
 
-Set at minimum:
+### Spreadsheet UI for defining business workflows
+Work in a spreadsheet-style interface to define entities, relationships, field types, and constraints. If you can model something in a sheet, nocodo can turn it into a running application.
 
-- `PROJECT_NAME`
-- `PROJECT_TITLE`
-- `DB_KIND` (`sqlite` or `postgres`)
-- `DATABASE_URL` (required for postgres; optional for sqlite)
-- `SERVER_IP`
-- `SSH_USER`
-- `DOMAIN_NAME`
-- `LETSENCRYPT_EMAIL`
+### AI-generated database and CRUD API
+nocodo uses an AI schema designer agent to translate your sheet definitions into a production-quality relational database schema and CRUD API. Currently targets **SQLite3**, with more backends planned.
 
-Then apply naming across crate/package/docs:
+- Automatic schema migrations
+- Type-safe API backed by shared Rust types
+- Chat with the AI assistant inside the app to refine your schema
 
-```bash
-scripts/init-project.sh
-```
+### Custom business logic with Rust/Wasm *(coming soon)*
+Write custom business logic once, compile to WebAssembly, and share it across deployments. Runs anywhere nocodo runs.
 
-`init-project.sh` also sets the backend default Cargo feature based on `DB_KIND`:
-- `sqlite` -> `db-sqlite`
-- `postgres` -> `db-postgres`
+### Multi-user auth and permissions *(coming soon)*
+- Authentication and authorization built in
+- Entity owner permissions
+- Role-based access control (RBAC)
 
-## What This Template Includes
+### Generated web app *(coming soon)*
+nocodo will generate a web frontend for your application using **TypeScript, SolidJS, TailwindCSS, and DaisyUI** — ready to deploy alongside your API.
 
-- `GET /api/heartbeat` in backend
-- Embedded DB schema migrations via dedicated backend migrate binary
-- Shared `HeartbeatResponse` type defined in Rust
-- Generated TypeScript type consumed by GUI
-- `gui`: Hello World + heartbeat status
-- `admin-gui`: Hello World admin placeholder
-- `systemd` service template for backend
-- `nginx` site template for GUI + `/api` reverse proxy
-- certbot setup flow for TLS certificates
-- pre-commit hook for Rust and frontend checks
+---
 
-## Project Layout
+## Completely open source desktop app
 
-- `backend/`: Actix API crate
-- `shared-types/`: canonical API types + TS generator
-- `gui/`: main SolidJS app
-- `admin-gui/`: admin SolidJS app
-- `tauri/`: desktop app (Tauri) + backend sidecar runner
-- `scripts/`: setup, init, deploy, and server config templates
-  - `scripts/init-project.sh`
-  - `scripts/setup-server.sh`
-  - `scripts/deploy.sh`
-  - `scripts/configs/backend.service.template`
-  - `scripts/configs/nginx.conf.template`
-  - `scripts/configs/nginx-temp-cert.conf.template`
+nocodo is a Tauri desktop application wrapping the admin UI. The spreadsheet UI, AI agent, and generated schema are all yours — no lock-in.
 
-## Local Run
+- Run the desktop app locally on Mac, Windows, or Linux
+- Share business logic as portable Wasm modules
+- Inspect or modify every artifact nocodo produces
 
-1. Generate TypeScript API types:
+---
 
-```bash
-cargo run -p shared-types --bin generate_api_types
-```
+## Deployment options
 
-2. Run backend:
+| Option | Description |
+|---|---|
+| **Self-host** | Deploy the generated backend and frontend to your own server. Scripts included. |
+| **nocodo hosting** | Pay-as-you-go managed hosting at [nocodo.com](https://nocodo.com) with custom domain support. |
 
-```bash
-cargo run -p nocodo-backend --bin migrate
-cargo run -p nocodo-backend
-```
+---
 
-`DATABASE_URL` is read from environment first, then `project.conf`.
+## Tech stack
 
-3. Run main GUI:
+- **Backend** — Rust + Actix Web
+- **Desktop app** — Tauri wrapping the admin UI
+- **Shared types** — Rust types with TypeScript generation (no handwritten API contracts)
+- **Admin UI** — TypeScript + SolidJS + TailwindCSS + DaisyUI
+- **AI agents** — LLM-backed schema designer with SQLite-persisted sessions
+- **Database** — SQLite (default); PostgreSQL support available
 
-```bash
-cd gui
-npm install
-npm run dev
-```
+---
 
-4. Run admin GUI:
+## Getting started
 
-```bash
-cd admin-gui
-npm install
-npm run dev
-```
+See [DEVELOP.md](DEVELOP.md) for local development setup, running the backend and UI, and the deploy workflow.
 
-Open:
+---
 
-- main GUI: `http://127.0.0.1:${GUI_PORT}` from `project.conf` (current repo value: `6625`)
-- admin GUI: `http://127.0.0.1:${ADMIN_GUI_PORT}` from `project.conf` (current repo value: `6626`)
+## Status
 
-5. Run desktop app (admin GUI in Tauri):
+nocodo is in active development. Core spreadsheet UI and AI schema generation are functional. Auth, Wasm business logic, and the generated web app frontend are on the roadmap.
 
-```bash
-npm --prefix tauri install
-NOCODO_BACKEND_PATH="$(pwd)/target/debug/nocodo-backend" npm --prefix tauri run dev
-```
-
-## Git Hooks
-
-Install repository-managed hooks:
-
-```bash
-scripts/install-git-hooks.sh
-```
-
-Pre-commit checks:
-
-- `cargo fmt --all --check`
-- `cargo check --workspace`
-- `cargo test --workspace`
-- `gui`: `prettier --check .` and `npm run build`
-- `admin-gui`: `prettier --check .` and `npm run build`
-
-## Deploy Pattern
-
-1. `scripts/setup-server.sh`
-2. `scripts/deploy.sh`
-
-Both scripts read `project.conf` by default. You can pass a custom config path if needed.
-
-`deploy.sh` uploads full source via `scp`, builds backend on server, runs migrations using the migrate binary, installs `systemd` and `nginx` config, and keeps certbot renew timer enabled.
-
-## Development Model
-
-Read `DEVELOP.md` for the type-driven feature workflow.
+Contributions, feedback, and issues welcome at [github.com/brainless/nocodo](https://github.com/brainless/nocodo).
