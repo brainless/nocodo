@@ -1,6 +1,7 @@
 import { For, Show, createSignal, onMount } from 'solid-js';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import type {
+  Project,
   Sheet,
   SheetTab,
   SheetTabColumn,
@@ -52,13 +53,39 @@ function ProjectSelector() {
     }
   };
 
+  // Toggle dropdown with proper event handling for Tauri
+  const toggleDropdown = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropdownOpen(!isDropdownOpen());
+  };
+
+  // Close dropdown when clicking backdrop
+  const closeDropdown = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropdownOpen(false);
+  };
+
+  // Handle project selection
+  const selectProject = (project: Project) => {
+    setCurrentProject(project);
+    setIsDropdownOpen(false);
+  };
+
+  // Open create project modal
+  const openCreateModal = () => {
+    setIsDropdownOpen(false);
+    setIsModalOpen(true);
+  };
+
   return (
     <>
       {/* Project Selector Dropdown */}
-      <div class="dropdown dropdown-bottom">
+      <div class="relative">
         <button
           class="btn btn-ghost btn-sm gap-2"
-          onClick={() => setIsDropdownOpen(!isDropdownOpen())}
+          onClick={toggleDropdown}
         >
           <Show when={isLoading()}>
             <span class="loading loading-spinner loading-xs"></span>
@@ -68,7 +95,7 @@ function ProjectSelector() {
         </button>
         
         <Show when={isDropdownOpen()}>
-          <div class="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-56 mt-2 border border-base-300">
+          <div class="absolute top-full left-0 z-[100] menu p-2 shadow bg-base-100 rounded-box w-56 mt-2 border border-base-300">
             <div class="px-3 py-2 text-xs font-semibold text-base-content/60 uppercase tracking-wider">
               Projects
             </div>
@@ -76,10 +103,7 @@ function ProjectSelector() {
               {(project) => (
                 <button
                   class={`btn btn-ghost btn-sm justify-start ${project.id === currentProject()?.id ? 'btn-active' : ''}`}
-                  onClick={() => {
-                    setCurrentProject(project);
-                    setIsDropdownOpen(false);
-                  }}
+                  onClick={() => selectProject(project)}
                 >
                   <span class="truncate">{project.name}</span>
                 </button>
@@ -90,10 +114,7 @@ function ProjectSelector() {
             
             <button
               class="btn btn-ghost btn-sm justify-start text-primary"
-              onClick={() => {
-                setIsDropdownOpen(false);
-                setIsModalOpen(true);
-              }}
+              onClick={openCreateModal}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
               Create Project
@@ -105,7 +126,7 @@ function ProjectSelector() {
         <Show when={isDropdownOpen()}>
           <div 
             class="fixed inset-0 z-[99]" 
-            onClick={() => setIsDropdownOpen(false)}
+            onClick={closeDropdown}
           />
         </Show>
       </div>

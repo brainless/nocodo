@@ -1,5 +1,7 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: light --default;
+}
 
 :root {
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -10,6 +12,9 @@
 body {
   min-height: 100vh;
   margin: 0;
+  background: #d9e0ee;
+  color: #172033;
+  color-scheme: light;
 }
 
 #root {
