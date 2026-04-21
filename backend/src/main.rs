@@ -7,7 +7,7 @@ mod auth;
 mod config;
 mod db;
 mod projects_api;
-mod sheets_api;
+mod schema_api;
 
 #[get("/api/heartbeat")]
 async fn heartbeat() -> impl Responder {
@@ -89,7 +89,7 @@ async fn main() -> std::io::Result<()> {
     // Load schema cache for dynamic SQL queries
     let schema_cache = {
         let conn = rusqlite::Connection::open(&database_url).expect("Failed to open database");
-        match sheets_api::schema_cache::SchemaCache::load(&conn) {
+        match schema_api::schema_cache::SchemaCache::load(&conn) {
             Ok(cache) => {
                 println!("Schema cache loaded successfully");
                 web::Data::new(cache)
@@ -130,11 +130,12 @@ async fn main() -> std::io::Result<()> {
             // Project API routes
             .service(projects_api::handlers::list_projects)
             .service(projects_api::handlers::create_project)
-            // Sheets API routes (read-only)
-            .service(sheets_api::handlers::list_sheets)
-            .service(sheets_api::handlers::get_sheet)
-            .service(sheets_api::handlers::get_sheet_tab_schema)
-            .service(sheets_api::handlers::get_sheet_data)
+            // Schema API routes (read-only)
+            .service(schema_api::handlers::list_schemas)
+            .service(schema_api::handlers::get_schema)
+            .service(schema_api::handlers::get_table_columns)
+            .service(schema_api::handlers::get_table_foreign_keys)
+            .service(schema_api::handlers::get_table_data)
     })
     .bind((backend_host.as_str(), backend_port))?
     .run()

@@ -1258,6 +1258,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "shared-types",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -1911,6 +1912,7 @@ dependencies = [
 name = "shared-types"
 version = "0.1.0"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
  "ts-rs",

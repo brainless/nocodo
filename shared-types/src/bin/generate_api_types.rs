@@ -1,17 +1,16 @@
 use shared_types::{
-    ColumnType, CreateProjectRequest, CreateProjectResponse, GetSheetDataRequest,
-    GetSheetDataResponse, GetSheetResponse, GetSheetTabSchemaRequest, GetSheetTabSchemaResponse,
-    HeartbeatResponse, ListProjectsResponse, ListSheetsRequest, ListSheetsResponse, PaginationInfo,
-    Project, Sheet, SheetTab, SheetTabColumn, SheetTabDataResult,
+    Column, ColumnDef, ColumnDisplay, CreateProjectRequest, CreateProjectResponse, DataType,
+    ForeignKey, ForeignKeyDef, GetSchemaResponse, GetTableColumnsResponse, GetTableDataResponse,
+    HeartbeatResponse, ListProjectsResponse, ListSchemasResponse, PaginationInfo, Project, Schema,
+    SchemaDef, Table, TableDataResult, TableDef,
 };
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use ts_rs::TS;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut types = Vec::new();
 
-    // Helper macro to export types with error handling
     macro_rules! export_type {
         ($t:ty) => {
             match <$t>::export_to_string() {
@@ -21,58 +20,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
     }
 
-    // Core types
+    // Core project type
     export_type!(Project);
-    export_type!(Sheet);
-    export_type!(SheetTab);
-    export_type!(SheetTabColumn);
-    export_type!(ColumnType);
+
+    // Core relational types (persisted)
+    export_type!(Schema);
+    export_type!(Table);
+    export_type!(DataType);
+    export_type!(Column);
+    export_type!(ForeignKey);
+    export_type!(ColumnDisplay);
+
+    // Agent definition types
+    export_type!(ForeignKeyDef);
+    export_type!(ColumnDef);
+    export_type!(TableDef);
+    export_type!(SchemaDef);
+
+    // Schema API response types
+    export_type!(ListSchemasResponse);
+    export_type!(GetSchemaResponse);
+    export_type!(GetTableColumnsResponse);
+    export_type!(PaginationInfo);
+    export_type!(TableDataResult);
+    export_type!(GetTableDataResponse);
 
     // Project API types
     export_type!(CreateProjectRequest);
     export_type!(CreateProjectResponse);
     export_type!(ListProjectsResponse);
 
-    // API request/response types
-    export_type!(ListSheetsRequest);
-    export_type!(ListSheetsResponse);
-    export_type!(GetSheetResponse);
-    export_type!(GetSheetTabSchemaRequest);
-    export_type!(GetSheetTabSchemaResponse);
-
-    // Dynamic data API types
-    export_type!(GetSheetDataRequest);
-    export_type!(GetSheetDataResponse);
-    export_type!(SheetTabDataResult);
-    export_type!(PaginationInfo);
-
-    // Legacy types
+    // Misc
     export_type!(HeartbeatResponse);
 
     let output_content = types.join("\n\n");
 
-    // Get the workspace root (parent of shared-types directory)
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap());
     let workspace_root = manifest_dir.parent().unwrap_or(&manifest_dir);
 
-    // Generate for gui
+    // gui
     let output_dir = workspace_root.join("gui/src/types");
     fs::create_dir_all(&output_dir)?;
     let output_path = output_dir.join("api.ts");
     fs::write(&output_path, &output_content)?;
     println!("Generated TypeScript types in {}", output_path.display());
 
-    // Generate for admin-gui
+    // admin-gui
     let admin_output_dir = workspace_root.join("admin-gui/src/types");
     fs::create_dir_all(&admin_output_dir)?;
     let admin_output_path = admin_output_dir.join("api.ts");
     fs::write(&admin_output_path, &output_content)?;
-    println!(
-        "Generated TypeScript types in {}",
-        admin_output_path.display()
-    );
+    println!("Generated TypeScript types in {}", admin_output_path.display());
 
     Ok(())
 }

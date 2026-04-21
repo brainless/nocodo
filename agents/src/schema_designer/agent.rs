@@ -6,9 +6,11 @@ use llm_sdk::{
     types::{CompletionRequest, Message, Role},
 };
 
+use shared_types::SchemaDef;
+
 use super::{
     prompts::system_prompt,
-    tools::{GenerateSchemaParams, StopAgentParams},
+    tools::StopAgentParams,
 };
 use crate::{
     error::AgentError,
@@ -29,7 +31,7 @@ pub enum AgentResponse {
     /// Model called generate_schema; schema is now stored. Text is the model's message.
     SchemaGenerated {
         text: String,
-        schema: GenerateSchemaParams,
+        schema: SchemaDef,
         schema_row_id: i64,
     },
     /// Model called stop_agent because the request is outside its domain.
@@ -124,7 +126,7 @@ impl SchemaDesignerAgent {
         session_id: i64,
         preview_mode: bool,
     ) -> Result<AgentResponse, AgentError> {
-        let generate_schema_tool = Tool::from_type::<GenerateSchemaParams>()
+        let generate_schema_tool = Tool::from_type::<SchemaDef>()
             .name("generate_schema")
             .description(
                 "Emit a complete, normalized SQLite schema for the user's requirements. \
@@ -225,7 +227,7 @@ impl SchemaDesignerAgent {
                     match tool_name {
                         "generate_schema" => {
                             log::info!("[Agent] Processing generate_schema tool call");
-                            let params: GenerateSchemaParams =
+                            let params: SchemaDef =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             log::debug!(
                                 "[Agent] Schema params parsed: {} tables",

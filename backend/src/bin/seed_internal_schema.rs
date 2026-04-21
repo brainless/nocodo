@@ -14,274 +14,135 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let now_ts = now();
 
-    // Check if "Nocodo Internal" sheet already exists
+    // Check if "Nocodo Internal" schema already exists
     let internal_exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sheet WHERE name = 'Nocodo Internal')",
+        "SELECT EXISTS(SELECT 1 FROM app_schema WHERE name = 'Nocodo Internal')",
         [],
         |row| row.get(0),
     )?;
 
     if internal_exists {
-        println!("'Nocodo Internal' sheet already exists, skipping schema creation.");
+        println!("'Nocodo Internal' schema already exists, skipping.");
         return Ok(());
     }
 
-    // Create the "Nocodo Internal" sheet
+    // Create "Nocodo Internal" schema (project_id=1 is the default project)
     conn.execute(
-        "INSERT INTO sheet (project_id, name, created_at, updated_at) VALUES (1, 'Nocodo Internal', ?1, ?1)",
+        "INSERT INTO app_schema (project_id, name, created_at) VALUES (1, 'Nocodo Internal', ?1)",
         params![now_ts],
     )?;
-    let sheet_id = conn.last_insert_rowid();
-    println!("Created sheet: Nocodo Internal (id={})", sheet_id);
+    let schema_id = conn.last_insert_rowid();
+    println!("Created schema: Nocodo Internal (id={})", schema_id);
 
-    // Create tabs for our internal tables
-    let tabs = vec![
-        ("Projects", 0),
-        ("Sessions", 1),
-        ("Messages", 2),
-        ("Tool Calls", 3),
+    // Create tables
+    let tables = [
+        ("Projects",   "project"),
+        ("Sessions",   "agent_chat_session"),
+        ("Messages",   "agent_chat_message"),
+        ("Tool Calls", "agent_tool_call"),
     ];
 
-    let mut tab_ids: Vec<i64> = Vec::new();
-    for (name, order) in &tabs {
+    let mut table_ids: Vec<i64> = Vec::new();
+    for (name, _) in &tables {
         conn.execute(
-            "INSERT INTO sheet_tab (sheet_id, name, display_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
-            params![sheet_id, name, order, now_ts],
+            "INSERT INTO schema_table (schema_id, name, created_at) VALUES (?1, ?2, ?3)",
+            params![schema_id, name, now_ts],
         )?;
-        tab_ids.push(conn.last_insert_rowid());
+        table_ids.push(conn.last_insert_rowid());
     }
+    let [projects_id, sessions_id, messages_id, tool_calls_id] =
+        [table_ids[0], table_ids[1], table_ids[2], table_ids[3]];
     println!(
-        "Created {} tabs: Projects(id={}), Sessions(id={}), Messages(id={}), Tool Calls(id={})",
-        tabs.len(),
-        tab_ids[0],
-        tab_ids[1],
-        tab_ids[2],
-        tab_ids[3]
+        "Created tables: Projects({}) Sessions({}) Messages({}) Tool Calls({})",
+        projects_id, sessions_id, messages_id, tool_calls_id
     );
 
-    // ============================================
-    // Tab 0: Projects - columns matching project table
-    // ============================================
-    let projects_tab_id = tab_ids[0];
-    let projects_columns = vec![
-        ("ID", "id", r#"{"type": "integer"}"#, 0, true, true),
-        ("Name", "name", r#"{"type": "text"}"#, 1, true, false),
-        ("Path", "path", r#"{"type": "text"}"#, 2, true, false),
-        (
-            "Created At",
-            "created_at",
-            r#"{"type": "date_time"}"#,
-            3,
-            true,
-            false,
-        ),
-    ];
-
-    for (name, sql_name, col_type, order, required, unique) in &projects_columns {
+    // Helper to insert a column
+    let insert_col = |table_id: i64,
+                      name: &str,
+                      data_type: &str,
+                      nullable: bool,
+                      primary_key: bool,
+                      display_order: i32|
+     -> Result<i64, Box<dyn std::error::Error>> {
         conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![projects_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
+            "INSERT INTO schema_column
+             (table_id, name, data_type, nullable, primary_key, display_order, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                table_id,
+                name,
+                data_type,
+                nullable as i64,
+                primary_key as i64,
+                display_order,
+                now_ts
+            ],
         )?;
-    }
-    println!("Created {} columns in Projects tab", projects_columns.len());
+        Ok(conn.last_insert_rowid())
+    };
 
-    // ============================================
-    // Tab 1: Sessions - columns with relation to Projects
-    // ============================================
-    let sessions_tab_id = tab_ids[1];
-    let project_relation_type = format!(
-        r#"{{"type": "relation", "target_sheet_tab_id": {}, "display_column": "Name"}}"#,
-        projects_tab_id
-    );
-    let sessions_columns = vec![
-        (
-            "ID",
-            "id",
-            r#"{"type": "integer"}"#.to_string(),
-            0,
-            true,
-            true,
-        ),
-        (
-            "Project",
-            "project_id",
-            project_relation_type,
-            1,
-            true,
-            false,
-        ),
-        (
-            "Agent Type",
-            "agent_type",
-            r#"{"type": "text"}"#.to_string(),
-            2,
-            true,
-            false,
-        ),
-        (
-            "Created At",
-            "created_at",
-            r#"{"type": "date_time"}"#.to_string(),
-            3,
-            true,
-            false,
-        ),
-    ];
+    // Helper to insert a foreign key
+    let insert_fk =
+        |column_id: i64, ref_table: &str, ref_column: &str| -> Result<(), Box<dyn std::error::Error>> {
+            conn.execute(
+                "INSERT INTO schema_fk (column_id, ref_table, ref_column) VALUES (?1, ?2, ?3)",
+                params![column_id, ref_table, ref_column],
+            )?;
+            Ok(())
+        };
 
-    for (name, sql_name, col_type, order, required, unique) in &sessions_columns {
-        conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![sessions_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
-        )?;
-    }
-    println!(
-        "Created {} columns in Sessions tab (with relation to Projects)",
-        sessions_columns.len()
-    );
+    // Helper to insert column_display
+    let insert_display =
+        |column_id: i64, display_column: Option<&str>| -> Result<(), Box<dyn std::error::Error>> {
+            conn.execute(
+                "INSERT INTO column_display (column_id, width, display_column) VALUES (?1, 120, ?2)",
+                params![column_id, display_column],
+            )?;
+            Ok(())
+        };
 
-    // ============================================
-    // Tab 2: Messages - columns with relation to Sessions
-    // ============================================
-    let messages_tab_id = tab_ids[2];
-    let session_relation_type = format!(
-        r#"{{"type": "relation", "target_sheet_tab_id": {}, "display_column": "Agent Type"}}"#,
-        sessions_tab_id
-    );
-    let messages_columns = vec![
-        (
-            "ID",
-            "id",
-            r#"{"type": "integer"}"#.to_string(),
-            0,
-            true,
-            true,
-        ),
-        (
-            "Session",
-            "session_id",
-            session_relation_type,
-            1,
-            true,
-            false,
-        ),
-        (
-            "Role",
-            "role",
-            r#"{"type": "text"}"#.to_string(),
-            2,
-            true,
-            false,
-        ),
-        (
-            "Content",
-            "content",
-            r#"{"type": "text"}"#.to_string(),
-            3,
-            true,
-            false,
-        ),
-        (
-            "Created At",
-            "created_at",
-            r#"{"type": "date_time"}"#.to_string(),
-            4,
-            true,
-            false,
-        ),
-    ];
+    // ── Projects ──────────────────────────────────────────────────────────────
+    insert_col(projects_id, "id",         "integer",   false, true,  0)?;
+    insert_col(projects_id, "name",       "text",      false, false, 1)?;
+    insert_col(projects_id, "path",       "text",      false, false, 2)?;
+    insert_col(projects_id, "created_at", "date_time", false, false, 3)?;
+    println!("Created Projects columns");
 
-    for (name, sql_name, col_type, order, required, unique) in &messages_columns {
-        conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![messages_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
-        )?;
-    }
-    println!(
-        "Created {} columns in Messages tab (with relation to Sessions)",
-        messages_columns.len()
-    );
+    // ── Sessions ─────────────────────────────────────────────────────────────
+    insert_col(sessions_id, "id",         "integer",   false, true,  0)?;
+    let sessions_project_col = insert_col(sessions_id, "project_id", "integer", false, false, 1)?;
+    insert_col(sessions_id, "agent_type", "text",      false, false, 2)?;
+    insert_col(sessions_id, "created_at", "date_time", false, false, 3)?;
+    // FK: sessions.project_id → project.id
+    insert_fk(sessions_project_col, "project", "id")?;
+    insert_display(sessions_project_col, Some("name"))?;
+    println!("Created Sessions columns (FK → Projects)");
 
-    // ============================================
-    // Tab 3: Tool Calls - columns with relations to Messages
-    // ============================================
-    let tool_calls_tab_id = tab_ids[3];
-    let message_relation_type = format!(
-        r#"{{"type": "relation", "target_sheet_tab_id": {}, "display_column": "ID"}}"#,
-        messages_tab_id
-    );
-    let tool_calls_columns = vec![
-        (
-            "ID",
-            "id",
-            r#"{"type": "integer"}"#.to_string(),
-            0,
-            true,
-            true,
-        ),
-        (
-            "Message",
-            "message_id",
-            message_relation_type,
-            1,
-            true,
-            false,
-        ),
-        (
-            "Call ID",
-            "call_id",
-            r#"{"type": "text"}"#.to_string(),
-            2,
-            true,
-            false,
-        ),
-        (
-            "Tool Name",
-            "tool_name",
-            r#"{"type": "text"}"#.to_string(),
-            3,
-            true,
-            false,
-        ),
-        (
-            "Arguments",
-            "arguments",
-            r#"{"type": "json"}"#.to_string(),
-            4,
-            false,
-            false,
-        ),
-        (
-            "Result",
-            "result",
-            r#"{"type": "text"}"#.to_string(),
-            5,
-            false,
-            false,
-        ),
-        (
-            "Created At",
-            "created_at",
-            r#"{"type": "date_time"}"#.to_string(),
-            6,
-            true,
-            false,
-        ),
-    ];
+    // ── Messages ──────────────────────────────────────────────────────────────
+    insert_col(messages_id, "id",         "integer",   false, true,  0)?;
+    let messages_session_col = insert_col(messages_id, "session_id", "integer", false, false, 1)?;
+    insert_col(messages_id, "role",       "text",      false, false, 2)?;
+    insert_col(messages_id, "content",    "text",      false, false, 3)?;
+    insert_col(messages_id, "created_at", "date_time", false, false, 4)?;
+    // FK: messages.session_id → agent_chat_session.id
+    insert_fk(messages_session_col, "agent_chat_session", "id")?;
+    insert_display(messages_session_col, Some("agent_type"))?;
+    println!("Created Messages columns (FK → Sessions)");
 
-    for (name, sql_name, col_type, order, required, unique) in &tool_calls_columns {
-        conn.execute(
-            "INSERT INTO sheet_tab_column (sheet_tab_id, name, sql_name, column_type, display_order, is_required, is_unique, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![tool_calls_tab_id, name, sql_name, col_type, order, *required as i64, *unique as i64, now_ts],
-        )?;
-    }
-    println!(
-        "Created {} columns in Tool Calls tab (with relation to Messages)",
-        tool_calls_columns.len()
-    );
+    // ── Tool Calls ────────────────────────────────────────────────────────────
+    insert_col(tool_calls_id, "id",         "integer",   false, true,  0)?;
+    let tc_message_col = insert_col(tool_calls_id, "message_id", "integer", false, false, 1)?;
+    insert_col(tool_calls_id, "call_id",    "text",      false, false, 2)?;
+    insert_col(tool_calls_id, "tool_name",  "text",      false, false, 3)?;
+    insert_col(tool_calls_id, "arguments",  "text",      true,  false, 4)?;
+    insert_col(tool_calls_id, "result",     "text",      true,  false, 5)?;
+    insert_col(tool_calls_id, "created_at", "date_time", false, false, 6)?;
+    // FK: tool_calls.message_id → agent_chat_message.id
+    insert_fk(tc_message_col, "agent_chat_message", "id")?;
+    insert_display(tc_message_col, Some("id"))?;
+    println!("Created Tool Calls columns (FK → Messages)");
 
-    println!("\n✅ 'Nocodo Internal' schema created successfully!");
-    println!("Tabs: Projects → Sessions → Messages → Tool Calls");
-    println!("Relations: Sessions→Projects, Messages→Sessions, Tool Calls→Messages");
-
+    println!("\n'Nocodo Internal' schema seeded successfully.");
     Ok(())
 }

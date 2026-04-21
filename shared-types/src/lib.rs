@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
@@ -6,8 +7,7 @@ use ts_rs::TS;
 // Core Project Types
 // ============================================================================
 
-/// A Project is a container for related sheets and agent chat sessions.
-/// It represents a workspace with its own data storage path.
+/// A Project is a container for related schemas and agent chat sessions.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Project {
@@ -21,13 +21,13 @@ pub struct Project {
 }
 
 // ============================================================================
-// Core Sheet Types
+// Core Relational Types (persisted)
 // ============================================================================
 
-/// A Sheet is a collection of related tabs (like a database/schema)
+/// A Schema is a named collection of tables within a project.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct Sheet {
+pub struct Schema {
     #[ts(type = "number")]
     pub id: i64,
     #[ts(type = "number")]
@@ -35,143 +35,150 @@ pub struct Sheet {
     pub name: String,
     #[ts(type = "number")]
     pub created_at: i64,
-    #[ts(type = "number")]
-    pub updated_at: i64,
 }
 
-/// A SheetTab is a tab within a sheet (like a table/spreadsheet page)
+/// A Table is a relational table within a schema.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct SheetTab {
+pub struct Table {
     #[ts(type = "number")]
     pub id: i64,
     #[ts(type = "number")]
-    pub sheet_id: i64,
+    pub schema_id: i64,
     pub name: String,
-    pub display_order: i32,
     #[ts(type = "number")]
     pub created_at: i64,
-    #[ts(type = "number")]
-    pub updated_at: i64,
 }
 
-/// Column data types for sheet tabs
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+/// Storage-level column data type.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, JsonSchema, PartialEq)]
 #[ts(export)]
-#[serde(rename_all = "snake_case", tag = "type")]
-pub enum ColumnType {
+#[serde(rename_all = "snake_case")]
+pub enum DataType {
     Text,
-    Number,
     Integer,
+    Real,
     Boolean,
     Date,
     DateTime,
-    Currency,
-    /// Relations shown as clickable links in UI
-    #[serde(rename = "relation")]
-    Relation {
-        #[ts(type = "number")]
-        target_sheet_tab_id: i64,
-        display_column: String,
-    },
-    /// Lookup pulls value from related table
-    #[serde(rename = "lookup")]
-    Lookup {
-        relation_column: String,
-        lookup_column: String,
-    },
-    /// Formula with expression
-    #[serde(rename = "formula")]
-    Formula {
-        expression: String,
-    },
 }
 
-/// Column definition (schema) for a sheet tab
+/// A Column in a relational table.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct SheetTabColumn {
+pub struct Column {
     #[ts(type = "number")]
     pub id: i64,
     #[ts(type = "number")]
-    pub sheet_tab_id: i64,
+    pub table_id: i64,
     pub name: String,
-    pub column_type: ColumnType,
-    pub is_required: bool,
-    pub is_unique: bool,
-    pub default_value: Option<String>,
+    pub data_type: DataType,
+    pub nullable: bool,
+    pub primary_key: bool,
+    /// Defines column order in SELECT queries and UI display.
     pub display_order: i32,
     #[ts(type = "number")]
     pub created_at: i64,
-    /// Column width in pixels (user-resizable), default 120
+}
+
+/// A persisted foreign key constraint on a column.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ForeignKey {
     #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub column_id: i64,
+    /// SQL name of the referenced table.
+    pub ref_table: String,
+    /// Name of the referenced column (usually "id").
+    pub ref_column: String,
+}
+
+/// UI display metadata for a column. Decoupled from the relational schema.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ColumnDisplay {
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub column_id: i64,
+    /// Column width in pixels (user-resizable), default 120.
     pub width: i32,
+    /// For FK columns: which column of the referenced table to show as the link label.
+    pub display_column: Option<String>,
 }
 
 // ============================================================================
-// Read-Only Schema API Types
+// Agent Definition Types
+// (pre-persistence; used as LLM tool parameters via JsonSchema)
 // ============================================================================
 
-/// List all sheets in a project
-#[derive(Debug, Serialize, Deserialize, TS)]
+/// Foreign key reference by name — resolved to IDs on persist.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, JsonSchema)]
 #[ts(export)]
-pub struct ListSheetsRequest {
-    #[ts(type = "number")]
-    pub project_id: i64,
+pub struct ForeignKeyDef {
+    /// SQL name of the referenced table.
+    pub ref_table: String,
+    /// Name of the referenced column (usually "id").
+    pub ref_column: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
+/// Column definition as emitted by the agent.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, JsonSchema)]
 #[ts(export)]
-pub struct ListSheetsResponse {
-    pub sheets: Vec<Sheet>,
+pub struct ColumnDef {
+    pub name: String,
+    pub data_type: DataType,
+    #[serde(default)]
+    pub nullable: bool,
+    #[serde(default)]
+    pub primary_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreign_key: Option<ForeignKeyDef>,
 }
 
-/// Get a single sheet with its tabs
-#[derive(Debug, Serialize, Deserialize, TS)]
+/// Table definition as emitted by the agent.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, JsonSchema)]
 #[ts(export)]
-pub struct GetSheetRequest {
-    #[ts(type = "number")]
-    pub sheet_id: i64,
+pub struct TableDef {
+    pub name: String,
+    pub columns: Vec<ColumnDef>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS)]
+/// Complete schema definition — the agent emits this via the `generate_schema` tool.
+/// Each call produces a new versioned snapshot stored in `project_schema`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, JsonSchema)]
 #[ts(export)]
-pub struct GetSheetResponse {
-    pub sheet: Sheet,
-    pub sheet_tabs: Vec<SheetTab>,
-}
-
-/// Get a sheet tab's schema (columns)
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct GetSheetTabSchemaRequest {
-    #[ts(type = "number")]
-    pub sheet_tab_id: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct GetSheetTabSchemaResponse {
-    pub sheet_tab: SheetTab,
-    pub columns: Vec<SheetTabColumn>,
+pub struct SchemaDef {
+    /// Human-readable schema name.
+    pub name: String,
+    /// Normalized set of tables that make up the schema.
+    pub tables: Vec<TableDef>,
 }
 
 // ============================================================================
-// Dynamic Data API Types
+// Schema API Response Types
 // ============================================================================
 
-/// Request data for one or more sheet tabs
-/// Returns positional row data (not column-id keyed) for flexible querying
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct GetSheetDataRequest {
-    /// Sheet tab IDs to query (supports multi-table in future)
-    #[ts(type = "number[]")]
-    pub sheet_tab_ids: Vec<i64>,
-    #[ts(type = "number | null")]
-    pub limit: Option<i64>,
-    #[ts(type = "number | null")]
-    pub offset: Option<i64>,
+pub struct ListSchemasResponse {
+    pub schemas: Vec<Schema>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GetSchemaResponse {
+    pub schema: Schema,
+    pub tables: Vec<Table>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GetTableColumnsResponse {
+    pub table: Table,
+    pub columns: Vec<Column>,
 }
 
 /// Pagination metadata
@@ -184,21 +191,18 @@ pub struct PaginationInfo {
     pub limit: i64,
     #[ts(type = "number")]
     pub offset: i64,
-    #[ts(type = "boolean")]
     pub has_more: bool,
 }
 
-/// Data result for a single sheet tab
+/// Data result for a single table
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct SheetTabDataResult {
+pub struct TableDataResult {
     #[ts(type = "number")]
-    pub sheet_tab_id: i64,
-    /// Column definitions (same order as row data)
-    pub columns: Vec<SheetTabColumn>,
-    /// Rows as positional arrays (not keyed by column_id)
-    /// Each inner array matches the order of `columns`
-    /// TypeScript: unknown[][] (any JSON value)
+    pub table_id: i64,
+    /// Column definitions in display order
+    pub columns: Vec<Column>,
+    /// Rows as positional arrays matching the order of `columns`
     #[ts(type = "unknown[][]")]
     pub rows: Vec<Vec<Value>>,
     pub pagination: PaginationInfo,
@@ -206,21 +210,18 @@ pub struct SheetTabDataResult {
 
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct GetSheetDataResponse {
-    /// Results for each requested sheet_tab_id
-    pub results: Vec<SheetTabDataResult>,
+pub struct GetTableDataResponse {
+    pub results: Vec<TableDataResult>,
 }
 
 // ============================================================================
 // Project API Types
 // ============================================================================
 
-/// Create a new project
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct CreateProjectRequest {
     pub name: String,
-    /// Path to folder where project data is stored (optional, auto-generated if not provided)
     pub path: Option<String>,
 }
 
@@ -230,7 +231,6 @@ pub struct CreateProjectResponse {
     pub project: Project,
 }
 
-/// List all projects
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ListProjectsResponse {
@@ -238,7 +238,7 @@ pub struct ListProjectsResponse {
 }
 
 // ============================================================================
-// Legacy Types
+// Misc Types
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

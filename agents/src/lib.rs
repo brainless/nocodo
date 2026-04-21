@@ -5,7 +5,7 @@ pub mod storage;
 
 pub use config::AgentConfig;
 pub use error::AgentError;
-pub use schema_designer::{AgentResponse, SchemaDesignerAgent};
+pub use schema_designer::{AgentResponse, SchemaDesignerAgent, StopAgentParams};
 pub use storage::sqlite::{SqliteAgentStorage, SqliteSchemaStorage};
 pub use storage::{AgentStorage, ChatMessage, SchemaStorage, Session, ToolCallRecord};
 

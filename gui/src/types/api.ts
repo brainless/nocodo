@@ -1,6 +1,5 @@
 /**
- * A Project is a container for related sheets and agent chat sessions.
- * It represents a workspace with its own data storage path.
+ * A Project is a container for related schemas and agent chat sessions.
  */
 export type Project = { id: number, name: string, 
 /**
@@ -10,111 +9,141 @@ path: string, created_at: number, };
 
 
 /**
- * A Sheet is a collection of related tabs (like a database/schema)
+ * A Schema is a named collection of tables within a project.
  */
-export type Sheet = { id: number, project_id: number, name: string, created_at: number, updated_at: number, };
+export type Schema = { id: number, project_id: number, name: string, created_at: number, };
 
 
 /**
- * A SheetTab is a tab within a sheet (like a table/spreadsheet page)
+ * A Table is a relational table within a schema.
  */
-export type SheetTab = { id: number, sheet_id: number, name: string, display_order: number, created_at: number, updated_at: number, };
+export type Table = { id: number, schema_id: number, name: string, created_at: number, };
 
 
 /**
- * Column definition (schema) for a sheet tab
+ * Storage-level column data type.
  */
-export type SheetTabColumn = { id: number, sheet_tab_id: number, name: string, column_type: ColumnType, is_required: boolean, is_unique: boolean, default_value: string | null, display_order: number, created_at: number, 
-/**
- * Column width in pixels (user-resizable), default 120
- */
-width: number, };
+export type DataType = "text" | "integer" | "real" | "boolean" | "date" | "date_time";
 
 
 /**
- * Column data types for sheet tabs
+ * A Column in a relational table.
  */
-export type ColumnType = { "type": "text" } | { "type": "number" } | { "type": "integer" } | { "type": "boolean" } | { "type": "date" } | { "type": "date_time" } | { "type": "currency" } | { "type": "relation", target_sheet_tab_id: number, display_column: string, } | { "type": "lookup", relation_column: string, lookup_column: string, } | { "type": "formula", expression: string, };
+export type Column = { id: number, table_id: number, name: string, data_type: DataType, nullable: boolean, primary_key: boolean, 
+/**
+ * Defines column order in SELECT queries and UI display.
+ */
+display_order: number, created_at: number, };
 
 
 /**
- * Create a new project
+ * A persisted foreign key constraint on a column.
  */
-export type CreateProjectRequest = { name: string, 
+export type ForeignKey = { id: number, column_id: number, 
 /**
- * Path to folder where project data is stored (optional, auto-generated if not provided)
+ * SQL name of the referenced table.
  */
-path: string | null, };
-
-
-export type CreateProjectResponse = { project: Project, };
-
-
+ref_table: string, 
 /**
- * List all projects
+ * Name of the referenced column (usually "id").
  */
-export type ListProjectsResponse = { projects: Array<Project>, };
+ref_column: string, };
 
 
 /**
- * List all sheets in a project
+ * UI display metadata for a column. Decoupled from the relational schema.
  */
-export type ListSheetsRequest = { project_id: number, };
-
-
-export type ListSheetsResponse = { sheets: Array<Sheet>, };
-
-
-export type GetSheetResponse = { sheet: Sheet, sheet_tabs: Array<SheetTab>, };
+export type ColumnDisplay = { id: number, column_id: number, 
+/**
+ * Column width in pixels (user-resizable), default 120.
+ */
+width: number, 
+/**
+ * For FK columns: which column of the referenced table to show as the link label.
+ */
+display_column: string | null, };
 
 
 /**
- * Get a sheet tab's schema (columns)
+ * Foreign key reference by name — resolved to IDs on persist.
  */
-export type GetSheetTabSchemaRequest = { sheet_tab_id: number, };
-
-
-export type GetSheetTabSchemaResponse = { sheet_tab: SheetTab, columns: Array<SheetTabColumn>, };
+export type ForeignKeyDef = { 
+/**
+ * SQL name of the referenced table.
+ */
+ref_table: string, 
+/**
+ * Name of the referenced column (usually "id").
+ */
+ref_column: string, };
 
 
 /**
- * Request data for one or more sheet tabs
- * Returns positional row data (not column-id keyed) for flexible querying
+ * Column definition as emitted by the agent.
  */
-export type GetSheetDataRequest = { 
-/**
- * Sheet tab IDs to query (supports multi-table in future)
- */
-sheet_tab_ids: number[], limit: number | null, offset: number | null, };
-
-
-export type GetSheetDataResponse = { 
-/**
- * Results for each requested sheet_tab_id
- */
-results: Array<SheetTabDataResult>, };
+export type ColumnDef = { name: string, data_type: DataType, nullable: boolean, primary_key: boolean, foreign_key: ForeignKeyDef | null, };
 
 
 /**
- * Data result for a single sheet tab
+ * Table definition as emitted by the agent.
  */
-export type SheetTabDataResult = { sheet_tab_id: number, 
+export type TableDef = { name: string, columns: Array<ColumnDef>, };
+
+
 /**
- * Column definitions (same order as row data)
+ * Complete schema definition — the agent emits this via the `generate_schema` tool.
+ * Each call produces a new versioned snapshot stored in `project_schema`.
  */
-columns: Array<SheetTabColumn>, 
+export type SchemaDef = { 
 /**
- * Rows as positional arrays (not keyed by column_id)
- * Each inner array matches the order of `columns`
- * TypeScript: unknown[][] (any JSON value)
+ * Human-readable schema name.
  */
-rows: unknown[][], pagination: PaginationInfo, };
+name: string, 
+/**
+ * Normalized set of tables that make up the schema.
+ */
+tables: Array<TableDef>, };
+
+
+export type ListSchemasResponse = { schemas: Array<Schema>, };
+
+
+export type GetSchemaResponse = { schema: Schema, tables: Array<Table>, };
+
+
+export type GetTableColumnsResponse = { table: Table, columns: Array<Column>, };
 
 
 /**
  * Pagination metadata
  */
 export type PaginationInfo = { total_count: number, limit: number, offset: number, has_more: boolean, };
+
+
+/**
+ * Data result for a single table
+ */
+export type TableDataResult = { table_id: number, 
+/**
+ * Column definitions in display order
+ */
+columns: Array<Column>, 
+/**
+ * Rows as positional arrays matching the order of `columns`
+ */
+rows: unknown[][], pagination: PaginationInfo, };
+
+
+export type GetTableDataResponse = { results: Array<TableDataResult>, };
+
+
+export type CreateProjectRequest = { name: string, path: string | null, };
+
+
+export type CreateProjectResponse = { project: Project, };
+
+
+export type ListProjectsResponse = { projects: Array<Project>, };
 
 
 export type HeartbeatResponse = { status: string, service: string, };

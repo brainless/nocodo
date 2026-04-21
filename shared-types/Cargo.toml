@@ -7,6 +7,7 @@ edition = "2021"
 serde.workspace = true
 serde_json.workspace = true
 ts-rs.workspace = true
+schemars = { version = "0.8", features = ["preserve_order"] }
 
 [[bin]]
 name = "generate_api_types"
