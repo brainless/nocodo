@@ -289,6 +289,11 @@ function AppContent() {
       if (!response.ok) throw new Error(`Failed to load sessions: ${response.status}`);
       const data = await response.json() as ListSessionsResponse;
       setSessions(data.sessions);
+      // No sessions yet — go straight to the chat UI
+      if (data.sessions.length === 0) {
+        setDrawerView('chat');
+        setSelectedSession(null);
+      }
     } catch (error) {
       console.error('Error loading sessions:', error);
     } finally {
@@ -329,6 +334,9 @@ function AppContent() {
     setSelectedSession(null);
     setMessages([DEFAULT_GREETING]);
     setInputValue('');
+    // Refresh session list (may have grown since the drawer was opened)
+    const p = currentProject();
+    if (p) loadSessions(p.id);
   };
 
   const pollForResponse = async (messageId: number, sessionId: number) => {
@@ -365,22 +373,36 @@ function AppContent() {
     const message = inputValue().trim();
     const session = selectedSession();
     const projectId = currentProject()?.id;
-    if (!message || !session || !projectId) return;
+    if (!message || !projectId) return;
 
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setInputValue('');
     setChatLoading(true);
 
     try {
+      const body: Record<string, unknown> = { project_id: projectId, message };
+      if (session) body.session_id = session.id;
+
       const response = await fetch(`${API_BASE_URL}/api/agents/schema-designer/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId, session_id: session.id, message }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      const data = await response.json() as { session_id: number; message_id: number };
+
+      // Backend created a new session — capture it so the rest of the chat works
+      if (!session && data.session_id) {
+        setSelectedSession({
+          id: data.session_id,
+          project_id: projectId,
+          agent_type: 'schema_designer',
+          created_at: Math.floor(Date.now() / 1000),
+        });
+      }
+
       if (data.message_id) {
-        pollForResponse(data.message_id, session.id);
+        pollForResponse(data.message_id, data.session_id ?? session!.id);
       } else {
         setChatLoading(false);
       }
@@ -712,13 +734,15 @@ function AppContent() {
             {/* Chat view */}
             <Show when={drawerView() === 'chat'}>
               <div class="chat-panel-header">
-                <button class="btn btn-ghost btn-sm btn-square" onClick={backToSessions}>‹</button>
+                <Show when={sessions().length > 0}>
+                  <button class="btn btn-ghost btn-sm btn-square" onClick={backToSessions}>‹</button>
+                </Show>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold truncate">
-                    {selectedSession() ? agentTypeLabel(selectedSession()!.agent_type) : ''}
+                    {selectedSession() ? agentTypeLabel(selectedSession()!.agent_type) : 'Schema Designer'}
                   </p>
                   <p class="text-xs text-base-content/50">
-                    Session {selectedSession()?.id}
+                    {selectedSession() ? `Session ${selectedSession()!.id}` : 'New session'}
                   </p>
                 </div>
                 <label for="chat-drawer" class="btn btn-ghost btn-sm btn-square">✕</label>
