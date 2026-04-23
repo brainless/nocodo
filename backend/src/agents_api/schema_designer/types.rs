@@ -1,4 +1,11 @@
 use serde::{Deserialize, Serialize};
+use shared_types::SchemaDef;
+
+#[derive(Debug, Serialize)]
+pub struct SchemaPreviewResponse {
+    pub schema: SchemaDef,
+    pub version: i64,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ChatRequest {
@@ -22,7 +29,7 @@ pub enum AgentResponsePayload {
     #[serde(rename = "schema_generated")]
     SchemaGenerated {
         text: String,
-        schema: serde_json::Value,
+        schema: SchemaDef,
         preview: bool,
     },
     #[serde(rename = "stopped")]
@@ -49,4 +56,23 @@ pub struct ChatHistoryMessage {
 pub struct ChatHistoryResponse {
     pub session_id: i64,
     pub messages: Vec<ChatHistoryMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListSessionsQuery {
+    pub project_id: i64,
+    pub agent_type: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionItem {
+    pub id: i64,
+    pub project_id: i64,
+    pub agent_type: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListSessionsResponse {
+    pub sessions: Vec<SessionItem>,
 }

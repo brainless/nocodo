@@ -124,8 +124,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(schema_cache.clone())
             .service(heartbeat)
             // Agent API routes
+            .service(agents_api::schema_designer::list_sessions)
             .service(agents_api::schema_designer::send_chat_message)
             .service(agents_api::schema_designer::get_session_messages)
+            .service(agents_api::schema_designer::get_session_schema)
             .service(agents_api::schema_designer::get_message_response)
             // Project API routes
             .service(projects_api::handlers::list_projects)

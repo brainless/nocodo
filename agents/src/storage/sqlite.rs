@@ -54,6 +54,56 @@ impl SqliteAgentStorage {
         })
     }
 
+    pub async fn list_sessions(
+        &self,
+        project_id: i64,
+        agent_type: Option<&str>,
+    ) -> Result<Vec<Session>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = match agent_type {
+            Some(at) => {
+                let mut s = conn.prepare(
+                    "SELECT id, project_id, agent_type, created_at
+                     FROM agent_chat_session
+                     WHERE project_id = ?1 AND agent_type = ?2
+                     ORDER BY id ASC",
+                )?;
+                let rows = s.query_map(params![project_id, at], |row| {
+                    Ok(Session {
+                        id: Some(row.get(0)?),
+                        project_id: row.get(1)?,
+                        agent_type: row.get(2)?,
+                        created_at: row.get(3)?,
+                    })
+                })?;
+                let mut sessions = Vec::new();
+                for row in rows {
+                    sessions.push(row?);
+                }
+                return Ok(sessions);
+            }
+            None => conn.prepare(
+                "SELECT id, project_id, agent_type, created_at
+                 FROM agent_chat_session
+                 WHERE project_id = ?1
+                 ORDER BY id ASC",
+            )?,
+        };
+        let rows = stmt.query_map(params![project_id], |row| {
+            Ok(Session {
+                id: Some(row.get(0)?),
+                project_id: row.get(1)?,
+                agent_type: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+        let mut sessions = Vec::new();
+        for row in rows {
+            sessions.push(row?);
+        }
+        Ok(sessions)
+    }
+
     pub async fn get_session_by_id(&self, session_id: i64) -> Result<Option<Session>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let session = conn
@@ -218,6 +268,23 @@ impl SqliteSchemaStorage {
     pub fn open(path: &str) -> Result<Self, AgentError> {
         let conn = Connection::open(path)?;
         Ok(Self::new(conn))
+    }
+
+    pub async fn get_latest_schema_for_session(
+        &self,
+        session_id: i64,
+    ) -> Result<Option<(String, i64)>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn
+            .query_row(
+                "SELECT schema_json, version FROM project_schema
+                 WHERE session_id = ?1
+                 ORDER BY version DESC LIMIT 1",
+                params![session_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .optional()?;
+        Ok(result)
     }
 }
 

@@ -147,3 +147,9 @@ export type ListProjectsResponse = { projects: Array<Project>, };
 
 
 export type HeartbeatResponse = { status: string, service: string, };
+
+
+export type SessionItem = { id: number, project_id: number, agent_type: string, created_at: number, };
+
+
+export type ListSessionsResponse = { sessions: Array<SessionItem>, };

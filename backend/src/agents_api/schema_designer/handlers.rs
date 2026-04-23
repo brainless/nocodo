@@ -1,10 +1,11 @@
 use crate::agents_api::state::AgentState;
 use crate::agents_api::schema_designer::types::{
     AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
-    MessageResponse,
+    ListSessionsQuery, ListSessionsResponse, MessageResponse, SchemaPreviewResponse, SessionItem,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
-use nocodo_agents::{build_schema_designer, AgentResponse, AgentStorage, SqliteAgentStorage};
+use nocodo_agents::{build_schema_designer, AgentResponse, AgentStorage, SqliteAgentStorage, SqliteSchemaStorage};
+use shared_types::SchemaDef;
 use std::time::Duration;
 
 /// POST /api/agents/schema-designer/chat
@@ -108,8 +109,7 @@ pub async fn send_chat_message(
             }
         };
 
-        // Run agent in preview mode
-        match agent.chat_with_session(target_session_id, true).await {
+        match agent.chat_with_session(target_session_id, false).await {
             Ok(response) => match response {
                 AgentResponse::Text(text) => {
                     response_storage.store_text(user_msg_id, text).await;
@@ -137,6 +137,43 @@ pub async fn send_chat_message(
         message_id: user_msg_id,
         status: "pending".to_string(),
     })
+}
+
+/// GET /api/agents/sessions?project_id=X[&agent_type=Y]
+/// List all sessions for a project, optionally filtered by agent type.
+#[get("/api/agents/sessions")]
+pub async fn list_sessions(
+    state: web::Data<AgentState>,
+    query: web::Query<ListSessionsQuery>,
+) -> impl Responder {
+    let agent_storage = match SqliteAgentStorage::open(&state.db_path) {
+        Ok(storage) => storage,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to open storage: {}", e)
+            }));
+        }
+    };
+
+    match agent_storage
+        .list_sessions(query.project_id, query.agent_type.as_deref())
+        .await
+    {
+        Ok(sessions) => HttpResponse::Ok().json(ListSessionsResponse {
+            sessions: sessions
+                .into_iter()
+                .map(|s| SessionItem {
+                    id: s.id.unwrap_or(0),
+                    project_id: s.project_id,
+                    agent_type: s.agent_type,
+                    created_at: s.created_at,
+                })
+                .collect(),
+        }),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Failed to list sessions: {}", e)
+        })),
+    }
 }
 
 /// GET /api/agents/schema-designer/sessions/{session_id}/messages
@@ -220,10 +257,21 @@ pub async fn get_message_response(
                 let payload = match stored.response_type.as_str() {
                     "text" => AgentResponsePayload::Text { text: stored.text },
                     "schema_generated" => {
-                        let schema = stored
+                        let schema = match stored
                             .schema_json
-                            .and_then(|s| serde_json::from_str(&s).ok())
-                            .unwrap_or(serde_json::Value::Null);
+                            .and_then(|s| serde_json::from_str::<SchemaDef>(&s).ok())
+                        {
+                            Some(s) => s,
+                            None => {
+                                log::error!(
+                                    "Failed to deserialize stored schema for message_id: {}",
+                                    message_id
+                                );
+                                return HttpResponse::InternalServerError().json(
+                                    serde_json::json!({ "error": "Stored schema is corrupt" }),
+                                );
+                            }
+                        };
                         AgentResponsePayload::SchemaGenerated {
                             text: stored.text,
                             schema,
@@ -254,5 +302,37 @@ pub async fn get_message_response(
 
         // Wait before next poll
         actix_web::rt::time::sleep(poll_interval).await;
+    }
+}
+
+/// GET /api/agents/schema-designer/sessions/{session_id}/schema
+/// Returns the latest persisted schema for a session (or 404 if none).
+#[get("/api/agents/schema-designer/sessions/{session_id}/schema")]
+pub async fn get_session_schema(
+    state: web::Data<AgentState>,
+    path: web::Path<i64>,
+) -> HttpResponse {
+    let session_id = path.into_inner();
+
+    let schema_storage = match SqliteSchemaStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": format!("Storage error: {}", e) }));
+        }
+    };
+
+    match schema_storage.get_latest_schema_for_session(session_id).await {
+        Ok(Some((schema_json, version))) => {
+            match serde_json::from_str::<SchemaDef>(&schema_json) {
+                Ok(schema) => HttpResponse::Ok().json(SchemaPreviewResponse { schema, version }),
+                Err(e) => HttpResponse::InternalServerError()
+                    .json(serde_json::json!({ "error": format!("Schema corrupt: {}", e) })),
+            }
+        }
+        Ok(None) => HttpResponse::NotFound()
+            .json(serde_json::json!({ "error": "No schema generated for this session yet" })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({ "error": format!("Query error: {}", e) })),
     }
 }
