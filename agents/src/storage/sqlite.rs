@@ -279,7 +279,7 @@ impl SqliteSchemaStorage {
             .query_row(
                 "SELECT schema_json, version FROM project_schema
                  WHERE session_id = ?1
-                 ORDER BY version DESC LIMIT 1",
+                 ORDER BY version DESC, id DESC LIMIT 1",
                 params![session_id],
                 |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
             )
@@ -317,6 +317,14 @@ impl SchemaStorage for SqliteSchemaStorage {
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![project_id, session_id, schema_json, version, created_at],
         )?;
-        Ok(conn.last_insert_rowid())
+        let row_id = conn.last_insert_rowid();
+        log::info!(
+            "[SchemaStorage] Saved schema: project_id={}, session_id={}, version={}, row_id={}",
+            project_id,
+            session_id,
+            version,
+            row_id
+        );
+        Ok(row_id)
     }
 }
