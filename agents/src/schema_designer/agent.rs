@@ -274,7 +274,10 @@ impl SchemaDesignerAgent {
                                 );
                                 (
                                     0,
-                                    "Schema generated (preview mode - not saved).".to_string(),
+                                    format!(
+                                        "Schema generated (preview mode - not saved):\n```json\n{}\n```",
+                                        schema_json
+                                    ),
                                 )
                             } else {
                                 log::info!("[Agent] Saving schema to database...");
@@ -285,7 +288,10 @@ impl SchemaDesignerAgent {
                                 log::info!("[Agent] Schema saved with row_id={}", row_id);
                                 (
                                     row_id,
-                                    format!("Schema stored successfully as version {}.", row_id),
+                                    format!(
+                                        "Schema saved as version {}.\n```json\n{}\n```",
+                                        row_id, schema_json
+                                    ),
                                 )
                             };
 
