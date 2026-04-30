@@ -238,6 +238,33 @@ impl AgentStorage for SqliteAgentStorage {
         )?;
         Ok(conn.last_insert_rowid())
     }
+
+    async fn get_tool_calls_for_message(
+        &self,
+        message_id: i64,
+    ) -> Result<Vec<ToolCallRecord>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, message_id, call_id, tool_name, arguments, created_at
+             FROM agent_tool_call
+             WHERE message_id = ?1",
+        )?;
+        let rows = stmt.query_map(params![message_id], |row| {
+            Ok(ToolCallRecord {
+                id: Some(row.get(0)?),
+                message_id: row.get(1)?,
+                call_id: row.get(2)?,
+                tool_name: row.get(3)?,
+                arguments: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })?;
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+        Ok(records)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,14 +291,22 @@ impl SqliteSchemaStorage {
         &self,
         session_id: i64,
     ) -> Result<Option<(String, i64)>, AgentError> {
+        self.get_schema_for_session(session_id, None).await
+    }
+
+    pub async fn get_schema_version_by_json(
+        &self,
+        session_id: i64,
+        schema_json: &str,
+    ) -> Result<Option<i64>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let result = conn
             .query_row(
-                "SELECT schema_json, version FROM project_schema
-                 WHERE session_id = ?1
-                 ORDER BY version DESC, id DESC LIMIT 1",
-                params![session_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+                "SELECT version FROM project_schema
+                 WHERE session_id = ?1 AND schema_json = ?2
+                 LIMIT 1",
+                params![session_id, schema_json],
+                |row| row.get::<_, i64>(0),
             )
             .optional()?;
         Ok(result)
@@ -291,6 +326,35 @@ impl SchemaStorage for SqliteSchemaStorage {
             .optional()?
             .flatten();
         Ok(max.unwrap_or(0) + 1)
+    }
+
+    async fn get_schema_for_session(
+        &self,
+        session_id: i64,
+        version: Option<i64>,
+    ) -> Result<Option<(String, i64)>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let result = match version {
+            Some(v) => conn
+                .query_row(
+                    "SELECT schema_json, version FROM project_schema
+                     WHERE session_id = ?1 AND version = ?2
+                     LIMIT 1",
+                    params![session_id, v],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+                )
+                .optional()?,
+            None => conn
+                .query_row(
+                    "SELECT schema_json, version FROM project_schema
+                     WHERE session_id = ?1
+                     ORDER BY version DESC, id DESC LIMIT 1",
+                    params![session_id],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+                )
+                .optional()?,
+        };
+        Ok(result)
     }
 
     async fn save_schema(

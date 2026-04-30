@@ -50,6 +50,12 @@ pub struct ChatHistoryMessage {
     pub role: String,
     pub content: String,
     pub created_at: i64,
+    pub schema_version: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SchemaPreviewQuery {
+    pub version: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]

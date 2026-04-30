@@ -1,10 +1,10 @@
 use crate::agents_api::state::AgentState;
 use crate::agents_api::schema_designer::types::{
     AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
-    ListSessionsQuery, ListSessionsResponse, MessageResponse, SchemaPreviewResponse, SessionItem,
+    ListSessionsQuery, ListSessionsResponse, MessageResponse, SchemaPreviewQuery, SchemaPreviewResponse, SessionItem,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
-use nocodo_agents::{build_schema_designer, AgentResponse, AgentStorage, SqliteAgentStorage, SqliteSchemaStorage};
+use nocodo_agents::{build_schema_designer, AgentResponse, AgentStorage, SchemaStorage, SqliteAgentStorage, SqliteSchemaStorage};
 use shared_types::SchemaDef;
 use std::time::Duration;
 
@@ -178,6 +178,7 @@ pub async fn list_sessions(
 
 /// GET /api/agents/schema-designer/sessions/{session_id}/messages
 /// Returns the persisted chat history for a session.
+/// Assistant messages that triggered a generate_schema tool call include `schema_version`.
 #[get("/api/agents/schema-designer/sessions/{session_id}/messages")]
 pub async fn get_session_messages(
     state: web::Data<AgentState>,
@@ -194,16 +195,56 @@ pub async fn get_session_messages(
         }
     };
 
+    let schema_storage = match SqliteSchemaStorage::open(&state.db_path) {
+        Ok(storage) => storage,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to open schema storage: {}", e)
+            }));
+        }
+    };
+
     let messages = match agent_storage.get_messages(session_id).await {
-        Ok(messages) => messages
-            .into_iter()
-            .map(|m| ChatHistoryMessage {
-                id: m.id.unwrap_or(0),
-                role: m.role,
-                content: m.content,
-                created_at: m.created_at,
-            })
-            .collect(),
+        Ok(messages) => {
+            let mut enriched = Vec::new();
+            for m in messages {
+                let mut schema_version: Option<i64> = None;
+                if m.role == "assistant" {
+                    match agent_storage.get_tool_calls_for_message(m.id.unwrap_or(0)).await {
+                        Ok(tool_calls) => {
+                            for tc in tool_calls {
+                                if tc.tool_name == "generate_schema" {
+                                    match schema_storage
+                                        .get_schema_version_by_json(session_id, &tc.arguments)
+                                        .await
+                                    {
+                                        Ok(Some(v)) => {
+                                            schema_version = Some(v);
+                                            break;
+                                        }
+                                        Ok(None) => {}
+                                        Err(e) => {
+                                            log::warn!("Failed to lookup schema version: {}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to load tool calls for message {}: {}", m.id.unwrap_or(0), e);
+                        }
+                    }
+                }
+                enriched.push(ChatHistoryMessage {
+                    id: m.id.unwrap_or(0),
+                    role: m.role,
+                    content: m.content,
+                    created_at: m.created_at,
+                    schema_version,
+                });
+            }
+            enriched
+        }
         Err(e) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": format!("Failed to load messages: {}", e)
@@ -305,12 +346,13 @@ pub async fn get_message_response(
     }
 }
 
-/// GET /api/agents/schema-designer/sessions/{session_id}/schema
-/// Returns the latest persisted schema for a session (or 404 if none).
+/// GET /api/agents/schema-designer/sessions/{session_id}/schema?version=N
+/// Returns the persisted schema for a session. If version is omitted, returns the latest.
 #[get("/api/agents/schema-designer/sessions/{session_id}/schema")]
 pub async fn get_session_schema(
     state: web::Data<AgentState>,
     path: web::Path<i64>,
+    query: web::Query<SchemaPreviewQuery>,
 ) -> HttpResponse {
     let session_id = path.into_inner();
 
@@ -322,7 +364,7 @@ pub async fn get_session_schema(
         }
     };
 
-    match schema_storage.get_latest_schema_for_session(session_id).await {
+    match schema_storage.get_schema_for_session(session_id, query.version).await {
         Ok(Some((schema_json, version))) => {
             match serde_json::from_str::<SchemaDef>(&schema_json) {
                 Ok(schema) => HttpResponse::Ok().json(SchemaPreviewResponse { schema, version }),

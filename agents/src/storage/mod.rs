@@ -74,6 +74,11 @@ pub trait AgentStorage: Send + Sync {
     async fn get_messages(&self, session_id: i64) -> Result<Vec<ChatMessage>, AgentError>;
 
     async fn create_tool_call(&self, record: ToolCallRecord) -> Result<i64, AgentError>;
+
+    async fn get_tool_calls_for_message(
+        &self,
+        message_id: i64,
+    ) -> Result<Vec<ToolCallRecord>, AgentError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,4 +97,11 @@ pub trait SchemaStorage: Send + Sync {
 
     /// Next version number for a given project (latest + 1, or 1 if none).
     async fn next_version(&self, project_id: i64) -> Result<i64, AgentError>;
+
+    /// Retrieve a schema for a session. If version is None, returns the latest.
+    async fn get_schema_for_session(
+        &self,
+        session_id: i64,
+        version: Option<i64>,
+    ) -> Result<Option<(String, i64)>, AgentError>;
 }

@@ -18,8 +18,8 @@ import type {
 const API_BASE_URL = '';  // Use relative URLs to leverage Vite proxy
 
 type ChatRole = 'user' | 'assistant';
-type UiMessage = { role: ChatRole; content: string };
-type HistoryMessage = { id: number; role: string; content: string; created_at: number };
+type UiMessage = { role: ChatRole; content: string; schema_version?: number };
+type HistoryMessage = { id: number; role: string; content: string; created_at: number; schema_version?: number };
 
 const DEFAULT_GREETING: UiMessage = {
   role: 'assistant',
@@ -320,7 +320,7 @@ function AppContent() {
       const data = await response.json() as { messages?: HistoryMessage[] };
       const history = (data.messages ?? [])
         .filter(m => m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role as ChatRole, content: m.content }));
+        .map(m => ({ role: m.role as ChatRole, content: m.content, schema_version: m.schema_version }));
       if (history.length > 0) setMessages(history);
     } catch (error) {
       console.error('Error loading session history:', error);
@@ -358,7 +358,7 @@ function AppContent() {
         const histData = await histRes.json() as { messages?: HistoryMessage[] };
         const history = (histData.messages ?? [])
           .filter(m => m.role === 'user' || m.role === 'assistant')
-          .map(m => ({ role: m.role as ChatRole, content: m.content }));
+          .map(m => ({ role: m.role as ChatRole, content: m.content, schema_version: m.schema_version }));
         if (history.length > 0) setMessages(history);
       }
     } catch (error) {
@@ -413,14 +413,15 @@ function AppContent() {
     }
   };
 
-  const fetchPreviewSchema = async () => {
+  const fetchPreviewSchema = async (version?: number) => {
     const session = selectedSession();
     if (!session) return;
     setPreviewLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/agents/schema-designer/sessions/${session.id}/schema`
-      );
+      const url = version
+        ? `${API_BASE_URL}/api/agents/schema-designer/sessions/${session.id}/schema?version=${version}`
+        : `${API_BASE_URL}/api/agents/schema-designer/sessions/${session.id}/schema`;
+      const response = await fetch(url);
       if (!response.ok) {
         const err = await response.json() as { error?: string };
         throw new Error(err.error ?? `HTTP ${response.status}`);
@@ -754,7 +755,18 @@ function AppContent() {
                   {(msg) => (
                     <div class={`chat ${msg.role === 'user' ? 'chat-end' : 'chat-start'}`}>
                       <div class={`chat-bubble whitespace-pre-wrap ${msg.role === 'user' ? 'chat-bubble-primary' : ''}`}>
-                        {msg.content}
+                        <Show when={msg.schema_version != null} fallback={msg.content}>
+                          <div class="flex flex-col gap-2">
+                            <span>{msg.content || 'Designed a schema'}</span>
+                            <button
+                              class="btn btn-xs btn-outline self-start"
+                              onClick={() => fetchPreviewSchema(msg.schema_version)}
+                              disabled={previewLoading()}
+                            >
+                              Preview Schema, V{msg.schema_version}
+                            </button>
+                          </div>
+                        </Show>
                       </div>
                     </div>
                   )}
@@ -771,7 +783,7 @@ function AppContent() {
               <div class="border-t border-base-300 px-4 py-3 bg-base-200">
                 <button
                   class="btn btn-success btn-sm w-full"
-                  onClick={fetchPreviewSchema}
+                  onClick={() => fetchPreviewSchema()}
                   disabled={previewLoading()}
                 >
                   <Show when={previewLoading()}>
