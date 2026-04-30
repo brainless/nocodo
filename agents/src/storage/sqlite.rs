@@ -226,27 +226,17 @@ impl AgentStorage for SqliteAgentStorage {
         };
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO agent_tool_call (message_id, call_id, tool_name, arguments, result, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO agent_tool_call (message_id, call_id, tool_name, arguments, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 record.message_id,
                 record.call_id,
                 record.tool_name,
                 record.arguments,
-                record.result,
                 created_at
             ],
         )?;
         Ok(conn.last_insert_rowid())
-    }
-
-    async fn update_tool_call_result(&self, id: i64, result: &str) -> Result<(), AgentError> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "UPDATE agent_tool_call SET result = ?1 WHERE id = ?2",
-            params![result, id],
-        )?;
-        Ok(())
     }
 }
 

@@ -5,6 +5,22 @@ use async_trait::async_trait;
 use crate::error::AgentError;
 
 // ---------------------------------------------------------------------------
+// Agent type registry
+// ---------------------------------------------------------------------------
+
+pub enum AgentType {
+    SchemaDesigner,
+}
+
+impl AgentType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AgentType::SchemaDesigner => "schema_designer",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Domain types
 // ---------------------------------------------------------------------------
 
@@ -35,9 +51,8 @@ pub struct ToolCallRecord {
     /// LLM-assigned call identifier (used to correlate tool results).
     pub call_id: String,
     pub tool_name: String,
-    /// JSON-serialised arguments.
+    /// JSON-serialised arguments (raw LLM tool call input).
     pub arguments: String,
-    pub result: Option<String>,
     pub created_at: i64,
 }
 
@@ -59,8 +74,6 @@ pub trait AgentStorage: Send + Sync {
     async fn get_messages(&self, session_id: i64) -> Result<Vec<ChatMessage>, AgentError>;
 
     async fn create_tool_call(&self, record: ToolCallRecord) -> Result<i64, AgentError>;
-
-    async fn update_tool_call_result(&self, id: i64, result: &str) -> Result<(), AgentError>;
 }
 
 // ---------------------------------------------------------------------------

@@ -14,10 +14,8 @@ use super::{
 };
 use crate::{
     error::AgentError,
-    storage::{AgentStorage, ChatMessage, SchemaStorage, ToolCallRecord},
+    storage::{AgentStorage, AgentType, ChatMessage, SchemaStorage, ToolCallRecord},
 };
-
-const AGENT_TYPE: &str = "schema_designer";
 const MAX_NUDGES: u32 = 3;
 
 // ---------------------------------------------------------------------------
@@ -85,7 +83,7 @@ impl SchemaDesignerAgent {
         // Always resume the single session for this project + agent type.
         let session = self
             .storage
-            .get_or_create_session(self.project_id, AGENT_TYPE)
+            .get_or_create_session(self.project_id, AgentType::SchemaDesigner.as_str())
             .await?;
         let session_id = session
             .id
@@ -254,15 +252,13 @@ impl SchemaDesignerAgent {
                                 }
                             };
 
-                            let tc_id = self
-                                .storage
+                            self.storage
                                 .create_tool_call(ToolCallRecord {
                                     id: None,
                                     message_id: msg_id,
                                     call_id: tool_call.id().to_string(),
                                     tool_name: "generate_schema".to_string(),
                                     arguments: schema_json.clone(),
-                                    result: None,
                                     created_at: 0,
                                 })
                                 .await?;
@@ -294,10 +290,6 @@ impl SchemaDesignerAgent {
                                     ),
                                 )
                             };
-
-                            self.storage
-                                .update_tool_call_result(tc_id, &result_text)
-                                .await?;
 
                             // Persist the tool result message so the model sees it next turn.
                             self.storage
@@ -349,7 +341,6 @@ impl SchemaDesignerAgent {
                                     call_id: tool_call.id().to_string(),
                                     tool_name: "stop_agent".to_string(),
                                     arguments: serde_json::to_string(tool_call.arguments())?,
-                                    result: Some("Agent stopped.".to_string()),
                                     created_at: 0,
                                 })
                                 .await?;
