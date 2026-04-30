@@ -185,8 +185,7 @@ function AppContent() {
   const [sessions, setSessions] = createSignal<SessionItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = createSignal(false);
 
-  // Drawer view: 'sessions' shows the list, 'chat' shows the chat UI
-  const [drawerView, setDrawerView] = createSignal<'sessions' | 'chat'>('sessions');
+  const [selectedAgent, setSelectedAgent] = createSignal<string>('schema_designer');
   const [selectedSession, setSelectedSession] = createSignal<SessionItem | null>(null);
 
   // Chat state
@@ -199,7 +198,7 @@ function AppContent() {
   const [previewTableIdx, setPreviewTableIdx] = createSignal(0);
   const [previewLoading, setPreviewLoading] = createSignal(false);
 
-  // Reload schemas and sessions when project changes
+  // Reload schemas and sessions when project or agent changes
   createEffect(() => {
     const project = currentProject();
     if (!project) return;
@@ -282,16 +281,19 @@ function AppContent() {
     }
   };
 
-  const loadSessions = async (projectId: number) => {
+  const loadSessions = async (projectId: number, agentType?: string) => {
     setSessionsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/sessions?project_id=${projectId}`);
+      const type = agentType ?? selectedAgent();
+      const url = `${API_BASE_URL}/api/agents/sessions?project_id=${projectId}&agent_type=${type}`;
+      const response = await fetch(url);
       if (!response.ok) throw new Error(`Failed to load sessions: ${response.status}`);
       const data = await response.json() as ListSessionsResponse;
       setSessions(data.sessions);
-      // No sessions yet — go straight to the chat UI
-      if (data.sessions.length === 0) {
-        setDrawerView('chat');
+      if (data.sessions.length > 0) {
+        const latest = data.sessions.sort((a, b) => b.created_at - a.created_at)[0];
+        await selectSession(latest);
+      } else {
         setSelectedSession(null);
       }
     } catch (error) {
@@ -305,11 +307,10 @@ function AppContent() {
     new Date(unixTs * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const agentTypeLabel = (type: string) =>
-    type.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+    ({ schema_designer: 'Database Dev' } as Record<string, string>)[type] ?? type;
 
   const selectSession = async (session: SessionItem) => {
     setSelectedSession(session);
-    setDrawerView('chat');
     setMessages([DEFAULT_GREETING]);
     setChatLoading(true);
     try {
@@ -329,14 +330,13 @@ function AppContent() {
     }
   };
 
-  const backToSessions = () => {
-    setDrawerView('sessions');
+  const switchAgent = (agentType: string) => {
+    setSelectedAgent(agentType);
     setSelectedSession(null);
     setMessages([DEFAULT_GREETING]);
     setInputValue('');
-    // Refresh session list (may have grown since the drawer was opened)
     const p = currentProject();
-    if (p) loadSessions(p.id);
+    if (p) loadSessions(p.id, agentType);
   };
 
   const pollForResponse = async (messageId: number, sessionId: number) => {
@@ -690,58 +690,38 @@ function AppContent() {
           <label for="chat-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
           <div class="chat-sidebar">
 
-            {/* Sessions list view */}
-            <Show when={drawerView() === 'sessions'}>
+            {/* Left column: Agent contacts */}
+            <div class="agent-list">
               <div class="chat-panel-header">
                 <h3 class="text-sm font-semibold">Dev Team</h3>
                 <label for="chat-drawer" class="btn btn-ghost btn-sm btn-square">✕</label>
               </div>
 
               <div class="flex-1 overflow-y-auto">
-                <Show when={sessionsLoading()}>
-                  <div class="flex justify-center p-6">
-                    <span class="loading loading-spinner loading-sm"></span>
-                  </div>
-                </Show>
-                <Show when={!sessionsLoading() && sessions().length === 0}>
-                  <div class="p-6 text-sm text-base-content/50 text-center">No sessions yet</div>
-                </Show>
-                <Show when={!sessionsLoading() && sessions().length > 0}>
-                  <ul class="list bg-base-100">
-                    <For each={sessions()}>
-                      {(session) => (
-                        <li
-                          class="list-row items-center cursor-pointer hover:bg-base-200 transition-colors"
-                          onClick={() => selectSession(session)}
-                        >
-                          <div class="avatar placeholder">
-<div class="bg-neutral text-neutral-content w-10 h-10 rounded-full flex items-center justify-center">
-                              <svg xmlns="http://www.w3.org/20/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
-                            </div>
-                          </div>
-                          <div class="list-col-grow">
-                            <p class="text-sm font-medium">{agentTypeLabel(session.agent_type)}</p>
-                            <p class="text-xs text-base-content/50 truncate">Online</p>
-                          </div>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
+                <ul class="list bg-base-100">
+                  <li class="list-row items-center cursor-default bg-base-200">
+                    <div class="avatar placeholder">
+                      <div class="bg-neutral text-neutral-content w-10 h-10 rounded-full flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                      </div>
+                    </div>
+                    <div class="list-col-grow">
+                      <p class="text-sm font-medium">{agentTypeLabel(selectedAgent())}</p>
+                      <p class="text-xs text-base-content/50">Online</p>
+                    </div>
+                  </li>
+                </ul>
               </div>
-            </Show>
+            </div>
 
-            {/* Chat view */}
-            <Show when={drawerView() === 'chat'}>
+            {/* Right column: Chat */}
+            <div class="chat-panel">
               <div class="chat-panel-header">
-                <Show when={sessions().length > 0}>
-                  <button class="btn btn-ghost btn-sm btn-square" onClick={backToSessions}>‹</button>
-                </Show>
-<div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate">
-                      {selectedSession() ? agentTypeLabel(selectedSession()!.agent_type) : 'Database Dev'}
-                    </p>
-                  </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold truncate">
+                    {agentTypeLabel(selectedAgent())}
+                  </p>
+                </div>
                 <label for="chat-drawer" class="btn btn-ghost btn-sm btn-square">✕</label>
               </div>
 
@@ -813,7 +793,7 @@ function AppContent() {
                   </button>
                 </div>
               </div>
-            </Show>
+            </div>
 
           </div>
         </div>
