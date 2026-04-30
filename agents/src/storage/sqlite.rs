@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension};
 
-use super::{AgentStorage, ChatMessage, SchemaStorage, Session, ToolCallRecord};
+use super::{AgentStorage, ChatMessage, SchemaStorage, Session};
 use crate::error::AgentError;
 
 fn now() -> i64 {
@@ -173,30 +173,71 @@ impl AgentStorage for SqliteAgentStorage {
     }
 
     async fn create_message(&self, msg: ChatMessage) -> Result<i64, AgentError> {
-        let created_at = if msg.created_at == 0 {
-            now()
-        } else {
-            msg.created_at
-        };
+        let created_at = if msg.created_at == 0 { now() } else { msg.created_at };
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO agent_chat_message (session_id, role, content, tool_call_id, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO agent_chat_message
+                 (session_id, role, agent_type, content, tool_call_id, tool_name, turn_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
             params![
-                msg.session_id,
-                msg.role,
-                msg.content,
-                msg.tool_call_id,
-                created_at
+                msg.session_id, msg.role, msg.agent_type, msg.content,
+                msg.tool_call_id, msg.tool_name, created_at
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        let id = conn.last_insert_rowid();
+        conn.execute(
+            "UPDATE agent_chat_message SET turn_id = ?1 WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(id)
+    }
+
+    async fn create_turn(&self, messages: Vec<ChatMessage>) -> Result<i64, AgentError> {
+        if messages.is_empty() {
+            return Err(AgentError::Other("create_turn requires at least one message".into()));
+        }
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+
+        // Insert first row with placeholder turn_id, then patch it with its own id.
+        let first = &messages[0];
+        let created_at = now();
+        tx.execute(
+            "INSERT INTO agent_chat_message
+                 (session_id, role, agent_type, content, tool_call_id, tool_name, turn_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
+            params![
+                first.session_id, first.role, first.agent_type, first.content,
+                first.tool_call_id, first.tool_name, created_at
+            ],
+        )?;
+        let turn_id = tx.last_insert_rowid();
+        tx.execute(
+            "UPDATE agent_chat_message SET turn_id = ?1 WHERE id = ?1",
+            params![turn_id],
+        )?;
+
+        for msg in &messages[1..] {
+            let created_at = now();
+            tx.execute(
+                "INSERT INTO agent_chat_message
+                     (session_id, role, agent_type, content, tool_call_id, tool_name, turn_id, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    msg.session_id, msg.role, msg.agent_type, msg.content,
+                    msg.tool_call_id, msg.tool_name, turn_id, created_at
+                ],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(turn_id)
     }
 
     async fn get_messages(&self, session_id: i64) -> Result<Vec<ChatMessage>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, content, tool_call_id, created_at
+            "SELECT id, session_id, role, agent_type, content, tool_call_id, tool_name, turn_id, created_at
              FROM agent_chat_message
              WHERE session_id = ?1
              ORDER BY id ASC",
@@ -206,9 +247,12 @@ impl AgentStorage for SqliteAgentStorage {
                 id: Some(row.get(0)?),
                 session_id: row.get(1)?,
                 role: row.get(2)?,
-                content: row.get(3)?,
-                tool_call_id: row.get(4)?,
-                created_at: row.get(5)?,
+                agent_type: row.get(3)?,
+                content: row.get(4)?,
+                tool_call_id: row.get(5)?,
+                tool_name: row.get(6)?,
+                turn_id: row.get(7)?,
+                created_at: row.get(8)?,
             })
         })?;
         let mut messages = Vec::new();
@@ -216,54 +260,6 @@ impl AgentStorage for SqliteAgentStorage {
             messages.push(row?);
         }
         Ok(messages)
-    }
-
-    async fn create_tool_call(&self, record: ToolCallRecord) -> Result<i64, AgentError> {
-        let created_at = if record.created_at == 0 {
-            now()
-        } else {
-            record.created_at
-        };
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO agent_tool_call (message_id, call_id, tool_name, arguments, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                record.message_id,
-                record.call_id,
-                record.tool_name,
-                record.arguments,
-                created_at
-            ],
-        )?;
-        Ok(conn.last_insert_rowid())
-    }
-
-    async fn get_tool_calls_for_message(
-        &self,
-        message_id: i64,
-    ) -> Result<Vec<ToolCallRecord>, AgentError> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, message_id, call_id, tool_name, arguments, created_at
-             FROM agent_tool_call
-             WHERE message_id = ?1",
-        )?;
-        let rows = stmt.query_map(params![message_id], |row| {
-            Ok(ToolCallRecord {
-                id: Some(row.get(0)?),
-                message_id: row.get(1)?,
-                call_id: row.get(2)?,
-                tool_name: row.get(3)?,
-                arguments: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })?;
-        let mut records = Vec::new();
-        for row in rows {
-            records.push(row?);
-        }
-        Ok(records)
     }
 }
 

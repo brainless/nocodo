@@ -75,8 +75,11 @@ pub async fn send_chat_message(
             id: None,
             session_id: target_session_id,
             role: "user".to_string(),
+            agent_type: None,
             content: message.clone(),
             tool_call_id: None,
+            tool_name: None,
+            turn_id: None,
             created_at: 0,
         })
         .await
@@ -209,30 +212,13 @@ pub async fn get_session_messages(
             let mut enriched = Vec::new();
             for m in messages {
                 let mut schema_version: Option<i64> = None;
-                if m.role == "assistant" {
-                    match agent_storage.get_tool_calls_for_message(m.id.unwrap_or(0)).await {
-                        Ok(tool_calls) => {
-                            for tc in tool_calls {
-                                if tc.tool_name == "generate_schema" {
-                                    match schema_storage
-                                        .get_schema_version_by_json(session_id, &tc.arguments)
-                                        .await
-                                    {
-                                        Ok(Some(v)) => {
-                                            schema_version = Some(v);
-                                            break;
-                                        }
-                                        Ok(None) => {}
-                                        Err(e) => {
-                                            log::warn!("Failed to lookup schema version: {}", e);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to load tool calls for message {}: {}", m.id.unwrap_or(0), e);
-                        }
+                if m.tool_name.as_deref() == Some("generate_schema") && m.role == "assistant" {
+                    match schema_storage
+                        .get_schema_version_by_json(session_id, &m.content)
+                        .await
+                    {
+                        Ok(v) => schema_version = v,
+                        Err(e) => log::warn!("Failed to lookup schema version: {}", e),
                     }
                 }
                 enriched.push(ChatHistoryMessage {

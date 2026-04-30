@@ -38,21 +38,17 @@ pub struct ChatMessage {
     pub session_id: i64,
     /// "user" | "assistant" | "tool"
     pub role: String,
+    /// NULL for human messages; agent identifier for agent-originated rows.
+    pub agent_type: Option<String>,
+    /// Plain text for user/tool rows; arguments JSON for assistant tool-call rows.
     pub content: String,
-    /// Set for role="tool": the LLM-assigned call_id this result belongs to.
+    /// Set on role="assistant" tool-call rows and their matching role="tool" result rows.
     pub tool_call_id: Option<String>,
-    pub created_at: i64,
-}
-
-#[derive(Debug, Clone)]
-pub struct ToolCallRecord {
-    pub id: Option<i64>,
-    pub message_id: i64,
-    /// LLM-assigned call identifier (used to correlate tool results).
-    pub call_id: String,
-    pub tool_name: String,
-    /// JSON-serialised arguments (raw LLM tool call input).
-    pub arguments: String,
+    /// Set on role="assistant" (invocation) and role="tool" (result) rows.
+    pub tool_name: Option<String>,
+    /// id of the first row in this turn; equals id for single-row turns.
+    /// Managed by the storage layer — callers always pass None.
+    pub turn_id: Option<i64>,
     pub created_at: i64,
 }
 
@@ -69,16 +65,14 @@ pub trait AgentStorage: Send + Sync {
         agent_type: &str,
     ) -> Result<Session, AgentError>;
 
+    /// Persist a single-row turn (user messages, nudges). Sets turn_id = id automatically.
     async fn create_message(&self, msg: ChatMessage) -> Result<i64, AgentError>;
 
+    /// Persist all rows of one LLM response turn atomically.
+    /// The storage layer assigns turn_id = id of the first inserted row to every row.
+    async fn create_turn(&self, messages: Vec<ChatMessage>) -> Result<i64, AgentError>;
+
     async fn get_messages(&self, session_id: i64) -> Result<Vec<ChatMessage>, AgentError>;
-
-    async fn create_tool_call(&self, record: ToolCallRecord) -> Result<i64, AgentError>;
-
-    async fn get_tool_calls_for_message(
-        &self,
-        message_id: i64,
-    ) -> Result<Vec<ToolCallRecord>, AgentError>;
 }
 
 // ---------------------------------------------------------------------------

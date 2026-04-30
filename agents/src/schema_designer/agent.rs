@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     error::AgentError,
-    storage::{AgentStorage, AgentType, ChatMessage, SchemaStorage, ToolCallRecord},
+    storage::{AgentStorage, AgentType, ChatMessage, SchemaStorage},
 };
 const MAX_NUDGES: u32 = 3;
 
@@ -96,8 +96,11 @@ impl SchemaDesignerAgent {
                 id: None,
                 session_id,
                 role: "user".to_string(),
+                agent_type: None,
                 content: user_text.to_string(),
                 tool_call_id: None,
+                tool_name: None,
+                turn_id: None,
                 created_at: 0,
             })
             .await?;
@@ -197,22 +200,19 @@ impl SchemaDesignerAgent {
                 .collect::<Vec<_>>()
                 .join("");
 
-            // Persist assistant text if non-empty.
-            let assistant_msg_id = if !assistant_text.is_empty() {
-                let id = self
-                    .storage
-                    .create_message(ChatMessage {
-                        id: None,
-                        session_id,
-                        role: "assistant".to_string(),
-                        content: assistant_text.clone(),
-                        tool_call_id: None,
-                        created_at: 0,
-                    })
-                    .await?;
-                Some(id)
-            } else {
-                None
+            // Build the optional leading text row (present when the LLM sends both
+            // text and a tool call in the same response).
+            let agent_type_str = AgentType::SchemaDesigner.as_str().to_string();
+            let text_row = |content: String| ChatMessage {
+                id: None,
+                session_id,
+                role: "assistant".to_string(),
+                agent_type: Some(agent_type_str.clone()),
+                content,
+                tool_call_id: None,
+                tool_name: None,
+                turn_id: None,
+                created_at: 0,
             };
 
             // Handle tool calls.
@@ -220,7 +220,7 @@ impl SchemaDesignerAgent {
                 log::info!("[Agent] LLM made {} tool call(s)", tool_calls.len());
                 for tool_call in tool_calls {
                     let tool_name = tool_call.name();
-                    let call_id = tool_call.id();
+                    let call_id = tool_call.id().to_string();
                     log::info!("[Agent] Tool call: name={}, call_id={}", tool_name, call_id);
                     match tool_name {
                         "generate_schema" => {
@@ -234,36 +234,7 @@ impl SchemaDesignerAgent {
 
                             let schema_json = serde_json::to_string(&params)?;
 
-                            // Persist tool call record (linked to the assistant message, or a
-                            // synthetic one if the model sent no text).
-                            let msg_id = match assistant_msg_id {
-                                Some(id) => id,
-                                None => {
-                                    self.storage
-                                        .create_message(ChatMessage {
-                                            id: None,
-                                            session_id,
-                                            role: "assistant".to_string(),
-                                            content: String::new(),
-                                            tool_call_id: None,
-                                            created_at: 0,
-                                        })
-                                        .await?
-                                }
-                            };
-
-                            self.storage
-                                .create_tool_call(ToolCallRecord {
-                                    id: None,
-                                    message_id: msg_id,
-                                    call_id: tool_call.id().to_string(),
-                                    tool_name: "generate_schema".to_string(),
-                                    arguments: schema_json.clone(),
-                                    created_at: 0,
-                                })
-                                .await?;
-
-                            // Save schema to DB only if not in preview mode
+                            // Save schema before building turn rows so result_text is ready.
                             let (schema_row_id, result_text) = if preview_mode {
                                 log::info!(
                                     "[Agent] Schema generated in preview mode - not saving to DB"
@@ -291,17 +262,33 @@ impl SchemaDesignerAgent {
                                 )
                             };
 
-                            // Persist the tool result message so the model sees it next turn.
-                            self.storage
-                                .create_message(ChatMessage {
-                                    id: None,
-                                    session_id,
-                                    role: "tool".to_string(),
-                                    content: result_text,
-                                    tool_call_id: Some(tool_call.id().to_string()),
-                                    created_at: 0,
-                                })
-                                .await?;
+                            let mut turn = Vec::new();
+                            if !assistant_text.is_empty() {
+                                turn.push(text_row(assistant_text.clone()));
+                            }
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "assistant".to_string(),
+                                agent_type: Some(agent_type_str.clone()),
+                                content: schema_json,
+                                tool_call_id: Some(call_id.clone()),
+                                tool_name: Some("generate_schema".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "tool".to_string(),
+                                agent_type: None,
+                                content: result_text,
+                                tool_call_id: Some(call_id),
+                                tool_name: Some("generate_schema".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            self.storage.create_turn(turn).await?;
 
                             log::info!("[Agent] Returning SchemaGenerated response");
                             return Ok(AgentResponse::SchemaGenerated {
@@ -317,33 +304,22 @@ impl SchemaDesignerAgent {
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             log::info!("[Agent] Stop reason: {}", params.reply);
 
-                            // Persist the stop call.
-                            let msg_id = match assistant_msg_id {
-                                Some(id) => id,
-                                None => {
-                                    self.storage
-                                        .create_message(ChatMessage {
-                                            id: None,
-                                            session_id,
-                                            role: "assistant".to_string(),
-                                            content: params.reply.clone(),
-                                            tool_call_id: None,
-                                            created_at: 0,
-                                        })
-                                        .await?
-                                }
-                            };
-
-                            self.storage
-                                .create_tool_call(ToolCallRecord {
-                                    id: None,
-                                    message_id: msg_id,
-                                    call_id: tool_call.id().to_string(),
-                                    tool_name: "stop_agent".to_string(),
-                                    arguments: serde_json::to_string(tool_call.arguments())?,
-                                    created_at: 0,
-                                })
-                                .await?;
+                            let mut turn = Vec::new();
+                            if !assistant_text.is_empty() {
+                                turn.push(text_row(assistant_text.clone()));
+                            }
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "assistant".to_string(),
+                                agent_type: Some(agent_type_str),
+                                content: serde_json::to_string(tool_call.arguments())?,
+                                tool_call_id: Some(call_id),
+                                tool_name: Some("stop_agent".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            self.storage.create_turn(turn).await?;
 
                             log::info!("[Agent] Returning Stopped response");
                             return Ok(AgentResponse::Stopped(params.reply));
@@ -360,12 +336,13 @@ impl SchemaDesignerAgent {
                 }
             }
 
-            // No tool call: if the model produced text we can return it.
+            // No tool call: persist text and return.
             if !assistant_text.is_empty() {
                 log::info!(
                     "[Agent] Returning Text response ({} chars)",
                     assistant_text.len()
                 );
+                self.storage.create_turn(vec![text_row(assistant_text.clone())]).await?;
                 return Ok(AgentResponse::Text(assistant_text));
             }
 
@@ -388,8 +365,11 @@ impl SchemaDesignerAgent {
                     id: None,
                     session_id,
                     role: "user".to_string(),
+                    agent_type: None,
                     content: "Please respond with either a schema (call generate_schema) or an explanation (call stop_agent).".to_string(),
                     tool_call_id: None,
+                    tool_name: None,
+                    turn_id: None,
                     created_at: 0,
                 })
                 .await?;
