@@ -519,7 +519,7 @@ function AppContent() {
           <section class="sheet-main">
             <div class="formula-strip">
               <label for="chat-drawer" class="btn btn-success btn-sm">
-                AI Assistant
+                Dev Team
               </label>
               <div class="name-box">{selectedCell().col}{selectedCell().row}</div>
               <label class="formula-label" for="formula-input">fx</label>
@@ -692,7 +692,7 @@ function AppContent() {
             {/* Sessions list view */}
             <Show when={drawerView() === 'sessions'}>
               <div class="chat-panel-header">
-                <h3 class="text-sm font-semibold">AI Assistant</h3>
+                <h3 class="text-sm font-semibold">Dev Team</h3>
                 <label for="chat-drawer" class="btn btn-ghost btn-sm btn-square">✕</label>
               </div>
 
@@ -713,16 +713,15 @@ function AppContent() {
                           class="list-row items-center cursor-pointer hover:bg-base-200 transition-colors"
                           onClick={() => selectSession(session)}
                         >
-                          <div>
-                            <div class="badge badge-primary badge-soft badge-sm">
-                              {agentTypeLabel(session.agent_type)}
+                          <div class="avatar placeholder">
+<div class="bg-neutral text-neutral-content w-10 h-10 rounded-full flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/20/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
                             </div>
                           </div>
                           <div class="list-col-grow">
-                            <p class="text-sm font-medium">Session {session.id}</p>
-                            <p class="text-xs text-base-content/50">{formatSessionDate(session.created_at)}</p>
+                            <p class="text-sm font-medium">{agentTypeLabel(session.agent_type)}</p>
+                            <p class="text-xs text-base-content/50 truncate">Online</p>
                           </div>
-                          <div class="text-base-content/30">›</div>
                         </li>
                       )}
                     </For>
@@ -737,14 +736,11 @@ function AppContent() {
                 <Show when={sessions().length > 0}>
                   <button class="btn btn-ghost btn-sm btn-square" onClick={backToSessions}>‹</button>
                 </Show>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold truncate">
-                    {selectedSession() ? agentTypeLabel(selectedSession()!.agent_type) : 'Schema Designer'}
-                  </p>
-                  <p class="text-xs text-base-content/50">
-                    {selectedSession() ? `Session ${selectedSession()!.id}` : 'New session'}
-                  </p>
-                </div>
+<div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold truncate">
+                      {selectedSession() ? agentTypeLabel(selectedSession()!.agent_type) : 'Database Dev'}
+                    </p>
+                  </div>
                 <label for="chat-drawer" class="btn btn-ghost btn-sm btn-square">✕</label>
               </div>
 
