@@ -444,11 +444,14 @@ function AppContent() {
   const MIN_COLUMNS = 26;
 
   // When a preview schema is active, use its columns; otherwise use live DB columns.
-  const displayColumns = (): { name: string }[] => {
+  const displayColumns = (): { name: string; label?: string | null }[] => {
     const ps = previewSchema();
     if (ps) return ps.tables[previewTableIdx()]?.columns ?? [];
     return columns();
   };
+
+  const displayColumnHeader = (col: { name: string; label?: string | null }): string =>
+    col.label?.trim() || col.name;
 
   const gridTemplateColumns = () => {
     const rowHeaderWidth = 56;
@@ -572,7 +575,7 @@ function AppContent() {
                               class={`cell${1 === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
                               onClick={() => handleCellClick(colLetter, 1)}
                             >
-                              {dataCols[colIndex]?.name ?? ''}
+                              {dataCols[colIndex] ? displayColumnHeader(dataCols[colIndex]) : ''}
                             </div>
                           );
                         }}
@@ -660,7 +663,7 @@ function AppContent() {
                       class={`sheet-tab${i() === previewTableIdx() ? ' sheet-tab-active' : ''}`}
                       onClick={() => setPreviewTableIdx(i())}
                     >
-                      {table.name}
+                      {table.label?.trim() || table.name}
                     </button>
                   )}
                 </For>

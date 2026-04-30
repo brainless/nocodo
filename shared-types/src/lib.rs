@@ -129,6 +129,8 @@ pub struct ForeignKeyDef {
 #[ts(export)]
 pub struct ColumnDef {
     pub name: String,
+    #[serde(default)]
+    pub label: Option<String>,
     pub data_type: DataType,
     #[serde(default)]
     pub nullable: bool,
@@ -143,6 +145,8 @@ pub struct ColumnDef {
 #[ts(export)]
 pub struct TableDef {
     pub name: String,
+    #[serde(default)]
+    pub label: Option<String>,
     pub columns: Vec<ColumnDef>,
 }
 
@@ -153,6 +157,8 @@ pub struct TableDef {
 pub struct SchemaDef {
     /// Human-readable schema name.
     pub name: String,
+    #[serde(default)]
+    pub label: Option<String>,
     /// Normalized set of tables that make up the schema.
     pub tables: Vec<TableDef>,
 }

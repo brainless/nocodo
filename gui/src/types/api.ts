@@ -81,13 +81,13 @@ ref_column: string, };
 /**
  * Column definition as emitted by the agent.
  */
-export type ColumnDef = { name: string, data_type: DataType, nullable: boolean, primary_key: boolean, foreign_key: ForeignKeyDef | null, };
+export type ColumnDef = { name: string, label: string | null, data_type: DataType, nullable: boolean, primary_key: boolean, foreign_key: ForeignKeyDef | null, };
 
 
 /**
  * Table definition as emitted by the agent.
  */
-export type TableDef = { name: string, columns: Array<ColumnDef>, };
+export type TableDef = { name: string, label: string | null, columns: Array<ColumnDef>, };
 
 
 /**
@@ -98,7 +98,7 @@ export type SchemaDef = {
 /**
  * Human-readable schema name.
  */
-name: string, 
+name: string, label: string | null, 
 /**
  * Normalized set of tables that make up the schema.
  */

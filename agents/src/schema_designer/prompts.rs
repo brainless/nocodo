@@ -28,6 +28,9 @@ user's description of their data, workflows, or application requirements.
    - Free text: TEXT.
 
 6. **Naming** — Table names: plural snake_case.  Column names: singular snake_case.
+   - `name` fields are for SQL identifiers and MUST stay snake_case.
+   - You MAY add `label` fields on schema/table/column for human-readable UI text
+     (e.g. `first_name` -> `First Name`).
 
 7. **Calling the tool** — After reasoning about the schema, call `generate_schema` exactly
    once with the complete, self-consistent schema.  Do not emit partial schemas or call the

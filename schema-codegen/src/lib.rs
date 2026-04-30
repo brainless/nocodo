@@ -21,6 +21,8 @@ use std::fmt::Write;
 pub struct TableModel {
     /// Original SQL table name (plural snake_case).
     pub sql_name: String,
+    /// Optional human-readable table label for display usage.
+    pub label: Option<String>,
     /// Rust struct name (singular PascalCase derived from sql_name).
     pub rust_name: String,
     pub columns: Vec<ColumnModel>,
@@ -31,6 +33,8 @@ pub struct TableModel {
 pub struct ColumnModel {
     /// SQL column name (snake_case).
     pub sql_name: String,
+    /// Optional human-readable column label for display usage.
+    pub label: Option<String>,
     /// Rust field name (snake_case, same as sql_name).
     pub rust_name: String,
     /// Rust type expression (e.g. `String`, `Option<i64>`).
@@ -56,6 +60,29 @@ pub struct CodegenResult {
     pub sql_ddl: String,
 }
 
+/// Display labels extracted from schema metadata.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SchemaLabels {
+    pub schema_name: String,
+    pub schema_label: Option<String>,
+    pub tables: Vec<TableLabels>,
+}
+
+/// Display labels for one table.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableLabels {
+    pub table_name: String,
+    pub table_label: Option<String>,
+    pub columns: Vec<ColumnLabels>,
+}
+
+/// Display labels for one column.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColumnLabels {
+    pub column_name: String,
+    pub column_label: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Stage 1: SchemaDef → AST
 // ---------------------------------------------------------------------------
@@ -71,6 +98,7 @@ fn parse_table_def(table: &TableDef) -> TableModel {
     let columns = table.columns.iter().map(parse_column_def).collect();
     TableModel {
         sql_name,
+        label: table.label.clone(),
         rust_name,
         columns,
     }
@@ -81,6 +109,7 @@ fn parse_column_def(col: &ColumnDef) -> ColumnModel {
     let sql_type = data_type_to_sql(&col.data_type);
     ColumnModel {
         sql_name: col.name.clone(),
+        label: col.label.clone(),
         rust_name: col.name.clone(),
         rust_type,
         sql_type: sql_type.to_string(),
@@ -195,6 +224,30 @@ pub fn generate(schema: &SchemaDef) -> CodegenResult {
     }
 }
 
+/// Extract name/label metadata for schema/table/column display usage.
+pub fn schema_labels(schema: &SchemaDef) -> SchemaLabels {
+    SchemaLabels {
+        schema_name: schema.name.clone(),
+        schema_label: schema.label.clone(),
+        tables: schema
+            .tables
+            .iter()
+            .map(|t| TableLabels {
+                table_name: t.name.clone(),
+                table_label: t.label.clone(),
+                columns: t
+                    .columns
+                    .iter()
+                    .map(|c| ColumnLabels {
+                        column_name: c.name.clone(),
+                        column_label: c.label.clone(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -273,12 +326,15 @@ mod tests {
     fn sample_schema() -> SchemaDef {
         SchemaDef {
             name: "Test App".to_string(),
+            label: Some("Test App".to_string()),
             tables: vec![
                 TableDef {
                     name: "users".to_string(),
+                    label: Some("Users".to_string()),
                     columns: vec![
                         ColumnDef {
                             name: "id".to_string(),
+                            label: Some("ID".to_string()),
                             data_type: DataType::Integer,
                             nullable: false,
                             primary_key: true,
@@ -286,6 +342,7 @@ mod tests {
                         },
                         ColumnDef {
                             name: "name".to_string(),
+                            label: Some("Name".to_string()),
                             data_type: DataType::Text,
                             nullable: false,
                             primary_key: false,
@@ -293,6 +350,7 @@ mod tests {
                         },
                         ColumnDef {
                             name: "email".to_string(),
+                            label: Some("Email".to_string()),
                             data_type: DataType::Text,
                             nullable: true,
                             primary_key: false,
@@ -300,6 +358,7 @@ mod tests {
                         },
                         ColumnDef {
                             name: "active".to_string(),
+                            label: Some("Active".to_string()),
                             data_type: DataType::Boolean,
                             nullable: false,
                             primary_key: false,
@@ -309,9 +368,11 @@ mod tests {
                 },
                 TableDef {
                     name: "orders".to_string(),
+                    label: Some("Orders".to_string()),
                     columns: vec![
                         ColumnDef {
                             name: "id".to_string(),
+                            label: Some("ID".to_string()),
                             data_type: DataType::Integer,
                             nullable: false,
                             primary_key: true,
@@ -319,6 +380,7 @@ mod tests {
                         },
                         ColumnDef {
                             name: "user_id".to_string(),
+                            label: Some("User".to_string()),
                             data_type: DataType::Integer,
                             nullable: false,
                             primary_key: false,
@@ -329,6 +391,7 @@ mod tests {
                         },
                         ColumnDef {
                             name: "total".to_string(),
+                            label: Some("Total".to_string()),
                             data_type: DataType::Real,
                             nullable: false,
                             primary_key: false,
@@ -346,7 +409,9 @@ mod tests {
         let tables = parse_schema_def(&schema);
         assert_eq!(tables.len(), 2);
         assert_eq!(tables[0].sql_name, "users");
+        assert_eq!(tables[0].label.as_deref(), Some("Users"));
         assert_eq!(tables[0].rust_name, "User");
+        assert_eq!(tables[0].columns[1].label.as_deref(), Some("Name"));
         assert_eq!(tables[1].sql_name, "orders");
         assert_eq!(tables[1].rust_name, "Order");
     }
@@ -385,6 +450,18 @@ mod tests {
         assert!(result.rust_code.contains("pub struct Order"));
         assert!(result.sql_ddl.contains("CREATE TABLE IF NOT EXISTS users"));
         assert!(result.sql_ddl.contains("CREATE TABLE IF NOT EXISTS orders"));
+    }
+
+    #[test]
+    fn test_schema_labels_extraction() {
+        let schema = sample_schema();
+        let labels = schema_labels(&schema);
+        assert_eq!(labels.schema_name, "Test App");
+        assert_eq!(labels.schema_label.as_deref(), Some("Test App"));
+        assert_eq!(labels.tables[0].table_name, "users");
+        assert_eq!(labels.tables[0].table_label.as_deref(), Some("Users"));
+        assert_eq!(labels.tables[0].columns[1].column_name, "name");
+        assert_eq!(labels.tables[0].columns[1].column_label.as_deref(), Some("Name"));
     }
 
     #[test]
