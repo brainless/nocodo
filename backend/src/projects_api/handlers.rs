@@ -1,6 +1,7 @@
 use actix_web::{get, post, web, HttpResponse, Responder, Result};
 use rusqlite::{params, Connection};
 use shared_types::{CreateProjectRequest, CreateProjectResponse, ListProjectsResponse, Project};
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config;
@@ -13,7 +14,7 @@ fn open_db() -> Result<Connection, rusqlite::Error> {
     Connection::open(&database_url)
 }
 
-fn generate_project_path(name: &str) -> String {
+fn generate_project_path(base_path: &str, name: &str) -> String {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -22,7 +23,11 @@ fn generate_project_path(name: &str) -> String {
         .to_lowercase()
         .replace(' ', "-")
         .replace(|c: char| !c.is_alphanumeric() && c != '-', "");
-    format!("./projects/{}-{}", sanitized_name, timestamp)
+    let dir_name = format!("{}-{}", sanitized_name, timestamp);
+    PathBuf::from(base_path)
+        .join(dir_name)
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// GET /api/projects
@@ -77,10 +82,15 @@ pub async fn create_project(body: web::Json<CreateProjectRequest>) -> Result<imp
         .unwrap_or_default()
         .as_secs() as i64;
 
+    let default_projects_path = std::env::var("DEFAULT_PROJECTS_PATH")
+        .ok()
+        .or_else(|| config::read_project_conf("DEFAULT_PROJECTS_PATH"))
+        .unwrap_or_else(|| "./projects".to_string());
+
     let path = body
         .path
         .clone()
-        .unwrap_or_else(|| generate_project_path(&body.name));
+        .unwrap_or_else(|| generate_project_path(&default_projects_path, &body.name));
 
     // Create the project directory if it doesn't exist
     if let Err(e) = std::fs::create_dir_all(&path) {

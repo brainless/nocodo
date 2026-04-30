@@ -12,6 +12,8 @@ BACKEND_HOST=127.0.0.1
 BACKEND_PORT=8080
 GUI_PORT=3030
 ADMIN_GUI_PORT=3031
+# Base directory used by backend when CreateProjectRequest.path is omitted.
+DEFAULT_PROJECTS_PATH=./projects
 
 SERVER_IP=203.0.113.10
 SSH_USER=deploy

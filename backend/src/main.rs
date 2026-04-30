@@ -26,6 +26,18 @@ async fn main() -> std::io::Result<()> {
         .format_timestamp_secs()
         .init();
 
+    if let Some(path) = config::resolved_config_path() {
+        println!("Config file resolved to {}", path.display());
+    } else {
+        println!("Config file not found in configured lookup paths");
+    }
+
+    let default_projects_path = std::env::var("DEFAULT_PROJECTS_PATH")
+        .ok()
+        .or_else(|| config::read_project_conf("DEFAULT_PROJECTS_PATH"))
+        .unwrap_or_else(|| "./projects".to_string());
+    println!("Default projects path resolved to {}", default_projects_path);
+
     // Run database migrations on startup
     let database_url = std::env::var("DATABASE_URL")
         .ok()

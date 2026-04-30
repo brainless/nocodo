@@ -29,6 +29,16 @@ fn exe_dir() -> Option<PathBuf> {
 }
 
 pub fn read_project_conf(key: &str) -> Option<String> {
+    let candidates = project_conf_candidates();
+    candidates.iter().find_map(|p| read_conf_file(p, key))
+}
+
+pub fn resolved_config_path() -> Option<PathBuf> {
+    let candidates = project_conf_candidates();
+    candidates.into_iter().find(|p| p.is_file())
+}
+
+fn project_conf_candidates() -> Vec<PathBuf> {
     let mut candidates = vec![
         PathBuf::from("project.conf"),
         PathBuf::from("../project.conf"),
@@ -36,5 +46,5 @@ pub fn read_project_conf(key: &str) -> Option<String> {
     if let Some(dir) = exe_dir() {
         candidates.push(dir.join("server.env"));
     }
-    candidates.iter().find_map(|p| read_conf_file(p, key))
+    candidates
 }
