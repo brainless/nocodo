@@ -1275,6 +1275,7 @@ dependencies = [
  "postgres",
  "refinery",
  "rusqlite",
+ "schema-codegen",
  "serde",
  "serde_json",
  "shared-types",
@@ -1758,6 +1759,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91c1b7e4904c873ef0710c1f407dde2e6287de2bebc1bbbf7d430bb7cbffd939"
 dependencies = [
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "schema-codegen"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "shared-types",
 ]
 
 [[package]]

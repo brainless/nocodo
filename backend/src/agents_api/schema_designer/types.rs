@@ -82,3 +82,9 @@ pub struct SessionItem {
 pub struct ListSessionsResponse {
     pub sessions: Vec<SessionItem>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct SchemaCodegenResponse {
+    pub rust_code: String,
+    pub sql_ddl: String,
+}

@@ -4,13 +4,14 @@ Minimal template for fullstack development. Shared Rust types drive everything.
 
 ## Scope
 
-Maintain: `backend`, `shared-types`, `agents`, `gui`, `admin-gui`, `tauri`, `scripts`.
+Maintain: `backend`, `shared-types`, `agents`, `schema-codegen`, `gui`, `admin-gui`, `tauri`, `scripts`.
 
 ## Workspace
 
 - `backend` — Actix-web API with auto-migrations, CORS for gui/admin-gui origins
 - `agents` — LLM agent crate with SQLite-backed storage (schema designer agent active)
 - `shared-types` — API contract types with TypeScript generation
+- `schema-codegen` — Deterministic `SchemaDef` → Rust structs + SQLite DDL generator
 
 ## Type-Driven Workflow
 
@@ -45,6 +46,7 @@ Resolved priority: **env var → `project.conf` → `server.env`** (sibling to b
   - `POST /api/agents/schema-designer/chat` — send message, returns `{session_id, message_id}`
   - `GET /api/agents/schema-designer/messages/{id}/response` — long-poll for response (text/schema/stopped)
   - `GET /api/agents/schema-designer/sessions/{id}/messages` — fetch session history
+  - `GET /api/agents/schema-designer/sessions/{id}/codegen` — generate Rust structs + SQLite DDL from the session's latest schema
 - Config: reads `AGENT_PROVIDER` and `AGENT_API_KEY` from env/project.conf
 - Backend auto-initializes agent state on startup; runs DB migrations and ensures default project exists
 

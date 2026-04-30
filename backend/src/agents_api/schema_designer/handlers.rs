@@ -1,7 +1,7 @@
 use crate::agents_api::state::AgentState;
 use crate::agents_api::schema_designer::types::{
     AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
-    ListSessionsQuery, ListSessionsResponse, MessageResponse, SchemaPreviewQuery, SchemaPreviewResponse, SessionItem,
+    ListSessionsQuery, ListSessionsResponse, MessageResponse, SchemaCodegenResponse, SchemaPreviewQuery, SchemaPreviewResponse, SessionItem,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{build_schema_designer, AgentResponse, AgentStorage, SchemaStorage, SqliteAgentStorage, SqliteSchemaStorage};
@@ -363,4 +363,48 @@ pub async fn get_session_schema(
         Err(e) => HttpResponse::InternalServerError()
             .json(serde_json::json!({ "error": format!("Query error: {}", e) })),
     }
+}
+
+/// GET /api/agents/schema-designer/sessions/{session_id}/codegen
+/// Loads the latest schema for a session and returns the generated Rust structs
+/// and SQLite DDL as strings.
+#[get("/api/agents/schema-designer/sessions/{session_id}/codegen")]
+pub async fn generate_schema_code(
+    state: web::Data<AgentState>,
+    path: web::Path<i64>,
+) -> HttpResponse {
+    let session_id = path.into_inner();
+
+    let schema_storage = match SqliteSchemaStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": format!("Storage error: {}", e) }));
+        }
+    };
+
+    let schema_def = match schema_storage.get_schema_for_session(session_id, None).await {
+        Ok(Some((schema_json, _version))) => match serde_json::from_str::<SchemaDef>(&schema_json) {
+            Ok(schema) => schema,
+            Err(e) => {
+                return HttpResponse::InternalServerError()
+                    .json(serde_json::json!({ "error": format!("Schema corrupt: {}", e) }));
+            }
+        },
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(serde_json::json!({ "error": "No schema generated for this session yet" }));
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": format!("Query error: {}", e) }));
+        }
+    };
+
+    let result = schema_codegen::generate(&schema_def);
+
+    HttpResponse::Ok().json(SchemaCodegenResponse {
+        rust_code: result.rust_code,
+        sql_ddl: result.sql_ddl,
+    })
 }

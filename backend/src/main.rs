@@ -129,6 +129,7 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::schema_designer::get_session_messages)
             .service(agents_api::schema_designer::get_session_schema)
             .service(agents_api::schema_designer::get_message_response)
+            .service(agents_api::schema_designer::generate_schema_code)
             // Project API routes
             .service(projects_api::handlers::list_projects)
             .service(projects_api::handlers::create_project)
