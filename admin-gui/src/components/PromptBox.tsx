@@ -5,20 +5,27 @@ export interface PromptBoxProps {
   examples?: string[];
   submitLabel?: string;
   onSubmit: (value: string) => Promise<void> | void;
+  disabled?: boolean;
+  loading?: boolean;
 }
 
 export function PromptBox(props: PromptBoxProps) {
   const [value, setValue] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
+  const [internalLoading, setInternalLoading] = createSignal(false);
+
+  const isLoading = () => props.loading ?? internalLoading();
+  const isInputDisabled = () => props.disabled || isLoading();
+  const isButtonDisabled = () => props.disabled || isLoading() || !value().trim();
 
   const handleSubmit = async () => {
     const text = value().trim();
     if (!text) return;
-    setLoading(true);
+    setInternalLoading(true);
     try {
       await props.onSubmit(text);
     } finally {
-      setLoading(false);
+      setInternalLoading(false);
+      setValue('');
     }
   };
 
@@ -39,7 +46,7 @@ export function PromptBox(props: PromptBoxProps) {
           value={value()}
           onInput={(e) => setValue(e.currentTarget.value)}
           onKeyDown={handleKeyDown}
-          disabled={loading()}
+          disabled={isInputDisabled()}
         />
         <div class="prompt-box-footer">
           <span class="prompt-box-hint">
@@ -50,12 +57,12 @@ export function PromptBox(props: PromptBoxProps) {
           <button
             class="prompt-box-btn"
             onClick={handleSubmit}
-            disabled={loading() || !value().trim()}
+            disabled={isButtonDisabled()}
           >
-            <Show when={loading()}>
+            <Show when={isLoading()}>
               <span class="loading loading-spinner loading-xs" />
             </Show>
-            <Show when={!loading()}>
+            <Show when={!isLoading()}>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
               </svg>
@@ -72,7 +79,7 @@ export function PromptBox(props: PromptBoxProps) {
               <button
                 class="prompt-box-chip"
                 onClick={() => setValue(ex)}
-                disabled={loading()}
+                disabled={isInputDisabled()}
               >
                 {ex}
               </button>

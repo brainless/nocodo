@@ -2,6 +2,7 @@ import { For, Show, createEffect, createSignal } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { useProject } from '../contexts/ProjectContext';
 import ProjectSelector from '../components/ProjectSelector';
+import { PromptBox } from '../components/PromptBox';
 import type {
   Schema,
   Table,
@@ -61,8 +62,12 @@ export default function DBDeveloperPage() {
 
   // Chat state
   const [messages, setMessages] = createSignal<UiMessage[]>([DEFAULT_GREETING]);
-  const [inputValue, setInputValue] = createSignal('');
   const [chatLoading, setChatLoading] = createSignal(false);
+
+  const promptPlaceholder = () =>
+    messages().length > 1
+      ? 'I am a database developer: Would you like some changes in the database design?'
+      : 'I am a database developer: Tell me the workflow you have in mind, I will help you design the database.';
 
   // Schema preview state
   const [previewSchema, setPreviewSchema] = createSignal<SchemaDef | null>(null);
@@ -229,14 +234,12 @@ export default function DBDeveloperPage() {
     }
   };
 
-  const handleSend = async () => {
-    const message = inputValue().trim();
+  const handleSend = async (message: string) => {
     const session = selectedSession();
     const projectId = currentProject()?.id;
     if (!message || !projectId) return;
 
     setMessages(prev => [...prev, { role: 'user', content: message }]);
-    setInputValue('');
     setChatLoading(true);
 
     try {
@@ -566,7 +569,7 @@ export default function DBDeveloperPage() {
                 <For each={messages()}>
                   {(msg) => (
                     <div class={`chat ${msg.role === 'user' ? 'chat-end' : 'chat-start'}`}>
-                      <div class={`chat-bubble whitespace-pre-wrap ${msg.role === 'user' ? 'chat-bubble-primary' : ''}`}>
+                      <div class={`chat-bubble whitespace-pre-wrap ${msg.role === 'user' ? 'chat-bubble-primary' : 'bg-transparent'}`}>
                         <Show when={msg.schema_version != null} fallback={msg.content}>
                           <div class="flex flex-col gap-2">
                             <span>{msg.content || 'Designed a schema'}</span>
@@ -592,38 +595,13 @@ export default function DBDeveloperPage() {
                 </Show>
               </div>
 
-              <div class="border-t border-base-300 px-4 py-3 bg-base-200">
-                <button
-                  class="btn btn-success btn-sm w-full"
-                  onClick={() => fetchPreviewSchema()}
-                  disabled={previewLoading()}
-                >
-                  <Show when={previewLoading()}>
-                    <span class="loading loading-spinner loading-xs mr-1" />
-                  </Show>
-                  Preview Schema
-                </button>
-              </div>
-
               <div class="chat-input-area">
-                <div class="chat-input-row">
-                  <input
-                    type="text"
-                    placeholder="Describe a schema..."
-                    class="input input-bordered input-sm flex-1"
-                    value={inputValue()}
-                    onInput={(e) => setInputValue(e.currentTarget.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !chatLoading() && handleSend()}
-                    disabled={chatLoading()}
-                  />
-                  <button
-                    class="btn btn-success btn-sm"
-                    onClick={handleSend}
-                    disabled={chatLoading() || !inputValue().trim()}
-                  >
-                    Send
-                  </button>
-                </div>
+                <PromptBox
+                  placeholder={promptPlaceholder()}
+                  submitLabel="Send"
+                  onSubmit={handleSend}
+                  loading={chatLoading()}
+                />
               </div>
             </div>
           </div>
