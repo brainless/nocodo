@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createSignal } from 'solid-js';
+import { useParams } from '@solidjs/router';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import type {
   Project,
@@ -163,8 +164,8 @@ function ProjectSelector() {
 }
 
 // Main App Content Component
-function AppContent() {
-  const { currentProject } = useProject();
+function AppContent(props: { projectId: number | null }) {
+  const { projects, currentProject, setCurrentProject } = useProject();
 
   // Schema/table state
   const [currentSchema, setCurrentSchema] = createSignal<Schema | null>(null);
@@ -197,6 +198,16 @@ function AppContent() {
   const [previewSchema, setPreviewSchema] = createSignal<SchemaDef | null>(null);
   const [previewTableIdx, setPreviewTableIdx] = createSignal(0);
   const [previewLoading, setPreviewLoading] = createSignal(false);
+
+  // Reload schemas and sessions when project or agent changes
+  createEffect(() => {
+    const targetProjectId = props.projectId;
+    if (!targetProjectId) return;
+    const project = projects().find((p) => p.id === targetProjectId) ?? null;
+    if (project && currentProject()?.id !== targetProjectId) {
+      setCurrentProject(project);
+    }
+  });
 
   // Reload schemas and sessions when project or agent changes
   createEffect(() => {
@@ -805,11 +816,16 @@ function AppContent() {
   );
 }
 
-// Root App component with Provider
-export default function App() {
+export function ProjectPage() {
+  const params = useParams<{ projectId: string }>();
+  const parsedProjectId = Number.parseInt(params.projectId, 10);
+  const projectId = Number.isFinite(parsedProjectId) ? parsedProjectId : null;
+
   return (
     <ProjectProvider>
-      <AppContent />
+      <Show when={projectId !== null} fallback={<main class="min-h-screen grid place-items-center"><div class="alert alert-error max-w-md"><span>Invalid project ID in URL.</span></div></main>}>
+        <AppContent projectId={projectId} />
+      </Show>
     </ProjectProvider>
   );
 }
