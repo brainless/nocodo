@@ -534,8 +534,9 @@ body {
   max-width: 560px;
 }
 
-/* Prompt */
-.home-prompt-section {
+/* ── PromptBox component ── */
+
+.prompt-box-section {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -543,7 +544,7 @@ body {
   gap: 1rem;
 }
 
-.home-prompt-box {
+.prompt-box {
   width: 100%;
   background: #fff;
   border: 1px solid #c0ccdf;
@@ -555,14 +556,14 @@ body {
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 
-.home-prompt-box:focus-within {
+.prompt-box:focus-within {
   border-color: #6b89c4;
   box-shadow:
     0 4px 32px rgb(76 125 215 / 18%),
     0 0 0 3px rgb(107 137 196 / 14%);
 }
 
-.home-prompt-textarea {
+.prompt-box-textarea {
   width: 100%;
   border: 0;
   background: transparent;
@@ -575,11 +576,11 @@ body {
   font-family: inherit;
 }
 
-.home-prompt-textarea::placeholder {
+.prompt-box-textarea::placeholder {
   color: #8fa0be;
 }
 
-.home-prompt-footer {
+.prompt-box-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -588,7 +589,7 @@ body {
   border-top: 1px solid #e5eaf4;
 }
 
-.home-prompt-hint {
+.prompt-box-hint {
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -596,7 +597,7 @@ body {
   color: #7a8faf;
 }
 
-.home-prompt-btn {
+.prompt-box-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -612,24 +613,23 @@ body {
   font-family: inherit;
 }
 
-.home-prompt-btn:hover:not(:disabled) {
+.prompt-box-btn:hover:not(:disabled) {
   background: #254e9a;
 }
 
-.home-prompt-btn:disabled {
+.prompt-box-btn:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-/* Chips */
-.home-chips {
+.prompt-box-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: center;
 }
 
-.home-chip {
+.prompt-box-chip {
   background: #fff;
   border: 1px solid #c7d6f0;
   border-radius: 999px;
@@ -641,14 +641,23 @@ body {
   transition: background 0.12s, border-color 0.12s;
 }
 
-.home-chip:hover:not(:disabled) {
+.prompt-box-chip:hover:not(:disabled) {
   background: #eef3fc;
   border-color: #8ea9d8;
 }
 
-.home-chip:disabled {
+.prompt-box-chip:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* homepage alias — keeps the home-prompt-section max-width constraint */
+.home-prompt-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
 /* Import section */
@@ -690,7 +699,9 @@ body {
   }
 }
 
-.home-import-card {
+/* ── ImportCard component ── */
+
+.import-card {
   background: #fff;
   border: 1px solid #d0daf0;
   border-radius: 14px;
@@ -702,12 +713,16 @@ body {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.home-import-card:hover {
+.import-card--clickable {
+  cursor: pointer;
+}
+
+.import-card:hover {
   border-color: #a8bfdf;
   box-shadow: 0 2px 12px rgb(76 125 215 / 8%);
 }
 
-.home-import-icon {
+.import-card-icon {
   width: 42px;
   height: 42px;
   border-radius: 10px;
@@ -717,36 +732,36 @@ body {
   flex-shrink: 0;
 }
 
-.home-import-icon-csv {
+.import-card-icon--blue {
   background: #e8f0fe;
   color: #3b5ea8;
 }
 
-.home-import-icon-excel {
+.import-card-icon--green {
   background: #e6f4ea;
   color: #2a7a47;
 }
 
-.home-import-icon-sheets {
+.import-card-icon--orange {
   background: #fff3e0;
   color: #c56b00;
 }
 
-.home-import-text h3 {
+.import-card-text h3 {
   font-size: 0.88rem;
   font-weight: 700;
   color: #1e304d;
   margin: 0 0 0.25rem;
 }
 
-.home-import-text p {
+.import-card-text p {
   font-size: 0.78rem;
   color: #5a6f90;
   line-height: 1.5;
   margin: 0;
 }
 
-.home-import-text code {
+.import-card-text code {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.75rem;
   background: #f0f4fc;
@@ -754,7 +769,7 @@ body {
   border-radius: 4px;
 }
 
-.home-import-soon {
+.import-card-badge {
   position: absolute;
   top: 0.7rem;
   right: 0.7rem;
@@ -884,4 +899,255 @@ body {
   font-size: 0.9rem;
   color: #5a6f90;
   margin: 0;
+}
+
+/* ── Components Gallery ── */
+
+.gallery-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eef2fa 0%, #e2e8f5 100%);
+  padding: 3rem 2rem 5rem;
+}
+
+.gallery-header {
+  max-width: 900px;
+  margin: 0 auto 3rem;
+  border-bottom: 1px solid #c6d1e4;
+  padding-bottom: 1.5rem;
+}
+
+.gallery-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #172033;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.4rem;
+}
+
+.gallery-subtitle {
+  font-size: 0.9rem;
+  color: #5a6f90;
+  margin: 0;
+}
+
+.gallery-body {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3.5rem;
+}
+
+.gallery-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.gallery-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b89c4;
+  background: #e8f0fe;
+  border: 1px solid #c7d6f0;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  display: inline-flex;
+  align-self: flex-start;
+}
+
+.gallery-section-desc {
+  font-size: 0.875rem;
+  color: #4a5a7a;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 640px;
+}
+
+.gallery-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.gallery-row--2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.gallery-row--3col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 700px) {
+  .gallery-row--2col,
+  .gallery-row--3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gallery-example {
+  background: #fff;
+  border: 1px solid #d0daf0;
+  border-radius: 16px;
+  padding: 1.25rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.gallery-example-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7a8faf;
+  letter-spacing: 0.02em;
+}
+
+.gallery-output {
+  font-size: 0.78rem;
+  color: #3b5ea8;
+  background: #eef3fc;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  margin: 0;
+}
+
+.gallery-output code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+}
+
+/* ── ContentCard component ── */
+
+.content-card {
+  background: #fff;
+  border: 1px solid #d0daf0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.content-card--clickable {
+  cursor: pointer;
+}
+
+.content-card--clickable:hover {
+  border-color: #a8bfdf;
+  box-shadow: 0 2px 10px rgb(76 125 215 / 8%);
+}
+
+.content-card--selected {
+  border-color: #4c7dd7;
+  background: #f0f5ff;
+  box-shadow: 0 0 0 3px rgb(76 125 215 / 12%);
+}
+
+.content-card--disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.content-card-leading {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.content-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.content-card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e304d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.content-card-text {
+  font-size: 0.8rem;
+  color: #5a6f90;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.content-card-meta {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: #8fa0be;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+/* ── Project avatar (used as ContentCard leading) ── */
+
+.project-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #dde9ff;
+  color: #2f5cad;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* ── Recent projects section (homepage) ── */
+
+.home-recent-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.home-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-recent-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7a8faf;
+}
+
+.home-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.home-recent-skeleton {
+  height: 62px;
+  background: linear-gradient(90deg, #e8edf8 25%, #f0f4fc 50%, #e8edf8 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: 12px;
+  border: 1px solid #d0daf0;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

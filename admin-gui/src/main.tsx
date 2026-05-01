@@ -2,6 +2,7 @@ import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import './index.css';
 import AdminHomePage from './pages/AdminHomePage';
+import ComponentsGalleryPage from './pages/ComponentsGalleryPage';
 import ProjectLayout from './components/ProjectLayout';
 import DBDeveloperPage from './pages/DBDeveloperPage';
 import ProjectManagerPage from './pages/ProjectManagerPage';
@@ -13,6 +14,7 @@ render(
   () => (
     <Router base="/admin">
       <Route path="/" component={AdminHomePage} />
+      <Route path="/components" component={ComponentsGalleryPage} />
       <Route path="/projects/:projectId" component={ProjectLayout}>
         <Route path="/manager" component={ProjectManagerPage} />
         <Route path="/db-developer" component={DBDeveloperPage} />

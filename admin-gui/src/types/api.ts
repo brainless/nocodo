@@ -151,3 +151,5 @@ export type HeartbeatResponse = { status: string, service: string, };
 // Agent API types (not generated from shared-types yet)
 export type SessionItem = { id: number, project_id: number, agent_type: string, created_at: number, };
 export type ListSessionsResponse = { sessions: Array<SessionItem>, };
+export type ChatHistoryMessage = { id: number, role: string, content: string, created_at: number, schema_version: number | null, };
+export type ChatHistoryResponse = { session_id: number, messages: Array<ChatHistoryMessage>, };

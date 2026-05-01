@@ -1,6 +1,10 @@
-import { For, Show, createSignal } from 'solid-js';
+import { For, Show, createEffect, createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { ProjectProvider, useProject } from '../contexts/ProjectContext';
+import { PromptBox } from '../components/PromptBox';
+import { ImportCard } from '../components/ImportCard';
+import { ContentCard } from '../components/ContentCard';
+import type { Project, ListSessionsResponse, ChatHistoryResponse } from '../types/api';
 
 const API_BASE_URL = '';
 
@@ -10,6 +14,19 @@ function formatProjectTimestamp(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
+function timeAgo(unixSeconds: number): string {
+  const diff = Math.floor(Date.now() / 1000) - unixSeconds;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 7 * 86400) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(unixSeconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function projectInitial(name: string): string {
+  return name.replace(/^Project\s+/i, '').charAt(0).toUpperCase() || 'P';
+}
+
 const EXAMPLE_PROMPTS = [
   'CRM with leads, companies, contacts, and deal stages',
   'Project tracker with tasks, sprints, and team members',
@@ -17,55 +34,118 @@ const EXAMPLE_PROMPTS = [
   'Support desk with tickets, priorities, and SLA tracking',
 ];
 
+type ProjectWithContext = { project: Project; firstPrompt: string | null };
+
+function RecentProjects() {
+  const navigate = useNavigate();
+  const { projects, isLoading: projectsLoading } = useProject();
+  const [items, setItems] = createSignal<ProjectWithContext[]>([]);
+  const [loading, setLoading] = createSignal(true);
+
+  createEffect(() => {
+    const ps = projects();
+    if (projectsLoading()) return;
+
+    setLoading(true);
+    void (async () => {
+      try {
+        const sessionData = await Promise.all(
+          ps.map(p =>
+            fetch(`${API_BASE_URL}/api/agents/sessions?project_id=${p.id}`)
+              .then(r => r.json() as Promise<ListSessionsResponse>)
+              .catch(() => ({ sessions: [] } as ListSessionsResponse))
+          )
+        );
+
+        const withContext = await Promise.all(
+          ps.map(async (project, i) => {
+            const sessions = sessionData[i].sessions;
+            if (!sessions.length) return { project, firstPrompt: null };
+            try {
+              const r = await fetch(`${API_BASE_URL}/api/agents/schema-designer/sessions/${sessions[0].id}/messages`);
+              const data = await r.json() as ChatHistoryResponse;
+              const first = data.messages.find(m => m.role === 'user');
+              return { project, firstPrompt: first?.content ?? null };
+            } catch {
+              return { project, firstPrompt: null };
+            }
+          })
+        );
+
+        setItems(withContext);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  });
+
+  return (
+    <Show when={!projectsLoading() && (loading() || items().length > 0)}>
+      <section class="home-recent-section">
+        <div class="home-recent-header">
+          <span class="home-recent-title">Recent projects</span>
+        </div>
+        <div class="home-recent-list">
+          <Show when={loading()} fallback={
+            <For each={items()}>
+              {({ project, firstPrompt }) => (
+                <ContentCard
+                  title={project.name}
+                  body={firstPrompt}
+                  meta={timeAgo(project.created_at)}
+                  leading={<div class="project-avatar">{projectInitial(project.name)}</div>}
+                  onClick={() => navigate(`/projects/${project.id}/db-developer`)}
+                />
+              )}
+            </For>
+          }>
+            <div class="home-recent-skeleton" />
+            <div class="home-recent-skeleton" style="opacity: 0.6" />
+            <div class="home-recent-skeleton" style="opacity: 0.35" />
+          </Show>
+        </div>
+      </section>
+    </Show>
+  );
+}
+
 function HomeContent() {
   const navigate = useNavigate();
   const { createProject } = useProject();
-  const [prompt, setPrompt] = createSignal('');
-  const [isStarting, setIsStarting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
-  const startWithPrompt = async () => {
-    const message = prompt().trim();
-    if (!message) return;
-
-    setIsStarting(true);
+  const startWithPrompt = async (message: string) => {
     setError(null);
 
-    try {
-      const project = await createProject(`Project ${formatProjectTimestamp()}`);
-      if (!project) throw new Error('Failed to create project');
+    const project = await createProject(`Project ${formatProjectTimestamp()}`);
+    if (!project) throw new Error('Failed to create project');
 
-      const response = await fetch(`${API_BASE_URL}/api/agents/schema-designer/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: project.id, message }),
-      });
+    const response = await fetch(`${API_BASE_URL}/api/agents/schema-designer/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: project.id, message }),
+    });
 
-      if (!response.ok) throw new Error(`Failed to start schema designer: ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to start schema designer: ${response.status}`);
 
-      navigate(`/projects/${project.id}/db-developer`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start project');
-      setIsStarting(false);
-    }
+    navigate(`/projects/${project.id}/db-developer`);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      startWithPrompt();
+  const handleSubmit = async (message: string) => {
+    try {
+      await startWithPrompt(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start project');
     }
   };
 
   return (
     <main class="home-page">
-      {/* Ambient background blobs */}
       <div class="home-blob home-blob-1" />
       <div class="home-blob home-blob-2" />
 
       <div class="home-inner">
 
-        {/* Hero */}
         <section class="home-hero">
           <div class="home-badge">
             <span class="home-badge-dot" />
@@ -79,106 +159,52 @@ function HomeContent() {
           </p>
         </section>
 
-        {/* Prompt box */}
         <section class="home-prompt-section">
-          <div class="home-prompt-box">
-            <textarea
-              class="home-prompt-textarea"
-              placeholder="What do you want to build? e.g. A CRM with leads, companies, contacts, tasks, and deal stages."
-              rows={4}
-              value={prompt()}
-              onInput={(e) => setPrompt(e.currentTarget.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isStarting()}
-            />
-            <div class="home-prompt-footer">
-              <span class="home-prompt-hint">
-                <kbd class="kbd kbd-sm">⌘</kbd>
-                <kbd class="kbd kbd-sm">↵</kbd>
-                to send
-              </span>
-              <button
-                class="home-prompt-btn"
-                classList={{ 'home-prompt-btn-loading': isStarting() }}
-                onClick={startWithPrompt}
-                disabled={isStarting() || !prompt().trim()}
-              >
-                <Show when={isStarting()}>
-                  <span class="loading loading-spinner loading-xs" />
-                </Show>
-                <Show when={!isStarting()}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </Show>
-                Build it
-              </button>
-            </div>
-          </div>
-
+          <PromptBox
+            placeholder="What do you want to build? e.g. A CRM with leads, companies, contacts, tasks, and deal stages."
+            examples={EXAMPLE_PROMPTS}
+            submitLabel="Build it"
+            onSubmit={handleSubmit}
+          />
           <Show when={error()}>
             <div class="alert alert-error mt-3 max-w-2xl text-sm">
               <span>{error()}</span>
             </div>
           </Show>
-
-          {/* Example chips */}
-          <div class="home-chips">
-            <For each={EXAMPLE_PROMPTS}>
-              {(ex) => (
-                <button
-                  class="home-chip"
-                  onClick={() => setPrompt(ex)}
-                  disabled={isStarting()}
-                >
-                  {ex}
-                </button>
-              )}
-            </For>
-          </div>
         </section>
 
-        {/* Import options */}
         <section class="home-import-section">
           <div class="home-import-header">
             <span class="home-import-divider" />
             <span class="home-import-label">or start from existing data</span>
             <span class="home-import-divider" />
           </div>
-
           <div class="home-import-grid">
-            <div class="home-import-card">
-              <div class="home-import-icon home-import-icon-csv">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
-              </div>
-              <div class="home-import-text">
-                <h3>Upload CSV</h3>
-                <p>Import a CSV file and Nocodo will infer your schema from the headers and rows.</p>
-              </div>
-              <div class="home-import-soon">Soon</div>
-            </div>
-
-            <div class="home-import-card">
-              <div class="home-import-icon home-import-icon-excel">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="9"/><line x1="15" y1="15" x2="9" y2="9"/></svg>
-              </div>
-              <div class="home-import-text">
-                <h3>Upload Excel</h3>
-                <p>Bring in <code>.xlsx</code> workbooks — sheets become tables, columns stay intact.</p>
-              </div>
-              <div class="home-import-soon">Soon</div>
-            </div>
-
-            <div class="home-import-card">
-              <div class="home-import-icon home-import-icon-sheets">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-              </div>
-              <div class="home-import-text">
-                <h3>Connect Google Sheets</h3>
-                <p>Link a Google Sheet directly — live sync with your existing collaborative data.</p>
-              </div>
-              <div class="home-import-soon">Soon</div>
-            </div>
+            <ImportCard
+              theme="blue"
+              icon={<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>}
+              title="Upload CSV"
+              description="Import a CSV file and Nocodo will infer your schema from the headers and rows."
+              badge="Soon"
+            />
+            <ImportCard
+              theme="green"
+              icon={<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="9"/><line x1="15" y1="15" x2="9" y2="9"/></svg>}
+              title="Upload Excel"
+              description={<>Bring in <code>.xlsx</code> workbooks — sheets become tables, columns stay intact.</>}
+              badge="Soon"
+            />
+            <ImportCard
+              theme="orange"
+              icon={<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>}
+              title="Connect Google Sheets"
+              description="Link a Google Sheet directly — live sync with your existing collaborative data."
+              badge="Soon"
+            />
           </div>
         </section>
+
+        <RecentProjects />
 
       </div>
     </main>
