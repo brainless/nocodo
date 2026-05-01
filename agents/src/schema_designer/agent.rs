@@ -10,7 +10,7 @@ use shared_types::SchemaDef;
 
 use super::{
     prompts::system_prompt,
-    tools::StopAgentParams,
+    tools::{AskUserParams, StopAgentParams},
 };
 use crate::{
     error::AgentError,
@@ -34,6 +34,8 @@ pub enum AgentResponse {
     },
     /// Model called stop_agent because the request is outside its domain.
     Stopped(String),
+    /// Model called ask_user because it needs clarifying information.
+    Question(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +147,15 @@ impl SchemaDesignerAgent {
             )
             .build();
 
+        let ask_user_tool = Tool::from_type::<AskUserParams>()
+            .name("ask_user")
+            .description(
+                "Call this when you need clarifying information from the user before you \
+                 can design a proper schema. Provide your question in the question field. \
+                 You may use plain text or Markdown formatting.",
+            )
+            .build();
+
         let mut nudges: u32 = 0;
 
         loop {
@@ -174,7 +185,7 @@ impl SchemaDesignerAgent {
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
-                tools: Some(vec![generate_schema_tool.clone(), stop_agent_tool.clone()]),
+                tools: Some(vec![generate_schema_tool.clone(), stop_agent_tool.clone(), ask_user_tool.clone()]),
                 tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
             };
@@ -312,9 +323,9 @@ impl SchemaDesignerAgent {
                                 id: None,
                                 session_id,
                                 role: "assistant".to_string(),
-                                agent_type: Some(agent_type_str),
+                                agent_type: Some(agent_type_str.clone()),
                                 content: serde_json::to_string(tool_call.arguments())?,
-                                tool_call_id: Some(call_id),
+                                tool_call_id: Some(call_id.clone()),
                                 tool_name: Some("stop_agent".to_string()),
                                 turn_id: None,
                                 created_at: 0,
@@ -323,6 +334,44 @@ impl SchemaDesignerAgent {
 
                             log::info!("[Agent] Returning Stopped response");
                             return Ok(AgentResponse::Stopped(params.reply));
+                        }
+
+                        "ask_user" => {
+                            log::info!("[Agent] Processing ask_user tool call");
+                            let params: AskUserParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            log::info!("[Agent] Question: {}", params.question);
+
+                            let mut turn = Vec::new();
+                            if !assistant_text.is_empty() {
+                                turn.push(text_row(assistant_text.clone()));
+                            }
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "assistant".to_string(),
+                                agent_type: Some(agent_type_str.clone()),
+                                content: serde_json::to_string(tool_call.arguments())?,
+                                tool_call_id: Some(call_id.clone()),
+                                tool_name: Some("ask_user".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "tool".to_string(),
+                                agent_type: None,
+                                content: "Question sent to user. Awaiting user response.".to_string(),
+                                tool_call_id: Some(call_id),
+                                tool_name: Some("ask_user".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            self.storage.create_turn(turn).await?;
+
+                            log::info!("[Agent] Returning Question response");
+                            return Ok(AgentResponse::Question(params.question));
                         }
 
                         unknown => {

@@ -75,6 +75,19 @@ impl ResponseStorage {
         );
     }
 
+    pub async fn store_question(&self, message_id: i64, text: String) {
+        let mut responses = self.responses.write().await;
+        responses.insert(
+            message_id,
+            StoredResponse {
+                response_type: "question".to_string(),
+                text,
+                schema_json: None,
+                _completed: true,
+            },
+        );
+    }
+
     pub async fn get(&self, message_id: i64) -> Option<StoredResponse> {
         let responses = self.responses.read().await;
         responses.get(&message_id).cloned()

@@ -126,6 +126,9 @@ pub async fn send_chat_message(
                 AgentResponse::Stopped(text) => {
                     response_storage.store_stopped(user_msg_id, text).await;
                 }
+                AgentResponse::Question(text) => {
+                    response_storage.store_question(user_msg_id, text).await;
+                }
             },
             Err(e) => {
                 response_storage
@@ -212,19 +215,42 @@ pub async fn get_session_messages(
             let mut enriched = Vec::new();
             for m in messages {
                 let mut schema_version: Option<i64> = None;
-                if m.tool_name.as_deref() == Some("generate_schema") && m.role == "assistant" {
-                    match schema_storage
-                        .get_schema_version_by_json(session_id, &m.content)
-                        .await
-                    {
-                        Ok(v) => schema_version = v,
-                        Err(e) => log::warn!("Failed to lookup schema version: {}", e),
+                let mut content = m.content.clone();
+
+                if m.role == "assistant" {
+                    match m.tool_name.as_deref() {
+                        Some("generate_schema") => {
+                            match schema_storage
+                                .get_schema_version_by_json(session_id, &m.content)
+                                .await
+                            {
+                                Ok(v) => schema_version = v,
+                                Err(e) => log::warn!("Failed to lookup schema version: {}", e),
+                            }
+                            content = String::new(); // hide raw JSON, UI shows preview button
+                        }
+                        Some("ask_user") => {
+                            if let Ok(args) = serde_json::from_str::<serde_json::Value>(&m.content) {
+                                if let Some(q) = args.get("question").and_then(|v| v.as_str()) {
+                                    content = q.to_string();
+                                }
+                            }
+                        }
+                        Some("stop_agent") => {
+                            if let Ok(args) = serde_json::from_str::<serde_json::Value>(&m.content) {
+                                if let Some(r) = args.get("reply").and_then(|v| v.as_str()) {
+                                    content = r.to_string();
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
+
                 enriched.push(ChatHistoryMessage {
                     id: m.id.unwrap_or(0),
                     role: m.role,
-                    content: m.content,
+                    content,
                     created_at: m.created_at,
                     schema_version,
                 });
@@ -306,6 +332,7 @@ pub async fn get_message_response(
                         }
                     }
                     "stopped" => AgentResponsePayload::Stopped { text: stored.text },
+                    "question" => AgentResponsePayload::Question { text: stored.text },
                     _ => AgentResponsePayload::Pending,
                 };
 

@@ -3,4 +3,4 @@ pub mod prompts;
 pub mod tools;
 
 pub use agent::{AgentResponse, SchemaDesignerAgent};
-pub use tools::StopAgentParams;
+pub use tools::{AskUserParams, StopAgentParams};

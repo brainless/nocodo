@@ -14,3 +14,14 @@ pub struct StopAgentParams {
     /// Human-readable reply explaining why no schema was produced.
     pub reply: String,
 }
+
+/// Argument type for the `ask_user` tool.
+///
+/// The model calls this when it needs clarifying information from the user
+/// before it can design a proper schema. The question may be plain text or
+/// Markdown formatted.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AskUserParams {
+    /// The question to ask the user. May be plain text or Markdown.
+    pub question: String,
+}

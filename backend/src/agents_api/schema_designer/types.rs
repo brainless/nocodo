@@ -34,6 +34,8 @@ pub enum AgentResponsePayload {
     },
     #[serde(rename = "stopped")]
     Stopped { text: String },
+    #[serde(rename = "question")]
+    Question { text: String },
     #[serde(rename = "pending")]
     Pending,
 }
