@@ -1,4 +1,4 @@
-import { Show, createSignal } from 'solid-js';
+import { For, Show, createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { ProjectProvider, useProject } from '../contexts/ProjectContext';
 
@@ -9,6 +9,13 @@ function formatProjectTimestamp(): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
+
+const EXAMPLE_PROMPTS = [
+  'CRM with leads, companies, contacts, and deal stages',
+  'Project tracker with tasks, sprints, and team members',
+  'Inventory system with products, suppliers, and stock levels',
+  'Support desk with tickets, priorities, and SLA tracking',
+];
 
 function HomeContent() {
   const navigate = useNavigate();
@@ -36,80 +43,143 @@ function HomeContent() {
 
       if (!response.ok) throw new Error(`Failed to start schema designer: ${response.status}`);
 
-      navigate(`/projects/${project.id}`);
+      navigate(`/projects/${project.id}/db-developer`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start project');
       setIsStarting(false);
     }
   };
 
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      startWithPrompt();
+    }
+  };
+
   return (
-    <main class="min-h-screen bg-gradient-to-b from-base-200 to-base-100 p-6 md:p-10">
-      <div class="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <section class="hero rounded-box border border-base-300 bg-base-100 shadow-xl">
-          <div class="hero-content w-full flex-col gap-8 p-8 lg:flex-row lg:items-start lg:justify-between">
-            <div class="max-w-2xl">
-              <div class="badge badge-success badge-outline mb-4">Nocodo</div>
-              <h1 class="text-4xl font-bold leading-tight md:text-5xl">
-                Start a project from your workflow
-              </h1>
-              <p class="mt-4 text-base-content/80">
-                Describe your process in plain language. Nocodo turns that prompt into a spreadsheet-style software workspace using the schema designer agent.
-              </p>
-            </div>
+    <main class="home-page">
+      {/* Ambient background blobs */}
+      <div class="home-blob home-blob-1" />
+      <div class="home-blob home-blob-2" />
 
-            <div class="card w-full max-w-xl border border-base-300 bg-base-100">
-              <div class="card-body gap-4">
-                <h2 class="card-title">Prompt-based setup</h2>
-                <p class="text-sm text-base-content/70">Tell us what you want to build and we will create a new project and open it in Sheets.</p>
-                <textarea
-                  class="textarea textarea-bordered h-32"
-                  placeholder="Example: I need a CRM with leads, companies, contacts, tasks, and deal stages."
-                  value={prompt()}
-                  onInput={(e) => setPrompt(e.currentTarget.value)}
-                  disabled={isStarting()}
-                />
-                <Show when={error()}>
-                  <div class="alert alert-error text-sm"><span>{error()}</span></div>
+      <div class="home-inner">
+
+        {/* Hero */}
+        <section class="home-hero">
+          <div class="home-badge">
+            <span class="home-badge-dot" />
+            Nocodo
+          </div>
+          <h1 class="home-heading">
+            Your workflow,<br />built for you in seconds
+          </h1>
+          <p class="home-subheading">
+            Describe your process in plain language. Nocodo designs a spreadsheet workspace — tables, columns, relationships — and opens it ready to use.
+          </p>
+        </section>
+
+        {/* Prompt box */}
+        <section class="home-prompt-section">
+          <div class="home-prompt-box">
+            <textarea
+              class="home-prompt-textarea"
+              placeholder="What do you want to build? e.g. A CRM with leads, companies, contacts, tasks, and deal stages."
+              rows={4}
+              value={prompt()}
+              onInput={(e) => setPrompt(e.currentTarget.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isStarting()}
+            />
+            <div class="home-prompt-footer">
+              <span class="home-prompt-hint">
+                <kbd class="kbd kbd-sm">⌘</kbd>
+                <kbd class="kbd kbd-sm">↵</kbd>
+                to send
+              </span>
+              <button
+                class="home-prompt-btn"
+                classList={{ 'home-prompt-btn-loading': isStarting() }}
+                onClick={startWithPrompt}
+                disabled={isStarting() || !prompt().trim()}
+              >
+                <Show when={isStarting()}>
+                  <span class="loading loading-spinner loading-xs" />
                 </Show>
-                <button class="btn btn-success" onClick={startWithPrompt} disabled={isStarting() || !prompt().trim()}>
-                  <Show when={isStarting()}>
-                    <span class="loading loading-spinner loading-xs mr-2"></span>
-                  </Show>
-                  Start with Prompt
+                <Show when={!isStarting()}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </Show>
+                Build it
+              </button>
+            </div>
+          </div>
+
+          <Show when={error()}>
+            <div class="alert alert-error mt-3 max-w-2xl text-sm">
+              <span>{error()}</span>
+            </div>
+          </Show>
+
+          {/* Example chips */}
+          <div class="home-chips">
+            <For each={EXAMPLE_PROMPTS}>
+              {(ex) => (
+                <button
+                  class="home-chip"
+                  onClick={() => setPrompt(ex)}
+                  disabled={isStarting()}
+                >
+                  {ex}
                 </button>
+              )}
+            </For>
+          </div>
+        </section>
+
+        {/* Import options */}
+        <section class="home-import-section">
+          <div class="home-import-header">
+            <span class="home-import-divider" />
+            <span class="home-import-label">or start from existing data</span>
+            <span class="home-import-divider" />
+          </div>
+
+          <div class="home-import-grid">
+            <div class="home-import-card">
+              <div class="home-import-icon home-import-icon-csv">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
               </div>
+              <div class="home-import-text">
+                <h3>Upload CSV</h3>
+                <p>Import a CSV file and Nocodo will infer your schema from the headers and rows.</p>
+              </div>
+              <div class="home-import-soon">Soon</div>
+            </div>
+
+            <div class="home-import-card">
+              <div class="home-import-icon home-import-icon-excel">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="9"/><line x1="15" y1="15" x2="9" y2="9"/></svg>
+              </div>
+              <div class="home-import-text">
+                <h3>Upload Excel</h3>
+                <p>Bring in <code>.xlsx</code> workbooks — sheets become tables, columns stay intact.</p>
+              </div>
+              <div class="home-import-soon">Soon</div>
+            </div>
+
+            <div class="home-import-card">
+              <div class="home-import-icon home-import-icon-sheets">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+              </div>
+              <div class="home-import-text">
+                <h3>Connect Google Sheets</h3>
+                <p>Link a Google Sheet directly — live sync with your existing collaborative data.</p>
+              </div>
+              <div class="home-import-soon">Soon</div>
             </div>
           </div>
         </section>
 
-        <section>
-          <h2 class="mb-4 text-xl font-semibold">Other ways to start (coming soon)</h2>
-          <div class="grid gap-4 md:grid-cols-3">
-            <div class="card border border-base-300 bg-base-100">
-              <div class="card-body">
-                <h3 class="card-title text-lg">Upload CSV</h3>
-                <p class="text-sm text-base-content/70">Bring your workflow from a CSV file.</p>
-                <button class="btn btn-outline btn-disabled">Upload CSV</button>
-              </div>
-            </div>
-            <div class="card border border-base-300 bg-base-100">
-              <div class="card-body">
-                <h3 class="card-title text-lg">Upload Excel</h3>
-                <p class="text-sm text-base-content/70">Import from `.xlsx` spreadsheets.</p>
-                <button class="btn btn-outline btn-disabled">Upload Excel</button>
-              </div>
-            </div>
-            <div class="card border border-base-300 bg-base-100">
-              <div class="card-body">
-                <h3 class="card-title text-lg">Connect Google Sheet</h3>
-                <p class="text-sm text-base-content/70">Link a Google Sheet as your starting point.</p>
-                <button class="btn btn-outline btn-disabled">Connect Google Sheet</button>
-              </div>
-            </div>
-          </div>
-          <p class="mt-3 text-sm text-base-content/60">CSV, Excel, and Google Sheets import UI is placeholder-only in this version.</p>
-        </section>
       </div>
     </main>
   );
