@@ -253,3 +253,57 @@ pub struct HeartbeatResponse {
     pub status: String,
     pub service: String,
 }
+
+// ============================================================================
+// Agent Task/Epic API Types
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TaskItem {
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub project_id: i64,
+    #[ts(type = "number | null")]
+    pub epic_id: Option<i64>,
+    pub title: String,
+    pub source_prompt: String,
+    pub assigned_to_agent: String,
+    pub status: String,
+    #[ts(type = "number")]
+    pub created_at: i64,
+    #[ts(type = "number")]
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ListTasksResponse {
+    pub tasks: Vec<TaskItem>,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EpicItem {
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub title: String,
+    pub description: String,
+    pub status: String,
+    pub created_by_agent: String,
+    #[ts(type = "number | null")]
+    pub created_by_task_id: Option<i64>,
+    #[ts(type = "number")]
+    pub created_at: i64,
+    #[ts(type = "number")]
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ListEpicsResponse {
+    pub epics: Vec<EpicItem>,
+}

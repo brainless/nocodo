@@ -35,6 +35,7 @@ pub struct Epic {
     pub source_prompt: String,
     pub status: EpicStatus,
     pub created_by_agent: String,
+    pub created_by_task_id: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }

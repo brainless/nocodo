@@ -147,3 +147,15 @@ export type ListProjectsResponse = { projects: Array<Project>, };
 
 
 export type HeartbeatResponse = { status: string, service: string, };
+
+
+export type TaskItem = { id: number, project_id: number, epic_id: number | null, title: string, source_prompt: string, assigned_to_agent: string, status: string, created_at: number, updated_at: number, };
+
+
+export type ListTasksResponse = { tasks: Array<TaskItem>, };
+
+
+export type EpicItem = { id: number, project_id: number, title: string, description: string, status: string, created_by_agent: string, created_by_task_id: number | null, created_at: number, updated_at: number, };
+
+
+export type ListEpicsResponse = { epics: Array<EpicItem>, };

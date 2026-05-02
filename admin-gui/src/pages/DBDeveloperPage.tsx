@@ -147,13 +147,13 @@ function DBDeveloperContent() {
   };
 
   const fetchPreviewSchema = async (version?: number) => {
-    const session = chat.selectedSession();
-    if (!session) return;
+    const task = chat.selectedTask();
+    if (!task) return;
     setPreviewLoading(true);
     try {
       const url = version
-        ? `${API_BASE_URL}/api/agents/schema-designer/sessions/${session.id}/schema?version=${version}`
-        : `${API_BASE_URL}/api/agents/schema-designer/sessions/${session.id}/schema`;
+        ? `${API_BASE_URL}/api/agents/schema-designer/tasks/${task.id}/schema?version=${version}`
+        : `${API_BASE_URL}/api/agents/schema-designer/tasks/${task.id}/schema`;
       const response = await fetch(url);
       if (!response.ok) {
         const err = await response.json() as { error?: string };

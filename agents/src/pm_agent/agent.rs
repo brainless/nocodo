@@ -256,6 +256,7 @@ impl PmAgent {
                                     source_prompt: params.description.clone(),
                                     status: EpicStatus::Open,
                                     created_by_agent: agent_type_str.clone(),
+                                    created_by_task_id: Some(task_id),
                                     created_at: now,
                                     updated_at: now,
                                 })

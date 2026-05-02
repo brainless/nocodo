@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use shared_types::SchemaDef;
+pub use shared_types::{EpicItem, ListEpicsResponse, ListTasksResponse, TaskItem};
 
 #[derive(Debug, Deserialize)]
 pub struct ChatRequest {
@@ -66,21 +67,9 @@ pub struct ListTasksQuery {
     pub project_id: i64,
 }
 
-#[derive(Debug, Serialize)]
-pub struct TaskItem {
-    pub id: i64,
+#[derive(Debug, Deserialize)]
+pub struct EpicListQuery {
     pub project_id: i64,
-    pub epic_id: Option<i64>,
-    pub title: String,
-    pub source_prompt: String,
-    pub assigned_to_agent: String,
-    pub status: String,
-    pub created_at: i64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ListTasksResponse {
-    pub tasks: Vec<TaskItem>,
 }
 
 #[derive(Debug, Serialize)]

@@ -148,8 +148,14 @@ export type ListProjectsResponse = { projects: Array<Project>, };
 
 export type HeartbeatResponse = { status: string, service: string, };
 
-// Agent API types (not generated from shared-types yet)
-export type SessionItem = { id: number, project_id: number, agent_type: string, created_at: number, };
-export type ListSessionsResponse = { sessions: Array<SessionItem>, };
-export type ChatHistoryMessage = { id: number, role: string, content: string, created_at: number, schema_version: number | null, };
-export type ChatHistoryResponse = { session_id: number, messages: Array<ChatHistoryMessage>, };
+
+export type TaskItem = { id: number, project_id: number, epic_id: number | null, title: string, source_prompt: string, assigned_to_agent: string, status: string, created_at: number, updated_at: number, };
+
+
+export type ListTasksResponse = { tasks: Array<TaskItem>, };
+
+
+export type EpicItem = { id: number, project_id: number, title: string, description: string, status: string, created_by_agent: string, created_by_task_id: number | null, created_at: number, updated_at: number, };
+
+
+export type ListEpicsResponse = { epics: Array<EpicItem>, };

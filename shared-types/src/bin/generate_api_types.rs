@@ -1,8 +1,9 @@
 use shared_types::{
     Column, ColumnDef, ColumnDisplay, CreateProjectRequest, CreateProjectResponse, DataType,
-    ForeignKey, ForeignKeyDef, GetSchemaResponse, GetTableColumnsResponse, GetTableDataResponse,
-    HeartbeatResponse, ListProjectsResponse, ListSchemasResponse, PaginationInfo, Project, Schema,
-    SchemaDef, Table, TableDataResult, TableDef,
+    EpicItem, ForeignKey, ForeignKeyDef, GetSchemaResponse, GetTableColumnsResponse,
+    GetTableDataResponse, HeartbeatResponse, ListEpicsResponse, ListProjectsResponse,
+    ListSchemasResponse, ListTasksResponse, PaginationInfo, Project, Schema, SchemaDef, Table,
+    TableDataResult, TableDef, TaskItem,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -52,6 +53,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Misc
     export_type!(HeartbeatResponse);
+
+    // Agent Task/Epic API types
+    export_type!(TaskItem);
+    export_type!(ListTasksResponse);
+    export_type!(EpicItem);
+    export_type!(ListEpicsResponse);
 
     let output_content = types.join("\n\n");
 

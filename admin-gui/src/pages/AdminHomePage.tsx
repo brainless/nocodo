@@ -4,7 +4,7 @@ import { ProjectProvider, useProject } from '../contexts/ProjectContext';
 import { PromptBox } from '../components/PromptBox';
 import { ImportCard } from '../components/ImportCard';
 import { ContentCard } from '../components/ContentCard';
-import type { Project, ListSessionsResponse, ChatHistoryResponse } from '../types/api';
+import type { Project, ListTasksResponse } from '../types/api';
 
 const API_BASE_URL = '';
 
@@ -49,28 +49,21 @@ function RecentProjects() {
     setLoading(true);
     void (async () => {
       try {
-        const sessionData = await Promise.all(
+        const taskData = await Promise.all(
           ps.map(p =>
-            fetch(`${API_BASE_URL}/api/agents/sessions?project_id=${p.id}`)
-              .then(r => r.json() as Promise<ListSessionsResponse>)
-              .catch(() => ({ sessions: [] } as ListSessionsResponse))
+            fetch(`${API_BASE_URL}/api/agents/tasks?project_id=${p.id}`)
+              .then(r => r.json() as Promise<ListTasksResponse>)
+              .catch(() => ({ tasks: [] } as ListTasksResponse))
           )
         );
 
-        const withContext = await Promise.all(
-          ps.map(async (project, i) => {
-            const sessions = sessionData[i].sessions;
-            if (!sessions.length) return { project, firstPrompt: null };
-            try {
-              const r = await fetch(`${API_BASE_URL}/api/agents/schema-designer/sessions/${sessions[0].id}/messages`);
-              const data = await r.json() as ChatHistoryResponse;
-              const first = data.messages.find(m => m.role === 'user');
-              return { project, firstPrompt: first?.content ?? null };
-            } catch {
-              return { project, firstPrompt: null };
-            }
-          })
-        );
+        const withContext = ps.map((project, i) => {
+          const tasks = taskData[i].tasks ?? [];
+          const latest = tasks
+            .filter(t => t.assigned_to_agent === 'schema_designer')
+            .sort((a, b) => b.created_at - a.created_at)[0];
+          return { project, firstPrompt: latest?.source_prompt ?? null };
+        });
 
         setItems(withContext);
       } finally {

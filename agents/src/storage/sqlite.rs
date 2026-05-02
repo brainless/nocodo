@@ -272,8 +272,9 @@ fn map_epic(row: &rusqlite::Row<'_>) -> rusqlite::Result<Epic> {
         source_prompt: row.get(4)?,
         status: EpicStatus::from_str(&row.get::<_, String>(5)?),
         created_by_agent: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
+        created_by_task_id: row.get(7)?,
+        created_at: row.get(8)?,
+        updated_at: row.get(9)?,
     })
 }
 
@@ -385,8 +386,8 @@ impl TaskStorage for SqliteTaskStorage {
         conn.execute(
             "INSERT INTO epic
                  (project_id, title, description, source_prompt, status, created_by_agent,
-                  created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                  created_by_task_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 epic.project_id,
                 epic.title,
@@ -394,6 +395,7 @@ impl TaskStorage for SqliteTaskStorage {
                 epic.source_prompt,
                 epic.status.as_str(),
                 epic.created_by_agent,
+                epic.created_by_task_id,
                 created_at,
                 updated_at,
             ],
@@ -415,7 +417,7 @@ impl TaskStorage for SqliteTaskStorage {
         let epic = conn
             .query_row(
                 "SELECT id, project_id, title, description, source_prompt, status,
-                        created_by_agent, created_at, updated_at
+                        created_by_agent, created_by_task_id, created_at, updated_at
                  FROM epic WHERE id = ?1 LIMIT 1",
                 params![epic_id],
                 map_epic,
@@ -428,7 +430,7 @@ impl TaskStorage for SqliteTaskStorage {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, project_id, title, description, source_prompt, status,
-                    created_by_agent, created_at, updated_at
+                    created_by_agent, created_by_task_id, created_at, updated_at
              FROM epic WHERE project_id = ?1 ORDER BY id ASC",
         )?;
         let epics = stmt

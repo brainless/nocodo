@@ -1,8 +1,8 @@
 use crate::agents_api::state::AgentState;
 use crate::agents_api::schema_designer::types::{
     AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
-    ListTasksQuery, ListTasksResponse, MessageResponse, SchemaCodegenResponse, SchemaPreviewQuery,
-    SchemaPreviewResponse, TaskItem,
+    EpicItem, EpicListQuery, ListEpicsResponse, ListTasksQuery, ListTasksResponse, MessageResponse,
+    SchemaCodegenResponse, SchemaPreviewQuery, SchemaPreviewResponse, TaskItem,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
@@ -228,11 +228,50 @@ pub async fn list_tasks(
                     assigned_to_agent: t.assigned_to_agent,
                     status: t.status.as_str().to_string(),
                     created_at: t.created_at,
+                    updated_at: t.updated_at,
                 })
                 .collect(),
         }),
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": format!("Failed to list tasks: {}", e)
+        })),
+    }
+}
+
+/// GET /api/agents/epics?project_id=X
+#[get("/api/agents/epics")]
+pub async fn list_epics(
+    state: web::Data<AgentState>,
+    query: web::Query<EpicListQuery>,
+) -> impl Responder {
+    let task_storage = match SqliteTaskStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to open task storage: {}", e)
+            }));
+        }
+    };
+
+    match task_storage.list_epics(query.project_id).await {
+        Ok(epics) => HttpResponse::Ok().json(ListEpicsResponse {
+            epics: epics
+                .into_iter()
+                .map(|e| EpicItem {
+                    id: e.id.unwrap_or(0),
+                    project_id: e.project_id,
+                    title: e.title,
+                    description: e.description,
+                    status: e.status.as_str().to_string(),
+                    created_by_agent: e.created_by_agent,
+                    created_by_task_id: e.created_by_task_id,
+                    created_at: e.created_at,
+                    updated_at: e.updated_at,
+                })
+                .collect(),
+        }),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Failed to list epics: {}", e)
         })),
     }
 }
