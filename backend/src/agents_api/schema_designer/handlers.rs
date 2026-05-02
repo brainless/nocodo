@@ -166,7 +166,7 @@ pub async fn send_chat_message(
             }
         };
 
-        match agent.chat_with_session(session_id, false).await {
+        match agent.chat_with_session(session_id, actual_task_id, false).await {
             Ok(response) => match response {
                 AgentResponse::Text(text) => {
                     response_storage.store_text(user_msg_id, text).await;

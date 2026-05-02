@@ -25,3 +25,13 @@ pub struct AskUserParams {
     /// The question to ask the user. May be plain text or Markdown.
     pub question: String,
 }
+
+/// Argument type for the `update_task_status` tool.
+///
+/// The model calls this to record a status transition on the current task.
+/// Valid status values: "in_progress", "review", "done", "blocked".
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct UpdateTaskStatusParams {
+    /// New task status. Must be one of: "in_progress", "review", "done", "blocked".
+    pub status: String,
+}

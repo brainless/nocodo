@@ -10,11 +10,11 @@ use shared_types::SchemaDef;
 
 use super::{
     prompts::system_prompt,
-    tools::{AskUserParams, StopAgentParams},
+    tools::{AskUserParams, StopAgentParams, UpdateTaskStatusParams},
 };
 use crate::{
     error::AgentError,
-    storage::{AgentStorage, AgentType, ChatMessage, SchemaStorage},
+    storage::{AgentStorage, AgentType, ChatMessage, SchemaStorage, TaskStatus, TaskStorage},
 };
 const MAX_NUDGES: u32 = 3;
 
@@ -46,6 +46,7 @@ pub struct SchemaDesignerAgent {
     llm_client: Arc<dyn LlmClient>,
     storage: Arc<dyn AgentStorage>,
     schema_storage: Arc<dyn SchemaStorage>,
+    task_storage: Arc<dyn TaskStorage>,
     model: String,
     project_id: i64,
 }
@@ -55,6 +56,7 @@ impl SchemaDesignerAgent {
         llm_client: Arc<dyn LlmClient>,
         storage: Arc<dyn AgentStorage>,
         schema_storage: Arc<dyn SchemaStorage>,
+        task_storage: Arc<dyn TaskStorage>,
         model: impl Into<String>,
         project_id: i64,
     ) -> Self {
@@ -62,6 +64,7 @@ impl SchemaDesignerAgent {
             llm_client,
             storage,
             schema_storage,
+            task_storage,
             model: model.into(),
             project_id,
         }
@@ -73,9 +76,10 @@ impl SchemaDesignerAgent {
     pub async fn chat_with_session(
         &self,
         session_id: i64,
+        task_id: i64,
         preview_mode: bool,
     ) -> Result<AgentResponse, AgentError> {
-        self.run_loop(session_id, preview_mode).await
+        self.run_loop(session_id, task_id, preview_mode).await
     }
 
     // -----------------------------------------------------------------------
@@ -85,6 +89,7 @@ impl SchemaDesignerAgent {
     async fn run_loop(
         &self,
         session_id: i64,
+        task_id: i64,
         preview_mode: bool,
     ) -> Result<AgentResponse, AgentError> {
         let generate_schema_tool = Tool::from_type::<SchemaDef>()
@@ -111,6 +116,16 @@ impl SchemaDesignerAgent {
                 "Call this when you need clarifying information from the user before you \
                  can design a proper schema. Provide your question in the question field. \
                  You may use plain text or Markdown formatting.",
+            )
+            .build();
+
+        let update_task_status_tool = Tool::from_type::<UpdateTaskStatusParams>()
+            .name("update_task_status")
+            .description(
+                "Update the status of the current task. Call with \"in_progress\" when \
+                 you begin designing, \"review\" when the schema is ready for user review, \
+                 \"done\" when the user has confirmed the schema, \"blocked\" when you \
+                 cannot proceed without information or action outside your scope.",
             )
             .build();
 
@@ -143,7 +158,12 @@ impl SchemaDesignerAgent {
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
-                tools: Some(vec![generate_schema_tool.clone(), stop_agent_tool.clone(), ask_user_tool.clone()]),
+                tools: Some(vec![
+                    generate_schema_tool.clone(),
+                    stop_agent_tool.clone(),
+                    ask_user_tool.clone(),
+                    update_task_status_tool.clone(),
+                ]),
                 tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
             };
@@ -270,6 +290,16 @@ impl SchemaDesignerAgent {
                             });
                             self.storage.create_turn(turn).await?;
 
+                            if !preview_mode {
+                                if let Err(e) = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Done)
+                                    .await
+                                {
+                                    log::warn!("[Agent] Failed to update task status to Done: {}", e);
+                                }
+                            }
+
                             log::info!("[Agent] Returning SchemaGenerated response");
                             return Ok(AgentResponse::SchemaGenerated {
                                 text: assistant_text,
@@ -301,8 +331,65 @@ impl SchemaDesignerAgent {
                             });
                             self.storage.create_turn(turn).await?;
 
+                            if let Err(e) = self
+                                .task_storage
+                                .update_task_status(task_id, TaskStatus::Blocked)
+                                .await
+                            {
+                                log::warn!("[Agent] Failed to update task status to Blocked: {}", e);
+                            }
+
                             log::info!("[Agent] Returning Stopped response");
                             return Ok(AgentResponse::Stopped(params.reply));
+                        }
+
+                        "update_task_status" => {
+                            log::info!("[Agent] Processing update_task_status tool call");
+                            let params: UpdateTaskStatusParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            log::info!("[Agent] Requested status: {}", params.status);
+
+                            let new_status = TaskStatus::from_str(&params.status);
+                            let result_text = match self
+                                .task_storage
+                                .update_task_status(task_id, new_status)
+                                .await
+                            {
+                                Ok(()) => format!("Task status updated to {}.", params.status),
+                                Err(e) => {
+                                    log::warn!("[Agent] update_task_status failed: {}", e);
+                                    format!("Failed to update task status: {}", e)
+                                }
+                            };
+
+                            let mut turn = Vec::new();
+                            if !assistant_text.is_empty() {
+                                turn.push(text_row(assistant_text.clone()));
+                            }
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "assistant".to_string(),
+                                agent_type: Some(agent_type_str.clone()),
+                                content: serde_json::to_string(tool_call.arguments())?,
+                                tool_call_id: Some(call_id.clone()),
+                                tool_name: Some("update_task_status".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "tool".to_string(),
+                                agent_type: None,
+                                content: result_text,
+                                tool_call_id: Some(call_id),
+                                tool_name: Some("update_task_status".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            self.storage.create_turn(turn).await?;
+                            // Continue the loop — LLM will produce a follow-up text response.
                         }
 
                         "ask_user" => {

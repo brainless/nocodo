@@ -135,13 +135,18 @@ async fn main() -> std::io::Result<()> {
             .app_data(agent_state.clone())
             .app_data(schema_cache.clone())
             .service(heartbeat)
-            // Agent API routes
+            // Agent API routes — shared
             .service(agents_api::schema_designer::list_tasks)
+            // DB Developer (schema_designer) routes
             .service(agents_api::schema_designer::send_chat_message)
             .service(agents_api::schema_designer::get_task_messages)
             .service(agents_api::schema_designer::get_task_schema)
             .service(agents_api::schema_designer::get_message_response)
             .service(agents_api::schema_designer::generate_task_schema_code)
+            // PM Agent routes
+            .service(agents_api::pm_agent::send_pm_chat_message)
+            .service(agents_api::pm_agent::get_pm_message_response)
+            .service(agents_api::pm_agent::get_pm_task_messages)
             // Project API routes
             .service(projects_api::handlers::list_projects)
             .service(projects_api::handlers::create_project)

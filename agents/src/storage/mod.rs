@@ -10,12 +10,14 @@ use crate::error::AgentError;
 
 pub enum AgentType {
     SchemaDesigner,
+    ProjectManager,
 }
 
 impl AgentType {
     pub fn as_str(&self) -> &'static str {
         match self {
             AgentType::SchemaDesigner => "schema_designer",
+            AgentType::ProjectManager => "project_manager",
         }
     }
 }

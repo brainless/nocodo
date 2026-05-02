@@ -5,6 +5,7 @@ use crate::error::AgentError;
 /// Provider identifier constants — mirror llm_sdk::providers
 pub const PROVIDER_OPENAI: &str = "openai";
 pub const PROVIDER_ANTHROPIC: &str = "anthropic";
+pub const PROVIDER_GROQ: &str = "groq";
 
 /// Runtime configuration for an agent: which LLM to use and how to authenticate.
 #[derive(Debug, Clone)]
@@ -15,31 +16,42 @@ pub struct AgentConfig {
 }
 
 impl AgentConfig {
-    /// Load from environment variables, falling back to project.conf.
+    /// Load DB-developer agent config from environment / project.conf.
     ///
-    /// Keys read:
-    ///   AGENT_PROVIDER  (default: "openai")
-    ///   AGENT_MODEL     (default: llm_sdk::models::openai::GPT_5_MINI_ID)
-    ///   OPENAI_API_KEY  — required when provider is "openai"
-    ///   ANTHROPIC_API_KEY — required when provider is "anthropic"
+    /// Keys read: AGENT_PROVIDER, AGENT_MODEL, OPENAI_API_KEY / ANTHROPIC_API_KEY / GROQ_API_KEY
     pub fn load() -> Result<Self, AgentError> {
-        let provider = std::env::var("AGENT_PROVIDER")
+        Self::load_from_prefix("AGENT")
+    }
+
+    /// Load PM agent config from environment / project.conf.
+    ///
+    /// Keys read: PM_AGENT_PROVIDER (default: "groq"), PM_AGENT_MODEL,
+    /// GROQ_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY
+    /// Falls back to AGENT_* keys if PM_AGENT_* are absent.
+    pub fn load_pm() -> Result<Self, AgentError> {
+        let provider = std::env::var("PM_AGENT_PROVIDER")
             .ok()
+            .or_else(|| read_project_conf("PM_AGENT_PROVIDER"))
+            .or_else(|| std::env::var("AGENT_PROVIDER").ok())
             .or_else(|| read_project_conf("AGENT_PROVIDER"))
-            .unwrap_or_else(|| PROVIDER_OPENAI.to_string());
+            .unwrap_or_else(|| PROVIDER_GROQ.to_string());
 
         let default_model = match provider.as_str() {
             PROVIDER_ANTHROPIC => llm_sdk::models::claude::SONNET_4_5_ID.to_string(),
+            PROVIDER_GROQ => llm_sdk::models::groq::GPT_OSS_120B_ID.to_string(),
             _ => llm_sdk::models::openai::GPT_5_MINI_ID.to_string(),
         };
 
-        let model = std::env::var("AGENT_MODEL")
+        let model = std::env::var("PM_AGENT_MODEL")
             .ok()
+            .or_else(|| read_project_conf("PM_AGENT_MODEL"))
+            .or_else(|| std::env::var("AGENT_MODEL").ok())
             .or_else(|| read_project_conf("AGENT_MODEL"))
             .unwrap_or(default_model);
 
         let key_name = match provider.as_str() {
             PROVIDER_ANTHROPIC => "ANTHROPIC_API_KEY",
+            PROVIDER_GROQ => "GROQ_API_KEY",
             _ => "OPENAI_API_KEY",
         };
 
@@ -53,11 +65,46 @@ impl AgentConfig {
                 ))
             })?;
 
-        Ok(AgentConfig {
-            provider,
-            model,
-            api_key,
-        })
+        Ok(AgentConfig { provider, model, api_key })
+    }
+
+    fn load_from_prefix(prefix: &str) -> Result<Self, AgentError> {
+        let provider_key = format!("{}_PROVIDER", prefix);
+        let model_key = format!("{}_MODEL", prefix);
+
+        let provider = std::env::var(&provider_key)
+            .ok()
+            .or_else(|| read_project_conf(&provider_key))
+            .unwrap_or_else(|| PROVIDER_OPENAI.to_string());
+
+        let default_model = match provider.as_str() {
+            PROVIDER_ANTHROPIC => llm_sdk::models::claude::SONNET_4_5_ID.to_string(),
+            PROVIDER_GROQ => llm_sdk::models::groq::GPT_OSS_120B_ID.to_string(),
+            _ => llm_sdk::models::openai::GPT_5_MINI_ID.to_string(),
+        };
+
+        let model = std::env::var(&model_key)
+            .ok()
+            .or_else(|| read_project_conf(&model_key))
+            .unwrap_or(default_model);
+
+        let key_name = match provider.as_str() {
+            PROVIDER_ANTHROPIC => "ANTHROPIC_API_KEY",
+            PROVIDER_GROQ => "GROQ_API_KEY",
+            _ => "OPENAI_API_KEY",
+        };
+
+        let api_key = std::env::var(key_name)
+            .ok()
+            .or_else(|| read_project_conf(key_name))
+            .ok_or_else(|| {
+                AgentError::Config(format!(
+                    "{} not set — add it to environment or project.conf",
+                    key_name
+                ))
+            })?;
+
+        Ok(AgentConfig { provider, model, api_key })
     }
 }
 
