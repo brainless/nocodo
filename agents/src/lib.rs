@@ -6,20 +6,21 @@ pub mod storage;
 pub use config::AgentConfig;
 pub use error::AgentError;
 pub use schema_designer::{AgentResponse, SchemaDesignerAgent, StopAgentParams};
-pub use storage::sqlite::{SqliteAgentStorage, SqliteSchemaStorage};
-pub use storage::{AgentStorage, AgentType, ChatMessage, SchemaStorage, Session};
+pub use storage::sqlite::{SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage};
+pub use storage::{
+    AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, SchemaStorage, Session, Task,
+    TaskStatus, TaskStorage,
+};
 
 // ---------------------------------------------------------------------------
-// Factory helpers
+// Factory helper
 // ---------------------------------------------------------------------------
 
 use std::sync::Arc;
 
-/// Build a `SchemaDesignerAgent` from config + SQLite connection paths.
-///
-/// `db_path` should be the same SQLite file used by the backend (contains the
-/// migrated tables).  The same file can be opened concurrently; each storage
-/// wrapper holds its own connection.
+/// Build a `SchemaDesignerAgent` from config + SQLite path.
+/// The caller is responsible for creating the task and session before calling
+/// `agent.chat_with_session(session_id, preview_mode)`.
 pub fn build_schema_designer(
     config: &AgentConfig,
     db_path: &str,

@@ -3,7 +3,10 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension};
 
-use super::{AgentStorage, ChatMessage, SchemaStorage, Session};
+use super::{
+    AgentStorage, ChatMessage, Epic, EpicStatus, SchemaStorage, Session, Task, TaskStatus,
+    TaskStorage,
+};
 use crate::error::AgentError;
 
 fn now() -> i64 {
@@ -33,74 +36,36 @@ impl SqliteAgentStorage {
         Ok(Self::new(conn))
     }
 
-    pub async fn create_session(
-        &self,
-        project_id: i64,
-        agent_type: &str,
-    ) -> Result<Session, AgentError> {
-        let created_at = now();
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO agent_chat_session (project_id, agent_type, created_at)
-             VALUES (?1, ?2, ?3)",
-            params![project_id, agent_type, created_at],
-        )?;
-        let id = conn.last_insert_rowid();
-        Ok(Session {
-            id: Some(id),
-            project_id,
-            agent_type: agent_type.to_string(),
-            created_at,
-        })
-    }
-
     pub async fn list_sessions(
         &self,
         project_id: i64,
         agent_type: Option<&str>,
     ) -> Result<Vec<Session>, AgentError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = match agent_type {
+        let sessions = match agent_type {
             Some(at) => {
-                let mut s = conn.prepare(
-                    "SELECT id, project_id, agent_type, created_at
+                let mut stmt = conn.prepare(
+                    "SELECT id, project_id, agent_type, task_id, created_at
                      FROM agent_chat_session
                      WHERE project_id = ?1 AND agent_type = ?2
                      ORDER BY id ASC",
                 )?;
-                let rows = s.query_map(params![project_id, at], |row| {
-                    Ok(Session {
-                        id: Some(row.get(0)?),
-                        project_id: row.get(1)?,
-                        agent_type: row.get(2)?,
-                        created_at: row.get(3)?,
-                    })
-                })?;
-                let mut sessions = Vec::new();
-                for row in rows {
-                    sessions.push(row?);
-                }
-                return Ok(sessions);
+                let rows = stmt.query_map(params![project_id, at], map_session)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
             }
-            None => conn.prepare(
-                "SELECT id, project_id, agent_type, created_at
-                 FROM agent_chat_session
-                 WHERE project_id = ?1
-                 ORDER BY id ASC",
-            )?,
+            None => {
+                let mut stmt = conn.prepare(
+                    "SELECT id, project_id, agent_type, task_id, created_at
+                     FROM agent_chat_session
+                     WHERE project_id = ?1
+                     ORDER BY id ASC",
+                )?;
+                let rows = stmt.query_map(params![project_id], map_session)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
+            }
         };
-        let rows = stmt.query_map(params![project_id], |row| {
-            Ok(Session {
-                id: Some(row.get(0)?),
-                project_id: row.get(1)?,
-                agent_type: row.get(2)?,
-                created_at: row.get(3)?,
-            })
-        })?;
-        let mut sessions = Vec::new();
-        for row in rows {
-            sessions.push(row?);
-        }
         Ok(sessions)
     }
 
@@ -108,68 +73,68 @@ impl SqliteAgentStorage {
         let conn = self.conn.lock().unwrap();
         let session = conn
             .query_row(
-                "SELECT id, project_id, agent_type, created_at
-                 FROM agent_chat_session
-                 WHERE id = ?1
-                 LIMIT 1",
+                "SELECT id, project_id, agent_type, task_id, created_at
+                 FROM agent_chat_session WHERE id = ?1 LIMIT 1",
                 params![session_id],
-                |row| {
-                    Ok(Session {
-                        id: Some(row.get(0)?),
-                        project_id: row.get(1)?,
-                        agent_type: row.get(2)?,
-                        created_at: row.get(3)?,
-                    })
-                },
+                map_session,
             )
             .optional()?;
         Ok(session)
     }
 }
 
+fn map_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<Session> {
+    Ok(Session {
+        id: Some(row.get(0)?),
+        project_id: row.get(1)?,
+        agent_type: row.get(2)?,
+        task_id: row.get(3)?,
+        created_at: row.get(4)?,
+    })
+}
+
 #[async_trait]
 impl AgentStorage for SqliteAgentStorage {
-    async fn get_or_create_session(
+    async fn create_task_session(
         &self,
         project_id: i64,
+        task_id: i64,
         agent_type: &str,
     ) -> Result<Session, AgentError> {
-        let conn = self.conn.lock().unwrap();
-        let existing = conn
-            .query_row(
-                "SELECT id, project_id, agent_type, created_at
-                 FROM agent_chat_session
-                 WHERE project_id = ?1 AND agent_type = ?2
-                 LIMIT 1",
-                params![project_id, agent_type],
-                |row| {
-                    Ok(Session {
-                        id: Some(row.get(0)?),
-                        project_id: row.get(1)?,
-                        agent_type: row.get(2)?,
-                        created_at: row.get(3)?,
-                    })
-                },
-            )
-            .optional()?;
-
-        if let Some(session) = existing {
-            return Ok(session);
-        }
-
         let created_at = now();
+        let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO agent_chat_session (project_id, agent_type, created_at)
-             VALUES (?1, ?2, ?3)",
-            params![project_id, agent_type, created_at],
+            "INSERT INTO agent_chat_session (project_id, agent_type, task_id, created_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![project_id, agent_type, task_id, created_at],
         )?;
         let id = conn.last_insert_rowid();
         Ok(Session {
             id: Some(id),
             project_id,
             agent_type: agent_type.to_string(),
+            task_id,
             created_at,
         })
+    }
+
+    async fn get_session_by_task(
+        &self,
+        task_id: i64,
+        agent_type: &str,
+    ) -> Result<Option<Session>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let session = conn
+            .query_row(
+                "SELECT id, project_id, agent_type, task_id, created_at
+                 FROM agent_chat_session
+                 WHERE task_id = ?1 AND agent_type = ?2
+                 LIMIT 1",
+                params![task_id, agent_type],
+                map_session,
+            )
+            .optional()?;
+        Ok(session)
     }
 
     async fn create_message(&self, msg: ChatMessage) -> Result<i64, AgentError> {
@@ -199,7 +164,6 @@ impl AgentStorage for SqliteAgentStorage {
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
 
-        // Insert first row with placeholder turn_id, then patch it with its own id.
         let first = &messages[0];
         let created_at = now();
         tx.execute(
@@ -242,24 +206,235 @@ impl AgentStorage for SqliteAgentStorage {
              WHERE session_id = ?1
              ORDER BY id ASC",
         )?;
-        let rows = stmt.query_map(params![session_id], |row| {
-            Ok(ChatMessage {
-                id: Some(row.get(0)?),
-                session_id: row.get(1)?,
-                role: row.get(2)?,
-                agent_type: row.get(3)?,
-                content: row.get(4)?,
-                tool_call_id: row.get(5)?,
-                tool_name: row.get(6)?,
-                turn_id: row.get(7)?,
-                created_at: row.get(8)?,
-            })
-        })?;
-        let mut messages = Vec::new();
-        for row in rows {
-            messages.push(row?);
-        }
+        let messages = stmt
+            .query_map(params![session_id], |row| {
+                Ok(ChatMessage {
+                    id: Some(row.get(0)?),
+                    session_id: row.get(1)?,
+                    role: row.get(2)?,
+                    agent_type: row.get(3)?,
+                    content: row.get(4)?,
+                    tool_call_id: row.get(5)?,
+                    tool_name: row.get(6)?,
+                    turn_id: row.get(7)?,
+                    created_at: row.get(8)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(messages)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteTaskStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteTaskStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteTaskStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(conn),
+        }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+fn map_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
+    Ok(Task {
+        id: Some(row.get(0)?),
+        project_id: row.get(1)?,
+        epic_id: row.get(2)?,
+        title: row.get(3)?,
+        description: row.get(4)?,
+        source_prompt: row.get(5)?,
+        assigned_to_agent: row.get(6)?,
+        status: TaskStatus::from_str(&row.get::<_, String>(7)?),
+        depends_on_task_id: row.get(8)?,
+        created_by_agent: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
+    })
+}
+
+fn map_epic(row: &rusqlite::Row<'_>) -> rusqlite::Result<Epic> {
+    Ok(Epic {
+        id: Some(row.get(0)?),
+        project_id: row.get(1)?,
+        title: row.get(2)?,
+        description: row.get(3)?,
+        source_prompt: row.get(4)?,
+        status: EpicStatus::from_str(&row.get::<_, String>(5)?),
+        created_by_agent: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+    })
+}
+
+#[async_trait]
+impl TaskStorage for SqliteTaskStorage {
+    async fn create_task(&self, task: Task) -> Result<i64, AgentError> {
+        let ts = now();
+        let created_at = if task.created_at == 0 { ts } else { task.created_at };
+        let updated_at = if task.updated_at == 0 { ts } else { task.updated_at };
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO task
+                 (project_id, epic_id, title, description, source_prompt,
+                  assigned_to_agent, status, depends_on_task_id, created_by_agent,
+                  created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                task.project_id,
+                task.epic_id,
+                task.title,
+                task.description,
+                task.source_prompt,
+                task.assigned_to_agent,
+                task.status.as_str(),
+                task.depends_on_task_id,
+                task.created_by_agent,
+                created_at,
+                updated_at,
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn update_task_status(&self, task_id: i64, status: TaskStatus) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE task SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status.as_str(), now(), task_id],
+        )?;
+        Ok(())
+    }
+
+    async fn get_task(&self, task_id: i64) -> Result<Option<Task>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let task = conn
+            .query_row(
+                "SELECT id, project_id, epic_id, title, description, source_prompt,
+                        assigned_to_agent, status, depends_on_task_id, created_by_agent,
+                        created_at, updated_at
+                 FROM task WHERE id = ?1 LIMIT 1",
+                params![task_id],
+                map_task,
+            )
+            .optional()?;
+        Ok(task)
+    }
+
+    async fn list_tasks_for_project(&self, project_id: i64) -> Result<Vec<Task>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, epic_id, title, description, source_prompt,
+                    assigned_to_agent, status, depends_on_task_id, created_by_agent,
+                    created_at, updated_at
+             FROM task WHERE project_id = ?1 ORDER BY id ASC",
+        )?;
+        let tasks = stmt
+            .query_map(params![project_id], map_task)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tasks)
+    }
+
+    async fn list_tasks_for_agent(
+        &self,
+        project_id: i64,
+        agent_type: &str,
+    ) -> Result<Vec<Task>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, epic_id, title, description, source_prompt,
+                    assigned_to_agent, status, depends_on_task_id, created_by_agent,
+                    created_at, updated_at
+             FROM task WHERE project_id = ?1 AND assigned_to_agent = ?2 ORDER BY id ASC",
+        )?;
+        let tasks = stmt
+            .query_map(params![project_id, agent_type], map_task)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tasks)
+    }
+
+    async fn list_pending_review_tasks(&self, project_id: i64) -> Result<Vec<Task>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, epic_id, title, description, source_prompt,
+                    assigned_to_agent, status, depends_on_task_id, created_by_agent,
+                    created_at, updated_at
+             FROM task WHERE project_id = ?1 AND status = 'review' ORDER BY id ASC",
+        )?;
+        let tasks = stmt
+            .query_map(params![project_id], map_task)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tasks)
+    }
+
+    async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError> {
+        let ts = now();
+        let created_at = if epic.created_at == 0 { ts } else { epic.created_at };
+        let updated_at = if epic.updated_at == 0 { ts } else { epic.updated_at };
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO epic
+                 (project_id, title, description, source_prompt, status, created_by_agent,
+                  created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                epic.project_id,
+                epic.title,
+                epic.description,
+                epic.source_prompt,
+                epic.status.as_str(),
+                epic.created_by_agent,
+                created_at,
+                updated_at,
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn update_epic_status(&self, epic_id: i64, status: EpicStatus) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE epic SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status.as_str(), now(), epic_id],
+        )?;
+        Ok(())
+    }
+
+    async fn get_epic(&self, epic_id: i64) -> Result<Option<Epic>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let epic = conn
+            .query_row(
+                "SELECT id, project_id, title, description, source_prompt, status,
+                        created_by_agent, created_at, updated_at
+                 FROM epic WHERE id = ?1 LIMIT 1",
+                params![epic_id],
+                map_epic,
+            )
+            .optional()?;
+        Ok(epic)
+    }
+
+    async fn list_epics(&self, project_id: i64) -> Result<Vec<Epic>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, title, description, source_prompt, status,
+                    created_by_agent, created_at, updated_at
+             FROM epic WHERE project_id = ?1 ORDER BY id ASC",
+        )?;
+        let epics = stmt
+            .query_map(params![project_id], map_epic)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(epics)
     }
 }
 
@@ -334,8 +509,7 @@ impl SchemaStorage for SqliteSchemaStorage {
             Some(v) => conn
                 .query_row(
                     "SELECT schema_json, version FROM project_schema
-                     WHERE session_id = ?1 AND version = ?2
-                     LIMIT 1",
+                     WHERE session_id = ?1 AND version = ?2 LIMIT 1",
                     params![session_id, v],
                     |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
                 )
@@ -370,10 +544,7 @@ impl SchemaStorage for SqliteSchemaStorage {
         let row_id = conn.last_insert_rowid();
         log::info!(
             "[SchemaStorage] Saved schema: project_id={}, session_id={}, version={}, row_id={}",
-            project_id,
-            session_id,
-            version,
-            row_id
+            project_id, session_id, version, row_id
         );
         Ok(row_id)
     }

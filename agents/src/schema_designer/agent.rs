@@ -67,51 +67,9 @@ impl SchemaDesignerAgent {
         }
     }
 
-    /// Process one user message and return the agent's response.
-    /// Session is created automatically on first call and resumed on subsequent calls.
-    /// Set `preview_mode=true` to return schema without persisting to DB.
-    pub async fn chat(
-        &self,
-        user_text: &str,
-        preview_mode: bool,
-    ) -> Result<AgentResponse, AgentError> {
-        log::info!(
-            "[Agent] Starting chat for project={}, preview={}",
-            self.project_id,
-            preview_mode
-        );
-        log::debug!("[Agent] User message: {}", user_text);
-
-        // Always resume the single session for this project + agent type.
-        let session = self
-            .storage
-            .get_or_create_session(self.project_id, AgentType::SchemaDesigner.as_str())
-            .await?;
-        let session_id = session
-            .id
-            .expect("session must have id after get_or_create");
-        log::info!("[Agent] Using session_id={}", session_id);
-
-        // Persist the incoming user message.
-        self.storage
-            .create_message(ChatMessage {
-                id: None,
-                session_id,
-                role: "user".to_string(),
-                agent_type: None,
-                content: user_text.to_string(),
-                tool_call_id: None,
-                tool_name: None,
-                turn_id: None,
-                created_at: 0,
-            })
-            .await?;
-
-        self.run_loop(session_id, preview_mode).await
-    }
-
-    /// Continue an existing chat session.
-    /// The caller is responsible for persisting the incoming user message first.
+    /// Run the agent for an existing session.
+    /// The caller is responsible for creating the task + session and persisting
+    /// the incoming user message before calling this.
     pub async fn chat_with_session(
         &self,
         session_id: i64,

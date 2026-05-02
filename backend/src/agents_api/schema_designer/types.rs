@@ -1,22 +1,17 @@
 use serde::{Deserialize, Serialize};
 use shared_types::SchemaDef;
 
-#[derive(Debug, Serialize)]
-pub struct SchemaPreviewResponse {
-    pub schema: SchemaDef,
-    pub version: i64,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ChatRequest {
     pub project_id: i64,
-    pub session_id: Option<i64>,
+    /// None = new task (creates task + session); Some = continue existing task
+    pub task_id: Option<i64>,
     pub message: String,
 }
 
 #[derive(Debug, Serialize)]
 pub struct ChatResponse {
-    pub session_id: i64,
+    pub task_id: i64,
     pub message_id: i64,
     pub status: String,
 }
@@ -62,27 +57,36 @@ pub struct SchemaPreviewQuery {
 
 #[derive(Debug, Serialize)]
 pub struct ChatHistoryResponse {
-    pub session_id: i64,
+    pub task_id: i64,
     pub messages: Vec<ChatHistoryMessage>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ListSessionsQuery {
+pub struct ListTasksQuery {
     pub project_id: i64,
-    pub agent_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct SessionItem {
+pub struct TaskItem {
     pub id: i64,
     pub project_id: i64,
-    pub agent_type: String,
+    pub epic_id: Option<i64>,
+    pub title: String,
+    pub source_prompt: String,
+    pub assigned_to_agent: String,
+    pub status: String,
     pub created_at: i64,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ListSessionsResponse {
-    pub sessions: Vec<SessionItem>,
+pub struct ListTasksResponse {
+    pub tasks: Vec<TaskItem>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SchemaPreviewResponse {
+    pub schema: SchemaDef,
+    pub version: i64,
 }
 
 #[derive(Debug, Serialize)]

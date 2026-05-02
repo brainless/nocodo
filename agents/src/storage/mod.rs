@@ -21,7 +21,100 @@ impl AgentType {
 }
 
 // ---------------------------------------------------------------------------
-// Domain types
+// Epic
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct Epic {
+    pub id: Option<i64>,
+    pub project_id: i64,
+    pub title: String,
+    pub description: String,
+    pub source_prompt: String,
+    pub status: EpicStatus,
+    pub created_by_agent: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EpicStatus {
+    Open,
+    InProgress,
+    Done,
+}
+
+impl EpicStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::InProgress => "in_progress",
+            Self::Done => "done",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "in_progress" => Self::InProgress,
+            "done" => Self::Done,
+            _ => Self::Open,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct Task {
+    pub id: Option<i64>,
+    pub project_id: i64,
+    pub epic_id: Option<i64>,
+    pub title: String,
+    pub description: String,
+    pub source_prompt: String,
+    pub assigned_to_agent: String,
+    pub status: TaskStatus,
+    pub depends_on_task_id: Option<i64>,
+    pub created_by_agent: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskStatus {
+    Open,
+    InProgress,
+    Review,
+    Done,
+    Blocked,
+}
+
+impl TaskStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::InProgress => "in_progress",
+            Self::Review => "review",
+            Self::Done => "done",
+            Self::Blocked => "blocked",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "in_progress" => Self::InProgress,
+            "review" => Self::Review,
+            "done" => Self::Done,
+            "blocked" => Self::Blocked,
+            _ => Self::Open,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Session + ChatMessage
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -29,6 +122,7 @@ pub struct Session {
     pub id: Option<i64>,
     pub project_id: i64,
     pub agent_type: String,
+    pub task_id: i64,
     pub created_at: i64,
 }
 
@@ -53,35 +147,67 @@ pub struct ChatMessage {
 }
 
 // ---------------------------------------------------------------------------
-// Storage trait
+// AgentStorage trait — used by agents (session + message management)
 // ---------------------------------------------------------------------------
 
 #[async_trait]
 pub trait AgentStorage: Send + Sync {
-    /// Return the existing session for (project_id, agent_type) or create one.
-    async fn get_or_create_session(
+    /// Create a new session for a task. One session per (task_id, agent_type).
+    async fn create_task_session(
         &self,
         project_id: i64,
+        task_id: i64,
         agent_type: &str,
     ) -> Result<Session, AgentError>;
+
+    /// Find the session for a (task_id, agent_type) pair, if it exists.
+    async fn get_session_by_task(
+        &self,
+        task_id: i64,
+        agent_type: &str,
+    ) -> Result<Option<Session>, AgentError>;
 
     /// Persist a single-row turn (user messages, nudges). Sets turn_id = id automatically.
     async fn create_message(&self, msg: ChatMessage) -> Result<i64, AgentError>;
 
     /// Persist all rows of one LLM response turn atomically.
-    /// The storage layer assigns turn_id = id of the first inserted row to every row.
     async fn create_turn(&self, messages: Vec<ChatMessage>) -> Result<i64, AgentError>;
 
     async fn get_messages(&self, session_id: i64) -> Result<Vec<ChatMessage>, AgentError>;
 }
 
 // ---------------------------------------------------------------------------
-// Schema storage trait
+// TaskStorage trait — shared communication plane between agents
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait TaskStorage: Send + Sync {
+    async fn create_task(&self, task: Task) -> Result<i64, AgentError>;
+    async fn update_task_status(&self, task_id: i64, status: TaskStatus) -> Result<(), AgentError>;
+    async fn get_task(&self, task_id: i64) -> Result<Option<Task>, AgentError>;
+    async fn list_tasks_for_project(&self, project_id: i64) -> Result<Vec<Task>, AgentError>;
+    async fn list_tasks_for_agent(
+        &self,
+        project_id: i64,
+        agent_type: &str,
+    ) -> Result<Vec<Task>, AgentError>;
+    async fn list_pending_review_tasks(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<Task>, AgentError>;
+
+    async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError>;
+    async fn update_epic_status(&self, epic_id: i64, status: EpicStatus) -> Result<(), AgentError>;
+    async fn get_epic(&self, epic_id: i64) -> Result<Option<Epic>, AgentError>;
+    async fn list_epics(&self, project_id: i64) -> Result<Vec<Epic>, AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// SchemaStorage trait
 // ---------------------------------------------------------------------------
 
 #[async_trait]
 pub trait SchemaStorage: Send + Sync {
-    /// Persist a new schema version.  Returns the new row id.
     async fn save_schema(
         &self,
         project_id: i64,
@@ -89,10 +215,8 @@ pub trait SchemaStorage: Send + Sync {
         schema_json: &str,
     ) -> Result<i64, AgentError>;
 
-    /// Next version number for a given project (latest + 1, or 1 if none).
     async fn next_version(&self, project_id: i64) -> Result<i64, AgentError>;
 
-    /// Retrieve a schema for a session. If version is None, returns the latest.
     async fn get_schema_for_session(
         &self,
         session_id: i64,
