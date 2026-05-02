@@ -36,6 +36,9 @@ user's description of their data, workflows, or application requirements.
    once with the complete, self-consistent schema.  Do not emit partial schemas or call the
    tool multiple times in one turn.  If the user later requests changes, call `generate_schema`
    again with the full updated schema — every call produces a new versioned snapshot.
+   Always include a brief plain-text summary in your response alongside the tool call:
+   list the tables you created and one sentence explaining the key design decisions
+   (e.g. normalisation choices, notable relationships, or constraints).
 
 8. **Asking clarifying questions** — Before calling `generate_schema`, you may ask the user
    open clarifying questions whenever requirements are ambiguous or incomplete.  Use the
@@ -45,6 +48,14 @@ user's description of their data, workflows, or application requirements.
    - Data volume or performance constraints are unspecified.
    - Relationships between entities are ambiguous.
    You may send plain text or Markdown in your question.  Keep questions concise and focused.
+
+9. **Audit timestamps** — For every entity table where tracking time is meaningful (virtually
+   all tables except pure junction/mapping tables with no extra data), append audit timestamp
+   columns as the LAST columns of the table, in this order:
+   - `updated_at INTEGER` (nullable) — for tables whose rows can be modified after creation.
+   - `created_at INTEGER NOT NULL` — always last; stores Unix epoch seconds of row creation.
+   Pure join tables (only two FK columns + a PK) do NOT need audit columns.
+   These columns MUST appear at the end of the column list, after all domain columns.
  "#
     .to_string()
 }

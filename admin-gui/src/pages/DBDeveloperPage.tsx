@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal } from 'solid-js';
+import { For, Show, createEffect, createMemo, createSignal } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { useProject } from '../contexts/ProjectContext';
 import { ChatProvider, useChat } from '../contexts/ChatContext';
@@ -195,13 +195,10 @@ function DBDeveloperContent() {
 
   const getCellValue = (col: string, row: number): string => {
     const colIndex = col.charCodeAt(0) - 65;
-    const cols = columns();
     const key = getCellKey(col, row);
     const formula = cellFormulas()[key];
     if (formula !== undefined && formula !== '') return formula;
-    if (row === 1 && colIndex >= 0 && colIndex < cols.length) return cols[colIndex].name;
-    const rowIndex = row - 2;
-    const rowData = rows()[rowIndex];
+    const rowData = rows()[row - 1];
     if (!rowData || colIndex < 0 || colIndex >= rowData.length) return '';
     const value = rowData[colIndex];
     return value === null || value === undefined ? '' : String(value);
@@ -217,6 +214,14 @@ function DBDeveloperContent() {
     const key = getCellKey(selectedCell().col, selectedCell().row);
     setCellFormulas(prev => ({ ...prev, [key]: value }));
   };
+
+  const columnHeaders = createMemo(() => {
+    const cols = displayColumns();
+    return Array.from({ length: Math.max(cols.length, MIN_COLUMNS) }, (_, i) => ({
+      i,
+      col: cols[i] ?? null,
+    }));
+  });
 
   const placeholder = () =>
     chat.messages().length > 1
@@ -277,41 +282,35 @@ function DBDeveloperContent() {
 
           <div class="grid-wrap" style={{ "grid-template-columns": gridTemplateColumns() }}>
             <div class="grid-corner" />
-            <For each={Array.from({ length: Math.max(displayColumns().length, MIN_COLUMNS) }, (_, i) => i)}>
-              {(i) => <div class="column-header">{String.fromCharCode(65 + i)}</div>}
+            <For each={columnHeaders()}>
+              {(item) => item.col ? (
+                <div class="column-header column-header-field">
+                  <span class="truncate">{displayColumnHeader(item.col)}</span>
+                  <details class="dropdown dropdown-end" onClick={(e) => e.stopPropagation()}>
+                    <summary class="btn btn-ghost btn-xs p-0 h-5 min-h-5 w-5 opacity-40 hover:opacity-100 flex items-center justify-center">
+                      ▾
+                    </summary>
+                    <ul class="dropdown-content menu bg-base-100 rounded-box shadow-md w-44 p-1 text-sm">
+                      <li><a>Edit column</a></li>
+                      <li><a>← Move left</a></li>
+                      <li><a>→ Move right</a></li>
+                      <li class="border-t border-base-200 my-0.5 pointer-events-none" />
+                      <li><a>Hide field</a></li>
+                      <li><a class="text-error">Remove field</a></li>
+                    </ul>
+                  </details>
+                </div>
+              ) : (
+                <div class="column-header">{String.fromCharCode(65 + item.i)}</div>
+              )}
             </For>
-
-            <Show when={displayColumns().length > 0}>
-              {(() => {
-                const dataCols = displayColumns();
-                const colCount = Math.max(dataCols.length, MIN_COLUMNS);
-                return (
-                  <>
-                    <div class="row-header">1</div>
-                    <For each={Array.from({ length: colCount }, (_, i) => i)}>
-                      {(colIndex) => {
-                        const colLetter = String.fromCharCode(65 + colIndex);
-                        return (
-                          <div
-                            class={`cell${1 === selectedCell().row && colLetter === selectedCell().col ? ' cell-active' : ''}`}
-                            onClick={() => handleCellClick(colLetter, 1)}
-                          >
-                            {dataCols[colIndex] ? displayColumnHeader(dataCols[colIndex]) : ''}
-                          </div>
-                        );
-                      }}
-                    </For>
-                  </>
-                );
-              })()}
-            </Show>
 
             <Show when={previewSchema() === null}>
               <For each={rows()}>
                 {(_, rowIndex) => {
                   const dataCols = displayColumns();
                   const colCount = Math.max(dataCols.length, MIN_COLUMNS);
-                  const currentRow = rowIndex() + 2;
+                  const currentRow = rowIndex() + 1;
                   return (
                     <>
                       <div class="row-header">{currentRow}</div>
@@ -340,7 +339,7 @@ function DBDeveloperContent() {
               const rowCount = previewSchema() ? 0 : rows().length;
               const hasColumns = dataCols.length > 0;
               const emptyRowCount = hasColumns ? Math.max(0, 99 - rowCount) : 100;
-              const startRowNum = hasColumns ? 2 + rowCount : 1;
+              const startRowNum = hasColumns ? 1 + rowCount : 1;
               return (
                 <For each={Array.from({ length: emptyRowCount }, (_, i) => i)}>
                   {(rowOffset) => {

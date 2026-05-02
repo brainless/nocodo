@@ -236,12 +236,23 @@ impl SchemaDesignerAgent {
                     match tool_name {
                         "generate_schema" => {
                             log::info!("[Agent] Processing generate_schema tool call");
-                            let params: SchemaDef =
+                            let mut params: SchemaDef =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             log::debug!(
                                 "[Agent] Schema params parsed: {} tables",
                                 params.tables.len()
                             );
+
+                            // Ensure created_at / updated_at are always the last columns.
+                            for table in &mut params.tables {
+                                let (mut audit, rest): (Vec<_>, Vec<_>) = table
+                                    .columns
+                                    .drain(..)
+                                    .partition(|c| c.name == "created_at" || c.name == "updated_at");
+                                audit.sort_by_key(|c| if c.name == "updated_at" { 0u8 } else { 1u8 });
+                                table.columns = rest;
+                                table.columns.extend(audit);
+                            }
 
                             let schema_json = serde_json::to_string(&params)?;
 
