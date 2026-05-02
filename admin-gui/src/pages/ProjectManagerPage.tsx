@@ -34,11 +34,7 @@ export default function ProjectManagerPage() {
   const { currentProject } = useProject();
 
   return (
-    <ChatProvider
-      agentType="project_manager"
-      projectId={() => currentProject()?.id}
-      greeting={{ role: 'assistant', content: "Hi! Tell me what you want to build and I'll plan the epics and tasks." }}
-    >
+    <ChatProvider defaultAgentType="project_manager" projectId={() => currentProject()?.id}>
       <ProjectManagerContent />
     </ChatProvider>
   );
@@ -183,7 +179,7 @@ function ProjectManagerContent() {
 
   return (
     <main class="sheet-app">
-      <ChatDrawer agentName="Project Manager" placeholder={placeholder}>
+      <ChatDrawer placeholder={placeholder}>
         <section class="sheet-main">
           <div class="formula-strip">
             <label for="chat-drawer" class="btn btn-success btn-sm">Dev Team</label>

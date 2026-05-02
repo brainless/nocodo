@@ -23,7 +23,7 @@ export default function DBDeveloperPage() {
   const { currentProject } = useProject();
 
   return (
-    <ChatProvider agentType="schema_designer" projectId={() => currentProject()?.id}>
+    <ChatProvider defaultAgentType="schema_designer" projectId={() => currentProject()?.id}>
       <DBDeveloperContent />
     </ChatProvider>
   );
@@ -231,7 +231,6 @@ function DBDeveloperContent() {
   return (
     <main class="sheet-app">
       <ChatDrawer
-        agentName="Database Dev"
         placeholder={placeholder}
         renderMessage={(msg) => (
           <div class={`chat ${msg.role === 'user' ? 'chat-end' : 'chat-start'}`}>

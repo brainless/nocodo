@@ -15,13 +15,43 @@ type HistoryMessage = {
   tool_name?: string;
 };
 
+const AGENT_GREETINGS: Record<string, UiMessage> = {
+  project_manager: {
+    role: 'assistant',
+    content: "Hi! Tell me what you want to build and I'll plan the epics and tasks.",
+  },
+  schema_designer: {
+    role: 'assistant',
+    content: "Hello! Tell me what you want to build and I'll design a schema for it.",
+  },
+  backend_developer: {
+    role: 'assistant',
+    content: "Hello! I'm the Backend Developer. What APIs do you need?",
+  },
+  frontend_developer: {
+    role: 'assistant',
+    content: "Hello! I'm the UI Designer. What should we build?",
+  },
+};
+
+const DEFAULT_GREETING: UiMessage = {
+  role: 'assistant',
+  content: 'Hello! How can I help you today?',
+};
+
+function getGreeting(agentType: string): UiMessage {
+  return AGENT_GREETINGS[agentType] ?? DEFAULT_GREETING;
+}
+
 export interface ChatContextValue {
   messages: () => UiMessage[];
   chatLoading: () => boolean;
   tasks: () => TaskItem[];
   tasksLoading: () => boolean;
   selectedTask: () => TaskItem | null;
+  selectedAgentType: () => string;
   sendMessage: (text: string) => Promise<void>;
+  selectAgent: (agentType: string) => Promise<void>;
   openTask: (taskId: number, agentType: string) => Promise<void>;
   loadTasks: () => Promise<void>;
 }
@@ -35,27 +65,20 @@ export function useChat(): ChatContextValue {
 }
 
 interface ChatProviderProps {
-  agentType?: string;
+  defaultAgentType: string;
   projectId: () => number | null | undefined;
-  greeting?: UiMessage;
   children: JSX.Element;
 }
 
-const DEFAULT_GREETING: UiMessage = {
-  role: 'assistant',
-  content: "Hello! Tell me what you want to build and I'll design a schema for it.",
-};
-
 export function ChatProvider(props: ChatProviderProps) {
-  const [messages, setMessages] = createSignal<UiMessage[]>([props.greeting ?? DEFAULT_GREETING]);
+  const [messages, setMessages] = createSignal<UiMessage[]>([getGreeting(props.defaultAgentType)]);
   const [chatLoading, setChatLoading] = createSignal(false);
   const [tasks, setTasks] = createSignal<TaskItem[]>([]);
   const [tasksLoading, setTasksLoading] = createSignal(false);
   const [selectedTask, setSelectedTask] = createSignal<TaskItem | null>(null);
-  // Track which agent type is active for the current conversation
-  const [activeAgentType, setActiveAgentType] = createSignal<string>(props.agentType ?? '');
+  const [selectedAgentType, setSelectedAgentType] = createSignal<string>(props.defaultAgentType);
 
-  const agentPath = () => activeAgentType().replace(/_/g, '-');
+  const agentPath = () => selectedAgentType().replace(/_/g, '-');
 
   const loadTasks = async () => {
     const pid = props.projectId();
@@ -67,10 +90,7 @@ export function ChatProvider(props: ChatProviderProps) {
       if (!res.ok) throw new Error(`Failed to load tasks: ${res.status}`);
       const data = await res.json() as { tasks: TaskItem[] };
       const all = data.tasks ?? [];
-      // If agentType is set on the provider, filter to that agent's tasks for the sidebar
-      const filtered = props.agentType
-        ? all.filter(t => t.assigned_to_agent === props.agentType)
-        : all;
+      const filtered = all.filter((t) => t.assigned_to_agent === selectedAgentType());
       setTasks(filtered);
       // Auto-select most recent task for this agent if none selected
       if (!selectedTask() && filtered.length > 0) {
@@ -84,8 +104,16 @@ export function ChatProvider(props: ChatProviderProps) {
     }
   };
 
+  const selectAgent = async (agentType: string) => {
+    if (agentType === selectedAgentType()) return;
+    setSelectedAgentType(agentType);
+    setSelectedTask(null);
+    setMessages([getGreeting(agentType)]);
+    await loadTasks();
+  };
+
   const openTask = async (taskId: number, agentType: string) => {
-    setActiveAgentType(agentType);
+    setSelectedAgentType(agentType);
     const path = agentType.replace(/_/g, '-');
     setChatLoading(true);
     try {
@@ -93,7 +121,7 @@ export function ChatProvider(props: ChatProviderProps) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { task_id: number; messages: HistoryMessage[] };
 
-      const found = tasks().find(t => t.id === taskId);
+      const found = tasks().find((t) => t.id === taskId);
       if (found) {
         setSelectedTask(found);
       } else {
@@ -102,16 +130,22 @@ export function ChatProvider(props: ChatProviderProps) {
       }
 
       const history = (data.messages ?? [])
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role as ChatRole, content: m.content, schema_version: m.schema_version }));
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          role: m.role as ChatRole,
+          content: m.content,
+          schema_version: m.schema_version,
+        }));
 
-      setMessages(history.length > 0 ? history : [props.greeting ?? DEFAULT_GREETING]);
+      setMessages(history.length > 0 ? history : [getGreeting(agentType)]);
     } catch (err) {
       console.error('Error opening task:', err);
-      setMessages([props.greeting ?? DEFAULT_GREETING]);
+      setMessages([getGreeting(agentType)]);
     } finally {
       setChatLoading(false);
     }
+    // Refresh task list for the newly selected agent
+    await loadTasks();
   };
 
   const pollForResponse = async (messageId: number, taskId: number) => {
@@ -128,15 +162,22 @@ export function ChatProvider(props: ChatProviderProps) {
       if (histRes.ok) {
         const histData = await histRes.json() as { messages: HistoryMessage[] };
         const history = (histData.messages ?? [])
-          .filter(m => m.role === 'user' || m.role === 'assistant')
-          .map(m => ({ role: m.role as ChatRole, content: m.content, schema_version: m.schema_version }));
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({
+            role: m.role as ChatRole,
+            content: m.content,
+            schema_version: m.schema_version,
+          }));
         if (history.length > 0) setMessages(history);
       }
       // Refresh task list so status changes are reflected
       await loadTasks();
     } catch (err) {
       console.error('Error polling response:', err);
-      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
+      ]);
     } finally {
       setChatLoading(false);
     }
@@ -147,10 +188,10 @@ export function ChatProvider(props: ChatProviderProps) {
     if (!message || !pid) return;
 
     const currentTask = selectedTask();
-    const agent = activeAgentType() || props.agentType || '';
+    const agent = selectedAgentType();
     if (!agent) return;
 
-    setMessages(prev => [...prev, { role: 'user', content: message }]);
+    setMessages((prev) => [...prev, { role: 'user', content: message }]);
     setChatLoading(true);
 
     try {
@@ -179,7 +220,7 @@ export function ChatProvider(props: ChatProviderProps) {
           updated_at: Math.floor(Date.now() / 1000),
         };
         setSelectedTask(newTask);
-        setTasks(prev => [...prev, newTask]);
+        setTasks((prev) => [...prev, newTask]);
       }
 
       if (data.message_id) {
@@ -190,7 +231,10 @@ export function ChatProvider(props: ChatProviderProps) {
     } catch (err) {
       console.error('Error sending message:', err);
       setChatLoading(false);
-      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Failed to send'}` }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Failed to send'}` },
+      ]);
     }
   };
 
@@ -205,7 +249,9 @@ export function ChatProvider(props: ChatProviderProps) {
     tasks,
     tasksLoading,
     selectedTask,
+    selectedAgentType,
     sendMessage,
+    selectAgent,
     openTask,
     loadTasks,
   };

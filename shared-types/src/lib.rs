@@ -110,6 +110,21 @@ pub struct ColumnDisplay {
 }
 
 // ============================================================================
+// Agent Type Registry
+// ============================================================================
+
+/// Available agent types in the multi-agent system.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentType {
+    ProjectManager,
+    SchemaDesigner,
+    BackendDeveloper,
+    FrontendDeveloper,
+}
+
+// ============================================================================
 // Agent Definition Types
 // (pre-persistence; used as LLM tool parameters via JsonSchema)
 // ============================================================================

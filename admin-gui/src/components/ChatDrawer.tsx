@@ -5,15 +5,23 @@ import { PromptBox } from './PromptBox';
 interface ChatDrawerProps {
   children: JSX.Element;
   renderMessage?: (msg: UiMessage) => JSX.Element;
-  agentName?: string;
   drawerId?: string;
   placeholder?: string | (() => string);
 }
 
+const AGENT_CONTACTS = [
+  { type: 'project_manager', name: 'Project Manager', initial: 'PM' },
+  { type: 'schema_designer', name: 'Database Dev', initial: 'DB' },
+  { type: 'backend_developer', name: 'Backend Developer', initial: 'BE' },
+  { type: 'frontend_developer', name: 'UI Designer', initial: 'UI' },
+];
+
 export default function ChatDrawer(props: ChatDrawerProps) {
   const chat = useChat();
   const drawerId = props.drawerId ?? 'chat-drawer';
-  const agentName = props.agentName ?? 'AI Assistant';
+
+  const selectedAgentName = () =>
+    AGENT_CONTACTS.find((c) => c.type === chat.selectedAgentType())?.name ?? 'AI Assistant';
 
   const defaultRenderMessage = (msg: UiMessage) => (
     <div class={`chat ${msg.role === 'user' ? 'chat-end' : 'chat-start'}`}>
@@ -51,38 +59,36 @@ export default function ChatDrawer(props: ChatDrawerProps) {
             </div>
             <div class="flex-1 overflow-y-auto">
               <ul class="list bg-base-100">
-                <li class="list-row items-center cursor-default bg-base-200">
-                  <div class="avatar placeholder">
-                    <div class="bg-neutral text-neutral-content w-10 h-10 rounded-full flex items-center justify-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
+                <For each={AGENT_CONTACTS}>
+                  {(contact) => {
+                    const isSelected = () => chat.selectedAgentType() === contact.type;
+                    return (
+                      <li
+                        class={`list-row items-center cursor-pointer ${isSelected() ? 'bg-base-200' : 'hover:bg-base-200/50'}`}
+                        onClick={() => chat.selectAgent(contact.type)}
                       >
-                        <ellipse cx="12" cy="5" rx="9" ry="3" />
-                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                        <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div class="list-col-grow">
-                    <p class="text-sm font-medium">{agentName}</p>
-                    <p class="text-xs text-base-content/50">Online</p>
-                  </div>
-                </li>
+                        <div class="avatar placeholder">
+                          <div
+                            class={`text-neutral-content w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${isSelected() ? 'bg-primary' : 'bg-neutral'}`}
+                          >
+                            {contact.initial}
+                          </div>
+                        </div>
+                        <div class="list-col-grow">
+                          <p class="text-sm font-medium">{contact.name}</p>
+                          <p class="text-xs text-base-content/50">Online</p>
+                        </div>
+                      </li>
+                    );
+                  }}
+                </For>
               </ul>
             </div>
           </div>
 
           <div class="chat-panel">
             <div class="chat-panel-header">
-              <p class="text-sm font-semibold flex-1 truncate">{agentName}</p>
+              <p class="text-sm font-semibold flex-1 truncate">{selectedAgentName()}</p>
               <label for={drawerId} class="btn btn-ghost btn-sm btn-square">
                 ✕
               </label>

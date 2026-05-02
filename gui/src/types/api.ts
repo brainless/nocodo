@@ -65,6 +65,12 @@ display_column: string | null, };
 
 
 /**
+ * Available agent types in the multi-agent system.
+ */
+export type AgentType = "project_manager" | "schema_designer" | "backend_developer" | "frontend_developer";
+
+
+/**
  * Foreign key reference by name — resolved to IDs on persist.
  */
 export type ForeignKeyDef = { 

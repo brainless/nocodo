@@ -1,6 +1,6 @@
 use shared_types::{
-    Column, ColumnDef, ColumnDisplay, CreateProjectRequest, CreateProjectResponse, DataType,
-    EpicItem, ForeignKey, ForeignKeyDef, GetSchemaResponse, GetTableColumnsResponse,
+    AgentType, Column, ColumnDef, ColumnDisplay, CreateProjectRequest, CreateProjectResponse,
+    DataType, EpicItem, ForeignKey, ForeignKeyDef, GetSchemaResponse, GetTableColumnsResponse,
     GetTableDataResponse, HeartbeatResponse, ListEpicsResponse, ListProjectsResponse,
     ListSchemasResponse, ListTasksResponse, PaginationInfo, Project, Schema, SchemaDef, Table,
     TableDataResult, TableDef, TaskItem,
@@ -31,6 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     export_type!(Column);
     export_type!(ForeignKey);
     export_type!(ColumnDisplay);
+
+    // Agent type registry
+    export_type!(AgentType);
 
     // Agent definition types
     export_type!(ForeignKeyDef);
