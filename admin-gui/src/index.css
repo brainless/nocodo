@@ -24,7 +24,7 @@ body {
 
 .sheet-app {
   display: grid;
-  grid-template-rows: 48px 1fr;
+  grid-template-rows: 1fr;
   height: 100%;
   overflow: hidden;
   background:
@@ -74,55 +74,6 @@ body {
 .chat-btn {
   white-space: nowrap;
 }
-
-.menu-strip {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  border-bottom: 1px solid #c6cfdf;
-  background: #f6f8fe;
-  padding: 0 0.875rem;
-}
-
-.menu-title {
-  min-width: 120px;
-  font-size: 0.84rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #304264;
-}
-
-.menu-items {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.menu-item {
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.9rem;
-  color: #334361;
-  cursor: default;
-}
-
-.menu-item:hover {
-  background: #e7ecf8;
-}
-
-.menu-status {
-  margin-left: auto;
-  border-radius: 999px;
-  background: #dde9ff;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.8rem;
-  color: #225197;
-}
-
-
 
 .chat-toggle-btn {
   border-radius: 8px;
@@ -374,15 +325,6 @@ body {
 }
 
 @media (max-width: 900px) {
-  .menu-title {
-    display: none;
-  }
-
-  .menu-items {
-    gap: 0.15rem;
-    overflow-x: auto;
-  }
-
   .formula-strip {
     grid-template-columns: auto 64px 40px 1fr;
   }
@@ -395,44 +337,7 @@ body {
   border-top: 1px solid #c6cfdf;
   background: #f2f5fc;
   padding: 0 0.75rem;
-  height: 48px;
   flex-shrink: 0;
-}
-
-.sheet-add {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid #c0ccdf;
-  background: #fff;
-  color: #38537e;
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.sheet-list {
-  display: flex;
-  gap: 0.45rem;
-  min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
-}
-
-.sheet-tab {
-  border-radius: 8px;
-  border: 1px solid #c6d1e4;
-  background: #eaf0fc;
-  padding: 0.35rem 0.75rem;
-  white-space: nowrap;
-  font-size: 0.84rem;
-  color: #3f5274;
-}
-
-.sheet-tab-active {
-  background: #fff;
-  border-color: #8ea9d8;
-  color: #2e4a7c;
-  font-weight: 600;
 }
 
 /* ── Homepage ── */
