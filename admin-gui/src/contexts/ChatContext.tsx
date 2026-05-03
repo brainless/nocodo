@@ -114,20 +114,16 @@ export function ChatProvider(props: ChatProviderProps) {
 
   const openTask = async (taskId: number, agentType: string) => {
     setSelectedAgentType(agentType);
+    // Set selectedTask immediately so loadTasks() called below won't re-trigger auto-select
+    const found = tasks().find((t) => t.id === taskId);
+    setSelectedTask(found ?? { id: taskId, assigned_to_agent: agentType } as TaskItem);
+
     const path = agentType.replace(/_/g, '-');
     setChatLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/agents/${path}/tasks/${taskId}/messages`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { task_id: number; messages: HistoryMessage[] };
-
-      const found = tasks().find((t) => t.id === taskId);
-      if (found) {
-        setSelectedTask(found);
-      } else {
-        // Task might not be in filtered list (e.g. task board click across agents)
-        setSelectedTask({ id: taskId, assigned_to_agent: agentType } as TaskItem);
-      }
 
       const history = (data.messages ?? [])
         .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -144,7 +140,7 @@ export function ChatProvider(props: ChatProviderProps) {
     } finally {
       setChatLoading(false);
     }
-    // Refresh task list for the newly selected agent
+    // Refresh task list so status changes from the selected agent are reflected
     await loadTasks();
   };
 

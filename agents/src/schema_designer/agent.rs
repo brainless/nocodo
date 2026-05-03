@@ -146,6 +146,7 @@ impl SchemaDesignerAgent {
                         role,
                         content: vec![llm_sdk::types::ContentBlock::Text { text: m.content }],
                         tool_call_id: m.tool_call_id,
+                        tool_name: m.tool_name,
                     }
                 })
                 .collect();

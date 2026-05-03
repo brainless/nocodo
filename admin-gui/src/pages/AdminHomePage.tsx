@@ -113,7 +113,7 @@ function HomeContent() {
     const project = await createProject(`Project ${formatProjectTimestamp()}`);
     if (!project) throw new Error('Failed to create project');
 
-    const response = await fetch(`${API_BASE_URL}/api/agents/pm/init`, {
+    const response = await fetch(`${API_BASE_URL}/api/agents/project-manager/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_id: project.id, message }),
@@ -121,7 +121,7 @@ function HomeContent() {
 
     if (!response.ok) throw new Error(`Failed to initialize project: ${response.status}`);
 
-    navigate(`/projects/${project.id}/project-manager`);
+    navigate(`/projects/${project.id}/manager`);
   };
 
   const handleSubmit = async (message: string) => {

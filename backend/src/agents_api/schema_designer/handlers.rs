@@ -1,14 +1,16 @@
 use crate::agents_api::state::AgentState;
 use crate::agents_api::schema_designer::types::{
-    AgentResponsePayload, ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse,
-    EpicItem, EpicListQuery, ListEpicsResponse, ListTasksQuery, ListTasksResponse, MessageResponse,
-    SchemaCodegenResponse, SchemaPreviewQuery, SchemaPreviewResponse, TaskItem,
+    AgentResponsePayload, BoardQuery, BoardResponse, ChatHistoryMessage, ChatHistoryResponse,
+    ChatRequest, ChatResponse, EpicItem, EpicListQuery, ListEpicsResponse, ListTasksQuery,
+    ListTasksResponse, MessageResponse, SchemaCodegenResponse, SchemaPreviewQuery,
+    SchemaPreviewResponse, TaskItem,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
     build_schema_designer, AgentResponse, AgentStorage, SchemaStorage, SqliteAgentStorage,
     SqliteSchemaStorage, SqliteTaskStorage, Task, TaskStatus, TaskStorage,
 };
+use rusqlite::params as sql_params;
 use shared_types::SchemaDef;
 use std::time::Duration;
 
@@ -274,6 +276,129 @@ pub async fn list_epics(
             "error": format!("Failed to list epics: {}", e)
         })),
     }
+}
+
+/// GET /api/agents/board?project_id=X[&since=Y]
+/// Long-poll: holds the connection until tasks/epics are newer than `since`, or 30s elapses.
+/// `since` is the max `updated_at` the client already has (0 = first load, returns immediately).
+#[get("/api/agents/board")]
+pub async fn get_board(
+    state: web::Data<AgentState>,
+    query: web::Query<BoardQuery>,
+) -> impl Responder {
+    let project_id = query.project_id;
+    let since = query.since.unwrap_or(0);
+
+    // Subscribe BEFORE fetching so we don't miss a notification that arrives
+    // between the fetch and the wait.
+    let notified = state.board_notify.notified();
+    tokio::pin!(notified);
+    notified.as_mut().enable();
+
+    let task_storage = match SqliteTaskStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("storage error: {}", e)
+            }))
+        }
+    };
+
+    let (tasks, epics) = match fetch_board_data(&task_storage, project_id).await {
+        Ok(d) => d,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": e }))
+        }
+    };
+
+    let updated_at = tasks
+        .iter()
+        .map(|t| t.updated_at)
+        .chain(epics.iter().map(|e| e.updated_at))
+        .max()
+        .unwrap_or(0);
+
+    let project_name = fetch_project_name(&state.db_path, project_id);
+
+    if since == 0 || updated_at > since {
+        return HttpResponse::Ok().json(BoardResponse { tasks, epics, updated_at, project_name });
+    }
+
+    // Hold until notified of a change or 30s timeout.
+    let _ = tokio::time::timeout(Duration::from_secs(30), notified).await;
+
+    match fetch_board_data(&task_storage, project_id).await {
+        Ok((tasks, epics)) => {
+            let updated_at = tasks
+                .iter()
+                .map(|t| t.updated_at)
+                .chain(epics.iter().map(|e| e.updated_at))
+                .max()
+                .unwrap_or(0);
+            let project_name = fetch_project_name(&state.db_path, project_id);
+            HttpResponse::Ok().json(BoardResponse { tasks, epics, updated_at, project_name })
+        }
+        Err(e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({ "error": e })),
+    }
+}
+
+fn fetch_project_name(db_path: &str, project_id: i64) -> String {
+    rusqlite::Connection::open(db_path)
+        .ok()
+        .and_then(|conn| {
+            conn.query_row(
+                "SELECT name FROM project WHERE id = ?1",
+                sql_params![project_id],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+        })
+        .unwrap_or_default()
+}
+
+async fn fetch_board_data(
+    storage: &SqliteTaskStorage,
+    project_id: i64,
+) -> Result<(Vec<TaskItem>, Vec<EpicItem>), String> {
+    let tasks = storage
+        .list_tasks_for_project(project_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|t| TaskItem {
+            id: t.id.unwrap_or(0),
+            project_id: t.project_id,
+            epic_id: t.epic_id,
+            title: t.title,
+            source_prompt: t.source_prompt,
+            assigned_to_agent: t.assigned_to_agent,
+            status: t.status.as_str().to_string(),
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+        })
+        .collect();
+
+    let epics = storage
+        .list_epics(project_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|e| EpicItem {
+            id: e.id.unwrap_or(0),
+            project_id: e.project_id,
+            title: e.title,
+            description: e.description,
+            status: e.status.as_str().to_string(),
+            created_by_agent: e.created_by_agent,
+            created_by_task_id: e.created_by_task_id,
+            created_at: e.created_at,
+            updated_at: e.updated_at,
+        })
+        .collect();
+
+    Ok((tasks, epics))
 }
 
 /// GET /api/agents/schema-designer/tasks/{task_id}/messages

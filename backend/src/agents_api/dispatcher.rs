@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Notify};
 
 use nocodo_agents::{
     build_schema_designer, AgentConfig, AgentError, AgentResponse, AgentStorage, AgentType,
@@ -26,11 +27,16 @@ pub struct DispatchEvent {
 pub struct DispatchingTaskStorage {
     inner: SqliteTaskStorage,
     tx: mpsc::UnboundedSender<DispatchEvent>,
+    board_notify: Arc<Notify>,
 }
 
 impl DispatchingTaskStorage {
-    pub fn new(inner: SqliteTaskStorage, tx: mpsc::UnboundedSender<DispatchEvent>) -> Self {
-        Self { inner, tx }
+    pub fn new(
+        inner: SqliteTaskStorage,
+        tx: mpsc::UnboundedSender<DispatchEvent>,
+        board_notify: Arc<Notify>,
+    ) -> Self {
+        Self { inner, tx, board_notify }
     }
 }
 
@@ -52,6 +58,7 @@ impl TaskStorage for DispatchingTaskStorage {
             });
         }
 
+        self.board_notify.notify_waiters();
         Ok(task_id)
     }
 
@@ -60,7 +67,9 @@ impl TaskStorage for DispatchingTaskStorage {
         task_id: i64,
         status: TaskStatus,
     ) -> Result<(), AgentError> {
-        self.inner.update_task_status(task_id, status).await
+        self.inner.update_task_status(task_id, status).await?;
+        self.board_notify.notify_waiters();
+        Ok(())
     }
 
     async fn get_task(&self, task_id: i64) -> Result<Option<Task>, AgentError> {
@@ -94,7 +103,9 @@ impl TaskStorage for DispatchingTaskStorage {
     }
 
     async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError> {
-        self.inner.create_epic(epic).await
+        let id = self.inner.create_epic(epic).await?;
+        self.board_notify.notify_waiters();
+        Ok(id)
     }
 
     async fn update_epic_status(
@@ -102,7 +113,9 @@ impl TaskStorage for DispatchingTaskStorage {
         epic_id: i64,
         status: EpicStatus,
     ) -> Result<(), AgentError> {
-        self.inner.update_epic_status(epic_id, status).await
+        self.inner.update_epic_status(epic_id, status).await?;
+        self.board_notify.notify_waiters();
+        Ok(())
     }
 
     async fn get_epic(&self, epic_id: i64) -> Result<Option<Epic>, AgentError> {
@@ -121,11 +134,16 @@ impl TaskStorage for DispatchingTaskStorage {
 pub struct AgentDispatcher {
     rx: mpsc::UnboundedReceiver<DispatchEvent>,
     db_path: String,
+    board_notify: Arc<Notify>,
 }
 
 impl AgentDispatcher {
-    pub fn new(rx: mpsc::UnboundedReceiver<DispatchEvent>, db_path: String) -> Self {
-        Self { rx, db_path }
+    pub fn new(
+        rx: mpsc::UnboundedReceiver<DispatchEvent>,
+        db_path: String,
+        board_notify: Arc<Notify>,
+    ) -> Self {
+        Self { rx, db_path, board_notify }
     }
 
     pub async fn run(mut self) {
@@ -137,8 +155,10 @@ impl AgentDispatcher {
                 event.assigned_to_agent
             );
             let db_path = self.db_path.clone();
+            let notify = self.board_notify.clone();
             tokio::spawn(async move {
                 dispatch_task(event, db_path).await;
+                notify.notify_waiters();
             });
         }
         log::warn!("[Dispatcher] Channel closed — exiting");

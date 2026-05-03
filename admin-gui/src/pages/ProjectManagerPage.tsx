@@ -41,7 +41,7 @@ export default function ProjectManagerPage() {
 }
 
 function ProjectManagerContent() {
-  const { currentProject } = useProject();
+  const { currentProject, setCurrentProject } = useProject();
   const chat = useChat();
 
   const [epics, setEpics] = createSignal<EpicItem[]>([]);
@@ -49,37 +49,52 @@ function ProjectManagerContent() {
   const [activeTab, setActiveTab] = createSignal<'epics' | 'tasks'>('tasks');
   const [loading, setLoading] = createSignal(false);
 
-  const loadBoard = async (projectId: number) => {
-    setLoading(true);
-    try {
-      const [epicsRes, tasksRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/agents/epics?project_id=${projectId}`),
-        fetch(`${API_BASE_URL}/api/agents/tasks?project_id=${projectId}`),
-      ]);
-      if (epicsRes.ok) {
-        const d = await epicsRes.json() as { epics: EpicItem[] };
-        setEpics(d.epics ?? []);
+  let abortController: AbortController | null = null;
+
+  const startLongPoll = (projectId: number) => {
+    abortController?.abort();
+    const ac = new AbortController();
+    abortController = ac;
+    let lastUpdatedAt = 0;
+
+    const poll = async () => {
+      while (!ac.signal.aborted) {
+        setLoading(true);
+        try {
+          const url = `${API_BASE_URL}/api/agents/board?project_id=${projectId}&since=${lastUpdatedAt}`;
+          const res = await fetch(url, { signal: ac.signal });
+          if (!res.ok) {
+            await new Promise<void>((r) => setTimeout(r, 3000));
+            continue;
+          }
+          const data = await res.json() as { tasks: TaskItem[]; epics: EpicItem[]; updated_at: number; project_name?: string };
+          lastUpdatedAt = data.updated_at ?? lastUpdatedAt;
+          setTasks(data.tasks ?? []);
+          setEpics(data.epics ?? []);
+          if (data.project_name) {
+            const proj = currentProject();
+            if (proj && proj.name !== data.project_name) {
+              setCurrentProject({ ...proj, name: data.project_name });
+            }
+          }
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') break;
+          await new Promise<void>((r) => setTimeout(r, 3000));
+        } finally {
+          setLoading(false);
+        }
       }
-      if (tasksRes.ok) {
-        const d = await tasksRes.json() as { tasks: TaskItem[] };
-        setTasks(d.tasks ?? []);
-      }
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    poll();
   };
 
   createEffect(() => {
     const pid = currentProject()?.id;
-    if (pid) loadBoard(pid);
+    if (pid) startLongPoll(pid);
   });
 
-  // Poll every 5s to pick up agent status changes
-  const interval = setInterval(() => {
-    const pid = currentProject()?.id;
-    if (pid) loadBoard(pid);
-  }, 5000);
-  onCleanup(() => clearInterval(interval));
+  onCleanup(() => abortController?.abort());
 
   const epicById = createMemo(() => {
     const map: Record<number, EpicItem> = {};

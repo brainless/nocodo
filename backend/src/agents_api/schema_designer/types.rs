@@ -83,3 +83,19 @@ pub struct SchemaCodegenResponse {
     pub rust_code: String,
     pub sql_ddl: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct BoardQuery {
+    pub project_id: i64,
+    /// Max updated_at the client already has; 0 = first load.
+    pub since: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BoardResponse {
+    pub tasks: Vec<TaskItem>,
+    pub epics: Vec<EpicItem>,
+    /// Max updated_at across all tasks and epics in this response.
+    pub updated_at: i64,
+    pub project_name: String,
+}

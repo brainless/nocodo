@@ -14,8 +14,8 @@ use std::time::Duration;
 
 const AGENT_TYPE: &str = "project_manager";
 
-/// POST /api/agents/pm/chat
-#[post("/api/agents/pm/chat")]
+/// POST /api/agents/project-manager/chat
+#[post("/api/agents/project-manager/chat")]
 pub async fn send_pm_chat_message(
     state: web::Data<AgentState>,
     request: web::Json<PmChatRequest>,
@@ -148,6 +148,7 @@ pub async fn send_pm_chat_message(
     let response_storage = state.response_storage.clone();
     let db_path = state.db_path.clone();
     let dispatch_tx = state.dispatch_tx.clone();
+    let board_notify = state.board_notify.clone();
 
     actix_web::rt::spawn(async move {
         let config = match AgentConfig::load_pm() {
@@ -161,7 +162,7 @@ pub async fn send_pm_chat_message(
         };
 
         let task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
-            Ok(s) => Arc::new(DispatchingTaskStorage::new(s, dispatch_tx)),
+            Ok(s) => Arc::new(DispatchingTaskStorage::new(s, dispatch_tx, board_notify.clone())),
             Err(e) => {
                 response_storage
                     .store_text(user_msg_id, format!("Storage error: {}", e))
@@ -204,10 +205,10 @@ pub async fn send_pm_chat_message(
     })
 }
 
-/// POST /api/agents/pm/init
+/// POST /api/agents/project-manager/init
 /// Bootstrap a brand-new project: create a PM task + session, then run the PM agent
 /// with the project-init system prompt so it creates an Epic and schema_designer task.
-#[post("/api/agents/pm/init")]
+#[post("/api/agents/project-manager/init")]
 pub async fn init_pm_project(
     state: web::Data<AgentState>,
     request: web::Json<PmInitRequest>,
@@ -298,6 +299,7 @@ pub async fn init_pm_project(
     let response_storage = state.response_storage.clone();
     let db_path = state.db_path.clone();
     let dispatch_tx = state.dispatch_tx.clone();
+    let board_notify = state.board_notify.clone();
 
     actix_web::rt::spawn(async move {
         let config = match AgentConfig::load_pm() {
@@ -311,7 +313,7 @@ pub async fn init_pm_project(
         };
 
         let task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
-            Ok(s) => Arc::new(DispatchingTaskStorage::new(s, dispatch_tx)),
+            Ok(s) => Arc::new(DispatchingTaskStorage::new(s, dispatch_tx, board_notify.clone())),
             Err(e) => {
                 response_storage
                     .store_text(user_msg_id, format!("Storage error: {}", e))
@@ -354,8 +356,8 @@ pub async fn init_pm_project(
     })
 }
 
-/// GET /api/agents/pm/messages/{message_id}/response
-#[get("/api/agents/pm/messages/{message_id}/response")]
+/// GET /api/agents/project-manager/messages/{message_id}/response
+#[get("/api/agents/project-manager/messages/{message_id}/response")]
 pub async fn get_pm_message_response(
     state: web::Data<AgentState>,
     path: web::Path<i64>,
@@ -401,8 +403,8 @@ pub async fn get_pm_message_response(
     }
 }
 
-/// GET /api/agents/pm/tasks/{task_id}/messages
-#[get("/api/agents/pm/tasks/{task_id}/messages")]
+/// GET /api/agents/project-manager/tasks/{task_id}/messages
+#[get("/api/agents/project-manager/tasks/{task_id}/messages")]
 pub async fn get_pm_task_messages(
     state: web::Data<AgentState>,
     path: web::Path<i64>,

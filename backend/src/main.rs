@@ -162,6 +162,7 @@ async fn main() -> std::io::Result<()> {
             // Agent API routes — shared
             .service(agents_api::schema_designer::list_tasks)
             .service(agents_api::schema_designer::list_epics)
+            .service(agents_api::schema_designer::get_board)
             // DB Developer (schema_designer) routes
             .service(agents_api::schema_designer::send_chat_message)
             .service(agents_api::schema_designer::get_task_messages)
