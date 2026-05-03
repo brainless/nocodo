@@ -78,3 +78,18 @@ pub fn build_pm_agent(
 
     Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
 }
+
+/// Like `build_pm_agent` but accepts a caller-supplied `task_storage`.
+/// Use this when the backend wraps storage with `DispatchingTaskStorage` so that
+/// tasks created by the PM agent's tool calls automatically fire dispatch events.
+pub fn build_pm_agent_with_task_storage(
+    config: &AgentConfig,
+    db_path: &str,
+    project_id: i64,
+    task_storage: Arc<dyn TaskStorage>,
+) -> Result<PmAgent, AgentError> {
+    let client = make_llm_client(config)?;
+    let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
+
+    Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
+}

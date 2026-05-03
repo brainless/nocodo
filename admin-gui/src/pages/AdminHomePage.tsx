@@ -113,15 +113,15 @@ function HomeContent() {
     const project = await createProject(`Project ${formatProjectTimestamp()}`);
     if (!project) throw new Error('Failed to create project');
 
-    const response = await fetch(`${API_BASE_URL}/api/agents/schema-designer/chat`, {
+    const response = await fetch(`${API_BASE_URL}/api/agents/pm/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_id: project.id, message }),
     });
 
-    if (!response.ok) throw new Error(`Failed to start schema designer: ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to initialize project: ${response.status}`);
 
-    navigate(`/projects/${project.id}/db-developer`);
+    navigate(`/projects/${project.id}/project-manager`);
   };
 
   const handleSubmit = async (message: string) => {

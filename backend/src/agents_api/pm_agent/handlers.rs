@@ -1,13 +1,15 @@
+use crate::agents_api::dispatcher::{DispatchingTaskStorage};
 use crate::agents_api::state::AgentState;
 use crate::agents_api::pm_agent::types::{
-    PmChatHistoryMessage, PmChatHistoryResponse, PmChatRequest, PmChatResponse,
+    PmChatHistoryMessage, PmChatHistoryResponse, PmChatRequest, PmChatResponse, PmInitRequest,
     PmMessageResponse, PmResponsePayload,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
-    build_pm_agent, AgentConfig, AgentStorage, PmResponse, SqliteAgentStorage, SqliteTaskStorage,
-    Task, TaskStatus, TaskStorage,
+    build_pm_agent_with_task_storage, AgentConfig, AgentStorage, PmResponse, SqliteAgentStorage,
+    SqliteTaskStorage, Task, TaskStatus, TaskStorage,
 };
+use std::sync::Arc;
 use std::time::Duration;
 
 const AGENT_TYPE: &str = "project_manager";
@@ -145,6 +147,7 @@ pub async fn send_pm_chat_message(
 
     let response_storage = state.response_storage.clone();
     let db_path = state.db_path.clone();
+    let dispatch_tx = state.dispatch_tx.clone();
 
     actix_web::rt::spawn(async move {
         let config = match AgentConfig::load_pm() {
@@ -157,7 +160,17 @@ pub async fn send_pm_chat_message(
             }
         };
 
-        let agent = match build_pm_agent(&config, &db_path, project_id) {
+        let task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
+            Ok(s) => Arc::new(DispatchingTaskStorage::new(s, dispatch_tx)),
+            Err(e) => {
+                response_storage
+                    .store_text(user_msg_id, format!("Storage error: {}", e))
+                    .await;
+                return;
+            }
+        };
+
+        let agent = match build_pm_agent_with_task_storage(&config, &db_path, project_id, task_storage) {
             Ok(a) => a,
             Err(e) => {
                 response_storage
@@ -186,6 +199,156 @@ pub async fn send_pm_chat_message(
 
     HttpResponse::Ok().json(PmChatResponse {
         task_id: actual_task_id,
+        message_id: user_msg_id,
+        status: "pending".to_string(),
+    })
+}
+
+/// POST /api/agents/pm/init
+/// Bootstrap a brand-new project: create a PM task + session, then run the PM agent
+/// with the project-init system prompt so it creates an Epic and schema_designer task.
+#[post("/api/agents/pm/init")]
+pub async fn init_pm_project(
+    state: web::Data<AgentState>,
+    request: web::Json<PmInitRequest>,
+) -> impl Responder {
+    let PmInitRequest { project_id, message } = request.into_inner();
+
+    let task_storage = match SqliteTaskStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to open task storage: {}", e)
+            }))
+        }
+    };
+
+    let agent_storage = match SqliteAgentStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to open agent storage: {}", e)
+            }))
+        }
+    };
+
+    let title: String = message.chars().take(100).collect();
+    let task_id = match task_storage
+        .create_task(Task {
+            id: None,
+            project_id,
+            epic_id: None,
+            title,
+            description: message.clone(),
+            source_prompt: message.clone(),
+            assigned_to_agent: AGENT_TYPE.to_string(),
+            status: TaskStatus::InProgress,
+            depends_on_task_id: None,
+            created_by_agent: "user".to_string(),
+            created_at: 0,
+            updated_at: 0,
+        })
+        .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to create task: {}", e)
+            }))
+        }
+    };
+
+    let session = match agent_storage
+        .create_task_session(project_id, task_id, AGENT_TYPE)
+        .await
+    {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to create session: {}", e)
+            }))
+        }
+    };
+    let session_id = session.id.unwrap_or(0);
+
+    let user_msg_id = match agent_storage
+        .create_message(nocodo_agents::ChatMessage {
+            id: None,
+            session_id,
+            role: "user".to_string(),
+            agent_type: None,
+            content: message.clone(),
+            tool_call_id: None,
+            tool_name: None,
+            turn_id: None,
+            created_at: 0,
+        })
+        .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to store message: {}", e)
+            }))
+        }
+    };
+
+    state.response_storage.store_pending(user_msg_id).await;
+
+    let response_storage = state.response_storage.clone();
+    let db_path = state.db_path.clone();
+    let dispatch_tx = state.dispatch_tx.clone();
+
+    actix_web::rt::spawn(async move {
+        let config = match AgentConfig::load_pm() {
+            Ok(c) => c,
+            Err(e) => {
+                response_storage
+                    .store_text(user_msg_id, format!("Config error: {}", e))
+                    .await;
+                return;
+            }
+        };
+
+        let task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
+            Ok(s) => Arc::new(DispatchingTaskStorage::new(s, dispatch_tx)),
+            Err(e) => {
+                response_storage
+                    .store_text(user_msg_id, format!("Storage error: {}", e))
+                    .await;
+                return;
+            }
+        };
+
+        let agent = match build_pm_agent_with_task_storage(&config, &db_path, project_id, task_storage) {
+            Ok(a) => a,
+            Err(e) => {
+                response_storage
+                    .store_text(user_msg_id, format!("Error: {}", e))
+                    .await;
+                return;
+            }
+        };
+
+        match agent.chat_with_session_init(session_id, task_id).await {
+            Ok(response) => match response {
+                PmResponse::Text(text) => {
+                    response_storage.store_text(user_msg_id, text).await;
+                }
+                PmResponse::Stopped(text) => {
+                    response_storage.store_stopped(user_msg_id, text).await;
+                }
+            },
+            Err(e) => {
+                response_storage
+                    .store_text(user_msg_id, format!("Error: {}", e))
+                    .await;
+            }
+        }
+    });
+
+    HttpResponse::Ok().json(PmChatResponse {
+        task_id,
         message_id: user_msg_id,
         status: "pending".to_string(),
     })

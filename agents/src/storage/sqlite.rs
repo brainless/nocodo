@@ -95,6 +95,15 @@ fn map_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<Session> {
 
 #[async_trait]
 impl AgentStorage for SqliteAgentStorage {
+    async fn rename_project(&self, project_id: i64, name: &str) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE project SET name = ?1 WHERE id = ?2",
+            params![name, project_id],
+        )?;
+        Ok(())
+    }
+
     async fn create_task_session(
         &self,
         project_id: i64,
@@ -375,6 +384,24 @@ impl TaskStorage for SqliteTaskStorage {
         let tasks = stmt
             .query_map(params![project_id], map_task)?
             .collect::<Result<Vec<_>, _>>()?;
+        Ok(tasks)
+    }
+
+    async fn list_open_dispatchable_tasks(&self) -> Result<Vec<Task>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.project_id, t.epic_id, t.title, t.description, t.source_prompt,
+                    t.assigned_to_agent, t.status, t.depends_on_task_id, t.created_by_agent,
+                    t.created_at, t.updated_at
+             FROM task t
+             LEFT JOIN agent_chat_session s
+                    ON s.task_id = t.id AND s.agent_type = t.assigned_to_agent
+             WHERE t.status = 'open'
+               AND t.assigned_to_agent != 'project_manager'
+               AND s.id IS NULL
+             ORDER BY t.id ASC",
+        )?;
+        let tasks = stmt.query_map([], map_task)?.collect::<Result<Vec<_>, _>>()?;
         Ok(tasks)
     }
 

@@ -7,10 +7,10 @@ use llm_sdk::{
 };
 
 use super::{
-    prompts::system_prompt,
+    prompts::{init_project_system_prompt, system_prompt},
     tools::{
         CreateEpicParams, CreateTaskParams, ListPendingReviewTasksParams,
-        PmUpdateTaskStatusParams,
+        PmUpdateTaskStatusParams, SetProjectNameParams,
     },
 };
 use crate::{
@@ -66,7 +66,17 @@ impl PmAgent {
         session_id: i64,
         task_id: i64,
     ) -> Result<PmResponse, AgentError> {
-        self.run_loop(session_id, task_id).await
+        self.run_loop(session_id, task_id, false).await
+    }
+
+    /// Run the PM agent for a brand-new project's first message.
+    /// Uses the project-init system prompt: create Epic + schema_designer task immediately.
+    pub async fn chat_with_session_init(
+        &self,
+        session_id: i64,
+        task_id: i64,
+    ) -> Result<PmResponse, AgentError> {
+        self.run_loop(session_id, task_id, true).await
     }
 
     // -----------------------------------------------------------------------
@@ -77,6 +87,7 @@ impl PmAgent {
         &self,
         session_id: i64,
         task_id: i64,
+        is_init: bool,
     ) -> Result<PmResponse, AgentError> {
         let list_tool = Tool::from_type::<ListPendingReviewTasksParams>()
             .name("list_pending_review_tasks")
@@ -110,6 +121,14 @@ impl PmAgent {
             )
             .build();
 
+        let set_project_name_tool = Tool::from_type::<SetProjectNameParams>()
+            .name("set_project_name")
+            .description(
+                "Set a descriptive name for this project based on the user's domain. \
+                 Call this once during project init, before creating the epic.",
+            )
+            .build();
+
         let agent_type_str = AgentType::ProjectManager.as_str().to_string();
         let mut nudges: u32 = 0;
 
@@ -135,16 +154,23 @@ impl PmAgent {
                 messages: llm_messages,
                 max_tokens: 4096,
                 model: self.model.clone(),
-                system: Some(system_prompt()),
+                system: Some(if is_init { init_project_system_prompt() } else { system_prompt() }),
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
-                tools: Some(vec![
-                    list_tool.clone(),
-                    create_epic_tool.clone(),
-                    create_task_tool.clone(),
-                    update_status_tool.clone(),
-                ]),
+                tools: Some({
+                    let mut tools = vec![
+                        create_epic_tool.clone(),
+                        create_task_tool.clone(),
+                        update_status_tool.clone(),
+                    ];
+                    if is_init {
+                        tools.insert(0, set_project_name_tool.clone());
+                    } else {
+                        tools.insert(0, list_tool.clone());
+                    }
+                    tools
+                }),
                 tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
             };
@@ -183,6 +209,48 @@ impl PmAgent {
                     log::info!("[PM] Tool: {}", tool_name);
 
                     match tool_name {
+                        "set_project_name" => {
+                            let params: SetProjectNameParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
+
+                            let result_text = match self
+                                .storage
+                                .rename_project(self.project_id, &params.name)
+                                .await
+                            {
+                                Ok(()) => format!("Project renamed to \"{}\".", params.name),
+                                Err(e) => format!("Failed to rename project: {}", e),
+                            };
+
+                            let mut turn = Vec::new();
+                            if !assistant_text.is_empty() {
+                                turn.push(text_row(assistant_text.clone()));
+                            }
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "assistant".to_string(),
+                                agent_type: Some(agent_type_str.clone()),
+                                content: serde_json::to_string(tool_call.arguments())?,
+                                tool_call_id: Some(call_id.clone()),
+                                tool_name: Some("set_project_name".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            turn.push(ChatMessage {
+                                id: None,
+                                session_id,
+                                role: "tool".to_string(),
+                                agent_type: None,
+                                content: result_text,
+                                tool_call_id: Some(call_id),
+                                tool_name: Some("set_project_name".to_string()),
+                                turn_id: None,
+                                created_at: 0,
+                            });
+                            self.storage.create_turn(turn).await?;
+                        }
+
                         "list_pending_review_tasks" => {
                             let tasks = self
                                 .task_storage

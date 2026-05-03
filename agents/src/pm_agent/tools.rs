@@ -31,6 +31,15 @@ pub struct CreateTaskParams {
     pub depends_on_task_id: Option<i64>,
 }
 
+/// Set the human-readable name of the current project.
+/// Use this during project init, after understanding the user's domain.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SetProjectNameParams {
+    /// A concise, descriptive name for the project (≤ 60 chars). Derived from the user's domain,
+    /// e.g. "CRM — Leads & Deals" or "Inventory Tracker".
+    pub name: String,
+}
+
 /// Update the status of any task the PM is managing.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PmUpdateTaskStatusParams {

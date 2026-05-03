@@ -1,7 +1,9 @@
 use nocodo_agents::AgentConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
+
+use super::dispatcher::{AgentDispatcher, DispatchEvent};
 
 /// In-memory storage for agent responses that are pending or completed.
 pub struct ResponseStorage {
@@ -105,6 +107,8 @@ pub struct AgentState {
     pub config: AgentConfig,
     pub db_path: String,
     pub response_storage: Arc<ResponseStorage>,
+    /// Send a DispatchEvent to kick off an agent for a newly created task.
+    pub dispatch_tx: mpsc::UnboundedSender<DispatchEvent>,
 }
 
 impl AgentState {
@@ -112,18 +116,28 @@ impl AgentState {
         let config =
             AgentConfig::load().map_err(|e| format!("Failed to load agent config: {}", e))?;
 
+        let (tx, rx) = mpsc::unbounded_channel::<DispatchEvent>();
+        let dispatcher = AgentDispatcher::new(rx, db_path.clone());
+        tokio::spawn(dispatcher.run());
+
         Ok(Self {
             config,
             db_path,
             response_storage: Arc::new(ResponseStorage::new()),
+            dispatch_tx: tx,
         })
     }
 
     pub fn with_config(config: AgentConfig, db_path: String) -> Self {
+        let (tx, rx) = mpsc::unbounded_channel::<DispatchEvent>();
+        let dispatcher = AgentDispatcher::new(rx, db_path.clone());
+        tokio::spawn(dispatcher.run());
+
         Self {
             config,
             db_path,
             response_storage: Arc::new(ResponseStorage::new()),
+            dispatch_tx: tx,
         }
     }
 }

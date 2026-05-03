@@ -1,5 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use nocodo_agents::{SqliteTaskStorage, TaskStorage};
 use shared_types::HeartbeatResponse;
 
 mod agents_api;
@@ -98,6 +99,29 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    // Startup reconciliation: find open tasks with no session and dispatch them.
+    // Covers tasks that were created before a previous shutdown.
+    if let Ok(ts) = SqliteTaskStorage::open(&database_url) {
+        match ts.list_open_dispatchable_tasks().await {
+            Ok(tasks) => {
+                if !tasks.is_empty() {
+                    log::info!("Reconciling {} open dispatchable task(s)", tasks.len());
+                }
+                for task in tasks {
+                    let _ = agent_state.dispatch_tx.send(
+                        agents_api::dispatcher::DispatchEvent {
+                            task_id: task.id.unwrap_or(0),
+                            project_id: task.project_id,
+                            assigned_to_agent: task.assigned_to_agent,
+                            source_prompt: task.source_prompt,
+                        },
+                    );
+                }
+            }
+            Err(e) => log::warn!("Startup reconciliation failed: {}", e),
+        }
+    }
+
     // Load schema cache for dynamic SQL queries
     let schema_cache = {
         let conn = rusqlite::Connection::open(&database_url).expect("Failed to open database");
@@ -145,6 +169,7 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::schema_designer::get_message_response)
             .service(agents_api::schema_designer::generate_task_schema_code)
             // PM Agent routes
+            .service(agents_api::pm_agent::init_pm_project)
             .service(agents_api::pm_agent::send_pm_chat_message)
             .service(agents_api::pm_agent::get_pm_message_response)
             .service(agents_api::pm_agent::get_pm_task_messages)

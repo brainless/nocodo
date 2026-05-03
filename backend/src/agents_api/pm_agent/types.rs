@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+/// Used by POST /api/agents/pm/init — first message for a brand-new project.
+#[derive(Debug, Deserialize)]
+pub struct PmInitRequest {
+    pub project_id: i64,
+    pub message: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PmChatRequest {
     pub project_id: i64,
