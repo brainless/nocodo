@@ -174,6 +174,11 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::pm_agent::send_pm_chat_message)
             .service(agents_api::pm_agent::get_pm_message_response)
             .service(agents_api::pm_agent::get_pm_task_messages)
+            // UI Designer routes
+            .service(agents_api::ui_designer::handlers::list_entities)
+            .service(agents_api::ui_designer::handlers::generate_form)
+            .service(agents_api::ui_designer::handlers::get_form)
+            .service(agents_api::ui_designer::handlers::list_forms)
             // Project API routes
             .service(projects_api::handlers::list_projects)
             .service(projects_api::handlers::create_project)

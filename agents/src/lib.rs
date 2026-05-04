@@ -3,15 +3,22 @@ pub mod error;
 pub mod pm_agent;
 pub mod schema_designer;
 pub mod storage;
+pub mod ui_designer;
 
 pub use config::AgentConfig;
 pub use error::AgentError;
 pub use pm_agent::{PmAgent, PmResponse};
 pub use schema_designer::{AgentResponse, SchemaDesignerAgent, StopAgentParams};
-pub use storage::sqlite::{SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage};
+pub use storage::sqlite::{
+    SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage, SqliteUiFormStorage,
+};
 pub use storage::{
     AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, SchemaStorage, Session, Task,
-    TaskStatus, TaskStorage,
+    TaskStatus, TaskStorage, UiFormStorage,
+};
+pub use ui_designer::{
+    agent::{UiDesignerAgent, UiDesignerResponse},
+    FormField, FormFieldType, FormLayout, FormRow,
 };
 
 // ---------------------------------------------------------------------------
@@ -77,6 +84,27 @@ pub fn build_pm_agent(
     let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
 
     Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
+}
+
+/// Build a `UiDesignerAgent` from config + SQLite path.
+pub fn build_ui_designer(
+    config: &AgentConfig,
+    db_path: &str,
+    project_id: i64,
+) -> Result<UiDesignerAgent, AgentError> {
+    let client = make_llm_client(config)?;
+    let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
+    let form_storage: Arc<dyn UiFormStorage> = Arc::new(SqliteUiFormStorage::open(db_path)?);
+    let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
+
+    Ok(UiDesignerAgent::new(
+        client,
+        storage,
+        form_storage,
+        task_storage,
+        &config.model,
+        project_id,
+    ))
 }
 
 /// Like `build_pm_agent` but accepts a caller-supplied `task_storage`.

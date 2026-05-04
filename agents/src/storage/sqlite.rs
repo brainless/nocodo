@@ -5,7 +5,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
     AgentStorage, ChatMessage, Epic, EpicStatus, SchemaStorage, Session, Task, TaskStatus,
-    TaskStorage,
+    TaskStorage, UiFormStorage,
 };
 use crate::error::AgentError;
 
@@ -576,5 +576,97 @@ impl SchemaStorage for SqliteSchemaStorage {
             project_id, session_id, version, row_id
         );
         Ok(row_id)
+    }
+
+    async fn get_latest_schema_for_project(
+        &self,
+        project_id: i64,
+    ) -> Result<Option<String>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn
+            .query_row(
+                "SELECT schema_json FROM project_schema
+                 WHERE project_id = ?1
+                 ORDER BY version DESC, id DESC LIMIT 1",
+                params![project_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        Ok(result)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteUiFormStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteUiFormStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteUiFormStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self { conn: Mutex::new(conn) }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+#[async_trait]
+impl UiFormStorage for SqliteUiFormStorage {
+    async fn save_form_layout(
+        &self,
+        project_id: i64,
+        entity_name: &str,
+        layout_json: &str,
+    ) -> Result<(), AgentError> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO ui_form_layout (project_id, entity_name, layout_json, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT(project_id, entity_name) DO UPDATE SET
+               layout_json = excluded.layout_json,
+               updated_at  = excluded.updated_at",
+            params![project_id, entity_name, layout_json, ts],
+        )?;
+        Ok(())
+    }
+
+    async fn get_form_layout(
+        &self,
+        project_id: i64,
+        entity_name: &str,
+    ) -> Result<Option<String>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn
+            .query_row(
+                "SELECT layout_json FROM ui_form_layout
+                 WHERE project_id = ?1 AND entity_name = ?2 LIMIT 1",
+                params![project_id, entity_name],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        Ok(result)
+    }
+
+    async fn list_form_layouts(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<(String, String)>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT entity_name, layout_json FROM ui_form_layout
+             WHERE project_id = ?1 ORDER BY entity_name ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 }

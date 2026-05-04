@@ -11,6 +11,7 @@ use crate::error::AgentError;
 pub enum AgentType {
     SchemaDesigner,
     ProjectManager,
+    UiDesigner,
 }
 
 impl AgentType {
@@ -18,6 +19,7 @@ impl AgentType {
         match self {
             AgentType::SchemaDesigner => "schema_designer",
             AgentType::ProjectManager => "project_manager",
+            AgentType::UiDesigner => "ui_designer",
         }
     }
 }
@@ -232,4 +234,38 @@ pub trait SchemaStorage: Send + Sync {
         session_id: i64,
         version: Option<i64>,
     ) -> Result<Option<(String, i64)>, AgentError>;
+
+    /// Latest schema for the project regardless of session.
+    async fn get_latest_schema_for_project(
+        &self,
+        project_id: i64,
+    ) -> Result<Option<String>, AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// UiFormStorage trait — persists generated form layouts
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait UiFormStorage: Send + Sync {
+    /// Upsert the form layout JSON for a (project, entity) pair.
+    async fn save_form_layout(
+        &self,
+        project_id: i64,
+        entity_name: &str,
+        layout_json: &str,
+    ) -> Result<(), AgentError>;
+
+    /// Retrieve the form layout JSON for a (project, entity) pair, if it exists.
+    async fn get_form_layout(
+        &self,
+        project_id: i64,
+        entity_name: &str,
+    ) -> Result<Option<String>, AgentError>;
+
+    /// List all (entity_name, layout_json) pairs for a project.
+    async fn list_form_layouts(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<(String, String)>, AgentError>;
 }

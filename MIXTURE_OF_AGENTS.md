@@ -7,9 +7,10 @@ nocodo is a development team of LLM agents that builds full-stack Rust + SolidJS
 | Agent | Scope | Status |
 |---|---|---| 
 | DB Developer | SQLite schema design | Active (`schema_designer`) |
+| UI Designer | Low-fidelity form layout generation | Active (`ui_designer`) |
 | Backend Developer | Actix-web handlers, migrations | Planned |
-| Frontend Developer | SolidJS components | Planned |
-| Project Manager | Epic/Task orchestration, fan-out | Planned |
+| Frontend Developer | SolidJS code generation | Planned |
+| Project Manager | Epic/Task orchestration, fan-out | Active (`project_manager`) |
 
 ## Communication Model
 
@@ -163,10 +164,52 @@ async fn create_task_session(
 
 Always creates a new session — no "get or create". One session per task per agent.
 
+## UI Designer Agent
+
+The `ui_designer` agent generates low-fidelity form layouts for database entities. It is triggered on demand by the user selecting an entity from the schema.
+
+### Flow
+
+```
+User selects entity → POST /api/agents/ui-designer/form
+  → Backend checks cache (ui_form_layout table)
+  → Cache hit: return FormLayout immediately
+  → Cache miss: extract TableDef from latest schema → create Task → dispatch ui_designer
+     → Agent reads TableDef → calls write_form_layout tool → saves FormLayout JSON
+  → Frontend polls GET /api/agents/ui-designer/form/{project_id}/{entity_name}
+  → FormCanvas renders CSS skeleton blocks
+```
+
+### Layout Format
+
+Forms are stored as typed JSON (`FormLayout`) — not tied to any generated project. Layout intent is captured as **row grouping**: fields in the same row render side-by-side; a row with one field is full-width.
+
+```
+FormLayout
+  entity: String
+  title: String          -- human-readable, e.g. "New Project"
+  rows: Vec<FormRow>
+    fields: Vec<FormField>
+      name, label, field_type, required, placeholder?
+
+FormFieldType: text | number | boolean | date | select | textarea
+```
+
+The agent infers field types from column names and types, omits id/audit columns, and groups related short fields (e.g. first_name + last_name) side-by-side. Layout decisions are encoded in the YAML so future code-gen can consume them without re-inferring.
+
+### Storage
+
+`ui_form_layout` table: `(project_id, entity_name)` unique. Upsert on regenerate. Types live in `agents/src/ui_designer/` — not in `shared-types` (no managed-project code-gen needed).
+
+### Canvas
+
+`UIDesignerPage` in `admin-gui` renders CSS skeleton components per block type: text input shape, textarea, select with chevron, checkbox. No SVG. Each `FormRow` is a flex row.
+
 ## Rollout Plan
 
-1. **Epic/Task storage** — SQLite migration, Rust types, `TaskStorage` trait + `SqliteTaskStorage` impl, `AgentStorage::get_or_create_task_session`
-2. **DB Developer tools** — `create_task` / `update_task_status` tool calls; switch to task-scoped sessions; test end-to-end
-3. **PM Agent** — new agent with `create_epic`, `create_task`, `assign_task`, `list_pending_review_tasks`; test PM → DB Developer hand-off
-4. **Backend Developer Agent** — add agent; test DB → Backend cross-agent task dependency
-5. **Frontend Developer Agent** — add agent; test full-stack Epic flow
+1. **Epic/Task storage** — SQLite migration, Rust types, `TaskStorage` trait + `SqliteTaskStorage` impl, `AgentStorage::get_or_create_task_session` ✓
+2. **DB Developer tools** — `create_task` / `update_task_status` tool calls; switch to task-scoped sessions; test end-to-end ✓
+3. **PM Agent** — new agent with `create_epic`, `create_task`, `assign_task`, `list_pending_review_tasks`; test PM → DB Developer hand-off ✓
+4. **UI Designer Agent** — on-demand form layout generation; canvas renderer in admin-gui ✓
+5. **Backend Developer Agent** — add agent; test DB → Backend cross-agent task dependency
+6. **Frontend Developer Agent** — SolidJS code-gen from FormLayout + shared types

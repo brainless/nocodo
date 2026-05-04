@@ -3,9 +3,9 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Notify};
 
 use nocodo_agents::{
-    build_schema_designer, AgentConfig, AgentError, AgentResponse, AgentStorage, AgentType,
-    ChatMessage, Epic, EpicStatus, SqliteAgentStorage, SqliteTaskStorage, Task, TaskStatus,
-    TaskStorage,
+    build_schema_designer, build_ui_designer, AgentConfig, AgentError, AgentResponse, AgentStorage,
+    AgentType, ChatMessage, Epic, EpicStatus, SqliteAgentStorage, SqliteTaskStorage, Task,
+    TaskStatus, TaskStorage, UiDesignerResponse,
 };
 
 // ---------------------------------------------------------------------------
@@ -172,6 +172,7 @@ impl AgentDispatcher {
 async fn dispatch_task(event: DispatchEvent, db_path: String) {
     match event.assigned_to_agent.as_str() {
         "schema_designer" => dispatch_schema_designer(event, &db_path).await,
+        "ui_designer" => dispatch_ui_designer(event, &db_path).await,
         other => log::warn!("[Dispatcher] No handler for agent type: {}", other),
     }
 }
@@ -248,6 +249,90 @@ async fn dispatch_schema_designer(event: DispatchEvent, db_path: &str) {
         }
         Err(e) => {
             log::error!("[Dispatcher] schema_designer task={} error: {}", task_id, e);
+        }
+    }
+}
+
+async fn dispatch_ui_designer(event: DispatchEvent, db_path: &str) {
+    let task_id = event.task_id;
+
+    let agent_storage = match SqliteAgentStorage::open(db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("[Dispatcher] ui_designer task={} storage error: {}", task_id, e);
+            return;
+        }
+    };
+
+    // The HTTP handler creates the session and stores the first message before
+    // sending the dispatch event. For startup reconciliation (no session yet),
+    // create session + store source_prompt here.
+    let session_id = match agent_storage.get_session_by_task(task_id, "ui_designer").await {
+        Ok(Some(s)) => s.id.unwrap_or(0),
+        Ok(None) => {
+            let session =
+                match agent_storage.create_task_session(event.project_id, task_id, "ui_designer").await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::error!("[Dispatcher] ui_designer task={} session error: {}", task_id, e);
+                        return;
+                    }
+                };
+            let sid = session.id.unwrap_or(0);
+            if let Err(e) = agent_storage
+                .create_message(ChatMessage {
+                    id: None,
+                    session_id: sid,
+                    role: "user".to_string(),
+                    agent_type: None,
+                    content: event.source_prompt.clone(),
+                    tool_call_id: None,
+                    tool_name: None,
+                    turn_id: None,
+                    created_at: 0,
+                })
+                .await
+            {
+                log::error!("[Dispatcher] ui_designer task={} message error: {}", task_id, e);
+                return;
+            }
+            sid
+        }
+        Err(e) => {
+            log::error!("[Dispatcher] ui_designer task={} session lookup error: {}", task_id, e);
+            return;
+        }
+    };
+
+    let config = match AgentConfig::load() {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("[Dispatcher] ui_designer task={} config error: {}", task_id, e);
+            return;
+        }
+    };
+
+    let agent = match build_ui_designer(&config, db_path, event.project_id) {
+        Ok(a) => a,
+        Err(e) => {
+            log::error!("[Dispatcher] ui_designer task={} build error: {}", task_id, e);
+            return;
+        }
+    };
+
+    match agent.run_for_task(session_id, task_id).await {
+        Ok(UiDesignerResponse::FormGenerated(form)) => {
+            log::info!(
+                "[Dispatcher] ui_designer task={} form generated for entity '{}'",
+                task_id,
+                form.entity
+            );
+        }
+        Ok(UiDesignerResponse::Stopped(reason)) => {
+            log::warn!("[Dispatcher] ui_designer task={} stopped: {}", task_id, reason);
+        }
+        Err(e) => {
+            log::error!("[Dispatcher] ui_designer task={} error: {}", task_id, e);
         }
     }
 }
