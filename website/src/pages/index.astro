@@ -59,17 +59,14 @@ import '../styles/global.css';
         </a>
       </div>
 
-      <!-- Screenshot placeholder -->
+      <!-- Hero screenshot -->
       <div class="rounded-xl border border-[#c6d1e4] bg-white overflow-hidden shadow-2xl">
         <div class="flex items-center gap-1.5 px-4 py-3 border-b border-[#c6d1e4] bg-[#f6f8fe]">
           <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
           <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
           <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
         </div>
-        <div class="bg-white h-80 flex items-center justify-center text-[#8fa0be] text-sm">
-          <!-- Screenshot goes here -->
-          App screenshot
-        </div>
+        <img src="/screenshots/nocodo_app_home.png" alt="nocodo app home" class="w-full block" />
       </div>
     </section>
 
@@ -181,10 +178,7 @@ import '../styles/global.css';
               <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
               <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
             </div>
-            <div class="h-56 flex items-center justify-center text-[#8fa0be] text-sm">
-              <!-- Screenshot: spreadsheet UI -->
-              Spreadsheet UI screenshot
-            </div>
+            <img src="/screenshots/nocodo_generated_sheet_schema.png" alt="Spreadsheet-driven schema definition" class="w-full block" />
           </div>
         </div>
       </div>
@@ -199,10 +193,7 @@ import '../styles/global.css';
             <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
             <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
           </div>
-          <div class="h-56 flex items-center justify-center text-[#8fa0be] text-sm">
-            <!-- Screenshot: AI chat -->
-            AI chat screenshot
-          </div>
+          <img src="/screenshots/nocodo_project_manager.png" alt="Project manager agent" class="w-full block" />
         </div>
         <div class="order-1 lg:order-2">
           <h2 class="text-2xl font-bold mb-4 text-[#172033]">Chat with your schema designer</h2>
@@ -215,6 +206,34 @@ import '../styles/global.css';
             <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Generates migrations automatically</li>
             <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Bring your own LLM API key</li>
           </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Project management -->
+    <section class="border-t border-b border-[#c6cfdf] bg-white">
+      <div class="max-w-6xl mx-auto px-6 py-20">
+        <div class="grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 class="text-2xl font-bold mb-4 text-[#172033]">Built-in project management</h2>
+            <p class="text-[#4a5a7a] leading-relaxed mb-6">
+              Track your work without leaving nocodo. Organise tasks under epics, assign them to team members, and let the AI project manager keep everything in sync with your schema and codebase.
+            </p>
+            <ul class="space-y-3 text-sm text-[#334361]">
+              <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Tasks and epics in one view</li>
+              <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> AI project manager agent</li>
+              <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Linked to your schema and code</li>
+              <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Multi-agent collaboration</li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-[#c6d1e4] bg-white overflow-hidden shadow-xl">
+            <div class="flex items-center gap-1.5 px-4 py-3 border-b border-[#c6d1e4] bg-[#f6f8fe]">
+              <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
+              <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
+              <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
+            </div>
+            <img src="/screenshots/nocodo_project_management_with_tasks_epics.png" alt="Project management with tasks and epics" class="w-full block" />
+          </div>
         </div>
       </div>
     </section>

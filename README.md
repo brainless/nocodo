@@ -12,6 +12,8 @@ nocodo lets you describe your application's data model and business logic the wa
 
 It's a desktop app you run locally. Everything stays on your machine. When you're ready, self-host the generated backend or use nocodo's pay-as-you-go hosting with a custom domain.
 
+![nocodo app home](website/public/screenshots/nocodo_app_home.png)
+
 ---
 
 ## Features
@@ -19,12 +21,22 @@ It's a desktop app you run locally. Everything stays on your machine. When you'r
 ### Spreadsheet UI for defining business workflows
 Work in a spreadsheet-style interface to define entities, relationships, field types, and constraints. If you can model something in a sheet, nocodo can turn it into a running application.
 
+![Spreadsheet-driven schema definition](website/public/screenshots/nocodo_generated_sheet_schema.png)
+
 ### AI-generated database and CRUD API
 nocodo uses an AI schema designer agent to translate your sheet definitions into a production-quality relational database schema and CRUD API. Currently targets **SQLite3**, with more backends planned.
 
 - Automatic schema migrations
 - Type-safe API backed by shared Rust types
 - Chat with the AI assistant inside the app to refine your schema
+
+![Project manager agent](website/public/screenshots/nocodo_project_manager.png)
+
+### Project management with tasks and epics
+
+Manage your work inside nocodo with built-in project tracking. Organise tasks under epics, assign them, and let the AI project manager keep everything in sync.
+
+![Project management with tasks and epics](website/public/screenshots/nocodo_project_management_with_tasks_epics.png)
 
 ### Custom business logic with Rust/Wasm *(coming soon)*
 Write custom business logic once, compile to WebAssembly, and share it across deployments. Runs anywhere nocodo runs.
