@@ -62,7 +62,7 @@ rsync -az --delete \
   "${SSH_USER}@${SERVER_IP}:${REMOTE_ROOT}/"
 
 echo "[deploy] build backend on server"
-remote_exec "command -v sccache >/dev/null 2>&1 || (SCCACHE_VER=\$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mozilla/sccache/releases/latest | grep -o 'v[0-9.]*\$') && curl -fsSL \"https://github.com/mozilla/sccache/releases/download/\${SCCACHE_VER}/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl.tar.gz\" | tar xz -C /tmp && sudo mv /tmp/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache && rm -rf /tmp/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl)"
+remote_exec "command -v sccache >/dev/null 2>&1 || (SARCH=\$(uname -m); case \"\$SARCH\" in x86_64) ST=x86_64-unknown-linux-musl ;; aarch64) ST=aarch64-unknown-linux-musl ;; *) echo \"unsupported arch: \$SARCH\"; exit 1 ;; esac && SCCACHE_VER=\$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mozilla/sccache/releases/latest | grep -o 'v[0-9.]*\$') && curl -fsSL \"https://github.com/mozilla/sccache/releases/download/\${SCCACHE_VER}/sccache-\${SCCACHE_VER}-\${ST}.tar.gz\" | tar xz -C /tmp && sudo mv /tmp/sccache-\${SCCACHE_VER}-\${ST}/sccache /usr/local/bin/sccache && rm -rf /tmp/sccache-\${SCCACHE_VER}-\${ST})"
 remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && RUSTC_WRAPPER=sccache cargo build --release -p ${BACKEND_BIN} --bin ${BACKEND_BIN} --bin ${MIGRATE_BIN}"
 
 echo "[deploy] install backend binary"
@@ -80,12 +80,14 @@ remote_exec "bash -c 'set -a; . ${DEPLOY_ROOT}/server.env; cd ${DEPLOY_ROOT}; ./
 
 echo "[deploy] upload gui dist"
 remote_exec "sudo rm -rf ${DEPLOY_ROOT}/gui/* && sudo mkdir -p ${DEPLOY_ROOT}/gui"
+remote_exec "mkdir -p /tmp/${PROJECT_NAME}-gui-dist"
 scp -o StrictHostKeyChecking=no -r "$PROJECT_ROOT/gui/dist/"* "${SSH_USER}@${SERVER_IP}:/tmp/${PROJECT_NAME}-gui-dist/"
 remote_exec "sudo mv /tmp/${PROJECT_NAME}-gui-dist/* ${DEPLOY_ROOT}/gui/ && rmdir /tmp/${PROJECT_NAME}-gui-dist"
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/gui"
 
 echo "[deploy] upload admin-gui dist"
 remote_exec "sudo rm -rf ${DEPLOY_ROOT}/admin-gui/* && sudo mkdir -p ${DEPLOY_ROOT}/admin-gui"
+remote_exec "mkdir -p /tmp/${PROJECT_NAME}-admin-gui-dist"
 scp -o StrictHostKeyChecking=no -r "$PROJECT_ROOT/admin-gui/dist/"* "${SSH_USER}@${SERVER_IP}:/tmp/${PROJECT_NAME}-admin-gui-dist/"
 remote_exec "sudo mv /tmp/${PROJECT_NAME}-admin-gui-dist/* ${DEPLOY_ROOT}/admin-gui/ && rmdir /tmp/${PROJECT_NAME}-admin-gui-dist"
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/admin-gui"
