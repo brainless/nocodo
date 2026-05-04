@@ -16,25 +16,37 @@ pub struct AgentConfig {
 }
 
 impl AgentConfig {
-    /// Load DB-developer agent config from environment / project.conf.
-    ///
-    /// Keys read: AGENT_PROVIDER, AGENT_MODEL, OPENAI_API_KEY / ANTHROPIC_API_KEY / GROQ_API_KEY
+    /// Load default agent config (AGENT_PROVIDER / AGENT_MODEL).
     pub fn load() -> Result<Self, AgentError> {
         Self::load_from_prefix("AGENT")
     }
 
-    /// Load PM agent config from environment / project.conf.
-    ///
-    /// Keys read: PM_AGENT_PROVIDER (default: "groq"), PM_AGENT_MODEL,
-    /// GROQ_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY
-    /// Falls back to AGENT_* keys if PM_AGENT_* are absent.
+    /// Load schema-designer config: SCHEMA_AGENT_* with fallback to AGENT_*.
+    pub fn load_schema_designer() -> Result<Self, AgentError> {
+        Self::load_with_agent_fallback("SCHEMA_AGENT")
+    }
+
+    /// Load UI-designer config: UI_AGENT_* with fallback to AGENT_*.
+    pub fn load_ui_designer() -> Result<Self, AgentError> {
+        Self::load_with_agent_fallback("UI_AGENT")
+    }
+
+    /// Load PM agent config: PM_AGENT_* with fallback to AGENT_*.
     pub fn load_pm() -> Result<Self, AgentError> {
-        let provider = std::env::var("PM_AGENT_PROVIDER")
+        Self::load_with_agent_fallback("PM_AGENT")
+    }
+
+    /// Try `{prefix}_PROVIDER` / `{prefix}_MODEL` first; fall back to AGENT_* defaults.
+    fn load_with_agent_fallback(prefix: &str) -> Result<Self, AgentError> {
+        let provider_key = format!("{}_PROVIDER", prefix);
+        let model_key = format!("{}_MODEL", prefix);
+
+        let provider = std::env::var(&provider_key)
             .ok()
-            .or_else(|| read_project_conf("PM_AGENT_PROVIDER"))
+            .or_else(|| read_project_conf(&provider_key))
             .or_else(|| std::env::var("AGENT_PROVIDER").ok())
             .or_else(|| read_project_conf("AGENT_PROVIDER"))
-            .unwrap_or_else(|| PROVIDER_GROQ.to_string());
+            .unwrap_or_else(|| PROVIDER_OPENAI.to_string());
 
         let default_model = match provider.as_str() {
             PROVIDER_ANTHROPIC => llm_sdk::models::claude::SONNET_4_5_ID.to_string(),
@@ -42,9 +54,9 @@ impl AgentConfig {
             _ => llm_sdk::models::openai::GPT_5_MINI_ID.to_string(),
         };
 
-        let model = std::env::var("PM_AGENT_MODEL")
+        let model = std::env::var(&model_key)
             .ok()
-            .or_else(|| read_project_conf("PM_AGENT_MODEL"))
+            .or_else(|| read_project_conf(&model_key))
             .or_else(|| std::env::var("AGENT_MODEL").ok())
             .or_else(|| read_project_conf("AGENT_MODEL"))
             .unwrap_or(default_model);
@@ -125,7 +137,9 @@ fn read_conf_file(path: &Path, key: &str) -> Option<String> {
         if k.trim() != key {
             continue;
         }
-        let value = value.trim().trim_matches('"').trim_matches('\'');
+        let value = value.trim();
+        let value = value.split_once(" #").map(|(v, _)| v).unwrap_or(value).trim();
+        let value = value.trim_matches('"').trim_matches('\'');
         if !value.is_empty() {
             return Some(value.to_string());
         }

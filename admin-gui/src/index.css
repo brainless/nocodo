@@ -1071,8 +1071,6 @@ body {
 
 .uid-page {
   padding: 2rem;
-  max-width: 960px;
-  margin: 0 auto;
 }
 
 .uid-page-header {
@@ -1112,9 +1110,10 @@ body {
 }
 
 .uid-entity-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 1.5rem;
+  align-items: start;
 }
 
 /* ---- Entity card ---- */

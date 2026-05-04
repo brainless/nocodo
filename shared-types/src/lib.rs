@@ -134,8 +134,10 @@ pub enum AgentType {
 #[ts(export)]
 pub struct ForeignKeyDef {
     /// SQL name of the referenced table.
+    #[serde(default)]
     pub ref_table: String,
     /// Name of the referenced column (usually "id").
+    #[serde(default)]
     pub ref_column: String,
 }
 
@@ -146,6 +148,8 @@ pub struct ColumnDef {
     pub name: String,
     #[serde(default)]
     pub label: Option<String>,
+    #[serde(deserialize_with = "deserialize_data_type")]
+    #[schemars(schema_with = "data_type_loose_schema")]
     pub data_type: DataType,
     #[serde(default)]
     pub nullable: bool,
@@ -153,6 +157,40 @@ pub struct ColumnDef {
     pub primary_key: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreign_key: Option<ForeignKeyDef>,
+}
+
+/// Loose schema for the tool: accept any string with a description of valid values.
+/// Prevents provider-side enum validation from rejecting LLM aliases like "varchar".
+fn data_type_loose_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    use schemars::schema::*;
+    SchemaObject {
+        instance_type: Some(InstanceType::String.into()),
+        metadata: Some(Box::new(Metadata {
+            description: Some(
+                "Column storage type. Use exactly one of: text, integer, real, boolean, date, date_time".to_string(),
+            ),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+    .into()
+}
+
+/// Lenient deserializer: maps SQL type aliases to canonical DataType variants.
+fn deserialize_data_type<'de, D>(deserializer: D) -> Result<DataType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(match s.to_lowercase().replace(['-', ' '], "_").as_str() {
+        "text" | "varchar" | "string" | "char" | "nvarchar" | "uuid" | "json" | "blob" => DataType::Text,
+        "integer" | "int" | "bigint" | "smallint" | "tinyint" | "int4" | "int8" | "number" => DataType::Integer,
+        "real" | "float" | "double" | "decimal" | "numeric" | "float4" | "float8" => DataType::Real,
+        "boolean" | "bool" | "bit" => DataType::Boolean,
+        "date" => DataType::Date,
+        "date_time" | "datetime" | "timestamp" | "timestamptz" | "time" => DataType::DateTime,
+        _ => DataType::Text,
+    })
 }
 
 /// Table definition as emitted by the agent.

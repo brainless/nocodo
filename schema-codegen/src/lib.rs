@@ -115,9 +115,15 @@ fn parse_column_def(col: &ColumnDef) -> ColumnModel {
         sql_type: sql_type.to_string(),
         nullable: col.nullable,
         primary_key: col.primary_key,
-        foreign_key: col.foreign_key.as_ref().map(|fk| ForeignKeyModel {
-            ref_table: fk.ref_table.clone(),
-            ref_column: fk.ref_column.clone(),
+        foreign_key: col.foreign_key.as_ref().and_then(|fk| {
+            if fk.ref_table.is_empty() || fk.ref_column.is_empty() {
+                None
+            } else {
+                Some(ForeignKeyModel {
+                    ref_table: fk.ref_table.clone(),
+                    ref_column: fk.ref_column.clone(),
+                })
+            }
         }),
     }
 }

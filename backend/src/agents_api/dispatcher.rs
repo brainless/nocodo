@@ -218,7 +218,7 @@ async fn dispatch_schema_designer(event: DispatchEvent, db_path: &str) {
         return;
     }
 
-    let config = match AgentConfig::load() {
+    let config = match AgentConfig::load_schema_designer() {
         Ok(c) => c,
         Err(e) => {
             log::error!("[Dispatcher] schema_designer task={} config error: {}", task_id, e);
@@ -304,7 +304,7 @@ async fn dispatch_ui_designer(event: DispatchEvent, db_path: &str) {
         }
     };
 
-    let config = match AgentConfig::load() {
+    let config = match AgentConfig::load_ui_designer() {
         Ok(c) => c,
         Err(e) => {
             log::error!("[Dispatcher] ui_designer task={} config error: {}", task_id, e);

@@ -7,8 +7,8 @@ use crate::agents_api::schema_designer::types::{
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
-    build_schema_designer, AgentResponse, AgentStorage, SchemaStorage, SqliteAgentStorage,
-    SqliteSchemaStorage, SqliteTaskStorage, Task, TaskStatus, TaskStorage,
+    build_schema_designer, AgentConfig, AgentResponse, AgentStorage, SchemaStorage,
+    SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage, Task, TaskStatus, TaskStorage,
 };
 use rusqlite::params as sql_params;
 use shared_types::SchemaDef;
@@ -154,10 +154,18 @@ pub async fn send_chat_message(
     state.response_storage.store_pending(user_msg_id).await;
 
     let response_storage = state.response_storage.clone();
-    let config = state.config.clone();
     let db_path = state.db_path.clone();
 
     actix_web::rt::spawn(async move {
+        let config = match AgentConfig::load_schema_designer() {
+            Ok(c) => c,
+            Err(e) => {
+                response_storage
+                    .store_text(user_msg_id, format!("Config error: {}", e))
+                    .await;
+                return;
+            }
+        };
         let agent = match build_schema_designer(&config, &db_path, project_id) {
             Ok(a) => a,
             Err(e) => {
