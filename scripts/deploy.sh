@@ -58,8 +58,18 @@ rsync -az --delete \
   --exclude='.git/' \
   --exclude='.DS_Store' \
   -e "ssh -o StrictHostKeyChecking=no" \
-  "$PROJECT_ROOT/" \
+  "${PROJECT_ROOT}/" \
   "${SSH_USER}@${SERVER_IP}:${REMOTE_ROOT}/"
+
+echo "[deploy] sync llm-sdk source tree"
+LLM_SDK_ROOT="$(cd "${PROJECT_ROOT}/../llm-sdk" && pwd)"
+rsync -az --delete \
+  --exclude='target/' \
+  --exclude='.git/' \
+  --exclude='.DS_Store' \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  "${LLM_SDK_ROOT}/" \
+  "${SSH_USER}@${SERVER_IP}:${REMOTE_BASE_DIR}/llm-sdk/"
 
 echo "[deploy] build backend on server"
 remote_exec "command -v sccache >/dev/null 2>&1 || (SARCH=\$(uname -m); case \"\$SARCH\" in x86_64) ST=x86_64-unknown-linux-musl ;; aarch64) ST=aarch64-unknown-linux-musl ;; *) echo \"unsupported arch: \$SARCH\"; exit 1 ;; esac && SCCACHE_VER=\$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mozilla/sccache/releases/latest | grep -o 'v[0-9.]*\$') && curl -fsSL \"https://github.com/mozilla/sccache/releases/download/\${SCCACHE_VER}/sccache-\${SCCACHE_VER}-\${ST}.tar.gz\" | tar xz -C /tmp && sudo mv /tmp/sccache-\${SCCACHE_VER}-\${ST}/sccache /usr/local/bin/sccache && rm -rf /tmp/sccache-\${SCCACHE_VER}-\${ST})"

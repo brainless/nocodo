@@ -96,6 +96,14 @@ echo "[setup] writing server.env"
   else
     printf 'DATABASE_URL=app.db\n'
   fi
+  [ -n "${AGENT_PROVIDER:-}" ] && printf 'AGENT_PROVIDER=%s\n' "${AGENT_PROVIDER}"
+  [ -n "${AGENT_MODEL:-}" ] && printf 'AGENT_MODEL=%s\n' "${AGENT_MODEL}"
+  [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY=%s\n' "${OPENAI_API_KEY}"
+  [ -n "${GROQ_API_KEY:-}" ] && printf 'GROQ_API_KEY=%s\n' "${GROQ_API_KEY}"
+  [ -n "${CEREBRAS_API_KEY:-}" ] && printf 'CEREBRAS_API_KEY=%s\n' "${CEREBRAS_API_KEY}"
+  [ -n "${ANTHROPIC_API_KEY:-}" ] && printf 'ANTHROPIC_API_KEY=%s\n' "${ANTHROPIC_API_KEY}"
+  [ -n "${PM_AGENT_PROVIDER:-}" ] && printf 'PM_AGENT_PROVIDER=%s\n' "${PM_AGENT_PROVIDER}"
+  [ -n "${PM_AGENT_MODEL:-}" ] && printf 'PM_AGENT_MODEL=%s\n' "${PM_AGENT_MODEL}"
 } | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/server.env"
 remote_exec "sudo mv /tmp/server.env ${DEPLOY_ROOT}/server.env && sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/server.env && chmod 600 ${DEPLOY_ROOT}/server.env"
 
