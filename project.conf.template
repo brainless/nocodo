@@ -15,6 +15,13 @@ ADMIN_GUI_PORT=3031
 # Base directory used by backend when CreateProjectRequest.path is omitted.
 DEFAULT_PROJECTS_PATH=./projects
 
+# Authentication — set to false for desktop (Tauri) use; true for web hosting.
+MANDATORY_AUTHENTICATION=false
+# Required when MANDATORY_AUTHENTICATION=true. Get your key from resend.com.
+RESEND_API_KEY=re_xxxxxxxxx
+# The verified sender address configured in your Resend account.
+AUTH_FROM_EMAIL=noreply@yourdomain.com
+
 SERVER_IP=203.0.113.10
 SSH_USER=deploy
 DOMAIN_NAME=example.com

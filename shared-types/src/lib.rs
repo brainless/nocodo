@@ -305,6 +305,7 @@ pub struct ListProjectsResponse {
 pub struct HeartbeatResponse {
     pub status: String,
     pub service: String,
+    pub auth_required: bool,
 }
 
 // ============================================================================
@@ -359,4 +360,27 @@ pub struct EpicItem {
 #[ts(export)]
 pub struct ListEpicsResponse {
     pub epics: Vec<EpicItem>,
+}
+
+// ============================================================================
+// Auth API Types
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct OtpRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct VerifyOtpRequest {
+    pub email: String,
+    pub otp: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MeResponse {
+    pub email: String,
 }

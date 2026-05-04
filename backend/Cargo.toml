@@ -36,6 +36,9 @@ shared-types = { path = "../shared-types" }
 nocodo-agents = { path = "../agents" }
 schema-codegen = { path = "../schema-codegen" }
 async-trait = "0.1"
-tokio = { version = "1.0", features = ["sync"] }
+tokio = { version = "1.0", features = ["sync", "rt"] }
+futures-util = "0.3"
+rand = "0.8"
+resend-rs = "0.4"
 log = "0.4"
 env_logger = "0.11"

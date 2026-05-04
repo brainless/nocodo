@@ -152,7 +152,16 @@ export type CreateProjectResponse = { project: Project, };
 export type ListProjectsResponse = { projects: Array<Project>, };
 
 
-export type HeartbeatResponse = { status: string, service: string, };
+export type HeartbeatResponse = { status: string, service: string, auth_required: boolean, };
+
+
+export type OtpRequest = { email: string, };
+
+
+export type VerifyOtpRequest = { email: string, otp: string, };
+
+
+export type MeResponse = { email: string, };
 
 
 export type TaskItem = { id: number, project_id: number, epic_id: number | null, title: string, source_prompt: string, assigned_to_agent: string, status: string, created_at: number, updated_at: number, };

@@ -2,8 +2,8 @@ use shared_types::{
     AgentType, Column, ColumnDef, ColumnDisplay, CreateProjectRequest, CreateProjectResponse,
     DataType, EpicItem, ForeignKey, ForeignKeyDef, GetSchemaResponse, GetTableColumnsResponse,
     GetTableDataResponse, HeartbeatResponse, ListEpicsResponse, ListProjectsResponse,
-    ListSchemasResponse, ListTasksResponse, PaginationInfo, Project, Schema, SchemaDef, Table,
-    TableDataResult, TableDef, TaskItem,
+    ListSchemasResponse, ListTasksResponse, MeResponse, OtpRequest, PaginationInfo, Project,
+    Schema, SchemaDef, Table, TableDataResult, TableDef, TaskItem, VerifyOtpRequest,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -56,6 +56,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Misc
     export_type!(HeartbeatResponse);
+
+    // Auth API types
+    export_type!(OtpRequest);
+    export_type!(VerifyOtpRequest);
+    export_type!(MeResponse);
 
     // Agent Task/Epic API types
     export_type!(TaskItem);

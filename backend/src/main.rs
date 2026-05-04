@@ -11,10 +11,11 @@ mod projects_api;
 mod schema_api;
 
 #[get("/api/heartbeat")]
-async fn heartbeat() -> impl Responder {
+async fn heartbeat(auth_config: web::Data<auth::AuthConfig>) -> impl Responder {
     let payload = HeartbeatResponse {
         status: "ok".to_string(),
         service: env!("CARGO_PKG_NAME").to_string(),
+        auth_required: auth_config.mandatory,
     };
 
     HttpResponse::Ok().json(payload)
@@ -77,6 +78,32 @@ async fn main() -> std::io::Result<()> {
     let domain_name = std::env::var("DOMAIN_NAME")
         .ok()
         .or_else(|| config::read_project_conf("DOMAIN_NAME"));
+
+    let mandatory_auth = std::env::var("MANDATORY_AUTHENTICATION")
+        .ok()
+        .or_else(|| config::read_project_conf("MANDATORY_AUTHENTICATION"))
+        .map(|v| !matches!(v.to_lowercase().as_str(), "false" | "0" | "no"))
+        .unwrap_or(true);
+
+    let resend_api_key = std::env::var("RESEND_API_KEY")
+        .ok()
+        .or_else(|| config::read_project_conf("RESEND_API_KEY"));
+
+    let from_email = std::env::var("AUTH_FROM_EMAIL")
+        .ok()
+        .or_else(|| config::read_project_conf("AUTH_FROM_EMAIL"));
+
+    println!(
+        "Mandatory authentication: {}",
+        if mandatory_auth { "enabled" } else { "disabled" }
+    );
+
+    let auth_config = web::Data::new(auth::AuthConfig {
+        db_url: database_url.clone(),
+        mandatory: mandatory_auth,
+        resend_api_key,
+        from_email,
+    });
 
     println!(
         "Backend listening on http://{}:{}",
@@ -155,10 +182,17 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
+            .wrap(auth::middleware::RequireAuth)
             .app_data(web::JsonConfig::default())
             .app_data(agent_state.clone())
             .app_data(schema_cache.clone())
+            .app_data(auth_config.clone())
             .service(heartbeat)
+            // Auth routes
+            .service(auth::handlers::request_otp)
+            .service(auth::handlers::verify_otp)
+            .service(auth::handlers::logout)
+            .service(auth::handlers::me)
             // Agent API routes — shared
             .service(agents_api::schema_designer::list_tasks)
             .service(agents_api::schema_designer::list_epics)
