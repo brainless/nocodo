@@ -49,13 +49,25 @@ PYEOF
 }
 
 PROJECT_NAME="$(toml_get "$CONFIG_FILE" project name)"
+PROJECT_TITLE="$(toml_get "$CONFIG_FILE" project title)"
 SERVER_IP="$(toml_get "$CONFIG_FILE" deploy server_ip)"
 SSH_USER="$(toml_get "$CONFIG_FILE" deploy ssh_user)"
 DOMAIN_NAME="$(toml_get "$CONFIG_FILE" deploy domain_name)"
+LETSENCRYPT_EMAIL="$(toml_get "$CONFIG_FILE" deploy letsencrypt_email || true)"
 REMOTE_BASE_DIR="$(toml_get "$CONFIG_FILE" deploy remote_base_dir || true)"
 REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
 BACKEND_PORT="$(toml_get "$CONFIG_FILE" server port)"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
+GUI_PORT="$(toml_get "$CONFIG_FILE" gui port || true)"; GUI_PORT="${GUI_PORT:-3030}"
+ADMIN_GUI_PORT="$(toml_get "$CONFIG_FILE" admin_gui port || true)"; ADMIN_GUI_PORT="${ADMIN_GUI_PORT:-3031}"
+DB_KIND="$(toml_get "$CONFIG_FILE" database kind || true)"; DB_KIND="${DB_KIND:-sqlite}"
+DEFAULT_PROJECTS_PATH="$(toml_get "$CONFIG_FILE" projects default_path || true)"
+DEFAULT_PROJECTS_PATH="${DEFAULT_PROJECTS_PATH:-/opt/${PROJECT_NAME}/projects}"
+AGENT_PROVIDER="$(toml_get "$CONFIG_FILE" agents provider || true)"
+AGENT_MODEL="$(toml_get "$CONFIG_FILE" agents model || true)"
+PM_AGENT_PROVIDER="$(toml_get "$CONFIG_FILE" pm_agent provider || true)"
+PM_AGENT_MODEL="$(toml_get "$CONFIG_FILE" pm_agent model || true)"
+MANDATORY_AUTH="$(toml_get "$CONFIG_FILE" auth mandatory || true)"; MANDATORY_AUTH="${MANDATORY_AUTH:-true}"
 
 for v in PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME; do
   if [ -z "${!v:-}" ]; then
@@ -125,6 +137,26 @@ remote_exec "sudo chmod +x ${DEPLOY_ROOT}/${BACKEND_BIN}"
 remote_exec "sudo chmod +x ${DEPLOY_ROOT}/${MIGRATE_BIN}"
 remote_exec "sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/${BACKEND_BIN}"
 remote_exec "sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/${MIGRATE_BIN}"
+
+echo "[deploy] upload project.toml (non-secret config)"
+{
+  printf '[project]\nname  = "%s"\ntitle = "%s"\n\n' "${PROJECT_NAME}" "${PROJECT_TITLE}"
+  printf '[database]\nkind = "%s"\nurl  = "nocodo.db"\n\n' "${DB_KIND}"
+  printf '[server]\nhost = "127.0.0.1"\nport = %s\n\n' "${BACKEND_PORT}"
+  printf '[gui]\nport = %s\n\n' "${GUI_PORT}"
+  printf '[admin_gui]\nport = %s\n\n' "${ADMIN_GUI_PORT}"
+  printf '[projects]\ndefault_path = "%s"\n\n' "${DEFAULT_PROJECTS_PATH}"
+  printf '[auth]\nmandatory = %s\n\n' "${MANDATORY_AUTH}"
+  if [ -n "${AGENT_PROVIDER:-}" ] && [ -n "${AGENT_MODEL:-}" ]; then
+    printf '[agents]\nprovider = "%s"\nmodel    = "%s"\n\n' "${AGENT_PROVIDER}" "${AGENT_MODEL}"
+  fi
+  if [ -n "${PM_AGENT_PROVIDER:-}" ] && [ -n "${PM_AGENT_MODEL:-}" ]; then
+    printf '[pm_agent]\nprovider = "%s"\nmodel    = "%s"\n\n' "${PM_AGENT_PROVIDER}" "${PM_AGENT_MODEL}"
+  fi
+  printf '[deploy]\nserver_ip         = "%s"\nssh_user          = "%s"\ndomain_name       = "%s"\nletsencrypt_email = "%s"\n' \
+    "${SERVER_IP}" "${SSH_USER}" "${DOMAIN_NAME}" "${LETSENCRYPT_EMAIL:-}"
+} | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/project.toml"
+remote_exec "sudo mv /tmp/project.toml ${DEPLOY_ROOT}/project.toml && sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/project.toml"
 
 echo "[deploy] run database migrations"
 remote_exec "bash -c 'set -a; . ${DEPLOY_ROOT}/server.env; cd ${DEPLOY_ROOT}; ./${MIGRATE_BIN}'"
