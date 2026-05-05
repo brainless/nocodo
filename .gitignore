@@ -19,8 +19,8 @@
 # TypeScript build info
 *.tsbuildinfo
 
-# Local config
-/project.conf
+# Local config (copy from project.toml.template)
+/project.toml
 
 # OS/editor
 .DS_Store

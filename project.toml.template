@@ -1,0 +1,56 @@
+# Copy to project.toml and fill in your values.
+# project.toml is gitignored — never commit secrets.
+
+[project]
+name  = "myapp"
+title = "My App"
+
+[database]
+# kind: sqlite | postgres
+kind = "sqlite"
+# sqlite example: url = "app.db"
+# postgres example: url = "postgresql://postgres:postgres@127.0.0.1:5432/myapp"
+url  = "app.db"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[gui]
+port = 3030
+
+[admin_gui]
+port = 3031
+
+[projects]
+# Base directory used when creating a project without an explicit path.
+default_path = "./projects"
+
+[auth]
+# Set to false for desktop (Tauri) use; true for web hosting.
+mandatory      = false
+# Required when mandatory = true. Get your key from resend.com.
+resend_api_key = "re_xxxxxxxxx"
+# The verified sender address configured in your Resend account.
+from_email     = "noreply@yourdomain.com"
+
+[agents]
+provider = "groq"
+model    = "openai/gpt-oss-120b"
+
+[pm_agent]
+provider = "groq"
+model    = "openai/gpt-oss-120b"
+
+[api_keys]
+openai_api_key    = ""
+groq_api_key      = ""
+cerebras_api_key  = ""
+anthropic_api_key = ""
+
+[deploy]
+server_ip         = "203.0.113.10"
+ssh_user          = "deploy"
+domain_name       = "example.com"
+letsencrypt_email = "admin@example.com"
+remote_base_dir   = "/home/deploy/apps"

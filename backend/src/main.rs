@@ -23,75 +23,40 @@ async fn heartbeat(auth_config: web::Data<auth::AuthConfig>) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_secs()
         .init();
 
+    let config = config::Config::load()
+        .unwrap_or_else(|e| { eprintln!("error: {e}"); std::process::exit(1) });
+
     if let Some(path) = config::resolved_config_path() {
         println!("Config file resolved to {}", path.display());
-    } else {
-        println!("Config file not found in configured lookup paths");
     }
 
-    let default_projects_path = std::env::var("DEFAULT_PROJECTS_PATH")
-        .ok()
-        .or_else(|| config::read_project_conf("DEFAULT_PROJECTS_PATH"))
+    // Export API keys and agent config to env vars for the agents crate.
+    config.export_to_env();
+
+    let default_projects_path = config
+        .projects
+        .as_ref()
+        .and_then(|p| p.default_path.clone())
         .unwrap_or_else(|| "./projects".to_string());
     println!("Default projects path resolved to {}", default_projects_path);
 
-    // Run database migrations on startup
-    let database_url = std::env::var("DATABASE_URL")
-        .ok()
-        .or_else(|| config::read_project_conf("DATABASE_URL"))
-        .unwrap_or_else(|| "nocodo.db".to_string());
-
-    if let Err(e) = db::run_startup_migrations(&database_url) {
+    if let Err(e) = db::run_startup_migrations(&config.database.url) {
         eprintln!("Warning: Failed to run migrations: {}", e);
     } else {
         println!("Database migrations applied successfully");
     }
 
-    let backend_host = std::env::var("BACKEND_HOST")
-        .ok()
-        .or_else(|| config::read_project_conf("BACKEND_HOST"))
-        .unwrap_or_else(|| "127.0.0.1".to_string());
-
-    let backend_port: u16 = std::env::var("BACKEND_PORT")
-        .ok()
-        .or_else(|| config::read_project_conf("BACKEND_PORT"))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(8080);
-
-    let gui_port: u16 = std::env::var("GUI_PORT")
-        .ok()
-        .or_else(|| config::read_project_conf("GUI_PORT"))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3030);
-
-    let admin_gui_port: u16 = std::env::var("ADMIN_GUI_PORT")
-        .ok()
-        .or_else(|| config::read_project_conf("ADMIN_GUI_PORT"))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3031);
-
-    let domain_name = std::env::var("DOMAIN_NAME")
-        .ok()
-        .or_else(|| config::read_project_conf("DOMAIN_NAME"));
-
-    let mandatory_auth = std::env::var("MANDATORY_AUTHENTICATION")
-        .ok()
-        .or_else(|| config::read_project_conf("MANDATORY_AUTHENTICATION"))
-        .map(|v| !matches!(v.to_lowercase().as_str(), "false" | "0" | "no"))
+    let mandatory_auth = config
+        .auth
+        .as_ref()
+        .map(|a| a.mandatory)
         .unwrap_or(true);
-
-    let resend_api_key = std::env::var("RESEND_API_KEY")
-        .ok()
-        .or_else(|| config::read_project_conf("RESEND_API_KEY"));
-
-    let from_email = std::env::var("AUTH_FROM_EMAIL")
-        .ok()
-        .or_else(|| config::read_project_conf("AUTH_FROM_EMAIL"));
+    let resend_api_key = config.auth.as_ref().and_then(|a| a.resend_api_key.clone());
+    let from_email = config.auth.as_ref().and_then(|a| a.from_email.clone());
 
     println!(
         "Mandatory authentication: {}",
@@ -99,7 +64,7 @@ async fn main() -> std::io::Result<()> {
     );
 
     let auth_config = web::Data::new(auth::AuthConfig {
-        db_url: database_url.clone(),
+        db_url: config.database.url.clone(),
         mandatory: mandatory_auth,
         resend_api_key,
         from_email,
@@ -107,18 +72,23 @@ async fn main() -> std::io::Result<()> {
 
     println!(
         "Backend listening on http://{}:{}",
-        backend_host, backend_port
+        config.server.host, config.server.port
     );
 
-    let gui_origin_ip = format!("http://127.0.0.1:{gui_port}");
-    let gui_origin_local = format!("http://localhost:{gui_port}");
-    let admin_origin_ip = format!("http://127.0.0.1:{admin_gui_port}");
-    let admin_origin_local = format!("http://localhost:{admin_gui_port}");
-    let domain_origin_https = domain_name.as_deref().map(|d| format!("https://{d}"));
-    let domain_origin_http = domain_name.as_deref().map(|d| format!("http://{d}"));
+    let gui_origin_ip = format!("http://127.0.0.1:{}", config.gui.port);
+    let gui_origin_local = format!("http://localhost:{}", config.gui.port);
+    let admin_origin_ip = format!("http://127.0.0.1:{}", config.admin_gui.port);
+    let admin_origin_local = format!("http://localhost:{}", config.admin_gui.port);
+    let domain_origin_https = config
+        .deploy
+        .as_ref()
+        .map(|d| format!("https://{}", d.domain_name));
+    let domain_origin_http = config
+        .deploy
+        .as_ref()
+        .map(|d| format!("http://{}", d.domain_name));
 
-    // Create one shared agent state for all Actix workers.
-    let agent_state = match agents_api::AgentState::new(database_url.clone()) {
+    let agent_state = match agents_api::AgentState::new(config.database.url.clone()) {
         Ok(state) => web::Data::new(state),
         Err(e) => {
             eprintln!("Warning: Failed to initialize agent state: {}", e);
@@ -126,9 +96,7 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    // Startup reconciliation: find open tasks with no session and dispatch them.
-    // Covers tasks that were created before a previous shutdown.
-    if let Ok(ts) = SqliteTaskStorage::open(&database_url) {
+    if let Ok(ts) = SqliteTaskStorage::open(&config.database.url) {
         match ts.list_open_dispatchable_tasks().await {
             Ok(tasks) => {
                 if !tasks.is_empty() {
@@ -149,9 +117,9 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    // Load schema cache for dynamic SQL queries
     let schema_cache = {
-        let conn = rusqlite::Connection::open(&database_url).expect("Failed to open database");
+        let conn = rusqlite::Connection::open(&config.database.url)
+            .expect("Failed to open database");
         match schema_api::schema_cache::SchemaCache::load(&conn) {
             Ok(cache) => {
                 println!("Schema cache loaded successfully");
@@ -188,42 +156,35 @@ async fn main() -> std::io::Result<()> {
             .app_data(schema_cache.clone())
             .app_data(auth_config.clone())
             .service(heartbeat)
-            // Auth routes
             .service(auth::handlers::request_otp)
             .service(auth::handlers::verify_otp)
             .service(auth::handlers::logout)
             .service(auth::handlers::me)
-            // Agent API routes — shared
             .service(agents_api::schema_designer::list_tasks)
             .service(agents_api::schema_designer::list_epics)
             .service(agents_api::schema_designer::get_board)
-            // DB Developer (schema_designer) routes
             .service(agents_api::schema_designer::send_chat_message)
             .service(agents_api::schema_designer::get_task_messages)
             .service(agents_api::schema_designer::get_task_schema)
             .service(agents_api::schema_designer::get_message_response)
             .service(agents_api::schema_designer::generate_task_schema_code)
-            // PM Agent routes
             .service(agents_api::pm_agent::init_pm_project)
             .service(agents_api::pm_agent::send_pm_chat_message)
             .service(agents_api::pm_agent::get_pm_message_response)
             .service(agents_api::pm_agent::get_pm_task_messages)
-            // UI Designer routes
             .service(agents_api::ui_designer::handlers::list_entities)
             .service(agents_api::ui_designer::handlers::generate_form)
             .service(agents_api::ui_designer::handlers::get_form)
             .service(agents_api::ui_designer::handlers::list_forms)
-            // Project API routes
             .service(projects_api::handlers::list_projects)
             .service(projects_api::handlers::create_project)
-            // Schema API routes (read-only)
             .service(schema_api::handlers::list_schemas)
             .service(schema_api::handlers::get_schema)
             .service(schema_api::handlers::get_table_columns)
             .service(schema_api::handlers::get_table_foreign_keys)
             .service(schema_api::handlers::get_table_data)
     })
-    .bind((backend_host.as_str(), backend_port))?
+    .bind((config.server.host.as_str(), config.server.port))?
     .run()
     .await
 }

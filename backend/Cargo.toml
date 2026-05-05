@@ -32,6 +32,7 @@ postgres = { version = "0.19", optional = true }
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 serde.workspace = true
 serde_json.workspace = true
+toml = "1.1.2"
 shared-types = { path = "../shared-types" }
 nocodo-agents = { path = "../agents" }
 schema-codegen = { path = "../schema-codegen" }
