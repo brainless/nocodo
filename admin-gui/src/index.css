@@ -65,8 +65,7 @@ body {
 }
 
 .formula-strip {
-  display: grid;
-  grid-template-columns: auto 74px 50px minmax(140px, 1fr);
+  display: flex;
   align-items: center;
   gap: 0.55rem;
 }
@@ -716,7 +715,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 8px 0;
-  z-index: 10;
+  z-index: 20;
 }
 
 .project-sidebar-top {
@@ -767,11 +766,27 @@ body {
   color: #2f5cad;
 }
 
+.sidebar-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.sidebar-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b5451b;
+  border: 1.5px solid #f0f4fc;
+}
+
 .project-content {
   flex: 1;
   min-width: 0;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 /* ── Placeholder pages ── */

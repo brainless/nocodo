@@ -1,10 +1,13 @@
 import { A, useParams } from '@solidjs/router';
 import type { RouteSectionProps } from '@solidjs/router';
+import { For, Show, createEffect, createSignal } from 'solid-js';
 import { ProjectProvider } from '../contexts/ProjectContext';
+import type { ListTasksResponse } from '../types/api';
 
 const NAV_ITEMS = [
   {
     href: 'manager',
+    agentType: 'project_manager',
     label: 'Project Manager',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -15,6 +18,7 @@ const NAV_ITEMS = [
   },
   {
     href: 'db-developer',
+    agentType: 'schema_designer',
     label: 'DB Developer',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -26,6 +30,7 @@ const NAV_ITEMS = [
   },
   {
     href: 'backend',
+    agentType: 'backend_developer',
     label: 'Backend Developer',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -36,6 +41,7 @@ const NAV_ITEMS = [
   },
   {
     href: 'ui',
+    agentType: 'ui_designer',
     label: 'UI Designer',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -50,6 +56,18 @@ const NAV_ITEMS = [
 function ProjectSidebar() {
   const params = useParams<{ projectId: string }>();
   const base = `/projects/${params.projectId}`;
+  const [activeAgents, setActiveAgents] = createSignal(new Set<string>());
+
+  createEffect(() => {
+    const pid = params.projectId;
+    if (!pid) return;
+    fetch(`/api/agents/tasks?project_id=${pid}`)
+      .then(r => r.json() as Promise<ListTasksResponse>)
+      .then(data => {
+        setActiveAgents(new Set((data.tasks ?? []).map(t => t.assigned_to_agent)));
+      })
+      .catch(() => {});
+  });
 
   return (
     <nav class="project-sidebar">
@@ -64,16 +82,23 @@ function ProjectSidebar() {
 
         <div class="project-sidebar-divider" />
 
-        {NAV_ITEMS.map((item) => (
-          <A
-            href={`${base}/${item.href}`}
-            class="tooltip tooltip-right project-sidebar-icon"
-            activeClass="project-sidebar-icon-active"
-            data-tip={item.label}
-          >
-            {item.icon}
-          </A>
-        ))}
+        <For each={NAV_ITEMS}>
+          {(item) => (
+            <A
+              href={`${base}/${item.href}`}
+              class="tooltip tooltip-right project-sidebar-icon"
+              activeClass="project-sidebar-icon-active"
+              data-tip={item.label}
+            >
+              <span class="sidebar-icon-wrap">
+                {item.icon}
+                <Show when={activeAgents().has(item.agentType)}>
+                  <span class="sidebar-dot" />
+                </Show>
+              </span>
+            </A>
+          )}
+        </For>
       </div>
 
       {/* Settings at bottom */}

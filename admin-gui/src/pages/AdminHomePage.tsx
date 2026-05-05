@@ -2,7 +2,6 @@ import { For, Show, createEffect, createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { ProjectProvider, useProject } from '../contexts/ProjectContext';
 import { PromptBox } from '../components/PromptBox';
-import { ImportCard } from '../components/ImportCard';
 import { ContentCard } from '../components/ContentCard';
 import type { Project, ListTasksResponse } from '../types/api';
 
@@ -164,37 +163,6 @@ function HomeContent() {
               <span>{error()}</span>
             </div>
           </Show>
-        </section>
-
-        <section class="home-import-section">
-          <div class="home-import-header">
-            <span class="home-import-divider" />
-            <span class="home-import-label">or start from existing data</span>
-            <span class="home-import-divider" />
-          </div>
-          <div class="home-import-grid">
-            <ImportCard
-              theme="blue"
-              icon={<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>}
-              title="Upload CSV"
-              description="Import a CSV file and Nocodo will infer your schema from the headers and rows."
-              badge="Soon"
-            />
-            <ImportCard
-              theme="green"
-              icon={<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="9"/><line x1="15" y1="15" x2="9" y2="9"/></svg>}
-              title="Upload Excel"
-              description={<>Bring in <code>.xlsx</code> workbooks — sheets become tables, columns stay intact.</>}
-              badge="Soon"
-            />
-            <ImportCard
-              theme="orange"
-              icon={<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>}
-              title="Connect Google Sheets"
-              description="Link a Google Sheet directly — live sync with your existing collaborative data."
-              badge="Soon"
-            />
-          </div>
         </section>
 
         <RecentProjects />

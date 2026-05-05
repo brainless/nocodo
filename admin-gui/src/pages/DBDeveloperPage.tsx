@@ -51,8 +51,6 @@ function DBDeveloperContent() {
 
   // Cell/Grid state
   const [selectedCell, setSelectedCell] = createSignal({ col: 'A', row: 1 });
-  const [cellFormulas, setCellFormulas] = createSignal<Record<string, string>>({});
-  const [formulaValue, setFormulaValue] = createSignal('');
 
   // Schema preview state
   const [previewSchema, setPreviewSchema] = createSignal<SchemaDef | null>(null);
@@ -191,28 +189,8 @@ function DBDeveloperContent() {
     return value === null || value === undefined ? '' : String(value);
   };
 
-  const getCellKey = (col: string, row: number) => `${col}${row}`;
-
-  const getCellValue = (col: string, row: number): string => {
-    const colIndex = col.charCodeAt(0) - 65;
-    const key = getCellKey(col, row);
-    const formula = cellFormulas()[key];
-    if (formula !== undefined && formula !== '') return formula;
-    const rowData = rows()[row - 1];
-    if (!rowData || colIndex < 0 || colIndex >= rowData.length) return '';
-    const value = rowData[colIndex];
-    return value === null || value === undefined ? '' : String(value);
-  };
-
   const handleCellClick = (col: string, row: number) => {
     setSelectedCell({ col, row });
-    setFormulaValue(getCellValue(col, row));
-  };
-
-  const handleFormulaChange = (value: string) => {
-    setFormulaValue(value);
-    const key = getCellKey(selectedCell().col, selectedCell().row);
-    setCellFormulas(prev => ({ ...prev, [key]: value }));
   };
 
   const columnHeaders = createMemo(() => {
@@ -221,6 +199,16 @@ function DBDeveloperContent() {
       i,
       col: cols[i] ?? null,
     }));
+  });
+
+  const latestSchemaVersion = createMemo(() => {
+    let latest: number | null = null;
+    for (const msg of chat.messages()) {
+      if (msg.schema_version != null && (latest === null || msg.schema_version > latest)) {
+        latest = msg.schema_version;
+      }
+    }
+    return latest;
   });
 
   const placeholder = () =>
@@ -254,15 +242,13 @@ function DBDeveloperContent() {
         <section class="sheet-main">
           <div class="formula-strip">
             <label for="chat-drawer" class="btn btn-success btn-sm">Dev Team</label>
-            <div class="name-box">{selectedCell().col}{selectedCell().row}</div>
-            <label class="formula-label" for="formula-input">fx</label>
-            <input
-              id="formula-input"
-              class="formula-input"
-              value={formulaValue()}
-              onInput={(e) => handleFormulaChange(e.currentTarget.value)}
-              aria-label="Formula bar"
-            />
+            <button
+              class="btn btn-sm btn-outline ml-2 whitespace-nowrap"
+              onClick={() => { const v = latestSchemaVersion(); if (v !== null) fetchPreviewSchema(v); }}
+              disabled={latestSchemaVersion() === null || previewLoading()}
+            >
+              {latestSchemaVersion() !== null ? `Preview Schema V${latestSchemaVersion()}` : 'Preview Schema'}
+            </button>
           </div>
 
           <Show when={schemaError()}>
