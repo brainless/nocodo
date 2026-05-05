@@ -77,6 +77,7 @@ RESEND_API_KEY="$(toml_get "$CONFIG_FILE" auth resend_api_key || true)"
 AUTH_FROM_EMAIL="$(toml_get "$CONFIG_FILE" auth from_email || true)"
 MANDATORY_AUTH="$(toml_get "$CONFIG_FILE" auth mandatory || true)"
 MANDATORY_AUTH="${MANDATORY_AUTH:-true}"
+MANDATORY_AUTH="$(echo "$MANDATORY_AUTH" | tr '[:upper:]' '[:lower:]')"
 
 for v in PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME LETSENCRYPT_EMAIL; do
   if [ -z "${!v:-}" ]; then

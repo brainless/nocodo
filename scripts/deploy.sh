@@ -68,6 +68,7 @@ AGENT_MODEL="$(toml_get "$CONFIG_FILE" agents model || true)"
 PM_AGENT_PROVIDER="$(toml_get "$CONFIG_FILE" pm_agent provider || true)"
 PM_AGENT_MODEL="$(toml_get "$CONFIG_FILE" pm_agent model || true)"
 MANDATORY_AUTH="$(toml_get "$CONFIG_FILE" auth mandatory || true)"; MANDATORY_AUTH="${MANDATORY_AUTH:-true}"
+MANDATORY_AUTH="$(echo "$MANDATORY_AUTH" | tr '[:upper:]' '[:lower:]')"
 
 for v in PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME; do
   if [ -z "${!v:-}" ]; then
