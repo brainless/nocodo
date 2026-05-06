@@ -104,16 +104,16 @@ pub async fn send_otp_email(
     to_email: &str,
     otp: &str,
 ) -> Result<(), String> {
-    use resend_rs::types::SendEmail;
-    use resend_rs::Client;
+    use resend_rs::types::CreateEmailBaseOptions;
+    use resend_rs::Resend;
 
-    let client = Client::new(api_key);
+    let client = Resend::new(api_key);
     let html = format!(
         "<p>Your verification code is: <strong style=\"font-size:1.5em;letter-spacing:0.1em\">{}</strong></p>\
          <p>This code expires in 30 minutes.</p>",
         otp
     );
-    let email = SendEmail::new(from_email, [to_email], "Your sign-in code").with_html(&html);
+    let email = CreateEmailBaseOptions::new(from_email, [to_email], "Your sign-in code").with_html(&html);
     client
         .emails
         .send(email)

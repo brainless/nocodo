@@ -8,6 +8,7 @@ mod auth;
 mod config;
 mod db;
 mod projects_api;
+mod repo_api;
 mod schema_api;
 
 #[get("/api/heartbeat")]

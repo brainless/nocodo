@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config;
+use crate::repo_api;
 
 fn open_db() -> Result<Connection, rusqlite::Error> {
     let database_url = std::env::var("DATABASE_URL")
@@ -111,9 +112,15 @@ pub async fn create_project(body: web::Json<CreateProjectRequest>) -> Result<imp
             let project = Project {
                 id: project_id,
                 name: body.name.clone(),
-                path,
+                path: path.clone(),
                 created_at: now,
             };
+
+            // Clone template repo in background
+            tokio::spawn(async move {
+                repo_api::handlers::clone_template_repo(path).await;
+            });
+
             let response = CreateProjectResponse { project };
             Ok(HttpResponse::Created().json(response))
         }
