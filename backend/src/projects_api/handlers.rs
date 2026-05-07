@@ -7,12 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::config;
 use crate::repo_api;
 
-fn open_db() -> Result<Connection, rusqlite::Error> {
-    let database_url = std::env::var("DATABASE_URL")
-        .ok()
-        .or_else(|| config::read_project_conf("DATABASE_URL"))
-        .unwrap_or_else(|| "nocodo.db".to_string());
-    Connection::open(&database_url)
+fn open_db(database_url: &str) -> Result<Connection, rusqlite::Error> {
+    Connection::open(database_url)
 }
 
 fn generate_project_path(base_path: &str, name: &str) -> String {
@@ -34,8 +30,8 @@ fn generate_project_path(base_path: &str, name: &str) -> String {
 /// GET /api/projects
 /// List all projects
 #[get("/api/projects")]
-pub async fn list_projects() -> Result<impl Responder> {
-    let conn = open_db().map_err(|e| {
+pub async fn list_projects(config: web::Data<config::Config>) -> Result<impl Responder> {
+    let conn = open_db(&config.database.url).map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
     })?;
 
@@ -73,8 +69,11 @@ pub async fn list_projects() -> Result<impl Responder> {
 /// POST /api/projects
 /// Create a new project
 #[post("/api/projects")]
-pub async fn create_project(body: web::Json<CreateProjectRequest>) -> Result<impl Responder> {
-    let conn = open_db().map_err(|e| {
+pub async fn create_project(
+    body: web::Json<CreateProjectRequest>,
+    config: web::Data<config::Config>,
+) -> Result<impl Responder> {
+    let conn = open_db(&config.database.url).map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
     })?;
 
@@ -83,9 +82,10 @@ pub async fn create_project(body: web::Json<CreateProjectRequest>) -> Result<imp
         .unwrap_or_default()
         .as_secs() as i64;
 
-    let default_projects_path = std::env::var("DEFAULT_PROJECTS_PATH")
-        .ok()
-        .or_else(|| config::read_project_conf("DEFAULT_PROJECTS_PATH"))
+    let default_projects_path = config
+        .projects
+        .as_ref()
+        .and_then(|p| p.default_path.clone())
         .unwrap_or_else(|| "./projects".to_string());
 
     let path = body

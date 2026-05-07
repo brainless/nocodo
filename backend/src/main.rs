@@ -38,12 +38,7 @@ async fn main() -> std::io::Result<()> {
     // Export API keys and agent config to env vars for the agents crate.
     config.export_to_env();
 
-    let default_projects_path = config
-        .projects
-        .as_ref()
-        .and_then(|p| p.default_path.clone())
-        .unwrap_or_else(|| "./projects".to_string());
-    println!("Default projects path resolved to {}", default_projects_path);
+    let config = web::Data::new(config);
 
     if let Err(e) = db::run_startup_migrations(&config.database.url) {
         eprintln!("Warning: Failed to run migrations: {}", e);
@@ -133,6 +128,7 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    let config_for_app = config.clone();
     HttpServer::new(move || {
         let mut cors = Cors::default()
             .allowed_origin(&gui_origin_ip)
@@ -153,6 +149,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(auth::middleware::RequireAuth)
             .app_data(web::JsonConfig::default())
+            .app_data(config_for_app.clone())
             .app_data(agent_state.clone())
             .app_data(schema_cache.clone())
             .app_data(auth_config.clone())
