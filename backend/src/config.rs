@@ -17,6 +17,8 @@ pub struct Config {
     #[serde(default)]
     pub pm_agent: Option<PmAgentConfig>,
     #[serde(default)]
+    pub context_agent: Option<PmAgentConfig>,
+    #[serde(default)]
     pub api_keys: Option<ApiKeysConfig>,
     #[serde(default)]
     pub deploy: Option<DeployConfig>,
@@ -128,6 +130,10 @@ impl Config {
             set_env_if_unset("PM_AGENT_PROVIDER", Some(pm.provider.as_str()));
             set_env_if_unset("PM_AGENT_MODEL", Some(pm.model.as_str()));
         }
+        if let Some(ctx) = &self.context_agent {
+            set_env_if_unset("CONTEXT_AGENT_PROVIDER", Some(ctx.provider.as_str()));
+            set_env_if_unset("CONTEXT_AGENT_MODEL", Some(ctx.model.as_str()));
+        }
     }
 
     fn apply_env_overrides(&mut self) {
@@ -203,6 +209,8 @@ pub fn read_project_conf(key: &str) -> Option<String> {
         "AGENT_MODEL"          => config.agents.as_ref().map(|a| a.model.clone()),
         "PM_AGENT_PROVIDER"    => config.pm_agent.as_ref().map(|a| a.provider.clone()),
         "PM_AGENT_MODEL"       => config.pm_agent.as_ref().map(|a| a.model.clone()),
+        "CONTEXT_AGENT_PROVIDER" => config.context_agent.as_ref().map(|a| a.provider.clone()),
+        "CONTEXT_AGENT_MODEL"    => config.context_agent.as_ref().map(|a| a.model.clone()),
         "OPENAI_API_KEY"       => config.api_keys.as_ref().and_then(|k| k.openai_api_key.clone()),
         "GROQ_API_KEY"         => config.api_keys.as_ref().and_then(|k| k.groq_api_key.clone()),
         "CEREBRAS_API_KEY"     => config.api_keys.as_ref().and_then(|k| k.cerebras_api_key.clone()),

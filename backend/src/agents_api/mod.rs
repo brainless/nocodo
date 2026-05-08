@@ -1,3 +1,4 @@
+pub mod context_agent;
 pub mod dispatcher;
 pub mod pm_agent;
 pub mod schema_designer;

@@ -1,4 +1,5 @@
 pub mod config;
+pub mod context_agent;
 pub mod error;
 pub mod pm_agent;
 pub mod schema_designer;
@@ -6,15 +7,17 @@ pub mod storage;
 pub mod ui_designer;
 
 pub use config::AgentConfig;
+pub use context_agent::{ContextAgent, ContextAgentResponse};
 pub use error::AgentError;
 pub use pm_agent::{PmAgent, PmResponse};
 pub use schema_designer::{AgentResponse, SchemaDesignerAgent, StopAgentParams};
 pub use storage::sqlite::{
-    SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage, SqliteUiFormStorage,
+    SqliteAgentStorage, SqliteContextStorage, SqliteSchemaStorage, SqliteTaskStorage,
+    SqliteUiFormStorage,
 };
 pub use storage::{
-    AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, SchemaStorage, Session, Task,
-    TaskStatus, TaskStorage, UiFormStorage,
+    AgentStorage, AgentType, ChatMessage, ContextStorage, Epic, EpicStatus, SchemaStorage, Session,
+    Task, TaskStatus, TaskStorage, UiFormStorage,
 };
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
@@ -120,4 +123,54 @@ pub fn build_pm_agent_with_task_storage(
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
 
     Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
+}
+
+/// Build a `ContextAgent` for backend context gathering.
+/// The `project_path` is the filesystem path to the project root directory.
+pub fn build_backend_context_agent(
+    config: &AgentConfig,
+    db_path: &str,
+    project_id: i64,
+    project_path: &str,
+) -> Result<ContextAgent, AgentError> {
+    let client = make_llm_client(config)?;
+    let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
+    let context_storage: Arc<dyn ContextStorage> = Arc::new(SqliteContextStorage::open(db_path)?);
+    let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
+
+    Ok(ContextAgent::new(
+        client,
+        storage,
+        context_storage,
+        task_storage,
+        &config.model,
+        project_id,
+        project_path,
+        context_agent::prompts::ContextType::Backend,
+    ))
+}
+
+/// Build a `ContextAgent` for admin-gui context gathering.
+/// The `project_path` is the filesystem path to the project root directory.
+pub fn build_admin_gui_context_agent(
+    config: &AgentConfig,
+    db_path: &str,
+    project_id: i64,
+    project_path: &str,
+) -> Result<ContextAgent, AgentError> {
+    let client = make_llm_client(config)?;
+    let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
+    let context_storage: Arc<dyn ContextStorage> = Arc::new(SqliteContextStorage::open(db_path)?);
+    let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
+
+    Ok(ContextAgent::new(
+        client,
+        storage,
+        context_storage,
+        task_storage,
+        &config.model,
+        project_id,
+        project_path,
+        context_agent::prompts::ContextType::AdminGui,
+    ))
 }

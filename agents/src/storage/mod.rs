@@ -12,6 +12,8 @@ pub enum AgentType {
     SchemaDesigner,
     ProjectManager,
     UiDesigner,
+    BackendContext,
+    AdminGuiContext,
 }
 
 impl AgentType {
@@ -20,6 +22,8 @@ impl AgentType {
             AgentType::SchemaDesigner => "schema_designer",
             AgentType::ProjectManager => "project_manager",
             AgentType::UiDesigner => "ui_designer",
+            AgentType::BackendContext => "backend_context",
+            AgentType::AdminGuiContext => "admin_gui_context",
         }
     }
 }
@@ -268,4 +272,26 @@ pub trait UiFormStorage: Send + Sync {
         &self,
         project_id: i64,
     ) -> Result<Vec<(String, String)>, AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// ContextStorage trait — persists gathered project context
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait ContextStorage: Send + Sync {
+    /// Upsert context for a (project_id, context_type) pair.
+    async fn save_context(
+        &self,
+        project_id: i64,
+        context_type: &str,
+        context: &str,
+    ) -> Result<(), AgentError>;
+
+    /// Retrieve context for a (project_id, context_type) pair, if it exists.
+    async fn get_context(
+        &self,
+        project_id: i64,
+        context_type: &str,
+    ) -> Result<Option<String>, AgentError>;
 }

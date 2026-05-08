@@ -174,6 +174,8 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::ui_designer::handlers::generate_form)
             .service(agents_api::ui_designer::handlers::get_form)
             .service(agents_api::ui_designer::handlers::list_forms)
+            .service(agents_api::context_agent::handlers::gather_context)
+            .service(agents_api::context_agent::handlers::get_context)
             .service(projects_api::handlers::list_projects)
             .service(projects_api::handlers::create_project)
             .service(schema_api::handlers::list_schemas)

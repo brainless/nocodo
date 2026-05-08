@@ -36,6 +36,11 @@ impl AgentConfig {
         Self::load_with_agent_fallback("PM_AGENT")
     }
 
+    /// Load context agent config: CONTEXT_AGENT_* with fallback to AGENT_*.
+    pub fn load_context_agent() -> Result<Self, AgentError> {
+        Self::load_with_agent_fallback("CONTEXT_AGENT")
+    }
+
     /// Try `{prefix}_PROVIDER` / `{prefix}_MODEL` first; fall back to AGENT_* defaults.
     fn load_with_agent_fallback(prefix: &str) -> Result<Self, AgentError> {
         let provider_key = format!("{}_PROVIDER", prefix);

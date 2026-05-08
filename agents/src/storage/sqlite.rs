@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    AgentStorage, ChatMessage, Epic, EpicStatus, SchemaStorage, Session, Task, TaskStatus,
+    AgentStorage, ChatMessage, ContextStorage, Epic, EpicStatus, SchemaStorage, Session, Task, TaskStatus,
     TaskStorage, UiFormStorage,
 };
 use crate::error::AgentError;
@@ -668,5 +668,63 @@ impl UiFormStorage for SqliteUiFormStorage {
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteContextStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteContextStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteContextStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self { conn: Mutex::new(conn) }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+#[async_trait]
+impl ContextStorage for SqliteContextStorage {
+    async fn save_context(
+        &self,
+        project_id: i64,
+        context_type: &str,
+        context: &str,
+    ) -> Result<(), AgentError> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO project_context (project_id, context_type, context, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT(project_id, context_type) DO UPDATE SET
+               context    = excluded.context,
+               updated_at = excluded.updated_at",
+            params![project_id, context_type, context, ts],
+        )?;
+        Ok(())
+    }
+
+    async fn get_context(
+        &self,
+        project_id: i64,
+        context_type: &str,
+    ) -> Result<Option<String>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn
+            .query_row(
+                "SELECT context FROM project_context
+                 WHERE project_id = ?1 AND context_type = ?2 LIMIT 1",
+                params![project_id, context_type],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        Ok(result)
     }
 }
