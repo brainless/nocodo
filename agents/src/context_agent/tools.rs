@@ -24,3 +24,9 @@ pub struct UpdateTaskStatusParams {
     /// New task status. Must be one of: "in_progress", "done", "blocked".
     pub status: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CommentaryParams {
+    /// Optional assistant commentary text.
+    pub text: Option<String>,
+}

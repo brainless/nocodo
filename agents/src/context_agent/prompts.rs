@@ -40,11 +40,10 @@ You are analyzing the `backend/` directory of a Rust + SolidJS fullstack project
 
 ## Your tools
 
-You have two tools:
-1. `list_files` — list files and directories at a given path (pass "" for project root, or a subdirectory path)
-2. `read_file` — read the contents of a file at a given path
-3. `write_context` — write your final structured summary to the context store
-4. `update_task_status` — update the task status
+You have tools:
+1. `list_files` — list files and directories at a given path relative to project root (pass "" for project root)
+2. `read_file` — read the contents of a file at a given path relative to project root
+3. `update_task_status` — update the task status
 
 ## Your job
 
@@ -58,7 +57,7 @@ You have two tools:
    - `backend/migrations/sqlite/` — all migration files (list them first, then read each)
    - Any other `backend/src/**/*.rs` files that look important (auth, handlers, etc.)
 4. Also check `shared-types/src/lib.rs` for the API contract types.
-5. When you have a thorough understanding, call `write_context` with a JSON object structured as:
+5. When you have a thorough understanding, output a JSON object as plain text with this structure:
 
 ```json
 {
@@ -86,15 +85,16 @@ You have two tools:
 }
 ```
 
-Keep the summary factual and concise. Do not guess — only include what you can verify from the files you read. After calling `write_context`, call `update_task_status` with "done".
+Keep the summary factual and concise. Do not guess — only include what you can verify from the files you read. After outputting the JSON, call `update_task_status` with "done".
 
 ## Rules
 
 - Always start with `list_files` to discover the directory structure before reading files.
 - Read every relevant file — do not skip important ones.
 - The `path` parameter for `list_files` and `read_file` is relative to the project root (the directory containing `backend/` and `shared-types/`).
-- Call `write_context` exactly once with the complete summary.
-- After `write_context`, call `update_task_status` with status "done"."#.to_string()
+- Do not use absolute paths.
+- Output the complete JSON summary in one assistant response.
+- After outputting JSON, call `update_task_status` with status "done"."#.to_string()
 }
 
 pub fn admin_gui_system_prompt() -> String {
@@ -113,11 +113,10 @@ You are analyzing the `admin-gui/` directory of a Rust + SolidJS fullstack proje
 
 ## Your tools
 
-You have two tools:
-1. `list_files` — list files and directories at a given path (pass "" for project root, or a subdirectory path)
-2. `read_file` — read the contents of a file at a given path
-3. `write_context` — write your final structured summary to the context store
-4. `update_task_status` — update the task status
+You have tools:
+1. `list_files` — list files and directories at a given path relative to project root (pass "" for project root)
+2. `read_file` — read the contents of a file at a given path relative to project root
+3. `update_task_status` — update the task status
 
 ## Your job
 
@@ -133,7 +132,7 @@ You have two tools:
    - All other `admin-gui/src/**/*.tsx` files — pages, components, stores
    - Check `gui/` for the main app too (for comparison, if present)
 4. Also check `shared-types/src/lib.rs` for generated TypeScript types.
-5. When you have a thorough understanding, call `write_context` with a JSON object structured as:
+5. When you have a thorough understanding, output a JSON object as plain text with this structure:
 
 ```json
 {
@@ -167,13 +166,14 @@ You have two tools:
 }
 ```
 
-Keep the summary factual and concise. Do not guess — only include what you can verify from the files you read. After calling `write_context`, call `update_task_status` with "done".
+Keep the summary factual and concise. Do not guess — only include what you can verify from the files you read. After outputting the JSON, call `update_task_status` with "done".
 
 ## Rules
 
 - Always start with `list_files` to discover the directory structure before reading files.
 - Read every relevant file — do not skip important ones.
 - The `path` parameter for `list_files` and `read_file` is relative to the project root (the directory containing `admin-gui/`).
-- Call `write_context` exactly once with the complete summary.
-- After `write_context`, call `update_task_status` with status "done"."#.to_string()
+- Do not use absolute paths.
+- Output the complete JSON summary in one assistant response.
+- After outputting JSON, call `update_task_status` with status "done"."#.to_string()
 }

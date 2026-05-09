@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
     AgentStorage, ContextStorage, SqliteAgentStorage, SqliteContextStorage, SqliteTaskStorage,
@@ -75,6 +77,17 @@ pub async fn gather_context(
                 .json(serde_json::json!({ "error": format!("{}", e) }))
         }
     };
+    let project_path_ref = Path::new(&project_path);
+    if !project_path_ref.is_dir() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": format!("Project path is not a readable directory: {}", project_path)
+        }));
+    }
+    if let Err(e) = std::fs::read_dir(project_path_ref) {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": format!("Project path is not readable: {} ({})", project_path, e)
+        }));
+    }
 
     let agent_type_str = ct.to_string();
     let title = if ct == BACKEND_CONTEXT {

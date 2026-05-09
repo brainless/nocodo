@@ -8,7 +8,7 @@ use llm_sdk::{
 };
 
 use super::prompts::ContextType;
-use super::tools::{ListFilesParams, ReadFileParams, UpdateTaskStatusParams};
+use super::tools::{CommentaryParams, ListFilesParams, ReadFileParams, UpdateTaskStatusParams};
 use crate::{
     error::AgentError,
     storage::{AgentStorage, AgentType, ChatMessage, ContextStorage, TaskStatus, TaskStorage},
@@ -85,6 +85,16 @@ impl ContextAgent {
                  Use this to examine source files, Cargo.toml, config files, migrations, etc.",
             )
             .build();
+        let open_file_alias_tool = Tool::from_type::<ReadFileParams>()
+            .name("repo_browser.open_file")
+            .description(
+                "Alias of read_file. Read file contents at the path relative to project root.",
+            )
+            .build();
+        let commentary_tool = Tool::from_type::<CommentaryParams>()
+            .name("commentary")
+            .description("Optional commentary tool. Use plain assistant text instead when possible.")
+            .build();
 
         let update_task_status_tool = Tool::from_type::<UpdateTaskStatusParams>()
             .name("update_task_status")
@@ -117,6 +127,8 @@ impl ContextAgent {
         };
 
         let mut nudges: u32 = 0;
+        let mut last_tool_signature: Option<String> = None;
+        let mut same_tool_call_streak: u32 = 0;
 
         loop {
             let history = self.storage.get_messages(session_id).await?;
@@ -148,7 +160,9 @@ impl ContextAgent {
                 tools: Some(vec![
                     list_files_tool.clone(),
                     read_file_tool.clone(),
+                    open_file_alias_tool.clone(),
                     update_task_status_tool.clone(),
+                    commentary_tool.clone(),
                 ]),
                 tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
@@ -172,7 +186,7 @@ impl ContextAgent {
                                 session_id,
                                 role: "user".to_string(),
                                 agent_type: None,
-                                content: "The write_context tool had a validation error. Instead of using write_context, please output your complete JSON context summary directly as plain text. Do not use any tools — just respond with the JSON object.".to_string(),
+                                content: "A tool call had a validation error. Instead of using tools now, output your complete JSON context summary directly as plain text.".to_string(),
                                 tool_call_id: None,
                                 tool_name: None,
                                 turn_id: None,
@@ -206,6 +220,22 @@ impl ContextAgent {
 
                     match tool_name {
                         "list_files" | "repo_browser.list_files" => {
+                            let signature = format!("{}:{}", tool_name, serde_json::to_string(tool_call.arguments())?);
+                            if last_tool_signature.as_deref() == Some(signature.as_str()) {
+                                same_tool_call_streak += 1;
+                            } else {
+                                last_tool_signature = Some(signature);
+                                same_tool_call_streak = 0;
+                            }
+                            if same_tool_call_streak >= 2 {
+                                let _ = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Blocked)
+                                    .await;
+                                return Ok(ContextAgentResponse::Stopped(
+                                    "stopped due to repeated identical tool call".to_string(),
+                                ));
+                            }
                             let params: ListFilesParams =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             let result = self.execute_list_files(&params.path);
@@ -238,7 +268,23 @@ impl ContextAgent {
                             self.storage.create_turn(turn).await?;
                         }
 
-                        "read_file" | "repo_browser.read_file" => {
+                        "read_file" | "repo_browser.read_file" | "repo_browser.open_file" => {
+                            let signature = format!("{}:{}", tool_name, serde_json::to_string(tool_call.arguments())?);
+                            if last_tool_signature.as_deref() == Some(signature.as_str()) {
+                                same_tool_call_streak += 1;
+                            } else {
+                                last_tool_signature = Some(signature);
+                                same_tool_call_streak = 0;
+                            }
+                            if same_tool_call_streak >= 2 {
+                                let _ = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Blocked)
+                                    .await;
+                                return Ok(ContextAgentResponse::Stopped(
+                                    "stopped due to repeated identical tool call".to_string(),
+                                ));
+                            }
                             let params: ReadFileParams =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             let result = self.execute_read_file(&params.path);
@@ -272,6 +318,22 @@ impl ContextAgent {
                         }
 
                         "update_task_status" | "task.update_task_status" => {
+                            let signature = format!("{}:{}", tool_name, serde_json::to_string(tool_call.arguments())?);
+                            if last_tool_signature.as_deref() == Some(signature.as_str()) {
+                                same_tool_call_streak += 1;
+                            } else {
+                                last_tool_signature = Some(signature);
+                                same_tool_call_streak = 0;
+                            }
+                            if same_tool_call_streak >= 2 {
+                                let _ = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Blocked)
+                                    .await;
+                                return Ok(ContextAgentResponse::Stopped(
+                                    "stopped due to repeated identical tool call".to_string(),
+                                ));
+                            }
                             let params: UpdateTaskStatusParams =
                                 tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             let new_status = TaskStatus::from_str(&params.status);
@@ -313,39 +375,12 @@ impl ContextAgent {
                             self.storage.create_turn(turn).await?;
                         }
 
-                        "write_context" | "context.write_context" => {
-                            // Fallback: parse the context from whatever the model sends
-                            let raw = tool_call.arguments();
-                            let context_str = match raw.get("context") {
-                                Some(v) => {
-                                    // context field exists — use it
-                                    if v.is_string() {
-                                        v.as_str().unwrap_or_default().to_string()
-                                    } else {
-                                        v.to_string()
-                                    }
-                                }
-                                None => {
-                                    // The model sent arguments without the "context" key.
-                                    // Use the entire arguments as the context.
-                                    raw.to_string()
-                                }
-                            };
-
-                            self.context_storage
-                                .save_context(
-                                    self.project_id,
-                                    self.context_type.as_str(),
-                                    &context_str,
-                                )
-                                .await?;
-
-                            let result_text = format!(
-                                "Context saved for project {}, type {}.",
-                                self.project_id,
-                                self.context_type.as_str()
-                            );
-
+                        "commentary" => {
+                            let params: CommentaryParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            let content = params
+                                .text
+                                .unwrap_or_else(|| "Commentary received.".to_string());
                             let mut turn = Vec::new();
                             if !assistant_text.is_empty() {
                                 turn.push(text_row(session_id, assistant_text.clone()));
@@ -355,9 +390,9 @@ impl ContextAgent {
                                 session_id,
                                 role: "assistant".to_string(),
                                 agent_type: Some(agent_type_str.clone()),
-                                content: serde_json::to_string(raw)?,
+                                content: serde_json::to_string(tool_call.arguments())?,
                                 tool_call_id: Some(call_id.clone()),
-                                tool_name: Some("write_context".to_string()),
+                                tool_name: Some("commentary".to_string()),
                                 turn_id: None,
                                 created_at: 0,
                             });
@@ -366,22 +401,13 @@ impl ContextAgent {
                                 session_id,
                                 role: "tool".to_string(),
                                 agent_type: None,
-                                content: result_text,
+                                content,
                                 tool_call_id: Some(call_id),
-                                tool_name: Some("write_context".to_string()),
+                                tool_name: Some("commentary".to_string()),
                                 turn_id: None,
                                 created_at: 0,
                             });
                             self.storage.create_turn(turn).await?;
-
-                            let _ = self
-                                .task_storage
-                                .update_task_status(task_id, TaskStatus::Done)
-                                .await;
-
-                            return Ok(ContextAgentResponse::ContextSaved {
-                                context: context_str,
-                            });
                         }
 
                         unknown => {
@@ -438,10 +464,10 @@ impl ContextAgent {
 
             let nudge = match self.context_type {
                 ContextType::Backend => {
-                    "Continue exploring backend files and then respond with the complete JSON context summary wrapped in write_context(context=\"...\"). If write_context fails, just output the JSON directly."
+                    "Continue exploring backend files and respond with the complete JSON context summary as plain text only."
                 }
                 ContextType::AdminGui => {
-                    "Continue exploring admin-gui files and then respond with the complete JSON context summary wrapped in write_context(context=\"...\"). If write_context fails, just output the JSON directly."
+                    "Continue exploring admin-gui files and respond with the complete JSON context summary as plain text only."
                 }
             };
 
@@ -462,11 +488,9 @@ impl ContextAgent {
     }
 
     fn execute_list_files(&self, relative_path: &str) -> String {
-        let base = &self.project_path;
-        let target = if relative_path.is_empty() {
-            base.clone()
-        } else {
-            base.join(relative_path)
+        let target = match self.resolve_relative_path(relative_path) {
+            Ok(p) => p,
+            Err(e) => return e,
         };
 
         let entries = match std::fs::read_dir(&target) {
@@ -514,7 +538,10 @@ impl ContextAgent {
     }
 
     fn execute_read_file(&self, relative_path: &str) -> String {
-        let target = self.project_path.join(relative_path);
+        let target = match self.resolve_relative_path(relative_path) {
+            Ok(p) => p,
+            Err(e) => return e,
+        };
         match std::fs::read_to_string(&target) {
             Ok(content) => {
                 let lines: Vec<&str> = content.lines().collect();
@@ -530,5 +557,23 @@ impl ContextAgent {
             }
             Err(e) => format!("Error reading file: {}", e),
         }
+    }
+
+    fn resolve_relative_path(&self, relative_path: &str) -> Result<PathBuf, String> {
+        let rel = relative_path.trim();
+        if rel.is_empty() || rel == "." {
+            return Ok(self.project_path.clone());
+        }
+        let rel_path = std::path::Path::new(rel);
+        if rel_path.is_absolute() {
+            return Err("Error: absolute paths are not allowed. Use a path relative to project root.".to_string());
+        }
+        if rel_path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err("Error: path traversal is not allowed. Use a path relative to project root.".to_string());
+        }
+        Ok(self.project_path.join(rel_path))
     }
 }
