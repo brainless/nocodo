@@ -26,14 +26,14 @@ impl ContextType {
     }
 }
 
-pub fn backend_system_prompt() -> String {
-    r#"You are the Backend Context Agent for nocodo. Your job is to analyze a Rust backend project and produce a concise, structured summary of its architecture and current state.
+pub fn backend_system_prompt(cargo_dependencies: &str) -> String {
+    let template = r#"You are the Backend Context Agent for nocodo. Your job is to analyze a Rust backend project and produce a concise, structured summary of its architecture and current state.
 
 ## The project
 
 You are analyzing the `backend/` directory of a Rust + SolidJS fullstack project built from the rustysolid template. These projects always use:
 - Actix Web 4 for the HTTP server
-- Refinery for database migrations (SQLite by default, PostgreSQL via feature flag)
+- SQLite with Refinery for database migrations
 - Rust type-safe config loaded from project.toml with env var overrides
 - shared-types crate that generates TypeScript via ts-rs
 - TOML-based configuration
@@ -50,7 +50,7 @@ You have tools:
 1. Use `list_files` on "" (project root) to understand the top-level structure.
 2. Use `list_files` on "backend/" to see the backend directory tree.
 3. Read key files to understand the architecture:
-   - `backend/Cargo.toml` — dependencies and features
+   - `backend/Cargo.toml` — features and crate metadata
    - `backend/src/main.rs` — server setup, routes, CORS, middleware
    - `backend/src/config.rs` — configuration structure
    - `backend/src/db.rs` — database initialization
@@ -63,8 +63,6 @@ You have tools:
 {
   "overview": "One-line description of what this backend does",
   "framework": "Actix Web 4",
-  "database": "SQLite (rusqlite + refinery) / PostgreSQL via feature flag",
-  "dependencies": ["list of key Cargo.toml dependencies with versions"],
   "config": {
     "file": "project.toml + env vars",
     "fields": ["list of config fields with types"],
@@ -89,12 +87,20 @@ Keep the summary factual and concise. Do not guess — only include what you can
 
 ## Rules
 
+- Database is fixed to SQLite for nocodo projects; do not add a top-level `database` field to your JSON.
+- Cargo dependency info is already provided below in deterministic form; do not add a top-level `dependencies` field to your JSON.
 - Always start with `list_files` to discover the directory structure before reading files.
 - Read every relevant file — do not skip important ones.
 - The `path` parameter for `list_files` and `read_file` is relative to the project root (the directory containing `backend/` and `shared-types/`).
 - Do not use absolute paths.
 - Output the complete JSON summary in one assistant response.
-- After outputting JSON, call `update_task_status` with status "done"."#.to_string()
+- After outputting JSON, call `update_task_status` with status "done".
+
+## Deterministic Cargo Dependency Context
+
+__CARGO_DEPS__
+"#;
+    template.replace("__CARGO_DEPS__", cargo_dependencies)
 }
 
 pub fn admin_gui_system_prompt() -> String {

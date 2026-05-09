@@ -5,6 +5,7 @@ pub mod pm_agent;
 pub mod schema_designer;
 pub mod storage;
 pub mod ui_designer;
+pub mod utils;
 
 pub use config::AgentConfig;
 pub use context_agent::{ContextAgent, ContextAgentResponse};

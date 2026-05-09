@@ -12,6 +12,8 @@ use super::tools::{CommentaryParams, ListFilesParams, ReadFileParams, UpdateTask
 use crate::{
     error::AgentError,
     storage::{AgentStorage, AgentType, ChatMessage, ContextStorage, TaskStatus, TaskStorage},
+    utils::cargo::collect_cargo_dependencies,
+    utils::context::normalize_backend_context_json,
 };
 
 const MAX_NUDGES: u32 = 8;
@@ -122,7 +124,11 @@ impl ContextAgent {
         };
 
         let system_prompt = match self.context_type {
-            ContextType::Backend => super::prompts::backend_system_prompt(),
+            ContextType::Backend => {
+                let cargo_dependencies =
+                    collect_cargo_dependencies(&self.project_path, "backend/Cargo.toml");
+                super::prompts::backend_system_prompt(&cargo_dependencies)
+            }
             ContextType::AdminGui => super::prompts::admin_gui_system_prompt(),
         };
 
@@ -427,12 +433,17 @@ impl ContextAgent {
                 // Check if the text response looks like structured context (starts with {)
                 let trimmed = assistant_text.trim();
                 if trimmed.starts_with('{') || trimmed.starts_with('[') {
+                    let normalized_context = if matches!(self.context_type, ContextType::Backend) {
+                        normalize_backend_context_json(trimmed)
+                    } else {
+                        trimmed.to_string()
+                    };
                     // Model returned context as text instead of a tool call — save it
                     self.context_storage
                         .save_context(
                             self.project_id,
                             self.context_type.as_str(),
-                            trimmed,
+                            &normalized_context,
                         )
                         .await?;
 
@@ -446,7 +457,7 @@ impl ContextAgent {
                         .await;
 
                     return Ok(ContextAgentResponse::ContextSaved {
-                        context: trimmed.to_string(),
+                        context: normalized_context,
                     });
                 }
 
@@ -576,4 +587,5 @@ impl ContextAgent {
         }
         Ok(self.project_path.join(rel_path))
     }
+
 }
