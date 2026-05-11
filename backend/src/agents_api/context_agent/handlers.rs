@@ -11,13 +11,13 @@ use crate::agents_api::state::AgentState;
 
 use super::types::{ContextResponse, GatherContextQueued, GatherContextRequest};
 
-const BACKEND_CONTEXT: &str = "backend_context";
-const ADMIN_GUI_CONTEXT: &str = "admin_gui_context";
+const BACKEND_ENGINEER: &str = "backend_engineer";
+const FRONTEND_ENGINEER: &str = "frontend_engineer";
 
 fn validate_context_type(context_type: &str) -> Option<&'static str> {
     match context_type {
-        "backend" | "backend_context" => Some(BACKEND_CONTEXT),
-        "admin_gui" | "admin-gui" | "admin_gui_context" => Some(ADMIN_GUI_CONTEXT),
+        "backend" | "backend_engineer" => Some(BACKEND_ENGINEER),
+        "frontend" | "admin_gui" | "admin-gui" | "frontend_engineer" => Some(FRONTEND_ENGINEER),
         _ => None,
     }
 }
@@ -37,7 +37,7 @@ pub async fn gather_context(
         Some(ct) => ct,
         None => {
             return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": format!("Invalid context_type '{}'. Use 'backend' or 'admin_gui'.", context_type)
+                "error": format!("Invalid context_type '{}'. Use 'backend' or 'frontend'.", context_type)
             }));
         }
     };
@@ -90,10 +90,10 @@ pub async fn gather_context(
     }
 
     let agent_type_str = ct.to_string();
-    let title = if ct == BACKEND_CONTEXT {
+    let title = if ct == BACKEND_ENGINEER {
         format!("Gather backend context for project {}", project_id)
     } else {
-        format!("Gather admin-gui context for project {}", project_id)
+        format!("Gather frontend context for project {}", project_id)
     };
 
     let task_storage = match SqliteTaskStorage::open(&state.db_path) {
@@ -156,7 +156,7 @@ pub async fn gather_context(
             agent_type: None,
             content: format!(
                 "Analyze the {} of the project at: {}",
-                if ct == BACKEND_CONTEXT { "backend" } else { "admin-gui" },
+                if ct == BACKEND_ENGINEER { "backend" } else { "admin-gui" },
                 project_path
             ),
             tool_call_id: None,
@@ -199,7 +199,7 @@ pub async fn get_context(
         Some(ct) => ct,
         None => {
             return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": format!("Invalid context_type '{}'. Use 'backend' or 'admin_gui'.", context_type)
+                "error": format!("Invalid context_type '{}'. Use 'backend' or 'frontend'.", context_type)
             }));
         }
     };

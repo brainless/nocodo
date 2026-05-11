@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListFilesParams {
-    /// Absolute or relative directory path to list. Use "" for the project root.
+    /// Directory path to list, relative to project root. Use "" for the project root.
     pub path: String,
 }
 
@@ -11,12 +11,6 @@ pub struct ListFilesParams {
 pub struct ReadFileParams {
     /// Path to the file to read, relative to the project root.
     pub path: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct WriteContextParams {
-    /// The gathered context as a structured summary of the codebase.
-    pub context: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

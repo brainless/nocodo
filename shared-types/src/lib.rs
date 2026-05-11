@@ -122,8 +122,8 @@ pub enum AgentType {
     SchemaDesigner,
     BackendDeveloper,
     FrontendDeveloper,
-    BackendContext,
-    AdminGuiContext,
+    BackendEngineer,
+    FrontendEngineer,
 }
 
 // ============================================================================

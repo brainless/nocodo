@@ -1,15 +1,17 @@
+pub mod backend_engineer;
 pub mod config;
-pub mod context_agent;
 pub mod error;
+pub mod frontend_engineer;
 pub mod pm_agent;
 pub mod schema_designer;
 pub mod storage;
 pub mod ui_designer;
 pub mod utils;
 
+pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
 pub use config::AgentConfig;
-pub use context_agent::{ContextAgent, ContextAgentResponse};
 pub use error::AgentError;
+pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
 pub use pm_agent::{PmAgent, PmResponse};
 pub use schema_designer::{AgentResponse, SchemaDesignerAgent, StopAgentParams};
 pub use storage::sqlite::{
@@ -26,7 +28,7 @@ pub use ui_designer::{
 };
 
 // ---------------------------------------------------------------------------
-// Factory helper
+// Factory helpers
 // ---------------------------------------------------------------------------
 
 use std::sync::Arc;
@@ -52,9 +54,6 @@ fn make_llm_client(
     Ok(client)
 }
 
-/// Build a `SchemaDesignerAgent` from config + SQLite path.
-/// The caller is responsible for creating the task and session before calling
-/// `agent.chat_with_session(session_id, task_id, preview_mode)`.
 pub fn build_schema_designer(
     config: &AgentConfig,
     db_path: &str,
@@ -75,9 +74,6 @@ pub fn build_schema_designer(
     ))
 }
 
-/// Build a `PmAgent` from config + SQLite path.
-/// The caller is responsible for creating the task and session before calling
-/// `agent.chat_with_session(session_id, task_id)`.
 pub fn build_pm_agent(
     config: &AgentConfig,
     db_path: &str,
@@ -90,7 +86,6 @@ pub fn build_pm_agent(
     Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
 }
 
-/// Build a `UiDesignerAgent` from config + SQLite path.
 pub fn build_ui_designer(
     config: &AgentConfig,
     db_path: &str,
@@ -111,9 +106,6 @@ pub fn build_ui_designer(
     ))
 }
 
-/// Like `build_pm_agent` but accepts a caller-supplied `task_storage`.
-/// Use this when the backend wraps storage with `DispatchingTaskStorage` so that
-/// tasks created by the PM agent's tool calls automatically fire dispatch events.
 pub fn build_pm_agent_with_task_storage(
     config: &AgentConfig,
     db_path: &str,
@@ -126,20 +118,18 @@ pub fn build_pm_agent_with_task_storage(
     Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
 }
 
-/// Build a `ContextAgent` for backend context gathering.
-/// The `project_path` is the filesystem path to the project root directory.
-pub fn build_backend_context_agent(
+pub fn build_backend_engineer(
     config: &AgentConfig,
     db_path: &str,
     project_id: i64,
     project_path: &str,
-) -> Result<ContextAgent, AgentError> {
+) -> Result<BackendEngineerAgent, AgentError> {
     let client = make_llm_client(config)?;
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
     let context_storage: Arc<dyn ContextStorage> = Arc::new(SqliteContextStorage::open(db_path)?);
     let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
 
-    Ok(ContextAgent::new(
+    Ok(BackendEngineerAgent::new(
         client,
         storage,
         context_storage,
@@ -147,24 +137,21 @@ pub fn build_backend_context_agent(
         &config.model,
         project_id,
         project_path,
-        context_agent::prompts::ContextType::Backend,
     ))
 }
 
-/// Build a `ContextAgent` for admin-gui context gathering.
-/// The `project_path` is the filesystem path to the project root directory.
-pub fn build_admin_gui_context_agent(
+pub fn build_frontend_engineer(
     config: &AgentConfig,
     db_path: &str,
     project_id: i64,
     project_path: &str,
-) -> Result<ContextAgent, AgentError> {
+) -> Result<FrontendEngineerAgent, AgentError> {
     let client = make_llm_client(config)?;
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
     let context_storage: Arc<dyn ContextStorage> = Arc::new(SqliteContextStorage::open(db_path)?);
     let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
 
-    Ok(ContextAgent::new(
+    Ok(FrontendEngineerAgent::new(
         client,
         storage,
         context_storage,
@@ -172,6 +159,5 @@ pub fn build_admin_gui_context_agent(
         &config.model,
         project_id,
         project_path,
-        context_agent::prompts::ContextType::AdminGui,
     ))
 }

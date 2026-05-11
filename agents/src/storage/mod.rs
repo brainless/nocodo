@@ -12,8 +12,8 @@ pub enum AgentType {
     SchemaDesigner,
     ProjectManager,
     UiDesigner,
-    BackendContext,
-    AdminGuiContext,
+    BackendEngineer,
+    FrontendEngineer,
 }
 
 impl AgentType {
@@ -22,8 +22,8 @@ impl AgentType {
             AgentType::SchemaDesigner => "schema_designer",
             AgentType::ProjectManager => "project_manager",
             AgentType::UiDesigner => "ui_designer",
-            AgentType::BackendContext => "backend_context",
-            AgentType::AdminGuiContext => "admin_gui_context",
+            AgentType::BackendEngineer => "backend_engineer",
+            AgentType::FrontendEngineer => "frontend_engineer",
         }
     }
 }
