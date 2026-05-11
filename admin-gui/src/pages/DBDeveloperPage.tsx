@@ -3,6 +3,7 @@ import { useParams } from '@solidjs/router';
 import { useProject } from '../contexts/ProjectContext';
 import { ChatProvider, useChat } from '../contexts/ChatContext';
 import ChatDrawer from '../components/ChatDrawer';
+import ProjectTopNav from '../components/ProjectTopNav';
 import type {
   Schema,
   Table,
@@ -240,16 +241,18 @@ function DBDeveloperContent() {
         )}
       >
         <section class="sheet-main">
-          <div class="formula-strip">
-            <label for="chat-drawer" class="btn btn-success btn-sm">Dev Team</label>
-            <button
-              class="btn btn-sm btn-outline ml-2 whitespace-nowrap"
-              onClick={() => { const v = latestSchemaVersion(); if (v !== null) fetchPreviewSchema(v); }}
-              disabled={latestSchemaVersion() === null || previewLoading()}
-            >
-              {latestSchemaVersion() !== null ? `Preview Schema V${latestSchemaVersion()}` : 'Preview Schema'}
-            </button>
-          </div>
+          <ProjectTopNav
+            title="Database"
+            actions={
+              <button
+                class="btn btn-sm btn-outline whitespace-nowrap"
+                onClick={() => { const v = latestSchemaVersion(); if (v !== null) fetchPreviewSchema(v); }}
+                disabled={latestSchemaVersion() === null || previewLoading()}
+              >
+                {latestSchemaVersion() !== null ? `Preview Schema V${latestSchemaVersion()}` : 'Preview Schema'}
+              </button>
+            }
+          />
 
           <Show when={schemaError()}>
             <div class="alert alert-error m-4">

@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   {
     href: 'manager',
     agentType: 'project_manager',
-    label: 'Project Manager',
+    label: 'Epics/Tasks',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   {
     href: 'db-developer',
     agentType: 'schema_designer',
-    label: 'DB Developer',
+    label: 'Database',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <ellipse cx="12" cy="5" rx="9" ry="3"/>
@@ -31,7 +31,7 @@ const NAV_ITEMS = [
   {
     href: 'backend',
     agentType: 'backend_developer',
-    label: 'Backend Developer',
+    label: 'Backend Engineer',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="16 18 22 12 16 6"/>
@@ -42,7 +42,7 @@ const NAV_ITEMS = [
   {
     href: 'ui',
     agentType: 'ui_designer',
-    label: 'UI Designer',
+    label: 'UI Prototype',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>

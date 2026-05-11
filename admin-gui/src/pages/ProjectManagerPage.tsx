@@ -2,6 +2,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from 'so
 import { useProject } from '../contexts/ProjectContext';
 import { ChatProvider, useChat } from '../contexts/ChatContext';
 import ChatDrawer from '../components/ChatDrawer';
+import ProjectTopNav from '../components/ProjectTopNav';
 import { Sheet, type SheetColumn } from '../components/Sheet';
 import type { TaskItem, EpicItem } from '../types/api';
 
@@ -196,12 +197,14 @@ function ProjectManagerContent() {
     <main class="sheet-app">
       <ChatDrawer placeholder={placeholder}>
         <section class="sheet-main">
-          <div class="formula-strip">
-            <label for="chat-drawer" class="btn btn-success btn-sm">Dev Team</label>
-            <Show when={loading()}>
-              <span class="loading loading-spinner loading-xs ml-2 opacity-40" />
-            </Show>
-          </div>
+          <ProjectTopNav
+            title="Epics/Tasks"
+            actions={
+              <Show when={loading()}>
+                <span class="loading loading-spinner loading-xs opacity-40" />
+              </Show>
+            }
+          />
 
           <Show when={activeTab() === 'epics'}>
             <Sheet

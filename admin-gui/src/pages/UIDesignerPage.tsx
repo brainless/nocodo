@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { useProject } from '../contexts/ProjectContext';
+import ProjectTopNav from '../components/ProjectTopNav';
 
 const API_BASE_URL = '';
 
@@ -196,24 +197,25 @@ export default function UIDesignerPage() {
   });
 
   return (
-    <div class="uid-page">
-      <div class="uid-page-header">
-        <h2 class="uid-page-title">UI Designer</h2>
-        <p class="uid-page-subtitle">Generate low-fidelity form layouts for your entities.</p>
-      </div>
-      <Show when={loadError()}>
-        <div class="uid-error uid-error-block">{loadError()}</div>
-      </Show>
-      <Show when={!entities().length && !loadError()}>
-        <div class="uid-empty">
-          No schema found. Run the DB Developer first to design your data model.
+    <main class="sheet-app">
+      <section class="sheet-main">
+        <ProjectTopNav title="UI Prototype" />
+        <div class="uid-page">
+          <Show when={loadError()}>
+            <div class="uid-error uid-error-block">{loadError()}</div>
+          </Show>
+          <Show when={!entities().length && !loadError()}>
+            <div class="uid-empty">
+              No schema found. Run the Database agent first to design your data model.
+            </div>
+          </Show>
+          <div class="uid-entity-grid">
+            <For each={entities()}>
+              {name => <EntityCard entityName={name} projectId={projectId()!} />}
+            </For>
+          </div>
         </div>
-      </Show>
-      <div class="uid-entity-grid">
-        <For each={entities()}>
-          {name => <EntityCard entityName={name} projectId={projectId()!} />}
-        </For>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
