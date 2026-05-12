@@ -42,7 +42,7 @@ pub enum AgentResponse {
 // Agent
 // ---------------------------------------------------------------------------
 
-pub struct SchemaDesignerAgent {
+pub struct DbEngineerAgent {
     llm_client: Arc<dyn LlmClient>,
     storage: Arc<dyn AgentStorage>,
     schema_storage: Arc<dyn SchemaStorage>,
@@ -51,7 +51,7 @@ pub struct SchemaDesignerAgent {
     project_id: i64,
 }
 
-impl SchemaDesignerAgent {
+impl DbEngineerAgent {
     pub fn new(
         llm_client: Arc<dyn LlmClient>,
         storage: Arc<dyn AgentStorage>,
@@ -192,7 +192,7 @@ impl SchemaDesignerAgent {
 
             // Build the optional leading text row (present when the LLM sends both
             // text and a tool call in the same response).
-            let agent_type_str = AgentType::SchemaDesigner.as_str().to_string();
+            let agent_type_str = AgentType::DbEngineer.as_str().to_string();
             let text_row = |content: String| ChatMessage {
                 id: None,
                 session_id,

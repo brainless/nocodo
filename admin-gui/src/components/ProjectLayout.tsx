@@ -6,7 +6,7 @@ import type { ListTasksResponse } from '../types/api';
 
 const NAV_ITEMS = [
   {
-    href: 'manager',
+    href: 'epics',
     agentType: 'project_manager',
     label: 'Epics/Tasks',
     icon: (
@@ -17,8 +17,8 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: 'db-developer',
-    agentType: 'schema_designer',
+    href: 'database',
+    agentType: 'db_engineer',
     label: 'Database',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -30,8 +30,8 @@ const NAV_ITEMS = [
   },
   {
     href: 'backend',
-    agentType: 'backend_developer',
-    label: 'Backend Engineer',
+    agentType: 'backend_engineer',
+    label: 'Backend',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="16 18 22 12 16 6"/>
@@ -40,9 +40,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: 'ui',
+    href: 'ui-design',
     agentType: 'ui_designer',
-    label: 'UI Prototype',
+    label: 'UI Design',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>

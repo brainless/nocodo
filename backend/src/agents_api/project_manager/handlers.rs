@@ -1,12 +1,12 @@
 use crate::agents_api::dispatcher::{DispatchingTaskStorage};
 use crate::agents_api::state::AgentState;
-use crate::agents_api::pm_agent::types::{
+use crate::agents_api::project_manager::types::{
     PmChatHistoryMessage, PmChatHistoryResponse, PmChatRequest, PmChatResponse, PmInitRequest,
     PmMessageResponse, PmResponsePayload,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
-    build_pm_agent_with_task_storage, AgentConfig, AgentStorage, PmResponse, SqliteAgentStorage,
+    build_project_manager_with_task_storage, AgentConfig, AgentStorage, PmResponse, SqliteAgentStorage,
     SqliteTaskStorage, Task, TaskStatus, TaskStorage,
 };
 use std::sync::Arc;
@@ -171,7 +171,7 @@ pub async fn send_pm_chat_message(
             }
         };
 
-        let agent = match build_pm_agent_with_task_storage(&config, &db_path, project_id, task_storage) {
+        let agent = match build_project_manager_with_task_storage(&config, &db_path, project_id, task_storage) {
             Ok(a) => a,
             Err(e) => {
                 response_storage
@@ -207,7 +207,7 @@ pub async fn send_pm_chat_message(
 
 /// POST /api/agents/project-manager/init
 /// Bootstrap a brand-new project: create a PM task + session, then run the PM agent
-/// with the project-init system prompt so it creates an Epic and schema_designer task.
+/// with the project-init system prompt so it creates an Epic and db_engineer task.
 #[post("/api/agents/project-manager/init")]
 pub async fn init_pm_project(
     state: web::Data<AgentState>,
@@ -322,7 +322,7 @@ pub async fn init_pm_project(
             }
         };
 
-        let agent = match build_pm_agent_with_task_storage(&config, &db_path, project_id, task_storage) {
+        let agent = match build_project_manager_with_task_storage(&config, &db_path, project_id, task_storage) {
             Ok(a) => a,
             Err(e) => {
                 response_storage

@@ -11,7 +11,7 @@ use crate::{
     error::AgentError,
     storage::{AgentStorage, ChatMessage, ContextStorage, TaskStatus, TaskStorage},
     utils::{
-        agent_tools::{CommentaryParams, ListFilesParams, ReadFileParams, UpdateTaskStatusParams},
+        tools::{CommentaryParams, ListFilesParams, ReadFileParams, UpdateTaskStatusParams},
         cargo::collect_cargo_dependencies,
         context::normalize_backend_context_json,
         file_ops,

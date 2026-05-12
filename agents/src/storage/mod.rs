@@ -9,7 +9,7 @@ use crate::error::AgentError;
 // ---------------------------------------------------------------------------
 
 pub enum AgentType {
-    SchemaDesigner,
+    DbEngineer,
     ProjectManager,
     UiDesigner,
     BackendEngineer,
@@ -19,7 +19,7 @@ pub enum AgentType {
 impl AgentType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            AgentType::SchemaDesigner => "schema_designer",
+            AgentType::DbEngineer => "db_engineer",
             AgentType::ProjectManager => "project_manager",
             AgentType::UiDesigner => "ui_designer",
             AgentType::BackendEngineer => "backend_engineer",

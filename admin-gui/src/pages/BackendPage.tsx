@@ -1,6 +1,6 @@
 import ProjectTopNav from '../components/ProjectTopNav';
 
-export default function BackendDeveloperPage() {
+export default function BackendPage() {
   return (
     <main class="sheet-app">
       <section class="sheet-main">

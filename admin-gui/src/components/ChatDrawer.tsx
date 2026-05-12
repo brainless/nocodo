@@ -11,9 +11,9 @@ interface ChatDrawerProps {
 
 const AGENT_CONTACTS = [
   { type: 'project_manager', name: 'Project Manager', initial: 'PM' },
-  { type: 'schema_designer', name: 'Database Dev', initial: 'DB' },
-  { type: 'backend_developer', name: 'Backend Developer', initial: 'BE' },
-  { type: 'frontend_developer', name: 'UI Designer', initial: 'UI' },
+  { type: 'db_engineer', name: 'DB Engineer', initial: 'DB' },
+  { type: 'backend_engineer', name: 'Backend Engineer', initial: 'BE' },
+  { type: 'frontend_engineer', name: 'Frontend Engineer', initial: 'FE' },
 ];
 
 export default function ChatDrawer(props: ChatDrawerProps) {

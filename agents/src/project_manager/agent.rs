@@ -34,7 +34,7 @@ pub enum PmResponse {
 // Agent
 // ---------------------------------------------------------------------------
 
-pub struct PmAgent {
+pub struct ProjectManagerAgent {
     llm_client: Arc<dyn LlmClient>,
     storage: Arc<dyn AgentStorage>,
     task_storage: Arc<dyn TaskStorage>,
@@ -42,7 +42,7 @@ pub struct PmAgent {
     project_id: i64,
 }
 
-impl PmAgent {
+impl ProjectManagerAgent {
     pub fn new(
         llm_client: Arc<dyn LlmClient>,
         storage: Arc<dyn AgentStorage>,
@@ -70,7 +70,7 @@ impl PmAgent {
     }
 
     /// Run the PM agent for a brand-new project's first message.
-    /// Uses the project-init system prompt: create Epic + schema_designer task immediately.
+    /// Uses the project-init system prompt: create Epic + db_engineer task immediately.
     pub async fn chat_with_session_init(
         &self,
         session_id: i64,

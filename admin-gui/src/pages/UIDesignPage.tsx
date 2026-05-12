@@ -175,7 +175,7 @@ function EntityCard(props: { entityName: string; projectId: number }) {
 
 // ---- Page -------------------------------------------------------------------
 
-export default function UIDesignerPage() {
+export default function UIDesignPage() {
   const params = useParams();
   const { currentProject } = useProject();
   const [entities, setEntities] = createSignal<string[]>([]);

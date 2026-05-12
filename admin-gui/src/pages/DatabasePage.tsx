@@ -20,11 +20,11 @@ const API_BASE_URL = '';
 
 const MIN_COLUMNS = 26;
 
-export default function DBDeveloperPage() {
+export default function DatabasePage() {
   const { currentProject } = useProject();
 
   return (
-    <ChatProvider defaultAgentType="schema_designer" projectId={() => currentProject()?.id}>
+    <ChatProvider defaultAgentType="db_engineer" projectId={() => currentProject()?.id}>
       <DBDeveloperContent />
     </ChatProvider>
   );

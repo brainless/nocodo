@@ -2,8 +2,8 @@ pub mod backend_engineer;
 pub mod config;
 pub mod error;
 pub mod frontend_engineer;
-pub mod pm_agent;
-pub mod schema_designer;
+pub mod project_manager;
+pub mod db_engineer;
 pub mod storage;
 pub mod ui_designer;
 pub mod utils;
@@ -12,8 +12,8 @@ pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
 pub use config::AgentConfig;
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
-pub use pm_agent::{PmAgent, PmResponse};
-pub use schema_designer::{AgentResponse, SchemaDesignerAgent, StopAgentParams};
+pub use project_manager::{ProjectManagerAgent, PmResponse};
+pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteContextStorage, SqliteSchemaStorage, SqliteTaskStorage,
     SqliteUiFormStorage,
@@ -54,17 +54,17 @@ fn make_llm_client(
     Ok(client)
 }
 
-pub fn build_schema_designer(
+pub fn build_db_engineer(
     config: &AgentConfig,
     db_path: &str,
     project_id: i64,
-) -> Result<SchemaDesignerAgent, AgentError> {
+) -> Result<DbEngineerAgent, AgentError> {
     let client = make_llm_client(config)?;
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
     let schema_storage: Arc<dyn SchemaStorage> = Arc::new(SqliteSchemaStorage::open(db_path)?);
     let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
 
-    Ok(SchemaDesignerAgent::new(
+    Ok(DbEngineerAgent::new(
         client,
         storage,
         schema_storage,
@@ -74,16 +74,16 @@ pub fn build_schema_designer(
     ))
 }
 
-pub fn build_pm_agent(
+pub fn build_project_manager(
     config: &AgentConfig,
     db_path: &str,
     project_id: i64,
-) -> Result<PmAgent, AgentError> {
+) -> Result<ProjectManagerAgent, AgentError> {
     let client = make_llm_client(config)?;
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
     let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
 
-    Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
+    Ok(ProjectManagerAgent::new(client, storage, task_storage, &config.model, project_id))
 }
 
 pub fn build_ui_designer(
@@ -106,16 +106,16 @@ pub fn build_ui_designer(
     ))
 }
 
-pub fn build_pm_agent_with_task_storage(
+pub fn build_project_manager_with_task_storage(
     config: &AgentConfig,
     db_path: &str,
     project_id: i64,
     task_storage: Arc<dyn TaskStorage>,
-) -> Result<PmAgent, AgentError> {
+) -> Result<ProjectManagerAgent, AgentError> {
     let client = make_llm_client(config)?;
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
 
-    Ok(PmAgent::new(client, storage, task_storage, &config.model, project_id))
+    Ok(ProjectManagerAgent::new(client, storage, task_storage, &config.model, project_id))
 }
 
 pub fn build_backend_engineer(

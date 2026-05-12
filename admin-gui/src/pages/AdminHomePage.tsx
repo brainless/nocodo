@@ -59,7 +59,7 @@ function RecentProjects() {
         const withContext = ps.map((project, i) => {
           const tasks = taskData[i].tasks ?? [];
           const latest = tasks
-            .filter(t => t.assigned_to_agent === 'schema_designer')
+            .filter(t => t.assigned_to_agent === 'db_engineer')
             .sort((a, b) => b.created_at - a.created_at)[0];
           return { project, firstPrompt: latest?.source_prompt ?? null };
         });
@@ -86,7 +86,7 @@ function RecentProjects() {
                   body={firstPrompt}
                   meta={timeAgo(project.created_at)}
                   leading={<div class="project-avatar">{projectInitial(project.name)}</div>}
-                  onClick={() => navigate(`/projects/${project.id}/db-developer`)}
+                  onClick={() => navigate(`/projects/${project.id}/database`)}
                 />
               )}
             </For>
@@ -120,7 +120,7 @@ function HomeContent() {
 
     if (!response.ok) throw new Error(`Failed to initialize project: ${response.status}`);
 
-    navigate(`/projects/${project.id}/manager`);
+    navigate(`/projects/${project.id}/epics`);
   };
 
   const handleSubmit = async (message: string) => {

@@ -38,15 +38,15 @@ Resolved priority: **env var → `project.conf` → `server.env`** (sibling to b
 
 ## Agents
 
-- Active agent: `schema_designer` — designs SQLite schemas via LLM
+- Active agent: `db_engineer` — designs SQLite schemas via LLM
 - Storage: SQLite (`nocodo.db`) with chat sessions and generated schemas
 - Agent crate (`agents/`) — business logic only: agent implementations, storage traits, LLM integration
 - Backend crate (`backend/`) — HTTP layer: API endpoints live in `backend/src/agents_api/`
 - API endpoints:
-  - `POST /api/agents/schema-designer/chat` — send message, returns `{session_id, message_id}`
-  - `GET /api/agents/schema-designer/messages/{id}/response` — long-poll for response (text/schema/stopped)
-  - `GET /api/agents/schema-designer/sessions/{id}/messages` — fetch session history
-  - `GET /api/agents/schema-designer/sessions/{id}/codegen` — generate Rust structs + SQLite DDL from the session's latest schema
+  - `POST /api/agents/db-engineer/chat` — send message, returns `{session_id, message_id}`
+  - `GET /api/agents/db-engineer/messages/{id}/response` — long-poll for response (text/schema/stopped)
+  - `GET /api/agents/db-engineer/sessions/{id}/messages` — fetch session history
+  - `GET /api/agents/db-engineer/sessions/{id}/codegen` — generate Rust structs + SQLite DDL from the session's latest schema
 - Config: reads `AGENT_PROVIDER` and `AGENT_API_KEY` from env/project.conf
 - Backend auto-initializes agent state on startup; runs DB migrations and ensures default project exists
 

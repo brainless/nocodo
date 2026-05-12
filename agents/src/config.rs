@@ -21,8 +21,8 @@ impl AgentConfig {
         Self::load_from_prefix("AGENT")
     }
 
-    /// Load schema-designer config: SCHEMA_AGENT_* with fallback to AGENT_*.
-    pub fn load_schema_designer() -> Result<Self, AgentError> {
+    /// Load db-engineer config: SCHEMA_AGENT_* with fallback to AGENT_*.
+    pub fn load_db_engineer() -> Result<Self, AgentError> {
         Self::load_with_agent_fallback("SCHEMA_AGENT")
     }
 

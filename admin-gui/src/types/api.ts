@@ -67,7 +67,7 @@ display_column: string | null, };
 /**
  * Available agent types in the multi-agent system.
  */
-export type AgentType = "project_manager" | "schema_designer" | "backend_developer" | "frontend_developer";
+export type AgentType = "project_manager" | "db_engineer" | "backend_engineer" | "frontend_engineer";
 
 
 /**

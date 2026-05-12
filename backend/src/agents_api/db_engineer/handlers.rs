@@ -1,5 +1,5 @@
 use crate::agents_api::state::AgentState;
-use crate::agents_api::schema_designer::types::{
+use crate::agents_api::db_engineer::types::{
     AgentResponsePayload, BoardQuery, BoardResponse, ChatHistoryMessage, ChatHistoryResponse,
     ChatRequest, ChatResponse, EpicItem, EpicListQuery, ListEpicsResponse, ListTasksQuery,
     ListTasksResponse, MessageResponse, SchemaCodegenResponse, SchemaPreviewQuery,
@@ -7,20 +7,20 @@ use crate::agents_api::schema_designer::types::{
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
-    build_schema_designer, AgentConfig, AgentResponse, AgentStorage, SchemaStorage,
+    build_db_engineer, AgentConfig, AgentResponse, AgentStorage, SchemaStorage,
     SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage, Task, TaskStatus, TaskStorage,
 };
 use rusqlite::params as sql_params;
 use shared_types::SchemaDef;
 use std::time::Duration;
 
-const AGENT_TYPE: &str = "schema_designer";
+const AGENT_TYPE: &str = "db_engineer";
 
-/// POST /api/agents/schema-designer/chat
+/// POST /api/agents/db-engineer/chat
 /// If task_id is None, creates a new task + session from the prompt.
 /// If task_id is Some, continues the existing task's session.
 /// Returns immediately with task_id and message_id.
-#[post("/api/agents/schema-designer/chat")]
+#[post("/api/agents/db-engineer/chat")]
 pub async fn send_chat_message(
     state: web::Data<AgentState>,
     request: web::Json<ChatRequest>,
@@ -157,7 +157,7 @@ pub async fn send_chat_message(
     let db_path = state.db_path.clone();
 
     actix_web::rt::spawn(async move {
-        let config = match AgentConfig::load_schema_designer() {
+        let config = match AgentConfig::load_db_engineer() {
             Ok(c) => c,
             Err(e) => {
                 response_storage
@@ -166,7 +166,7 @@ pub async fn send_chat_message(
                 return;
             }
         };
-        let agent = match build_schema_designer(&config, &db_path, project_id) {
+        let agent = match build_db_engineer(&config, &db_path, project_id) {
             Ok(a) => a,
             Err(e) => {
                 response_storage
@@ -409,8 +409,8 @@ async fn fetch_board_data(
     Ok((tasks, epics))
 }
 
-/// GET /api/agents/schema-designer/tasks/{task_id}/messages
-#[get("/api/agents/schema-designer/tasks/{task_id}/messages")]
+/// GET /api/agents/db-engineer/tasks/{task_id}/messages
+#[get("/api/agents/db-engineer/tasks/{task_id}/messages")]
 pub async fn get_task_messages(
     state: web::Data<AgentState>,
     path: web::Path<i64>,
@@ -505,8 +505,8 @@ pub async fn get_task_messages(
     }
 }
 
-/// GET /api/agents/schema-designer/messages/{message_id}/response
-#[get("/api/agents/schema-designer/messages/{message_id}/response")]
+/// GET /api/agents/db-engineer/messages/{message_id}/response
+#[get("/api/agents/db-engineer/messages/{message_id}/response")]
 pub async fn get_message_response(
     state: web::Data<AgentState>,
     path: web::Path<i64>,
@@ -572,8 +572,8 @@ pub async fn get_message_response(
     }
 }
 
-/// GET /api/agents/schema-designer/tasks/{task_id}/schema?version=N
-#[get("/api/agents/schema-designer/tasks/{task_id}/schema")]
+/// GET /api/agents/db-engineer/tasks/{task_id}/schema?version=N
+#[get("/api/agents/db-engineer/tasks/{task_id}/schema")]
 pub async fn get_task_schema(
     state: web::Data<AgentState>,
     path: web::Path<i64>,
@@ -625,8 +625,8 @@ pub async fn get_task_schema(
     }
 }
 
-/// GET /api/agents/schema-designer/tasks/{task_id}/codegen
-#[get("/api/agents/schema-designer/tasks/{task_id}/codegen")]
+/// GET /api/agents/db-engineer/tasks/{task_id}/codegen
+#[get("/api/agents/db-engineer/tasks/{task_id}/codegen")]
 pub async fn generate_task_schema_code(
     state: web::Data<AgentState>,
     path: web::Path<i64>,

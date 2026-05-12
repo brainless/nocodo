@@ -23,7 +23,7 @@ pub struct CreateTaskParams {
     pub description: String,
     /// Verbatim user intent for this task — the focused agent reads this.
     pub source_prompt: String,
-    /// Target agent. Must be one of: "schema_designer".
+    /// Target agent. Must be one of: "db_engineer".
     pub assigned_to_agent: String,
     /// Epic this task belongs to (null for standalone tasks).
     pub epic_id: Option<i64>,

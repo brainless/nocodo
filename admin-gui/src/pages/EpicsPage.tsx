@@ -17,10 +17,10 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 const AGENT_LABEL: Record<string, string> = {
-  schema_designer: 'DB Dev',
+  db_engineer: 'DB Engineer',
   project_manager: 'PM',
-  backend_developer: 'Backend Dev',
-  frontend_developer: 'Frontend Dev',
+  backend_engineer: 'Backend Engineer',
+  frontend_engineer: 'Frontend Engineer',
 };
 
 function StatusBadge(props: { status: string }) {
@@ -31,7 +31,7 @@ function StatusBadge(props: { status: string }) {
   );
 }
 
-export default function ProjectManagerPage() {
+export default function EpicsPage() {
   const { currentProject } = useProject();
 
   return (

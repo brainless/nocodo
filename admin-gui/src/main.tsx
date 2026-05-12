@@ -7,10 +7,10 @@ import { AuthModal } from './components/AuthModal';
 import AdminHomePage from './pages/AdminHomePage';
 import ComponentsGalleryPage from './pages/ComponentsGalleryPage';
 import ProjectLayout from './components/ProjectLayout';
-import DBDeveloperPage from './pages/DBDeveloperPage';
-import ProjectManagerPage from './pages/ProjectManagerPage';
-import BackendDeveloperPage from './pages/BackendDeveloperPage';
-import UIDesignerPage from './pages/UIDesignerPage';
+import DatabasePage from './pages/DatabasePage';
+import EpicsPage from './pages/EpicsPage';
+import BackendPage from './pages/BackendPage';
+import UIDesignPage from './pages/UIDesignPage';
 import ProjectSettingsPage from './pages/ProjectSettingsPage';
 
 function AppRoutes() {
@@ -19,10 +19,10 @@ function AppRoutes() {
       <Route path="/" component={AdminHomePage} />
       <Route path="/components" component={ComponentsGalleryPage} />
       <Route path="/projects/:projectId" component={ProjectLayout}>
-        <Route path="/manager" component={ProjectManagerPage} />
-        <Route path="/db-developer" component={DBDeveloperPage} />
-        <Route path="/backend" component={BackendDeveloperPage} />
-        <Route path="/ui" component={UIDesignerPage} />
+        <Route path="/epics" component={EpicsPage} />
+        <Route path="/database" component={DatabasePage} />
+        <Route path="/backend" component={BackendPage} />
+        <Route path="/ui-design" component={UIDesignPage} />
         <Route path="/settings" component={ProjectSettingsPage} />
       </Route>
     </Router>

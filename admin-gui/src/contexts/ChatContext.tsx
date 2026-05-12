@@ -20,15 +20,15 @@ const AGENT_GREETINGS: Record<string, UiMessage> = {
     role: 'assistant',
     content: "Hi! Tell me what you want to build and I'll plan the epics and tasks.",
   },
-  schema_designer: {
+  db_engineer: {
     role: 'assistant',
-    content: "Hello! Tell me what you want to build and I'll design a schema for it.",
+    content: "Hello! I'm the DB Engineer. Tell me what schema you need.",
   },
-  backend_developer: {
+  backend_engineer: {
     role: 'assistant',
-    content: "Hello! I'm the Backend Developer. What APIs do you need?",
+    content: "Hello! I'm the Backend Engineer. What APIs do you need?",
   },
-  frontend_developer: {
+  frontend_engineer: {
     role: 'assistant',
     content: "Hello! I'm the UI Designer. What should we build?",
   },
