@@ -150,9 +150,10 @@ function DBDeveloperContent() {
     if (!task) return;
     setPreviewLoading(true);
     try {
+      const agentPath = chat.selectedAgentType().replace(/_/g, '-');
       const url = version
-        ? `${API_BASE_URL}/api/agents/schema-designer/tasks/${task.id}/schema?version=${version}`
-        : `${API_BASE_URL}/api/agents/schema-designer/tasks/${task.id}/schema`;
+        ? `${API_BASE_URL}/api/agents/${agentPath}/tasks/${task.id}/schema?version=${version}`
+        : `${API_BASE_URL}/api/agents/${agentPath}/tasks/${task.id}/schema`;
       const response = await fetch(url);
       if (!response.ok) {
         const err = await response.json() as { error?: string };
