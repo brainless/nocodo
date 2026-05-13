@@ -1,0 +1,360 @@
+#!/usr/bin/env python3
+"""
+Combine prompt logs from opencode, Claude Code, and Codex into a single JSONL file.
+
+Usage:
+    python scripts/prompt-log                         # last 30 days
+    python scripts/prompt-log --days 7                 # last 7 days
+    python scripts/prompt-log --from 2026-04-01 --to 2026-05-01
+    python scripts/prompt-log --include-agent-responses # include model responses
+
+Output: prompt-log-{start_date}-{end_date}.jsonl in current working directory.
+"""
+
+import argparse
+import ast
+import json
+import os
+import sqlite3
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+CLAUDE_PROJECTS_DIR = Path.home() / ".claude/projects"
+CODEX_HISTORY = Path.home() / ".codex/history.jsonl"
+CODEX_SESSIONS_DIR = Path.home() / ".codex/sessions"
+
+
+def cwd_to_claude_dir(cwd: str) -> Path:
+    return CLAUDE_PROJECTS_DIR / ("-" + cwd.lstrip("/").replace("/", "-"))
+
+
+def parse_date(s: str) -> datetime:
+    return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+
+def format_date(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%d")
+
+
+def extract_opencode(cwd: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
+    records = []
+    if not OPENCODE_DB.exists():
+        return records
+    conn = sqlite3.connect(str(OPENCODE_DB))
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
+
+    query = """
+        SELECT m.id, m.time_created, json_extract(m.data, '$.role') as role
+        FROM message m
+        JOIN session s ON m.session_id = s.id
+        WHERE s.directory = ? AND m.time_created >= ? AND m.time_created < ?
+        ORDER BY m.time_created ASC
+    """
+    messages = conn.execute(query, (cwd, start_ms, end_ms)).fetchall()
+
+    for msg_id, time_created, role in messages:
+        ts_sec = time_created / 1000
+        if role == "user":
+            role_out = "user"
+        elif role == "assistant":
+            if not include_responses:
+                continue
+            role_out = "agent"
+        else:
+            continue
+
+        part_query = "SELECT data FROM part WHERE message_id = ?"
+        parts = conn.execute(part_query, (msg_id,)).fetchall()
+        texts = []
+        for (part_data,) in parts:
+            obj = json.loads(part_data)
+            if obj.get("type") == "text":
+                texts.append(obj.get("text", ""))
+
+        if texts:
+            records.append({
+                "timestamp": datetime.fromtimestamp(ts_sec, tz=timezone.utc).isoformat(),
+                "agent": "opencode",
+                "role": role_out,
+                "content": "\n".join(texts),
+            })
+
+    conn.close()
+    return records
+
+
+def extract_claude_code(cwd: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
+    records = []
+    project_dir = cwd_to_claude_dir(cwd)
+    if not project_dir.exists():
+        return records
+
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
+
+    for jsonl_file in project_dir.glob("*.jsonl"):
+        with open(jsonl_file) as f:
+            for line in f:
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                entry_type = obj.get("type")
+                if entry_type not in ("user", "assistant"):
+                    continue
+
+                msg = obj.get("message", {})
+                if not isinstance(msg, dict):
+                    continue
+
+                role_raw = msg.get("role", "")
+                timestamp = obj.get("timestamp", "")
+
+                if not timestamp:
+                    continue
+
+                try:
+                    ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    continue
+
+                ts_ms = int(ts.timestamp() * 1000)
+                if ts_ms < start_ms or ts_ms >= end_ms:
+                    continue
+
+                content = msg.get("content", "")
+
+                if entry_type == "user":
+                    if isinstance(content, str) and content.strip():
+                        records.append({
+                            "timestamp": ts.isoformat(),
+                            "agent": "claude-code",
+                            "role": "user",
+                            "content": content,
+                        })
+                elif entry_type == "assistant" and include_responses:
+                    if isinstance(content, list):
+                        texts = []
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                texts.append(block.get("text", ""))
+                        if texts:
+                            records.append({
+                                "timestamp": ts.isoformat(),
+                                "agent": "claude-code",
+                                "role": "agent",
+                                "content": "\n".join(texts),
+                            })
+
+    return records
+
+
+def extract_codex(cwd: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
+    records = []
+
+    # Build a map of session_id -> cwd from session files
+    session_cwd_map: dict[str, str] = {}
+    for jsonl_file in CODEX_SESSIONS_DIR.rglob("*.jsonl"):
+        with open(jsonl_file) as f:
+            for line in f:
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if obj.get("type") == "session_meta":
+                    payload = obj.get("payload", {})
+                    if isinstance(payload, str):
+                        try:
+                            payload = ast.literal_eval(payload)
+                        except Exception:
+                            continue
+                    sid = payload.get("id", "")
+                    swd = payload.get("cwd", "")
+                    if sid and swd:
+                        session_cwd_map[sid] = swd
+                    break
+
+    if not CODEX_HISTORY.exists():
+        return records
+
+    start_ms = int(start.timestamp())
+    end_ms = int(end.timestamp())
+
+    with open(CODEX_HISTORY) as f:
+        for line in f:
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            sid = obj.get("session_id", "")
+            ts = obj.get("ts", 0)
+
+            if ts < start_ms or ts >= end_ms:
+                continue
+
+            session_cwd = session_cwd_map.get(sid, "")
+            if session_cwd != cwd:
+                continue
+
+            text = obj.get("text", "")
+            if not text or not text.strip():
+                continue
+
+            ts_iso = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            records.append({
+                "timestamp": ts_iso,
+                "agent": "codex",
+                "role": "user",
+                "content": text,
+            })
+
+    if include_responses and session_cwd_map:
+        matching_sessions = {sid for sid, swd in session_cwd_map.items() if swd == cwd}
+        for jsonl_file in CODEX_SESSIONS_DIR.rglob("*.jsonl"):
+            file_session_id = None
+            file_texts: list[dict] = []
+
+            with open(jsonl_file) as f:
+                for line in f:
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    if obj.get("type") == "session_meta":
+                        payload = obj.get("payload", {})
+                        if isinstance(payload, str):
+                            try:
+                                payload = ast.literal_eval(payload)
+                            except Exception:
+                                continue
+                        file_session_id = payload.get("id", "")
+                        continue
+
+                    if file_session_id not in matching_sessions:
+                        if file_session_id is not None:
+                            break
+                        continue
+
+                    if obj.get("type") == "response_item":
+                        payload = obj.get("payload", {})
+                        if isinstance(payload, str):
+                            try:
+                                payload = ast.literal_eval(payload)
+                            except Exception:
+                                continue
+                        if not isinstance(payload, dict):
+                            continue
+                        if payload.get("role") != "assistant":
+                            continue
+
+                        ts_str = obj.get("timestamp", "")
+                        if not ts_str:
+                            continue
+                        try:
+                            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        except (ValueError, AttributeError):
+                            continue
+                        ts_sec = ts.timestamp()
+                        if ts_sec < start_ms or ts_sec >= end_ms:
+                            continue
+
+                        content_list = payload.get("content", [])
+                        if isinstance(content_list, list):
+                            texts = []
+                            for block in content_list:
+                                if isinstance(block, dict) and block.get("type") in ("text", "output_text"):
+                                    texts.append(block.get("text", ""))
+                            if texts:
+                                file_texts.append({
+                                    "timestamp": ts.isoformat(),
+                                    "agent": "codex",
+                                    "role": "agent",
+                                    "content": "\n".join(texts),
+                                })
+
+            records.extend(file_texts)
+
+    return records
+
+
+def write_markdown(records: list[dict], output_file: Path):
+    agent_labels = {
+        "opencode": "OpenCode",
+        "claude-code": "Claude Code",
+        "codex": "Codex",
+    }
+    role_labels = {
+        "user": "User",
+        "agent": "Agent",
+    }
+
+    start_date = format_date(datetime.fromisoformat(records[0]["timestamp"])) if records else "unknown"
+    end_date = format_date(datetime.fromisoformat(records[-1]["timestamp"])) if records else "unknown"
+
+    current_date = ""
+    with open(output_file, "w") as f:
+        f.write(f"# Prompt Log: {start_date} — {end_date}\n\n")
+
+        for rec in records:
+            ts = datetime.fromisoformat(rec["timestamp"])
+            date_str = format_date(ts)
+            if date_str != current_date:
+                current_date = date_str
+                f.write(f"## {current_date}\n\n")
+
+            time_str = ts.strftime("%H:%M")
+            agent = agent_labels.get(rec["agent"], rec["agent"])
+            role = role_labels.get(rec["role"], rec["role"])
+            label = f"**{agent} {role}**"
+            f.write(f"### {time_str} — {label}\n\n")
+            f.write(f"{rec['content']}\n\n")
+
+        f.write("---\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Combine prompt logs from opencode, Claude Code, and Codex")
+    parser.add_argument("--from", dest="from_date", help="Start date (YYYY-MM-DD)")
+    parser.add_argument("--to", dest="to_date", help="End date (YYYY-MM-DD)")
+    parser.add_argument("--days", type=int, default=30, help="Number of days to look back (default: 30)")
+    parser.add_argument("--include-agent-responses", action="store_true", help="Include model responses")
+    parser.add_argument("--format", dest="output_format", choices=["jsonl", "markdown"], default="jsonl", help="Output format (default: jsonl)")
+    parser.add_argument("--cwd", default=os.getcwd(), help="Project directory (default: current directory)")
+    args = parser.parse_args()
+
+    end = datetime.now(tz=timezone.utc)
+    if args.from_date and args.to_date:
+        start = parse_date(args.from_date)
+        end = parse_date(args.to_date)
+    else:
+        start = end - timedelta(days=args.days)
+
+    cwd = os.path.abspath(args.cwd)
+
+    all_records = []
+    all_records.extend(extract_opencode(cwd, start, end, args.include_agent_responses))
+    all_records.extend(extract_claude_code(cwd, start, end, args.include_agent_responses))
+    all_records.extend(extract_codex(cwd, start, end, args.include_agent_responses))
+
+    all_records.sort(key=lambda r: r["timestamp"])
+
+    ext = "md" if args.output_format == "markdown" else "jsonl"
+    output_file = Path.cwd() / f"prompt-log-{format_date(start)}-{format_date(end)}.{ext}"
+
+    if args.output_format == "markdown":
+        write_markdown(all_records, output_file)
+    else:
+        with open(output_file, "w") as f:
+            for rec in all_records:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    print(f"Wrote {len(all_records)} records to {output_file}")
+
+
+if __name__ == "__main__":
+    main()
