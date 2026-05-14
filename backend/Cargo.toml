@@ -40,7 +40,7 @@ async-trait = "0.1"
 tokio = { version = "1.0", features = ["sync", "rt", "process"] }
 futures-util = "0.3"
 rand = "0.8"
-resend-rs = { path = "/Users/brainless/Projects/resend-rust" }
+resend-rs = "0.25.1"
 log = "0.4"
 env_logger = "0.11"
 
