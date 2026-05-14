@@ -58,10 +58,8 @@ function RecentProjects() {
 
         const withContext = ps.map((project, i) => {
           const tasks = taskData[i].tasks ?? [];
-          const latest = tasks
-            .filter(t => t.assigned_to_agent === 'db_engineer')
-            .sort((a, b) => b.created_at - a.created_at)[0];
-          return { project, firstPrompt: latest?.source_prompt ?? null };
+          const oldest = tasks.sort((a, b) => a.created_at - b.created_at)[0];
+          return { project, firstPrompt: oldest?.source_prompt ?? null };
         });
 
         setItems(withContext);
