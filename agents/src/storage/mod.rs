@@ -1,6 +1,7 @@
 pub mod sqlite;
 
 use async_trait::async_trait;
+use serde::Serialize;
 
 use crate::error::AgentError;
 
@@ -160,6 +161,67 @@ pub struct ChatMessage {
 }
 
 // ---------------------------------------------------------------------------
+// User / User-chat / Comment row structs
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserRow {
+    pub id: i64,
+    pub display_name: String,
+    pub email: Option<String>,
+    pub is_guest: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserChatSessionRow {
+    pub id: i64,
+    pub project_id: i64,
+    pub created_by_user_id: i64,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub completed_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserChatMessageRow {
+    pub id: i64,
+    pub session_id: i64,
+    pub author_type: String,
+    pub author_user_id: Option<i64>,
+    pub agent_type: Option<String>,
+    pub turn_id: Option<i64>,
+    pub content: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EpicCommentRow {
+    pub id: i64,
+    pub epic_id: i64,
+    pub author_type: String,
+    pub author_user_id: Option<i64>,
+    pub agent_type: Option<String>,
+    pub content: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TaskCommentRow {
+    pub id: i64,
+    pub task_id: i64,
+    pub author_type: String,
+    pub author_user_id: Option<i64>,
+    pub agent_type: Option<String>,
+    pub content: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+// ---------------------------------------------------------------------------
 // AgentStorage trait — used by agents (session + message management)
 // ---------------------------------------------------------------------------
 
@@ -298,4 +360,87 @@ pub trait ContextStorage: Send + Sync {
         project_id: i64,
         context_type: &str,
     ) -> Result<Option<String>, AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// UserStorage trait — guest user management
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait UserStorage: Send + Sync {
+    async fn create_guest_user(&self, display_name: String) -> Result<i64, AgentError>;
+
+    async fn get_user(&self, user_id: i64) -> Result<Option<UserRow>, AgentError>;
+
+    async fn update_display_name(
+        &self,
+        user_id: i64,
+        display_name: String,
+    ) -> Result<(), AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// UserChatStorage trait — user chat session + message management
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait UserChatStorage: Send + Sync {
+    async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError>;
+
+    async fn get_session(
+        &self,
+        session_id: i64,
+    ) -> Result<Option<UserChatSessionRow>, AgentError>;
+
+    async fn append_message(
+        &self,
+        session_id: i64,
+        author_type: &str,
+        author_user_id: Option<i64>,
+        agent_type: Option<AgentType>,
+        turn_id: Option<i64>,
+        content: String,
+    ) -> Result<i64, AgentError>;
+
+    async fn get_messages(
+        &self,
+        session_id: i64,
+    ) -> Result<Vec<UserChatMessageRow>, AgentError>;
+
+    async fn complete_session(&self, session_id: i64) -> Result<(), AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// CommentStorage trait — epic & task comments
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait CommentStorage: Send + Sync {
+    async fn add_epic_comment(
+        &self,
+        epic_id: i64,
+        author_type: &str,
+        author_user_id: Option<i64>,
+        agent_type: Option<AgentType>,
+        content: String,
+    ) -> Result<i64, AgentError>;
+
+    async fn get_epic_comments(
+        &self,
+        epic_id: i64,
+    ) -> Result<Vec<EpicCommentRow>, AgentError>;
+
+    async fn add_task_comment(
+        &self,
+        task_id: i64,
+        author_type: &str,
+        author_user_id: Option<i64>,
+        agent_type: Option<AgentType>,
+        content: String,
+    ) -> Result<i64, AgentError>;
+
+    async fn get_task_comments(
+        &self,
+        task_id: i64,
+    ) -> Result<Vec<TaskCommentRow>, AgentError>;
 }

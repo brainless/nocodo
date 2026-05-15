@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    AgentStorage, ChatMessage, ContextStorage, Epic, EpicStatus, SchemaStorage, Session, Task, TaskStatus,
-    TaskStorage, UiFormStorage,
+    AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicCommentRow, EpicStatus,
+    SchemaStorage, Session, Task, TaskCommentRow, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
+    UserChatSessionRow, UserChatStorage, UserRow, UserStorage,
 };
 use crate::error::AgentError;
 
@@ -726,5 +727,316 @@ impl ContextStorage for SqliteContextStorage {
             )
             .optional()?;
         Ok(result)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteUserStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteUserStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteUserStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self { conn: Mutex::new(conn) }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+fn map_user_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserRow> {
+    Ok(UserRow {
+        id: row.get(0)?,
+        display_name: row.get(1)?,
+        email: row.get(2)?,
+        is_guest: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
+}
+
+#[async_trait]
+impl UserStorage for SqliteUserStorage {
+    async fn create_guest_user(&self, display_name: String) -> Result<i64, AgentError> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO user (display_name, is_guest, created_at, updated_at)
+             VALUES (?1, 1, ?2, ?3)",
+            params![display_name, ts, ts],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn get_user(&self, user_id: i64) -> Result<Option<UserRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let user = conn
+            .query_row(
+                "SELECT id, display_name, email, is_guest, created_at, updated_at
+                 FROM user WHERE id = ?1 LIMIT 1",
+                params![user_id],
+                map_user_row,
+            )
+            .optional()?;
+        Ok(user)
+    }
+
+    async fn update_display_name(
+        &self,
+        user_id: i64,
+        display_name: String,
+    ) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE user SET display_name = ?1, updated_at = ?2 WHERE id = ?3",
+            params![display_name, now(), user_id],
+        )?;
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteUserChatStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteUserChatStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteUserChatStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self { conn: Mutex::new(conn) }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+fn map_user_chat_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserChatSessionRow> {
+    Ok(UserChatSessionRow {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        created_by_user_id: row.get(2)?,
+        status: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+        completed_at: row.get(6)?,
+    })
+}
+
+fn map_user_chat_message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserChatMessageRow> {
+    Ok(UserChatMessageRow {
+        id: row.get(0)?,
+        session_id: row.get(1)?,
+        author_type: row.get(2)?,
+        author_user_id: row.get(3)?,
+        agent_type: row.get(4)?,
+        turn_id: row.get(5)?,
+        content: row.get(6)?,
+        created_at: row.get(7)?,
+    })
+}
+
+#[async_trait]
+impl UserChatStorage for SqliteUserChatStorage {
+    async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO user_chat_session (project_id, created_by_user_id, status, created_at, updated_at)
+             VALUES (?1, ?2, 'open', ?3, ?4)",
+            params![project_id, user_id, ts, ts],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn get_session(
+        &self,
+        session_id: i64,
+    ) -> Result<Option<UserChatSessionRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let session = conn
+            .query_row(
+                "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at
+                 FROM user_chat_session WHERE id = ?1 LIMIT 1",
+                params![session_id],
+                map_user_chat_session_row,
+            )
+            .optional()?;
+        Ok(session)
+    }
+
+    async fn append_message(
+        &self,
+        session_id: i64,
+        author_type: &str,
+        author_user_id: Option<i64>,
+        agent_type: Option<AgentType>,
+        turn_id: Option<i64>,
+        content: String,
+    ) -> Result<i64, AgentError> {
+        let ts = now();
+        let agent_type_str = agent_type.map(|a| a.as_str().to_string());
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO user_chat_message
+                 (session_id, author_type, author_user_id, agent_type, turn_id, content, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![session_id, author_type, author_user_id, agent_type_str, turn_id, content, ts],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn get_messages(
+        &self,
+        session_id: i64,
+    ) -> Result<Vec<UserChatMessageRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, author_type, author_user_id, agent_type, turn_id, content, created_at
+             FROM user_chat_message
+             WHERE session_id = ?1
+             ORDER BY id ASC",
+        )?;
+        let messages = stmt
+            .query_map(params![session_id], map_user_chat_message_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(messages)
+    }
+
+    async fn complete_session(&self, session_id: i64) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE user_chat_session SET status = 'completed', completed_at = ?1, updated_at = ?1 WHERE id = ?2",
+            params![now(), session_id],
+        )?;
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteCommentStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteCommentStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteCommentStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self { conn: Mutex::new(conn) }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+fn map_epic_comment_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<EpicCommentRow> {
+    Ok(EpicCommentRow {
+        id: row.get(0)?,
+        epic_id: row.get(1)?,
+        author_type: row.get(2)?,
+        author_user_id: row.get(3)?,
+        agent_type: row.get(4)?,
+        content: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
+fn map_task_comment_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskCommentRow> {
+    Ok(TaskCommentRow {
+        id: row.get(0)?,
+        task_id: row.get(1)?,
+        author_type: row.get(2)?,
+        author_user_id: row.get(3)?,
+        agent_type: row.get(4)?,
+        content: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
+#[async_trait]
+impl CommentStorage for SqliteCommentStorage {
+    async fn add_epic_comment(
+        &self,
+        epic_id: i64,
+        author_type: &str,
+        author_user_id: Option<i64>,
+        agent_type: Option<AgentType>,
+        content: String,
+    ) -> Result<i64, AgentError> {
+        let ts = now();
+        let agent_type_str = agent_type.map(|a| a.as_str().to_string());
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO epic_comment (epic_id, author_type, author_user_id, agent_type, content, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![epic_id, author_type, author_user_id, agent_type_str, content, ts, ts],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn get_epic_comments(
+        &self,
+        epic_id: i64,
+    ) -> Result<Vec<EpicCommentRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, epic_id, author_type, author_user_id, agent_type, content, created_at, updated_at
+             FROM epic_comment
+             WHERE epic_id = ?1
+             ORDER BY id ASC",
+        )?;
+        let comments = stmt
+            .query_map(params![epic_id], map_epic_comment_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(comments)
+    }
+
+    async fn add_task_comment(
+        &self,
+        task_id: i64,
+        author_type: &str,
+        author_user_id: Option<i64>,
+        agent_type: Option<AgentType>,
+        content: String,
+    ) -> Result<i64, AgentError> {
+        let ts = now();
+        let agent_type_str = agent_type.map(|a| a.as_str().to_string());
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO task_comment (task_id, author_type, author_user_id, agent_type, content, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![task_id, author_type, author_user_id, agent_type_str, content, ts, ts],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn get_task_comments(
+        &self,
+        task_id: i64,
+    ) -> Result<Vec<TaskCommentRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, task_id, author_type, author_user_id, agent_type, content, created_at, updated_at
+             FROM task_comment
+             WHERE task_id = ?1
+             ORDER BY id ASC",
+        )?;
+        let comments = stmt
+            .query_map(params![task_id], map_task_comment_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(comments)
     }
 }
