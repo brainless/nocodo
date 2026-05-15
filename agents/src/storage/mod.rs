@@ -14,6 +14,8 @@ pub enum AgentType {
     UiDesigner,
     BackendEngineer,
     FrontendEngineer,
+    ProductOwner,
+    EngineeringManager,
 }
 
 impl AgentType {
@@ -24,6 +26,8 @@ impl AgentType {
             AgentType::UiDesigner => "ui_designer",
             AgentType::BackendEngineer => "backend_engineer",
             AgentType::FrontendEngineer => "frontend_engineer",
+            AgentType::ProductOwner => "product_owner",
+            AgentType::EngineeringManager => "engineering_manager",
         }
     }
 }
