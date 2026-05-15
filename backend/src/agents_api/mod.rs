@@ -1,3 +1,4 @@
+pub mod comments;
 pub mod context;
 pub mod dispatcher;
 pub mod project_manager;
