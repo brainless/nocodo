@@ -20,6 +20,19 @@ pub enum AgentType {
 }
 
 impl AgentType {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "db_engineer" => AgentType::DbEngineer,
+            "project_manager" => AgentType::ProjectManager,
+            "ui_designer" => AgentType::UiDesigner,
+            "backend_engineer" => AgentType::BackendEngineer,
+            "frontend_engineer" => AgentType::FrontendEngineer,
+            "product_owner" => AgentType::ProductOwner,
+            "engineering_manager" => AgentType::EngineeringManager,
+            _ => AgentType::ProjectManager,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             AgentType::DbEngineer => "db_engineer",

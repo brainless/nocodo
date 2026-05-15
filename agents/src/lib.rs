@@ -2,6 +2,7 @@ pub mod backend_engineer;
 pub mod config;
 pub mod error;
 pub mod frontend_engineer;
+pub mod product_owner;
 pub mod project_manager;
 pub mod db_engineer;
 pub mod storage;
@@ -34,7 +35,7 @@ pub use ui_designer::{
 
 use std::sync::Arc;
 
-fn make_llm_client(
+pub(crate) fn make_llm_client(
     config: &AgentConfig,
 ) -> Result<Arc<dyn llm_sdk::client::LlmClient>, AgentError> {
     use llm_sdk::{claude::ClaudeClient, groq::GroqClient, openai::OpenAIClient};
