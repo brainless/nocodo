@@ -14,15 +14,19 @@ pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
 pub use config::AgentConfig;
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
-pub use project_manager::{ProjectManagerAgent, PmResponse};
+pub use project_manager::{
+    FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
+};
 pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
+pub use product_owner::{PoSessionResult, ProductOwnerAgent};
 pub use storage::sqlite::{
-    SqliteAgentStorage, SqliteContextStorage, SqliteSchemaStorage, SqliteTaskStorage,
-    SqliteUiFormStorage,
+    SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteSchemaStorage,
+    SqliteTaskStorage, SqliteUiFormStorage, SqliteUserChatStorage, SqliteUserStorage,
 };
 pub use storage::{
-    AgentStorage, AgentType, ChatMessage, ContextStorage, Epic, EpicStatus, SchemaStorage, Session,
-    Task, TaskStatus, TaskStorage, UiFormStorage,
+    AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicStatus,
+    SchemaStorage, Session, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
+    UserChatSessionRow, UserChatStorage, UserStorage,
 };
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
