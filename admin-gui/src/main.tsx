@@ -12,6 +12,7 @@ import EpicsPage from './pages/EpicsPage';
 import BackendPage from './pages/BackendPage';
 import UIDesignPage from './pages/UIDesignPage';
 import ProjectSettingsPage from './pages/ProjectSettingsPage';
+import UserChatPage from './pages/UserChatPage';
 
 function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ function AppRoutes() {
         <Route path="/database" component={DatabasePage} />
         <Route path="/backend" component={BackendPage} />
         <Route path="/ui-design" component={UIDesignPage} />
+        <Route path="/chat" component={UserChatPage} />
         <Route path="/settings" component={ProjectSettingsPage} />
       </Route>
     </Router>
