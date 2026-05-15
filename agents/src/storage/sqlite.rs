@@ -397,7 +397,7 @@ impl TaskStorage for SqliteTaskStorage {
              FROM task t
              LEFT JOIN agent_chat_session s
                     ON s.task_id = t.id AND s.agent_type = t.assigned_to_agent
-             WHERE t.status = 'open'
+             WHERE t.status = 'ready'
                AND t.assigned_to_agent != 'project_manager'
                AND s.id IS NULL
              ORDER BY t.id ASC",

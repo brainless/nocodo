@@ -47,10 +47,11 @@ impl TaskStorage for DispatchingTaskStorage {
         let assigned_to = task.assigned_to_agent.clone();
         let source_prompt = task.source_prompt.clone();
         let project_id = task.project_id;
+        let status = task.status.clone();
 
         let task_id = self.inner.create_task(task).await?;
 
-        if assigned_to != AgentType::ProjectManager.as_str() {
+        if status == TaskStatus::Ready && assigned_to != AgentType::ProjectManager.as_str() {
             let _ = self.tx.send(DispatchEvent {
                 task_id,
                 project_id,
