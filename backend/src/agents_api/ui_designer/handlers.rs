@@ -115,7 +115,7 @@ pub async fn generate_form(
             description: format!("Generate a form layout for the '{}' entity.", entity_name),
             source_prompt: table_def_json.clone(),
             assigned_to_agent: AGENT_TYPE.to_string(),
-            status: TaskStatus::Open,
+            status: TaskStatus::Ready,
             depends_on_task_id: None,
             created_by_agent: "user".to_string(),
             created_at: 0,

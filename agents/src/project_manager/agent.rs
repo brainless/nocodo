@@ -386,7 +386,7 @@ impl ProjectManagerAgent {
                                     description: params.description.clone(),
                                     source_prompt: params.source_prompt.clone(),
                                     assigned_to_agent: params.assigned_to_agent.clone(),
-                                    status: TaskStatus::Open,
+                                    status: TaskStatus::Draft,
                                     depends_on_task_id: params.depends_on_task_id,
                                     created_by_agent: agent_type_str.clone(),
                                     created_at: now,

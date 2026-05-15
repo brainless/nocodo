@@ -45,6 +45,6 @@ pub struct SetProjectNameParams {
 pub struct PmUpdateTaskStatusParams {
     /// ID of the task to update.
     pub task_id: i64,
-    /// New status. Must be one of: "in_progress", "review", "done", "blocked".
+    /// New status. Must be one of: "draft", "in_progress", "done", "blocked".
     pub status: String,
 }

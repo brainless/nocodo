@@ -121,7 +121,7 @@ pub async fn gather_context(
             description: format!("Gather {} context.", ct),
             source_prompt: project_path.clone(),
             assigned_to_agent: agent_type_str.clone(),
-            status: TaskStatus::Open,
+            status: TaskStatus::Ready,
             depends_on_task_id: None,
             created_by_agent: "user".to_string(),
             created_at: 0,

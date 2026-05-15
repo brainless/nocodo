@@ -98,9 +98,10 @@ pub struct Task {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskStatus {
-    Open,
+    Draft,
+    NeedsTechnicalShaping,
+    Ready,
     InProgress,
-    Review,
     Done,
     Blocked,
 }
@@ -108,9 +109,10 @@ pub enum TaskStatus {
 impl TaskStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Open => "open",
+            Self::Draft => "draft",
+            Self::NeedsTechnicalShaping => "needs_technical_shaping",
+            Self::Ready => "ready",
             Self::InProgress => "in_progress",
-            Self::Review => "review",
             Self::Done => "done",
             Self::Blocked => "blocked",
         }
@@ -118,11 +120,16 @@ impl TaskStatus {
 
     pub fn from_str(s: &str) -> Self {
         match s {
+            "draft" => Self::Draft,
+            "needs_technical_shaping" => Self::NeedsTechnicalShaping,
+            "ready" => Self::Ready,
             "in_progress" => Self::InProgress,
-            "review" => Self::Review,
             "done" => Self::Done,
             "blocked" => Self::Blocked,
-            _ => Self::Open,
+            // Legacy mappings
+            "open" => Self::Ready,
+            "review" => Self::Done,
+            _ => Self::Draft,
         }
     }
 }

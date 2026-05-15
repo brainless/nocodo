@@ -5,6 +5,7 @@ pub mod frontend_engineer;
 pub mod project_manager;
 pub mod db_engineer;
 pub mod storage;
+pub mod task_policy;
 pub mod ui_designer;
 pub mod utils;
 
