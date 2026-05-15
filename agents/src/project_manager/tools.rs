@@ -48,3 +48,28 @@ pub struct PmUpdateTaskStatusParams {
     /// New status. Must be one of: "draft", "in_progress", "done", "blocked".
     pub status: String,
 }
+
+/// A single task definition within a finalize_session call.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FinalizeTaskDef {
+    /// Short title for the task.
+    pub title: String,
+    /// Description of what the assigned agent should produce.
+    pub description: String,
+    /// Target agent type string, e.g. "db_engineer".
+    pub assigned_to_agent: String,
+}
+
+/// Called by PM to atomically finalize a user chat session: emit a closing
+/// message, create one epic, and create one or more tasks.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FinalizeSessionParams {
+    /// PM's closing message to the user.
+    pub final_message: String,
+    /// Title for the epic.
+    pub epic_title: String,
+    /// Description for the epic.
+    pub epic_description: String,
+    /// Tasks to create under this epic.
+    pub tasks: Vec<FinalizeTaskDef>,
+}

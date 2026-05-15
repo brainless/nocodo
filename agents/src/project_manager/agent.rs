@@ -7,9 +7,9 @@ use llm_sdk::{
 };
 
 use super::{
-    prompts::{init_project_system_prompt, system_prompt},
+    prompts::{init_project_system_prompt, system_prompt, user_session_system_prompt},
     tools::{
-        CreateEpicParams, CreateTaskParams, ListPendingReviewTasksParams,
+        CreateEpicParams, CreateTaskParams, FinalizeSessionParams, ListPendingReviewTasksParams,
         PmUpdateTaskStatusParams, SetProjectNameParams,
     },
 };
@@ -28,6 +28,14 @@ const MAX_NUDGES: u32 = 3;
 pub enum PmResponse {
     Text(String),
     Stopped(String),
+}
+
+#[derive(Debug)]
+pub enum PmUserSessionResult {
+    Text(String),
+    Finalized {
+        params: FinalizeSessionParams,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +75,126 @@ impl ProjectManagerAgent {
         task_id: i64,
     ) -> Result<PmResponse, AgentError> {
         self.run_loop(session_id, task_id, false).await
+    }
+
+    /// Run the PM agent for a user chat session with only the finalize_session tool.
+    /// Takes conversation history as (role, content) pairs instead of reading from storage.
+    pub async fn chat_for_user_session(
+        &self,
+        _session_id: i64,
+        messages: Vec<(String, String)>,
+    ) -> Result<PmUserSessionResult, AgentError> {
+        let finalize_tool = Tool::from_type::<FinalizeSessionParams>()
+            .name("finalize_session")
+            .description(
+                "Finalize the user session by creating an epic and tasks. \
+                 Call this only when you have enough clarity from the user. \
+                 Provide a friendly closing message, one epic, and one or more assigned tasks.",
+            )
+            .build();
+
+        let _agent_type_str = AgentType::ProjectManager.as_str().to_string();
+        let mut nudges: u32 = 0;
+
+        loop {
+            let llm_messages: Vec<Message> = messages
+                .iter()
+                .map(|(role, content)| {
+                    let r = match role.as_str() {
+                        "assistant" => Role::Assistant,
+                        "tool" => Role::Tool,
+                        _ => Role::User,
+                    };
+                    Message {
+                        role: r,
+                        content: vec![llm_sdk::types::ContentBlock::Text {
+                            text: content.clone(),
+                        }],
+                        tool_call_id: None,
+                        tool_name: None,
+                    }
+                })
+                .collect();
+
+            let request = CompletionRequest {
+                messages: llm_messages,
+                max_tokens: 4096,
+                model: self.model.clone(),
+                system: Some(user_session_system_prompt()),
+                temperature: Some(0.2),
+                top_p: None,
+                stop_sequences: None,
+                tools: Some(vec![finalize_tool.clone()]),
+                tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
+            };
+
+            log::info!("[PM:user_session] Calling LLM with model={}", self.model);
+            let response = self.llm_client.complete(request).await?;
+            log::info!(
+                "[PM:user_session] LLM response received, stop_reason={:?}",
+                response.stop_reason
+            );
+
+            let assistant_text = response
+                .content
+                .iter()
+                .filter_map(|b| match b {
+                    llm_sdk::types::ContentBlock::Text { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("");
+
+            if let Some(tool_calls) = response.tool_calls {
+                for tool_call in tool_calls {
+                    let tool_name = tool_call.name();
+                    log::info!("[PM:user_session] Tool: {}", tool_name);
+
+                    match tool_name {
+                        "finalize_session" => {
+                            let params: FinalizeSessionParams = tool_call
+                                .parse_arguments()
+                                .map_err(AgentError::Llm)?;
+                            log::info!(
+                                "[PM:user_session] Session finalized: epic={}, {} task(s)",
+                                params.epic_title,
+                                params.tasks.len()
+                            );
+                            return Ok(PmUserSessionResult::Finalized { params });
+                        }
+
+                        unknown => {
+                            log::error!("[PM:user_session] Unknown tool: {}", unknown);
+                            return Err(AgentError::Other(format!(
+                                "PM called unknown tool in user session: {}",
+                                unknown
+                            )));
+                        }
+                    }
+                }
+
+                // After handling tool calls, loop to get the model's text summary.
+                continue;
+            }
+
+            // No tool call — plain text response.
+            if !assistant_text.is_empty() {
+                return Ok(PmUserSessionResult::Text(assistant_text));
+            }
+
+            nudges += 1;
+            log::warn!(
+                "[PM:user_session] No response, nudge {}/{}",
+                nudges,
+                MAX_NUDGES
+            );
+            if nudges >= MAX_NUDGES {
+                return Err(AgentError::Other(
+                    "PM agent did not produce a response after multiple nudges.".to_string(),
+                ));
+            }
+        }
     }
 
     /// Run the PM agent for a brand-new project's first message.
