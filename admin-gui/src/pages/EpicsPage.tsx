@@ -1,7 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
 import { useProject } from '../contexts/ProjectContext';
-import { ChatProvider, useChat } from '../contexts/ChatContext';
-import ChatDrawer from '../components/ChatDrawer';
 import ProjectTopNav from '../components/ProjectTopNav';
 import { Sheet, type SheetColumn } from '../components/Sheet';
 import type { TaskItem, EpicItem } from '../types/api';
@@ -19,6 +17,7 @@ const STATUS_BADGE: Record<string, string> = {
 const AGENT_LABEL: Record<string, string> = {
   db_engineer: 'DB Engineer',
   project_manager: 'PM',
+  product_owner: 'PO',
   backend_engineer: 'Backend Engineer',
   frontend_engineer: 'Frontend Engineer',
 };
@@ -26,24 +25,13 @@ const AGENT_LABEL: Record<string, string> = {
 function StatusBadge(props: { status: string }) {
   return (
     <span class={`badge badge-sm ${STATUS_BADGE[props.status] ?? 'badge-ghost'}`}>
-      {props.status.replace('_', ' ')}
+      {props.status.replace(/_/g, ' ')}
     </span>
   );
 }
 
 export default function EpicsPage() {
-  const { currentProject } = useProject();
-
-  return (
-    <ChatProvider defaultAgentType="project_manager" projectId={() => currentProject()?.id}>
-      <ProjectManagerContent />
-    </ChatProvider>
-  );
-}
-
-function ProjectManagerContent() {
   const { currentProject, setCurrentProject } = useProject();
-  const chat = useChat();
 
   const [epics, setEpics] = createSignal<EpicItem[]>([]);
   const [tasks, setTasks] = createSignal<TaskItem[]>([]);
@@ -174,82 +162,59 @@ function ProjectManagerContent() {
     },
   ];
 
-  const handleEpicClick = (epic: EpicItem) => {
-    if (epic.created_by_task_id != null) {
-      const drawer = document.getElementById('chat-drawer') as HTMLInputElement | null;
-      if (drawer) drawer.checked = true;
-      chat.openTask(epic.created_by_task_id, 'project_manager');
-    }
-  };
-
-  const handleTaskClick = (task: TaskItem) => {
-    const drawer = document.getElementById('chat-drawer') as HTMLInputElement | null;
-    if (drawer) drawer.checked = true;
-    chat.openTask(task.id, task.assigned_to_agent);
-  };
-
-  const placeholder = () =>
-    chat.messages().length > 1
-      ? 'Ask the PM to update or add to the plan...'
-      : 'Describe what you want to build...';
-
   return (
     <main class="sheet-app">
-      <ChatDrawer placeholder={placeholder}>
-        <section class="sheet-main">
-          <ProjectTopNav
-            title="Epics/Tasks"
-            actions={
-              <Show when={loading()}>
-                <span class="loading loading-spinner loading-xs opacity-40" />
-              </Show>
-            }
+      <section class="sheet-main">
+        <ProjectTopNav
+          title="Epics/Tasks"
+          actions={
+            <Show when={loading()}>
+              <span class="loading loading-spinner loading-xs opacity-40" />
+            </Show>
+          }
+        />
+
+        <Show when={activeTab() === 'epics'}>
+          <Sheet
+            columns={epicColumns}
+            rows={epics()}
+            rowKey={(e) => e.id}
+            emptyRows={50}
           />
+        </Show>
 
-          <Show when={activeTab() === 'epics'}>
-            <Sheet
-              columns={epicColumns}
-              rows={epics()}
-              rowKey={(e) => e.id}
-              onRowClick={handleEpicClick}
-              emptyRows={50}
-            />
-          </Show>
+        <Show when={activeTab() === 'tasks'}>
+          <Sheet
+            columns={taskColumns}
+            rows={tasks()}
+            rowKey={(t) => t.id}
+            emptyRows={50}
+          />
+        </Show>
+      </section>
 
-          <Show when={activeTab() === 'tasks'}>
-            <Sheet
-              columns={taskColumns}
-              rows={tasks()}
-              rowKey={(t) => t.id}
-              onRowClick={handleTaskClick}
-              emptyRows={50}
-            />
-          </Show>
-        </section>
-
-        <footer class="sheets-strip">
-          <div class="tabs tabs-border tabs-sm">
-            <button
-              class={`tab${activeTab() === 'tasks' ? ' tab-active' : ''}`}
-              onClick={() => setActiveTab('tasks')}
-            >
-              Tasks
-              <Show when={tasks().length > 0}>
-                <span class="badge badge-sm badge-ghost ml-1">{tasks().length}</span>
-              </Show>
-            </button>
-            <button
-              class={`tab${activeTab() === 'epics' ? ' tab-active' : ''}`}
-              onClick={() => setActiveTab('epics')}
-            >
-              Epics
-              <Show when={epics().length > 0}>
-                <span class="badge badge-sm badge-ghost ml-1">{epics().length}</span>
-              </Show>
-            </button>
-          </div>
-        </footer>
-      </ChatDrawer>
+      <footer class="sheets-strip">
+        <div class="tabs tabs-border tabs-sm">
+          <button
+            class={`tab${activeTab() === 'tasks' ? ' tab-active' : ''}`}
+            onClick={() => setActiveTab('tasks')}
+          >
+            Tasks
+            <Show when={tasks().length > 0}>
+              <span class="badge badge-sm badge-ghost ml-1">{tasks().length}</span>
+            </Show>
+          </button>
+          <button
+            class={`tab${activeTab() === 'epics' ? ' tab-active' : ''}`}
+            onClick={() => setActiveTab('epics')}
+          >
+            Epics
+            <Show when={epics().length > 0}>
+              <span class="badge badge-sm badge-ghost ml-1">{epics().length}</span>
+            </Show>
+          </button>
+        </div>
+      </footer>
     </main>
   );
 }

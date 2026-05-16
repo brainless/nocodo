@@ -1,12 +1,10 @@
-use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Notify};
 
 use nocodo_agents::{
     build_backend_engineer, build_frontend_engineer, build_db_engineer, build_ui_designer,
-    AgentConfig, AgentError, AgentResponse, AgentStorage, AgentType, BackendEngineerResponse,
-    ChatMessage, Epic, EpicStatus, FrontendEngineerResponse, SqliteAgentStorage, SqliteTaskStorage,
-    Task, TaskStatus, TaskStorage, UiDesignerResponse,
+    AgentConfig, AgentResponse, AgentStorage, BackendEngineerResponse,
+    ChatMessage, FrontendEngineerResponse, SqliteAgentStorage, UiDesignerResponse,
 };
 
 // ---------------------------------------------------------------------------
@@ -19,114 +17,6 @@ pub struct DispatchEvent {
     pub project_id: i64,
     pub assigned_to_agent: String,
     pub source_prompt: String,
-}
-
-// ---------------------------------------------------------------------------
-// DispatchingTaskStorage — wraps SqliteTaskStorage, fires events on create_task
-// ---------------------------------------------------------------------------
-
-pub struct DispatchingTaskStorage {
-    inner: SqliteTaskStorage,
-    tx: mpsc::UnboundedSender<DispatchEvent>,
-    board_notify: Arc<Notify>,
-}
-
-impl DispatchingTaskStorage {
-    pub fn new(
-        inner: SqliteTaskStorage,
-        tx: mpsc::UnboundedSender<DispatchEvent>,
-        board_notify: Arc<Notify>,
-    ) -> Self {
-        Self { inner, tx, board_notify }
-    }
-}
-
-#[async_trait]
-impl TaskStorage for DispatchingTaskStorage {
-    async fn create_task(&self, task: Task) -> Result<i64, AgentError> {
-        let assigned_to = task.assigned_to_agent.clone();
-        let source_prompt = task.source_prompt.clone();
-        let project_id = task.project_id;
-        let status = task.status.clone();
-
-        let task_id = self.inner.create_task(task).await?;
-
-        if status == TaskStatus::Ready && assigned_to != AgentType::ProjectManager.as_str() {
-            let _ = self.tx.send(DispatchEvent {
-                task_id,
-                project_id,
-                assigned_to_agent: assigned_to,
-                source_prompt,
-            });
-        }
-
-        self.board_notify.notify_waiters();
-        Ok(task_id)
-    }
-
-    async fn update_task_status(
-        &self,
-        task_id: i64,
-        status: TaskStatus,
-    ) -> Result<(), AgentError> {
-        self.inner.update_task_status(task_id, status).await?;
-        self.board_notify.notify_waiters();
-        Ok(())
-    }
-
-    async fn get_task(&self, task_id: i64) -> Result<Option<Task>, AgentError> {
-        self.inner.get_task(task_id).await
-    }
-
-    async fn list_tasks_for_project(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<Task>, AgentError> {
-        self.inner.list_tasks_for_project(project_id).await
-    }
-
-    async fn list_tasks_for_agent(
-        &self,
-        project_id: i64,
-        agent_type: &str,
-    ) -> Result<Vec<Task>, AgentError> {
-        self.inner.list_tasks_for_agent(project_id, agent_type).await
-    }
-
-    async fn list_pending_review_tasks(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<Task>, AgentError> {
-        self.inner.list_pending_review_tasks(project_id).await
-    }
-
-    async fn list_open_dispatchable_tasks(&self) -> Result<Vec<Task>, AgentError> {
-        self.inner.list_open_dispatchable_tasks().await
-    }
-
-    async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError> {
-        let id = self.inner.create_epic(epic).await?;
-        self.board_notify.notify_waiters();
-        Ok(id)
-    }
-
-    async fn update_epic_status(
-        &self,
-        epic_id: i64,
-        status: EpicStatus,
-    ) -> Result<(), AgentError> {
-        self.inner.update_epic_status(epic_id, status).await?;
-        self.board_notify.notify_waiters();
-        Ok(())
-    }
-
-    async fn get_epic(&self, epic_id: i64) -> Result<Option<Epic>, AgentError> {
-        self.inner.get_epic(epic_id).await
-    }
-
-    async fn list_epics(&self, project_id: i64) -> Result<Vec<Epic>, AgentError> {
-        self.inner.list_epics(project_id).await
-    }
 }
 
 // ---------------------------------------------------------------------------
