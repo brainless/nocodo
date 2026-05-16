@@ -84,7 +84,7 @@ function RecentProjects() {
                   body={firstPrompt}
                   meta={timeAgo(project.created_at)}
                   leading={<div class="project-avatar">{projectInitial(project.name)}</div>}
-                  onClick={() => navigate(`/projects/${project.id}/database`)}
+                  onClick={() => navigate(`/projects/${project.id}/chat`)}
                 />
               )}
             </For>
@@ -110,15 +110,16 @@ function HomeContent() {
     const project = await createProject(`Project ${formatProjectTimestamp()}`);
     if (!project) throw new Error('Failed to create project');
 
-    const response = await fetch(`${API_BASE_URL}/api/agents/project-manager/init`, {
+    const displayName = localStorage.getItem('nocodo_display_name') ?? 'User';
+    const response = await fetch(`${API_BASE_URL}/api/user-chats`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: project.id, message }),
+      body: JSON.stringify({ project_id: project.id, display_name: displayName, message }),
     });
 
-    if (!response.ok) throw new Error(`Failed to initialize project: ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to start chat session: ${response.status}`);
 
-    navigate(`/projects/${project.id}/epics`);
+    navigate(`/projects/${project.id}/chat`);
   };
 
   const handleSubmit = async (message: string) => {

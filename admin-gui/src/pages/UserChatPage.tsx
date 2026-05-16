@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createSignal } from 'solid-js';
+import { useNavigate, useParams } from '@solidjs/router';
 import { useProject } from '../contexts/ProjectContext';
 import { UserChatProvider, useUserChat } from '../contexts/UserChatContext';
 
@@ -39,15 +40,13 @@ function NamePrompt() {
 }
 
 function ChatContent(props: { projectId: () => number | undefined }) {
+  const params = useParams<{ projectId: string; sessionId?: string }>();
+  const navigate = useNavigate();
   const chat = useUserChat();
   const [inputText, setInputText] = createSignal('');
 
   const pid = () => props.projectId();
-
-  createEffect(() => {
-    const id = pid();
-    if (id) chat.loadSessions(id);
-  });
+  const urlSessionId = () => params.sessionId ? parseInt(params.sessionId) : null;
 
   const currentSession = () =>
     chat.sessions().find(s => s.id === chat.currentSessionId()) ?? null;
@@ -59,12 +58,15 @@ function ChatContent(props: { projectId: () => number | undefined }) {
     const msg = inputText().trim();
     if (!msg) return;
 
-    const sid = chat.currentSessionId();
+    const sid = urlSessionId();
     if (sid === null) {
       const id = pid();
       if (!id) return;
       setInputText('');
-      await chat.startSession(id, msg);
+      const newSessionId = await chat.startSession(id, msg);
+      if (newSessionId) {
+        navigate(`/projects/${params.projectId}/chat/${newSessionId}`);
+      }
       return;
     }
 
@@ -74,13 +76,13 @@ function ChatContent(props: { projectId: () => number | undefined }) {
   };
 
   const handleNewChat = () => {
-    chat.selectSession(null);
+    navigate(`/projects/${params.projectId}/chat`);
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -96,11 +98,11 @@ function ChatContent(props: { projectId: () => number | undefined }) {
               {(session) => (
                 <div
                   class={`p-3 rounded-lg cursor-pointer mb-1 transition-colors ${
-                    session.id === chat.currentSessionId()
+                    session.id === urlSessionId()
                       ? 'bg-[#dde9ff] border border-[#c7d6f0]'
                       : 'hover:bg-[#e7ecf8] border border-transparent'
                   }`}
-                  onClick={() => chat.selectSession(session.id)}
+                  onClick={() => navigate(`/projects/${params.projectId}/chat/${session.id}`)}
                 >
                   <div class="flex items-center justify-between mb-1">
                     <span
@@ -139,7 +141,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
           </div>
 
           <div class="flex-1 overflow-y-auto p-4 space-y-3">
-            <Show when={chat.currentSessionId() !== null && chat.messages().length > 0}>
+            <Show when={urlSessionId() !== null && chat.messages().length > 0}>
               <For each={chat.messages()}>
                 {(msg) => {
                   const isUser = msg.author_type === 'user';
@@ -172,7 +174,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
                 }}
               </For>
             </Show>
-            <Show when={chat.currentSessionId() === null}>
+            <Show when={urlSessionId() === null}>
               <div class="flex items-center justify-center h-full text-[#8fa0be] text-sm">
                 Select a session or start a new chat
               </div>
@@ -184,7 +186,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
               <textarea
                 class="textarea textarea-bordered textarea-sm flex-1 min-h-[40px] resize-none"
                 placeholder={
-                  chat.currentSessionId() === null
+                  urlSessionId() === null
                     ? 'Start a new conversation...'
                     : 'Type your message...'
                 }
@@ -195,7 +197,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
               />
               <button
                 class="btn btn-primary self-end"
-                onClick={handleSend}
+                onClick={() => void handleSend()}
                 disabled={
                   !inputText().trim() ||
                   currentSession()?.status === 'completed' ||
@@ -223,11 +225,32 @@ export default function UserChatPage() {
 }
 
 function UserChatInner(props: { projectId: () => number | undefined }) {
+  const params = useParams<{ projectId: string; sessionId?: string }>();
+  const navigate = useNavigate();
   const chat = useUserChat();
 
-  if (!chat.displayName()) {
-    return <NamePrompt />;
-  }
+  // Load sessions when project is available
+  createEffect(() => {
+    const id = props.projectId();
+    if (id) void chat.loadSessions(id);
+  });
+
+  // Once sessions load and no sessionId in URL, redirect to most recent
+  createEffect(() => {
+    const sessions = chat.sessions();
+    if (sessions.length > 0 && !params.sessionId) {
+      const mostRecent = sessions.reduce((a, b) =>
+        new Date(a.created_at) > new Date(b.created_at) ? a : b
+      );
+      navigate(`/projects/${params.projectId}/chat/${mostRecent.id}`, { replace: true });
+    }
+  });
+
+  // When sessionId in URL changes, sync context selection and load messages
+  createEffect(() => {
+    const sid = params.sessionId ? parseInt(params.sessionId) : null;
+    void chat.selectSession(sid);
+  });
 
   return <ChatContent projectId={props.projectId} />;
 }

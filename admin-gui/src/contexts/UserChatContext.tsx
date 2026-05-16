@@ -27,7 +27,7 @@ export interface UserChatContextValue {
   loading: () => boolean;
   displayName: () => string | null;
   loadSessions: (projectId: number) => Promise<void>;
-  startSession: (projectId: number, message: string) => Promise<void>;
+  startSession: (projectId: number, message: string) => Promise<number | undefined>;
   sendMessage: (sessionId: number, message: string) => Promise<void>;
   loadMessages: (sessionId: number) => Promise<void>;
   selectSession: (sessionId: number | null) => Promise<void>;
@@ -98,9 +98,8 @@ export function UserChatProvider(props: { children: JSX.Element }) {
     }
   };
 
-  const startSession = async (projectId: number, message: string) => {
-    const name = displayName();
-    if (!name) throw new Error('Display name is required');
+  const startSession = async (projectId: number, message: string): Promise<number | undefined> => {
+    const name = displayName() ?? 'User';
 
     setLoading(true);
     try {
@@ -123,6 +122,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
 
       pollForResponse(data.session_id, data.message_id);
       await loadSessions(projectId);
+      return data.session_id;
     } catch (err) {
       console.error('Error starting session:', err);
     } finally {

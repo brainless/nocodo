@@ -25,6 +25,7 @@ function AppRoutes() {
         <Route path="/backend" component={BackendPage} />
         <Route path="/ui-design" component={UIDesignPage} />
         <Route path="/chat" component={UserChatPage} />
+        <Route path="/chat/:sessionId" component={UserChatPage} />
         <Route path="/settings" component={ProjectSettingsPage} />
       </Route>
     </Router>
