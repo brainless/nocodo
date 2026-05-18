@@ -3,6 +3,7 @@ pub mod config;
 pub mod db_engineer;
 pub mod error;
 pub mod frontend_engineer;
+pub mod nocodo_description;
 pub mod product_owner;
 pub mod project_manager;
 pub mod storage;
@@ -10,6 +11,8 @@ pub mod task_policy;
 pub mod ui_designer;
 pub mod user_input_tool;
 pub mod utils;
+
+pub use nocodo_description::NOCODO_DESCRIPTION;
 
 pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
 pub use config::AgentConfig;

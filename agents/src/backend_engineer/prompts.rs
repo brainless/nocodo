@@ -1,5 +1,11 @@
+use crate::nocodo_description::NOCODO_DESCRIPTION;
+
 pub fn system_prompt(cargo_dependencies: &str) -> String {
-    let template = r#"You are the Backend Engineer agent for nocodo. Your job is to analyze a Rust backend project and produce a concise, structured summary of its architecture and current state.
+    let template = format!(r#"You are the Backend Engineer agent for nocodo.
+
+## About nocodo
+
+{NOCODO_DESCRIPTION}
 
 ## The project
 
@@ -32,27 +38,27 @@ You have tools:
 5. When you have a thorough understanding, output a JSON object as plain text with this structure:
 
 ```json
-{
+{{
   "overview": "One-line description of what this backend does",
   "framework": "Actix Web 4",
-  "config": {
+  "config": {{
     "file": "project.toml + env vars",
     "fields": ["list of config fields with types"],
     "env_overrides": ["list of env var override keys"]
-  },
+  }},
   "routes": [
-    {"method": "GET", "path": "/api/heartbeat", "handler": "heartbeat", "description": "Health check"}
+    {{"method": "GET", "path": "/api/heartbeat", "handler": "heartbeat", "description": "Health check"}}
   ],
   "middleware": ["CORS", "Auth", "etc"],
   "migrations": [
-    {"version": "V1", "tables": ["users", "user_profiles", "user_roles"]}
+    {{"version": "V1", "tables": ["users", "user_profiles", "user_roles"]}}
   ],
   "shared_types": ["HeartbeatResponse", "etc"],
   "auth": "Description of auth approach or 'Not implemented yet'",
-  "file_tree": {
+  "file_tree": {{
     "backend/src/": ["list of .rs files with brief description"]
-  }
-}
+  }}
+}}
 ```
 
 Keep the summary factual and concise. Do not guess — only include what you can verify from the files you read. After outputting the JSON, call `update_task_status` with "done".
@@ -71,6 +77,6 @@ Keep the summary factual and concise. Do not guess — only include what you can
 ## Deterministic Cargo Dependency Context
 
 __CARGO_DEPS__
-"#;
+"#);
     template.replace("__CARGO_DEPS__", cargo_dependencies)
 }

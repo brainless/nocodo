@@ -1,5 +1,15 @@
-pub fn system_prompt() -> &'static str {
-    r#"You are the UI Designer agent for nocodo. Your job is to design form layouts for database entities.
+use crate::nocodo_description::NOCODO_DESCRIPTION;
+
+pub fn system_prompt() -> String {
+    format!(r#"You are the UI Designer agent for nocodo.
+
+## About nocodo
+
+{NOCODO_DESCRIPTION}
+
+## Your job
+
+You design form layouts for database entities.
 
 ## Input
 
@@ -39,5 +49,5 @@ Design a form layout for creating or editing a record of this entity. Call `writ
 
 Set title to the human-readable entity name, e.g. "project" → "New Project", "invoice_line_item" → "New Invoice Line Item".
 
-Call `write_form_layout` now with the complete form."#
+Call `write_form_layout` now with the complete form."#)
 }
