@@ -866,6 +866,7 @@ fn map_user_chat_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserCh
         created_at: row.get(4)?,
         updated_at: row.get(5)?,
         completed_at: row.get(6)?,
+        handoff_session_id: row.get(7)?,
     })
 }
 
@@ -900,7 +901,7 @@ impl UserChatStorage for SqliteUserChatStorage {
         let conn = self.conn.lock().unwrap();
         let session = conn
             .query_row(
-                "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at
+                "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at, handoff_session_id
                  FROM user_chat_session WHERE id = ?1 LIMIT 1",
                 params![session_id],
                 map_user_chat_session_row,
@@ -951,6 +952,19 @@ impl UserChatStorage for SqliteUserChatStorage {
         conn.execute(
             "UPDATE user_chat_session SET status = 'completed', completed_at = ?1, updated_at = ?1 WHERE id = ?2",
             params![now(), session_id],
+        )?;
+        Ok(())
+    }
+
+    async fn set_handoff_session_id(
+        &self,
+        intake_id: i64,
+        planning_id: i64,
+    ) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE user_chat_session SET handoff_session_id = ?2 WHERE id = ?1",
+            params![intake_id, planning_id],
         )?;
         Ok(())
     }

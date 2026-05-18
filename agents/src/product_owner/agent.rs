@@ -7,6 +7,7 @@ use llm_sdk::{
 };
 
 use super::prompts::PO_USER_SESSION_SYSTEM_PROMPT;
+use super::tools::HandOffToPmParams;
 use crate::{
     config::AgentConfig,
     error::AgentError,
@@ -25,6 +26,10 @@ use crate::{
 pub enum PoSessionResult {
     Text(String),
     Questions(Vec<StructuredQuestion>),
+    HandedOff {
+        final_message: String,
+        summary: String,
+    },
     Silent,
 }
 
@@ -71,6 +76,16 @@ impl ProductOwnerAgent {
             )
             .build();
 
+        let handoff_tool = Tool::from_type::<HandOffToPmParams>()
+            .name("hand_off_to_pm")
+            .description(
+                "Call this when you have gathered enough requirements to proceed. \
+                 Provide a friendly closing message for the user and a structured \
+                 requirements brief for the Project Manager who will create the epic \
+                 and development tasks.",
+            )
+            .build();
+
         let llm_messages: Vec<Message> = messages
             .iter()
             .map(|(role, content)| {
@@ -98,7 +113,7 @@ impl ProductOwnerAgent {
             temperature: Some(0.3),
             top_p: None,
             stop_sequences: None,
-            tools: Some(vec![ask_tool]),
+            tools: Some(vec![ask_tool, handoff_tool]),
             tool_choice: Some(ToolChoice::Auto),
             response_format: None,
         };
@@ -134,6 +149,14 @@ impl ProductOwnerAgent {
                         structured_questions.push(StructuredQuestion {
                             question: params.question,
                             kind,
+                        });
+                    }
+                    "hand_off_to_pm" => {
+                        let params: HandOffToPmParams =
+                            tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                        return Ok(PoSessionResult::HandedOff {
+                            final_message: params.final_message,
+                            summary: params.summary,
                         });
                     }
                     _ => {}

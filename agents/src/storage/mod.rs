@@ -205,6 +205,7 @@ pub struct UserChatSessionRow {
     pub created_at: i64,
     pub updated_at: i64,
     pub completed_at: Option<i64>,
+    pub handoff_session_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -420,6 +421,12 @@ pub trait UserChatStorage: Send + Sync {
     async fn get_messages(&self, session_id: i64) -> Result<Vec<UserChatMessageRow>, AgentError>;
 
     async fn complete_session(&self, session_id: i64) -> Result<(), AgentError>;
+
+    async fn set_handoff_session_id(
+        &self,
+        intake_id: i64,
+        planning_id: i64,
+    ) -> Result<(), AgentError>;
 }
 
 // ---------------------------------------------------------------------------

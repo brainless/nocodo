@@ -54,6 +54,7 @@ struct AppendMessageResponse {
 struct GetMessagesResponse {
     session_id: i64,
     messages: Vec<UserChatMessageRow>,
+    handoff_session_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -134,7 +135,7 @@ pub async fn create_session(
 
     let db_path = state.db_path.clone();
     actix_web::rt::spawn(async move {
-        run_concurrent_pm_po(db_path, session_id, message_id).await;
+        run_po_intake(db_path, session_id, user_id).await;
     });
 
     HttpResponse::Ok().json(CreateSessionResponse {
@@ -227,9 +228,10 @@ pub async fn append_message(
         }
     };
 
+    let user_id = session.created_by_user_id;
     let db_path = state.db_path.clone();
     actix_web::rt::spawn(async move {
-        run_concurrent_pm_po(db_path, session_id, message_id).await;
+        run_po_intake(db_path, session_id, user_id).await;
     });
 
     HttpResponse::Ok().json(AppendMessageResponse {
@@ -255,6 +257,20 @@ pub async fn get_messages(state: web::Data<AgentState>, path: web::Path<i64>) ->
         }
     };
 
+    let session = match chat_storage.get_session(session_id).await {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Session not found"
+            }))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Storage error: {}", e)
+            }))
+        }
+    };
+
     let messages = match chat_storage.get_messages(session_id).await {
         Ok(m) => m,
         Err(e) => {
@@ -267,6 +283,7 @@ pub async fn get_messages(state: web::Data<AgentState>, path: web::Path<i64>) ->
     HttpResponse::Ok().json(GetMessagesResponse {
         session_id,
         messages,
+        handoff_session_id: session.handoff_session_id,
     })
 }
 
@@ -291,7 +308,7 @@ pub async fn list_sessions(
     };
 
     let mut stmt = match conn.prepare(
-        "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at \
+        "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at, handoff_session_id \
          FROM user_chat_session WHERE project_id = ?1 ORDER BY created_at DESC",
     ) {
         Ok(s) => s,
@@ -311,6 +328,7 @@ pub async fn list_sessions(
             created_at: row.get(4)?,
             updated_at: row.get(5)?,
             completed_at: row.get(6)?,
+            handoff_session_id: row.get(7)?,
         })
     }) {
         Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
@@ -325,10 +343,10 @@ pub async fn list_sessions(
 }
 
 // ---------------------------------------------------------------------------
-// Background task: run PM and PO concurrently on the session
+// Background task: PO handles intake session
 // ---------------------------------------------------------------------------
 
-async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64) {
+async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
     let chat_storage = match SqliteUserChatStorage::open(&db_path) {
         Ok(s) => s,
         Err(e) => {
@@ -358,6 +376,24 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
         }
     };
 
+    // Don't fire agents while there are unanswered structured questions.
+    // Agents will run once the user has answered all pending questions.
+    let answered_ids: std::collections::HashSet<i64> = messages
+        .iter()
+        .filter(|m| m.content_type == "structured_response")
+        .filter_map(|m| {
+            serde_json::from_str::<serde_json::Value>(&m.content)
+                .ok()
+                .and_then(|v| v["question_message_id"].as_i64())
+        })
+        .collect();
+    let has_unanswered = messages
+        .iter()
+        .any(|m| m.content_type == "structured_question" && !answered_ids.contains(&m.id));
+    if has_unanswered {
+        return;
+    }
+
     let llm_messages: Vec<(String, String)> = messages
         .iter()
         .map(|m| {
@@ -374,14 +410,6 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
         Ok(c) => c,
         Err(e) => {
             log::warn!("user_chat: load config: {}", e);
-            return;
-        }
-    };
-
-    let pm = match build_project_manager(&config, &db_path, project_id) {
-        Ok(a) => a,
-        Err(e) => {
-            log::warn!("user_chat: build PM: {}", e);
             return;
         }
     };
@@ -407,12 +435,7 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
             return;
         }
     };
-    let po = match ProductOwnerAgent::new(
-        po_storage,
-        po_task_storage,
-        po_comment_storage,
-        AgentConfig::load().unwrap(),
-    ) {
+    let po = match ProductOwnerAgent::new(po_storage, po_task_storage, po_comment_storage, config) {
         Ok(a) => a,
         Err(e) => {
             log::warn!("user_chat: build PO: {}", e);
@@ -420,12 +443,194 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
         }
     };
 
-    let (pm_result, po_result) = tokio::join!(
-        pm.chat_for_user_session(session_id, llm_messages.clone()),
-        po.respond_in_session(llm_messages.clone()),
-    );
+    match po.respond_in_session(llm_messages).await {
+        Ok(PoSessionResult::HandedOff {
+            final_message,
+            summary,
+        }) => {
+            handle_po_handoff(
+                &db_path,
+                session_id,
+                project_id,
+                user_id,
+                final_message,
+                summary,
+                &chat_storage,
+            )
+            .await;
+        }
+        Ok(PoSessionResult::Questions(questions)) => {
+            for q in questions {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::StructuredQuestion(q),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO question: {}", e);
+                }
+            }
+        }
+        Ok(PoSessionResult::Text(t)) if !t.trim().is_empty() => {
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProductOwner),
+                    None,
+                    MessageContent::Text(t),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PO response: {}", e);
+            }
+        }
+        Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) => {}
+        Err(e) => {
+            log::warn!("user_chat: PO error: {}", e);
+        }
+    }
+}
 
-    match pm_result {
+async fn handle_po_handoff(
+    db_path: &str,
+    intake_session_id: i64,
+    project_id: i64,
+    user_id: i64,
+    final_message: String,
+    summary: String,
+    chat_storage: &SqliteUserChatStorage,
+) {
+    // Store PO's closing message in the intake session.
+    if let Err(e) = chat_storage
+        .append_message(
+            intake_session_id,
+            "agent",
+            None,
+            Some(AgentType::ProductOwner),
+            None,
+            MessageContent::Text(final_message),
+        )
+        .await
+    {
+        log::warn!("user_chat: store PO final message: {}", e);
+        return;
+    }
+
+    // Create the planning session for PM.
+    let planning_session_id = match chat_storage.create_session(project_id, user_id).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::warn!("user_chat: create planning session: {}", e);
+            return;
+        }
+    };
+
+    // Seed planning session with PO's requirements summary as first message.
+    if let Err(e) = chat_storage
+        .append_message(
+            planning_session_id,
+            "agent",
+            None,
+            Some(AgentType::ProductOwner),
+            None,
+            MessageContent::Text(summary),
+        )
+        .await
+    {
+        log::warn!("user_chat: store PO summary in planning session: {}", e);
+        return;
+    }
+
+    // Link intake → planning session and close intake.
+    if let Err(e) = chat_storage
+        .set_handoff_session_id(intake_session_id, planning_session_id)
+        .await
+    {
+        log::warn!("user_chat: set handoff_session_id: {}", e);
+        return;
+    }
+    if let Err(e) = chat_storage.complete_session(intake_session_id).await {
+        log::warn!("user_chat: complete intake session: {}", e);
+        return;
+    }
+
+    // Kick off PM in the planning session.
+    let db_path = db_path.to_string();
+    actix_web::rt::spawn(async move {
+        run_pm_planning(db_path, planning_session_id).await;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Background task: PM handles planning session
+// ---------------------------------------------------------------------------
+
+async fn run_pm_planning(db_path: String, session_id: i64) {
+    let chat_storage = match SqliteUserChatStorage::open(&db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("user_chat: open storage (PM): {}", e);
+            return;
+        }
+    };
+
+    let session = match chat_storage.get_session(session_id).await {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            log::warn!("user_chat: PM session {} not found", session_id);
+            return;
+        }
+        Err(e) => {
+            log::warn!("user_chat: get PM session: {}", e);
+            return;
+        }
+    };
+    let project_id = session.project_id;
+
+    let messages = match chat_storage.get_messages(session_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            log::warn!("user_chat: get PM messages: {}", e);
+            return;
+        }
+    };
+
+    let llm_messages: Vec<(String, String)> = messages
+        .iter()
+        .map(|m| {
+            let role = match m.author_type.as_str() {
+                "user" => "user",
+                _ => "assistant",
+            };
+            let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+            (role.to_string(), text)
+        })
+        .collect();
+
+    let config = match AgentConfig::load() {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("user_chat: load config (PM): {}", e);
+            return;
+        }
+    };
+
+    let pm = match build_project_manager(&config, &db_path, project_id) {
+        Ok(a) => a,
+        Err(e) => {
+            log::warn!("user_chat: build PM: {}", e);
+            return;
+        }
+    };
+
+    match pm.chat_for_user_session(session_id, llm_messages).await {
         Ok(PmUserSessionResult::Finalized { params }) => {
             handle_pm_finalized(&db_path, session_id, project_id, params, &chat_storage).await;
         }
@@ -463,46 +668,6 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
         }
         Err(e) => {
             log::warn!("user_chat: PM error: {}", e);
-        }
-    }
-
-    match po_result {
-        Ok(PoSessionResult::Text(t)) if !t.trim().is_empty() => {
-            if let Err(e) = chat_storage
-                .append_message(
-                    session_id,
-                    "agent",
-                    None,
-                    Some(AgentType::ProductOwner),
-                    None,
-                    MessageContent::Text(t),
-                )
-                .await
-            {
-                log::warn!("user_chat: store PO response: {}", e);
-            }
-        }
-        Ok(PoSessionResult::Text(_)) => {}
-        Ok(PoSessionResult::Questions(questions)) => {
-            for q in questions {
-                if let Err(e) = chat_storage
-                    .append_message(
-                        session_id,
-                        "agent",
-                        None,
-                        Some(AgentType::ProductOwner),
-                        None,
-                        MessageContent::StructuredQuestion(q),
-                    )
-                    .await
-                {
-                    log::warn!("user_chat: store PO question: {}", e);
-                }
-            }
-        }
-        Ok(PoSessionResult::Silent) => {}
-        Err(e) => {
-            log::warn!("user_chat: PO error: {}", e);
         }
     }
 }

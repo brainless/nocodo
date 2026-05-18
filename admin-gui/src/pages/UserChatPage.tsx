@@ -462,5 +462,14 @@ function UserChatInner(props: { projectId: () => number | undefined }) {
     void chat.selectSession(sid);
   });
 
+  // When PO hands off to PM, navigate to the new planning session automatically
+  createEffect(() => {
+    const hid = chat.handoffSessionId();
+    if (hid) {
+      void chat.loadSessions(props.projectId()!);
+      navigate(`/projects/${params.projectId}/chat/${hid}`);
+    }
+  });
+
   return <ChatContent projectId={props.projectId} />;
 }

@@ -3,4 +3,4 @@ pub mod prompts;
 pub mod tools;
 
 pub use agent::{PoSessionResult, ProductOwnerAgent};
-pub use tools::{PoCommentParams, ValidateTaskParams};
+pub use tools::{HandOffToPmParams, PoCommentParams, ValidateTaskParams};
