@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use llm_sdk::{
     client::LlmClient,
+    tools::{Tool, ToolChoice},
     types::{CompletionRequest, Message, Role},
 };
 
@@ -9,8 +10,11 @@ use super::prompts::PO_USER_SESSION_SYSTEM_PROMPT;
 use crate::{
     config::AgentConfig,
     error::AgentError,
-    storage::{AgentStorage, AgentType, CommentStorage, TaskStorage},
+    storage::{
+        AgentStorage, AgentType, CommentStorage, QuestionKind, StructuredQuestion, TaskStorage,
+    },
     task_policy,
+    user_input_tool::{InputType, RequestUserInputParams},
 };
 
 // ---------------------------------------------------------------------------
@@ -20,6 +24,7 @@ use crate::{
 #[derive(Debug)]
 pub enum PoSessionResult {
     Text(String),
+    Questions(Vec<StructuredQuestion>),
     Silent,
 }
 
@@ -56,6 +61,16 @@ impl ProductOwnerAgent {
         &self,
         messages: Vec<(String, String)>,
     ) -> Result<PoSessionResult, AgentError> {
+        let ask_tool = Tool::from_type::<RequestUserInputParams>()
+            .name("request_user_input")
+            .description(
+                "Ask the user a structured question with predefined choices. \
+                 Use this instead of listing options in prose — the UI will render \
+                 radio buttons or checkboxes. You may call this tool multiple times \
+                 in one turn when the questions are independent.",
+            )
+            .build();
+
         let llm_messages: Vec<Message> = messages
             .iter()
             .map(|(role, content)| {
@@ -83,8 +98,8 @@ impl ProductOwnerAgent {
             temperature: Some(0.3),
             top_p: None,
             stop_sequences: None,
-            tools: None,
-            tool_choice: None,
+            tools: Some(vec![ask_tool]),
+            tool_choice: Some(ToolChoice::Auto),
             response_format: None,
         };
 
@@ -100,6 +115,35 @@ impl ProductOwnerAgent {
             })
             .collect::<Vec<_>>()
             .join("");
+
+        if let Some(tool_calls) = response.tool_calls {
+            let mut structured_questions: Vec<StructuredQuestion> = Vec::new();
+            for tool_call in tool_calls {
+                match tool_call.name() {
+                    "request_user_input" => {
+                        let params: RequestUserInputParams =
+                            tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                        let kind = match params.input_type {
+                            InputType::SingleChoice => QuestionKind::SingleChoice {
+                                options: params.options,
+                            },
+                            InputType::MultipleChoice => QuestionKind::MultipleChoice {
+                                options: params.options,
+                            },
+                        };
+                        structured_questions.push(StructuredQuestion {
+                            question: params.question,
+                            kind,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+
+            if !structured_questions.is_empty() {
+                return Ok(PoSessionResult::Questions(structured_questions));
+            }
+        }
 
         if text.trim().is_empty() {
             Ok(PoSessionResult::Silent)

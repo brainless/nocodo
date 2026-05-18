@@ -15,7 +15,10 @@ use super::{
 };
 use crate::{
     error::AgentError,
-    storage::{AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, QuestionKind, StructuredQuestion, Task, TaskStatus, TaskStorage},
+    storage::{
+        AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, QuestionKind, StructuredQuestion,
+        Task, TaskStatus, TaskStorage,
+    },
     user_input_tool::{InputType, RequestUserInputParams},
 };
 
@@ -37,8 +40,8 @@ pub enum PmUserSessionResult {
     Finalized {
         params: FinalizeSessionParams,
     },
-    /// PM posed a structured question; backend must store it and wait for user.
-    Question(StructuredQuestion),
+    /// PM posed one or more structured questions; backend stores each row.
+    Questions(Vec<StructuredQuestion>),
 }
 
 // ---------------------------------------------------------------------------
@@ -101,8 +104,8 @@ impl ProjectManagerAgent {
             .description(
                 "Ask the user a structured question with predefined choices. \
                  Use this instead of listing options in prose — the UI will render \
-                 radio buttons or checkboxes. Call once per question; wait for the \
-                 user to answer before asking another.",
+                 radio buttons or checkboxes. You may call this tool multiple times \
+                 in one turn when the questions are independent.",
             )
             .build();
 
@@ -160,15 +163,15 @@ impl ProjectManagerAgent {
                 .join("");
 
             if let Some(tool_calls) = response.tool_calls {
+                let mut structured_questions: Vec<StructuredQuestion> = Vec::new();
                 for tool_call in tool_calls {
                     let tool_name = tool_call.name();
                     log::info!("[PM:user_session] Tool: {}", tool_name);
 
                     match tool_name {
                         "finalize_session" => {
-                            let params: FinalizeSessionParams = tool_call
-                                .parse_arguments()
-                                .map_err(AgentError::Llm)?;
+                            let params: FinalizeSessionParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             log::info!(
                                 "[PM:user_session] Session finalized: epic={}, {} task(s)",
                                 params.epic_title,
@@ -178,25 +181,24 @@ impl ProjectManagerAgent {
                         }
 
                         "request_user_input" => {
-                            let params: RequestUserInputParams = tool_call
-                                .parse_arguments()
-                                .map_err(AgentError::Llm)?;
+                            let params: RequestUserInputParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             log::info!(
                                 "[PM:user_session] Structured question: {:?}",
                                 params.question
                             );
                             let kind = match params.input_type {
-                                InputType::SingleChoice => {
-                                    QuestionKind::SingleChoice { options: params.options }
-                                }
-                                InputType::MultipleChoice => {
-                                    QuestionKind::MultipleChoice { options: params.options }
-                                }
+                                InputType::SingleChoice => QuestionKind::SingleChoice {
+                                    options: params.options,
+                                },
+                                InputType::MultipleChoice => QuestionKind::MultipleChoice {
+                                    options: params.options,
+                                },
                             };
-                            return Ok(PmUserSessionResult::Question(StructuredQuestion {
+                            structured_questions.push(StructuredQuestion {
                                 question: params.question,
                                 kind,
-                            }));
+                            });
                         }
 
                         unknown => {
@@ -207,6 +209,10 @@ impl ProjectManagerAgent {
                             )));
                         }
                     }
+                }
+
+                if !structured_questions.is_empty() {
+                    return Ok(PmUserSessionResult::Questions(structured_questions));
                 }
 
                 // After handling tool calls, loop to get the model's text summary.
@@ -318,7 +324,11 @@ impl ProjectManagerAgent {
                 messages: llm_messages,
                 max_tokens: 4096,
                 model: self.model.clone(),
-                system: Some(if is_init { init_project_system_prompt() } else { system_prompt() }),
+                system: Some(if is_init {
+                    init_project_system_prompt()
+                } else {
+                    system_prompt()
+                }),
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
@@ -341,7 +351,10 @@ impl ProjectManagerAgent {
 
             log::info!("[PM] Calling LLM with model={}", self.model);
             let response = self.llm_client.complete(request).await?;
-            log::info!("[PM] LLM response received, stop_reason={:?}", response.stop_reason);
+            log::info!(
+                "[PM] LLM response received, stop_reason={:?}",
+                response.stop_reason
+            );
 
             let assistant_text = response
                 .content
@@ -494,10 +507,9 @@ impl ProjectManagerAgent {
                                 })
                                 .await
                             {
-                                Ok(id) => format!(
-                                    "Epic created: id={}, title=\"{}\"",
-                                    id, params.title
-                                ),
+                                Ok(id) => {
+                                    format!("Epic created: id={}, title=\"{}\"", id, params.title)
+                                }
                                 Err(e) => format!("Failed to create epic: {}", e),
                             };
 
@@ -680,8 +692,9 @@ impl ProjectManagerAgent {
                     session_id,
                     role: "user".to_string(),
                     agent_type: None,
-                    content: "Please summarize what you have done and what the user should do next."
-                        .to_string(),
+                    content:
+                        "Please summarize what you have done and what the user should do next."
+                            .to_string(),
                     tool_call_id: None,
                     tool_name: None,
                     turn_id: None,

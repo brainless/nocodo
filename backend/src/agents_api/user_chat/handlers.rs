@@ -2,10 +2,10 @@ use crate::agents_api::state::AgentState;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
     build_project_manager, AgentConfig, AgentStorage, AgentType, CommentStorage,
-    FinalizeSessionParams, MessageContent, PoSessionResult, PmUserSessionResult, ProductOwnerAgent,
+    FinalizeSessionParams, MessageContent, PmUserSessionResult, PoSessionResult, ProductOwnerAgent,
     SqliteAgentStorage, SqliteCommentStorage, SqliteTaskStorage, SqliteUserChatStorage,
-    SqliteUserStorage, StructuredQuestion, TaskStorage, UserChatMessageRow, UserChatSessionRow,
-    UserChatStorage, UserStorage,
+    SqliteUserStorage, StructuredQuestion, StructuredResponse, TaskStorage, UserChatMessageRow,
+    UserChatSessionRow, UserChatStorage, UserStorage,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -114,7 +114,14 @@ pub async fn create_session(
     };
 
     let message_id = match chat_storage
-        .append_message(session_id, "user", Some(user_id), None, None, MessageContent::Text(body.message))
+        .append_message(
+            session_id,
+            "user",
+            Some(user_id),
+            None,
+            None,
+            MessageContent::Text(body.message),
+        )
         .await
     {
         Ok(id) => id,
@@ -130,7 +137,10 @@ pub async fn create_session(
         run_concurrent_pm_po(db_path, session_id, message_id).await;
     });
 
-    HttpResponse::Ok().json(CreateSessionResponse { session_id, message_id })
+    HttpResponse::Ok().json(CreateSessionResponse {
+        session_id,
+        message_id,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -177,16 +187,36 @@ pub async fn append_message(
 
     let user_content = match body.content_type.as_deref() {
         Some("structured_response") => {
-            match serde_json::from_str::<nocodo_agents::StructuredResponse>(&body.message) {
-                Ok(r) => MessageContent::StructuredResponse(r),
-                Err(_) => MessageContent::Text(body.message),
+            let response: StructuredResponse = match serde_json::from_str(&body.message) {
+                Ok(r) => r,
+                Err(e) => {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "error": format!("Invalid structured_response JSON: {}", e)
+                    }))
+                }
+            };
+
+            match validate_structured_response(&chat_storage, session_id, &response).await {
+                Ok(()) => MessageContent::StructuredResponse(response),
+                Err(e) => {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "error": e
+                    }))
+                }
             }
         }
         _ => MessageContent::Text(body.message),
     };
 
     let message_id = match chat_storage
-        .append_message(session_id, "user", Some(body.user_id), None, None, user_content)
+        .append_message(
+            session_id,
+            "user",
+            Some(body.user_id),
+            None,
+            None,
+            user_content,
+        )
         .await
     {
         Ok(id) => id,
@@ -202,7 +232,10 @@ pub async fn append_message(
         run_concurrent_pm_po(db_path, session_id, message_id).await;
     });
 
-    HttpResponse::Ok().json(AppendMessageResponse { session_id, message_id })
+    HttpResponse::Ok().json(AppendMessageResponse {
+        session_id,
+        message_id,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -210,10 +243,7 @@ pub async fn append_message(
 // ---------------------------------------------------------------------------
 
 #[get("/api/user-chats/{session_id}/messages")]
-pub async fn get_messages(
-    state: web::Data<AgentState>,
-    path: web::Path<i64>,
-) -> impl Responder {
+pub async fn get_messages(state: web::Data<AgentState>, path: web::Path<i64>) -> impl Responder {
     let session_id = path.into_inner();
 
     let chat_storage = match SqliteUserChatStorage::open(&state.db_path) {
@@ -234,7 +264,10 @@ pub async fn get_messages(
         }
     };
 
-    HttpResponse::Ok().json(GetMessagesResponse { session_id, messages })
+    HttpResponse::Ok().json(GetMessagesResponse {
+        session_id,
+        messages,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -269,18 +302,17 @@ pub async fn list_sessions(
         }
     };
 
-    let sessions = match stmt
-        .query_map(rusqlite::params![project_id], |row| {
-            Ok(UserChatSessionRow {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                created_by_user_id: row.get(2)?,
-                status: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
-                completed_at: row.get(6)?,
-            })
-        }) {
+    let sessions = match stmt.query_map(rusqlite::params![project_id], |row| {
+        Ok(UserChatSessionRow {
+            id: row.get(0)?,
+            project_id: row.get(1)?,
+            created_by_user_id: row.get(2)?,
+            status: row.get(3)?,
+            created_at: row.get(4)?,
+            updated_at: row.get(5)?,
+            completed_at: row.get(6)?,
+        })
+    }) {
         Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
         Err(e) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
@@ -397,19 +429,21 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
         Ok(PmUserSessionResult::Finalized { params }) => {
             handle_pm_finalized(&db_path, session_id, project_id, params, &chat_storage).await;
         }
-        Ok(PmUserSessionResult::Question(q)) => {
-            if let Err(e) = chat_storage
-                .append_message(
-                    session_id,
-                    "agent",
-                    None,
-                    Some(AgentType::ProjectManager),
-                    None,
-                    MessageContent::StructuredQuestion(q),
-                )
-                .await
-            {
-                log::warn!("user_chat: store PM question: {}", e);
+        Ok(PmUserSessionResult::Questions(questions)) => {
+            for q in questions {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProjectManager),
+                        None,
+                        MessageContent::StructuredQuestion(q),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PM question: {}", e);
+                }
             }
         }
         Ok(PmUserSessionResult::Text(t)) => {
@@ -449,11 +483,79 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
             }
         }
         Ok(PoSessionResult::Text(_)) => {}
+        Ok(PoSessionResult::Questions(questions)) => {
+            for q in questions {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::StructuredQuestion(q),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO question: {}", e);
+                }
+            }
+        }
         Ok(PoSessionResult::Silent) => {}
         Err(e) => {
             log::warn!("user_chat: PO error: {}", e);
         }
     }
+}
+
+async fn validate_structured_response(
+    chat_storage: &SqliteUserChatStorage,
+    session_id: i64,
+    response: &StructuredResponse,
+) -> Result<(), String> {
+    if response.selected.is_empty() {
+        return Err("Structured response requires at least one selected option".to_string());
+    }
+
+    let messages = chat_storage
+        .get_messages(session_id)
+        .await
+        .map_err(|e| format!("Failed to load session messages: {}", e))?;
+
+    let question_row = messages
+        .iter()
+        .find(|m| m.id == response.question_message_id)
+        .ok_or_else(|| "question_message_id not found in this session".to_string())?;
+
+    if question_row.content_type != "structured_question" {
+        return Err("question_message_id does not reference a structured_question".to_string());
+    }
+
+    let question: StructuredQuestion = serde_json::from_str(&question_row.content)
+        .map_err(|e| format!("Invalid stored structured_question JSON: {}", e))?;
+
+    let allowed_options = match &question.kind {
+        nocodo_agents::QuestionKind::SingleChoice { options }
+        | nocodo_agents::QuestionKind::MultipleChoice { options } => options,
+    };
+
+    for selected in &response.selected {
+        if !allowed_options.iter().any(|opt| opt == selected) {
+            return Err(format!(
+                "Selected option '{}' is not valid for question_message_id={}",
+                selected, response.question_message_id
+            ));
+        }
+    }
+
+    if matches!(
+        question.kind,
+        nocodo_agents::QuestionKind::SingleChoice { .. }
+    ) && response.selected.len() != 1
+    {
+        return Err("Single-choice question requires exactly one selected option".to_string());
+    }
+
+    Ok(())
 }
 
 async fn handle_pm_finalized(
@@ -561,7 +663,8 @@ async fn handle_pm_finalized(
             return;
         }
     };
-    let val_po_comment_storage: Arc<dyn CommentStorage> = match SqliteCommentStorage::open(db_path) {
+    let val_po_comment_storage: Arc<dyn CommentStorage> = match SqliteCommentStorage::open(db_path)
+    {
         Ok(s) => Arc::new(s),
         Err(e) => {
             log::warn!("user_chat: PO validate open comment storage: {}", e);

@@ -59,7 +59,10 @@ and the concrete tasks needed to build it.
 **Prefer `request_user_input` over prose questions whenever you can offer a reasonable list of choices.**
 Use it for questions like "who are the users?", "what data needs tracking?", "which features are in scope?".
 Supply 2–6 short options. For genuinely open questions (e.g. "describe your idea") use plain text instead.
-Call `request_user_input` once per question — wait for the user's answer before asking the next one.
+You may call `request_user_input` multiple times in one turn when the questions are independent and all useful now.
+Do not batch dependent questions that require answers from earlier questions.
+Keep batches small (typically 2-4 questions max).
+Do not include synthetic catch-all options like "both", "all", "all of the above", or similar. The UI already supports selecting multiple options directly.
 
 ## Available agents
 

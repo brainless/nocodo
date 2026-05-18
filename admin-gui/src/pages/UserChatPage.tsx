@@ -66,6 +66,7 @@ function StructuredQuestionWidget(props: {
   };
 
   const submit = () => {
+    if (props.answered) return;
     const selected = checked();
     if (!selected.length) return;
     const response: StructuredResponse = {
@@ -88,7 +89,7 @@ function StructuredQuestionWidget(props: {
                   name={`q-${props.messageId}`}
                   checked={checked().includes(opt)}
                   onChange={() => toggle(opt)}
-                  class="cursor-pointer"
+                  class={`cursor-pointer ${isMultiple() ? 'checkbox checkbox-sm' : 'radio radio-sm'}`}
                 />
                 {opt}
               </label>
@@ -97,7 +98,7 @@ function StructuredQuestionWidget(props: {
         </div>
         <button
           class="btn btn-sm btn-primary mt-1"
-          disabled={!checked().length || chat.loading()}
+          disabled={!checked().length || chat.loading() || props.answered}
           onClick={submit}
         >
           Submit
@@ -121,6 +122,46 @@ function ChatContent(props: { projectId: () => number | undefined }) {
 
   const currentSession = () =>
     chat.sessions().find(s => s.id === chat.currentSessionId()) ?? null;
+
+  const questionResponseByQuestionId = () => {
+    const byId = new Map<number, StructuredResponse>();
+    for (const m of chat.messages()) {
+      if (m.content_type !== 'structured_response') continue;
+      try {
+        const r = JSON.parse(m.content) as StructuredResponse;
+        byId.set(r.question_message_id, r);
+      } catch {
+        // ignore invalid payload
+      }
+    }
+    return byId;
+  };
+
+  const unansweredQuestionRows = () => {
+    const responses = questionResponseByQuestionId();
+    return chat.messages()
+      .filter(m => m.content_type === 'structured_question' && m.id > 0 && !responses.has(m.id));
+  };
+
+  const answeredResponseForQuestion = (questionMessageId: number) => {
+    return questionResponseByQuestionId().get(questionMessageId);
+  };
+
+  const unansweredQuestionCount = () => {
+    const msgs = chat.messages();
+    const questionIds = msgs
+      .filter(m => m.content_type === 'structured_question' && m.id > 0)
+      .map(m => m.id);
+    return questionIds.filter((qid) =>
+      !msgs.some(m => {
+        if (m.content_type !== 'structured_response') return false;
+        try {
+          const r = JSON.parse(m.content) as { question_message_id: number };
+          return r.question_message_id === qid;
+        } catch { return false; }
+      })
+    ).length;
+  };
 
   const canSend = () =>
     currentSession()?.status !== 'completed' && !chat.loading();
@@ -224,13 +265,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
                   // A structured question is "answered" if a later message references it.
                   const isAnswered = () => {
                     if (!isStructuredQuestion || msg.id === 0) return false;
-                    return chat.messages().some(m => {
-                      if (m.content_type !== 'structured_response') return false;
-                      try {
-                        const r = JSON.parse(m.content) as { question_message_id: number };
-                        return r.question_message_id === msg.id;
-                      } catch { return false; }
-                    });
+                    return questionResponseByQuestionId().has(msg.id);
                   };
 
                   // Compact label for structured_response bubbles
@@ -241,6 +276,22 @@ function ChatContent(props: { projectId: () => number | undefined }) {
                       return `Selected: ${r.selected.join(', ')}`;
                     } catch { return msg.content; }
                   };
+
+                  // Open questions are rendered in the bottom "Open Questions" panel.
+                  if (isStructuredQuestion && !isAnswered()) return null;
+
+                  // Structured responses are rendered directly under their answered question.
+                  if (isStructuredResponse) {
+                    try {
+                      const r = JSON.parse(msg.content) as { question_message_id: number };
+                      const parentExists = chat.messages().some(
+                        m => m.id === r.question_message_id && m.content_type === 'structured_question'
+                      );
+                      if (parentExists) return null;
+                    } catch {
+                      // fall through to default text bubble
+                    }
+                  }
 
                   return (
                     <div class={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -255,12 +306,19 @@ function ChatContent(props: { projectId: () => number | undefined }) {
                             try {
                               const q = JSON.parse(msg.content) as StructuredQuestion;
                               return (
-                                <StructuredQuestionWidget
-                                  messageId={msg.id}
-                                  sessionId={msg.session_id}
-                                  question={q}
-                                  answered={isAnswered()}
-                                />
+                                <div class="space-y-2">
+                                  <StructuredQuestionWidget
+                                    messageId={msg.id}
+                                    sessionId={msg.session_id}
+                                    question={q}
+                                    answered={isAnswered()}
+                                  />
+                                  <Show when={isAnswered() && msg.id > 0}>
+                                    <div class="rounded-2xl px-4 py-2 text-sm leading-relaxed bg-blue-50 text-[#2f3f5f] border border-[#c7d6f0]">
+                                      Selected: {(answeredResponseForQuestion(msg.id)?.selected ?? []).join(', ')}
+                                    </div>
+                                  </Show>
+                                </div>
                               );
                             } catch {
                               return <span class="text-xs text-red-400">[invalid question]</span>;
@@ -295,6 +353,45 @@ function ChatContent(props: { projectId: () => number | undefined }) {
           </div>
 
           <div class="border-t border-[#c6cfdf] p-3 bg-[#f6f8fe]">
+            <Show when={urlSessionId() !== null && unansweredQuestionCount() > 0}>
+              <div class="mb-3 card bg-base-100 border border-base-300 shadow-sm">
+                <div class="card-body p-3">
+                  <div class="text-xs text-base-content/70 mb-2">
+                  {unansweredQuestionCount()} unanswered question{unansweredQuestionCount() === 1 ? '' : 's'}
+                  </div>
+                  <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <For each={unansweredQuestionRows()}>
+                      {(qMsg) => {
+                        const isPM = qMsg.agent_type === 'project_manager';
+                        const isPO = qMsg.agent_type === 'product_owner';
+                        return (
+                          <div class="space-y-1">
+                            <div class="text-xs font-semibold text-base-content/50">
+                              {isPM ? 'PM' : isPO ? 'PO' : qMsg.agent_type ?? 'Agent'}
+                            </div>
+                            {(() => {
+                              try {
+                                const q = JSON.parse(qMsg.content) as StructuredQuestion;
+                                return (
+                                  <StructuredQuestionWidget
+                                    messageId={qMsg.id}
+                                    sessionId={qMsg.session_id}
+                                    question={q}
+                                    answered={false}
+                                  />
+                                );
+                              } catch {
+                                return <span class="text-xs text-error">[invalid question]</span>;
+                              }
+                            })()}
+                          </div>
+                        );
+                      }}
+                    </For>
+                  </div>
+                </div>
+              </div>
+            </Show>
             <div class="flex gap-2">
               <textarea
                 class="textarea textarea-bordered textarea-sm flex-1 min-h-[40px] resize-none"
