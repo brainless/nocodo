@@ -95,9 +95,8 @@ export function UserChatProvider(props: { children: JSX.Element }) {
       if (!res.ok) throw new Error(`Failed to load messages: ${res.status}`);
       const data = await res.json() as GetMessagesData;
       setMessages(data.messages ?? []);
-      if (data.handoff_session_id) {
-        setHandoffSessionId(data.handoff_session_id);
-      }
+      // handoffSessionId is only set during polling; don't set it here
+      // so that manually selecting a completed intake session doesn't redirect.
     } catch (err) {
       console.error('Error loading messages:', err);
     }

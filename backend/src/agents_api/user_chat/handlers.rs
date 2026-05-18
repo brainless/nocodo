@@ -376,6 +376,17 @@ async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
         }
     };
 
+    // Detect planning sessions: seeded by PO (first msg is from product_owner).
+    // These should be handled by PM, not PO.
+    let is_planning_session = messages
+        .first()
+        .map(|m| m.author_type == "agent" && m.agent_type.as_deref() == Some("product_owner"))
+        .unwrap_or(false);
+    if is_planning_session {
+        drop(chat_storage);
+        return run_pm_planning(db_path, session_id).await;
+    }
+
     // Don't fire agents while there are unanswered structured questions.
     // Agents will run once the user has answered all pending questions.
     let answered_ids: std::collections::HashSet<i64> = messages
