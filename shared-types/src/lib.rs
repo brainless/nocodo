@@ -185,8 +185,12 @@ where
 {
     let s = String::deserialize(deserializer)?;
     Ok(match s.to_lowercase().replace(['-', ' '], "_").as_str() {
-        "text" | "varchar" | "string" | "char" | "nvarchar" | "uuid" | "json" | "blob" => DataType::Text,
-        "integer" | "int" | "bigint" | "smallint" | "tinyint" | "int4" | "int8" | "number" => DataType::Integer,
+        "text" | "varchar" | "string" | "char" | "nvarchar" | "uuid" | "json" | "blob" => {
+            DataType::Text
+        }
+        "integer" | "int" | "bigint" | "smallint" | "tinyint" | "int4" | "int8" | "number" => {
+            DataType::Integer
+        }
         "real" | "float" | "double" | "decimal" | "numeric" | "float4" | "float8" => DataType::Real,
         "boolean" | "bool" | "bit" => DataType::Boolean,
         "date" => DataType::Date,

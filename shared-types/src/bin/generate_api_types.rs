@@ -87,7 +87,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(&admin_output_dir)?;
     let admin_output_path = admin_output_dir.join("api.ts");
     fs::write(&admin_output_path, &output_content)?;
-    println!("Generated TypeScript types in {}", admin_output_path.display());
+    println!(
+        "Generated TypeScript types in {}",
+        admin_output_path.display()
+    );
 
     Ok(())
 }

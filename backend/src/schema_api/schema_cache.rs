@@ -22,9 +22,8 @@ impl SchemaCache {
         let mut cache = SchemaCache::default();
 
         // Load schemas
-        let mut stmt = conn.prepare(
-            "SELECT id, project_id, name, created_at FROM app_schema ORDER BY id",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT id, project_id, name, created_at FROM app_schema ORDER BY id")?;
         let rows = stmt.query_map([], |row| {
             Ok(Schema {
                 id: row.get(0)?,
@@ -39,9 +38,8 @@ impl SchemaCache {
         }
 
         // Load tables
-        let mut stmt = conn.prepare(
-            "SELECT id, schema_id, name, created_at FROM schema_table ORDER BY id",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT id, schema_id, name, created_at FROM schema_table ORDER BY id")?;
         let rows = stmt.query_map([], |row| {
             Ok(Table {
                 id: row.get(0)?,
@@ -80,7 +78,11 @@ impl SchemaCache {
             let table_id = col.table_id;
             let col_id = col.id;
             cache.columns.insert(col_id, col);
-            cache.table_columns.entry(table_id).or_default().push(col_id);
+            cache
+                .table_columns
+                .entry(table_id)
+                .or_default()
+                .push(col_id);
         }
 
         Ok(cache)
@@ -123,9 +125,9 @@ impl SchemaCache {
 
         if schema.name == "Nocodo Internal" {
             let sql_name = match table.name.as_str() {
-                "Projects"   => "project",
-                "Sessions"   => "agent_chat_session",
-                "Messages"   => "agent_chat_message",
+                "Projects" => "project",
+                "Sessions" => "agent_chat_session",
+                "Messages" => "agent_chat_message",
                 "Tool Calls" => "agent_tool_call",
                 _ => return None,
             };

@@ -1,8 +1,8 @@
 use actix_web::{get, post, web, HttpResponse, Responder, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use shared_types::{
-    Column, DataType, ForeignKey, GetSchemaResponse, GetTableColumnsResponse,
-    GetTableDataResponse, ListSchemasResponse, PaginationInfo, Schema, Table, TableDataResult,
+    Column, DataType, ForeignKey, GetSchemaResponse, GetTableColumnsResponse, GetTableDataResponse,
+    ListSchemasResponse, PaginationInfo, Schema, Table, TableDataResult,
 };
 
 use crate::config;
@@ -210,9 +210,9 @@ pub async fn get_table_data(
     let mut results = Vec::new();
 
     for table_id in table_ids {
-        let _table = cache
-            .get_table(table_id)
-            .ok_or_else(|| actix_web::error::ErrorNotFound(format!("Table {} not found", table_id)))?;
+        let _table = cache.get_table(table_id).ok_or_else(|| {
+            actix_web::error::ErrorNotFound(format!("Table {} not found", table_id))
+        })?;
 
         let columns = cache.get_table_columns(table_id);
         if columns.is_empty() {
@@ -230,24 +230,26 @@ pub async fn get_table_data(
             continue;
         }
 
-        let sql_table = cache
-            .get_sql_table_name(table_id)
-            .ok_or_else(|| actix_web::error::ErrorInternalServerError(
-                format!("Cannot resolve SQL table name for table {}", table_id),
-            ))?;
+        let sql_table = cache.get_sql_table_name(table_id).ok_or_else(|| {
+            actix_web::error::ErrorInternalServerError(format!(
+                "Cannot resolve SQL table name for table {}",
+                table_id
+            ))
+        })?;
 
         let sql_columns: Vec<String> = cache.get_table_sql_column_names(table_id);
         let select_cols = sql_columns.join(", ");
 
         let total_count: i64 = conn
-            .query_row(
-                &format!("SELECT COUNT(*) FROM {}", sql_table),
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|e| actix_web::error::ErrorInternalServerError(
-                format!("Count query failed for {}: {}", sql_table, e),
-            ))?;
+            .query_row(&format!("SELECT COUNT(*) FROM {}", sql_table), [], |row| {
+                row.get(0)
+            })
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Count query failed for {}: {}",
+                    sql_table, e
+                ))
+            })?;
 
         let sql = format!(
             "SELECT {} FROM {} ORDER BY id LIMIT ?1 OFFSET ?2",
@@ -288,13 +290,19 @@ pub async fn get_table_data(
                 }
                 Ok(values)
             })
-            .map_err(|e| actix_web::error::ErrorInternalServerError(
-                format!("Query failed for {}: {}", sql_table, e),
-            ))?
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Query failed for {}: {}",
+                    sql_table, e
+                ))
+            })?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| actix_web::error::ErrorInternalServerError(
-                format!("Row mapping failed for {}: {}", sql_table, e),
-            ))?;
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Row mapping failed for {}: {}",
+                    sql_table, e
+                ))
+            })?;
 
         let has_more = (offset + rows.len() as i64) < total_count;
 

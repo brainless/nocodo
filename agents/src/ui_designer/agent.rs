@@ -118,7 +118,10 @@ impl UiDesignerAgent {
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
-                tools: Some(vec![write_form_tool.clone(), update_task_status_tool.clone()]),
+                tools: Some(vec![
+                    write_form_tool.clone(),
+                    update_task_status_tool.clone(),
+                ]),
                 tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
             };

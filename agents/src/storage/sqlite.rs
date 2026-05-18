@@ -4,9 +4,10 @@ use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicCommentRow, EpicStatus,
-    MessageContent, SchemaStorage, Session, Task, TaskCommentRow, TaskStatus, TaskStorage, UiFormStorage,
-    UserChatMessageRow, UserChatSessionRow, UserChatStorage, UserRow, UserStorage,
+    AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicCommentRow,
+    EpicStatus, MessageContent, SchemaStorage, Session, Task, TaskCommentRow, TaskStatus,
+    TaskStorage, UiFormStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage, UserRow,
+    UserStorage,
 };
 use crate::error::AgentError;
 
@@ -51,7 +52,8 @@ impl SqliteAgentStorage {
                      WHERE project_id = ?1 AND agent_type = ?2
                      ORDER BY id ASC",
                 )?;
-                let rows = stmt.query_map(params![project_id, at], map_session)?
+                let rows = stmt
+                    .query_map(params![project_id, at], map_session)?
                     .collect::<Result<Vec<_>, _>>()?;
                 rows
             }
@@ -62,7 +64,8 @@ impl SqliteAgentStorage {
                      WHERE project_id = ?1
                      ORDER BY id ASC",
                 )?;
-                let rows = stmt.query_map(params![project_id], map_session)?
+                let rows = stmt
+                    .query_map(params![project_id], map_session)?
                     .collect::<Result<Vec<_>, _>>()?;
                 rows
             }
@@ -148,7 +151,11 @@ impl AgentStorage for SqliteAgentStorage {
     }
 
     async fn create_message(&self, msg: ChatMessage) -> Result<i64, AgentError> {
-        let created_at = if msg.created_at == 0 { now() } else { msg.created_at };
+        let created_at = if msg.created_at == 0 {
+            now()
+        } else {
+            msg.created_at
+        };
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO agent_chat_message
@@ -169,7 +176,9 @@ impl AgentStorage for SqliteAgentStorage {
 
     async fn create_turn(&self, messages: Vec<ChatMessage>) -> Result<i64, AgentError> {
         if messages.is_empty() {
-            return Err(AgentError::Other("create_turn requires at least one message".into()));
+            return Err(AgentError::Other(
+                "create_turn requires at least one message".into(),
+            ));
         }
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -292,8 +301,16 @@ fn map_epic(row: &rusqlite::Row<'_>) -> rusqlite::Result<Epic> {
 impl TaskStorage for SqliteTaskStorage {
     async fn create_task(&self, task: Task) -> Result<i64, AgentError> {
         let ts = now();
-        let created_at = if task.created_at == 0 { ts } else { task.created_at };
-        let updated_at = if task.updated_at == 0 { ts } else { task.updated_at };
+        let created_at = if task.created_at == 0 {
+            ts
+        } else {
+            task.created_at
+        };
+        let updated_at = if task.updated_at == 0 {
+            ts
+        } else {
+            task.updated_at
+        };
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO task
@@ -402,14 +419,24 @@ impl TaskStorage for SqliteTaskStorage {
                AND s.id IS NULL
              ORDER BY t.id ASC",
         )?;
-        let tasks = stmt.query_map([], map_task)?.collect::<Result<Vec<_>, _>>()?;
+        let tasks = stmt
+            .query_map([], map_task)?
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(tasks)
     }
 
     async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError> {
         let ts = now();
-        let created_at = if epic.created_at == 0 { ts } else { epic.created_at };
-        let updated_at = if epic.updated_at == 0 { ts } else { epic.updated_at };
+        let created_at = if epic.created_at == 0 {
+            ts
+        } else {
+            epic.created_at
+        };
+        let updated_at = if epic.updated_at == 0 {
+            ts
+        } else {
+            epic.updated_at
+        };
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO epic
@@ -574,7 +601,10 @@ impl SchemaStorage for SqliteSchemaStorage {
         let row_id = conn.last_insert_rowid();
         log::info!(
             "[SchemaStorage] Saved schema: project_id={}, session_id={}, version={}, row_id={}",
-            project_id, session_id, version, row_id
+            project_id,
+            session_id,
+            version,
+            row_id
         );
         Ok(row_id)
     }
@@ -607,7 +637,9 @@ pub struct SqliteUiFormStorage {
 
 impl SqliteUiFormStorage {
     pub fn new(conn: Connection) -> Self {
-        Self { conn: Mutex::new(conn) }
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 
     pub fn open(path: &str) -> Result<Self, AgentError> {
@@ -682,7 +714,9 @@ pub struct SqliteContextStorage {
 
 impl SqliteContextStorage {
     pub fn new(conn: Connection) -> Self {
-        Self { conn: Mutex::new(conn) }
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 
     pub fn open(path: &str) -> Result<Self, AgentError> {
@@ -740,7 +774,9 @@ pub struct SqliteUserStorage {
 
 impl SqliteUserStorage {
     pub fn new(conn: Connection) -> Self {
-        Self { conn: Mutex::new(conn) }
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 
     pub fn open(path: &str) -> Result<Self, AgentError> {
@@ -810,7 +846,9 @@ pub struct SqliteUserChatStorage {
 
 impl SqliteUserChatStorage {
     pub fn new(conn: Connection) -> Self {
-        Self { conn: Mutex::new(conn) }
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 
     pub fn open(path: &str) -> Result<Self, AgentError> {
@@ -858,10 +896,7 @@ impl UserChatStorage for SqliteUserChatStorage {
         Ok(conn.last_insert_rowid())
     }
 
-    async fn get_session(
-        &self,
-        session_id: i64,
-    ) -> Result<Option<UserChatSessionRow>, AgentError> {
+    async fn get_session(&self, session_id: i64) -> Result<Option<UserChatSessionRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let session = conn
             .query_row(
@@ -897,10 +932,7 @@ impl UserChatStorage for SqliteUserChatStorage {
         Ok(conn.last_insert_rowid())
     }
 
-    async fn get_messages(
-        &self,
-        session_id: i64,
-    ) -> Result<Vec<UserChatMessageRow>, AgentError> {
+    async fn get_messages(&self, session_id: i64) -> Result<Vec<UserChatMessageRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, session_id, author_type, author_user_id, agent_type, turn_id, content_type, content, created_at
@@ -934,7 +966,9 @@ pub struct SqliteCommentStorage {
 
 impl SqliteCommentStorage {
     pub fn new(conn: Connection) -> Self {
-        Self { conn: Mutex::new(conn) }
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 
     pub fn open(path: &str) -> Result<Self, AgentError> {
@@ -990,10 +1024,7 @@ impl CommentStorage for SqliteCommentStorage {
         Ok(conn.last_insert_rowid())
     }
 
-    async fn get_epic_comments(
-        &self,
-        epic_id: i64,
-    ) -> Result<Vec<EpicCommentRow>, AgentError> {
+    async fn get_epic_comments(&self, epic_id: i64) -> Result<Vec<EpicCommentRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, epic_id, author_type, author_user_id, agent_type, content, created_at, updated_at
@@ -1026,10 +1057,7 @@ impl CommentStorage for SqliteCommentStorage {
         Ok(conn.last_insert_rowid())
     }
 
-    async fn get_task_comments(
-        &self,
-        task_id: i64,
-    ) -> Result<Vec<TaskCommentRow>, AgentError> {
+    async fn get_task_comments(&self, task_id: i64) -> Result<Vec<TaskCommentRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, task_id, author_type, author_user_id, agent_type, content, created_at, updated_at

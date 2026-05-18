@@ -31,7 +31,11 @@ pub fn collect_cargo_dependencies(project_root: &Path, cargo_toml_relative_path:
         entries.sort_by(|a, b| a.0.cmp(b.0));
         out.push_str(&format!("[{}]\n", section));
         for (name, value) in entries {
-            out.push_str(&format!("- {} = {}\n", name, format_dependency_value(value)));
+            out.push_str(&format!(
+                "- {} = {}\n",
+                name,
+                format_dependency_value(value)
+            ));
         }
         out.push('\n');
     }

@@ -82,7 +82,11 @@ impl AgentConfig {
                 ))
             })?;
 
-        Ok(AgentConfig { provider, model, api_key })
+        Ok(AgentConfig {
+            provider,
+            model,
+            api_key,
+        })
     }
 
     fn load_from_prefix(prefix: &str) -> Result<Self, AgentError> {
@@ -121,7 +125,11 @@ impl AgentConfig {
                 ))
             })?;
 
-        Ok(AgentConfig { provider, model, api_key })
+        Ok(AgentConfig {
+            provider,
+            model,
+            api_key,
+        })
     }
 }
 
@@ -143,7 +151,11 @@ fn read_conf_file(path: &Path, key: &str) -> Option<String> {
             continue;
         }
         let value = value.trim();
-        let value = value.split_once(" #").map(|(v, _)| v).unwrap_or(value).trim();
+        let value = value
+            .split_once(" #")
+            .map(|(v, _)| v)
+            .unwrap_or(value)
+            .trim();
         let value = value.trim_matches('"').trim_matches('\'');
         if !value.is_empty() {
             return Some(value.to_string());

@@ -36,9 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create tables
     let tables = [
-        ("Projects",   "project"),
-        ("Sessions",   "agent_chat_session"),
-        ("Messages",   "agent_chat_message"),
+        ("Projects", "project"),
+        ("Sessions", "agent_chat_session"),
+        ("Messages", "agent_chat_message"),
         ("Tool Calls", "agent_tool_call"),
     ];
 
@@ -83,36 +83,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Helper to insert a foreign key
-    let insert_fk =
-        |column_id: i64, ref_table: &str, ref_column: &str| -> Result<(), Box<dyn std::error::Error>> {
-            conn.execute(
-                "INSERT INTO schema_fk (column_id, ref_table, ref_column) VALUES (?1, ?2, ?3)",
-                params![column_id, ref_table, ref_column],
-            )?;
-            Ok(())
-        };
+    let insert_fk = |column_id: i64,
+                     ref_table: &str,
+                     ref_column: &str|
+     -> Result<(), Box<dyn std::error::Error>> {
+        conn.execute(
+            "INSERT INTO schema_fk (column_id, ref_table, ref_column) VALUES (?1, ?2, ?3)",
+            params![column_id, ref_table, ref_column],
+        )?;
+        Ok(())
+    };
 
     // Helper to insert column_display
-    let insert_display =
-        |column_id: i64, display_column: Option<&str>| -> Result<(), Box<dyn std::error::Error>> {
-            conn.execute(
-                "INSERT INTO column_display (column_id, width, display_column) VALUES (?1, 120, ?2)",
-                params![column_id, display_column],
-            )?;
-            Ok(())
-        };
+    let insert_display = |column_id: i64,
+                          display_column: Option<&str>|
+     -> Result<(), Box<dyn std::error::Error>> {
+        conn.execute(
+            "INSERT INTO column_display (column_id, width, display_column) VALUES (?1, 120, ?2)",
+            params![column_id, display_column],
+        )?;
+        Ok(())
+    };
 
     // ── Projects ──────────────────────────────────────────────────────────────
-    insert_col(projects_id, "id",         "integer",   false, true,  0)?;
-    insert_col(projects_id, "name",       "text",      false, false, 1)?;
-    insert_col(projects_id, "path",       "text",      false, false, 2)?;
+    insert_col(projects_id, "id", "integer", false, true, 0)?;
+    insert_col(projects_id, "name", "text", false, false, 1)?;
+    insert_col(projects_id, "path", "text", false, false, 2)?;
     insert_col(projects_id, "created_at", "date_time", false, false, 3)?;
     println!("Created Projects columns");
 
     // ── Sessions ─────────────────────────────────────────────────────────────
-    insert_col(sessions_id, "id",         "integer",   false, true,  0)?;
+    insert_col(sessions_id, "id", "integer", false, true, 0)?;
     let sessions_project_col = insert_col(sessions_id, "project_id", "integer", false, false, 1)?;
-    insert_col(sessions_id, "agent_type", "text",      false, false, 2)?;
+    insert_col(sessions_id, "agent_type", "text", false, false, 2)?;
     insert_col(sessions_id, "created_at", "date_time", false, false, 3)?;
     // FK: sessions.project_id → project.id
     insert_fk(sessions_project_col, "project", "id")?;
@@ -120,10 +123,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Created Sessions columns (FK → Projects)");
 
     // ── Messages ──────────────────────────────────────────────────────────────
-    insert_col(messages_id, "id",         "integer",   false, true,  0)?;
+    insert_col(messages_id, "id", "integer", false, true, 0)?;
     let messages_session_col = insert_col(messages_id, "session_id", "integer", false, false, 1)?;
-    insert_col(messages_id, "role",       "text",      false, false, 2)?;
-    insert_col(messages_id, "content",    "text",      false, false, 3)?;
+    insert_col(messages_id, "role", "text", false, false, 2)?;
+    insert_col(messages_id, "content", "text", false, false, 3)?;
     insert_col(messages_id, "created_at", "date_time", false, false, 4)?;
     // FK: messages.session_id → agent_chat_session.id
     insert_fk(messages_session_col, "agent_chat_session", "id")?;
@@ -131,12 +134,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Created Messages columns (FK → Sessions)");
 
     // ── Tool Calls ────────────────────────────────────────────────────────────
-    insert_col(tool_calls_id, "id",         "integer",   false, true,  0)?;
+    insert_col(tool_calls_id, "id", "integer", false, true, 0)?;
     let tc_message_col = insert_col(tool_calls_id, "message_id", "integer", false, false, 1)?;
-    insert_col(tool_calls_id, "call_id",    "text",      false, false, 2)?;
-    insert_col(tool_calls_id, "tool_name",  "text",      false, false, 3)?;
-    insert_col(tool_calls_id, "arguments",  "text",      true,  false, 4)?;
-    insert_col(tool_calls_id, "result",     "text",      true,  false, 5)?;
+    insert_col(tool_calls_id, "call_id", "text", false, false, 2)?;
+    insert_col(tool_calls_id, "tool_name", "text", false, false, 3)?;
+    insert_col(tool_calls_id, "arguments", "text", true, false, 4)?;
+    insert_col(tool_calls_id, "result", "text", true, false, 5)?;
     insert_col(tool_calls_id, "created_at", "date_time", false, false, 6)?;
     // FK: tool_calls.message_id → agent_chat_message.id
     insert_fk(tc_message_col, "agent_chat_message", "id")?;

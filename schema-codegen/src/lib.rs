@@ -135,7 +135,11 @@ fn parse_column_def(col: &ColumnDef) -> ColumnModel {
 /// Generate a single Rust struct from a `TableModel`.
 pub fn table_model_to_rust_struct(table: &TableModel) -> String {
     let mut out = String::new();
-    writeln!(&mut out, "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]").unwrap();
+    writeln!(
+        &mut out,
+        "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]"
+    )
+    .unwrap();
     writeln!(&mut out, "pub struct {} {{", table.rust_name).unwrap();
     for col in &table.columns {
         writeln!(&mut out, "    pub {}: {},", col.rust_name, col.rust_type).unwrap();
@@ -170,7 +174,11 @@ pub fn table_model_to_sql_create(table: &TableModel) -> String {
     let mut fks: Vec<String> = Vec::new();
 
     for (i, col) in table.columns.iter().enumerate() {
-        let comma = if i < col_count - 1 || !fks.is_empty() { "," } else { "" };
+        let comma = if i < col_count - 1 || !fks.is_empty() {
+            ","
+        } else {
+            ""
+        };
         let mut constraints = String::new();
         if col.primary_key {
             constraints.push_str(" PRIMARY KEY AUTOINCREMENT");
@@ -443,9 +451,7 @@ mod tests {
         assert!(sql.contains("id INTEGER PRIMARY KEY AUTOINCREMENT"));
         assert!(sql.contains("user_id INTEGER NOT NULL"));
         assert!(sql.contains("total REAL NOT NULL"));
-        assert!(sql.contains(
-            "FOREIGN KEY (user_id) REFERENCES users(id)"
-        ));
+        assert!(sql.contains("FOREIGN KEY (user_id) REFERENCES users(id)"));
     }
 
     #[test]
@@ -467,7 +473,10 @@ mod tests {
         assert_eq!(labels.tables[0].table_name, "users");
         assert_eq!(labels.tables[0].table_label.as_deref(), Some("Users"));
         assert_eq!(labels.tables[0].columns[1].column_name, "name");
-        assert_eq!(labels.tables[0].columns[1].column_label.as_deref(), Some("Name"));
+        assert_eq!(
+            labels.tables[0].columns[1].column_label.as_deref(),
+            Some("Name")
+        );
     }
 
     #[test]

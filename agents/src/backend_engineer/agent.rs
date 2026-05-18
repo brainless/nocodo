@@ -11,10 +11,10 @@ use crate::{
     error::AgentError,
     storage::{AgentStorage, ChatMessage, ContextStorage, TaskStatus, TaskStorage},
     utils::{
-        tools::{CommentaryParams, ListFilesParams, ReadFileParams, UpdateTaskStatusParams},
         cargo::collect_cargo_dependencies,
         context::normalize_backend_context_json,
         file_ops,
+        tools::{CommentaryParams, ListFilesParams, ReadFileParams, UpdateTaskStatusParams},
     },
 };
 
@@ -97,7 +97,9 @@ impl BackendEngineerAgent {
 
         let commentary_tool = Tool::from_type::<CommentaryParams>()
             .name("commentary")
-            .description("Optional commentary tool. Use plain assistant text instead when possible.")
+            .description(
+                "Optional commentary tool. Use plain assistant text instead when possible.",
+            )
             .build();
 
         let update_task_status_tool = Tool::from_type::<UpdateTaskStatusParams>()
@@ -169,7 +171,9 @@ impl BackendEngineerAgent {
                 Ok(resp) => resp,
                 Err(llm_err) => {
                     let err_str = llm_err.to_string();
-                    if err_str.contains("validation failed") || err_str.contains("missing properties") {
+                    if err_str.contains("validation failed")
+                        || err_str.contains("missing properties")
+                    {
                         log::warn!(
                             "[backend_engineer] LLM tool validation error (attempt {}): {}. Falling back to text output.",
                             nudges, err_str
@@ -214,7 +218,11 @@ impl BackendEngineerAgent {
 
                     match tool_name {
                         "list_files" | "repo_browser.list_files" => {
-                            let signature = format!("{}:{}", tool_name, serde_json::to_string(tool_call.arguments())?);
+                            let signature = format!(
+                                "{}:{}",
+                                tool_name,
+                                serde_json::to_string(tool_call.arguments())?
+                            );
                             if last_tool_signature.as_deref() == Some(&signature) {
                                 same_tool_call_streak += 1;
                             } else {
@@ -222,12 +230,16 @@ impl BackendEngineerAgent {
                                 same_tool_call_streak = 0;
                             }
                             if same_tool_call_streak >= 2 {
-                                let _ = self.task_storage.update_task_status(task_id, TaskStatus::Blocked).await;
+                                let _ = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Blocked)
+                                    .await;
                                 return Ok(BackendEngineerResponse::Stopped(
                                     "stopped due to repeated identical tool call".to_string(),
                                 ));
                             }
-                            let params: ListFilesParams = tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            let params: ListFilesParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             let result = file_ops::list_files(&self.project_path, &params.path);
                             let mut turn = Vec::new();
                             if !assistant_text.is_empty() {
@@ -259,7 +271,11 @@ impl BackendEngineerAgent {
                         }
 
                         "read_file" | "repo_browser.read_file" | "repo_browser.open_file" => {
-                            let signature = format!("{}:{}", tool_name, serde_json::to_string(tool_call.arguments())?);
+                            let signature = format!(
+                                "{}:{}",
+                                tool_name,
+                                serde_json::to_string(tool_call.arguments())?
+                            );
                             if last_tool_signature.as_deref() == Some(&signature) {
                                 same_tool_call_streak += 1;
                             } else {
@@ -267,12 +283,16 @@ impl BackendEngineerAgent {
                                 same_tool_call_streak = 0;
                             }
                             if same_tool_call_streak >= 2 {
-                                let _ = self.task_storage.update_task_status(task_id, TaskStatus::Blocked).await;
+                                let _ = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Blocked)
+                                    .await;
                                 return Ok(BackendEngineerResponse::Stopped(
                                     "stopped due to repeated identical tool call".to_string(),
                                 ));
                             }
-                            let params: ReadFileParams = tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            let params: ReadFileParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             let result = file_ops::read_file(&self.project_path, &params.path);
                             let mut turn = Vec::new();
                             if !assistant_text.is_empty() {
@@ -304,7 +324,11 @@ impl BackendEngineerAgent {
                         }
 
                         "update_task_status" | "task.update_task_status" => {
-                            let signature = format!("{}:{}", tool_name, serde_json::to_string(tool_call.arguments())?);
+                            let signature = format!(
+                                "{}:{}",
+                                tool_name,
+                                serde_json::to_string(tool_call.arguments())?
+                            );
                             if last_tool_signature.as_deref() == Some(&signature) {
                                 same_tool_call_streak += 1;
                             } else {
@@ -312,14 +336,22 @@ impl BackendEngineerAgent {
                                 same_tool_call_streak = 0;
                             }
                             if same_tool_call_streak >= 2 {
-                                let _ = self.task_storage.update_task_status(task_id, TaskStatus::Blocked).await;
+                                let _ = self
+                                    .task_storage
+                                    .update_task_status(task_id, TaskStatus::Blocked)
+                                    .await;
                                 return Ok(BackendEngineerResponse::Stopped(
                                     "stopped due to repeated identical tool call".to_string(),
                                 ));
                             }
-                            let params: UpdateTaskStatusParams = tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            let params: UpdateTaskStatusParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
                             let new_status = TaskStatus::from_str(&params.status);
-                            let result_text = match self.task_storage.update_task_status(task_id, new_status).await {
+                            let result_text = match self
+                                .task_storage
+                                .update_task_status(task_id, new_status)
+                                .await
+                            {
                                 Ok(()) => format!("Task status updated to {}.", params.status),
                                 Err(e) => format!("Failed to update task status: {}", e),
                             };
@@ -353,8 +385,11 @@ impl BackendEngineerAgent {
                         }
 
                         "commentary" => {
-                            let params: CommentaryParams = tool_call.parse_arguments().map_err(AgentError::Llm)?;
-                            let content = params.text.unwrap_or_else(|| "Commentary received.".to_string());
+                            let params: CommentaryParams =
+                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                            let content = params
+                                .text
+                                .unwrap_or_else(|| "Commentary received.".to_string());
                             let mut turn = Vec::new();
                             if !assistant_text.is_empty() {
                                 turn.push(text_row(session_id, assistant_text.clone()));
@@ -406,8 +441,13 @@ impl BackendEngineerAgent {
                     self.storage
                         .create_turn(vec![text_row(session_id, assistant_text.clone())])
                         .await?;
-                    let _ = self.task_storage.update_task_status(task_id, TaskStatus::Done).await;
-                    return Ok(BackendEngineerResponse::ContextSaved { context: normalized });
+                    let _ = self
+                        .task_storage
+                        .update_task_status(task_id, TaskStatus::Done)
+                        .await;
+                    return Ok(BackendEngineerResponse::ContextSaved {
+                        context: normalized,
+                    });
                 }
 
                 self.storage

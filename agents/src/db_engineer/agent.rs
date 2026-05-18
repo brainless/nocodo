@@ -224,11 +224,13 @@ impl DbEngineerAgent {
 
                             // Ensure created_at / updated_at are always the last columns.
                             for table in &mut params.tables {
-                                let (mut audit, rest): (Vec<_>, Vec<_>) = table
-                                    .columns
-                                    .drain(..)
-                                    .partition(|c| c.name == "created_at" || c.name == "updated_at");
-                                audit.sort_by_key(|c| if c.name == "updated_at" { 0u8 } else { 1u8 });
+                                let (mut audit, rest): (Vec<_>, Vec<_>) =
+                                    table.columns.drain(..).partition(|c| {
+                                        c.name == "created_at" || c.name == "updated_at"
+                                    });
+                                audit.sort_by_key(
+                                    |c| if c.name == "updated_at" { 0u8 } else { 1u8 },
+                                );
                                 table.columns = rest;
                                 table.columns.extend(audit);
                             }
@@ -297,7 +299,10 @@ impl DbEngineerAgent {
                                     .update_task_status(task_id, TaskStatus::Done)
                                     .await
                                 {
-                                    log::warn!("[Agent] Failed to update task status to Done: {}", e);
+                                    log::warn!(
+                                        "[Agent] Failed to update task status to Done: {}",
+                                        e
+                                    );
                                 }
                             }
 
@@ -337,7 +342,10 @@ impl DbEngineerAgent {
                                 .update_task_status(task_id, TaskStatus::Blocked)
                                 .await
                             {
-                                log::warn!("[Agent] Failed to update task status to Blocked: {}", e);
+                                log::warn!(
+                                    "[Agent] Failed to update task status to Blocked: {}",
+                                    e
+                                );
                             }
 
                             log::info!("[Agent] Returning Stopped response");
@@ -419,7 +427,8 @@ impl DbEngineerAgent {
                                 session_id,
                                 role: "tool".to_string(),
                                 agent_type: None,
-                                content: "Question sent to user. Awaiting user response.".to_string(),
+                                content: "Question sent to user. Awaiting user response."
+                                    .to_string(),
                                 tool_call_id: Some(call_id),
                                 tool_name: Some("ask_user".to_string()),
                                 turn_id: None,
@@ -448,7 +457,9 @@ impl DbEngineerAgent {
                     "[Agent] Returning Text response ({} chars)",
                     assistant_text.len()
                 );
-                self.storage.create_turn(vec![text_row(assistant_text.clone())]).await?;
+                self.storage
+                    .create_turn(vec![text_row(assistant_text.clone())])
+                    .await?;
                 return Ok(AgentResponse::Text(assistant_text));
             }
 

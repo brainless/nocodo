@@ -1,8 +1,8 @@
-use crate::agents_api::state::AgentState;
 use crate::agents_api::db_engineer::types::{
     BoardQuery, BoardResponse, EpicItem, EpicListQuery, ListEpicsResponse, ListTasksQuery,
     ListTasksResponse, SchemaCodegenResponse, SchemaPreviewQuery, SchemaPreviewResponse, TaskItem,
 };
+use crate::agents_api::state::AgentState;
 use actix_web::{get, web, HttpResponse, Responder};
 use nocodo_agents::{
     AgentStorage, SchemaStorage, SqliteAgentStorage, SqliteSchemaStorage, SqliteTaskStorage,
@@ -116,8 +116,7 @@ pub async fn get_board(
     let (tasks, epics) = match fetch_board_data(&task_storage, project_id).await {
         Ok(d) => d,
         Err(e) => {
-            return HttpResponse::InternalServerError()
-                .json(serde_json::json!({ "error": e }))
+            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": e }))
         }
     };
 
@@ -131,7 +130,12 @@ pub async fn get_board(
     let project_name = fetch_project_name(&state.db_path, project_id);
 
     if since == 0 || updated_at > since {
-        return HttpResponse::Ok().json(BoardResponse { tasks, epics, updated_at, project_name });
+        return HttpResponse::Ok().json(BoardResponse {
+            tasks,
+            epics,
+            updated_at,
+            project_name,
+        });
     }
 
     let _ = tokio::time::timeout(Duration::from_secs(30), notified).await;
@@ -145,10 +149,14 @@ pub async fn get_board(
                 .max()
                 .unwrap_or(0);
             let project_name = fetch_project_name(&state.db_path, project_id);
-            HttpResponse::Ok().json(BoardResponse { tasks, epics, updated_at, project_name })
+            HttpResponse::Ok().json(BoardResponse {
+                tasks,
+                epics,
+                updated_at,
+                project_name,
+            })
         }
-        Err(e) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({ "error": e })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({ "error": e })),
     }
 }
 

@@ -1,5 +1,5 @@
-use actix_web::{cookie::time::Duration, get, post, web, HttpRequest, HttpResponse};
 use actix_web::cookie::{Cookie, SameSite};
+use actix_web::{cookie::time::Duration, get, post, web, HttpRequest, HttpResponse};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -98,8 +98,9 @@ pub async fn verify_otp(
             .json(serde_json::json!({"message": "authenticated"})),
         Ok(Ok(None)) => HttpResponse::Unauthorized()
             .json(serde_json::json!({"error": "invalid or expired OTP"})),
-        _ => HttpResponse::InternalServerError()
-            .json(serde_json::json!({"error": "internal error"})),
+        _ => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": "internal error"}))
+        }
     }
 }
 
@@ -132,7 +133,6 @@ pub async fn me(req: HttpRequest, config: web::Data<AuthConfig>) -> HttpResponse
 
     match result {
         Ok(Ok(Some(email))) => HttpResponse::Ok().json(MeResponse { email }),
-        _ => HttpResponse::Unauthorized()
-            .json(serde_json::json!({"error": "not authenticated"})),
+        _ => HttpResponse::Unauthorized().json(serde_json::json!({"error": "not authenticated"})),
     }
 }

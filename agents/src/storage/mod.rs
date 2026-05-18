@@ -292,10 +292,7 @@ pub trait TaskStorage: Send + Sync {
         project_id: i64,
         agent_type: &str,
     ) -> Result<Vec<Task>, AgentError>;
-    async fn list_pending_review_tasks(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<Task>, AgentError>;
+    async fn list_pending_review_tasks(&self, project_id: i64) -> Result<Vec<Task>, AgentError>;
 
     /// All open tasks across every project that have no agent session yet and are
     /// not assigned to project_manager. Used by the startup reconciliation pass.
@@ -357,10 +354,8 @@ pub trait UiFormStorage: Send + Sync {
     ) -> Result<Option<String>, AgentError>;
 
     /// List all (entity_name, layout_json) pairs for a project.
-    async fn list_form_layouts(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<(String, String)>, AgentError>;
+    async fn list_form_layouts(&self, project_id: i64)
+        -> Result<Vec<(String, String)>, AgentError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -410,10 +405,7 @@ pub trait UserStorage: Send + Sync {
 pub trait UserChatStorage: Send + Sync {
     async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError>;
 
-    async fn get_session(
-        &self,
-        session_id: i64,
-    ) -> Result<Option<UserChatSessionRow>, AgentError>;
+    async fn get_session(&self, session_id: i64) -> Result<Option<UserChatSessionRow>, AgentError>;
 
     async fn append_message(
         &self,
@@ -425,10 +417,7 @@ pub trait UserChatStorage: Send + Sync {
         content: MessageContent,
     ) -> Result<i64, AgentError>;
 
-    async fn get_messages(
-        &self,
-        session_id: i64,
-    ) -> Result<Vec<UserChatMessageRow>, AgentError>;
+    async fn get_messages(&self, session_id: i64) -> Result<Vec<UserChatMessageRow>, AgentError>;
 
     async fn complete_session(&self, session_id: i64) -> Result<(), AgentError>;
 }
@@ -448,10 +437,7 @@ pub trait CommentStorage: Send + Sync {
         content: String,
     ) -> Result<i64, AgentError>;
 
-    async fn get_epic_comments(
-        &self,
-        epic_id: i64,
-    ) -> Result<Vec<EpicCommentRow>, AgentError>;
+    async fn get_epic_comments(&self, epic_id: i64) -> Result<Vec<EpicCommentRow>, AgentError>;
 
     async fn add_task_comment(
         &self,
@@ -462,8 +448,5 @@ pub trait CommentStorage: Send + Sync {
         content: String,
     ) -> Result<i64, AgentError>;
 
-    async fn get_task_comments(
-        &self,
-        task_id: i64,
-    ) -> Result<Vec<TaskCommentRow>, AgentError>;
+    async fn get_task_comments(&self, task_id: i64) -> Result<Vec<TaskCommentRow>, AgentError>;
 }

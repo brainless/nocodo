@@ -56,17 +56,14 @@ where
             };
 
             let path = req.path();
-            let skip = !config.mandatory
-                || path.starts_with("/api/auth/")
-                || path == "/api/heartbeat";
+            let skip =
+                !config.mandatory || path.starts_with("/api/auth/") || path == "/api/heartbeat";
 
             if skip {
                 return svc.call(req).await.map(|r| r.map_into_left_body());
             }
 
-            let token = req
-                .cookie("nocodo_session")
-                .map(|c| c.value().to_string());
+            let token = req.cookie("nocodo_session").map(|c| c.value().to_string());
 
             let db_url = config.db_url.clone();
             let valid = match token {

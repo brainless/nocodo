@@ -28,8 +28,10 @@ async fn main() -> std::io::Result<()> {
         .format_timestamp_secs()
         .init();
 
-    let config = config::Config::load()
-        .unwrap_or_else(|e| { eprintln!("error: {e}"); std::process::exit(1) });
+    let config = config::Config::load().unwrap_or_else(|e| {
+        eprintln!("error: {e}");
+        std::process::exit(1)
+    });
 
     if let Some(path) = config::resolved_config_path() {
         println!("Config file resolved to {}", path.display());
@@ -46,17 +48,17 @@ async fn main() -> std::io::Result<()> {
         println!("Database migrations applied successfully");
     }
 
-    let mandatory_auth = config
-        .auth
-        .as_ref()
-        .map(|a| a.mandatory)
-        .unwrap_or(true);
+    let mandatory_auth = config.auth.as_ref().map(|a| a.mandatory).unwrap_or(true);
     let resend_api_key = config.auth.as_ref().and_then(|a| a.resend_api_key.clone());
     let from_email = config.auth.as_ref().and_then(|a| a.from_email.clone());
 
     println!(
         "Mandatory authentication: {}",
-        if mandatory_auth { "enabled" } else { "disabled" }
+        if mandatory_auth {
+            "enabled"
+        } else {
+            "disabled"
+        }
     );
 
     let auth_config = web::Data::new(auth::AuthConfig {
@@ -99,14 +101,14 @@ async fn main() -> std::io::Result<()> {
                     log::info!("Reconciling {} open dispatchable task(s)", tasks.len());
                 }
                 for task in tasks {
-                    let _ = agent_state.dispatch_tx.send(
-                        agents_api::dispatcher::DispatchEvent {
+                    let _ = agent_state
+                        .dispatch_tx
+                        .send(agents_api::dispatcher::DispatchEvent {
                             task_id: task.id.unwrap_or(0),
                             project_id: task.project_id,
                             assigned_to_agent: task.assigned_to_agent,
                             source_prompt: task.source_prompt,
-                        },
-                    );
+                        });
                 }
             }
             Err(e) => log::warn!("Startup reconciliation failed: {}", e),
@@ -114,8 +116,8 @@ async fn main() -> std::io::Result<()> {
     }
 
     let schema_cache = {
-        let conn = rusqlite::Connection::open(&config.database.url)
-            .expect("Failed to open database");
+        let conn =
+            rusqlite::Connection::open(&config.database.url).expect("Failed to open database");
         match schema_api::schema_cache::SchemaCache::load(&conn) {
             Ok(cache) => {
                 println!("Schema cache loaded successfully");

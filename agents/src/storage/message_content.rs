@@ -44,12 +44,8 @@ impl MessageContent {
     pub fn to_storage_content(&self) -> String {
         match self {
             MessageContent::Text(s) => s.clone(),
-            MessageContent::StructuredQuestion(q) => {
-                serde_json::to_string(q).unwrap_or_default()
-            }
-            MessageContent::StructuredResponse(r) => {
-                serde_json::to_string(r).unwrap_or_default()
-            }
+            MessageContent::StructuredQuestion(q) => serde_json::to_string(q).unwrap_or_default(),
+            MessageContent::StructuredResponse(r) => serde_json::to_string(r).unwrap_or_default(),
         }
     }
 

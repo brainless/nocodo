@@ -31,7 +31,10 @@ pub async fn gather_context(
     state: web::Data<AgentState>,
     request: web::Json<GatherContextRequest>,
 ) -> impl Responder {
-    let GatherContextRequest { project_id, context_type } = request.into_inner();
+    let GatherContextRequest {
+        project_id,
+        context_type,
+    } = request.into_inner();
 
     let ct = match validate_context_type(&context_type) {
         Some(ct) => ct,
@@ -156,7 +159,11 @@ pub async fn gather_context(
             agent_type: None,
             content: format!(
                 "Analyze the {} of the project at: {}",
-                if ct == BACKEND_ENGINEER { "backend" } else { "admin-gui" },
+                if ct == BACKEND_ENGINEER {
+                    "backend"
+                } else {
+                    "admin-gui"
+                },
                 project_path
             ),
             tool_call_id: None,

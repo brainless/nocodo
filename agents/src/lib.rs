@@ -1,10 +1,10 @@
 pub mod backend_engineer;
 pub mod config;
+pub mod db_engineer;
 pub mod error;
 pub mod frontend_engineer;
 pub mod product_owner;
 pub mod project_manager;
-pub mod db_engineer;
 pub mod storage;
 pub mod task_policy;
 pub mod ui_designer;
@@ -13,13 +13,13 @@ pub mod utils;
 
 pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
 pub use config::AgentConfig;
+pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
+pub use product_owner::{PoSessionResult, ProductOwnerAgent};
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
-pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
-pub use product_owner::{PoSessionResult, ProductOwnerAgent};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteSchemaStorage,
     SqliteTaskStorage, SqliteUiFormStorage, SqliteUserChatStorage, SqliteUserStorage,
@@ -30,11 +30,11 @@ pub use storage::{
     Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow, UserChatSessionRow,
     UserChatStorage, UserStorage,
 };
-pub use user_input_tool::{InputType, RequestUserInputParams};
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
     FormField, FormFieldType, FormLayout, FormRow,
 };
+pub use user_input_tool::{InputType, RequestUserInputParams};
 
 // ---------------------------------------------------------------------------
 // Factory helpers
@@ -92,7 +92,13 @@ pub fn build_project_manager(
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
     let task_storage: Arc<dyn TaskStorage> = Arc::new(SqliteTaskStorage::open(db_path)?);
 
-    Ok(ProjectManagerAgent::new(client, storage, task_storage, &config.model, project_id))
+    Ok(ProjectManagerAgent::new(
+        client,
+        storage,
+        task_storage,
+        &config.model,
+        project_id,
+    ))
 }
 
 pub fn build_ui_designer(
@@ -124,7 +130,13 @@ pub fn build_project_manager_with_task_storage(
     let client = make_llm_client(config)?;
     let storage: Arc<dyn AgentStorage> = Arc::new(SqliteAgentStorage::open(db_path)?);
 
-    Ok(ProjectManagerAgent::new(client, storage, task_storage, &config.model, project_id))
+    Ok(ProjectManagerAgent::new(
+        client,
+        storage,
+        task_storage,
+        &config.model,
+        project_id,
+    ))
 }
 
 pub fn build_backend_engineer(

@@ -1,7 +1,7 @@
 pub mod comments;
 pub mod context;
-pub mod dispatcher;
 pub mod db_engineer;
+pub mod dispatcher;
 pub mod state;
 pub mod ui_designer;
 pub mod user_chat;

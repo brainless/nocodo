@@ -72,17 +72,19 @@ pub async fn add_epic_comment(
     let agent_type = body.agent_type.as_deref().map(AgentType::from_str);
 
     match storage
-        .add_epic_comment(epic_id, &body.author_type, body.author_user_id, agent_type, body.content)
+        .add_epic_comment(
+            epic_id,
+            &body.author_type,
+            body.author_user_id,
+            agent_type,
+            body.content,
+        )
         .await
     {
-        Ok(comment_id) => {
-            HttpResponse::Ok().json(serde_json::json!({ "id": comment_id }))
-        }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to add comment: {}", e)
-            }))
-        }
+        Ok(comment_id) => HttpResponse::Ok().json(serde_json::json!({ "id": comment_id })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Failed to add comment: {}", e)
+        })),
     }
 }
 
@@ -135,16 +137,18 @@ pub async fn add_task_comment(
     let agent_type = body.agent_type.as_deref().map(AgentType::from_str);
 
     match storage
-        .add_task_comment(task_id, &body.author_type, body.author_user_id, agent_type, body.content)
+        .add_task_comment(
+            task_id,
+            &body.author_type,
+            body.author_user_id,
+            agent_type,
+            body.content,
+        )
         .await
     {
-        Ok(comment_id) => {
-            HttpResponse::Ok().json(serde_json::json!({ "id": comment_id }))
-        }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to add comment: {}", e)
-            }))
-        }
+        Ok(comment_id) => HttpResponse::Ok().json(serde_json::json!({ "id": comment_id })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Failed to add comment: {}", e)
+        })),
     }
 }

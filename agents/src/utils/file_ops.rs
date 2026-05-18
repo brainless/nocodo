@@ -9,10 +9,19 @@ pub fn resolve_relative_path(project_path: &Path, relative_path: &str) -> Result
     }
     let rel_path = Path::new(rel);
     if rel_path.is_absolute() {
-        return Err("Error: absolute paths are not allowed. Use a path relative to project root.".to_string());
+        return Err(
+            "Error: absolute paths are not allowed. Use a path relative to project root."
+                .to_string(),
+        );
     }
-    if rel_path.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Err("Error: path traversal is not allowed. Use a path relative to project root.".to_string());
+    if rel_path
+        .components()
+        .any(|c| matches!(c, Component::ParentDir))
+    {
+        return Err(
+            "Error: path traversal is not allowed. Use a path relative to project root."
+                .to_string(),
+        );
     }
     Ok(project_path.join(rel_path))
 }

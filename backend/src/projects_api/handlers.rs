@@ -41,9 +41,7 @@ pub async fn list_projects(config: web::Data<config::Config>) -> Result<impl Res
              FROM project 
              ORDER BY created_at DESC",
         )
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Prepare error: {}", e))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Prepare error: {}", e)))?;
 
     let projects = stmt
         .query_map([], |row| {
@@ -54,13 +52,11 @@ pub async fn list_projects(config: web::Data<config::Config>) -> Result<impl Res
                 created_at: row.get(3)?,
             })
         })
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Query error: {}", e))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Query error: {}", e)))?;
 
-    let projects: Vec<Project> = projects.collect::<Result<Vec<_>, _>>().map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Collect error: {}", e))
-    })?;
+    let projects: Vec<Project> = projects
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Collect error: {}", e)))?;
 
     let response = ListProjectsResponse { projects };
     Ok(HttpResponse::Ok().json(response))

@@ -40,11 +40,7 @@ pub fn store_otp(conn: &Connection, email: &str, otp: &str) -> rusqlite::Result<
     Ok(())
 }
 
-pub fn verify_and_consume_otp(
-    conn: &Connection,
-    email: &str,
-    otp: &str,
-) -> rusqlite::Result<bool> {
+pub fn verify_and_consume_otp(conn: &Connection, email: &str, otp: &str) -> rusqlite::Result<bool> {
     let now = unix_now();
     let count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM auth_otps WHERE email = ?1 AND otp = ?2 AND expires_at > ?3",
@@ -113,11 +109,8 @@ pub async fn send_otp_email(
          <p>This code expires in 30 minutes.</p>",
         otp
     );
-    let email = CreateEmailBaseOptions::new(from_email, [to_email], "Your sign-in code").with_html(&html);
-    client
-        .emails
-        .send(email)
-        .await
-        .map_err(|e| e.to_string())?;
+    let email =
+        CreateEmailBaseOptions::new(from_email, [to_email], "Your sign-in code").with_html(&html);
+    client.emails.send(email).await.map_err(|e| e.to_string())?;
     Ok(())
 }
