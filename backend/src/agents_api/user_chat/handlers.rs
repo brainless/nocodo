@@ -434,6 +434,20 @@ pub async fn list_sessions(
 }
 
 // ---------------------------------------------------------------------------
+// Static greetings — shown once per session before LLM responds
+// ---------------------------------------------------------------------------
+
+const PO_GREETING: &str = "Hi! I'm the Product Owner at nocodo — we help small and medium \
+    businesses get custom software built around the way they actually work. My job is to \
+    understand what you want to build and shape it into a clear brief for our development \
+    team. I'll ask you a few focused questions to get started.";
+
+const PM_GREETING: &str = "Hi! I'm the Project Manager at nocodo. I've received the \
+    requirements brief from our Product Owner and I'll be turning that into a concrete \
+    development plan. I may have one or two quick follow-up questions before I finalise \
+    the work.";
+
+// ---------------------------------------------------------------------------
 // Background task: PO handles intake session
 // ---------------------------------------------------------------------------
 
@@ -511,7 +525,30 @@ async fn run_po_intake(
         return;
     }
 
-    let llm_messages: Vec<(String, String)> = messages
+    // If PO hasn't spoken yet, store a static greeting now so the user sees it
+    // immediately. Also add it to llm_messages so the LLM knows not to re-introduce.
+    let po_has_spoken = messages
+        .iter()
+        .any(|m| m.author_type == "agent" && m.agent_type.as_deref() == Some("product_owner"));
+    if !po_has_spoken {
+        if let Err(e) = chat_storage
+            .append_message(
+                session_id,
+                "agent",
+                None,
+                Some(AgentType::ProductOwner),
+                None,
+                MessageContent::Text(PO_GREETING.to_string()),
+            )
+            .await
+        {
+            log::warn!("user_chat: store PO greeting: {}", e);
+        } else {
+            notify_session(&chat_notify, session_id).await;
+        }
+    }
+
+    let mut llm_messages: Vec<(String, String)> = messages
         .iter()
         .map(|m| {
             let role = match m.author_type.as_str() {
@@ -522,6 +559,11 @@ async fn run_po_intake(
             (role.to_string(), text)
         })
         .collect();
+    // If we just injected a greeting, include it as a prior assistant turn so the
+    // LLM doesn't repeat the introduction.
+    if !po_has_spoken {
+        llm_messages.push(("assistant".to_string(), PO_GREETING.to_string()));
+    }
 
     let config = match AgentConfig::load() {
         Ok(c) => c,
@@ -745,17 +787,86 @@ async fn run_pm_planning(
         }
     };
 
-    let llm_messages: Vec<(String, String)> = messages
+    // If PM hasn't spoken yet, store a static greeting so the user sees it immediately.
+    // Also append it to llm_messages so the LLM doesn't re-introduce itself.
+    let pm_has_spoken = messages
         .iter()
-        .map(|m| {
-            let role = match m.author_type.as_str() {
+        .any(|m| m.author_type == "agent" && m.agent_type.as_deref() == Some("project_manager"));
+    if !pm_has_spoken {
+        if let Err(e) = chat_storage
+            .append_message(
+                session_id,
+                "agent",
+                None,
+                Some(AgentType::ProjectManager),
+                None,
+                MessageContent::Text(PM_GREETING.to_string()),
+            )
+            .await
+        {
+            log::warn!("user_chat: store PM greeting: {}", e);
+        } else {
+            notify_session(&chat_notify, session_id).await;
+        }
+    }
+
+    // Load the parent intake session's messages so PM has the full requirements Q&A.
+    // We look up the intake session by finding the one whose handoff_session_id points here.
+    let intake_messages: Vec<UserChatMessageRow> =
+        match rusqlite::Connection::open(&db_path) {
+            Ok(conn) => {
+                match conn.query_row(
+                    "SELECT id FROM user_chat_session WHERE handoff_session_id = ?1",
+                    rusqlite::params![session_id],
+                    |row| row.get::<_, i64>(0),
+                ) {
+                    Ok(intake_id) => chat_storage.get_messages(intake_id).await.unwrap_or_default(),
+                    Err(_) => vec![],
+                }
+            }
+            Err(e) => {
+                log::warn!("user_chat: open db for intake lookup: {}", e);
+                vec![]
+            }
+        };
+
+    let mut llm_messages: Vec<(String, String)> = Vec::new();
+
+    // Intake conversation first (user ↔ PO), so PM sees exactly what was asked and answered.
+    for m in &intake_messages {
+        let role = match m.author_type.as_str() {
+            "user" => "user",
+            _ => "assistant",
+        };
+        let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+        if !text.trim().is_empty() {
+            llm_messages.push((role.to_string(), text));
+        }
+    }
+
+    // Planning session messages.
+    // The seeded PO summary (first message, author_type="agent"/product_owner) is mapped as
+    // "user" so PM reads it as a briefing it received, not as its own prior statement.
+    for m in &messages {
+        let is_po_seed = m.author_type == "agent"
+            && m.agent_type.as_deref() == Some("product_owner");
+        let role = if is_po_seed {
+            "user"
+        } else {
+            match m.author_type.as_str() {
                 "user" => "user",
                 _ => "assistant",
-            };
-            let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
-            (role.to_string(), text)
-        })
-        .collect();
+            }
+        };
+        let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+        if !text.trim().is_empty() {
+            llm_messages.push((role.to_string(), text));
+        }
+    }
+
+    if !pm_has_spoken {
+        llm_messages.push(("assistant".to_string(), PM_GREETING.to_string()));
+    }
 
     let config = match AgentConfig::load() {
         Ok(c) => c,
@@ -773,12 +884,27 @@ async fn run_pm_planning(
         }
     };
 
-    match pm.chat_for_user_session(session_id, llm_messages).await {
+    match pm.chat_for_user_session(session_id, llm_messages, true).await {
         Ok(PmUserSessionResult::Finalized { params }) => {
             handle_pm_finalized(&db_path, session_id, project_id, params, &chat_storage).await;
             notify_session(&chat_notify, session_id).await;
         }
-        Ok(PmUserSessionResult::Questions(questions)) => {
+        Ok(PmUserSessionResult::Questions { message, questions }) => {
+            if !message.trim().is_empty() {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProjectManager),
+                        None,
+                        MessageContent::Text(message),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PM greeting: {}", e);
+                }
+            }
             for q in questions {
                 if let Err(e) = chat_storage
                     .append_message(

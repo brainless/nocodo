@@ -7,7 +7,7 @@ use llm_sdk::{
 };
 
 use super::{
-    prompts::{init_project_system_prompt, system_prompt, user_session_system_prompt},
+    prompts::{init_project_system_prompt, po_handoff_planning_system_prompt, system_prompt, user_session_system_prompt},
     tools::{
         CreateEpicParams, CreateTaskParams, FinalizeSessionParams, ListPendingReviewTasksParams,
         PmUpdateTaskStatusParams, SetProjectNameParams,
@@ -41,7 +41,11 @@ pub enum PmUserSessionResult {
         params: FinalizeSessionParams,
     },
     /// PM posed one or more structured questions; backend stores each row.
-    Questions(Vec<StructuredQuestion>),
+    /// `message` is the accompanying text (greeting/context) to show before the widgets.
+    Questions {
+        message: String,
+        questions: Vec<StructuredQuestion>,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -85,10 +89,13 @@ impl ProjectManagerAgent {
 
     /// Run the PM agent for a user chat session.
     /// Takes conversation history as (role, content) pairs instead of reading from storage.
+    /// `from_po_handoff`: true when this is a planning session seeded by PO handoff.
+    /// Uses a dedicated prompt that instructs PM not to re-ask questions already covered.
     pub async fn chat_for_user_session(
         &self,
         _session_id: i64,
         messages: Vec<(String, String)>,
+        from_po_handoff: bool,
     ) -> Result<PmUserSessionResult, AgentError> {
         let finalize_tool = Tool::from_type::<FinalizeSessionParams>()
             .name("finalize_session")
@@ -136,7 +143,11 @@ impl ProjectManagerAgent {
                 messages: llm_messages,
                 max_tokens: 4096,
                 model: self.model.clone(),
-                system: Some(user_session_system_prompt()),
+                system: Some(if from_po_handoff {
+                    po_handoff_planning_system_prompt()
+                } else {
+                    user_session_system_prompt()
+                }),
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
@@ -212,7 +223,10 @@ impl ProjectManagerAgent {
                 }
 
                 if !structured_questions.is_empty() {
-                    return Ok(PmUserSessionResult::Questions(structured_questions));
+                    return Ok(PmUserSessionResult::Questions {
+                        message: assistant_text,
+                        questions: structured_questions,
+                    });
                 }
 
                 // After handling tool calls, loop to get the model's text summary.

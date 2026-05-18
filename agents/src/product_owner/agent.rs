@@ -6,7 +6,7 @@ use llm_sdk::{
     types::{CompletionRequest, Message, Role},
 };
 
-use super::prompts::PO_USER_SESSION_SYSTEM_PROMPT;
+use super::prompts::po_user_session_system_prompt;
 use super::tools::HandOffToPmParams;
 use crate::{
     config::AgentConfig,
@@ -112,7 +112,7 @@ impl ProductOwnerAgent {
             messages: llm_messages,
             max_tokens: 1024,
             model: self.model.clone(),
-            system: Some(PO_USER_SESSION_SYSTEM_PROMPT.to_string()),
+            system: Some(po_user_session_system_prompt()),
             temperature: Some(0.3),
             top_p: None,
             stop_sequences: None,

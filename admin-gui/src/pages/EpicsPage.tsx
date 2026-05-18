@@ -57,7 +57,10 @@ export default function EpicsPage() {
             continue;
           }
           const data = await res.json() as { tasks: TaskItem[]; epics: EpicItem[]; updated_at: number; project_name?: string };
-          lastUpdatedAt = data.updated_at ?? lastUpdatedAt;
+          // If no tasks/epics yet, updated_at is 0; use current time so the next
+          // poll sends a non-zero since and the backend long-polls instead of
+          // returning immediately (which would create an infinite tight loop).
+          lastUpdatedAt = data.updated_at || Math.floor(Date.now() / 1000);
           setTasks(data.tasks ?? []);
           setEpics(data.epics ?? []);
           if (data.project_name) {
