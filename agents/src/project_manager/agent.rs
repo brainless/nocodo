@@ -15,7 +15,8 @@ use super::{
 };
 use crate::{
     error::AgentError,
-    storage::{AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, Task, TaskStatus, TaskStorage},
+    storage::{AgentStorage, AgentType, ChatMessage, Epic, EpicStatus, QuestionKind, StructuredQuestion, Task, TaskStatus, TaskStorage},
+    user_input_tool::{InputType, RequestUserInputParams},
 };
 
 const MAX_NUDGES: u32 = 3;
@@ -36,6 +37,8 @@ pub enum PmUserSessionResult {
     Finalized {
         params: FinalizeSessionParams,
     },
+    /// PM posed a structured question; backend must store it and wait for user.
+    Question(StructuredQuestion),
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +80,7 @@ impl ProjectManagerAgent {
         self.run_loop(session_id, task_id, false).await
     }
 
-    /// Run the PM agent for a user chat session with only the finalize_session tool.
+    /// Run the PM agent for a user chat session.
     /// Takes conversation history as (role, content) pairs instead of reading from storage.
     pub async fn chat_for_user_session(
         &self,
@@ -90,6 +93,16 @@ impl ProjectManagerAgent {
                 "Finalize the user session by creating an epic and tasks. \
                  Call this only when you have enough clarity from the user. \
                  Provide a friendly closing message, one epic, and one or more assigned tasks.",
+            )
+            .build();
+
+        let ask_tool = Tool::from_type::<RequestUserInputParams>()
+            .name("request_user_input")
+            .description(
+                "Ask the user a structured question with predefined choices. \
+                 Use this instead of listing options in prose — the UI will render \
+                 radio buttons or checkboxes. Call once per question; wait for the \
+                 user to answer before asking another.",
             )
             .build();
 
@@ -124,7 +137,7 @@ impl ProjectManagerAgent {
                 temperature: Some(0.2),
                 top_p: None,
                 stop_sequences: None,
-                tools: Some(vec![finalize_tool.clone()]),
+                tools: Some(vec![finalize_tool.clone(), ask_tool.clone()]),
                 tool_choice: Some(ToolChoice::Auto),
                 response_format: None,
             };
@@ -162,6 +175,28 @@ impl ProjectManagerAgent {
                                 params.tasks.len()
                             );
                             return Ok(PmUserSessionResult::Finalized { params });
+                        }
+
+                        "request_user_input" => {
+                            let params: RequestUserInputParams = tool_call
+                                .parse_arguments()
+                                .map_err(AgentError::Llm)?;
+                            log::info!(
+                                "[PM:user_session] Structured question: {:?}",
+                                params.question
+                            );
+                            let kind = match params.input_type {
+                                InputType::SingleChoice => {
+                                    QuestionKind::SingleChoice { options: params.options }
+                                }
+                                InputType::MultipleChoice => {
+                                    QuestionKind::MultipleChoice { options: params.options }
+                                }
+                            };
+                            return Ok(PmUserSessionResult::Question(StructuredQuestion {
+                                question: params.question,
+                                kind,
+                            }));
                         }
 
                         unknown => {

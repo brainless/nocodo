@@ -1,7 +1,12 @@
 import { For, Show, createEffect, createSignal } from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
 import { useProject } from '../contexts/ProjectContext';
-import { UserChatProvider, useUserChat } from '../contexts/UserChatContext';
+import {
+  UserChatProvider,
+  useUserChat,
+  type StructuredQuestion,
+  type StructuredResponse,
+} from '../contexts/UserChatContext';
 
 function NamePrompt() {
   const chat = useUserChat();
@@ -36,6 +41,72 @@ function NamePrompt() {
         </div>
       </div>
     </main>
+  );
+}
+
+function StructuredQuestionWidget(props: {
+  messageId: number;
+  sessionId: number;
+  question: StructuredQuestion;
+  answered: boolean;
+}) {
+  const chat = useUserChat();
+  const isMultiple = () => props.question.kind.type === 'multiple_choice';
+  const options = () => props.question.kind.options;
+  const [checked, setChecked] = createSignal<string[]>([]);
+
+  const toggle = (opt: string) => {
+    if (isMultiple()) {
+      setChecked(prev =>
+        prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt]
+      );
+    } else {
+      setChecked([opt]);
+    }
+  };
+
+  const submit = () => {
+    const selected = checked();
+    if (!selected.length) return;
+    const response: StructuredResponse = {
+      question_message_id: props.messageId,
+      selected,
+    };
+    void chat.sendStructuredResponse(props.sessionId, response);
+  };
+
+  return (
+    <div class="rounded-2xl px-4 py-3 bg-gray-100 text-[#2f3f5f] rounded-bl-md space-y-2">
+      <p class="text-sm font-medium">{props.question.question}</p>
+      <Show when={!props.answered}>
+        <div class="space-y-1">
+          <For each={options()}>
+            {(opt) => (
+              <label class="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type={isMultiple() ? 'checkbox' : 'radio'}
+                  name={`q-${props.messageId}`}
+                  checked={checked().includes(opt)}
+                  onChange={() => toggle(opt)}
+                  class="cursor-pointer"
+                />
+                {opt}
+              </label>
+            )}
+          </For>
+        </div>
+        <button
+          class="btn btn-sm btn-primary mt-1"
+          disabled={!checked().length || chat.loading()}
+          onClick={submit}
+        >
+          Submit
+        </button>
+      </Show>
+      <Show when={props.answered}>
+        <p class="text-xs text-[#8fa0be] italic">Answered</p>
+      </Show>
+    </div>
   );
 }
 
@@ -147,6 +218,30 @@ function ChatContent(props: { projectId: () => number | undefined }) {
                   const isUser = msg.author_type === 'user';
                   const isPM = msg.agent_type === 'project_manager';
                   const isPO = msg.agent_type === 'product_owner';
+                  const isStructuredQuestion = msg.content_type === 'structured_question';
+                  const isStructuredResponse = msg.content_type === 'structured_response';
+
+                  // A structured question is "answered" if a later message references it.
+                  const isAnswered = () => {
+                    if (!isStructuredQuestion || msg.id === 0) return false;
+                    return chat.messages().some(m => {
+                      if (m.content_type !== 'structured_response') return false;
+                      try {
+                        const r = JSON.parse(m.content) as { question_message_id: number };
+                        return r.question_message_id === msg.id;
+                      } catch { return false; }
+                    });
+                  };
+
+                  // Compact label for structured_response bubbles
+                  const responseLabel = () => {
+                    if (!isStructuredResponse) return msg.content;
+                    try {
+                      const r = JSON.parse(msg.content) as { selected: string[] };
+                      return `Selected: ${r.selected.join(', ')}`;
+                    } catch { return msg.content; }
+                  };
+
                   return (
                     <div class={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                       <div class="max-w-[75%]">
@@ -155,19 +250,37 @@ function ChatContent(props: { projectId: () => number | undefined }) {
                             {isPM ? 'PM' : isPO ? 'PO' : msg.agent_type ?? 'Agent'}
                           </div>
                         </Show>
-                        <div
-                          class={`rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                            isUser
-                              ? 'bg-blue-500 text-white rounded-br-md'
-                              : isPM
-                                ? 'bg-gray-100 text-[#2f3f5f] rounded-bl-md'
-                                : isPO
-                                  ? 'bg-purple-100 text-[#2f3f5f] rounded-bl-md'
-                                  : 'bg-gray-100 text-[#2f3f5f] rounded-bl-md'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
+                        <Show when={isStructuredQuestion && !isUser}>
+                          {(() => {
+                            try {
+                              const q = JSON.parse(msg.content) as StructuredQuestion;
+                              return (
+                                <StructuredQuestionWidget
+                                  messageId={msg.id}
+                                  sessionId={msg.session_id}
+                                  question={q}
+                                  answered={isAnswered()}
+                                />
+                              );
+                            } catch {
+                              return <span class="text-xs text-red-400">[invalid question]</span>;
+                            }
+                          })()}</Show>
+                        <Show when={!isStructuredQuestion || isUser}>
+                          <div
+                            class={`rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                              isUser
+                                ? 'bg-blue-500 text-white rounded-br-md'
+                                : isPM
+                                  ? 'bg-gray-100 text-[#2f3f5f] rounded-bl-md'
+                                  : isPO
+                                    ? 'bg-purple-100 text-[#2f3f5f] rounded-bl-md'
+                                    : 'bg-gray-100 text-[#2f3f5f] rounded-bl-md'
+                            }`}
+                          >
+                            {isStructuredResponse ? responseLabel() : msg.content}
+                          </div>
+                        </Show>
                       </div>
                     </div>
                   );

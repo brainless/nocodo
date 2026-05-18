@@ -38,17 +38,36 @@ Resolved priority: **env var → `project.conf` → `server.env`** (sibling to b
 
 ## Agents
 
-- Active agent: `db_engineer` — designs SQLite schemas via LLM
-- Storage: SQLite (`nocodo.db`) with chat sessions and generated schemas
+- Active agents: `project_manager` (PM), `product_owner` (PO), `db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_designer`
+- Storage: SQLite (`nocodo.db`) with chat sessions, generated schemas, epics, tasks, comments
 - Agent crate (`agents/`) — business logic only: agent implementations, storage traits, LLM integration
 - Backend crate (`backend/`) — HTTP layer: API endpoints live in `backend/src/agents_api/`
-- API endpoints:
-  - `POST /api/agents/db-engineer/chat` — send message, returns `{session_id, message_id}`
-  - `GET /api/agents/db-engineer/messages/{id}/response` — long-poll for response (text/schema/stopped)
-  - `GET /api/agents/db-engineer/sessions/{id}/messages` — fetch session history
-  - `GET /api/agents/db-engineer/sessions/{id}/codegen` — generate Rust structs + SQLite DDL from the session's latest schema
+- User chat API (PM + PO speak concurrently per user message):
+  - `POST /api/user-chats` — create session + first message
+  - `POST /api/user-chats/{session_id}/messages` — append message (text or structured response)
+  - `GET /api/user-chats/{session_id}/messages` — fetch session history
+  - `GET /api/user-chats?project_id=X` — list sessions
 - Config: reads `AGENT_PROVIDER` and `AGENT_API_KEY` from env/project.conf
 - Backend auto-initializes agent state on startup; runs DB migrations and ensures default project exists
+
+## Structured Message Content
+
+`user_chat_message` rows carry a `content_type` column alongside `content`:
+
+| `content_type`        | `content`                          | Sender   |
+|-----------------------|------------------------------------|----------|
+| `text`                | plain string                       | user or agent |
+| `structured_question` | JSON `StructuredQuestion`          | agent (PM) |
+| `structured_response` | JSON `StructuredResponse`          | user (widget submit) |
+
+Types live in `agents/src/storage/message_content.rs`. The `MessageContent` enum is the internal representation; storage and LLM history both go through it.
+
+- `MessageContent::to_llm_text()` — compiles structured messages to plain text for LLM context
+- `MessageContent::from_row(content_type, content)` — reconstructs from DB columns
+
+`QuestionKind` is the extensibility point: add new variants (e.g. `Rating`, `Scale`) there; `StructuredQuestion` and `StructuredResponse` stay stable.
+
+The `request_user_input` tool (`agents/src/user_input_tool.rs`) is shared between PM and PO. PM currently uses it; PO can be wired up the same way. When an agent calls this tool the backend stores a `structured_question` message and returns to the frontend, which renders radio buttons or checkboxes. The user's submission is stored as `structured_response`.
 
 ## Desktop (Tauri)
 

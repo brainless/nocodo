@@ -173,7 +173,7 @@ Frontend renders each turn as its own bubble with the agent's identity visible. 
 
 ### Storage
 
-- `user_chat_message` has `author_type` (`user`|`agent`|`system`), `author_user_id` (when user), `agent_type` (when agent), `turn_id` (groups multi-message turns from one agent), `content`, `created_at`.
+- `user_chat_message` has `author_type` (`user`|`agent`|`system`), `author_user_id` (when user), `agent_type` (when agent), `turn_id` (groups multi-message turns from one agent), `content_type` (`text`|`structured_question`|`structured_response`), `content` (plain string or JSON), `created_at`.
 - Multiple agent rows with different `agent_type` per user message is expected and normal.
 
 ### Artifact-Creation Turn (PM)
@@ -211,6 +211,85 @@ PM and PO each maintain their own LLM context per session but read the same shar
 
 - Two LLM calls per user turn. Acceptable for beta.
 - Both responses long-poll on the same parent `user_chat_message.id`; client renders as they arrive.
+
+
+## Structured User Input
+
+### Motivation
+
+Free-text answers slow the user down and produce noisy LLM context. For questions where a finite set of choices covers the common cases (who are the users? what data needs tracking? which features are in scope?) we instead render interactive widgets and let the user click.
+
+### `request_user_input` Tool
+
+Available to PM (and PO when wired). Parameters:
+
+```rust
+struct RequestUserInputParams {
+    question: String,
+    input_type: InputType,   // SingleChoice | MultipleChoice
+    options: Vec<String>,    // 2–6 short labels
+}
+```
+
+Defined in `agents/src/user_input_tool.rs` — shared, not agent-specific.
+
+### Message Content Types
+
+`user_chat_message` carries `(content_type, content)`:
+
+| `content_type`        | Writer        | `content` payload                          |
+|-----------------------|---------------|--------------------------------------------|
+| `text`                | user or agent | plain string                               |
+| `structured_question` | agent (PM/PO) | JSON `StructuredQuestion`                  |
+| `structured_response` | user (widget) | JSON `StructuredResponse`                  |
+
+Types live in `agents/src/storage/message_content.rs`. `MessageContent` is the Rust enum used throughout; DB and frontend see the raw columns.
+
+### `StructuredQuestion` and Extensibility
+
+```rust
+struct StructuredQuestion {
+    question: String,
+    kind: QuestionKind,
+}
+
+enum QuestionKind {          // <-- extend here for new input types
+    SingleChoice  { options: Vec<String> },
+    MultipleChoice { options: Vec<String> },
+    // Future: Rating { min: u8, max: u8 }, Scale, ...
+}
+```
+
+`QuestionKind` is the extensibility point. `StructuredQuestion` and `StructuredResponse` stay stable.
+
+### `StructuredResponse`
+
+```rust
+struct StructuredResponse {
+    question_message_id: i64,   // FK to the matching structured_question row
+    selected: Vec<String>,
+}
+```
+
+`question_message_id` lets the UI mark the original widget as "answered" and lets agents correlate answers to questions when session history grows.
+
+### LLM Context Representation
+
+Structured messages are compiled to plain text before being sent to the LLM via `MessageContent::to_llm_text()`:
+
+- `structured_question` → `"Who will enter data? (pick all that apply): Internal staff, Volunteers, Candidates"`
+- `structured_response` → `"Selected: Internal staff, Volunteers"`
+
+The LLM never sees raw JSON.
+
+### Flow
+
+1. User sends a message → PM calls `request_user_input`.
+2. Backend stores a `structured_question` row and returns; PM does not emit additional text.
+3. Frontend renders the widget (radio or checkboxes).
+4. User submits → frontend sends `POST /api/user-chats/{id}/messages` with `content_type: "structured_response"`.
+5. Backend stores a `structured_response` row and fires PM + PO again with compiled history.
+6. PM reads the compiled answer and continues gathering requirements or calls `finalize_session`.
 
 
 ## Data Model Changes
@@ -257,7 +336,8 @@ user_chat_message (
   author_user_id INTEGER NULL REFERENCES user(id),  -- when author_type='user'
   agent_type TEXT NULL,              -- when author_type='agent'
   turn_id INTEGER NULL,              -- groups a single agent's response
-  content TEXT NOT NULL,
+  content_type TEXT NOT NULL DEFAULT 'text',  -- 'text' | 'structured_question' | 'structured_response'
+  content TEXT NOT NULL,             -- plain string for 'text'; JSON for structured variants
   created_at
 )
 ```
@@ -371,10 +451,12 @@ Extend `agents/src/storage/mod.rs:11-17`:
 
 ### Per-Agent Tools
 
-- **PM**: `finalize_session(final_message, epic, tasks)` — atomically commits artifacts + completes the session in one transaction.
-- **PO**: `validate_task` (calls `initial_state_for` to pick next state), `comment_on_task`, `comment_on_epic`.
+- **PM**: `finalize_session(final_message, epic, tasks)` — atomically commits artifacts + completes the session in one transaction. `request_user_input(question, input_type, options)` — poses a structured choice question; backend stores it and waits for the user.
+- **PO**: `validate_task` (calls `initial_state_for` to pick next state), `comment_on_task`, `comment_on_epic`. `request_user_input` is available to PO via the same shared definition but not yet wired into PO's tool list.
 - **EM**: `mark_task_ready`, `comment_on_task`.
 - **Specialist**: `complete_task`, `comment_on_assigned_task`.
+
+The `request_user_input` tool is defined in `agents/src/user_input_tool.rs` and shared. It is not agent-specific.
 
 ### Prompts
 
@@ -403,6 +485,7 @@ PO's `validate_task` tool reads this and writes the resulting status. To change 
 ### Added
 
 - **User Chat UI**: single chat surface per session. Renders all turns (user, PM, PO) inline by `created_at`. Each agent turn shows the agent's identity.
+- **Structured question widgets**: when PM emits a `structured_question` message, the UI renders radio buttons (single choice) or checkboxes (multiple choice) instead of a text input. The user submits their selection; it is stored as a `structured_response` and compiled to plain text for the LLM.
 - **First-chat display_name prompt**: if no user identity exists in localStorage, ask for `display_name` before the first message; create a guest user.
 - **Sessions list**: project-scoped, status-filtered.
 - **Epic/Task comments pane**: inline comments on each artifact view; permission-aware composer.

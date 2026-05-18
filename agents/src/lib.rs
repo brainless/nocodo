@@ -8,6 +8,7 @@ pub mod db_engineer;
 pub mod storage;
 pub mod task_policy;
 pub mod ui_designer;
+pub mod user_input_tool;
 pub mod utils;
 
 pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
@@ -25,9 +26,11 @@ pub use storage::sqlite::{
 };
 pub use storage::{
     AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicStatus,
-    SchemaStorage, Session, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
-    UserChatSessionRow, UserChatStorage, UserStorage,
+    MessageContent, QuestionKind, SchemaStorage, Session, StructuredQuestion, StructuredResponse,
+    Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow, UserChatSessionRow,
+    UserChatStorage, UserStorage,
 };
+pub use user_input_tool::{InputType, RequestUserInputParams};
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
     FormField, FormFieldType, FormLayout, FormRow,

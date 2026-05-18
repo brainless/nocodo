@@ -5,8 +5,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
     AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicCommentRow, EpicStatus,
-    SchemaStorage, Session, Task, TaskCommentRow, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
-    UserChatSessionRow, UserChatStorage, UserRow, UserStorage,
+    MessageContent, SchemaStorage, Session, Task, TaskCommentRow, TaskStatus, TaskStorage, UiFormStorage,
+    UserChatMessageRow, UserChatSessionRow, UserChatStorage, UserRow, UserStorage,
 };
 use crate::error::AgentError;
 
@@ -839,8 +839,9 @@ fn map_user_chat_message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserCh
         author_user_id: row.get(3)?,
         agent_type: row.get(4)?,
         turn_id: row.get(5)?,
-        content: row.get(6)?,
-        created_at: row.get(7)?,
+        content_type: row.get(6)?,
+        content: row.get(7)?,
+        created_at: row.get(8)?,
     })
 }
 
@@ -880,16 +881,18 @@ impl UserChatStorage for SqliteUserChatStorage {
         author_user_id: Option<i64>,
         agent_type: Option<AgentType>,
         turn_id: Option<i64>,
-        content: String,
+        content: MessageContent,
     ) -> Result<i64, AgentError> {
         let ts = now();
         let agent_type_str = agent_type.map(|a| a.as_str().to_string());
+        let content_type = content.content_type_str();
+        let content_str = content.to_storage_content();
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO user_chat_message
-                 (session_id, author_type, author_user_id, agent_type, turn_id, content, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![session_id, author_type, author_user_id, agent_type_str, turn_id, content, ts],
+                 (session_id, author_type, author_user_id, agent_type, turn_id, content_type, content, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![session_id, author_type, author_user_id, agent_type_str, turn_id, content_type, content_str, ts],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -900,7 +903,7 @@ impl UserChatStorage for SqliteUserChatStorage {
     ) -> Result<Vec<UserChatMessageRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, author_type, author_user_id, agent_type, turn_id, content, created_at
+            "SELECT id, session_id, author_type, author_user_id, agent_type, turn_id, content_type, content, created_at
              FROM user_chat_message
              WHERE session_id = ?1
              ORDER BY id ASC",

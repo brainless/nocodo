@@ -2,10 +2,10 @@ use crate::agents_api::state::AgentState;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
     build_project_manager, AgentConfig, AgentStorage, AgentType, CommentStorage,
-    FinalizeSessionParams, PoSessionResult, PmUserSessionResult, ProductOwnerAgent,
+    FinalizeSessionParams, MessageContent, PoSessionResult, PmUserSessionResult, ProductOwnerAgent,
     SqliteAgentStorage, SqliteCommentStorage, SqliteTaskStorage, SqliteUserChatStorage,
-    SqliteUserStorage, TaskStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage,
-    UserStorage,
+    SqliteUserStorage, StructuredQuestion, TaskStorage, UserChatMessageRow, UserChatSessionRow,
+    UserChatStorage, UserStorage,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -39,6 +39,9 @@ struct CreateSessionResponse {
 struct AppendMessageRequest {
     user_id: i64,
     message: String,
+    /// Defaults to "text". Pass "structured_response" with JSON in `message`
+    /// when the user submits widget choices.
+    content_type: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -111,7 +114,7 @@ pub async fn create_session(
     };
 
     let message_id = match chat_storage
-        .append_message(session_id, "user", Some(user_id), None, None, body.message)
+        .append_message(session_id, "user", Some(user_id), None, None, MessageContent::Text(body.message))
         .await
     {
         Ok(id) => id,
@@ -172,8 +175,18 @@ pub async fn append_message(
         }));
     }
 
+    let user_content = match body.content_type.as_deref() {
+        Some("structured_response") => {
+            match serde_json::from_str::<nocodo_agents::StructuredResponse>(&body.message) {
+                Ok(r) => MessageContent::StructuredResponse(r),
+                Err(_) => MessageContent::Text(body.message),
+            }
+        }
+        _ => MessageContent::Text(body.message),
+    };
+
     let message_id = match chat_storage
-        .append_message(session_id, "user", Some(body.user_id), None, None, body.message)
+        .append_message(session_id, "user", Some(body.user_id), None, None, user_content)
         .await
     {
         Ok(id) => id,
@@ -320,7 +333,8 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
                 "user" => "user",
                 _ => "assistant",
             };
-            (role.to_string(), m.content.clone())
+            let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+            (role.to_string(), text)
         })
         .collect();
 
@@ -383,6 +397,21 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
         Ok(PmUserSessionResult::Finalized { params }) => {
             handle_pm_finalized(&db_path, session_id, project_id, params, &chat_storage).await;
         }
+        Ok(PmUserSessionResult::Question(q)) => {
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProjectManager),
+                    None,
+                    MessageContent::StructuredQuestion(q),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PM question: {}", e);
+            }
+        }
         Ok(PmUserSessionResult::Text(t)) => {
             if let Err(e) = chat_storage
                 .append_message(
@@ -391,7 +420,7 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
                     None,
                     Some(AgentType::ProjectManager),
                     None,
-                    t,
+                    MessageContent::Text(t),
                 )
                 .await
             {
@@ -412,7 +441,7 @@ async fn run_concurrent_pm_po(db_path: String, session_id: i64, _message_id: i64
                     None,
                     Some(AgentType::ProductOwner),
                     None,
-                    t,
+                    MessageContent::Text(t),
                 )
                 .await
             {
@@ -459,8 +488,8 @@ async fn handle_pm_finalized(
     };
 
     if let Err(e) = tx.execute(
-        "INSERT INTO user_chat_message (session_id, author_type, agent_type, content, created_at) \
-         VALUES (?1, 'agent', 'project_manager', ?2, ?3)",
+        "INSERT INTO user_chat_message (session_id, author_type, agent_type, content_type, content, created_at) \
+         VALUES (?1, 'agent', 'project_manager', 'text', ?2, ?3)",
         rusqlite::params![session_id, final_message, ts],
     ) {
         log::warn!("user_chat: insert PM message: {}", e);

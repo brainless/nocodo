@@ -11,11 +11,26 @@ export type UserChatSession = {
   completed_at?: string;
 };
 
+export type QuestionKind =
+  | { type: 'single_choice'; options: string[] }
+  | { type: 'multiple_choice'; options: string[] };
+
+export type StructuredQuestion = {
+  question: string;
+  kind: QuestionKind;
+};
+
+export type StructuredResponse = {
+  question_message_id: number;
+  selected: string[];
+};
+
 export type UserChatMessage = {
   id: number;
   session_id: number;
   author_type: 'user' | 'agent' | 'system';
   agent_type?: string;
+  content_type: string;
   content: string;
   created_at: string;
 };
@@ -29,6 +44,7 @@ export interface UserChatContextValue {
   loadSessions: (projectId: number) => Promise<void>;
   startSession: (projectId: number, message: string) => Promise<number | undefined>;
   sendMessage: (sessionId: number, message: string) => Promise<void>;
+  sendStructuredResponse: (sessionId: number, response: StructuredResponse) => Promise<void>;
   loadMessages: (sessionId: number) => Promise<void>;
   selectSession: (sessionId: number | null) => Promise<void>;
   setDisplayName: (name: string) => void;
@@ -116,6 +132,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
         id: 0,
         session_id: data.session_id,
         author_type: 'user',
+        content_type: 'text',
         content: message,
         created_at: new Date().toISOString(),
       }]);
@@ -136,6 +153,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
       id: 0,
       session_id: sessionId,
       author_type: 'user',
+      content_type: 'text',
       content: message,
       created_at: new Date().toISOString(),
     }]);
@@ -152,6 +170,37 @@ export function UserChatProvider(props: { children: JSX.Element }) {
       pollForResponse(sessionId, data.message_id);
     } catch (err) {
       console.error('Error sending message:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendStructuredResponse = async (sessionId: number, response: StructuredResponse) => {
+    setLoading(true);
+    setMessages(prev => [...prev, {
+      id: 0,
+      session_id: sessionId,
+      author_type: 'user',
+      content_type: 'structured_response',
+      content: JSON.stringify(response),
+      created_at: new Date().toISOString(),
+    }]);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/user-chats/${sessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 1,
+          message: JSON.stringify(response),
+          content_type: 'structured_response',
+        }),
+      });
+      if (!res.ok) throw new Error(`Failed to send response: ${res.status}`);
+      const data = await res.json() as { message_id: number };
+      pollForResponse(sessionId, data.message_id);
+    } catch (err) {
+      console.error('Error sending structured response:', err);
     } finally {
       setLoading(false);
     }
@@ -180,6 +229,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
     loadSessions,
     startSession,
     sendMessage,
+    sendStructuredResponse,
     loadMessages,
     selectSession,
     setDisplayName,

@@ -1,9 +1,11 @@
+pub mod message_content;
 pub mod sqlite;
 
 use async_trait::async_trait;
 use serde::Serialize;
 
 use crate::error::AgentError;
+pub use message_content::{MessageContent, QuestionKind, StructuredQuestion, StructuredResponse};
 
 // ---------------------------------------------------------------------------
 // Agent type registry
@@ -213,6 +215,7 @@ pub struct UserChatMessageRow {
     pub author_user_id: Option<i64>,
     pub agent_type: Option<String>,
     pub turn_id: Option<i64>,
+    pub content_type: String,
     pub content: String,
     pub created_at: i64,
 }
@@ -419,7 +422,7 @@ pub trait UserChatStorage: Send + Sync {
         author_user_id: Option<i64>,
         agent_type: Option<AgentType>,
         turn_id: Option<i64>,
-        content: String,
+        content: MessageContent,
     ) -> Result<i64, AgentError>;
 
     async fn get_messages(
