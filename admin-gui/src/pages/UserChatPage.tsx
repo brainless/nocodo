@@ -53,16 +53,17 @@ function StructuredQuestionWidget(props: {
   const chat = useUserChat();
   const isMultiple = () => props.question.kind.type === 'multiple_choice';
   const options = () => props.question.kind.options;
-  const [checked, setChecked] = createSignal<string[]>([]);
+  const checked = () => chat.structuredSelections().get(props.messageId) ?? [];
 
   const toggle = (opt: string) => {
+    const current = checked();
+    let next: string[];
     if (isMultiple()) {
-      setChecked(prev =>
-        prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt]
-      );
+      next = current.includes(opt) ? current.filter(o => o !== opt) : [...current, opt];
     } else {
-      setChecked([opt]);
+      next = [opt];
     }
+    chat.setStructuredSelection(props.messageId, next);
   };
 
   const submit = () => {

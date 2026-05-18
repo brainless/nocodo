@@ -1,6 +1,7 @@
 use nocodo_agents::AgentConfig;
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, Mutex, Notify};
 
 use super::dispatcher::{AgentDispatcher, DispatchEvent};
 
@@ -12,6 +13,8 @@ pub struct AgentState {
     pub dispatch_tx: mpsc::UnboundedSender<DispatchEvent>,
     /// Notifies long-polling board clients when tasks or epics change.
     pub board_notify: Arc<Notify>,
+    /// Per-session Notifies for user-chat long-polling.
+    pub chat_notify: Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
 }
 
 impl AgentState {
@@ -29,6 +32,15 @@ impl AgentState {
             db_path,
             dispatch_tx: tx,
             board_notify,
+            chat_notify: Arc::new(Mutex::new(HashMap::new())),
         })
+    }
+
+    /// Get or create a Notify for the given chat session.
+    pub async fn get_session_notify(&self, session_id: i64) -> Arc<Notify> {
+        let mut map = self.chat_notify.lock().await;
+        map.entry(session_id)
+            .or_insert_with(|| Arc::new(Notify::new()))
+            .clone()
     }
 }

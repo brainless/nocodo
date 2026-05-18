@@ -95,15 +95,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Helper to insert column_display
-    let insert_display = |column_id: i64,
-                          display_column: Option<&str>|
-     -> Result<(), Box<dyn std::error::Error>> {
-        conn.execute(
+    let insert_display =
+        |column_id: i64, display_column: Option<&str>| -> Result<(), Box<dyn std::error::Error>> {
+            conn.execute(
             "INSERT INTO column_display (column_id, width, display_column) VALUES (?1, 120, ?2)",
             params![column_id, display_column],
         )?;
-        Ok(())
-    };
+            Ok(())
+        };
 
     // ── Projects ──────────────────────────────────────────────────────────────
     insert_col(projects_id, "id", "integer", false, true, 0)?;

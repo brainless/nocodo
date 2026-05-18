@@ -9,7 +9,10 @@ use nocodo_agents::{
 };
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::{Mutex, Notify};
 
 fn now() -> i64 {
     std::time::SystemTime::now()
@@ -55,6 +58,11 @@ struct GetMessagesResponse {
     session_id: i64,
     messages: Vec<UserChatMessageRow>,
     handoff_session_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct PollQuery {
+    after: i64,
 }
 
 #[derive(Deserialize)]
@@ -134,8 +142,9 @@ pub async fn create_session(
     };
 
     let db_path = state.db_path.clone();
+    let chat_notify = state.chat_notify.clone();
     actix_web::rt::spawn(async move {
-        run_po_intake(db_path, session_id, user_id).await;
+        run_po_intake(db_path, session_id, user_id, chat_notify).await;
     });
 
     HttpResponse::Ok().json(CreateSessionResponse {
@@ -230,8 +239,9 @@ pub async fn append_message(
 
     let user_id = session.created_by_user_id;
     let db_path = state.db_path.clone();
+    let chat_notify = state.chat_notify.clone();
     actix_web::rt::spawn(async move {
-        run_po_intake(db_path, session_id, user_id).await;
+        run_po_intake(db_path, session_id, user_id, chat_notify).await;
     });
 
     HttpResponse::Ok().json(AppendMessageResponse {
@@ -271,6 +281,87 @@ pub async fn get_messages(state: web::Data<AgentState>, path: web::Path<i64>) ->
         }
     };
 
+    let messages = match chat_storage.get_messages(session_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to load messages: {}", e)
+            }))
+        }
+    };
+
+    HttpResponse::Ok().json(GetMessagesResponse {
+        session_id,
+        messages,
+        handoff_session_id: session.handoff_session_id,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/user-chats/{session_id}/poll?after=X
+// Long-poll: holds the connection until a message newer than `after` arrives,
+// or 30 s elapses.
+// ---------------------------------------------------------------------------
+
+#[get("/api/user-chats/{session_id}/poll")]
+pub async fn poll_messages(
+    state: web::Data<AgentState>,
+    path: web::Path<i64>,
+    query: web::Query<PollQuery>,
+) -> impl Responder {
+    let session_id = path.into_inner();
+    let after = query.after;
+
+    let notify = state.get_session_notify(session_id).await;
+    let notified = notify.notified();
+    tokio::pin!(notified);
+    notified.as_mut().enable();
+
+    let chat_storage = match SqliteUserChatStorage::open(&state.db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Storage error: {}", e)
+            }))
+        }
+    };
+
+    let session = match chat_storage.get_session(session_id).await {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Session not found"
+            }))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Storage error: {}", e)
+            }))
+        }
+    };
+
+    let messages = match chat_storage.get_messages(session_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to load messages: {}", e)
+            }))
+        }
+    };
+
+    // Return immediately if there are already new messages.
+    let has_new = messages.iter().any(|m| m.id > after);
+    if has_new {
+        return HttpResponse::Ok().json(GetMessagesResponse {
+            session_id,
+            messages,
+            handoff_session_id: session.handoff_session_id,
+        });
+    }
+
+    let _ = tokio::time::timeout(Duration::from_secs(30), notified).await;
+
+    // Re-fetch after wake or timeout.
     let messages = match chat_storage.get_messages(session_id).await {
         Ok(m) => m,
         Err(e) => {
@@ -346,7 +437,22 @@ pub async fn list_sessions(
 // Background task: PO handles intake session
 // ---------------------------------------------------------------------------
 
-async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
+async fn notify_session(
+    chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+    session_id: i64,
+) {
+    let map = chat_notify.lock().await;
+    if let Some(notify) = map.get(&session_id) {
+        notify.notify_waiters();
+    }
+}
+
+async fn run_po_intake(
+    db_path: String,
+    session_id: i64,
+    user_id: i64,
+    chat_notify: Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
     let chat_storage = match SqliteUserChatStorage::open(&db_path) {
         Ok(s) => s,
         Err(e) => {
@@ -384,7 +490,7 @@ async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
         .unwrap_or(false);
     if is_planning_session {
         drop(chat_storage);
-        return run_pm_planning(db_path, session_id).await;
+        return run_pm_planning(db_path, session_id, chat_notify).await;
     }
 
     // Don't fire agents while there are unanswered structured questions.
@@ -467,6 +573,7 @@ async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
                 final_message,
                 summary,
                 &chat_storage,
+                &chat_notify,
             )
             .await;
         }
@@ -486,6 +593,7 @@ async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
                     log::warn!("user_chat: store PO question: {}", e);
                 }
             }
+            notify_session(&chat_notify, session_id).await;
         }
         Ok(PoSessionResult::Text(t)) if !t.trim().is_empty() => {
             if let Err(e) = chat_storage
@@ -501,6 +609,7 @@ async fn run_po_intake(db_path: String, session_id: i64, user_id: i64) {
             {
                 log::warn!("user_chat: store PO response: {}", e);
             }
+            notify_session(&chat_notify, session_id).await;
         }
         Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) => {}
         Err(e) => {
@@ -517,6 +626,7 @@ async fn handle_po_handoff(
     final_message: String,
     summary: String,
     chat_storage: &SqliteUserChatStorage,
+    chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
 ) {
     // Store PO's closing message in the intake session.
     if let Err(e) = chat_storage
@@ -533,6 +643,7 @@ async fn handle_po_handoff(
         log::warn!("user_chat: store PO final message: {}", e);
         return;
     }
+    notify_session(chat_notify, intake_session_id).await;
 
     // Create the planning session for PM.
     let planning_session_id = match chat_storage.create_session(project_id, user_id).await {
@@ -558,6 +669,7 @@ async fn handle_po_handoff(
         log::warn!("user_chat: store PO summary in planning session: {}", e);
         return;
     }
+    notify_session(chat_notify, planning_session_id).await;
 
     // Link intake → planning session and close intake.
     if let Err(e) = chat_storage
@@ -574,8 +686,9 @@ async fn handle_po_handoff(
 
     // Kick off PM in the planning session.
     let db_path = db_path.to_string();
+    let chat_notify = chat_notify.clone();
     actix_web::rt::spawn(async move {
-        run_pm_planning(db_path, planning_session_id).await;
+        run_pm_planning(db_path, planning_session_id, chat_notify).await;
     });
 }
 
@@ -583,7 +696,11 @@ async fn handle_po_handoff(
 // Background task: PM handles planning session
 // ---------------------------------------------------------------------------
 
-async fn run_pm_planning(db_path: String, session_id: i64) {
+async fn run_pm_planning(
+    db_path: String,
+    session_id: i64,
+    chat_notify: Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
     let chat_storage = match SqliteUserChatStorage::open(&db_path) {
         Ok(s) => s,
         Err(e) => {
@@ -644,6 +761,7 @@ async fn run_pm_planning(db_path: String, session_id: i64) {
     match pm.chat_for_user_session(session_id, llm_messages).await {
         Ok(PmUserSessionResult::Finalized { params }) => {
             handle_pm_finalized(&db_path, session_id, project_id, params, &chat_storage).await;
+            notify_session(&chat_notify, session_id).await;
         }
         Ok(PmUserSessionResult::Questions(questions)) => {
             for q in questions {
@@ -661,6 +779,7 @@ async fn run_pm_planning(db_path: String, session_id: i64) {
                     log::warn!("user_chat: store PM question: {}", e);
                 }
             }
+            notify_session(&chat_notify, session_id).await;
         }
         Ok(PmUserSessionResult::Text(t)) => {
             if let Err(e) = chat_storage
@@ -676,6 +795,7 @@ async fn run_pm_planning(db_path: String, session_id: i64) {
             {
                 log::warn!("user_chat: store PM response: {}", e);
             }
+            notify_session(&chat_notify, session_id).await;
         }
         Err(e) => {
             log::warn!("user_chat: PM error: {}", e);

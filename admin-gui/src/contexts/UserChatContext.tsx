@@ -37,6 +37,7 @@ export type UserChatMessage = {
 };
 
 type GetMessagesData = {
+  session_id: number;
   messages: UserChatMessage[];
   handoff_session_id?: number;
 };
@@ -48,6 +49,8 @@ export interface UserChatContextValue {
   loading: () => boolean;
   displayName: () => string | null;
   handoffSessionId: () => number | null;
+  structuredSelections: () => Map<number, string[]>;
+  setStructuredSelection: (messageId: number, selected: string[]) => void;
   loadSessions: (projectId: number) => Promise<void>;
   startSession: (projectId: number, message: string) => Promise<number | undefined>;
   sendMessage: (sessionId: number, message: string) => Promise<void>;
@@ -74,6 +77,9 @@ export function UserChatProvider(props: { children: JSX.Element }) {
   const [displayName, setDisplayNameState] = createSignal<string | null>(
     localStorage.getItem(DISPLAY_NAME_KEY)
   );
+  const [structuredSelections, setStructuredSelections] = createSignal<Map<number, string[]>>(new Map());
+
+  let abortController: AbortController | null = null;
 
   const loadSessions = async (projectId: number) => {
     setLoading(true);
@@ -95,45 +101,62 @@ export function UserChatProvider(props: { children: JSX.Element }) {
       if (!res.ok) throw new Error(`Failed to load messages: ${res.status}`);
       const data = await res.json() as GetMessagesData;
       setMessages(data.messages ?? []);
-      // handoffSessionId is only set during polling; don't set it here
-      // so that manually selecting a completed intake session doesn't redirect.
     } catch (err) {
       console.error('Error loading messages:', err);
     }
   };
 
-  // Poll messages for the session until it completes or hands off to PM.
-  const pollForResponse = async (sessionId: number) => {
+  // Long-poll for new agent messages. Cancels any previous poll.
+  const startLongPoll = (sessionId: number) => {
+    abortController?.abort();
+    const ac = new AbortController();
+    abortController = ac;
+
     const poll = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/user-chats/${sessionId}/messages`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json() as GetMessagesData;
-        setMessages(data.messages ?? []);
+      const realLastId = (msgs: UserChatMessage[]) => {
+        const real = msgs.filter(m => m.id > 0);
+        return real.length > 0 ? Math.max(...real.map(m => m.id)) : 0;
+      };
+      let lastId = realLastId(messages());
 
-        if (data.handoff_session_id) {
-          setHandoffSessionId(data.handoff_session_id);
-          return; // handoff detected — stop polling
+      while (!ac.signal.aborted) {
+        try {
+          const url = `${API_BASE_URL}/api/user-chats/${sessionId}/poll?after=${lastId}`;
+          const res = await fetch(url, { signal: ac.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as GetMessagesData;
+
+          // Ignore stale responses for a different session
+          if (data.session_id !== currentSessionId()) continue;
+
+          setMessages(data.messages ?? []);
+
+          if (data.handoff_session_id) {
+            setHandoffSessionId(data.handoff_session_id);
+            return; // handoff detected — stop polling
+          }
+
+          const msgs = data.messages ?? [];
+          const lastMsg = msgs[msgs.length - 1];
+          const sessionCompleted = lastMsg?.author_type === 'agent' &&
+            lastMsg?.content_type === 'text';
+          const hasAgentResponse = msgs.some(m => m.author_type === 'agent');
+
+          if (!hasAgentResponse || (!data.handoff_session_id && !sessionCompleted)) {
+            // immediately start next long-poll
+            lastId = realLastId(msgs);
+            continue;
+          }
+          return;
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') return;
+          console.error('Error long-polling messages:', err);
+          await new Promise<void>((r) => setTimeout(r, 2000));
         }
-
-        // Check if session is completed (PM finalized in a planning session).
-        const msgs = data.messages ?? [];
-        const lastMsg = msgs[msgs.length - 1];
-        const sessionCompleted = lastMsg?.author_type === 'agent' &&
-          lastMsg?.content_type === 'text';
-
-        // Keep polling if agent hasn't responded yet.
-        const hasAgentResponse = (data.messages ?? []).some(m => m.author_type === 'agent');
-        if (!hasAgentResponse || (!data.handoff_session_id && !sessionCompleted)) {
-          setTimeout(poll, 1500);
-        }
-      } catch (err) {
-        console.error('Error polling messages:', err);
-        setTimeout(poll, 2000);
       }
     };
 
-    setTimeout(poll, 1000);
+    void poll();
   };
 
   const startSession = async (projectId: number, message: string): Promise<number | undefined> => {
@@ -160,7 +183,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
         created_at: new Date().toISOString(),
       }]);
 
-      void pollForResponse(data.session_id);
+      startLongPoll(data.session_id);
       await loadSessions(projectId);
       return data.session_id;
     } catch (err) {
@@ -190,7 +213,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
       });
       if (!res.ok) throw new Error(`Failed to send message: ${res.status}`);
 
-      void pollForResponse(sessionId);
+      startLongPoll(sessionId);
     } catch (err) {
       console.error('Error sending message:', err);
     } finally {
@@ -221,7 +244,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
         }),
       });
       if (!res.ok) throw new Error(`Failed to send response: ${res.status}`);
-      void pollForResponse(sessionId);
+      startLongPoll(sessionId);
     } catch (err) {
       console.error('Error sending structured response:', err);
     } finally {
@@ -230,10 +253,16 @@ export function UserChatProvider(props: { children: JSX.Element }) {
   };
 
   const selectSession = async (sessionId: number | null) => {
+    abortController?.abort();
+    abortController = null;
     setCurrentSessionId(sessionId);
     setHandoffSessionId(null);
     if (sessionId !== null) {
       await loadMessages(sessionId);
+      const session = sessions().find(s => s.id === sessionId);
+      if (session && session.status === 'open') {
+        startLongPoll(sessionId);
+      }
     } else {
       setMessages([]);
     }
@@ -244,6 +273,14 @@ export function UserChatProvider(props: { children: JSX.Element }) {
     setDisplayNameState(name);
   };
 
+  const setStructuredSelection = (messageId: number, selected: string[]) => {
+    setStructuredSelections(prev => {
+      const next = new Map(prev);
+      next.set(messageId, selected);
+      return next;
+    });
+  };
+
   const value: UserChatContextValue = {
     sessions,
     messages,
@@ -251,6 +288,8 @@ export function UserChatProvider(props: { children: JSX.Element }) {
     loading,
     displayName,
     handoffSessionId,
+    structuredSelections,
+    setStructuredSelection,
     loadSessions,
     startSession,
     sendMessage,

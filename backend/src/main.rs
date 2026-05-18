@@ -174,6 +174,7 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::user_chat::create_session)
             .service(agents_api::user_chat::append_message)
             .service(agents_api::user_chat::get_messages)
+            .service(agents_api::user_chat::poll_messages)
             .service(agents_api::user_chat::list_sessions)
             .service(agents_api::comments::handlers::list_epic_comments)
             .service(agents_api::comments::handlers::add_epic_comment)
