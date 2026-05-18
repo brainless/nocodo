@@ -577,7 +577,22 @@ async fn run_po_intake(
             )
             .await;
         }
-        Ok(PoSessionResult::Questions(questions)) => {
+        Ok(PoSessionResult::Questions { message, questions }) => {
+            if !message.trim().is_empty() {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::Text(message),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO greeting: {}", e);
+                }
+            }
             for q in questions {
                 if let Err(e) = chat_storage
                     .append_message(

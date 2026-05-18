@@ -25,7 +25,10 @@ use crate::{
 #[derive(Debug)]
 pub enum PoSessionResult {
     Text(String),
-    Questions(Vec<StructuredQuestion>),
+    Questions {
+        message: String,
+        questions: Vec<StructuredQuestion>,
+    },
     HandedOff {
         final_message: String,
         summary: String,
@@ -164,7 +167,10 @@ impl ProductOwnerAgent {
             }
 
             if !structured_questions.is_empty() {
-                return Ok(PoSessionResult::Questions(structured_questions));
+                return Ok(PoSessionResult::Questions {
+                    message: text,
+                    questions: structured_questions,
+                });
             }
         }
 
