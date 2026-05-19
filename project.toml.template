@@ -49,8 +49,10 @@ cerebras_api_key  = ""
 anthropic_api_key = ""
 
 [deploy]
-server_ip         = "203.0.113.10"
-ssh_user          = "deploy"
-domain_name       = "example.com"
-letsencrypt_email = "admin@example.com"
-remote_base_dir   = "/home/deploy/apps"
+server_ip              = "203.0.113.10"
+ssh_user               = "deploy"
+domain_name            = "example.com"
+letsencrypt_email      = "admin@example.com"
+remote_base_dir        = "/home/deploy/apps"
+# Override [projects] default_path on the server. Falls back to [projects] default_path, then /opt/<name>/projects.
+# projects_default_path = "/srv/myapp/projects"
