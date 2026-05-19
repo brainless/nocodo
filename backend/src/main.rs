@@ -161,7 +161,7 @@ async fn main() -> std::io::Result<()> {
             cors = cors.allowed_origin(origin);
         }
 
-        let cors = cors.allowed_methods(vec!["GET", "POST"]).allow_any_header();
+        let cors = cors.allowed_methods(vec!["GET", "POST", "OPTIONS"]).allow_any_header();
 
         App::new()
             .wrap(cors)
