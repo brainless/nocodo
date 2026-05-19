@@ -121,6 +121,7 @@ impl StackReviewerAgent {
         let mut emitted_ids: Vec<i64> = Vec::new();
         let mut emitted_texts: HashSet<String> = HashSet::new();
         let mut turns: u32 = 0;
+        let mut consecutive_validation_errors: u32 = 0;
 
         loop {
             if turns >= MAX_TURNS {
@@ -128,6 +129,13 @@ impl StackReviewerAgent {
                     "stack_reviewer exceeded MAX_TURNS without calling finish_review".to_string(),
                 ));
             }
+
+            // After 3 consecutive validation errors the model is stuck; force finish_review.
+            let tool_choice = if consecutive_validation_errors >= 3 {
+                ToolChoice::Specific { name: "finish_review".to_string() }
+            } else {
+                ToolChoice::Auto
+            };
 
             let request = CompletionRequest {
                 messages: messages.clone(),
@@ -146,20 +154,27 @@ impl StackReviewerAgent {
                     repo_browser_open.clone(),
                     repo_browser_search.clone(),
                 ]),
-                tool_choice: Some(ToolChoice::Auto),
+                tool_choice: Some(tool_choice),
                 response_format: None,
             };
 
             let response = match self.llm_client.complete(request).await {
-                Ok(r) => r,
+                Ok(r) => {
+                    consecutive_validation_errors = 0;
+                    r
+                }
                 Err(e) => {
                     let msg = e.to_string();
                     if msg.contains("validation failed") || msg.contains("missing properties") {
-                        log::warn!("[stack_reviewer] LLM tool validation error (turn {}): {}. Nudging.", turns, msg);
+                        consecutive_validation_errors += 1;
+                        log::warn!(
+                            "[stack_reviewer] LLM tool validation error (turn {}, consecutive={}): {}. Nudging.",
+                            turns, consecutive_validation_errors, msg
+                        );
                         messages.push(Message {
                             role: Role::User,
                             content: vec![llm_sdk::types::ContentBlock::Text {
-                                text: "A tool call was invalid. Use only list_files, read_file, emit_note, and finish_review.".to_string(),
+                                text: "A tool call was invalid. You MUST use only: list_files, read_file, emit_note, finish_review. Call finish_review now if you are done.".to_string(),
                             }],
                             tool_call_id: None,
                             tool_name: None,
