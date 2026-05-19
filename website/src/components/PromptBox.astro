@@ -125,7 +125,7 @@ const {
 
       if (!chatRes.ok) throw new Error(`Failed to start chat (${chatRes.status})`);
 
-      window.location.href = `${apiBase}/projects/${project.id}/chat`;
+      window.location.href = `${apiBase}/admin/projects/${project.id}/chat`;
     } catch (err) {
       showError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
