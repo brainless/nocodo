@@ -82,6 +82,7 @@ export function UserChatProvider(props: { children: JSX.Element }) {
   let abortController: AbortController | null = null;
 
   const loadSessions = async (projectId: number) => {
+    setSessions([]);
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/user-chats?project_id=${projectId}`);

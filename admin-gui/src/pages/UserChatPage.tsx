@@ -1,6 +1,5 @@
 import { For, Show, createEffect, createSignal } from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
-import { useProject } from '../contexts/ProjectContext';
 import {
   UserChatProvider,
   useUserChat,
@@ -426,11 +425,11 @@ function ChatContent(props: { projectId: () => number | undefined }) {
 }
 
 export default function UserChatPage() {
-  const { currentProject } = useProject();
+  const params = useParams<{ projectId: string }>();
 
   return (
     <UserChatProvider>
-      <UserChatInner projectId={() => currentProject()?.id} />
+      <UserChatInner projectId={() => params.projectId ? parseInt(params.projectId) : undefined} />
     </UserChatProvider>
   );
 }
