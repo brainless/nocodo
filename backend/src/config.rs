@@ -96,6 +96,7 @@ pub struct DeployConfig {
     pub domain_name: String,
     pub letsencrypt_email: Option<String>,
     pub remote_base_dir: Option<String>,
+    pub website_domain: Option<String>,
 }
 
 impl Config {

@@ -1,5 +1,13 @@
 ---
 import '../styles/global.css';
+import PromptBox from '../components/PromptBox.astro';
+
+const EXAMPLE_PROMPTS = [
+  'CRM with leads, companies, contacts, and deal stages',
+  'Project tracker with tasks, sprints, and team members',
+  'Inventory system with products, suppliers, and stock levels',
+  'Support desk with tickets, priorities, and SLA tracking',
+];
 ---
 
 <html lang="en">
@@ -57,14 +65,13 @@ import '../styles/global.css';
         </a>
       </div>
 
-      <!-- Hero screenshot -->
-      <div class="rounded-xl border border-[#c6d1e4] bg-white overflow-hidden shadow-2xl">
-        <div class="flex items-center gap-1.5 px-4 py-3 border-b border-[#c6d1e4] bg-[#f6f8fe]">
-          <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-          <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-          <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-        </div>
-        <img src="/screenshots/nocodo_app_home.png" alt="nocodo app home" class="w-full block" />
+      <!-- Live prompt widget -->
+      <div class="max-w-2xl mx-auto w-full">
+        <PromptBox
+          examples={EXAMPLE_PROMPTS}
+          placeholder="What do you want to build? e.g. A CRM with leads, companies, contacts, tasks, and deal stages."
+          submitLabel="Build it"
+        />
       </div>
     </section>
 

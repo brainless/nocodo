@@ -85,6 +85,16 @@ async fn main() -> std::io::Result<()> {
         .deploy
         .as_ref()
         .map(|d| format!("http://{}", d.domain_name));
+    let website_origin_https = config
+        .deploy
+        .as_ref()
+        .and_then(|d| d.website_domain.as_ref())
+        .map(|w| format!("https://{}", w));
+    let website_origin_http = config
+        .deploy
+        .as_ref()
+        .and_then(|d| d.website_domain.as_ref())
+        .map(|w| format!("http://{}", w));
 
     let agent_state = match agents_api::AgentState::new(config.database.url.clone()) {
         Ok(state) => web::Data::new(state),
@@ -142,6 +152,12 @@ async fn main() -> std::io::Result<()> {
             cors = cors.allowed_origin(origin);
         }
         if let Some(ref origin) = domain_origin_http {
+            cors = cors.allowed_origin(origin);
+        }
+        if let Some(ref origin) = website_origin_https {
+            cors = cors.allowed_origin(origin);
+        }
+        if let Some(ref origin) = website_origin_http {
             cors = cors.allowed_origin(origin);
         }
 

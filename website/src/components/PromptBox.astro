@@ -1,0 +1,134 @@
+---
+interface Props {
+  apiBase?: string;
+  placeholder?: string;
+  examples?: string[];
+  submitLabel?: string;
+}
+
+const {
+  apiBase = 'https://app1.nocodo.com',
+  placeholder = 'What do you want to build? e.g. A CRM with leads, companies, contacts, tasks, and deal stages.',
+  examples = [],
+  submitLabel = 'Build it',
+} = Astro.props;
+---
+
+<div class="prompt-box-section" id="prompt-box-root">
+  <div class="prompt-box">
+    <textarea
+      id="prompt-textarea"
+      class="prompt-box-textarea"
+      placeholder={placeholder}
+      rows={4}
+    ></textarea>
+    <div class="prompt-box-footer">
+      <span class="prompt-box-hint">
+        <kbd class="prompt-kbd">⌘</kbd>
+        <kbd class="prompt-kbd">↵</kbd>
+        to send
+      </span>
+      <button id="prompt-submit" class="prompt-box-btn" disabled>
+        <svg id="prompt-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+        </svg>
+        <span id="prompt-spinner" class="prompt-spinner" style="display:none"></span>
+        <span id="prompt-label">{submitLabel}</span>
+      </button>
+    </div>
+  </div>
+
+  {examples.length > 0 && (
+    <div class="prompt-box-chips" id="prompt-chips">
+      {examples.map((ex) => (
+        <button class="prompt-box-chip" data-example={ex}>{ex}</button>
+      ))}
+    </div>
+  )}
+
+  <div id="prompt-error" class="prompt-error" style="display:none"></div>
+</div>
+
+<script define:vars={{ apiBase }}>
+  const textarea = document.getElementById('prompt-textarea');
+  const submitBtn = document.getElementById('prompt-submit');
+  const arrow = document.getElementById('prompt-arrow');
+  const spinner = document.getElementById('prompt-spinner');
+  const label = document.getElementById('prompt-label');
+  const errorBox = document.getElementById('prompt-error');
+  const chips = document.querySelectorAll('.prompt-box-chip');
+
+  function setLoading(on) {
+    textarea.disabled = on;
+    submitBtn.disabled = on;
+    chips.forEach(c => c.disabled = on);
+    arrow.style.display = on ? 'none' : '';
+    spinner.style.display = on ? 'inline-block' : 'none';
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+  }
+
+  function clearError() {
+    errorBox.style.display = 'none';
+  }
+
+  textarea.addEventListener('input', () => {
+    submitBtn.disabled = !textarea.value.trim();
+  });
+
+  textarea.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!submitBtn.disabled) handleSubmit();
+    }
+  });
+
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      textarea.value = chip.dataset.example;
+      submitBtn.disabled = false;
+      textarea.focus();
+    });
+  });
+
+  submitBtn.addEventListener('click', handleSubmit);
+
+  async function handleSubmit() {
+    const message = textarea.value.trim();
+    if (!message) return;
+
+    clearError();
+    setLoading(true);
+
+    try {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const projectName = `Project ${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+      const projectRes = await fetch(`${apiBase}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: projectName }),
+      });
+
+      if (!projectRes.ok) throw new Error(`Failed to create project (${projectRes.status})`);
+      const { project } = await projectRes.json();
+
+      const chatRes = await fetch(`${apiBase}/api/user-chats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: project.id, display_name: 'User', message }),
+      });
+
+      if (!chatRes.ok) throw new Error(`Failed to start chat (${chatRes.status})`);
+
+      window.location.href = `${apiBase}/projects/${project.id}/chat`;
+    } catch (err) {
+      showError(err.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
+  }
+</script>

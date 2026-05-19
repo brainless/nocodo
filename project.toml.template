@@ -56,3 +56,5 @@ letsencrypt_email      = "admin@example.com"
 remote_base_dir        = "/home/deploy/apps"
 # Override [projects] default_path on the server. Falls back to [projects] default_path, then /opt/<name>/projects.
 # projects_default_path = "/srv/myapp/projects"
+# Marketing website domain — added to CORS allowlist so the homepage prompt widget can POST to the API.
+# website_domain = "nocodo.com"
