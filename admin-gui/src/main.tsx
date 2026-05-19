@@ -22,6 +22,8 @@ function AppRoutes() {
       <Route path="/components" component={ComponentsGalleryPage} />
       <Route path="/projects/:projectId" component={ProjectLayout}>
         <Route path="/epics" component={EpicsPage} />
+        <Route path="/epics/epic/:epicId" component={EpicsPage} />
+        <Route path="/epics/task/:taskId" component={EpicsPage} />
         <Route path="/database" component={DatabasePage} />
         <Route path="/backend" component={BackendPage} />
         <Route path="/ui-design" component={UIDesignPage} />

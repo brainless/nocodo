@@ -1036,8 +1036,8 @@ async fn handle_pm_finalized(
     }
 
     if let Err(e) = tx.execute(
-        "INSERT INTO epic (project_id, title, description, created_by_agent, status, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, 'project_manager', 'open', ?4, ?5)",
+        "INSERT INTO epic (project_id, title, description, source_prompt, created_by_agent, status, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?3, 'project_manager', 'open', ?4, ?5)",
         rusqlite::params![project_id, epic_title, epic_description, ts, ts],
     ) {
         log::warn!("user_chat: insert epic: {}", e);
