@@ -70,6 +70,7 @@ PM_AGENT_PROVIDER="$(toml_get "$CONFIG_FILE" pm_agent provider || true)"
 PM_AGENT_MODEL="$(toml_get "$CONFIG_FILE" pm_agent model || true)"
 MANDATORY_AUTH="$(toml_get "$CONFIG_FILE" auth mandatory || true)"; MANDATORY_AUTH="${MANDATORY_AUTH:-true}"
 MANDATORY_AUTH="$(echo "$MANDATORY_AUTH" | tr '[:upper:]' '[:lower:]')"
+WEBSITE_DOMAIN="$(toml_get "$CONFIG_FILE" deploy website_domain || true)"
 
 for v in PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME; do
   if [ -z "${!v:-}" ]; then
@@ -157,6 +158,9 @@ echo "[deploy] upload project.toml (non-secret config)"
   fi
   printf '[deploy]\nserver_ip         = "%s"\nssh_user          = "%s"\ndomain_name       = "%s"\nletsencrypt_email = "%s"\n' \
     "${SERVER_IP}" "${SSH_USER}" "${DOMAIN_NAME}" "${LETSENCRYPT_EMAIL:-}"
+  if [ -n "${WEBSITE_DOMAIN:-}" ]; then
+    printf 'website_domain    = "%s"\n' "${WEBSITE_DOMAIN}"
+  fi
 } | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/project.toml"
 remote_exec "sudo mv /tmp/project.toml ${DEPLOY_ROOT}/project.toml && sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/project.toml"
 
