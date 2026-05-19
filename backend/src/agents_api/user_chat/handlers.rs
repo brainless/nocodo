@@ -22,6 +22,23 @@ fn now() -> i64 {
         .as_secs() as i64
 }
 
+/// Merge consecutive messages with the same role into one, joining their text with a newline.
+/// This is required because the DB stores e.g. a greeting and a structured question as separate
+/// rows (both "assistant"), but LLM APIs require strictly alternating user/assistant turns.
+fn merge_consecutive_roles(messages: Vec<(String, String)>) -> Vec<(String, String)> {
+    let mut result: Vec<(String, String)> = Vec::new();
+    for (role, text) in messages {
+        match result.last_mut() {
+            Some(last) if last.0 == role => {
+                last.1.push('\n');
+                last.1.push_str(&text);
+            }
+            _ => result.push((role, text)),
+        }
+    }
+    result
+}
+
 // ---------------------------------------------------------------------------
 // Request / Response types
 // ---------------------------------------------------------------------------
@@ -522,7 +539,9 @@ async fn run_po_intake(
     let has_unanswered = messages
         .iter()
         .any(|m| m.content_type == "structured_question" && !answered_ids.contains(&m.id));
+    log::info!("[PO:session={}] answered_ids={:?} has_unanswered={}", session_id, answered_ids, has_unanswered);
     if has_unanswered {
+        log::info!("[PO:session={}] returning early — unanswered questions present", session_id);
         return;
     }
 
@@ -549,7 +568,7 @@ async fn run_po_intake(
         }
     }
 
-    let mut llm_messages: Vec<(String, String)> = messages
+    let raw_messages: Vec<(String, String)> = messages
         .iter()
         .map(|m| {
             let role = match m.author_type.as_str() {
@@ -562,8 +581,20 @@ async fn run_po_intake(
         .collect();
     // If we just injected a greeting, include it as a prior assistant turn so the
     // LLM doesn't repeat the introduction.
-    if !po_has_spoken {
-        llm_messages.push(("assistant".to_string(), PO_GREETING.to_string()));
+    let raw_messages = if !po_has_spoken {
+        let mut v = raw_messages;
+        v.push(("assistant".to_string(), PO_GREETING.to_string()));
+        v
+    } else {
+        raw_messages
+    };
+    // Merge consecutive same-role messages — the DB stores greeting and structured
+    // questions as separate rows but the LLM requires strictly alternating turns.
+    let llm_messages = merge_consecutive_roles(raw_messages);
+
+    log::info!("[PO:session={}] sending {} messages to LLM:", session_id, llm_messages.len());
+    for (i, (role, text)) in llm_messages.iter().enumerate() {
+        log::info!("[PO:session={}]   [{i}] {role}: {}", session_id, &text[..text.len().min(120)]);
     }
 
     let config = match AgentConfig::load() {
@@ -618,7 +649,10 @@ async fn run_po_intake(
         }
     };
 
-    match po.respond_in_session(session_id, llm_messages).await {
+    log::info!("[PO:session={}] calling respond_in_session", session_id);
+    let po_result = po.respond_in_session(session_id, llm_messages).await;
+    log::info!("[PO:session={}] respond_in_session returned: {:?}", session_id, po_result.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|e| format!("Err({:?})", e)));
+    match po_result {
         Ok(PoSessionResult::HandedOff { final_message }) => {
             handle_po_handoff(
                 &db_path,
@@ -880,7 +914,7 @@ async fn run_pm_planning(
             }
         };
 
-    let mut llm_messages: Vec<(String, String)> = Vec::new();
+    let mut raw_messages: Vec<(String, String)> = Vec::new();
 
     // Intake conversation first (user ↔ PO), so PM sees exactly what was asked and answered.
     for m in &intake_messages {
@@ -890,7 +924,7 @@ async fn run_pm_planning(
         };
         let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
         if !text.trim().is_empty() {
-            llm_messages.push((role.to_string(), text));
+            raw_messages.push((role.to_string(), text));
         }
     }
 
@@ -910,13 +944,17 @@ async fn run_pm_planning(
         };
         let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
         if !text.trim().is_empty() {
-            llm_messages.push((role.to_string(), text));
+            raw_messages.push((role.to_string(), text));
         }
     }
 
     if !pm_has_spoken {
-        llm_messages.push(("assistant".to_string(), PM_GREETING.to_string()));
+        raw_messages.push(("assistant".to_string(), PM_GREETING.to_string()));
     }
+
+    // Merge consecutive same-role messages — the DB stores greeting and structured
+    // questions as separate rows but the LLM requires strictly alternating turns.
+    let llm_messages = merge_consecutive_roles(raw_messages);
 
     let config = match AgentConfig::load() {
         Ok(c) => c,
