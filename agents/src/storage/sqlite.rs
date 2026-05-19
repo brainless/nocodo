@@ -5,9 +5,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
     AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicCommentRow,
-    EpicStatus, MessageContent, SchemaStorage, Session, Task, TaskCommentRow, TaskStatus,
-    TaskStorage, UiFormStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage, UserRow,
-    UserStorage,
+    EpicStatus, MessageContent, SchemaStorage, Session, StackNoteRow, StackNoteStorage,
+    StackTag, Task, TaskCommentRow, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
+    UserChatSessionRow, UserChatStorage, UserRow, UserStorage,
 };
 use crate::error::AgentError;
 
@@ -966,6 +966,165 @@ impl UserChatStorage for SqliteUserChatStorage {
             "UPDATE user_chat_session SET handoff_session_id = ?2 WHERE id = ?1",
             params![intake_id, planning_id],
         )?;
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteStackNoteStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteStackNoteStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteStackNoteStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(conn),
+        }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+fn map_stack_note_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StackNoteRow> {
+    Ok(StackNoteRow {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        tag: row.get(2)?,
+        note: row.get(3)?,
+        file_path: row.get(4)?,
+        line_number: row.get(5)?,
+        replaces_id: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+    })
+}
+
+#[async_trait]
+impl StackNoteStorage for SqliteStackNoteStorage {
+    async fn add_note(
+        &self,
+        project_id: i64,
+        tag: StackTag,
+        note: String,
+        file_path: Option<String>,
+        line_number: Option<i64>,
+        replaces_note: Option<String>,
+    ) -> Result<i64, AgentError> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+
+        // Duplicate check: if a current note with the same text already exists, error.
+        let existing_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM stack_note sn
+             LEFT JOIN stack_note newer ON newer.replaces_id = sn.id
+             WHERE sn.project_id = ?1 AND sn.note = ?2 AND newer.id IS NULL",
+            params![project_id, note],
+            |row| row.get(0),
+        )?;
+        if existing_count > 0 {
+            return Err(AgentError::Other(format!(
+                "A current note with text '{}' already exists for project {}.",
+                note, project_id
+            )));
+        }
+
+        // Resolve replaces_note to a replaces_id.
+        let replaces_id: Option<i64> = if let Some(ref replaces_text) = replaces_note {
+            let id: Option<i64> = conn
+                .query_row(
+                    "SELECT sn.id FROM stack_note sn
+                     LEFT JOIN stack_note newer ON newer.replaces_id = sn.id
+                     WHERE sn.project_id = ?1 AND sn.note = ?2 AND newer.id IS NULL
+                     LIMIT 1",
+                    params![project_id, replaces_text],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    return Err(AgentError::Other(format!(
+                        "No current note with text '{}' found for project {}.",
+                        replaces_text, project_id
+                    )));
+                }
+            }
+        } else {
+            None
+        };
+
+        conn.execute(
+            "INSERT INTO stack_note (project_id, tag, note, file_path, line_number, replaces_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+            params![
+                project_id,
+                tag.as_str(),
+                note,
+                file_path,
+                line_number,
+                replaces_id,
+                ts,
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn list_notes(&self, project_id: i64) -> Result<Vec<StackNoteRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, tag, note, file_path, line_number, replaces_id, created_at, updated_at
+             FROM stack_note
+             WHERE project_id = ?1
+             ORDER BY tag ASC, id ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id], map_stack_note_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    async fn list_current_notes(&self, project_id: i64) -> Result<Vec<StackNoteRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT sn.id, sn.project_id, sn.tag, sn.note, sn.file_path, sn.line_number, sn.replaces_id, sn.created_at, sn.updated_at
+             FROM stack_note sn
+             LEFT JOIN stack_note newer ON newer.replaces_id = sn.id
+             WHERE sn.project_id = ?1 AND newer.id IS NULL
+             ORDER BY sn.tag ASC, sn.id ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id], map_stack_note_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    async fn list_notes_by_tag(
+        &self,
+        project_id: i64,
+        tag: StackTag,
+    ) -> Result<Vec<StackNoteRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, tag, note, file_path, line_number, replaces_id, created_at, updated_at
+             FROM stack_note
+             WHERE project_id = ?1 AND tag = ?2
+             ORDER BY id ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id, tag.as_str()], map_stack_note_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    async fn delete_note(&self, note_id: i64) -> Result<(), AgentError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM stack_note WHERE id = ?1", params![note_id])?;
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ pub mod frontend_engineer;
 pub mod nocodo_description;
 pub mod product_owner;
 pub mod project_manager;
+pub mod stack_reviewer;
 pub mod storage;
 pub mod task_policy;
 pub mod ui_designer;
@@ -23,15 +24,17 @@ pub use product_owner::{HandOffToPmParams, PoSessionResult, ProductOwnerAgent};
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
+pub use stack_reviewer::{StackReviewerAgent, StackReviewResult};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteSchemaStorage,
-    SqliteTaskStorage, SqliteUiFormStorage, SqliteUserChatStorage, SqliteUserStorage,
+    SqliteStackNoteStorage, SqliteTaskStorage, SqliteUiFormStorage, SqliteUserChatStorage,
+    SqliteUserStorage,
 };
 pub use storage::{
     AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicStatus,
-    MessageContent, QuestionKind, SchemaStorage, Session, StructuredQuestion, StructuredResponse,
-    Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow, UserChatSessionRow,
-    UserChatStorage, UserStorage,
+    MessageContent, QuestionKind, SchemaStorage, Session, StackNoteRow, StackNoteStorage, StackTag,
+    StructuredQuestion, StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage,
+    UserChatMessageRow, UserChatSessionRow, UserChatStorage, UserStorage,
 };
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
@@ -180,6 +183,24 @@ pub fn build_frontend_engineer(
         storage,
         context_storage,
         task_storage,
+        &config.model,
+        project_id,
+        project_path,
+    ))
+}
+
+pub fn build_stack_reviewer(
+    config: &AgentConfig,
+    db_path: &str,
+    project_id: i64,
+    project_path: &str,
+) -> Result<StackReviewerAgent, AgentError> {
+    let client = make_llm_client(config)?;
+    let stack_note_storage: Arc<dyn StackNoteStorage> =
+        Arc::new(SqliteStackNoteStorage::open(db_path)?);
+    Ok(StackReviewerAgent::new(
+        client,
+        stack_note_storage,
         &config.model,
         project_id,
         project_path,

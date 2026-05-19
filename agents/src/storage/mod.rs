@@ -360,6 +360,67 @@ pub trait UiFormStorage: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
+// Stack notes — tech stack overview for the Engineering Manager agent
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StackTag {
+    Backend,
+    Database,
+    Frontend,
+    Auth,
+    ApiContract,
+    Config,
+    Tooling,
+    Deployment,
+    Testing,
+}
+
+impl StackTag {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Backend => "backend",
+            Self::Database => "database",
+            Self::Frontend => "frontend",
+            Self::Auth => "auth",
+            Self::ApiContract => "api_contract",
+            Self::Config => "config",
+            Self::Tooling => "tooling",
+            Self::Deployment => "deployment",
+            Self::Testing => "testing",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "backend" => Self::Backend,
+            "database" => Self::Database,
+            "frontend" => Self::Frontend,
+            "auth" => Self::Auth,
+            "api_contract" => Self::ApiContract,
+            "config" => Self::Config,
+            "tooling" => Self::Tooling,
+            "deployment" => Self::Deployment,
+            "testing" => Self::Testing,
+            _ => Self::Backend,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StackNoteRow {
+    pub id: i64,
+    pub project_id: i64,
+    pub tag: String,
+    pub note: String,
+    pub file_path: Option<String>,
+    pub line_number: Option<i64>,
+    pub replaces_id: Option<i64>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+// ---------------------------------------------------------------------------
 // ContextStorage trait — persists gathered project context
 // ---------------------------------------------------------------------------
 
@@ -427,6 +488,38 @@ pub trait UserChatStorage: Send + Sync {
         intake_id: i64,
         planning_id: i64,
     ) -> Result<(), AgentError>;
+}
+
+// ---------------------------------------------------------------------------
+// StackNoteStorage trait — tech stack notes for the Engineering Manager
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait StackNoteStorage: Send + Sync {
+    /// replaces_note: text of existing current note to supersede (None for new notes).
+    /// Errors if replaces_note text not found, or if new note text already exists as a current note.
+    async fn add_note(
+        &self,
+        project_id: i64,
+        tag: StackTag,
+        note: String,
+        file_path: Option<String>,
+        line_number: Option<i64>,
+        replaces_note: Option<String>,
+    ) -> Result<i64, AgentError>;
+
+    async fn list_notes(&self, project_id: i64) -> Result<Vec<StackNoteRow>, AgentError>;
+
+    /// Returns only notes not superseded by any other note (the "current view").
+    async fn list_current_notes(&self, project_id: i64) -> Result<Vec<StackNoteRow>, AgentError>;
+
+    async fn list_notes_by_tag(
+        &self,
+        project_id: i64,
+        tag: StackTag,
+    ) -> Result<Vec<StackNoteRow>, AgentError>;
+
+    async fn delete_note(&self, note_id: i64) -> Result<(), AgentError>;
 }
 
 // ---------------------------------------------------------------------------

@@ -112,9 +112,10 @@ pub async fn create_project(
                 created_at: now,
             };
 
-            // Clone template repo in background
+            // Clone template repo and seed stack notes in background
+            let db_url = config.database.url.clone();
             tokio::spawn(async move {
-                repo_api::handlers::clone_template_repo(path).await;
+                repo_api::handlers::clone_template_repo(path, db_url, project_id).await;
             });
 
             let response = CreateProjectResponse { project };
