@@ -523,6 +523,83 @@ pub trait StackNoteStorage: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
+// Project notes — business-layer artifacts written by PO
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProjectNoteTopic {
+    Goal,
+    Constraint,
+    Decision,
+    Context,
+    Assumption,
+}
+
+impl ProjectNoteTopic {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Goal => "goal",
+            Self::Constraint => "constraint",
+            Self::Decision => "decision",
+            Self::Context => "context",
+            Self::Assumption => "assumption",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "goal" => Self::Goal,
+            "constraint" => Self::Constraint,
+            "decision" => Self::Decision,
+            "context" => Self::Context,
+            "assumption" => Self::Assumption,
+            _ => Self::Context,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectNoteRow {
+    pub id: i64,
+    pub project_id: i64,
+    pub topic: String,
+    pub title: String,
+    pub note: String,
+    pub source_session_id: Option<i64>,
+    pub source_epic_comment_id: Option<i64>,
+    pub source_task_comment_id: Option<i64>,
+    pub replaces_id: Option<i64>,
+    pub created_at: i64,
+}
+
+#[async_trait]
+pub trait ProjectNoteStorage: Send + Sync {
+    /// replaces_note: exact text of the current note this supersedes (None for new notes).
+    /// Errors if replaces_note text not found, or if new note text already exists as a current note.
+    async fn add_note(
+        &self,
+        project_id: i64,
+        topic: ProjectNoteTopic,
+        title: String,
+        note: String,
+        source_session_id: Option<i64>,
+        replaces_note: Option<String>,
+    ) -> Result<i64, AgentError>;
+
+    /// Returns only notes not superseded by any other note (the "current view").
+    async fn list_current_notes(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<ProjectNoteRow>, AgentError>;
+
+    async fn list_notes_by_topic(
+        &self,
+        project_id: i64,
+        topic: ProjectNoteTopic,
+    ) -> Result<Vec<ProjectNoteRow>, AgentError>;
+}
+
+// ---------------------------------------------------------------------------
 // CommentStorage trait — epic & task comments
 // ---------------------------------------------------------------------------
 

@@ -3,9 +3,10 @@ use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
     build_project_manager, AgentConfig, AgentStorage, AgentType, CommentStorage,
     FinalizeSessionParams, MessageContent, PmUserSessionResult, PoSessionResult, ProductOwnerAgent,
-    SqliteAgentStorage, SqliteCommentStorage, SqliteTaskStorage, SqliteUserChatStorage,
-    SqliteUserStorage, StructuredQuestion, StructuredResponse, TaskStorage, UserChatMessageRow,
-    UserChatSessionRow, UserChatStorage, UserStorage,
+    ProjectNoteStorage, SqliteAgentStorage, SqliteCommentStorage, SqliteProjectNoteStorage,
+    SqliteTaskStorage, SqliteUserChatStorage, SqliteUserStorage, StructuredQuestion,
+    StructuredResponse, TaskStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage,
+    UserStorage,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -594,7 +595,22 @@ async fn run_po_intake(
             return;
         }
     };
-    let po = match ProductOwnerAgent::new(po_storage, po_task_storage, po_comment_storage, config) {
+    let po_note_storage: Arc<dyn ProjectNoteStorage> =
+        match SqliteProjectNoteStorage::open(&db_path) {
+            Ok(s) => Arc::new(s),
+            Err(e) => {
+                log::warn!("user_chat: open project note storage: {}", e);
+                return;
+            }
+        };
+    let po = match ProductOwnerAgent::new(
+        po_storage,
+        po_task_storage,
+        po_comment_storage,
+        po_note_storage,
+        config,
+        project_id,
+    ) {
         Ok(a) => a,
         Err(e) => {
             log::warn!("user_chat: build PO: {}", e);
@@ -602,18 +618,14 @@ async fn run_po_intake(
         }
     };
 
-    match po.respond_in_session(llm_messages).await {
-        Ok(PoSessionResult::HandedOff {
-            final_message,
-            summary,
-        }) => {
+    match po.respond_in_session(session_id, llm_messages).await {
+        Ok(PoSessionResult::HandedOff { final_message }) => {
             handle_po_handoff(
                 &db_path,
                 session_id,
                 project_id,
                 user_id,
                 final_message,
-                summary,
                 &chat_storage,
                 &chat_notify,
             )
@@ -675,13 +687,50 @@ async fn run_po_intake(
     }
 }
 
+async fn build_notes_seed(db_path: &str, project_id: i64) -> String {
+    let note_storage = match SqliteProjectNoteStorage::open(db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("user_chat: open note storage for seed: {}", e);
+            return "No project notes recorded.".to_string();
+        }
+    };
+    let notes = match note_storage.list_current_notes(project_id).await {
+        Ok(n) => n,
+        Err(e) => {
+            log::warn!("user_chat: list notes for seed: {}", e);
+            return "No project notes recorded.".to_string();
+        }
+    };
+    if notes.is_empty() {
+        return "No project notes recorded yet.".to_string();
+    }
+    let mut out = String::from("## Requirements Brief (recorded by Product Owner)\n\n");
+    let mut current_topic = String::new();
+    for note in &notes {
+        if note.topic != current_topic {
+            current_topic = note.topic.clone();
+            let heading = match current_topic.as_str() {
+                "goal" => "### Goals",
+                "constraint" => "### Constraints",
+                "decision" => "### Decisions",
+                "context" => "### Context",
+                "assumption" => "### Assumptions",
+                other => other,
+            };
+            out.push_str(&format!("{}\n", heading));
+        }
+        out.push_str(&format!("- **{}**: {}\n", note.title, note.note));
+    }
+    out
+}
+
 async fn handle_po_handoff(
     db_path: &str,
     intake_session_id: i64,
     project_id: i64,
     user_id: i64,
     final_message: String,
-    summary: String,
     chat_storage: &SqliteUserChatStorage,
     chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
 ) {
@@ -711,7 +760,8 @@ async fn handle_po_handoff(
         }
     };
 
-    // Seed planning session with PO's requirements summary as first message.
+    // Build seed message from current project notes so PM has the requirements brief.
+    let notes_seed = build_notes_seed(db_path, project_id).await;
     if let Err(e) = chat_storage
         .append_message(
             planning_session_id,
@@ -719,11 +769,11 @@ async fn handle_po_handoff(
             None,
             Some(AgentType::ProductOwner),
             None,
-            MessageContent::Text(summary),
+            MessageContent::Text(notes_seed),
         )
         .await
     {
-        log::warn!("user_chat: store PO summary in planning session: {}", e);
+        log::warn!("user_chat: store notes seed in planning session: {}", e);
         return;
     }
     notify_session(chat_notify, planning_session_id).await;
@@ -1108,6 +1158,14 @@ async fn handle_pm_finalized(
             return;
         }
     };
+    let val_po_note_storage: Arc<dyn ProjectNoteStorage> =
+        match SqliteProjectNoteStorage::open(db_path) {
+            Ok(s) => Arc::new(s),
+            Err(e) => {
+                log::warn!("user_chat: PO validate open note storage: {}", e);
+                return;
+            }
+        };
     let val_config = match AgentConfig::load() {
         Ok(c) => c,
         Err(e) => {
@@ -1119,7 +1177,9 @@ async fn handle_pm_finalized(
         val_po_storage,
         val_po_task_storage,
         val_po_comment_storage,
+        val_po_note_storage,
         val_config,
+        project_id,
     ) {
         Ok(a) => a,
         Err(e) => {

@@ -178,6 +178,7 @@ async fn main() -> std::io::Result<()> {
             .service(agents_api::user_chat::list_sessions)
             .service(agents_api::stack_reviewer::handlers::run_review)
             .service(agents_api::stack_reviewer::handlers::list_notes)
+            .service(agents_api::project_notes::handlers::list_notes)
             .service(agents_api::comments::handlers::list_epic_comments)
             .service(agents_api::comments::handlers::add_epic_comment)
             .service(agents_api::comments::handlers::list_task_comments)

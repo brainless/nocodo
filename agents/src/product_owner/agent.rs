@@ -7,12 +7,13 @@ use llm_sdk::{
 };
 
 use super::prompts::po_user_session_system_prompt;
-use super::tools::HandOffToPmParams;
+use super::tools::{HandOffToPmParams, RecordProjectNoteParams};
 use crate::{
     config::AgentConfig,
     error::AgentError,
     storage::{
-        AgentStorage, AgentType, CommentStorage, QuestionKind, StructuredQuestion, TaskStorage,
+        AgentStorage, AgentType, CommentStorage, ProjectNoteStorage, ProjectNoteTopic,
+        QuestionKind, StructuredQuestion, TaskStorage,
     },
     task_policy,
     user_input_tool::{InputType, RequestUserInputParams},
@@ -31,7 +32,6 @@ pub enum PoSessionResult {
     },
     HandedOff {
         final_message: String,
-        summary: String,
     },
     Silent,
 }
@@ -45,7 +45,9 @@ pub struct ProductOwnerAgent {
     _storage: Arc<dyn AgentStorage>,
     task_storage: Arc<dyn TaskStorage>,
     _comment_storage: Arc<dyn CommentStorage>,
+    note_storage: Arc<dyn ProjectNoteStorage>,
     model: String,
+    project_id: i64,
 }
 
 impl ProductOwnerAgent {
@@ -53,7 +55,9 @@ impl ProductOwnerAgent {
         _storage: Arc<dyn AgentStorage>,
         task_storage: Arc<dyn TaskStorage>,
         _comment_storage: Arc<dyn CommentStorage>,
+        note_storage: Arc<dyn ProjectNoteStorage>,
         config: AgentConfig,
+        project_id: i64,
     ) -> Result<Self, AgentError> {
         let llm_client = crate::make_llm_client(&config)?;
         Ok(Self {
@@ -61,12 +65,15 @@ impl ProductOwnerAgent {
             _storage,
             task_storage,
             _comment_storage,
+            note_storage,
             model: config.model,
+            project_id,
         })
     }
 
     pub async fn respond_in_session(
         &self,
+        session_id: i64,
         messages: Vec<(String, String)>,
     ) -> Result<PoSessionResult, AgentError> {
         let ask_tool = Tool::from_type::<RequestUserInputParams>()
@@ -79,13 +86,23 @@ impl ProductOwnerAgent {
             )
             .build();
 
+        let note_tool = Tool::from_type::<RecordProjectNoteParams>()
+            .name("record_project_note")
+            .description(
+                "Record a business-layer artifact (goal, constraint, decision, context, or \
+                 assumption) discovered during intake. Call this as you learn key facts — \
+                 you may call it multiple times. These notes become the requirements brief \
+                 for the Project Manager. Use replaces_note to supersede an earlier note \
+                 when the user clarifies or changes direction.",
+            )
+            .build();
+
         let handoff_tool = Tool::from_type::<HandOffToPmParams>()
             .name("hand_off_to_pm")
             .description(
-                "Call this when you have gathered enough requirements to proceed. \
-                 Provide a friendly closing message for the user and a structured \
-                 requirements brief for the Project Manager who will create the epic \
-                 and development tasks.",
+                "Call this when you have gathered enough requirements and recorded the key \
+                 project notes. Provide a friendly closing message for the user. The Project \
+                 Manager will read the notes you have recorded to create the epic and tasks.",
             )
             .build();
 
@@ -116,7 +133,7 @@ impl ProductOwnerAgent {
             temperature: Some(0.3),
             top_p: None,
             stop_sequences: None,
-            tools: Some(vec![ask_tool, handoff_tool]),
+            tools: Some(vec![ask_tool, note_tool, handoff_tool]),
             tool_choice: Some(ToolChoice::Auto),
             response_format: None,
         };
@@ -136,6 +153,8 @@ impl ProductOwnerAgent {
 
         if let Some(tool_calls) = response.tool_calls {
             let mut structured_questions: Vec<StructuredQuestion> = Vec::new();
+            let mut handoff: Option<String> = None;
+
             for tool_call in tool_calls {
                 match tool_call.name() {
                     "request_user_input" => {
@@ -154,16 +173,43 @@ impl ProductOwnerAgent {
                             kind,
                         });
                     }
+                    "record_project_note" => {
+                        let params: RecordProjectNoteParams =
+                            match tool_call.parse_arguments().map_err(AgentError::Llm) {
+                                Ok(p) => p,
+                                Err(e) => {
+                                    log::warn!("[PO] record_project_note parse error: {}", e);
+                                    continue;
+                                }
+                            };
+                        let topic = ProjectNoteTopic::from_str(&params.topic);
+                        if let Err(e) = self
+                            .note_storage
+                            .add_note(
+                                self.project_id,
+                                topic,
+                                params.title,
+                                params.note,
+                                Some(session_id),
+                                params.replaces_note,
+                            )
+                            .await
+                        {
+                            log::warn!("[PO] record_project_note storage error: {}", e);
+                        }
+                    }
                     "hand_off_to_pm" => {
                         let params: HandOffToPmParams =
                             tool_call.parse_arguments().map_err(AgentError::Llm)?;
-                        return Ok(PoSessionResult::HandedOff {
-                            final_message: params.final_message,
-                            summary: params.summary,
-                        });
+                        handoff = Some(params.final_message);
                     }
                     _ => {}
                 }
+            }
+
+            // Handoff is processed after notes so all notes are persisted first.
+            if let Some(final_message) = handoff {
+                return Ok(PoSessionResult::HandedOff { final_message });
             }
 
             if !structured_questions.is_empty() {

@@ -20,21 +20,24 @@ pub use config::AgentConfig;
 pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
-pub use product_owner::{HandOffToPmParams, PoSessionResult, ProductOwnerAgent};
+pub use product_owner::{
+    HandOffToPmParams, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams,
+};
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
 pub use stack_reviewer::{StackReviewerAgent, StackReviewResult};
 pub use storage::sqlite::{
-    SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteSchemaStorage,
-    SqliteStackNoteStorage, SqliteTaskStorage, SqliteUiFormStorage, SqliteUserChatStorage,
-    SqliteUserStorage,
+    SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteProjectNoteStorage,
+    SqliteSchemaStorage, SqliteStackNoteStorage, SqliteTaskStorage, SqliteUiFormStorage,
+    SqliteUserChatStorage, SqliteUserStorage,
 };
 pub use storage::{
     AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicStatus,
-    MessageContent, QuestionKind, SchemaStorage, Session, StackNoteRow, StackNoteStorage, StackTag,
-    StructuredQuestion, StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage,
-    UserChatMessageRow, UserChatSessionRow, UserChatStorage, UserStorage,
+    MessageContent, ProjectNoteRow, ProjectNoteStorage, ProjectNoteTopic, QuestionKind,
+    SchemaStorage, Session, StackNoteRow, StackNoteStorage, StackTag, StructuredQuestion,
+    StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
+    UserChatSessionRow, UserChatStorage, UserStorage,
 };
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},

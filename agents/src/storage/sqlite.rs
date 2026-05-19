@@ -5,9 +5,10 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
     AgentStorage, AgentType, ChatMessage, CommentStorage, ContextStorage, Epic, EpicCommentRow,
-    EpicStatus, MessageContent, SchemaStorage, Session, StackNoteRow, StackNoteStorage,
-    StackTag, Task, TaskCommentRow, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
-    UserChatSessionRow, UserChatStorage, UserRow, UserStorage,
+    EpicStatus, MessageContent, ProjectNoteRow, ProjectNoteStorage, ProjectNoteTopic,
+    SchemaStorage, Session, StackNoteRow, StackNoteStorage, StackTag, Task, TaskCommentRow,
+    TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow, UserChatSessionRow,
+    UserChatStorage, UserRow, UserStorage,
 };
 use crate::error::AgentError;
 
@@ -1242,5 +1243,153 @@ impl CommentStorage for SqliteCommentStorage {
             .query_map(params![task_id], map_task_comment_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(comments)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteProjectNoteStorage
+// ---------------------------------------------------------------------------
+
+pub struct SqliteProjectNoteStorage {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteProjectNoteStorage {
+    pub fn new(conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(conn),
+        }
+    }
+
+    pub fn open(path: &str) -> Result<Self, AgentError> {
+        let conn = Connection::open(path)?;
+        Ok(Self::new(conn))
+    }
+}
+
+fn map_project_note_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectNoteRow> {
+    Ok(ProjectNoteRow {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        topic: row.get(2)?,
+        title: row.get(3)?,
+        note: row.get(4)?,
+        source_session_id: row.get(5)?,
+        source_epic_comment_id: row.get(6)?,
+        source_task_comment_id: row.get(7)?,
+        replaces_id: row.get(8)?,
+        created_at: row.get(9)?,
+    })
+}
+
+#[async_trait]
+impl ProjectNoteStorage for SqliteProjectNoteStorage {
+    async fn add_note(
+        &self,
+        project_id: i64,
+        topic: ProjectNoteTopic,
+        title: String,
+        note: String,
+        source_session_id: Option<i64>,
+        replaces_note: Option<String>,
+    ) -> Result<i64, AgentError> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+
+        // Duplicate check: reject if a current note with the same text already exists.
+        let existing_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM project_note pn
+             LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+             WHERE pn.project_id = ?1 AND pn.note = ?2 AND newer.id IS NULL",
+            params![project_id, note],
+            |row| row.get(0),
+        )?;
+        if existing_count > 0 {
+            return Err(AgentError::Other(format!(
+                "A current note with text '{}' already exists for project {}.",
+                note, project_id
+            )));
+        }
+
+        // Resolve replaces_note text → replaces_id.
+        let replaces_id: Option<i64> = if let Some(ref replaces_text) = replaces_note {
+            let id: Option<i64> = conn
+                .query_row(
+                    "SELECT pn.id FROM project_note pn
+                     LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+                     WHERE pn.project_id = ?1 AND pn.note = ?2 AND newer.id IS NULL
+                     LIMIT 1",
+                    params![project_id, replaces_text],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    return Err(AgentError::Other(format!(
+                        "No current note with text '{}' found for project {}.",
+                        replaces_text, project_id
+                    )));
+                }
+            }
+        } else {
+            None
+        };
+
+        conn.execute(
+            "INSERT INTO project_note (project_id, topic, title, note, source_session_id, replaces_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                project_id,
+                topic.as_str(),
+                title,
+                note,
+                source_session_id,
+                replaces_id,
+                ts,
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    async fn list_current_notes(
+        &self,
+        project_id: i64,
+    ) -> Result<Vec<ProjectNoteRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT pn.id, pn.project_id, pn.topic, pn.title, pn.note,
+                    pn.source_session_id, pn.source_epic_comment_id, pn.source_task_comment_id,
+                    pn.replaces_id, pn.created_at
+             FROM project_note pn
+             LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+             WHERE pn.project_id = ?1 AND newer.id IS NULL
+             ORDER BY pn.topic ASC, pn.id ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id], map_project_note_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    async fn list_notes_by_topic(
+        &self,
+        project_id: i64,
+        topic: ProjectNoteTopic,
+    ) -> Result<Vec<ProjectNoteRow>, AgentError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT pn.id, pn.project_id, pn.topic, pn.title, pn.note,
+                    pn.source_session_id, pn.source_epic_comment_id, pn.source_task_comment_id,
+                    pn.replaces_id, pn.created_at
+             FROM project_note pn
+             LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+             WHERE pn.project_id = ?1 AND pn.topic = ?2 AND newer.id IS NULL
+             ORDER BY pn.id ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id, topic.as_str()], map_project_note_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 }

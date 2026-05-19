@@ -14,6 +14,7 @@ import UIDesignPage from './pages/UIDesignPage';
 import ProjectSettingsPage from './pages/ProjectSettingsPage';
 import UserChatPage from './pages/UserChatPage';
 import StackNotesPage from './pages/StackNotesPage';
+import ProjectNotesPage from './pages/ProjectNotesPage';
 
 function AppRoutes() {
   return (
@@ -30,6 +31,7 @@ function AppRoutes() {
         <Route path="/chat" component={UserChatPage} />
         <Route path="/chat/:sessionId" component={UserChatPage} />
         <Route path="/stack-notes" component={StackNotesPage} />
+        <Route path="/project-notes" component={ProjectNotesPage} />
         <Route path="/settings" component={ProjectSettingsPage} />
       </Route>
     </Router>
