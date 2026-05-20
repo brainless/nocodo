@@ -1,11 +1,12 @@
 import { For, Show, createEffect, createSignal } from 'solid-js';
-import { useNavigate, useParams } from '@solidjs/router';
+import { useNavigate, useParams, useLocation } from '@solidjs/router';
 import {
   UserChatProvider,
   useUserChat,
   type StructuredQuestion,
   type StructuredResponse,
 } from '../contexts/UserChatContext';
+import ProjectTopNav from '../components/ProjectTopNav';
 
 function NamePrompt() {
   const chat = useUserChat();
@@ -187,10 +188,6 @@ function ChatContent(props: { projectId: () => number | undefined }) {
     await chat.sendMessage(sid, msg);
   };
 
-  const handleNewChat = () => {
-    navigate(`/projects/${params.projectId}/chat`);
-  };
-
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -200,58 +197,55 @@ function ChatContent(props: { projectId: () => number | undefined }) {
 
   return (
     <main class="sheet-app">
-      <div class="flex h-full overflow-hidden">
-        <aside class="w-72 flex-shrink-0 border-r border-[#c6cfdf] bg-[#f6f8fe] overflow-y-auto flex flex-col">
-          <div class="p-3 flex-1">
-            <div class="text-xs font-semibold text-[#7a8faf] uppercase tracking-wider mb-3">
-              Sessions
-            </div>
-            <For each={chat.sessions()}>
-              {(session) => (
-                <div
-                  class={`p-3 rounded-lg cursor-pointer mb-1 transition-colors ${
-                    session.id === urlSessionId()
-                      ? 'bg-[#dde9ff] border border-[#c7d6f0]'
-                      : 'hover:bg-[#e7ecf8] border border-transparent'
-                  }`}
-                  onClick={() => navigate(`/projects/${params.projectId}/chat/${session.id}`)}
-                >
-                  <div class="flex items-center justify-between mb-1">
-                    <span
-                      class={`badge badge-sm ${
-                        session.status === 'open' ? 'badge-success' : 'badge-ghost'
-                      }`}
-                    >
-                      {session.status}
-                    </span>
-                    <span class="text-xs text-[#8fa0be]">
-                      {new Date(session.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div class="text-xs text-[#8fa0be] truncate">
-                    Session #{session.id}
-                  </div>
-                </div>
-              )}
-            </For>
-          </div>
-        </aside>
+      <section class="sheet-main">
+        <ProjectTopNav
+          title="Chat with nocodo"
+          backHref={urlSessionId() !== null ? `/projects/${params.projectId}/chat/sessions` : undefined}
+          actions={
+            <Show when={chat.loading()}>
+              <span class="loading loading-spinner loading-xs opacity-40" />
+            </Show>
+          }
+        />
 
-        <div class="flex-1 flex flex-col min-w-0">
-          <div class="flex items-center justify-between px-4 py-2 border-b border-[#c6cfdf] bg-[#f6f8fe]">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold text-[#2e4a7c]">
-                {currentSession() ? `Session #${currentSession()!.id}` : 'User Chat'}
-              </span>
-              <Show when={chat.loading()}>
-                <span class="loading loading-spinner loading-xs opacity-40" />
-              </Show>
+        <div class="flex overflow-hidden rounded-xl border border-[#c6cfdf] bg-white">
+          <aside class={`w-full md:w-72 flex-shrink-0 border-r border-[#c6cfdf] bg-[#f6f8fe] overflow-y-auto flex-col ${urlSessionId() !== null ? 'hidden md:flex' : 'flex'}`}>
+            <div class="p-3 flex-1">
+              <div class="text-xs font-semibold text-[#7a8faf] uppercase tracking-wider mb-3">
+                Sessions
+              </div>
+              <For each={chat.sessions()}>
+                {(session) => (
+                  <div
+                    class={`p-3 rounded-lg cursor-pointer mb-1 transition-colors ${
+                      session.id === urlSessionId()
+                        ? 'bg-[#dde9ff] border border-[#c7d6f0]'
+                        : 'hover:bg-[#e7ecf8] border border-transparent'
+                    }`}
+                    onClick={() => navigate(`/projects/${params.projectId}/chat/${session.id}`)}
+                  >
+                    <div class="flex items-center justify-between mb-1">
+                      <span
+                        class={`badge badge-sm ${
+                          session.status === 'open' ? 'badge-success' : 'badge-ghost'
+                        }`}
+                      >
+                        {session.status}
+                      </span>
+                      <span class="text-xs text-[#8fa0be]">
+                        {new Date(session.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div class="text-xs text-[#8fa0be] truncate">
+                      Session #{session.id}
+                    </div>
+                  </div>
+                )}
+              </For>
             </div>
-            <button class="btn btn-sm btn-outline" onClick={handleNewChat}>
-              New Chat
-            </button>
-          </div>
+          </aside>
 
+          <div class={`flex-1 flex-col min-w-0 ${urlSessionId() === null ? 'hidden md:flex' : 'flex'}`}>
           <div class="flex-1 overflow-y-auto p-4 space-y-3">
             <Show when={urlSessionId() !== null && chat.messages().length > 0}>
               <For each={chat.messages()}>
@@ -295,7 +289,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
 
                   return (
                     <div class={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                      <div class="max-w-[75%]">
+                      <div class="w-full md:w-auto md:max-w-[75%]">
                         <Show when={!isUser}>
                           <div class="text-xs font-semibold mb-1 text-[#8fa0be]">
                             {isPM ? 'PM' : isPO ? 'PO' : msg.agent_type ?? 'Agent'}
@@ -420,6 +414,7 @@ function ChatContent(props: { projectId: () => number | undefined }) {
           </div>
         </div>
       </div>
+      </section>
     </main>
   );
 }
@@ -437,7 +432,10 @@ export default function UserChatPage() {
 function UserChatInner(props: { projectId: () => number | undefined }) {
   const params = useParams<{ projectId: string; sessionId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const chat = useUserChat();
+
+  const isSessionsListPage = () => location.pathname.endsWith('/chat/sessions');
 
   // Load sessions when project is available
   createEffect(() => {
@@ -445,10 +443,11 @@ function UserChatInner(props: { projectId: () => number | undefined }) {
     if (id) void chat.loadSessions(id);
   });
 
-  // Once sessions load and no sessionId in URL, redirect to most recent
+  // Once sessions load and no sessionId in URL, redirect to most recent.
+  // Skip redirect on /chat/sessions — that route is the intentional sessions list view.
   createEffect(() => {
     const sessions = chat.sessions();
-    if (sessions.length > 0 && !params.sessionId) {
+    if (sessions.length > 0 && !params.sessionId && !isSessionsListPage()) {
       const mostRecent = sessions.reduce((a, b) =>
         new Date(a.created_at) > new Date(b.created_at) ? a : b
       );
