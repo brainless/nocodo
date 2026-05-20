@@ -7,7 +7,7 @@ This document captures the design for:
 1. A two-phase user chat flow: Product Owner (PO) handles requirements intake alone, then hands off to Project Manager (PM) for planning.
 2. Replacing the agent-centric chat drawer with a single user-facing chat session.
 3. PO as the sole intake agent — PM is NOT present during requirements gathering.
-4. PO calls `hand_off_to_pm` when intake is complete, which atomically closes the intake session, creates a new planning session seeded with a summary, and fires PM once.
+4. PO gathers requirements then signals completion via `complete_requirements` (requirements gathering mode) and names the project via `set_project_name` (project naming mode). The backend auto-creates a planning session seeded with project notes and fires PM once.
 5. PM runs only in the planning session, gathers additional detail if needed, then calls `finalize_session` to create epics/tasks.
 6. A task state machine: PM creates tasks as `draft`; PO transitions them to the appropriate next state after PM finalizes.
 7. Adding a `user` table to support guest users now and email/password auth later.
@@ -53,7 +53,7 @@ Repository scope reviewed for this design:
 
 | Role | Scope | User-facing? |
 |------|-------|--------------|
-| `product_owner` (PO) | Requirements intake. Listens to user, gathers requirements via text and structured questions. Calls `hand_off_to_pm` when enough clarity. Validates tasks after PM creates them. | Yes — sole agent in intake session |
+| `product_owner` (PO) | Requirements intake. Listens to user, gathers requirements via text and structured questions. Calls `complete_requirements` when done, then `set_project_name` in a separate naming call. Validates tasks after PM creates them. | Yes — sole agent in intake session |
 | `project_manager` (PM) | Planning and artifact creation. Runs only in the planning session (created by PO handoff). Asks follow-up questions if needed. Calls `finalize_session` to atomically create epic + tasks. | Yes — in planning session only |
 | `engineering_manager` (EM) | Technical shaping. Gates `needs_technical_shaping → ready` for tasks that need it. May read codebase. | No initially; will join user chat later. |
 | `db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_designer` | Execute `ready` tasks assigned to them. | No — interaction via task comments only. |
@@ -64,7 +64,7 @@ The existing chat drawer (PM/DB/BE/FE peer contacts) is removed.
 
 There are two chat phases per user-facing initiative:
 
-**Phase 1 — Intake session (PO only):** The user describes what they want to build. PO asks clarifying questions (text and structured widgets) to understand the business context, users, data, features, and constraints. PO does NOT create artifacts. When PO has enough clarity, it calls `hand_off_to_pm`.
+**Phase 1 — Intake session (PO only):** The user describes what they want to build. PO asks clarifying questions (text and structured widgets) to understand the business context, users, data, features, and constraints. PO does NOT create artifacts. When PO has enough clarity, it calls `complete_requirements`, then names the project via `set_project_name` in a separate call.
 
 **Phase 2 — Planning session (PM only):** Created automatically by the handoff. Seeded with PO's requirements summary. PM may ask follow-up questions. When PM has enough clarity, it calls `finalize_session` to create the epic and tasks atomically.
 
@@ -81,7 +81,7 @@ Technical conversation about a specific artifact happens on **task/epic comments
 
 ### 3) User Chat Access Policy
 
-- PO: read/write to intake sessions. Calls `hand_off_to_pm` to transition to planning.
+- PO: read/write to intake sessions. Calls `complete_requirements` + `set_project_name` to signal completion; backend transitions to planning automatically.
 - PM: read/write to planning sessions only. Calls `finalize_session` to create artifacts.
 - EM: future.
 - Specialists (DB/BE/FE/UI): no direct access. Reached via task comments.
@@ -91,16 +91,17 @@ Technical conversation about a specific artifact happens on **task/epic comments
 **Intake session:**
 - A new user chat starts a new `user_chat_session` (intake).
 - While the session is `open`, the user may append messages and PO continues to respond.
-- PO gathers requirements via text and structured questions (`request_user_input`).
-- When PO has enough clarity, it calls `hand_off_to_pm(final_message, summary)`.
+- PO gathers requirements via text and structured questions (`request_user_input`), recording facts via `record_project_note`.
+- When PO has enough clarity it calls `complete_requirements { closing_message }` (requirements gathering mode), then `set_project_name { name }` (project naming mode — separate LLM call).
 
-**Handoff (atomic):**
-1. PO's closing message is stored in the intake session.
-2. A new planning session is created.
-3. PO's requirements summary is seeded as the first message in the planning session (from `product_owner`).
-4. `handoff_session_id` is set on the intake session, linking it to the planning session.
-5. The intake session is marked `completed`.
-6. PM is fired once in the background in the planning session.
+**Completion (backend-driven):**
+1. PO's `closing_message` is stored in the intake session.
+2. PO's `set_project_name` call renames the project.
+3. A new planning session is created.
+4. Current project notes are seeded as the first message in the planning session (from `product_owner`).
+5. `handoff_session_id` is set on the intake session, linking it to the planning session.
+6. The intake session is marked `completed`.
+7. PM is fired once in the background in the planning session.
 
 **Planning session:**
 - PM reads the PO summary + any prior context.
@@ -173,16 +174,17 @@ For each user message in an open intake session:
 1. Backend fires **PO only** (`run_po_intake`).
 2. PO decides whether to respond with text, structured questions, or handoff.
 3. **Empty/no-comment responses are silently discarded** — stored as `PoSessionResult::Silent`.
-4. PO has three possible outcomes per turn:
+4. PO has four possible outcomes per turn:
    - **Text response** (`PoSessionResult::Text`) — stored as a message with `agent_type = product_owner`.
    - **Structured questions** (`PoSessionResult::Questions`) — one or more `structured_question` messages stored; backend waits for user answers before firing PO again.
-   - **Handoff** (`PoSessionResult::HandedOff`) — triggers the handoff flow (see below).
+   - **Requirements complete** (`PoSessionResult::RequirementsComplete`) — closing message stored; backend immediately calls PO again in `project_naming` mode.
+   - **Named** (`PoSessionResult::Named`) — `set_project_name` was called; backend triggers PM handoff.
 
 **Unanswered structured question guard:** If there are `structured_question` messages without matching `structured_response` messages, the backend does NOT fire PO. PO runs only after the user has answered all pending questions.
 
 ### Phase 2: PM Planning (Single Agent)
 
-Triggered automatically when PO calls `hand_off_to_pm`:
+Triggered automatically after PO's project naming mode returns `Named`:
 
 1. Backend creates a new planning session and seeds it with PO's summary.
 2. Backend fires **PM only** (`run_pm_planning`).
@@ -191,24 +193,39 @@ Triggered automatically when PO calls `hand_off_to_pm`:
 
 **Session routing:** The backend detects planning sessions by checking if the first message is from `product_owner`. If so, it delegates to `run_pm_planning` instead of `run_po_intake`. This ensures PO doesn't respond alongside PM in planning sessions.
 
-### Handoff Flow
+### Completion Flow
 
-When PO calls `hand_off_to_pm(final_message, summary)`:
+PO completion is a two-step process, each a separate LLM call:
+
+**Step 1 — Requirements gathering mode:** PO calls `complete_requirements { closing_message }`.
 
 ```rust
-struct HandOffToPmParams {
-    final_message: String,  // warm closing message to the user
-    summary: String,        // structured requirements brief for PM
+struct CompleteRequirementsParams {
+    closing_message: String,  // warm closing message shown to the user
 }
 ```
 
-Backend executes:
-1. Store PO's `final_message` in the intake session.
-2. Create a new `user_chat_session` (planning session).
-3. Seed planning session with `summary` as the first message (author: `product_owner`).
-4. Set `handoff_session_id` on the intake session → links to planning session.
-5. Mark intake session `completed`.
-6. Fire PM in the planning session in the background.
+Backend:
+1. Stores `closing_message` in the intake session and notifies the UI.
+2. Immediately calls PO again in `project_naming` mode (same session, same message history).
+
+**Step 2 — Project naming mode:** PO calls `set_project_name { name }`.
+
+```rust
+struct SetProjectNameParams {
+    name: String,  // concise domain-derived name, ≤ 60 chars
+}
+```
+
+Backend (`handle_po_complete`):
+1. Renames the project.
+2. Creates a new `user_chat_session` (planning session).
+3. Seeds planning session with current project notes as the first message (author: `product_owner`).
+4. Sets `handoff_session_id` on the intake session → links to planning session.
+5. Marks intake session `completed`.
+6. Fires PM in the planning session in the background.
+
+PO never references PM — it signals completion and names the project; the backend handles everything else.
 
 The frontend detects `handoff_session_id` in the GET /messages response and navigates to the planning session URL.
 
@@ -343,7 +360,7 @@ The LLM never sees raw JSON.
 3. Frontend renders the widget (radio or checkboxes).
 4. User submits → frontend sends `POST /api/user-chats/{id}/messages` with `content_type: "structured_response"`.
 5. Backend stores a `structured_response` row and fires PO again (only after all pending questions are answered).
-6. PO reads the compiled answer and continues gathering requirements or calls `hand_off_to_pm`.
+6. PO reads the compiled answer and continues gathering requirements or calls `complete_requirements`.
 
 **Planning phase (after handoff):**
 1. PM receives PO's summary in the planning session.
@@ -387,7 +404,7 @@ user_chat_session (
 )
 ```
 
-`handoff_session_id` is set when PO calls `hand_off_to_pm`, linking the intake session to the newly created planning session.
+`handoff_session_id` is set by the backend after PO's project naming completes, linking the intake session to the newly created planning session.
 
 #### `user_chat_message`
 
@@ -546,11 +563,22 @@ pub fn system_prompt() -> String {
 }
 ```
 
+### PO Modes (Current)
+
+| Mode | File | When used | Tools available |
+|------|------|-----------|-----------------|
+| `requirements_gathering` | `modes/requirements_gathering.rs` | Every user turn during intake | `request_user_input`, `record_project_note`, `complete_requirements` |
+| `project_naming` | `modes/project_naming.rs` | Single call by backend after `RequirementsComplete` | `set_project_name` |
+
+The two modes are separate LLM calls. `requirements_gathering` mode drives the full intake
+conversation; `project_naming` mode fires once at the end to name the project from the
+conversation history. PO has no knowledge of PM — the backend handles the transition.
+
 ### PM Modes (Current)
 
 | Mode | File | When used | Tools available |
 |------|------|-----------|-----------------|
-| `init` | `modes/init.rs` | First message of a brand-new project | `set_project_name`, `create_epic`, `create_task` |
+| `init` | `modes/init.rs` | First message of a brand-new project (dead code — superseded by PO flow) | `create_epic`, `create_task` |
 | `general` | `modes/general.rs` | Ongoing PM session — triage, status | `list_pending_review_tasks`, `create_epic`, `create_task`, `update_task_status` |
 | `user_session` | `modes/user_session.rs` | Direct user requirements chat | `finalize_session`, `request_user_input` |
 | `po_handoff` | `modes/po_handoff.rs` | Planning session after PO handoff | `finalize_session`, `request_user_input` |
@@ -597,7 +625,7 @@ Extend `agents/src/storage/mod.rs:11-17`:
 
 ### Per-Agent Tools
 
-- **PO**: `hand_off_to_pm(final_message, summary)` — closes intake session, creates planning session, fires PM. `request_user_input(question, input_type, options)` — poses structured choice questions during intake. `validate_tasks(task_ids)` — transitions all PM-created tasks out of `draft` using `initial_state_for`. `comment_on_task`, `comment_on_epic`.
+- **PO**: `request_user_input(question, input_type, options)` — poses structured choice questions during intake. `record_project_note(topic, title, note, replaces_note?)` — records requirements facts as project notes. `complete_requirements(closing_message)` — signals end of requirements gathering; backend calls PO in project naming mode next. `set_project_name(name)` — names the project (project naming mode only); backend then creates the planning session and fires PM. `validate_tasks(task_ids)` — transitions all PM-created tasks out of `draft` using `initial_state_for`.
 - **PM**: `finalize_session(final_message, epic_title, epic_description, tasks)` — atomically commits artifacts + completes the planning session in one transaction. `request_user_input(question, input_type, options)` — poses structured choice questions during planning.
 - **EM**: `mark_task_ready`, `comment_on_task`.
 - **Specialist**: `complete_task`, `comment_on_assigned_task`.
@@ -608,7 +636,7 @@ The `request_user_input` tool is defined in `agents/src/user_input_tool.rs` and 
 
 Prompts are organised using the Agent Mode Architecture described above.
 
-- **PO**: warm, empathetic, non-technical. Gather requirements — business context, users, data, features, constraints. Use `request_user_input` for questions with clear choices. Call `hand_off_to_pm` when enough clarity. Never refer to internal roles or the handoff to the user.
+- **PO**: organised under `agents/src/product_owner/modes/`. `core.rs` holds the invariant PO identity (warm, empathetic, non-technical, MVP-first). `requirements_gathering.rs` drives intake — gather business context, users, data, features, constraints; use `request_user_input` for structured choices; record facts immediately with `record_project_note`; call `complete_requirements` when done. `project_naming.rs` is a focused, single-call mode: derive a project name from the conversation history and call `set_project_name`. Never refer to internal roles or PM to the user.
 - **PM**: organised under `agents/src/project_manager/modes/`. `core.rs` holds the invariant PM identity; each mode file adds its activation-context-specific instructions. See the Agent Mode Architecture section for the full mode table.
 - **EM**: technical shaping (TBD content); read codebase as needed; transition `needs_technical_shaping → ready`.
 
@@ -663,7 +691,7 @@ Additive, backward-compatible phases.
 - Implement user chat endpoints.
 - Implement `initial_state_for` policy function.
 - Implement PM `finalize_session` tool (one transaction: message + epic + tasks + session completion).
-- Implement PO `hand_off_to_pm` tool — atomically closes intake, creates planning session, fires PM.
+- Implement PO `complete_requirements` + `set_project_name` two-mode flow — backend creates planning session seeded with project notes, fires PM. (`hand_off_to_pm` removed; PO no longer references PM directly.)
 - Implement PO `validate_tasks` — auto-fired after PM finalizes.
 - PO-only intake turn-taking (single agent per session).
 - Long-poll endpoint (`GET /api/user-chats/{session_id}/poll`).
@@ -734,7 +762,7 @@ Additive, backward-compatible phases.
 - Task draft semantics: PM creates as `draft`; PO transitions every task out after finalization.
 - Attachments / rich text: plain text initially.
 - Notifications: deferred.
-- Handoff: PO calls `hand_off_to_pm` to create planning session and fire PM.
+- PO completion: two-mode flow — `complete_requirements` (requirements gathering) then `set_project_name` (project naming); backend creates planning session and fires PM automatically.
 - Long-polling: `GET /api/user-chats/{session_id}/poll` replaces short-polling.
 - Legacy endpoints: decommissioned (Phase 6 complete).
 
