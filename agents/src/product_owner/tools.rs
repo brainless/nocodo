@@ -15,11 +15,20 @@ pub struct RecordProjectNoteParams {
     pub replaces_note: Option<String>,
 }
 
-/// PO calls this when requirements are gathered — closes intake and hands off to PM.
+/// PO calls this when all questions are answered and project notes are saved.
+/// Signals the end of requirements gathering; backend will initiate project naming next.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct HandOffToPmParams {
-    /// Short closing message to show the user (e.g. "Great, I have everything I need!").
-    pub final_message: String,
+pub struct CompleteRequirementsParams {
+    /// Short, warm closing message to show the user before the team gets started.
+    pub closing_message: String,
+}
+
+/// PO calls this (in project naming mode) to set a descriptive name for the project.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SetProjectNameParams {
+    /// A concise, descriptive name for the project (≤ 60 chars).
+    /// Derived from the user's domain, e.g. "CRM — Leads & Deals" or "Inventory Tracker".
+    pub name: String,
 }
 
 /// PO calls this to transition a task out of draft.

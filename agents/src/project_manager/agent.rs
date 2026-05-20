@@ -10,7 +10,7 @@ use super::{
     modes::{general, init, po_handoff, user_session},
     tools::{
         CreateEpicParams, CreateTaskParams, FinalizeSessionParams, ListPendingReviewTasksParams,
-        PmUpdateTaskStatusParams, SetProjectNameParams,
+        PmUpdateTaskStatusParams,
     },
 };
 use crate::{
@@ -304,14 +304,6 @@ impl ProjectManagerAgent {
             )
             .build();
 
-        let set_project_name_tool = Tool::from_type::<SetProjectNameParams>()
-            .name("set_project_name")
-            .description(
-                "Set a descriptive name for this project based on the user's domain. \
-                 Call this once during project init, before creating the epic.",
-            )
-            .build();
-
         let agent_type_str = AgentType::ProjectManager.as_str().to_string();
         let mut nudges: u32 = 0;
 
@@ -352,9 +344,7 @@ impl ProjectManagerAgent {
                         create_task_tool.clone(),
                         update_status_tool.clone(),
                     ];
-                    if is_init {
-                        tools.insert(0, set_project_name_tool.clone());
-                    } else {
+                    if !is_init {
                         tools.insert(0, list_tool.clone());
                     }
                     tools
@@ -400,48 +390,6 @@ impl ProjectManagerAgent {
                     log::info!("[PM] Tool: {}", tool_name);
 
                     match tool_name {
-                        "set_project_name" => {
-                            let params: SetProjectNameParams =
-                                tool_call.parse_arguments().map_err(AgentError::Llm)?;
-
-                            let result_text = match self
-                                .storage
-                                .rename_project(self.project_id, &params.name)
-                                .await
-                            {
-                                Ok(()) => format!("Project renamed to \"{}\".", params.name),
-                                Err(e) => format!("Failed to rename project: {}", e),
-                            };
-
-                            let mut turn = Vec::new();
-                            if !assistant_text.is_empty() {
-                                turn.push(text_row(assistant_text.clone()));
-                            }
-                            turn.push(ChatMessage {
-                                id: None,
-                                session_id,
-                                role: "assistant".to_string(),
-                                agent_type: Some(agent_type_str.clone()),
-                                content: serde_json::to_string(tool_call.arguments())?,
-                                tool_call_id: Some(call_id.clone()),
-                                tool_name: Some("set_project_name".to_string()),
-                                turn_id: None,
-                                created_at: 0,
-                            });
-                            turn.push(ChatMessage {
-                                id: None,
-                                session_id,
-                                role: "tool".to_string(),
-                                agent_type: None,
-                                content: result_text,
-                                tool_call_id: Some(call_id),
-                                tool_name: Some("set_project_name".to_string()),
-                                turn_id: None,
-                                created_at: 0,
-                            });
-                            self.storage.create_turn(turn).await?;
-                        }
-
                         "list_pending_review_tasks" => {
                             let tasks = self
                                 .task_storage

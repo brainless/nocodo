@@ -649,21 +649,52 @@ async fn run_po_intake(
         }
     };
 
-    log::info!("[PO:session={}] calling respond_in_session", session_id);
-    let po_result = po.respond_in_session(session_id, llm_messages).await;
+    log::info!("[PO:session={}] calling respond_in_session (requirements_gathering)", session_id);
+    let po_result = po.respond_in_session(session_id, llm_messages.clone(), false).await;
     log::info!("[PO:session={}] respond_in_session returned: {:?}", session_id, po_result.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|e| format!("Err({:?})", e)));
     match po_result {
-        Ok(PoSessionResult::HandedOff { final_message }) => {
-            handle_po_handoff(
-                &db_path,
-                session_id,
-                project_id,
-                user_id,
-                final_message,
-                &chat_storage,
-                &chat_notify,
-            )
-            .await;
+        Ok(PoSessionResult::RequirementsComplete { closing_message }) => {
+            // Show the closing message to the user.
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProductOwner),
+                    None,
+                    MessageContent::Text(closing_message),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PO closing message: {}", e);
+                return;
+            }
+            notify_session(&chat_notify, session_id).await;
+
+            // Second call: project naming mode — PO derives a name from the conversation.
+            log::info!("[PO:session={}] calling respond_in_session (project_naming)", session_id);
+            let naming_result = po.respond_in_session(session_id, llm_messages, true).await;
+            log::info!("[PO:session={}] project_naming returned: {:?}", session_id, naming_result.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|e| format!("Err({:?})", e)));
+            match naming_result {
+                Ok(PoSessionResult::Named) | Ok(PoSessionResult::Silent) => {
+                    handle_po_complete(
+                        &db_path,
+                        session_id,
+                        project_id,
+                        user_id,
+                        &chat_storage,
+                        &chat_notify,
+                    )
+                    .await;
+                }
+                Ok(_) => {
+                    log::warn!("[PO:session={}] unexpected result from project_naming mode", session_id);
+                    handle_po_complete(&db_path, session_id, project_id, user_id, &chat_storage, &chat_notify).await;
+                }
+                Err(e) => {
+                    log::warn!("user_chat: PO project_naming error: {}", e);
+                }
+            }
         }
         Ok(PoSessionResult::Questions { message, questions }) => {
             if !message.trim().is_empty() {
@@ -678,7 +709,7 @@ async fn run_po_intake(
                     )
                     .await
                 {
-                    log::warn!("user_chat: store PO greeting: {}", e);
+                    log::warn!("user_chat: store PO message: {}", e);
                 }
             }
             for q in questions {
@@ -714,7 +745,7 @@ async fn run_po_intake(
             }
             notify_session(&chat_notify, session_id).await;
         }
-        Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) => {}
+        Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) | Ok(PoSessionResult::Named) => {}
         Err(e) => {
             log::warn!("user_chat: PO error: {}", e);
         }
@@ -759,32 +790,14 @@ async fn build_notes_seed(db_path: &str, project_id: i64) -> String {
     out
 }
 
-async fn handle_po_handoff(
+async fn handle_po_complete(
     db_path: &str,
     intake_session_id: i64,
     project_id: i64,
     user_id: i64,
-    final_message: String,
     chat_storage: &SqliteUserChatStorage,
     chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
 ) {
-    // Store PO's closing message in the intake session.
-    if let Err(e) = chat_storage
-        .append_message(
-            intake_session_id,
-            "agent",
-            None,
-            Some(AgentType::ProductOwner),
-            None,
-            MessageContent::Text(final_message),
-        )
-        .await
-    {
-        log::warn!("user_chat: store PO final message: {}", e);
-        return;
-    }
-    notify_session(chat_notify, intake_session_id).await;
-
     // Create the planning session for PM.
     let planning_session_id = match chat_storage.create_session(project_id, user_id).await {
         Ok(id) => id,

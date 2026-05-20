@@ -251,7 +251,7 @@ pub struct TaskCommentRow {
 
 #[async_trait]
 pub trait AgentStorage: Send + Sync {
-    /// Rename a project. Used by the PM agent during project init.
+    /// Rename a project. Called by the PO agent during project naming.
     async fn rename_project(&self, project_id: i64, name: &str) -> Result<(), AgentError>;
 
     /// Create a new session for a task. One session per (task_id, agent_type).

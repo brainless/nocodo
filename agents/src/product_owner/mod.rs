@@ -1,6 +1,9 @@
 pub mod agent;
-pub mod prompts;
+pub mod modes;
 pub mod tools;
 
 pub use agent::{PoSessionResult, ProductOwnerAgent};
-pub use tools::{HandOffToPmParams, PoCommentParams, RecordProjectNoteParams, ValidateTaskParams};
+pub use tools::{
+    CompleteRequirementsParams, PoCommentParams, RecordProjectNoteParams, SetProjectNameParams,
+    ValidateTaskParams,
+};
