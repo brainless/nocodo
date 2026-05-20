@@ -1,5 +1,5 @@
 pub mod agent;
-pub mod prompts;
+pub mod modes;
 pub mod tools;
 
 pub use agent::{PmResponse, PmUserSessionResult, ProjectManagerAgent};

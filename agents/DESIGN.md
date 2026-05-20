@@ -491,6 +491,89 @@ Authorization per role.
 Each transition is gated by which agent owns the corresponding tool. Access is granted by code (importing the helper into that agent's `tools.rs`), not by runtime config. Revocation = removing the import.
 
 
+## Agent Mode Architecture
+
+### What Is a "Mode"?
+
+An agent **mode** is a named activation context that changes three things simultaneously
+for the same agent:
+
+1. **System prompt** — what the agent is told about its current situation and goals.
+2. **Available tools** — which tools the agent may call in this context.
+3. **Data access** — what project context (tasks, schema, PO summary, etc.) is injected.
+
+"Mode" is preferred over "persona" (which implies a different identity) or "situation"
+(informal). The same physical agent (same code, same struct) runs in different modes
+depending on how and when it is invoked.
+
+### Module Structure
+
+Each agent that has more than one mode uses a `modes/` sub-directory:
+
+```
+agents/src/{agent_name}/
+├── mod.rs
+├── agent.rs        ← selects a mode and drives the LLM loop
+├── tools.rs        ← tool parameter types (shared across modes)
+└── modes/
+    ├── mod.rs      ← re-exports all mode modules
+    ├── core.rs     ← shared identity + principles (the "heart" of the agent)
+    └── {mode}.rs   ← one file per mode; each composes core.rs
+```
+
+### `core.rs` — Single Source of Truth
+
+`core.rs` contains a function (e.g. `pm_core()`) that returns the invariant part of the
+agent's system prompt: its identity, non-negotiable rules, and shared guidelines. Every
+mode's `system_prompt()` calls this function and formats the mode-specific section around
+it. Editing `core.rs` affects all modes simultaneously.
+
+Example structure for a mode file:
+
+```rust
+// modes/init.rs
+use super::core::pm_core;
+
+pub fn system_prompt() -> String {
+    format!(
+        r#"{core}
+
+## Mode: Project Initialisation
+...mode-specific instructions...
+"#,
+        core = pm_core()
+    )
+}
+```
+
+### PM Modes (Current)
+
+| Mode | File | When used | Tools available |
+|------|------|-----------|-----------------|
+| `init` | `modes/init.rs` | First message of a brand-new project | `set_project_name`, `create_epic`, `create_task` |
+| `general` | `modes/general.rs` | Ongoing PM session — triage, status | `list_pending_review_tasks`, `create_epic`, `create_task`, `update_task_status` |
+| `user_session` | `modes/user_session.rs` | Direct user requirements chat | `finalize_session`, `request_user_input` |
+| `po_handoff` | `modes/po_handoff.rs` | Planning session after PO handoff | `finalize_session`, `request_user_input` |
+
+`agent.rs` selects the mode and constructs the `CompletionRequest` with the matching
+`system_prompt()` and tool list. No mode logic lives in `agent.rs` itself — it is a
+dispatcher to mode functions.
+
+### Adding a New Mode
+
+1. Create `modes/{mode_name}.rs` with a `system_prompt() -> String` function that calls
+   `super::core::{agent}_core()` and appends mode-specific instructions.
+2. Declare it in `modes/mod.rs` (`pub mod {mode_name};`).
+3. Add a call site in `agent.rs` that selects the new `{mode_name}::system_prompt()` and
+   the correct tool list.
+
+### Extending to Other Agents
+
+Any agent with more than one activation context should adopt the same layout. The `core.rs`
+function becomes the canonical description of that agent's identity — the equivalent of a
+job description that never changes regardless of which task the agent is doing.
+
+
 ## agents/ Crate Impact
 
 ### Storage Traits
@@ -523,8 +606,10 @@ The `request_user_input` tool is defined in `agents/src/user_input_tool.rs` and 
 
 ### Prompts
 
-- **PO (intake)**: warm, empathetic, non-technical. Gather requirements — business context, users, data, features, constraints. Use `request_user_input` for questions with clear choices. Call `hand_off_to_pm` when enough clarity. Never refer to internal roles or the handoff to the user.
-- **PM (planning)**: receives PO's summary. Ask follow-up questions if needed. Create epic + tasks via `finalize_session`. Assign tasks to appropriate agents.
+Prompts are organised using the Agent Mode Architecture described above.
+
+- **PO**: warm, empathetic, non-technical. Gather requirements — business context, users, data, features, constraints. Use `request_user_input` for questions with clear choices. Call `hand_off_to_pm` when enough clarity. Never refer to internal roles or the handoff to the user.
+- **PM**: organised under `agents/src/project_manager/modes/`. `core.rs` holds the invariant PM identity; each mode file adds its activation-context-specific instructions. See the Agent Mode Architecture section for the full mode table.
 - **EM**: technical shaping (TBD content); read codebase as needed; transition `needs_technical_shaping → ready`.
 
 ### Initial State Policy

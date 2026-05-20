@@ -7,7 +7,7 @@ use llm_sdk::{
 };
 
 use super::{
-    prompts::{init_project_system_prompt, po_handoff_planning_system_prompt, system_prompt, user_session_system_prompt},
+    modes::{general, init, po_handoff, user_session},
     tools::{
         CreateEpicParams, CreateTaskParams, FinalizeSessionParams, ListPendingReviewTasksParams,
         PmUpdateTaskStatusParams, SetProjectNameParams,
@@ -144,9 +144,9 @@ impl ProjectManagerAgent {
                 max_tokens: 4096,
                 model: self.model.clone(),
                 system: Some(if from_po_handoff {
-                    po_handoff_planning_system_prompt()
+                    po_handoff::system_prompt()
                 } else {
-                    user_session_system_prompt()
+                    user_session::system_prompt()
                 }),
                 temperature: Some(0.2),
                 top_p: None,
@@ -339,9 +339,9 @@ impl ProjectManagerAgent {
                 max_tokens: 4096,
                 model: self.model.clone(),
                 system: Some(if is_init {
-                    init_project_system_prompt()
+                    init::system_prompt()
                 } else {
-                    system_prompt()
+                    general::system_prompt()
                 }),
                 temperature: Some(0.2),
                 top_p: None,
