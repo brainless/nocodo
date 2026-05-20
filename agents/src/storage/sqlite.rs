@@ -1272,13 +1272,12 @@ fn map_project_note_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectNote
         id: row.get(0)?,
         project_id: row.get(1)?,
         topic: row.get(2)?,
-        title: row.get(3)?,
-        note: row.get(4)?,
-        source_session_id: row.get(5)?,
-        source_epic_comment_id: row.get(6)?,
-        source_task_comment_id: row.get(7)?,
-        replaces_id: row.get(8)?,
-        created_at: row.get(9)?,
+        note: row.get(3)?,
+        source_session_id: row.get(4)?,
+        source_epic_comment_id: row.get(5)?,
+        source_task_comment_id: row.get(6)?,
+        replaces_id: row.get(7)?,
+        created_at: row.get(8)?,
     })
 }
 
@@ -1288,7 +1287,6 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
         &self,
         project_id: i64,
         topic: ProjectNoteTopic,
-        title: String,
         note: String,
         source_session_id: Option<i64>,
         replaces_note: Option<String>,
@@ -1337,12 +1335,11 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
         };
 
         conn.execute(
-            "INSERT INTO project_note (project_id, topic, title, note, source_session_id, replaces_id, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO project_note (project_id, topic, note, source_session_id, replaces_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 project_id,
                 topic.as_str(),
-                title,
                 note,
                 source_session_id,
                 replaces_id,
@@ -1358,7 +1355,7 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
     ) -> Result<Vec<ProjectNoteRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT pn.id, pn.project_id, pn.topic, pn.title, pn.note,
+            "SELECT pn.id, pn.project_id, pn.topic, pn.note,
                     pn.source_session_id, pn.source_epic_comment_id, pn.source_task_comment_id,
                     pn.replaces_id, pn.created_at
              FROM project_note pn
@@ -1379,7 +1376,7 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
     ) -> Result<Vec<ProjectNoteRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT pn.id, pn.project_id, pn.topic, pn.title, pn.note,
+            "SELECT pn.id, pn.project_id, pn.topic, pn.note,
                     pn.source_session_id, pn.source_epic_comment_id, pn.source_task_comment_id,
                     pn.replaces_id, pn.created_at
              FROM project_note pn

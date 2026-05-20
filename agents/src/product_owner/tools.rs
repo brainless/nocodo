@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 pub struct RecordProjectNoteParams {
     /// Topic category. Must be one of: goal, constraint, decision, context, assumption
     pub topic: String,
-    /// Short descriptive title (under 80 characters).
-    pub title: String,
     /// The note content. Be concise and factual.
     pub note: String,
     /// Exact text of an existing current note that this one supersedes. Omit for new facts.

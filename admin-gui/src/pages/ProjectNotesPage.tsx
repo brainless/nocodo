@@ -7,7 +7,6 @@ type ProjectNoteRow = {
   id: number;
   project_id: number;
   topic: string;
-  title: string;
   note: string;
   source_session_id: number | null;
   source_epic_comment_id: number | null;
@@ -38,12 +37,6 @@ const columns: SheetColumn<ProjectNoteRow>[] = [
     header: 'Topic',
     width: '120px',
     render: (row) => <TopicBadge topic={row.topic} />,
-  },
-  {
-    key: 'title',
-    header: 'Title',
-    width: '200px',
-    render: (row) => <span class="text-sm font-medium">{row.title}</span>,
   },
   {
     key: 'note',

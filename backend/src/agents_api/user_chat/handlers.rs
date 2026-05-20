@@ -785,7 +785,7 @@ async fn build_notes_seed(db_path: &str, project_id: i64) -> String {
             };
             out.push_str(&format!("{}\n", heading));
         }
-        out.push_str(&format!("- **{}**: {}\n", note.title, note.note));
+        out.push_str(&format!("- {}\n", note.note));
     }
     out
 }

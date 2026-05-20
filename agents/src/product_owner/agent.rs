@@ -231,14 +231,12 @@ impl ProductOwnerAgent {
                                     continue;
                                 }
                             };
-                        let result_str = format!("Note '{}' recorded", params.title);
                         let topic = ProjectNoteTopic::from_str(&params.topic);
                         if let Err(e) = self
                             .note_storage
                             .add_note(
                                 self.project_id,
                                 topic,
-                                params.title,
                                 params.note,
                                 Some(session_id),
                                 params.replaces_note,
@@ -247,7 +245,7 @@ impl ProductOwnerAgent {
                         {
                             log::warn!("[PO] record_project_note storage error: {}", e);
                         }
-                        result_str
+                        "Note recorded".to_string()
                     }
                     "complete_requirements" => {
                         let params: CompleteRequirementsParams =
