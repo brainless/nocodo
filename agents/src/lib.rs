@@ -1,4 +1,5 @@
 pub mod backend_engineer;
+pub mod codebase_index;
 pub mod config;
 pub mod db_engineer;
 pub mod error;

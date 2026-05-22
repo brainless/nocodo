@@ -15,3 +15,8 @@ rusqlite     = { version = "0.32", features = ["bundled"] }
 thiserror    = "1.0"
 log          = "0.4"
 toml         = "0.8"
+tree-sitter          = "0.24"
+tree-sitter-rust     = "0.24"
+streaming-iterator   = "0.1"
+walkdir              = "2"
+regex                = "1"
