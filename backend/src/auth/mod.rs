@@ -2,6 +2,7 @@ pub mod handlers;
 pub mod middleware;
 pub mod types;
 
+use actix_web::web;
 use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct AuthConfig {
@@ -113,4 +114,11 @@ pub async fn send_otp_email(
         CreateEmailBaseOptions::new(from_email, [to_email], "Your sign-in code").with_html(&html);
     client.emails.send(email).await.map_err(|e| e.to_string())?;
     Ok(())
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(handlers::request_otp)
+        .service(handlers::verify_otp)
+        .service(handlers::logout)
+        .service(handlers::me);
 }
