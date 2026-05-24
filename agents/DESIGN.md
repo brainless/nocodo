@@ -774,6 +774,24 @@ Additive, backward-compatible phases.
 - **PM follow-up burden** — should PM be able to ask PO clarifying questions before finalizing, or work solely from the handoff summary?
 
 
+## Code Extractor
+
+Tree-sitter-based code extraction for coding agents (small models, precise context).
+
+**Module:** `agents/src/code_extractor/`
+
+**Two modes:**
+- **Single-file extraction** — `extract_struct(path, "ContactRecord")`, `extract_free_fn(path, "register_user")`, `extract_impl_fn(path, "ContactRecord", "find_by_email")` — returns `CodeBlock { file, start_line, end_line, source }`
+- **Indexed lookup** — `CodeIndex::open("code_index.db")?; idx.build(&root)?;` — SQLite-backed, instant queries via `get_struct()`, `get_free_fn()`, `get_impl_fn()`, `list_impl_fns()`
+
+**SQLite schema** (stored in project DB, commit-friendly):
+- `code_index_structs` — name PK, file, start_line, end_line, source
+- `code_index_free_fns` — name PK, file, start_line, end_line, source
+- `code_index_impl_fns` — (struct_name, fn_name) PK, file, start_line, end_line, source
+
+**Design:** Inherent impls only (skips `impl Trait for Struct`). Agents query the index to check if helpers exist, then retrieve exact function bodies — no file I/O at query time. `reindex_file()` for incremental updates.
+
+
 ## Proposed Next Steps
 
 Phases 1–6 are complete. Remaining work:
