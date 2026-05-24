@@ -1,3 +1,4 @@
+pub mod code_extractor;
 pub mod comments;
 pub mod context;
 pub mod db_engineer;

@@ -179,6 +179,7 @@ async fn main() -> std::io::Result<()> {
             .configure(agents_api::user_chat::configure)
             .configure(agents_api::stack_reviewer::configure)
             .configure(agents_api::project_notes::configure)
+            .configure(agents_api::code_extractor::configure)
             .configure(agents_api::comments::configure)
             .configure(projects_api::configure)
             .configure(schema_api::configure)

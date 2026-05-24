@@ -67,7 +67,7 @@ display_column: string | null, };
 /**
  * Available agent types in the multi-agent system.
  */
-export type AgentType = "project_manager" | "db_engineer" | "backend_engineer" | "frontend_engineer";
+export type AgentType = "project_manager" | "schema_designer" | "backend_developer" | "frontend_developer" | "backend_engineer" | "frontend_engineer";
 
 
 /**
@@ -174,9 +174,3 @@ export type EpicItem = { id: number, project_id: number, title: string, descript
 
 
 export type ListEpicsResponse = { epics: Array<EpicItem>, };
-
-
-export type EpicCommentRow = { id: number, epic_id: number, author_type: string, author_user_id: number | null, agent_type: string | null, content: string, created_at: number, updated_at: number, };
-
-
-export type TaskCommentRow = { id: number, task_id: number, author_type: string, author_user_id: number | null, agent_type: string | null, content: string, created_at: number, updated_at: number, };

@@ -390,3 +390,179 @@ pub struct VerifyOtpRequest {
 pub struct MeResponse {
     pub email: String,
 }
+
+// ============================================================================
+// Code Extractor API Types
+// ============================================================================
+
+/// A block of extracted source code.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeBlock {
+    pub file: String,
+    #[ts(type = "number")]
+    pub start_line: u32,
+    #[ts(type = "number")]
+    pub end_line: u32,
+    pub source: String,
+}
+
+/// Build statistics for the code index.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexBuildStats {
+    #[ts(type = "number")]
+    pub structs: usize,
+    #[ts(type = "number")]
+    pub free_fns: usize,
+    #[ts(type = "number")]
+    pub impl_fns: usize,
+}
+
+/// Request to build the code index for a project.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexBuildRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+}
+
+/// Response after building the code index.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CodeIndexBuildResponse {
+    pub stats: CodeIndexBuildStats,
+}
+
+/// Request to extract a struct from a single file.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct ExtractStructRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub file: String,
+    pub name: String,
+}
+
+/// Request to extract a free function from a single file.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct ExtractFreeFnRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub file: String,
+    pub name: String,
+}
+
+/// Request to extract an impl method from a single file.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct ExtractImplFnRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub file: String,
+    pub struct_name: String,
+    pub fn_name: String,
+}
+
+/// Request to find a struct across all project files.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct FindStructRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub name: String,
+}
+
+/// Request to find a free function across all project files.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct FindFreeFnRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub name: String,
+}
+
+/// Request to find an impl method across all project files.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct FindImplFnRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub struct_name: String,
+    pub fn_name: String,
+}
+
+/// Response for a single code block extraction.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CodeBlockResponse {
+    pub block: Option<CodeBlock>,
+}
+
+/// Request to reindex a single file.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexReindexRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub file: String,
+}
+
+/// Response listing all indexed struct names.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CodeIndexListStructsResponse {
+    pub names: Vec<String>,
+}
+
+/// Response listing all indexed free function names.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CodeIndexListFreeFnsResponse {
+    pub names: Vec<String>,
+}
+
+/// Request to list impl methods for a struct.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexListImplFnsRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub struct_name: String,
+}
+
+/// Response listing impl method names for a struct.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct CodeIndexListImplFnsResponse {
+    pub names: Vec<String>,
+}
+
+/// Request to get a struct from the index.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexGetStructRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub name: String,
+}
+
+/// Request to get a free function from the index.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexGetFreeFnRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub name: String,
+}
+
+/// Request to get an impl method from the index.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct CodeIndexGetImplFnRequest {
+    #[ts(type = "number")]
+    pub project_id: i64,
+    pub struct_name: String,
+    pub fn_name: String,
+}
