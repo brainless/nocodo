@@ -22,8 +22,8 @@ fn seed_stack_notes(db_url: &str, project_id: i64, project_path: &str) {
         }
     };
     let mut count = 0usize;
-    for raw in sql.split(';') {
-        let stmt = raw.trim();
+    for stmt in split_sql_statements(&sql) {
+        let stmt = stmt.trim();
         if stmt.is_empty() || stmt.starts_with("--") {
             continue;
         }
@@ -33,6 +33,38 @@ fn seed_stack_notes(db_url: &str, project_id: i64, project_path: &str) {
         }
     }
     log::info!("[seed_stack_notes] Seeded {} stack notes for project {}", count, project_id);
+}
+
+/// Split SQL on semicolons while respecting single-quoted string literals.
+fn split_sql_statements(sql: &str) -> Vec<&str> {
+    let mut statements = Vec::new();
+    let mut start = 0;
+    let mut in_quote = false;
+    let chars: Vec<char> = sql.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '\'' if !in_quote => in_quote = true,
+            '\'' if in_quote => {
+                // Handle escaped quotes ('')
+                if i + 1 < chars.len() && chars[i + 1] == '\'' {
+                    i += 1;
+                } else {
+                    in_quote = false;
+                }
+            }
+            ';' if !in_quote => {
+                statements.push(&sql[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    if start < sql.len() {
+        statements.push(&sql[start..]);
+    }
+    statements
 }
 
 /// Clone template repo into project_path, then seed stack notes.
