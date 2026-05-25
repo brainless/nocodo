@@ -15,6 +15,7 @@ import ProjectSettingsPage from './pages/ProjectSettingsPage';
 import UserChatPage from './pages/UserChatPage';
 import StackNotesPage from './pages/StackNotesPage';
 import ProjectNotesPage from './pages/ProjectNotesPage';
+import RustEngineerPage from './pages/RustEngineerPage';
 
 function AppRoutes() {
   return (
@@ -31,6 +32,7 @@ function AppRoutes() {
         <Route path="/chat" component={UserChatPage} />
         <Route path="/chat/sessions" component={UserChatPage} />
         <Route path="/chat/:sessionId" component={UserChatPage} />
+        <Route path="/rust-engineer" component={RustEngineerPage} />
         <Route path="/stack-notes" component={StackNotesPage} />
         <Route path="/project-notes" component={ProjectNotesPage} />
         <Route path="/settings" component={ProjectSettingsPage} />

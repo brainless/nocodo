@@ -235,6 +235,50 @@ pub fn find_impl_fn_file(root: &Path, struct_name: &str, fn_name: &str) -> Resul
 }
 
 // ---------------------------------------------------------------------------
+// Extraction: all impl methods for a struct (for use as examples)
+// ---------------------------------------------------------------------------
+
+pub fn list_impl_fns(path: &Path, struct_name: &str) -> Result<Vec<CodeBlock>, String> {
+    let src = std::fs::read_to_string(path)
+        .map_err(|e| format!("read {path:?}: {e}"))?;
+    let mut parser = make_parser()?;
+    let tree = parser
+        .parse(src.as_bytes(), None)
+        .ok_or_else(|| format!("parse failed for {path:?}"))?;
+
+    let lang = tree_sitter_rust::LANGUAGE.into();
+    let impl_query = Query::new(&lang, queries::IMPL_BLOCK)
+        .map_err(|e| format!("query compile: {e}"))?;
+    let fn_query = Query::new(&lang, queries::IMPL_FN)
+        .map_err(|e| format!("query compile: {e}"))?;
+
+    let mut result = Vec::new();
+
+    for caps in run_query(&impl_query, tree.root_node(), src.as_bytes()) {
+        let struct_node = find_capture(&caps, &impl_query, "struct_name");
+        let impl_node = find_capture(&caps, &impl_query, "item");
+        if let (Some(sn), Some(impl_it)) = (struct_node, impl_node) {
+            if &src[sn.byte_range()] != struct_name {
+                continue;
+            }
+            for fn_caps in run_query(&fn_query, impl_it, src.as_bytes()) {
+                let fn_item_node = find_capture(&fn_caps, &fn_query, "item");
+                if let Some(fn_it) = fn_item_node {
+                    let (start_line, end_line) = line_range(fn_it);
+                    result.push(CodeBlock {
+                        file: path.to_path_buf(),
+                        start_line,
+                        end_line,
+                        source: node_source(fn_it, &src),
+                    });
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

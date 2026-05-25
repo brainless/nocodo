@@ -8,6 +8,7 @@ pub mod frontend_engineer;
 pub mod nocodo_description;
 pub mod product_owner;
 pub mod project_manager;
+pub mod rust_engineer;
 pub mod stack_reviewer;
 pub mod storage;
 pub mod task_policy;
@@ -29,6 +30,7 @@ pub use product_owner::{
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
+pub use rust_engineer::{DieselModelFnOutput, RustEngineerAgent, RustEngineerResult};
 pub use stack_reviewer::{StackReviewerAgent, StackReviewResult};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteProjectNoteStorage,
@@ -193,6 +195,13 @@ pub fn build_frontend_engineer(
         project_id,
         project_path,
     ))
+}
+
+pub fn build_rust_engineer(project_path: &str) -> Result<RustEngineerAgent, AgentError> {
+    let model = std::env::var("RUST_ENGINEER_MODEL")
+        .unwrap_or_else(|_| "unsloth/Qwen3.5-0.8B-GGUF:UD-Q4_K_XL".to_string());
+    let base_url = std::env::var("LLAMA_CPP_BASE_URL").ok();
+    RustEngineerAgent::new(model, base_url, project_path)
 }
 
 pub fn build_stack_reviewer(
