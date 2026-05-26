@@ -8,6 +8,24 @@ pub fn extract_table_name(struct_code: &str) -> Option<String> {
     Some(rest[..end].to_string())
 }
 
+/// Extract the struct's field names as the canonical column list.
+/// These are the ONLY valid column names for `table_name::column` references.
+pub fn extract_column_names(struct_code: &str) -> Vec<String> {
+    let mut columns = Vec::new();
+    for line in struct_code.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("pub ") && trimmed.contains(':') {
+            if let Some(name) = trimmed.strip_prefix("pub ").and_then(|s| s.split(':').next()) {
+                let name = name.trim();
+                if !name.is_empty() && !name.starts_with('_') {
+                    columns.push(name.to_string());
+                }
+            }
+        }
+    }
+    columns
+}
+
 /// Build a single-shot prompt for generating a Diesel model impl function.
 ///
 /// Optimized for Qwen 3.5 0.8B: explicit rules, concrete Diesel+SQLite examples,
@@ -21,14 +39,15 @@ pub fn build_prompt(
     fn_name: &str,
 ) -> (String, Option<String>) {
     let table_name = extract_table_name(struct_code);
+    let columns = extract_column_names(struct_code);
     let mut prompt = String::new();
 
     // ── Role and task ──────────────────────────────────────────────────────
     prompt.push_str(
         r#"You are a Rust expert writing Diesel ORM functions for SQLite.
 
-Write ONLY the function body. Do NOT include imports — they are added automatically.
-Return ONLY the function definition. No explanation.
+Write ONLY the function definition. Do NOT include imports — they are added automatically.
+Return ONLY the function. No explanation, no markdown fences.
 
 ## Diesel + SQLite Rules
 
@@ -42,20 +61,48 @@ Return ONLY the function definition. No explanation.
 8. SQLite uses `i32` for INTEGER columns, not `i64`
 9. SQLite uses `String` for TEXT columns, `bool` for BOOLEAN, `Option<T>` for NULLABLE
 
-## Diesel Schema Example (table! macro)
+## Column Reference Rules (CRITICAL)
+
+10. ALWAYS use `table_name::column_name` for column references (e.g. `users::id`, `users::email`)
+11. NEVER invent column names — only use columns listed in "Available columns" below
+12. NEVER use enum variant names as columns (e.g. `ContactType::Phone` does NOT mean a `phone` column exists)
+13. When filtering on enum columns, use `EnumType::Variant.as_str()` against the enum column (e.g. `contacts::contact_type.eq(ContactType::Email.as_str())`)
+14. Parameter names and column names are DIFFERENT — always use `table::column.eq(param_name)`
+15. ONLY filter on columns for which you have a function parameter. Do NOT add filters for columns without parameters.
+16. NEVER call methods on `pool` other than `pool.get()`. `pool.get()` returns a connection — it has no `.id()` method.
+
+## Function Signature Pattern
+
+Functions take `pool: &DbPool` and parameters. Get the connection FIRST, then use `conn` for all Diesel calls:
 
 ```rust
-diesel::table! {
-    posts (id) {
-        id -> Integer,
-        title -> Text,
-        body -> Text,
-        published -> Bool,
-    }
+pub fn find_by_x(pool: &DbPool, x_value: &str) -> Result<Option<Self>, diesel::result::Error> {
+    let mut conn = pool.get().expect("Failed to get connection");
+    table_name
+        .filter(table_name::column.eq(x_value))
+        .select(Self::as_select())
+        .first::<Self>(&mut conn)
+        .optional()
 }
 ```
 
-## Diesel Model Struct Examples
+NEVER write `pool.get().id()`, `pool.id()`, or any method on `pool` other than `pool.get()`.
+
+"#,
+    );
+
+    // ── Available columns for the target table ─────────────────────────────
+    if !columns.is_empty() {
+        prompt.push_str(&format!(
+            "## Available Columns for `{}`\n\n{}\n\n",
+            table_name.as_deref().unwrap_or("unknown"),
+            columns.iter().map(|c| format!("- `{c}`")).collect::<Vec<_>>().join("\n")
+        ));
+    }
+
+    // ── Struct/derive examples ─────────────────────────────────────────────
+    prompt.push_str(
+        r#"## Diesel Model Struct Examples
 
 Basic Queryable + Insertable:
 ```rust
@@ -114,8 +161,8 @@ pub struct Post {
 
 ### INSERT — single record via struct
 ```rust
-pub fn create_post(conn: &mut SqliteConnection, title: &str, body: &str) -> Post {
-    let new_post = NewPost { title, body };
+pub fn create_post(conn: &mut SqliteConnection, new_title: &str, new_body: &str) -> Post {
+    let new_post = NewPost { title: new_title, body: new_body };
 
     diesel::insert_into(posts::table)
         .values(&new_post)
@@ -127,9 +174,9 @@ pub fn create_post(conn: &mut SqliteConnection, title: &str, body: &str) -> Post
 
 ### INSERT — column-by-column
 ```rust
-pub fn new_author(conn: &mut SqliteConnection, name: &str) -> Author {
+pub fn new_author(conn: &mut SqliteConnection, author_name: &str) -> Author {
     diesel::insert_into(authors::table)
-        .values(authors::name.eq(name))
+        .values(authors::name.eq(author_name))
         .returning(Author::as_returning())
         .get_result(conn)
         .expect("Error saving author")
@@ -138,11 +185,11 @@ pub fn new_author(conn: &mut SqliteConnection, name: &str) -> Author {
 
 ### INSERT — multiple columns as tuple
 ```rust
-pub fn new_page(conn: &mut SqliteConnection, page_number: i32, content: &str, book_id: i32) -> Page {
+pub fn new_page(conn: &mut SqliteConnection, page_num: i32, page_content: &str, book_id: i32) -> Page {
     diesel::insert_into(pages::table)
         .values((
-            pages::page_number.eq(page_number),
-            pages::content.eq(content),
+            pages::page_number.eq(page_num),
+            pages::content.eq(page_content),
             pages::book_id.eq(book_id),
         ))
         .returning(Page::as_returning())
@@ -155,7 +202,7 @@ pub fn new_page(conn: &mut SqliteConnection, page_number: i32, content: &str, bo
 ```rust
 pub fn list_published_posts(conn: &mut SqliteConnection) -> Vec<Post> {
     posts
-        .filter(published.eq(true))
+        .filter(posts::published.eq(true))
         .limit(5)
         .select(Post::as_select())
         .load(conn)
@@ -177,9 +224,9 @@ pub fn get_post(conn: &mut SqliteConnection, post_id: i32) -> Option<Post> {
 
 ### QUERY — find by field with filter
 ```rust
-pub fn find_book_by_title(conn: &mut SqliteConnection, title: &str) -> Option<Book> {
+pub fn find_book_by_title(conn: &mut SqliteConnection, search_title: &str) -> Option<Book> {
     books
-        .filter(title.eq(title))
+        .filter(books::title.eq(search_title))
         .select(Book::as_select())
         .first(conn)
         .optional()
@@ -191,18 +238,47 @@ pub fn find_book_by_title(conn: &mut SqliteConnection, title: &str) -> Option<Bo
 ```rust
 pub fn list_all_authors(conn: &mut SqliteConnection) -> Vec<Author> {
     authors
-        .order(name.asc())
+        .order(authors::name.asc())
         .select(Author::as_select())
         .load(conn)
         .expect("Error loading authors")
 }
 ```
 
+### QUERY — filter by enum column (IMPORTANT)
+```rust
+pub fn find_verified_contacts(conn: &mut SqliteConnection) -> Vec<Contact> {
+    contacts
+        .filter(contacts::contact_type.eq(ContactType::Email.as_str()))
+        .filter(contacts::verified_at.is_not_null())
+        .select(Contact::as_select())
+        .load(conn)
+        .expect("Error loading contacts")
+}
+```
+
+### QUERY — find_by_X pattern with enum (COPY THIS for find_by_phone, find_by_email, etc.)
+```rust
+pub fn find_by_email(pool: &DbPool, email: &str) -> Result<Option<Self>, diesel::result::Error> {
+    let mut conn = pool.get().expect("Failed to get connection");
+    user_contacts::table
+        .filter(
+            user_contacts::contact_type.eq(ContactType::Email.as_str())
+                .and(user_contacts::value.eq(email)),
+        )
+        .select(Self::as_select())
+        .first::<Self>(&mut conn)
+        .optional()
+}
+```
+
+Notice: only TWO filters — the enum column + the value column. NO `user_id` filter unless the function has a `user_id` parameter.
+
 ### UPDATE — single field
 ```rust
-pub fn publish_post(conn: &mut SqliteConnection, id: i32) -> Post {
-    diesel::update(posts.find(id))
-        .set(published.eq(true))
+pub fn publish_post(conn: &mut SqliteConnection, post_id: i32) -> Post {
+    diesel::update(posts.find(post_id))
+        .set(posts::published.eq(true))
         .returning(Post::as_returning())
         .get_result(conn)
         .expect("Error publishing post")
@@ -211,9 +287,9 @@ pub fn publish_post(conn: &mut SqliteConnection, id: i32) -> Post {
 
 ### UPDATE — multiple fields as tuple
 ```rust
-pub fn update_post(conn: &mut SqliteConnection, id: i32, new_title: &str, new_body: &str) -> Post {
-    diesel::update(posts.find(id))
-        .set((title.eq(new_title), body.eq(new_body)))
+pub fn update_post(conn: &mut SqliteConnection, post_id: i32, new_title: &str, new_body: &str) -> Post {
+    diesel::update(posts.find(post_id))
+        .set((posts::title.eq(new_title), posts::body.eq(new_body)))
         .returning(Post::as_returning())
         .get_result(conn)
         .expect("Error updating post")
@@ -222,8 +298,8 @@ pub fn update_post(conn: &mut SqliteConnection, id: i32, new_title: &str, new_bo
 
 ### UPDATE — using AsChangeset struct (partial update, None = skip field)
 ```rust
-pub fn update_post_partial(conn: &mut SqliteConnection, id: i32, form: PostForm) -> Post {
-    diesel::update(posts::table.find(id))
+pub fn update_post_partial(conn: &mut SqliteConnection, post_id: i32, form: PostForm) -> Post {
+    diesel::update(posts::table.find(post_id))
         .set(&form)
         .returning(Post::as_returning())
         .get_result(conn)
@@ -233,8 +309,8 @@ pub fn update_post_partial(conn: &mut SqliteConnection, id: i32, form: PostForm)
 
 ### DELETE — by ID
 ```rust
-pub fn delete_post(conn: &mut SqliteConnection, id: i32) -> usize {
-    diesel::delete(posts.find(id))
+pub fn delete_post(conn: &mut SqliteConnection, post_id: i32) -> usize {
+    diesel::delete(posts.find(post_id))
         .execute(conn)
         .expect("Error deleting post")
 }
@@ -242,9 +318,9 @@ pub fn delete_post(conn: &mut SqliteConnection, id: i32) -> usize {
 
 ### DELETE — by pattern match (LIKE)
 ```rust
-pub fn delete_posts_by_title_pattern(conn: &mut SqliteConnection, pattern: &str) -> usize {
-    let pattern = format!("%{pattern}%");
-    diesel::delete(posts.filter(title.like(pattern)))
+pub fn delete_posts_by_title_pattern(conn: &mut SqliteConnection, search_pattern: &str) -> usize {
+    let search_pattern = format!("%{search_pattern}%");
+    diesel::delete(posts.filter(posts::title.like(search_pattern)))
         .execute(conn)
         .expect("Error deleting posts")
 }
@@ -252,8 +328,8 @@ pub fn delete_posts_by_title_pattern(conn: &mut SqliteConnection, pattern: &str)
 
 ### RELATIONSHIP — get children of a parent (belonging_to)
 ```rust
-pub fn get_pages_for_book(conn: &mut SqliteConnection, book: &Book) -> Vec<Page> {
-    Page::belonging_to(book)
+pub fn get_pages_for_book(conn: &mut SqliteConnection, parent_book: &Book) -> Vec<Page> {
+    Page::belonging_to(parent_book)
         .select(Page::as_select())
         .load(conn)
         .expect("Error loading pages")
@@ -289,6 +365,12 @@ pub fn get_pages_with_book(conn: &mut SqliteConnection) -> Vec<(Page, Book)> {
                 dep.source
             ));
         }
+        prompt.push_str(
+            "To filter on an enum column, use `EnumType::Variant.as_str()` against the column:\n\
+            ```rust\n\
+            table.filter(table::enum_column.eq(EnumType::Variant.as_str()))\n\
+            ```\n\n",
+        );
     }
 
     // ── Existing impl functions (style examples) ───────────────────────────
@@ -308,6 +390,15 @@ pub fn get_pages_with_book(conn: &mut SqliteConnection) -> Vec<(Page, Book)> {
         "Write the function `{}` for the model above. Return ONLY the function definition. No imports, no explanation, no markdown fences.",
         fn_name
     ));
+
+    // Column reminder at the very end — last thing the model reads.
+    if !columns.is_empty() {
+        prompt.push_str(&format!(
+            "\n\nReminder: the only valid columns for `{}` are: {}.",
+            table_name.as_deref().unwrap_or("this table"),
+            columns.join(", ")
+        ));
+    }
 
     (prompt, table_name)
 }

@@ -51,12 +51,27 @@ Repository scope reviewed for this design:
 
 ### 1) Agent Roles
 
-| Role | Scope | User-facing? |
-|------|-------|--------------|
-| `product_owner` (PO) | Requirements intake. Listens to user, gathers requirements via text and structured questions. Calls `complete_requirements` when done, then `set_project_name` in a separate naming call. Validates tasks after PM creates them. | Yes — sole agent in intake session |
-| `project_manager` (PM) | Planning and artifact creation. Runs only in the planning session (created by PO handoff). Asks follow-up questions if needed. Calls `finalize_session` to atomically create epic + tasks. | Yes — in planning session only |
-| `engineering_manager` (EM) | Technical shaping. Gates `needs_technical_shaping → ready` for tasks that need it. May read codebase. | No initially; will join user chat later. |
-| `db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_designer` | Execute `ready` tasks assigned to them. | No — interaction via task comments only. |
+| Role | Scope | User-facing? | Model class |
+|------|-------|--------------|-------------|
+| `product_owner` (PO) | Requirements intake. Listens to user, gathers requirements via text and structured questions. Calls `complete_requirements` when done, then `set_project_name` in a separate naming call. Validates tasks after PM finalizes. | Yes — sole agent in intake session | Cloud (Anthropic/Groq/OpenAI) |
+| `project_manager` (PM) | Planning and artifact creation. Runs only in the planning session (created by PO handoff). Asks follow-up questions if needed. Calls `finalize_session` to atomically create epic + tasks. | Yes — in planning session only | Cloud (Anthropic/Groq/OpenAI) |
+| `engineering_manager` (EM) | Technical shaping. Gates `needs_technical_shaping → ready` for tasks that need it. May read codebase. | No initially; will join user chat later. | Cloud (Anthropic/Groq/OpenAI) |
+| `db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_designer` | Execute `ready` tasks assigned to them. | No — interaction via task comments only. | Small (≤ 20B) |
+| `rust_engineer` | Generates Rust/Diesel ORM impl functions by example. Single-shot prompt → code. Uses tree-sitter extraction for struct definitions, existing impl functions, and dependent types. | No — admin UI tool for code generation | Tiny (≤ 1B, llama.cpp local) |
+
+### 1a) Small-Model Code Agents
+
+Code writer agents (`db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_designer`, `rust_engineer`) use small or tiny models (≤ 20B parameters) to keep inference cheap and local-friendly. This constraint shapes their design:
+
+**Design principles for small models:**
+- **Example-driven prompts** — show concrete patterns, never ask the model to "figure it out"
+- **Deterministic post-processing** — strip and re-inject imports, unwrap code fences, strip `<think>` blocks
+- **Single-shot where possible** — avoid multi-turn tool loops; one prompt → one response → parse
+- **Narrow scope per mode** — each mode does one thing (e.g. `diesel_model_fn` writes one function body)
+- **Low temperature** (0.1–0.3) — favor determinism over creativity
+- **Transparent output** — return prompt + raw response + extracted code for debugging
+
+**`rust_engineer`** is the most constrained: runs on `Qwen3.5-0.8B` via llama.cpp at `localhost:8080`, single-shot, no tools, max 512 tokens. Override with `RUST_ENGINEER_MODEL` / `LLAMA_CPP_BASE_URL`.
 
 ### 2) Two-Phase User Chat Surface
 
@@ -602,6 +617,89 @@ function becomes the canonical description of that agent's identity — the equi
 job description that never changes regardless of which task the agent is doing.
 
 
+### RustEngineer — Constrained Code Generation
+
+`RustEngineerAgent` is a single-shot code generator optimized for tiny local models
+(≤ 1B parameters). It does NOT use tools, multi-turn conversation, or cloud LLMs.
+Instead it extracts code context via tree-sitter, builds a self-contained prompt with
+concrete examples, and parses the response deterministically.
+
+**Model:** `unsloth/Qwen3.5-0.8B-GGUF:UD-Q4_K_XL` via llama.cpp at `localhost:8080`.
+Override with `RUST_ENGINEER_MODEL` / `LLAMA_CPP_BASE_URL`.
+
+**Design principles:**
+- **Single-shot** — one prompt → one response → parse. No tool loops.
+- **Example-driven** — prompt contains 13+ concrete patterns the model can copy.
+- **Deterministic post-processing** — strips model `use` lines, prepends correct imports
+  from `#[diesel(table_name)]`, unwraps code fences, strips `<think>` blocks.
+- **Narrow scope per mode** — each mode generates one function body.
+- **Low temperature** (0.2) — favor determinism over creativity.
+- **Transparent** — returns `prompt + raw_response + extracted_code` for debugging.
+
+**Module:** `agents/src/rust_engineer/`
+
+```
+agents/src/rust_engineer/
+├── mod.rs              ← re-exports
+├── agent.rs            ← RustEngineerAgent struct, diesel_model_fn() entry point
+└── modes/
+    ├── mod.rs
+    └── diesel_model.rs ← build_prompt() + extract_table_name()
+```
+
+**Backend endpoint:** `POST /api/rust-engineer/run` (synchronous, runs inline).
+
+**Admin UI:** `RustEngineerPage` — struct/fn inputs in top nav, three result panels
+(prompt sent, raw response, extracted code). Wrench icon in sidebar.
+
+#### Current Modes
+
+| Mode | File | Input | Output |
+|------|------|-------|--------|
+| `diesel_model` | `modes/diesel_model.rs` | `struct_name`, `fn_name` | Diesel impl function body for SQLite |
+
+**`diesel_model` mode flow:**
+1. `find_struct_file()` → locate the `.rs` file containing the struct
+2. `extract_struct()` → get the struct definition via tree-sitter
+3. `list_impl_fns()` → collect up to 3 existing impl functions as style examples
+4. `find_dependent_types()` → discover custom enums referenced in struct fields
+5. `extract_table_name()` → parse `#[diesel(table_name = X)]` for deterministic imports
+6. `build_prompt()` → compose single-shot prompt with rules, examples, struct, dependent types
+7. LLM call → `max_tokens: 512, temperature: 0.2`
+8. `extract_code()` → strip `<think>`, unwrap fences
+9. `prepend_imports()` → strip model's `use` lines, prepend `use diesel::prelude::*; use crate::schema::{table};`
+
+**Prompt composition** (`build_prompt`):
+- 9 explicit Diesel+SQLite rules (connection type, insert/update/delete patterns, select/returning, SQLite types)
+- 4 struct/derive examples (Queryable, Insertable, Associations, AsChangeset)
+- 13 CRUD examples (insert via struct/columns/tuple, query with filter/find/limit/order, update single/multiple/changeset, delete by ID/pattern, relationships via belonging_to/inner_join)
+- Target struct definition
+- Dependent type definitions (enums, etc.)
+- Up to 3 existing impl functions for style matching
+- Final instruction: "Write ONLY the function definition. No imports, no explanation, no markdown fences."
+
+#### Planned Modes (Experimental)
+
+If `diesel_model` proves reliable with tiny models, additional modes will be added for
+the full Actix Web + Diesel stack:
+
+| Mode (planned) | Input | Output |
+|----------------|-------|--------|
+| `actix_controller` | `struct_name`, handler name, HTTP method | Actix `#[get/post/put/delete]` handler function |
+| `actix_router` | module path, handler names | `ServiceConfig` route registration |
+| `shared_type` | struct name, fields | `shared-types` Rust struct with `#[derive(TS)]` |
+| `solid_component` | component name, props | SolidJS component with TypeScript types |
+
+Each mode follows the same pattern: extract context → build example-rich prompt → single-shot → deterministic post-processing.
+
+**Adding a new mode:**
+1. Create `modes/{mode_name}.rs` with `build_prompt(...) -> (String, ...)` function
+2. Declare in `modes/mod.rs`
+3. Add method on `RustEngineerAgent` in `agent.rs` that extracts context, calls `build_prompt`, fires LLM, post-processes
+4. Add backend handler in `backend/src/agents_api/rust_engineer/`
+5. Add admin UI controls on `RustEngineerPage`
+
+
 ## agents/ Crate Impact
 
 ### Storage Traits
@@ -639,6 +737,7 @@ Prompts are organised using the Agent Mode Architecture described above.
 - **PO**: organised under `agents/src/product_owner/modes/`. `core.rs` holds the invariant PO identity (warm, empathetic, non-technical, MVP-first). `requirements_gathering.rs` drives intake — gather business context, users, data, features, constraints; use `request_user_input` for structured choices; record facts immediately with `record_project_note`; call `complete_requirements` when done. `project_naming.rs` is a focused, single-call mode: derive a project name from the conversation history and call `set_project_name`. Never refer to internal roles or PM to the user.
 - **PM**: organised under `agents/src/project_manager/modes/`. `core.rs` holds the invariant PM identity; each mode file adds its activation-context-specific instructions. See the Agent Mode Architecture section for the full mode table.
 - **EM**: technical shaping (TBD content); read codebase as needed; transition `needs_technical_shaping → ready`.
+- **RustEngineer**: organised under `agents/src/rust_engineer/modes/`. No `core.rs` — modes are self-contained prompt builders. Each mode extracts code context via tree-sitter, builds an example-rich single-shot prompt, and returns `(prompt, metadata)`. The agent fires the LLM and post-processes deterministically. See the RustEngineer section above for mode details.
 
 ### Initial State Policy
 
@@ -781,8 +880,9 @@ Tree-sitter-based code extraction for coding agents (small models, precise conte
 **Module:** `agents/src/code_extractor/`
 
 **Two modes:**
-- **Single-file extraction** — `extract_struct(path, "ContactRecord")`, `extract_free_fn(path, "register_user")`, `extract_impl_fn(path, "ContactRecord", "find_by_email")` — returns `CodeBlock { file, start_line, end_line, source }`
+- **Single-file extraction** — `extract_struct(path, "ContactRecord")`, `extract_free_fn(path, "register_user")`, `extract_impl_fn(path, "ContactRecord", "find_by_email")`, `extract_enum(path, "ContactType")` — returns `CodeBlock { file, start_line, end_line, source }`
 - **Indexed lookup** — `CodeIndex::open("code_index.db")?; idx.build(&root)?;` — SQLite-backed, instant queries via `get_struct()`, `get_free_fn()`, `get_impl_fn()`, `list_impl_fns()`
+- **Dependency scanning** — `find_dependent_types(project_path, source_file, struct_source)` — parses struct fields to discover custom enum/type references, then extracts their definitions. Used by RustEngineer to include dependent types in prompts.
 
 **SQLite schema** (stored in project DB, commit-friendly):
 - `code_index_structs` — name PK, file, start_line, end_line, source
@@ -801,3 +901,5 @@ Phases 1–6 are complete. Remaining work:
 3. **Real auth** — email/password login; guest claim flow.
 4. **PO can transition back to `draft`** — if PO disagrees with PM's artifacts, allow a redo request.
 5. **Multi-PM / diverse thinking** — voting models for artifact quality.
+6. **RustEngineer mode expansion** — add `actix_controller`, `actix_router`, `shared_type`, `solid_component` modes if `diesel_model` proves reliable with tiny models (≤ 1B).
+7. **Small-model specialist agents** — extend tiny-model pattern to `db_engineer`, `backend_engineer`, `frontend_engineer` task execution (≤ 20B).
