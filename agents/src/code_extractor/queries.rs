@@ -43,3 +43,14 @@ pub const ANY_FN: &str = r#"
     (function_item
       name: (identifier) @fn_name) @item
 "#;
+
+// ---------------------------------------------------------------------------
+// Enum definitions
+// ---------------------------------------------------------------------------
+
+/// Matches `enum Foo { ... }` or `pub enum Foo { ... }`.
+/// Captures: @name (type_identifier), @item (the full enum_item node).
+pub const ENUM_DEF: &str = r#"
+    (enum_item
+      name: (type_identifier) @name) @item
+"#;

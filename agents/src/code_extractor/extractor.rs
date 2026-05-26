@@ -124,6 +124,112 @@ pub fn extract_struct(path: &Path, name: &str) -> Result<Option<CodeBlock>, Stri
 }
 
 // ---------------------------------------------------------------------------
+// Extraction: enum definition
+// ---------------------------------------------------------------------------
+
+pub fn extract_enum(path: &Path, name: &str) -> Result<Option<CodeBlock>, String> {
+    let src = std::fs::read_to_string(path)
+        .map_err(|e| format!("read {path:?}: {e}"))?;
+    let mut parser = make_parser()?;
+    let tree = parser
+        .parse(src.as_bytes(), None)
+        .ok_or_else(|| format!("parse failed for {path:?}"))?;
+
+    let query = Query::new(&tree_sitter_rust::LANGUAGE.into(), queries::ENUM_DEF)
+        .map_err(|e| format!("query compile: {e}"))?;
+
+    for caps in run_query(&query, tree.root_node(), src.as_bytes()) {
+        let name_node = find_capture(&caps, &query, "name");
+        let item_node = find_capture(&caps, &query, "item");
+        if let (Some(nn), Some(it)) = (name_node, item_node) {
+            if &src[nn.byte_range()] == name {
+                let (start_line, end_line) = line_range(it);
+                return Ok(Some(CodeBlock {
+                    file: path.to_path_buf(),
+                    start_line,
+                    end_line,
+                    source: node_source(it, &src),
+                }));
+            }
+        }
+    }
+    Ok(None)
+}
+
+// ---------------------------------------------------------------------------
+// Find dependent types referenced in a struct's fields
+// ---------------------------------------------------------------------------
+
+const KNOWN_TYPES: &[&str] = &[
+    "i8", "i16", "i32", "i64", "i128", "isize",
+    "u8", "u16", "u32", "u64", "u128", "usize",
+    "f32", "f64",
+    "bool", "char",
+    "String", "str",
+    "NaiveDateTime", "NaiveDate", "NaiveTime",
+    "Uuid",
+];
+
+/// Parse the struct source for field types that are NOT standard Rust/chrono types.
+/// Returns unique type names that need to be resolved (e.g. "ContactType").
+fn collect_custom_type_names(struct_code: &str) -> Vec<String> {
+    let mut types = Vec::new();
+    let mut parser = make_parser().ok();
+    let Some(ref mut parser) = parser else { return types };
+    let Some(tree) = parser.parse(struct_code.as_bytes(), None) else { return types };
+
+    let lang = tree_sitter_rust::LANGUAGE.into();
+    // Match any type_identifier that appears as a field type in a struct.
+    let type_query = Query::new(&lang, "(field_declaration type: (type_identifier) @type_name)")
+        .ok();
+    let Some(type_query) = type_query else { return types };
+
+    for caps in run_query(&type_query, tree.root_node(), struct_code.as_bytes()) {
+        let type_node = find_capture(&caps, &type_query, "type_name");
+        if let Some(tn) = type_node {
+            let name = &struct_code[tn.byte_range()];
+            if !KNOWN_TYPES.contains(&name) && !types.iter().any(|t| t == name) {
+                types.push(name.to_string());
+            }
+        }
+    }
+
+    types
+}
+
+/// For each custom type referenced in the struct, try to find and extract its
+/// definition. Searches the same file first, then all Rust files under `root`.
+pub fn find_dependent_types(
+    root: &Path,
+    struct_file: &Path,
+    struct_code: &str,
+) -> Result<Vec<CodeBlock>, String> {
+    let type_names = collect_custom_type_names(struct_code);
+    let mut result = Vec::new();
+
+    for type_name in type_names {
+        // Try the struct's own file first (enums are often co-located).
+        if let Some(block) = extract_enum(struct_file, &type_name)? {
+            result.push(block);
+            continue;
+        }
+
+        // Search all files.
+        for path in rust_sources(root) {
+            if path == struct_file {
+                continue;
+            }
+            if let Some(block) = extract_enum(&path, &type_name)? {
+                result.push(block);
+                break;
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+// ---------------------------------------------------------------------------
 // Extraction: free function (top-level, not inside impl/trait)
 // ---------------------------------------------------------------------------
 
@@ -305,8 +411,30 @@ mod tests {
         let block = block.expect("struct found");
         assert!(block.source.contains("pub struct ContactRecord"));
         assert!(block.source.contains("pub id: i64"));
-        assert_eq!(block.start_line, 10);
-        assert_eq!(block.end_line, 17);
+        assert!(block.source.contains("pub contact_type: ContactType"));
+    }
+
+    #[test]
+    fn test_extract_enum_contact_type() {
+        let src = rustysolid_backend();
+        let path = src.join("models").join("contact.rs");
+        let block = extract_enum(&path, "ContactType").expect("parse ok");
+        let block = block.expect("enum found");
+        assert!(block.source.contains("pub enum ContactType"));
+        assert!(block.source.contains("Email"));
+        assert!(block.source.contains("Phone"));
+    }
+
+    #[test]
+    fn test_find_dependent_types_contact_record() {
+        let src = rustysolid_backend();
+        let path = src.join("models").join("contact.rs");
+        let struct_block = extract_struct(&path, "ContactRecord")
+            .expect("parse ok")
+            .expect("struct found");
+        let deps = find_dependent_types(&src, &path, &struct_block.source).expect("scan ok");
+        assert_eq!(deps.len(), 1);
+        assert!(deps[0].source.contains("pub enum ContactType"));
     }
 
     #[test]

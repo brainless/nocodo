@@ -2,6 +2,76 @@ use std::path::Path;
 
 const TEMPLATE_REPO_URL: &str = "https://github.com/brainless/rustysolid.git";
 const STACK_NOTES_SEED_FILE: &str = "stack_notes_seed.sql";
+const DEFAULT_DB_KIND: &str = "sqlite";
+
+/// After cloning the template, select the correct database variant files.
+/// Copies `backend/src/db.rs.{kind}` → `backend/src/db.rs`
+/// Copies `backend/Cargo.toml.{kind}` → `backend/Cargo.toml`
+/// Removes the suffix files after selection.
+fn select_project_db(project_path: &str, db_kind: &str) {
+    let db_src = Path::new(project_path)
+        .join("backend")
+        .join("src")
+        .join(format!("db.rs.{db_kind}"));
+    let db_dst = Path::new(project_path)
+        .join("backend")
+        .join("src")
+        .join("db.rs");
+    let cargo_src = Path::new(project_path)
+        .join("backend")
+        .join(format!("Cargo.toml.{db_kind}"));
+    let cargo_dst = Path::new(project_path).join("backend").join("Cargo.toml");
+
+    if db_src.exists() {
+        match std::fs::copy(&db_src, &db_dst) {
+            Ok(_) => {
+                log::info!(
+                    "[select_project_db] Selected {} db.rs variant",
+                    db_kind
+                );
+                let _ = std::fs::remove_file(&db_src);
+            }
+            Err(e) => {
+                log::warn!(
+                    "[select_project_db] Failed to copy db.rs.{}: {}",
+                    db_kind,
+                    e
+                );
+            }
+        }
+    } else {
+        log::warn!(
+            "[select_project_db] db.rs.{} not found at {}",
+            db_kind,
+            db_src.display()
+        );
+    }
+
+    if cargo_src.exists() {
+        match std::fs::copy(&cargo_src, &cargo_dst) {
+            Ok(_) => {
+                log::info!(
+                    "[select_project_db] Selected {} Cargo.toml variant",
+                    db_kind
+                );
+                let _ = std::fs::remove_file(&cargo_src);
+            }
+            Err(e) => {
+                log::warn!(
+                    "[select_project_db] Failed to copy Cargo.toml.{}: {}",
+                    db_kind,
+                    e
+                );
+            }
+        }
+    } else {
+        log::warn!(
+            "[select_project_db] Cargo.toml.{} not found at {}",
+            db_kind,
+            cargo_src.display()
+        );
+    }
+}
 
 /// Read stack_notes_seed.sql from the cloned project and insert rows for project_id.
 /// Each statement in the file uses ?1 as the project_id placeholder.
@@ -91,6 +161,7 @@ pub async fn clone_template_repo(project_path: String, db_url: String, project_i
     match output {
         Ok(ref out) if out.status.success() => {
             log::info!("Template cloned successfully to {}", project_path);
+            select_project_db(&project_path, DEFAULT_DB_KIND);
             seed_stack_notes(&db_url, project_id, &project_path);
         }
         Ok(out) => {

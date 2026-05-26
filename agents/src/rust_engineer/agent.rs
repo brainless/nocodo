@@ -8,7 +8,7 @@ use llm_sdk::{
 
 use super::modes::diesel_model;
 use crate::{
-    code_extractor::{extract_struct, find_struct_file, list_impl_fns},
+    code_extractor::{extract_struct, find_dependent_types, find_struct_file, list_impl_fns},
     error::AgentError,
 };
 
@@ -83,14 +83,18 @@ impl RustEngineerAgent {
 
         let examples = list_impl_fns(&struct_file, struct_name).map_err(AgentError::Other)?;
 
+        let dependent_types = find_dependent_types(&self.project_path, &struct_file, &struct_block.source)
+            .map_err(AgentError::Other)?;
+
         log::info!(
-            "[RustEngineer:diesel_model] struct={} fn={} examples={}",
+            "[RustEngineer:diesel_model] struct={} fn={} examples={} dependent_types={}",
             struct_name,
             fn_name,
-            examples.len()
+            examples.len(),
+            dependent_types.len()
         );
 
-        let prompt = diesel_model::build_prompt(&struct_block.source, &examples, fn_name);
+        let (prompt, table_name) = diesel_model::build_prompt(&struct_block.source, &examples, &dependent_types, fn_name);
 
         let request = CompletionRequest {
             messages: vec![Message {
@@ -128,7 +132,7 @@ impl RustEngineerAgent {
 
         log::info!("[RustEngineer:diesel_model] raw_len={}", raw_response.len());
 
-        let code = extract_code(&raw_response);
+        let code = prepend_imports(&extract_code(&raw_response), &table_name);
         Ok(DieselModelFnOutput {
             prompt,
             raw_response,
@@ -163,4 +167,20 @@ fn extract_code(text: &str) -> String {
     }
 
     text.trim().to_string()
+}
+
+/// Strip any `use` lines from the model output and prepend deterministic imports.
+fn prepend_imports(code: &str, table_name: &Option<String>) -> String {
+    let body = code
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("use "))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    match table_name {
+        Some(table) => format!(
+            "use diesel::prelude::*;\nuse crate::schema::{table};\n\n{body}"
+        ),
+        None => body,
+    }
 }
