@@ -30,8 +30,11 @@ pub use product_owner::{
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
-pub use rust_engineer::{DieselModelFnOutput, RustEngineerAgent, RustEngineerResult};
-pub use stack_reviewer::{StackReviewerAgent, StackReviewResult};
+pub use rust_engineer::{
+    DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, RustEngineerAgent,
+    RustEngineerResult,
+};
+pub use stack_reviewer::{StackReviewResult, StackReviewerAgent};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteProjectNoteStorage,
     SqliteSchemaStorage, SqliteStackNoteStorage, SqliteTaskStorage, SqliteUiFormStorage,

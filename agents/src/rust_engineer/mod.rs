@@ -1,4 +1,7 @@
 mod agent;
 mod modes;
 
-pub use agent::{DieselModelFnOutput, RustEngineerAgent, RustEngineerResult};
+pub use agent::{
+    DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, RustEngineerAgent,
+    RustEngineerResult,
+};

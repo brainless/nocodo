@@ -15,7 +15,10 @@ pub fn extract_column_names(struct_code: &str) -> Vec<String> {
     for line in struct_code.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("pub ") && trimmed.contains(':') {
-            if let Some(name) = trimmed.strip_prefix("pub ").and_then(|s| s.split(':').next()) {
+            if let Some(name) = trimmed
+                .strip_prefix("pub ")
+                .and_then(|s| s.split(':').next())
+            {
                 let name = name.trim();
                 if !name.is_empty() && !name.starts_with('_') {
                     columns.push(name.to_string());
@@ -96,7 +99,11 @@ NEVER write `pool.get().id()`, `pool.id()`, or any method on `pool` other than `
         prompt.push_str(&format!(
             "## Available Columns for `{}`\n\n{}\n\n",
             table_name.as_deref().unwrap_or("unknown"),
-            columns.iter().map(|c| format!("- `{c}`")).collect::<Vec<_>>().join("\n")
+            columns
+                .iter()
+                .map(|c| format!("- `{c}`"))
+                .collect::<Vec<_>>()
+                .join("\n")
         ));
     }
 

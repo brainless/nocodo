@@ -621,8 +621,8 @@ job description that never changes regardless of which task the agent is doing.
 
 `RustEngineerAgent` is a single-shot code generator optimized for tiny local models
 (≤ 1B parameters). It does NOT use tools, multi-turn conversation, or cloud LLMs.
-Instead it extracts code context via tree-sitter, builds a self-contained prompt with
-concrete examples, and parses the response deterministically.
+Instead it extracts or receives narrow code context, builds a self-contained prompt
+with concrete examples, and parses the response deterministically.
 
 **Model:** `unsloth/Qwen3.5-0.8B-GGUF:UD-Q4_K_XL` via llama.cpp at `localhost:8080`.
 Override with `RUST_ENGINEER_MODEL` / `LLAMA_CPP_BASE_URL`.
@@ -632,7 +632,7 @@ Override with `RUST_ENGINEER_MODEL` / `LLAMA_CPP_BASE_URL`.
 - **Example-driven** — prompt contains 13+ concrete patterns the model can copy.
 - **Deterministic post-processing** — strips model `use` lines, prepends correct imports
   from `#[diesel(table_name)]`, unwraps code fences, strips `<think>` blocks.
-- **Narrow scope per mode** — each mode generates one function body.
+- **Narrow scope per mode** — each mode generates one tightly scoped Rust artifact.
 - **Low temperature** (0.2) — favor determinism over creativity.
 - **Transparent** — returns `prompt + raw_response + extracted_code` for debugging.
 
@@ -641,22 +641,26 @@ Override with `RUST_ENGINEER_MODEL` / `LLAMA_CPP_BASE_URL`.
 ```
 agents/src/rust_engineer/
 ├── mod.rs              ← re-exports
-├── agent.rs            ← RustEngineerAgent struct, diesel_model_fn() entry point
+├── agent.rs            ← RustEngineerAgent struct and mode entry points
 └── modes/
     ├── mod.rs
-    └── diesel_model.rs ← build_prompt() + extract_table_name()
+    ├── diesel_model.rs        ← impl function prompt builder
+    ├── diesel_model_struct.rs ← compact struct system prompt
+    └── diesel_schema.rs       ← compact table schema system prompt
 ```
 
 **Backend endpoint:** `POST /api/rust-engineer/run` (synchronous, runs inline).
 
-**Admin UI:** `RustEngineerPage` — struct/fn inputs in top nav, three result panels
-(prompt sent, raw response, extracted code). Wrench icon in sidebar.
+**Admin UI:** `RustEngineerPage` — mode selector, mode-specific inputs, prompt/raw/code
+debug panels. Wrench icon in sidebar.
 
 #### Current Modes
 
 | Mode | File | Input | Output |
 |------|------|-------|--------|
 | `diesel_model` | `modes/diesel_model.rs` | `struct_name`, `fn_name` | Diesel impl function body for SQLite |
+| `diesel_model_struct` | `modes/diesel_model_struct.rs` | user prompt containing schema/request and, for updates, current struct | One Diesel model struct |
+| `diesel_schema` | `modes/diesel_schema.rs` | user prompt containing schema/request and, for updates, current `diesel::table!` block | One Diesel `table!` definition |
 
 **`diesel_model` mode flow:**
 1. `find_struct_file()` → locate the `.rs` file containing the struct
@@ -677,6 +681,33 @@ agents/src/rust_engineer/
 - Dependent type definitions (enums, etc.)
 - Up to 3 existing impl functions for style matching
 - Final instruction: "Write ONLY the function definition. No imports, no explanation, no markdown fences."
+
+**`diesel_model_struct` mode flow:**
+1. Caller sends the task in the user prompt. If updating, the current struct is included there.
+2. `build_system_prompt()` provides a compact stable prompt with Diesel derive rules and three examples.
+3. LLM call → `max_tokens: 768, temperature: 0.2`
+4. `extract_code()` → strip `<think>`, unwrap fences
+5. `strip_imports()` → remove model-added `use` lines; output remains the struct only.
+
+**Prompt composition** (`build_system_prompt`):
+- Output contract: one Rust struct item only, no imports/impl/explanation/markdown
+- Diesel derive rules for `Queryable`, `Selectable`, `Identifiable`, `Associations`, `Insertable`, `AsChangeset`
+- SQLite type mapping and nullable handling
+- Three small examples: read model, insert model, associated read model
+
+**`diesel_schema` mode flow:**
+1. Caller sends the task in the user prompt. If updating, the current `diesel::table!` block is included there.
+2. `build_system_prompt()` provides a compact stable prompt with Diesel SQLite schema rules and examples from the nocodo template style.
+3. LLM call → `max_tokens: 768, temperature: 0.2`
+4. `extract_code()` → strip `<think>`, unwrap fences
+5. `strip_imports()` → remove model-added `use` lines; output remains the table definition only.
+
+**Prompt composition** (`build_system_prompt`):
+- Output contract: one `diesel::table!` block only; no models, migrations, `joinable!`, or `allow_tables_to_appear_in_same_query!`
+- SQLite type mapping and nullable handling
+- Primary key and composite primary key syntax
+- Foreign-key guidance: emit the FK column only; join metadata is maintained separately in `backend/src/schema.rs`
+- Examples covering basic tables, nocodo `BigInt` ids, nullable fields, child tables, join tables, and token/state tables
 
 #### Planned Modes (Experimental)
 

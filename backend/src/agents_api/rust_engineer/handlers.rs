@@ -10,12 +10,15 @@ use crate::agents_api::state::AgentState;
 #[derive(Deserialize)]
 pub struct RunRequest {
     pub project_id: i64,
-    pub struct_name: String,
-    pub fn_name: String,
+    pub mode: Option<String>,
+    pub struct_name: Option<String>,
+    pub fn_name: Option<String>,
+    pub prompt: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct RunResponse {
+    pub system_prompt: Option<String>,
     pub prompt: String,
     pub raw_response: String,
     pub code: Option<String>,
@@ -23,13 +26,10 @@ pub struct RunResponse {
 
 /// POST /api/rust-engineer/run
 ///
-/// Runs the Rust engineer agent in diesel_model mode. Returns the full prompt
-/// that was sent to the model and the raw + extracted response for display.
+/// Runs the Rust engineer agent. Defaults to diesel_model_fn mode for backward
+/// compatibility. Returns prompt(s), raw response, and extracted code.
 #[post("/api/rust-engineer/run")]
-pub async fn run(
-    state: web::Data<AgentState>,
-    body: web::Json<RunRequest>,
-) -> impl Responder {
+pub async fn run(state: web::Data<AgentState>, body: web::Json<RunRequest>) -> impl Responder {
     let project_path = match get_project_path(&state.db_path, body.project_id) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -37,8 +37,7 @@ pub async fn run(
                 .json(serde_json::json!({ "error": "Project not found" }));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-                .json(serde_json::json!({ "error": e }));
+            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": e }));
         }
     };
 
@@ -56,14 +55,87 @@ pub async fn run(
         }
     };
 
-    match agent.diesel_model_fn(&body.struct_name, &body.fn_name).await {
-        Ok(output) => HttpResponse::Ok().json(RunResponse {
-            prompt: output.prompt,
-            raw_response: output.raw_response,
-            code: output.code,
-        }),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({ "error": format!("{}", e) })),
+    let mode = body.mode.as_deref().unwrap_or("diesel_model_fn");
+    match mode {
+        "diesel_model_struct" => {
+            let Some(prompt) = body
+                .prompt
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            else {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({ "error": "prompt is required for diesel_model_struct mode" }));
+            };
+
+            match agent.diesel_model_struct(prompt).await {
+                Ok(output) => HttpResponse::Ok().json(RunResponse {
+                    system_prompt: Some(output.system_prompt),
+                    prompt: output.prompt,
+                    raw_response: output.raw_response,
+                    code: output.code,
+                }),
+                Err(e) => HttpResponse::InternalServerError()
+                    .json(serde_json::json!({ "error": format!("{}", e) })),
+            }
+        }
+        "diesel_schema" => {
+            let Some(prompt) = body
+                .prompt
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            else {
+                return HttpResponse::BadRequest().json(
+                    serde_json::json!({ "error": "prompt is required for diesel_schema mode" }),
+                );
+            };
+
+            match agent.diesel_schema(prompt).await {
+                Ok(output) => HttpResponse::Ok().json(RunResponse {
+                    system_prompt: Some(output.system_prompt),
+                    prompt: output.prompt,
+                    raw_response: output.raw_response,
+                    code: output.code,
+                }),
+                Err(e) => HttpResponse::InternalServerError()
+                    .json(serde_json::json!({ "error": format!("{}", e) })),
+            }
+        }
+        "diesel_model_fn" | "diesel_model" => {
+            let Some(struct_name) = body
+                .struct_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            else {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({ "error": "struct_name is required for diesel_model_fn mode" }));
+            };
+            let Some(fn_name) = body
+                .fn_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            else {
+                return HttpResponse::BadRequest().json(
+                    serde_json::json!({ "error": "fn_name is required for diesel_model_fn mode" }),
+                );
+            };
+
+            match agent.diesel_model_fn(struct_name, fn_name).await {
+                Ok(output) => HttpResponse::Ok().json(RunResponse {
+                    system_prompt: None,
+                    prompt: output.prompt,
+                    raw_response: output.raw_response,
+                    code: output.code,
+                }),
+                Err(e) => HttpResponse::InternalServerError()
+                    .json(serde_json::json!({ "error": format!("{}", e) })),
+            }
+        }
+        _ => HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": format!("unknown rust engineer mode: {}", mode) })),
     }
 }
 
