@@ -25,10 +25,7 @@ fn select_project_db(project_path: &str, db_kind: &str) {
     if db_src.exists() {
         match std::fs::copy(&db_src, &db_dst) {
             Ok(_) => {
-                log::info!(
-                    "[select_project_db] Selected {} db.rs variant",
-                    db_kind
-                );
+                log::info!("[select_project_db] Selected {} db.rs variant", db_kind);
                 let _ = std::fs::remove_file(&db_src);
             }
             Err(e) => {
@@ -80,7 +77,11 @@ fn seed_stack_notes(db_url: &str, project_id: i64, project_path: &str) {
     let sql = match std::fs::read_to_string(&seed_path) {
         Ok(s) => s,
         Err(e) => {
-            log::warn!("[seed_stack_notes] Could not read {}: {}", seed_path.display(), e);
+            log::warn!(
+                "[seed_stack_notes] Could not read {}: {}",
+                seed_path.display(),
+                e
+            );
             return;
         }
     };
@@ -102,7 +103,11 @@ fn seed_stack_notes(db_url: &str, project_id: i64, project_path: &str) {
             Err(e) => log::warn!("[seed_stack_notes] Statement failed: {} — {}", stmt, e),
         }
     }
-    log::info!("[seed_stack_notes] Seeded {} stack notes for project {}", count, project_id);
+    log::info!(
+        "[seed_stack_notes] Seeded {} stack notes for project {}",
+        count,
+        project_id
+    );
 }
 
 /// Split SQL on semicolons while respecting single-quoted string literals.

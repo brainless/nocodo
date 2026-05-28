@@ -585,10 +585,7 @@ pub trait ProjectNoteStorage: Send + Sync {
     ) -> Result<i64, AgentError>;
 
     /// Returns only notes not superseded by any other note (the "current view").
-    async fn list_current_notes(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<ProjectNoteRow>, AgentError>;
+    async fn list_current_notes(&self, project_id: i64) -> Result<Vec<ProjectNoteRow>, AgentError>;
 
     async fn list_notes_by_topic(
         &self,

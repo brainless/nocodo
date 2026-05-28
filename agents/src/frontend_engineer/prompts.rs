@@ -1,7 +1,8 @@
 use crate::nocodo_description::NOCODO_DESCRIPTION;
 
 pub fn system_prompt() -> String {
-    format!(r#"You are the Frontend Engineer agent for nocodo.
+    format!(
+        r#"You are the Frontend Engineer agent for nocodo.
 
 ## About nocodo
 
@@ -82,5 +83,6 @@ Keep the summary factual and concise. Do not guess — only include what you can
 - The `path` parameter for `list_files` and `read_file` is relative to the project root (the directory containing `admin-gui/`).
 - Do not use absolute paths.
 - Output the complete JSON summary in one assistant response.
-- After outputting JSON, call `update_task_status` with status "done"."#)
+- After outputting JSON, call `update_task_status` with status "done"."#
+    )
 }

@@ -469,10 +469,7 @@ const PM_GREETING: &str = "Hi! I'm the Project Manager at nocodo. I've received 
 // Background task: PO handles intake session
 // ---------------------------------------------------------------------------
 
-async fn notify_session(
-    chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
-    session_id: i64,
-) {
+async fn notify_session(chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>, session_id: i64) {
     let map = chat_notify.lock().await;
     if let Some(notify) = map.get(&session_id) {
         notify.notify_waiters();
@@ -539,9 +536,17 @@ async fn run_po_intake(
     let has_unanswered = messages
         .iter()
         .any(|m| m.content_type == "structured_question" && !answered_ids.contains(&m.id));
-    log::info!("[PO:session={}] answered_ids={:?} has_unanswered={}", session_id, answered_ids, has_unanswered);
+    log::info!(
+        "[PO:session={}] answered_ids={:?} has_unanswered={}",
+        session_id,
+        answered_ids,
+        has_unanswered
+    );
     if has_unanswered {
-        log::info!("[PO:session={}] returning early — unanswered questions present", session_id);
+        log::info!(
+            "[PO:session={}] returning early — unanswered questions present",
+            session_id
+        );
         return;
     }
 
@@ -592,9 +597,17 @@ async fn run_po_intake(
     // questions as separate rows but the LLM requires strictly alternating turns.
     let llm_messages = merge_consecutive_roles(raw_messages);
 
-    log::info!("[PO:session={}] sending {} messages to LLM:", session_id, llm_messages.len());
+    log::info!(
+        "[PO:session={}] sending {} messages to LLM:",
+        session_id,
+        llm_messages.len()
+    );
     for (i, (role, text)) in llm_messages.iter().enumerate() {
-        log::info!("[PO:session={}]   [{i}] {role}: {}", session_id, &text[..text.len().min(120)]);
+        log::info!(
+            "[PO:session={}]   [{i}] {role}: {}",
+            session_id,
+            &text[..text.len().min(120)]
+        );
     }
 
     let config = match AgentConfig::load() {
@@ -649,9 +662,21 @@ async fn run_po_intake(
         }
     };
 
-    log::info!("[PO:session={}] calling respond_in_session (requirements_gathering)", session_id);
-    let po_result = po.respond_in_session(session_id, llm_messages.clone(), false).await;
-    log::info!("[PO:session={}] respond_in_session returned: {:?}", session_id, po_result.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|e| format!("Err({:?})", e)));
+    log::info!(
+        "[PO:session={}] calling respond_in_session (requirements_gathering)",
+        session_id
+    );
+    let po_result = po
+        .respond_in_session(session_id, llm_messages.clone(), false)
+        .await;
+    log::info!(
+        "[PO:session={}] respond_in_session returned: {:?}",
+        session_id,
+        po_result
+            .as_ref()
+            .map(|r| format!("{:?}", r))
+            .unwrap_or_else(|e| format!("Err({:?})", e))
+    );
     match po_result {
         Ok(PoSessionResult::RequirementsComplete { closing_message }) => {
             // Show the closing message to the user.
@@ -672,9 +697,19 @@ async fn run_po_intake(
             notify_session(&chat_notify, session_id).await;
 
             // Second call: project naming mode — PO derives a name from the conversation.
-            log::info!("[PO:session={}] calling respond_in_session (project_naming)", session_id);
+            log::info!(
+                "[PO:session={}] calling respond_in_session (project_naming)",
+                session_id
+            );
             let naming_result = po.respond_in_session(session_id, llm_messages, true).await;
-            log::info!("[PO:session={}] project_naming returned: {:?}", session_id, naming_result.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|e| format!("Err({:?})", e)));
+            log::info!(
+                "[PO:session={}] project_naming returned: {:?}",
+                session_id,
+                naming_result
+                    .as_ref()
+                    .map(|r| format!("{:?}", r))
+                    .unwrap_or_else(|e| format!("Err({:?})", e))
+            );
             match naming_result {
                 Ok(PoSessionResult::Named) | Ok(PoSessionResult::Silent) => {
                     handle_po_complete(
@@ -688,8 +723,19 @@ async fn run_po_intake(
                     .await;
                 }
                 Ok(_) => {
-                    log::warn!("[PO:session={}] unexpected result from project_naming mode", session_id);
-                    handle_po_complete(&db_path, session_id, project_id, user_id, &chat_storage, &chat_notify).await;
+                    log::warn!(
+                        "[PO:session={}] unexpected result from project_naming mode",
+                        session_id
+                    );
+                    handle_po_complete(
+                        &db_path,
+                        session_id,
+                        project_id,
+                        user_id,
+                        &chat_storage,
+                        &chat_notify,
+                    )
+                    .await;
                 }
                 Err(e) => {
                     log::warn!("user_chat: PO project_naming error: {}", e);
@@ -745,7 +791,8 @@ async fn run_po_intake(
             }
             notify_session(&chat_notify, session_id).await;
         }
-        Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) | Ok(PoSessionResult::Named) => {}
+        Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) | Ok(PoSessionResult::Named) => {
+        }
         Err(e) => {
             log::warn!("user_chat: PO error: {}", e);
         }
@@ -909,23 +956,25 @@ async fn run_pm_planning(
 
     // Load the parent intake session's messages so PM has the full requirements Q&A.
     // We look up the intake session by finding the one whose handoff_session_id points here.
-    let intake_messages: Vec<UserChatMessageRow> =
-        match rusqlite::Connection::open(&db_path) {
-            Ok(conn) => {
-                match conn.query_row(
-                    "SELECT id FROM user_chat_session WHERE handoff_session_id = ?1",
-                    rusqlite::params![session_id],
-                    |row| row.get::<_, i64>(0),
-                ) {
-                    Ok(intake_id) => chat_storage.get_messages(intake_id).await.unwrap_or_default(),
-                    Err(_) => vec![],
-                }
+    let intake_messages: Vec<UserChatMessageRow> = match rusqlite::Connection::open(&db_path) {
+        Ok(conn) => {
+            match conn.query_row(
+                "SELECT id FROM user_chat_session WHERE handoff_session_id = ?1",
+                rusqlite::params![session_id],
+                |row| row.get::<_, i64>(0),
+            ) {
+                Ok(intake_id) => chat_storage
+                    .get_messages(intake_id)
+                    .await
+                    .unwrap_or_default(),
+                Err(_) => vec![],
             }
-            Err(e) => {
-                log::warn!("user_chat: open db for intake lookup: {}", e);
-                vec![]
-            }
-        };
+        }
+        Err(e) => {
+            log::warn!("user_chat: open db for intake lookup: {}", e);
+            vec![]
+        }
+    };
 
     let mut raw_messages: Vec<(String, String)> = Vec::new();
 
@@ -945,8 +994,8 @@ async fn run_pm_planning(
     // The seeded PO summary (first message, author_type="agent"/product_owner) is mapped as
     // "user" so PM reads it as a briefing it received, not as its own prior statement.
     for m in &messages {
-        let is_po_seed = m.author_type == "agent"
-            && m.agent_type.as_deref() == Some("product_owner");
+        let is_po_seed =
+            m.author_type == "agent" && m.agent_type.as_deref() == Some("product_owner");
         let role = if is_po_seed {
             "user"
         } else {
@@ -985,7 +1034,10 @@ async fn run_pm_planning(
         }
     };
 
-    match pm.chat_for_user_session(session_id, llm_messages, true).await {
+    match pm
+        .chat_for_user_session(session_id, llm_messages, true)
+        .await
+    {
         Ok(PmUserSessionResult::Finalized { params }) => {
             handle_pm_finalized(&db_path, session_id, project_id, params, &chat_storage).await;
             notify_session(&chat_notify, session_id).await;

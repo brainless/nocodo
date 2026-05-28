@@ -1,7 +1,8 @@
 use crate::nocodo_description::NOCODO_DESCRIPTION;
 
 pub fn system_prompt() -> String {
-    format!(r#"You are the UI Designer agent for nocodo.
+    format!(
+        r#"You are the UI Designer agent for nocodo.
 
 ## About nocodo
 
@@ -49,5 +50,6 @@ Design a form layout for creating or editing a record of this entity. Call `writ
 
 Set title to the human-readable entity name, e.g. "project" → "New Project", "invoice_line_item" → "New Invoice Line Item".
 
-Call `write_form_layout` now with the complete form."#)
+Call `write_form_layout` now with the complete form."#
+    )
 }

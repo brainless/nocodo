@@ -138,7 +138,11 @@ impl CodeIndex {
             .map_err(|e| e.to_string())
     }
 
-    pub fn get_impl_fn(&self, struct_name: &str, fn_name: &str) -> Result<Option<CodeBlock>, String> {
+    pub fn get_impl_fn(
+        &self,
+        struct_name: &str,
+        fn_name: &str,
+    ) -> Result<Option<CodeBlock>, String> {
         self.conn
             .query_row(
                 "SELECT file, start_line, end_line, source FROM code_index_impl_fns WHERE struct_name = ?1 AND fn_name = ?2",
@@ -240,8 +244,16 @@ fn scan_file(
 
     let mut stats = BuildStats::default();
 
-    fn find_cap<'a>(caps: &[tree_sitter::QueryCapture<'a>], q: &Query, name: &str) -> Option<Node<'a>> {
-        let idx = q.capture_names().iter().position(|n| *n == name).map(|i| i as u32)?;
+    fn find_cap<'a>(
+        caps: &[tree_sitter::QueryCapture<'a>],
+        q: &Query,
+        name: &str,
+    ) -> Option<Node<'a>> {
+        let idx = q
+            .capture_names()
+            .iter()
+            .position(|n| *n == name)
+            .map(|i| i as u32)?;
         caps.iter().find(|c| c.index == idx).map(|c| c.node)
     }
 
@@ -250,7 +262,10 @@ fn scan_file(
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(&q_struct, tree.root_node(), src.as_bytes());
     while let Some(m) = matches.next() {
-        if let (Some(nn), Some(it)) = (find_cap(m.captures, &q_struct, "name"), find_cap(m.captures, &q_struct, "item")) {
+        if let (Some(nn), Some(it)) = (
+            find_cap(m.captures, &q_struct, "name"),
+            find_cap(m.captures, &q_struct, "item"),
+        ) {
             let name = &src[nn.byte_range()];
             let start = it.start_position().row as u32 + 1;
             let end = it.end_position().row as u32 + 1;
@@ -268,7 +283,10 @@ fn scan_file(
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(&q_fn, tree.root_node(), src.as_bytes());
     while let Some(m) = matches.next() {
-        if let (Some(nn), Some(it)) = (find_cap(m.captures, &q_fn, "fn_name"), find_cap(m.captures, &q_fn, "item")) {
+        if let (Some(nn), Some(it)) = (
+            find_cap(m.captures, &q_fn, "fn_name"),
+            find_cap(m.captures, &q_fn, "item"),
+        ) {
             if it.parent().map_or(false, |p| p.kind() == "source_file") {
                 let name = &src[nn.byte_range()];
                 let start = it.start_position().row as u32 + 1;
@@ -289,7 +307,10 @@ fn scan_file(
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(&q_impl, tree.root_node(), src.as_bytes());
     while let Some(m) = matches.next() {
-        if let (Some(sn), Some(impl_it)) = (find_cap(m.captures, &q_impl, "struct_name"), find_cap(m.captures, &q_impl, "item")) {
+        if let (Some(sn), Some(impl_it)) = (
+            find_cap(m.captures, &q_impl, "struct_name"),
+            find_cap(m.captures, &q_impl, "item"),
+        ) {
             let struct_name = &src[sn.byte_range()];
 
             // Skip trait impls (impl Trait for Struct) — only inherent impls
@@ -300,7 +321,10 @@ fn scan_file(
             let mut fn_cursor = QueryCursor::new();
             let mut fn_matches = fn_cursor.matches(&q_impl_fn, impl_it, src.as_bytes());
             while let Some(fm) = fn_matches.next() {
-                if let (Some(fnn), Some(fn_it)) = (find_cap(fm.captures, &q_impl_fn, "fn_name"), find_cap(fm.captures, &q_impl_fn, "item")) {
+                if let (Some(fnn), Some(fn_it)) = (
+                    find_cap(fm.captures, &q_impl_fn, "fn_name"),
+                    find_cap(fm.captures, &q_impl_fn, "item"),
+                ) {
                     let fn_name = &src[fnn.byte_range()];
                     let start = fn_it.start_position().row as u32 + 1;
                     let end = fn_it.end_position().row as u32 + 1;
@@ -367,7 +391,9 @@ mod tests {
         let mut idx = CodeIndex::memory().expect("open memory");
         idx.build(&src).expect("build ok");
 
-        let block = idx.get_impl_fn("ContactRecord", "find_by_email").expect("query ok");
+        let block = idx
+            .get_impl_fn("ContactRecord", "find_by_email")
+            .expect("query ok");
         let block = block.expect("fn found");
         assert!(block.source.contains("fn find_by_email"));
     }
@@ -415,7 +441,13 @@ mod tests {
         idx.build(&src).expect("build ok");
 
         assert!(idx.get_struct("Nonexistent").expect("query ok").is_none());
-        assert!(idx.get_free_fn("nonexistent_fn").expect("query ok").is_none());
-        assert!(idx.get_impl_fn("ContactRecord", "nonexistent").expect("query ok").is_none());
+        assert!(idx
+            .get_free_fn("nonexistent_fn")
+            .expect("query ok")
+            .is_none());
+        assert!(idx
+            .get_impl_fn("ContactRecord", "nonexistent")
+            .expect("query ok")
+            .is_none());
     }
 }

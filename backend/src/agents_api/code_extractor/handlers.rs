@@ -25,7 +25,9 @@ fn to_shared_block(block: CodeBlock) -> shared_types::CodeBlock {
     }
 }
 
-fn to_shared_stats(stats: nocodo_agents::code_extractor::BuildStats) -> shared_types::CodeIndexBuildStats {
+fn to_shared_stats(
+    stats: nocodo_agents::code_extractor::BuildStats,
+) -> shared_types::CodeIndexBuildStats {
     shared_types::CodeIndexBuildStats {
         structs: stats.structs,
         free_fns: stats.free_fns,

@@ -1,7 +1,8 @@
 use crate::nocodo_description::NOCODO_DESCRIPTION;
 
 pub fn system_prompt(cargo_dependencies: &str) -> String {
-    let template = format!(r#"You are the Backend Engineer agent for nocodo.
+    let template = format!(
+        r#"You are the Backend Engineer agent for nocodo.
 
 ## About nocodo
 
@@ -77,6 +78,7 @@ Keep the summary factual and concise. Do not guess — only include what you can
 ## Deterministic Cargo Dependency Context
 
 __CARGO_DEPS__
-"#);
+"#
+    );
     template.replace("__CARGO_DEPS__", cargo_dependencies)
 }

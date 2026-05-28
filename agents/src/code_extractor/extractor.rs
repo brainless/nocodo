@@ -58,7 +58,11 @@ fn run_query<'a>(
     captures.into_iter()
 }
 
-fn find_capture<'a>(caps: &[tree_sitter::QueryCapture<'a>], query: &Query, name: &str) -> Option<Node<'a>> {
+fn find_capture<'a>(
+    caps: &[tree_sitter::QueryCapture<'a>],
+    query: &Query,
+    name: &str,
+) -> Option<Node<'a>> {
     let idx = query
         .capture_names()
         .iter()
@@ -95,8 +99,7 @@ pub fn rust_sources(root: &Path) -> Vec<PathBuf> {
 // ---------------------------------------------------------------------------
 
 pub fn extract_struct(path: &Path, name: &str) -> Result<Option<CodeBlock>, String> {
-    let src = std::fs::read_to_string(path)
-        .map_err(|e| format!("read {path:?}: {e}"))?;
+    let src = std::fs::read_to_string(path).map_err(|e| format!("read {path:?}: {e}"))?;
     let mut parser = make_parser()?;
     let tree = parser
         .parse(src.as_bytes(), None)
@@ -128,8 +131,7 @@ pub fn extract_struct(path: &Path, name: &str) -> Result<Option<CodeBlock>, Stri
 // ---------------------------------------------------------------------------
 
 pub fn extract_enum(path: &Path, name: &str) -> Result<Option<CodeBlock>, String> {
-    let src = std::fs::read_to_string(path)
-        .map_err(|e| format!("read {path:?}: {e}"))?;
+    let src = std::fs::read_to_string(path).map_err(|e| format!("read {path:?}: {e}"))?;
     let mut parser = make_parser()?;
     let tree = parser
         .parse(src.as_bytes(), None)
@@ -161,12 +163,27 @@ pub fn extract_enum(path: &Path, name: &str) -> Result<Option<CodeBlock>, String
 // ---------------------------------------------------------------------------
 
 const KNOWN_TYPES: &[&str] = &[
-    "i8", "i16", "i32", "i64", "i128", "isize",
-    "u8", "u16", "u32", "u64", "u128", "usize",
-    "f32", "f64",
-    "bool", "char",
-    "String", "str",
-    "NaiveDateTime", "NaiveDate", "NaiveTime",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "i128",
+    "isize",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "u128",
+    "usize",
+    "f32",
+    "f64",
+    "bool",
+    "char",
+    "String",
+    "str",
+    "NaiveDateTime",
+    "NaiveDate",
+    "NaiveTime",
     "Uuid",
 ];
 
@@ -175,14 +192,23 @@ const KNOWN_TYPES: &[&str] = &[
 fn collect_custom_type_names(struct_code: &str) -> Vec<String> {
     let mut types = Vec::new();
     let mut parser = make_parser().ok();
-    let Some(ref mut parser) = parser else { return types };
-    let Some(tree) = parser.parse(struct_code.as_bytes(), None) else { return types };
+    let Some(ref mut parser) = parser else {
+        return types;
+    };
+    let Some(tree) = parser.parse(struct_code.as_bytes(), None) else {
+        return types;
+    };
 
     let lang = tree_sitter_rust::LANGUAGE.into();
     // Match any type_identifier that appears as a field type in a struct.
-    let type_query = Query::new(&lang, "(field_declaration type: (type_identifier) @type_name)")
-        .ok();
-    let Some(type_query) = type_query else { return types };
+    let type_query = Query::new(
+        &lang,
+        "(field_declaration type: (type_identifier) @type_name)",
+    )
+    .ok();
+    let Some(type_query) = type_query else {
+        return types;
+    };
 
     for caps in run_query(&type_query, tree.root_node(), struct_code.as_bytes()) {
         let type_node = find_capture(&caps, &type_query, "type_name");
@@ -234,8 +260,7 @@ pub fn find_dependent_types(
 // ---------------------------------------------------------------------------
 
 pub fn extract_free_fn(path: &Path, name: &str) -> Result<Option<CodeBlock>, String> {
-    let src = std::fs::read_to_string(path)
-        .map_err(|e| format!("read {path:?}: {e}"))?;
+    let src = std::fs::read_to_string(path).map_err(|e| format!("read {path:?}: {e}"))?;
     let mut parser = make_parser()?;
     let tree = parser
         .parse(src.as_bytes(), None)
@@ -266,19 +291,22 @@ pub fn extract_free_fn(path: &Path, name: &str) -> Result<Option<CodeBlock>, Str
 // Extraction: impl method (StructName::method_name)
 // ---------------------------------------------------------------------------
 
-pub fn extract_impl_fn(path: &Path, struct_name: &str, fn_name: &str) -> Result<Option<CodeBlock>, String> {
-    let src = std::fs::read_to_string(path)
-        .map_err(|e| format!("read {path:?}: {e}"))?;
+pub fn extract_impl_fn(
+    path: &Path,
+    struct_name: &str,
+    fn_name: &str,
+) -> Result<Option<CodeBlock>, String> {
+    let src = std::fs::read_to_string(path).map_err(|e| format!("read {path:?}: {e}"))?;
     let mut parser = make_parser()?;
     let tree = parser
         .parse(src.as_bytes(), None)
         .ok_or_else(|| format!("parse failed for {path:?}"))?;
 
     let lang = tree_sitter_rust::LANGUAGE.into();
-    let impl_query = Query::new(&lang, queries::IMPL_BLOCK)
-        .map_err(|e| format!("query compile: {e}"))?;
-    let fn_query = Query::new(&lang, queries::IMPL_FN)
-        .map_err(|e| format!("query compile: {e}"))?;
+    let impl_query =
+        Query::new(&lang, queries::IMPL_BLOCK).map_err(|e| format!("query compile: {e}"))?;
+    let fn_query =
+        Query::new(&lang, queries::IMPL_FN).map_err(|e| format!("query compile: {e}"))?;
 
     for caps in run_query(&impl_query, tree.root_node(), src.as_bytes()) {
         let struct_node = find_capture(&caps, &impl_query, "struct_name");
@@ -331,7 +359,11 @@ pub fn find_free_fn_file(root: &Path, name: &str) -> Result<Option<PathBuf>, Str
     Ok(None)
 }
 
-pub fn find_impl_fn_file(root: &Path, struct_name: &str, fn_name: &str) -> Result<Option<PathBuf>, String> {
+pub fn find_impl_fn_file(
+    root: &Path,
+    struct_name: &str,
+    fn_name: &str,
+) -> Result<Option<PathBuf>, String> {
     for path in rust_sources(root) {
         if extract_impl_fn(&path, struct_name, fn_name)?.is_some() {
             return Ok(Some(path));
@@ -345,18 +377,17 @@ pub fn find_impl_fn_file(root: &Path, struct_name: &str, fn_name: &str) -> Resul
 // ---------------------------------------------------------------------------
 
 pub fn list_impl_fns(path: &Path, struct_name: &str) -> Result<Vec<CodeBlock>, String> {
-    let src = std::fs::read_to_string(path)
-        .map_err(|e| format!("read {path:?}: {e}"))?;
+    let src = std::fs::read_to_string(path).map_err(|e| format!("read {path:?}: {e}"))?;
     let mut parser = make_parser()?;
     let tree = parser
         .parse(src.as_bytes(), None)
         .ok_or_else(|| format!("parse failed for {path:?}"))?;
 
     let lang = tree_sitter_rust::LANGUAGE.into();
-    let impl_query = Query::new(&lang, queries::IMPL_BLOCK)
-        .map_err(|e| format!("query compile: {e}"))?;
-    let fn_query = Query::new(&lang, queries::IMPL_FN)
-        .map_err(|e| format!("query compile: {e}"))?;
+    let impl_query =
+        Query::new(&lang, queries::IMPL_BLOCK).map_err(|e| format!("query compile: {e}"))?;
+    let fn_query =
+        Query::new(&lang, queries::IMPL_FN).map_err(|e| format!("query compile: {e}"))?;
 
     let mut result = Vec::new();
 

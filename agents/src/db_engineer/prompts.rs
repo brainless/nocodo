@@ -1,7 +1,8 @@
 use crate::nocodo_description::NOCODO_DESCRIPTION;
 
 pub fn system_prompt() -> String {
-    format!(r#"You are an expert SQLite 3 database schema designer and part of nocodo.
+    format!(
+        r#"You are an expert SQLite 3 database schema designer and part of nocodo.
 
 ## About nocodo
 
@@ -62,5 +63,6 @@ user's description of their data, workflows, or application requirements.
    - `created_at INTEGER NOT NULL` — always last; stores Unix epoch seconds of row creation.
    Pure join tables (only two FK columns + a PK) do NOT need audit columns.
     These columns MUST appear at the end of the column list, after all domain columns.
-  "#)
+  "#
+    )
 }

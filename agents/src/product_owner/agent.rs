@@ -216,21 +216,18 @@ impl ProductOwnerAgent {
                         "Question queued for user".to_string()
                     }
                     "record_project_note" => {
-                        let params: RecordProjectNoteParams =
-                            match tool_call.parse_arguments().map_err(AgentError::Llm) {
-                                Ok(p) => p,
-                                Err(e) => {
-                                    log::warn!(
-                                        "[PO] record_project_note parse error: {}",
-                                        e
-                                    );
-                                    tool_result_messages.push(Message::tool(
-                                        tool_call.id(),
-                                        format!("Error: {}", e),
-                                    ));
-                                    continue;
-                                }
-                            };
+                        let params: RecordProjectNoteParams = match tool_call
+                            .parse_arguments()
+                            .map_err(AgentError::Llm)
+                        {
+                            Ok(p) => p,
+                            Err(e) => {
+                                log::warn!("[PO] record_project_note parse error: {}", e);
+                                tool_result_messages
+                                    .push(Message::tool(tool_call.id(), format!("Error: {}", e)));
+                                continue;
+                            }
+                        };
                         let topic = ProjectNoteTopic::from_str(&params.topic);
                         if let Err(e) = self
                             .note_storage
@@ -328,10 +325,7 @@ impl ProductOwnerAgent {
 
         log::info!("[PO:project_naming] calling LLM model={}", self.model);
         let response = self.llm_client.complete(request).await?;
-        log::info!(
-            "[PO:project_naming] stop_reason={:?}",
-            response.stop_reason
-        );
+        log::info!("[PO:project_naming] stop_reason={:?}", response.stop_reason);
 
         let Some(tool_calls) = response.tool_calls else {
             log::warn!("[PO:project_naming] no tool call — model returned text only");

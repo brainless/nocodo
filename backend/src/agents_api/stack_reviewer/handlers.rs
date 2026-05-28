@@ -1,9 +1,7 @@
 use std::path::Path;
 
 use actix_web::{get, post, web, HttpResponse, Responder};
-use nocodo_agents::{
-    build_stack_reviewer, AgentConfig, SqliteStackNoteStorage, StackNoteStorage,
-};
+use nocodo_agents::{build_stack_reviewer, AgentConfig, SqliteStackNoteStorage, StackNoteStorage};
 use rusqlite::OptionalExtension;
 use serde::Deserialize;
 
@@ -34,8 +32,7 @@ pub async fn run_review(
                 .json(serde_json::json!({ "error": "Project not found" }));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-                .json(serde_json::json!({ "error": e }));
+            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": e }));
         }
     };
 

@@ -1349,10 +1349,7 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
         Ok(conn.last_insert_rowid())
     }
 
-    async fn list_current_notes(
-        &self,
-        project_id: i64,
-    ) -> Result<Vec<ProjectNoteRow>, AgentError> {
+    async fn list_current_notes(&self, project_id: i64) -> Result<Vec<ProjectNoteRow>, AgentError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT pn.id, pn.project_id, pn.topic, pn.note,

@@ -11,7 +11,10 @@ use llm_sdk::{
 use crate::{
     error::AgentError,
     storage::{StackNoteStorage, StackTag},
-    utils::{file_ops, tools::{ListFilesParams, ReadFileParams}},
+    utils::{
+        file_ops,
+        tools::{ListFilesParams, ReadFileParams},
+    },
 };
 
 use super::tools::{EmitNoteParams, FinishReviewParams};
@@ -112,7 +115,8 @@ impl StackReviewerAgent {
         let mut messages: Vec<Message> = vec![Message {
             role: Role::User,
             content: vec![llm_sdk::types::ContentBlock::Text {
-                text: "Please review the project codebase and update the tech stack notes.".to_string(),
+                text: "Please review the project codebase and update the tech stack notes."
+                    .to_string(),
             }],
             tool_call_id: None,
             tool_name: None,
@@ -132,7 +136,9 @@ impl StackReviewerAgent {
 
             // After 3 consecutive validation errors the model is stuck; force finish_review.
             let tool_choice = if consecutive_validation_errors >= 3 {
-                ToolChoice::Specific { name: "finish_review".to_string() }
+                ToolChoice::Specific {
+                    name: "finish_review".to_string(),
+                }
             } else {
                 ToolChoice::Auto
             };

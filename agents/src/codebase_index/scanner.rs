@@ -108,7 +108,12 @@ pub fn scan(
         each_match(&q_fn_ret, root_node, bytes, |caps| {
             if let Some(ret) = find_capture(caps, &q_fn_ret, "return_type") {
                 if src[ret.byte_range()].contains(struct_name) {
-                    refs.push(make_ref(&path, ret, ReferenceKind::FunctionSignature, &lines));
+                    refs.push(make_ref(
+                        &path,
+                        ret,
+                        ReferenceKind::FunctionSignature,
+                        &lines,
+                    ));
                 }
             }
         });
