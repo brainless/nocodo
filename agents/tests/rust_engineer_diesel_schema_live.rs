@@ -3,7 +3,7 @@ use common::*;
 
 #[tokio::test(flavor = "current_thread")]
 #[ignore]
-async fn live_diesel_model_fn_generates_code() {
+async fn live_diesel_schema_generates_code() {
     let _guard = LIVE_TEST_LOCK.lock().expect("live test lock poisoned");
     let cfg = LiveTestConfig::from_env();
     recreate_project_from_template(&cfg);
@@ -11,9 +11,13 @@ async fn live_diesel_model_fn_generates_code() {
     for model in cfg.models() {
         let agent = agent_for_model(&cfg, model);
         let output = agent
-            .diesel_model_fn("ContactRecord", "find_by_phone")
+            .diesel_schema(
+                r#"Write a Diesel SQLite table definition for user_contacts.
+Columns: id BigInt primary key, user_id BigInt, contact_type Text, value Text,
+country_code nullable Integer, verified_at nullable Timestamp, created_at Timestamp."#,
+            )
             .await
-            .unwrap_or_else(|e| panic!("model `{model}` diesel_model_fn failed: {e}"));
+            .unwrap_or_else(|e| panic!("model `{model}` diesel_schema failed: {e}"));
 
         let code = output
             .code
@@ -23,9 +27,10 @@ async fn live_diesel_model_fn_generates_code() {
         assert_not_empty(model, output.raw_response.as_str(), "raw_response");
         assert_not_empty(model, code, "code");
         assert_clean_code(model, code);
+        assert_no_imports(model, code);
         assert!(
-            code.contains("pub fn find_by_phone"),
-            "model `{model}` did not generate requested function:\n{code}"
+            code.contains("diesel::table!") && code.contains("user_contacts"),
+            "model `{model}` did not generate requested table block:\n{code}"
         );
     }
 }
