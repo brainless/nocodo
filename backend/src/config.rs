@@ -99,20 +99,57 @@ pub struct DeployConfig {
     pub website_domain: Option<String>,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            project: ProjectConfig {
+                name: "nocodo".to_string(),
+                title: "Nocodo".to_string(),
+            },
+            server: ServerConfig {
+                host: "0.0.0.0".to_string(),
+                port: std::env::var("PORT")
+                    .ok()
+                    .and_then(|p| p.parse().ok())
+                    .unwrap_or(8080),
+            },
+            database: DatabaseConfig {
+                kind: "sqlite".to_string(),
+                url: "app.db".to_string(),
+            },
+            gui: GuiConfig { port: 3030 },
+            admin_gui: AdminGuiConfig { port: 3031 },
+            projects: None,
+            auth: None,
+            agents: None,
+            pm_agent: None,
+            context_agent: None,
+            api_keys: None,
+            deploy: None,
+        }
+    }
+}
+
 impl Config {
     pub fn load() -> Result<Self, String> {
-        let path = Self::find_config_file().ok_or_else(|| {
-            "project.toml not found. Copy project.toml.template to project.toml and fill in your values.".to_string()
-        })?;
+        match Self::find_config_file() {
+            Some(path) => {
+                let contents = fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
-        let contents = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+                let mut config: Config = toml::from_str(&contents)
+                    .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
 
-        let mut config: Config = toml::from_str(&contents)
-            .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
-
-        config.apply_env_overrides();
-        Ok(config)
+                config.apply_env_overrides();
+                Ok(config)
+            }
+            None => {
+                log::warn!("project.toml not found, using env vars with sensible defaults.");
+                let mut config = Config::default();
+                config.apply_env_overrides();
+                Ok(config)
+            }
+        }
     }
 
     /// Export config values to env vars so that crates that read env vars directly
@@ -150,6 +187,9 @@ impl Config {
         }
         if let Ok(v) = std::env::var("DATABASE_URL") {
             self.database.url = v;
+        }
+        if let Ok(v) = std::env::var("DATABASE_KIND") {
+            self.database.kind = v;
         }
         if let Ok(v) = std::env::var("GUI_PORT") {
             if let Ok(p) = v.parse() {
@@ -229,6 +269,8 @@ pub fn read_project_conf(key: &str) -> Option<String> {
     let config = Config::load().ok()?;
     match key {
         "DATABASE_URL" => Some(config.database.url),
+        "DATABASE_KIND" => Some(config.database.kind),
+        "PROJECT_NAME" => Some(config.project.name),
         "BACKEND_HOST" => Some(config.server.host),
         "BACKEND_PORT" => Some(config.server.port.to_string()),
         "GUI_PORT" => Some(config.gui.port.to_string()),
