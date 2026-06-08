@@ -600,6 +600,237 @@ pub fn generate_diesel(schema: &SchemaDef) -> DieselCodegenResult {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 4: Write generated code to disk
+// ---------------------------------------------------------------------------
+
+use std::path::Path;
+
+/// Convert a PascalCase or camelCase identifier to snake_case.
+pub fn to_snake_case(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c.is_uppercase() {
+            if !out.is_empty() && !out.ends_with('_') {
+                out.push('_');
+            }
+            out.push(c.to_lowercase().next().unwrap());
+        } else {
+            out.push(c);
+        }
+    }
+    out.trim_matches('_').to_string()
+}
+
+/// Parse the table name from a `#[diesel(table_name = "...")]` attribute.
+pub fn parse_table_name_from_struct(code: &str) -> Option<String> {
+    for line in code.lines() {
+        let line = line.trim();
+        if let Some(start) = line.find("table_name") {
+            let rest = &line[start..];
+            if let Some(open) = rest.find('"') {
+                let after_open = &rest[open + 1..];
+                if let Some(close) = after_open.find('"') {
+                    return Some(after_open[..close].to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Parse the struct name from `pub struct Foo` or `pub struct Foo {`.
+pub fn parse_struct_name(code: &str) -> Option<String> {
+    for line in code.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("pub struct ") {
+            let name = rest
+                .split(|c: char| c.is_whitespace() || c == '{' || c == '(' || c == ';')
+                .next()?;
+            if !name.is_empty() {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Parse the table name from a `diesel::table! { table_name ... }` block.
+pub fn parse_table_name_from_schema(code: &str) -> Option<String> {
+    for line in code.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("diesel::table!") {
+            let rest = rest.trim_start();
+            let rest = rest.strip_prefix('{').unwrap_or(rest);
+            let name = rest
+                .trim()
+                .split(|c: char| c.is_whitespace() || c == '{')
+                .next()?;
+            if !name.is_empty() && name != "{" {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Check whether the struct source references a `NaiveDate` or `NaiveDateTime` type.
+fn struct_needs_chrono(code: &str) -> (bool, bool) {
+    let needs_date = code.contains("NaiveDate");
+    let needs_datetime = code.contains("NaiveDateTime");
+    (needs_date, needs_datetime)
+}
+
+/// Write `content` to `path` atomically: write to a sibling temp file, then rename.
+fn write_file_atomic(path: &Path, content: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("create_dir_all: {}", e))?;
+    }
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, content).map_err(|e| format!("write tmp: {}", e))?;
+    std::fs::rename(&tmp, path).map_err(|e| format!("rename: {}", e))?;
+    Ok(())
+}
+
+/// Generate a complete Diesel model file from a raw struct definition produced by an
+/// LLM. Builds deterministic imports, prepends them to the struct, writes the file to
+/// `backend/src/models/{stem}.rs`, and registers the module in `models/mod.rs`.
+///
+/// Returns the relative file path that was written.
+pub fn write_model_file(project_root: &Path, struct_code: &str) -> Result<String, String> {
+    let struct_name = parse_struct_name(struct_code)
+        .ok_or_else(|| {
+            format!(
+                "could not parse struct name from code. Code:\n{}",
+                &struct_code[..struct_code.len().min(500)]
+            )
+        })?;
+
+    let table_name = parse_table_name_from_struct(struct_code)
+        .unwrap_or_else(|| to_snake_case(&struct_name));
+
+    let file_stem = to_singular(&table_name);
+    let rel_path = format!("backend/src/models/{}.rs", file_stem);
+    let abs_path = project_root.join(&rel_path);
+
+    if abs_path.exists() {
+        return Err(format!("file already exists: {}", abs_path.display()));
+    }
+
+    let mut content = String::new();
+
+    // Deterministic imports
+    let (needs_date, needs_datetime) = struct_needs_chrono(struct_code);
+    if needs_date {
+        content.push_str("use chrono::NaiveDate;\n");
+    }
+    if needs_datetime {
+        content.push_str("use chrono::NaiveDateTime;\n");
+    }
+    let has_diesel_derive = struct_code.contains("diesel(") || struct_code.contains("diesel::");
+    if has_diesel_derive {
+        content.push_str("use diesel::prelude::*;\n");
+    }
+    let has_serde = struct_code.contains("Serialize") || struct_code.contains("Deserialize");
+    if has_serde {
+        content.push_str("use serde::{Deserialize, Serialize};\n");
+    }
+    content.push('\n');
+    content.push_str("use crate::db::DbPool;\n");
+    content.push_str(&format!("use crate::schema::{};\n", table_name));
+    content.push('\n');
+
+    // Strip any imports the LLM might have added
+    let body: String = struct_code
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("use "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    content.push_str(body.trim());
+    content.push('\n');
+
+    write_file_atomic(&abs_path, &content)?;
+
+    register_model_in_mod(project_root, &file_stem, &struct_name)?;
+
+    Ok(rel_path)
+}
+
+/// Register a model in `backend/src/models/mod.rs`. Creates the file if it does not
+/// exist. Deduplicates — skips if the module is already registered.
+pub fn register_model_in_mod(
+    project_root: &Path,
+    file_stem: &str,
+    struct_name: &str,
+) -> Result<(), String> {
+    let rel_path = "backend/src/models/mod.rs";
+    let abs_path = project_root.join(rel_path);
+
+    let new_line =
+        format!("pub mod {file_stem};\npub use {file_stem}::{struct_name};\n");
+
+    if abs_path.exists() {
+        let existing = std::fs::read_to_string(&abs_path)
+            .map_err(|e| format!("read mod.rs: {}", e))?;
+        if existing.contains(&new_line.trim()) {
+            return Ok(());
+        }
+        let updated = format!("{}{}", existing, new_line);
+        write_file_atomic(&abs_path, &updated)
+    } else {
+        if let Some(parent) = abs_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("create_dir_all: {}", e))?;
+        }
+        write_file_atomic(&abs_path, &new_line)
+    }
+}
+
+/// Append a `diesel::table!` block to the project's `backend/src/schema.rs`.
+/// Creates the file with a header if it does not exist. If the table name is
+/// already present in the file the write is silently skipped.
+///
+/// Returns the relative file path that was written.
+pub fn append_table_to_schema(
+    project_root: &Path,
+    table_block: &str,
+) -> Result<String, String> {
+    let table_name = parse_table_name_from_schema(table_block)
+        .ok_or_else(|| "could not parse table name from schema block".to_string())?;
+
+    let rel_path = "backend/src/schema.rs";
+    let abs_path = project_root.join(rel_path);
+
+    let block = table_block.trim();
+
+    if abs_path.exists() {
+        let existing = std::fs::read_to_string(&abs_path)
+            .map_err(|e| format!("read schema.rs: {}", e))?;
+        if existing.contains(&format!("diesel::table! {{\n    {}", table_name))
+            || existing.contains(&format!("diesel::table! {{ {}", table_name))
+        {
+            return Ok(rel_path.to_string());
+        }
+        // Strip any `use` lines the LLM might have added, and strip trailing blank lines
+        let body: String = block
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("use "))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let updated = format!("{}\n{}\n", existing.trim_end(), body.trim());
+        write_file_atomic(&abs_path, &updated)
+    } else {
+        if let Some(parent) = abs_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("create_dir_all: {}", e))?;
+        }
+        let header = "// Diesel schema — auto-generated by nocodo\n";
+        let content = format!("{}\n{}\n", header, block);
+        write_file_atomic(&abs_path, &content)
+    }?;
+
+    Ok(rel_path.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 

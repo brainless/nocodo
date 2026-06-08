@@ -14,6 +14,9 @@ pub struct RunRequest {
     pub struct_name: Option<String>,
     pub fn_name: Option<String>,
     pub prompt: Option<String>,
+    /// When `true`, write generated code to disk. Defaults to `false`.
+    #[serde(default)]
+    pub apply: bool,
 }
 
 #[derive(Serialize)]
@@ -22,6 +25,9 @@ pub struct RunResponse {
     pub prompt: String,
     pub raw_response: String,
     pub code: Option<String>,
+    /// Relative file path of the written file when `apply` is `true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
 }
 
 /// POST /api/rust-engineer/run
@@ -68,15 +74,30 @@ pub async fn run(state: web::Data<AgentState>, body: web::Json<RunRequest>) -> i
                     .json(serde_json::json!({ "error": "prompt is required for diesel_model_struct mode" }));
             };
 
-            match agent.diesel_model_struct(prompt).await {
-                Ok(output) => HttpResponse::Ok().json(RunResponse {
-                    system_prompt: Some(output.system_prompt),
-                    prompt: output.prompt,
-                    raw_response: output.raw_response,
-                    code: output.code,
-                }),
-                Err(e) => HttpResponse::InternalServerError()
-                    .json(serde_json::json!({ "error": format!("{}", e) })),
+            if body.apply {
+                match agent.diesel_model_struct_write(prompt).await {
+                    Ok(output) => HttpResponse::Ok().json(RunResponse {
+                        system_prompt: Some(output.system_prompt),
+                        prompt: output.prompt,
+                        raw_response: output.raw_response,
+                        code: output.code,
+                        file_path: output.file_path,
+                    }),
+                    Err(e) => HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": format!("{}", e) })),
+                }
+            } else {
+                match agent.diesel_model_struct(prompt).await {
+                    Ok(output) => HttpResponse::Ok().json(RunResponse {
+                        system_prompt: Some(output.system_prompt),
+                        prompt: output.prompt,
+                        raw_response: output.raw_response,
+                        code: output.code,
+                        file_path: None,
+                    }),
+                    Err(e) => HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": format!("{}", e) })),
+                }
             }
         }
         "diesel_schema" => {
@@ -91,15 +112,30 @@ pub async fn run(state: web::Data<AgentState>, body: web::Json<RunRequest>) -> i
                 );
             };
 
-            match agent.diesel_schema(prompt).await {
-                Ok(output) => HttpResponse::Ok().json(RunResponse {
-                    system_prompt: Some(output.system_prompt),
-                    prompt: output.prompt,
-                    raw_response: output.raw_response,
-                    code: output.code,
-                }),
-                Err(e) => HttpResponse::InternalServerError()
-                    .json(serde_json::json!({ "error": format!("{}", e) })),
+            if body.apply {
+                match agent.diesel_schema_write(prompt).await {
+                    Ok(output) => HttpResponse::Ok().json(RunResponse {
+                        system_prompt: Some(output.system_prompt),
+                        prompt: output.prompt,
+                        raw_response: output.raw_response,
+                        code: output.code,
+                        file_path: output.file_path,
+                    }),
+                    Err(e) => HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": format!("{}", e) })),
+                }
+            } else {
+                match agent.diesel_schema(prompt).await {
+                    Ok(output) => HttpResponse::Ok().json(RunResponse {
+                        system_prompt: Some(output.system_prompt),
+                        prompt: output.prompt,
+                        raw_response: output.raw_response,
+                        code: output.code,
+                        file_path: None,
+                    }),
+                    Err(e) => HttpResponse::InternalServerError()
+                        .json(serde_json::json!({ "error": format!("{}", e) })),
+                }
             }
         }
         "diesel_model_fn" | "diesel_model" => {
@@ -129,6 +165,7 @@ pub async fn run(state: web::Data<AgentState>, body: web::Json<RunRequest>) -> i
                     prompt: output.prompt,
                     raw_response: output.raw_response,
                     code: output.code,
+                    file_path: None,
                 }),
                 Err(e) => HttpResponse::InternalServerError()
                     .json(serde_json::json!({ "error": format!("{}", e) })),

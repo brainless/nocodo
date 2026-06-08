@@ -1,5 +1,6 @@
 pub mod backend_engineer;
 pub mod code_extractor;
+pub mod code_writer;
 pub mod codebase_index;
 pub mod config;
 pub mod db_engineer;

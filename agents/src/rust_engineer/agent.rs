@@ -31,6 +31,8 @@ pub struct DieselModelStructOutput {
     pub raw_response: String,
     /// Code extracted from the response (think-stripped, fence-unwrapped).
     pub code: Option<String>,
+    /// Relative file path if written to disk (None when `apply` is false).
+    pub file_path: Option<String>,
 }
 
 #[derive(Debug)]
@@ -40,6 +42,8 @@ pub struct DieselSchemaOutput {
     pub raw_response: String,
     /// Code extracted from the response (think-stripped, fence-unwrapped).
     pub code: Option<String>,
+    /// Relative file path if written to disk (None when `apply` is false).
+    pub file_path: Option<String>,
 }
 
 #[derive(Debug)]
@@ -242,7 +246,22 @@ impl RustEngineerAgent {
             } else {
                 Some(code)
             },
+            file_path: None,
         })
+    }
+
+    /// Like `diesel_model_struct` but also writes the generated code to disk
+    /// via `code_writer::write_diesel_model`.
+    pub async fn diesel_model_struct_write(
+        &self,
+        user_prompt: &str,
+    ) -> Result<DieselModelStructOutput, AgentError> {
+        let mut output = self.diesel_model_struct(user_prompt).await?;
+        if let Some(ref code) = output.code {
+            let file_path = crate::code_writer::write_diesel_model(&self.project_path, code)?;
+            output.file_path = Some(file_path);
+        }
+        Ok(output)
     }
 
     // -----------------------------------------------------------------------
@@ -314,7 +333,22 @@ impl RustEngineerAgent {
             } else {
                 Some(code)
             },
+            file_path: None,
         })
+    }
+
+    /// Like `diesel_schema` but also writes the generated code to disk
+    /// via `code_writer::write_diesel_schema`.
+    pub async fn diesel_schema_write(
+        &self,
+        user_prompt: &str,
+    ) -> Result<DieselSchemaOutput, AgentError> {
+        let mut output = self.diesel_schema(user_prompt).await?;
+        if let Some(ref code) = output.code {
+            let file_path = crate::code_writer::write_diesel_schema(&self.project_path, code)?;
+            output.file_path = Some(file_path);
+        }
+        Ok(output)
     }
 }
 

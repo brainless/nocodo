@@ -1585,6 +1585,7 @@ dependencies = [
  "log",
  "regex",
  "rusqlite",
+ "schema-codegen",
  "schemars",
  "serde",
  "serde_json",
