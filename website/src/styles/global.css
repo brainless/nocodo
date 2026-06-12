@@ -4,16 +4,16 @@
 }
 
 :root {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
-  color: #172033;
-  background: #d9e0ee;
+  font-family: 'Figtree', system-ui, sans-serif;
+  color: #1c1917;
+  background: #faf9f7;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background: #d9e0ee;
-  color: #172033;
+  background: #faf9f7;
+  color: #1c1917;
   color-scheme: light;
 }
 

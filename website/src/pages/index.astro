@@ -3,7 +3,7 @@ import '../styles/global.css';
 import PromptBox from '../components/PromptBox.astro';
 
 const EXAMPLE_PROMPTS = [
-  'CRM with leads, companies, contacts, and deal stages',
+  'A CRM with leads, companies, contacts, and deal stages',
   'Project tracker with tasks, sprints, and team members',
   'Inventory system with products, suppliers, and stock levels',
   'Support desk with tickets, priorities, and SLA tracking',
@@ -18,297 +18,218 @@ const EXAMPLE_PROMPTS = [
     <link rel="icon" href="/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet" />
     <meta name="generator" content={Astro.generator} />
-    <title>nocodo — Talk to build software</title>
-    <meta name="description" content="Describe what you want to build. nocodo's AI team turns your idea into a structured plan, epics, tasks, and working code — no boilerplate, no coordination overhead." />
+    <title>nocodo — Describe what you want to build</title>
+    <meta name="description" content="nocodo is an AI team that turns a plain-English description into a structured plan and working code. Local-first, no cloud required." />
+    <style>
+      body { font-family: 'Figtree', system-ui, sans-serif; background: #faf9f7; color: #1c1917; }
+      h1, h2, h3, .font-heading { font-family: 'Fraunces', Georgia, serif; }
+    </style>
   </head>
 
-  <body
-    class="antialiased"
-    style="background: radial-gradient(ellipse 70% 50% at 60% 0%, rgb(107 137 196 / 18%), transparent), radial-gradient(ellipse 50% 40% at 20% 80%, rgb(76 125 215 / 10%), transparent), linear-gradient(180deg, #eef2fa 0%, #e2e8f5 100%);"
-  >
+  <body class="antialiased" style="background: #faf9f7; color: #1c1917;">
 
     <!-- Nav -->
-    <header class="border-b border-[#c6cfdf]">
-      <nav class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <span class="text-lg font-bold tracking-tight text-[#172033]">nocodo</span>
+    <header class="border-b border-stone-200">
+      <nav class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+        <span class="font-heading text-xl font-bold tracking-tight">nocodo</span>
         <div class="flex items-center gap-6">
-          <a href="https://github.com/brainless/nocodo" class="text-sm text-[#5a6f90] hover:text-[#172033] transition-colors">GitHub</a>
-          <a href="https://github.com/brainless/nocodo/releases" class="text-sm bg-[#2f5cad] hover:bg-[#254e9a] text-white px-4 py-1.5 rounded-md transition-colors font-medium">Download</a>
+          <span class="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">Experimental</span>
+          <a href="https://github.com/brainless/nocodo" class="text-sm text-stone-500 hover:text-stone-900 transition-colors">GitHub</a>
         </div>
       </nav>
     </header>
 
     <!-- Hero -->
-    <section class="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-      <div class="inline-flex items-center gap-2 bg-white border border-[#c7d6f0] text-[#3b5ea8] text-xs font-medium px-3 py-1 rounded-full mb-8 shadow-[0_1px_4px_rgb(76_125_215_/_10%)]">
-        <span class="w-1.5 h-1.5 rounded-full bg-[#3db86e]"></span>
-        Open source · Local-first · AI-powered
-      </div>
-
-      <h1 class="text-5xl sm:text-6xl font-bold tracking-tight leading-tight mb-6 text-[#172033]">
-        Talk to<br />
-        <span class="text-[#4c7dd7]">build software</span>
+    <section class="max-w-5xl mx-auto px-6 pt-20 pb-16">
+      <h1 class="font-heading text-6xl sm:text-7xl lg:text-8xl font-black leading-[1.0] tracking-tight mb-8 text-stone-900" style="font-optical-sizing: auto;">
+        Describe what<br />you want to build.
       </h1>
 
-      <p class="text-xl text-[#4a5a7a] max-w-2xl mx-auto mb-10 leading-relaxed">
-        Describe what you want to build. nocodo's AI team — Product Owner, Project Manager, and specialist engineers — turns your idea into a structured plan and executes it. You stay in the conversation, not in the weeds.
-      </p>
+      <div class="max-w-2xl mb-12">
+        <p class="text-xl sm:text-2xl leading-relaxed text-stone-600 mb-6">
+          Your AI team handles the rest — the clarifying questions, the plan, the code. You stay in the conversation, not in the details.
+        </p>
+        <p class="text-base leading-relaxed text-stone-500">
+          nocodo is an experiment. A small-business app, described in plain English, built by AI agents that coordinate with each other — and run on your machine, not ours. We're not there yet on everything. But close enough to keep building.
+        </p>
+      </div>
 
-      <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-        <a href="https://github.com/brainless/nocodo/releases" class="bg-[#2f5cad] hover:bg-[#254e9a] text-white font-semibold px-6 py-3 rounded-lg transition-colors">
-          Download desktop app
+      <div class="flex flex-wrap gap-3 mb-16">
+        <a href="https://github.com/brainless/nocodo/releases" class="btn btn-neutral font-semibold px-6">
+          Download for Mac
         </a>
-        <a href="https://github.com/brainless/nocodo" class="bg-[#f2f5fc] hover:bg-[#e7ecf8] text-[#172033] font-semibold px-6 py-3 rounded-lg transition-colors border border-[#c0ccdf]">
-          View on GitHub
+        <a href="https://github.com/brainless/nocodo" class="btn btn-ghost border border-stone-300 font-semibold px-6">
+          View source
         </a>
       </div>
 
-      <!-- Live prompt widget -->
-      <div class="max-w-2xl mx-auto w-full">
+      <!-- Prompt widget -->
+      <div class="max-w-2xl">
+        <p class="text-sm font-medium text-stone-400 uppercase tracking-widest mb-4">Try it now</p>
         <PromptBox
           examples={EXAMPLE_PROMPTS}
           placeholder="What do you want to build? e.g. A CRM with leads, companies, contacts, tasks, and deal stages."
-          submitLabel="Build it"
+          submitLabel="Start building"
         />
       </div>
     </section>
 
-    <!-- How it works -->
-    <section class="border-t border-[#c6cfdf] bg-white">
-      <div class="max-w-6xl mx-auto px-6 py-20">
-        <h2 class="text-2xl font-bold text-center mb-4 text-[#172033]">How it works</h2>
-        <p class="text-[#5a6f90] text-center mb-12 max-w-xl mx-auto text-sm">Four steps from idea to execution — you drive the conversation, the AI team does the rest.</p>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div class="text-center">
-            <div class="w-10 h-10 rounded-full bg-[#2f5cad] text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">1</div>
-            <h3 class="font-semibold mb-2 text-[#172033]">Talk to the Product Owner</h3>
-            <p class="text-[#5a6f90] text-sm leading-relaxed">The PO asks about your users, data, features, and constraints. Answer in text or with click-to-select widgets — no ambiguity.</p>
-          </div>
-          <div class="text-center">
-            <div class="w-10 h-10 rounded-full bg-[#2f5cad] text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">2</div>
-            <h3 class="font-semibold mb-2 text-[#172033]">PM creates the plan</h3>
-            <p class="text-[#5a6f90] text-sm leading-relaxed">The PO hands off to the Project Manager, who creates a structured epic and tasks — assigned to the right specialist agents automatically.</p>
-          </div>
-          <div class="text-center">
-            <div class="w-10 h-10 rounded-full bg-[#2f5cad] text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">3</div>
-            <h3 class="font-semibold mb-2 text-[#172033]">Specialists execute</h3>
-            <p class="text-[#5a6f90] text-sm leading-relaxed">Backend, frontend, database, and UI designer agents pick up ready tasks. An Engineering Manager reviews and shapes technical work before it starts.</p>
-          </div>
-          <div class="text-center">
-            <div class="w-10 h-10 rounded-full bg-[#2f5cad] text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">4</div>
-            <h3 class="font-semibold mb-2 text-[#172033]">Comment and refine</h3>
-            <p class="text-[#5a6f90] text-sm leading-relaxed">Every epic and task has a comments thread. Stay in the loop, ask questions, and steer the work — without managing the team.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- Divider -->
+    <div class="border-t border-stone-200"></div>
 
-    <!-- Features -->
-    <section class="max-w-6xl mx-auto px-6 py-20">
-      <h2 class="text-2xl font-bold text-center mb-4 text-[#172033]">Features</h2>
-      <p class="text-[#5a6f90] text-center mb-12 max-w-xl mx-auto text-sm">Everything you need to go from idea to running software — without writing boilerplate or managing a team.</p>
-
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 transition-[border-color,box-shadow] hover:border-[#a8bfdf] hover:shadow-[0_2px_12px_rgb(76_125_215_/_8%)]">
-          <div class="text-2xl mb-3">💬</div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Conversational intake</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">The AI Product Owner interviews you — asking the right questions in the right order. Structured choice widgets keep answers precise and sessions fast.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 transition-[border-color,box-shadow] hover:border-[#a8bfdf] hover:shadow-[0_2px_12px_rgb(76_125_215_/_8%)]">
-          <div class="text-2xl mb-3">📋</div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Automatic epics and tasks</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">The Project Manager creates a full epic with tasks in a single atomic step — no manual decomposition, no copy-pasting notes into a tracker.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 transition-[border-color,box-shadow] hover:border-[#a8bfdf] hover:shadow-[0_2px_12px_rgb(76_125_215_/_8%)]">
-          <div class="text-2xl mb-3">🔄</div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Task state machine</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">Tasks move through a defined lifecycle: draft → ready → in progress → done. Rules are enforced in code — the right agent touches the right task at the right time.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 transition-[border-color,box-shadow] hover:border-[#a8bfdf] hover:shadow-[0_2px_12px_rgb(76_125_215_/_8%)]">
-          <div class="text-2xl mb-3">📝</div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Living project knowledge</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">Project notes (business context and decisions) and stack notes (technical decisions) are maintained by the AI team and grow with your project. Agents stay in context automatically.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 transition-[border-color,box-shadow] hover:border-[#a8bfdf] hover:shadow-[0_2px_12px_rgb(76_125_215_/_8%)]">
-          <div class="text-2xl mb-3">🖥️</div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Local-first desktop app</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">Built on Tauri. Runs on Mac, Windows, and Linux. Conversations, tasks, and artifacts are stored in a local SQLite database — no cloud dependency, no lock-in.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 transition-[border-color,box-shadow] hover:border-[#a8bfdf] hover:shadow-[0_2px_12px_rgb(76_125_215_/_8%)]">
-          <div class="text-2xl mb-3">💬</div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Comments on every artifact</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">Every epic and task has a threaded comments surface. Specialists discuss their work, PM and PO respond, and you stay in the loop — all anchored to the artifact it's about.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 border-dashed opacity-70">
-          <div class="flex items-start justify-between mb-3">
-            <div class="text-2xl">🔐</div>
-            <span class="text-xs bg-[#f0f4fc] text-[#6b89c4] border border-[#c7d6f0] px-2 py-0.5 rounded-full font-medium">Coming soon</span>
-          </div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Auth and permissions</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">Email/password login with guest claim flow. Role-based access so the right people see the right artifacts.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 border-dashed opacity-70">
-          <div class="flex items-start justify-between mb-3">
-            <div class="text-2xl">🌐</div>
-            <span class="text-xs bg-[#f0f4fc] text-[#6b89c4] border border-[#c7d6f0] px-2 py-0.5 rounded-full font-medium">Coming soon</span>
-          </div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Generated web app</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">A full web frontend generated for your application using TypeScript, SolidJS, TailwindCSS, and DaisyUI — ready to deploy alongside your backend.</p>
-        </div>
-
-        <div class="bg-white border border-[#d0daf0] rounded-xl p-6 border-dashed opacity-70">
-          <div class="flex items-start justify-between mb-3">
-            <div class="text-2xl">⚙️</div>
-            <span class="text-xs bg-[#f0f4fc] text-[#6b89c4] border border-[#c7d6f0] px-2 py-0.5 rounded-full font-medium">Coming soon</span>
-          </div>
-          <h3 class="font-semibold mb-2 text-[#172033]">Custom logic with Rust/Wasm</h3>
-          <p class="text-[#5a6f90] text-sm leading-relaxed">AI-generated custom business logic compiled to WebAssembly. Write once, share as portable Wasm modules, run anywhere nocodo runs.</p>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- AI team detail section -->
-    <section class="border-t border-b border-[#c6cfdf] bg-white">
-      <div class="max-w-6xl mx-auto px-6 py-20">
-        <div class="grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 class="text-2xl font-bold mb-4 text-[#172033]">An AI team with defined roles</h2>
-            <p class="text-[#4a5a7a] leading-relaxed mb-6">
-              nocodo ships with agents that have specific jobs and stay in their lane. The Product Owner handles requirements. The Project Manager creates the plan. Specialists execute. You never coordinate them — they coordinate each other.
-            </p>
-            <div class="space-y-4">
-              <div class="flex gap-4">
-                <div class="w-8 h-8 rounded-full bg-[#e8f0fe] border border-[#c7d6f0] flex items-center justify-center text-sm flex-shrink-0">PO</div>
-                <div>
-                  <div class="text-sm font-semibold text-[#172033]">Product Owner</div>
-                  <div class="text-sm text-[#5a6f90]">Requirements intake — your main conversation partner</div>
-                </div>
-              </div>
-              <div class="flex gap-4">
-                <div class="w-8 h-8 rounded-full bg-[#e8f0fe] border border-[#c7d6f0] flex items-center justify-center text-sm flex-shrink-0">PM</div>
-                <div>
-                  <div class="text-sm font-semibold text-[#172033]">Project Manager</div>
-                  <div class="text-sm text-[#5a6f90]">Planning — creates epics and tasks from the PO handoff</div>
-                </div>
-              </div>
-              <div class="flex gap-4">
-                <div class="w-8 h-8 rounded-full bg-[#e8f0fe] border border-[#c7d6f0] flex items-center justify-center text-sm flex-shrink-0">EM</div>
-                <div>
-                  <div class="text-sm font-semibold text-[#172033]">Engineering Manager</div>
-                  <div class="text-sm text-[#5a6f90]">Technical shaping — reviews tasks before specialists start</div>
-                </div>
-              </div>
-              <div class="flex gap-4">
-                <div class="w-8 h-8 rounded-full bg-[#e8f0fe] border border-[#c7d6f0] flex items-center justify-center text-sm flex-shrink-0 text-xs">DEV</div>
-                <div>
-                  <div class="text-sm font-semibold text-[#172033]">Specialists</div>
-                  <div class="text-sm text-[#5a6f90]">Backend, frontend, DB, UI — execute their assigned tasks</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="rounded-xl border border-[#c6d1e4] bg-white overflow-hidden shadow-xl">
-            <div class="flex items-center gap-1.5 px-4 py-3 border-b border-[#c6d1e4] bg-[#f6f8fe]">
-              <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-              <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-              <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-            </div>
-            <img src="/screenshots/nocodo_project_manager.png" alt="nocodo AI project manager" class="w-full block" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Project management section -->
-    <section class="max-w-6xl mx-auto px-6 py-20">
-      <div class="grid lg:grid-cols-2 gap-12 items-center">
-        <div class="rounded-xl border border-[#c6d1e4] bg-white overflow-hidden shadow-xl order-2 lg:order-1">
-          <div class="flex items-center gap-1.5 px-4 py-3 border-b border-[#c6d1e4] bg-[#f6f8fe]">
-            <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-            <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-            <span class="w-3 h-3 rounded-full bg-[#c7d6f0]"></span>
-          </div>
-          <img src="/screenshots/nocodo_project_management_with_tasks_epics.png" alt="Tasks and epics in nocodo" class="w-full block" />
-        </div>
-        <div class="order-1 lg:order-2">
-          <h2 class="text-2xl font-bold mb-4 text-[#172033]">Epics and tasks that stay in sync</h2>
-          <p class="text-[#4a5a7a] leading-relaxed mb-6">
-            Every conversation produces a structured epic with tasks. Each task has a clear owner, a state, and a link back to the conversation that created it. Nothing falls through the cracks.
+    <!-- The interesting part -->
+    <section class="max-w-5xl mx-auto px-6 py-20">
+      <div class="max-w-3xl">
+        <p class="text-sm font-semibold text-stone-400 uppercase tracking-widest mb-6">The interesting part</p>
+        <h2 class="font-heading text-4xl sm:text-5xl font-bold leading-tight mb-8 text-stone-900">
+          The AI that writes your code weighs less than a song.
+        </h2>
+        <div class="space-y-5 text-lg leading-relaxed text-stone-600">
+          <p>
+            Most AI coding tools need the largest, most expensive models to function. nocodo takes the opposite bet: constrain the problem so tightly that a model small enough to run on your laptop — under one gigabyte — can write correct, production-quality code.
           </p>
-          <ul class="space-y-3 text-sm text-[#334361]">
-            <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Tasks auto-assigned to specialist agents</li>
-            <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> State machine enforced by code, not convention</li>
-            <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Comments thread on every epic and task</li>
-            <li class="flex gap-3"><span class="text-[#4c7dd7] mt-0.5">✓</span> Audit trail links each task back to its source conversation</li>
-          </ul>
+          <p>
+            The stack is fixed: Rust on the backend, TypeScript on the frontend. The patterns are known. Instead of asking an AI to reason from first principles, nocodo shows it a dozen examples of the exact thing you need. The model copies the pattern. Deterministic code does the cleanup.
+          </p>
+          <p>
+            The result is less creative, and a lot more reliable. We have a 0.8-billion-parameter model writing correct database functions. That's the premise — and it works because of the constraint, not despite it.
+          </p>
         </div>
       </div>
     </section>
 
-    <!-- Deployment -->
-    <section class="border-t border-[#c6cfdf] bg-white">
-      <div class="max-w-6xl mx-auto px-6 py-20">
-        <h2 class="text-2xl font-bold text-center mb-4 text-[#172033]">Deploy on your terms</h2>
-        <p class="text-[#5a6f90] text-center mb-12 max-w-xl mx-auto text-sm">Your data, your infrastructure. Self-host with the included scripts or use nocodo's managed hosting.</p>
-
-        <div class="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
-          <div class="bg-white border border-[#d0daf0] rounded-xl p-8">
-            <h3 class="font-bold text-lg mb-3 text-[#172033]">Self-host</h3>
-            <p class="text-[#5a6f90] text-sm leading-relaxed mb-6">Deploy to your own server with the included Bash scripts. Sets up systemd, nginx, and TLS certificates automatically.</p>
-            <ul class="space-y-2 text-sm text-[#334361]">
-              <li class="flex gap-2"><span class="text-[#4c7dd7]">✓</span> Full control of your data</li>
-              <li class="flex gap-2"><span class="text-[#4c7dd7]">✓</span> Any Linux VPS</li>
-              <li class="flex gap-2"><span class="text-[#4c7dd7]">✓</span> Free</li>
-            </ul>
+    <!-- How it works — conversational -->
+    <section class="bg-stone-100 border-y border-stone-200">
+      <div class="max-w-5xl mx-auto px-6 py-20">
+        <div class="max-w-3xl">
+          <p class="text-sm font-semibold text-stone-400 uppercase tracking-widest mb-6">How it works</p>
+          <h2 class="font-heading text-4xl sm:text-5xl font-bold leading-tight mb-8 text-stone-900">
+            Start by talking. Not by filling in a form.
+          </h2>
+          <div class="space-y-5 text-lg leading-relaxed text-stone-600">
+            <p>
+              When you open nocodo, you're greeted by a Product Owner — an AI whose only job is to understand what you want to build. It asks about your users, your data, the features that matter, and the ones that can wait. You answer in plain English, or by clicking options when the choices are clear.
+            </p>
+            <p>
+              When the PO has enough, it hands off to a Project Manager. The PM turns your conversation into a structured plan: a single epic with tasks, each assigned to the right specialist. You never see the mechanics. You just see the plan.
+            </p>
+            <p>
+              Specialists — backend, frontend, database — pick up their tasks and get to work. Every epic and task has a comments thread, so you can follow along, ask questions, and steer without managing anyone.
+            </p>
           </div>
-          <div class="bg-white border border-[#8ea9d8] rounded-xl p-8">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-bold text-lg text-[#172033]">nocodo hosting</h3>
-              <span class="text-xs bg-[#e8f0fe] text-[#3b5ea8] border border-[#c7d6f0] px-2 py-0.5 rounded-full font-medium">Coming soon</span>
-            </div>
-            <p class="text-[#5a6f90] text-sm leading-relaxed mb-6">Managed hosting at nocodo.com. Custom domain, automatic TLS, pay-as-you-go — zero server management.</p>
-            <ul class="space-y-2 text-sm text-[#334361]">
-              <li class="flex gap-2"><span class="text-[#4c7dd7]">✓</span> Custom domains</li>
-              <li class="flex gap-2"><span class="text-[#4c7dd7]">✓</span> Automatic TLS</li>
-              <li class="flex gap-2"><span class="text-[#4c7dd7]">✓</span> Pay-as-you-go</li>
-            </ul>
+        </div>
+
+        <!-- Steps as large numbered prose -->
+        <div class="mt-16 grid sm:grid-cols-2 gap-x-12 gap-y-10 max-w-3xl">
+          <div>
+            <div class="font-heading text-5xl font-black text-stone-200 mb-3 leading-none">01</div>
+            <h3 class="font-heading text-xl font-bold mb-2 text-stone-900">Talk to the Product Owner</h3>
+            <p class="text-stone-500 leading-relaxed">Your main conversation partner. Asks about users, data, and features — using text and clickable choices to keep things clear.</p>
+          </div>
+          <div>
+            <div class="font-heading text-5xl font-black text-stone-200 mb-3 leading-none">02</div>
+            <h3 class="font-heading text-xl font-bold mb-2 text-stone-900">The PM makes a plan</h3>
+            <p class="text-stone-500 leading-relaxed">The PO hands off to the Project Manager, who produces a structured epic with tasks — assigned to the right specialist automatically.</p>
+          </div>
+          <div>
+            <div class="font-heading text-5xl font-black text-stone-200 mb-3 leading-none">03</div>
+            <h3 class="font-heading text-xl font-bold mb-2 text-stone-900">Specialists execute</h3>
+            <p class="text-stone-500 leading-relaxed">Backend, frontend, and database agents pick up their tasks. An Engineering Manager reviews technical work before anyone starts coding.</p>
+          </div>
+          <div>
+            <div class="font-heading text-5xl font-black text-stone-200 mb-3 leading-none">04</div>
+            <h3 class="font-heading text-xl font-bold mb-2 text-stone-900">You follow along</h3>
+            <p class="text-stone-500 leading-relaxed">Every task has a comments thread. Stay in the loop, ask questions, and redirect work — without managing the team yourself.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="max-w-6xl mx-auto px-6 py-24 text-center">
-      <h2 class="text-3xl font-bold mb-4 text-[#172033]">Ready to build without boilerplate?</h2>
-      <p class="text-[#4a5a7a] mb-10 max-w-lg mx-auto">Download nocodo, describe your idea, and let your AI team take it from there.</p>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="https://github.com/brainless/nocodo/releases" class="bg-[#2f5cad] hover:bg-[#254e9a] text-white font-semibold px-8 py-3 rounded-lg transition-colors">
-          Download for free
-        </a>
-        <a href="https://github.com/brainless/nocodo" class="bg-[#f2f5fc] hover:bg-[#e7ecf8] text-[#172033] font-semibold px-8 py-3 rounded-lg transition-colors border border-[#c0ccdf]">
-          Star on GitHub
-        </a>
+    <!-- AI team -->
+    <section class="max-w-5xl mx-auto px-6 py-20">
+      <div class="max-w-3xl">
+        <p class="text-sm font-semibold text-stone-400 uppercase tracking-widest mb-6">The team</p>
+        <h2 class="font-heading text-4xl sm:text-5xl font-bold leading-tight mb-8 text-stone-900">
+          Everyone has a role. And they stay in their lane.
+        </h2>
+        <p class="text-lg leading-relaxed text-stone-600 mb-12">
+          nocodo ships with agents that have specific jobs. The Product Owner handles requirements. The Project Manager creates the plan. Specialists execute. You never coordinate them — they coordinate each other.
+        </p>
+      </div>
+
+      <div class="divide-y divide-stone-200 max-w-3xl">
+        <div class="py-6 flex gap-6 items-start">
+          <div class="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 mt-0.5">PO</div>
+          <div>
+            <h3 class="font-heading text-lg font-bold text-stone-900 mb-1">Product Owner</h3>
+            <p class="text-stone-500 leading-relaxed">Your main conversation partner. Listens, asks clarifying questions, and summarises what you need — in plain language, not technical specs.</p>
+          </div>
+        </div>
+        <div class="py-6 flex gap-6 items-start">
+          <div class="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 mt-0.5">PM</div>
+          <div>
+            <h3 class="font-heading text-lg font-bold text-stone-900 mb-1">Project Manager</h3>
+            <p class="text-stone-500 leading-relaxed">Takes the PO's requirements and produces a structured plan — an epic with tasks, each assigned to the right specialist.</p>
+          </div>
+        </div>
+        <div class="py-6 flex gap-6 items-start">
+          <div class="w-10 h-10 rounded-full bg-stone-800 text-white flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 mt-0.5">EM</div>
+          <div>
+            <h3 class="font-heading text-lg font-bold text-stone-900 mb-1">Engineering Manager</h3>
+            <p class="text-stone-500 leading-relaxed">Reviews technical tasks before they reach specialists. Makes sure the work is shaped correctly before anyone writes a line of code.</p>
+          </div>
+        </div>
+        <div class="py-6 flex gap-6 items-start">
+          <div class="w-10 h-10 rounded-full bg-stone-700 text-white flex items-center justify-center font-heading font-bold text-xs flex-shrink-0 mt-0.5">DEV</div>
+          <div>
+            <h3 class="font-heading text-lg font-bold text-stone-900 mb-1">Specialists</h3>
+            <p class="text-stone-500 leading-relaxed">Backend, frontend, database, and UI agents execute their assigned tasks — running locally on small models, not shipped to the cloud.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Honest status -->
+    <section class="bg-stone-900 text-white">
+      <div class="max-w-5xl mx-auto px-6 py-20">
+        <div class="max-w-3xl">
+          <p class="text-sm font-semibold text-stone-400 uppercase tracking-widest mb-6">Honest status</p>
+          <h2 class="font-heading text-4xl sm:text-5xl font-bold leading-tight mb-8">
+            Here's where we actually are.
+          </h2>
+          <div class="space-y-5 text-lg leading-relaxed text-stone-300">
+            <p>
+              The conversation layer is fully working — PO intake, PM planning, task assignment, comments, and the full agent coordination flow. That part is solid.
+            </p>
+            <p>
+              The first coding agent — focused on Rust database code — runs reliably on a 0.8-billion-parameter model. Frontend coding agents are next. Auth, deployment, and managed hosting are on the roadmap.
+            </p>
+            <p>
+              This is experimental software, built in public. It works for the narrow case it's designed for. If you're a developer who finds the approach interesting, or someone who wants to follow along — welcome.
+            </p>
+          </div>
+
+          <div class="mt-12 flex flex-wrap gap-4">
+            <a href="https://github.com/brainless/nocodo" class="btn btn-outline text-white border-white hover:bg-white hover:text-stone-900 font-semibold px-6">
+              Star on GitHub
+            </a>
+            <a href="https://github.com/brainless/nocodo/releases" class="btn bg-white text-stone-900 hover:bg-stone-100 font-semibold px-6 border-0">
+              Download the app
+            </a>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- Footer -->
-    <footer class="border-t border-[#c6cfdf]">
-      <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[#7a8faf]">
-        <span class="text-[#5a6f90]">nocodo — Talk to build software</span>
+    <footer class="border-t border-stone-200">
+      <div class="max-w-5xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-stone-400">
+        <span class="font-heading font-bold text-stone-600">nocodo</span>
         <div class="flex gap-6">
-          <a href="https://github.com/brainless/nocodo" class="hover:text-[#172033] transition-colors">GitHub</a>
-          <a href="https://nocodo.com" class="hover:text-[#172033] transition-colors">nocodo.com</a>
+          <a href="https://github.com/brainless/nocodo" class="hover:text-stone-900 transition-colors">GitHub</a>
+          <a href="https://nocodo.com" class="hover:text-stone-900 transition-colors">nocodo.com</a>
         </div>
       </div>
     </footer>
