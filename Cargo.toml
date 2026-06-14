@@ -1,5 +1,5 @@
 [workspace]
-members = ["backend", "shared-types", "agents", "schema-codegen"]
+members = ["backend", "shared-types", "agents", "schema-codegen", "nocodo_praxis"]
 exclude = ["gui"]
 resolver = "2"
 

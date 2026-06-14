@@ -25,3 +25,6 @@
 # OS/editor
 .DS_Store
 *.swp
+
+# Local DB
+nocodo.db
