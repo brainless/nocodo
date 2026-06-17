@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct AtLeastOne<T: 'static> {
     pub head: T,
     pub tail: &'static [T],
@@ -17,6 +18,7 @@ impl<T> AtLeastOne<T> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Unresolved<T> {
     Resolved(T),
     Pending {

@@ -1,13 +1,13 @@
 use super::primitives::AtLeastOne;
 use super::provenance::Provenance;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RoleId(pub &'static str);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PermissionId(pub &'static str);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PersonaId(pub &'static str);
 
 pub enum RoleSemantics {

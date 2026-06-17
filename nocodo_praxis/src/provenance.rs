@@ -6,6 +6,12 @@ pub enum Provenance {
         id: &'static str,
         excerpt: &'static str,
     },
+    /// The LLM inferred this from context — it was not explicitly stated.
+    /// This variant makes inference visible and independently checkable.
+    Inferred {
+        reason: &'static str,
+        from: &'static [&'static str],
+    },
     File {
         path: &'static str,
         lines: (u32, u32),
@@ -17,6 +23,7 @@ impl Provenance {
     pub fn excerpt(&self) -> &'static str {
         match self {
             Provenance::Conversation { excerpt, .. } => excerpt,
+            Provenance::Inferred { reason, .. } => reason,
             Provenance::File { excerpt, .. } => excerpt,
         }
     }
