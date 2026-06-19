@@ -12,6 +12,7 @@ use crate::{
     config::AgentConfig,
     error::AgentError,
     storage::{
+        spec_schemas::{PersonaNote, SpecNoteContent},
         AgentStorage, AgentType, CommentStorage, ProjectNoteStorage, ProjectNoteTopic,
         QuestionKind, StructuredQuestion, TaskStorage,
     },
@@ -229,12 +230,52 @@ impl ProductOwnerAgent {
                             }
                         };
                         let topic = ProjectNoteTopic::from_str(&params.topic);
+
+                        // When content_type is set, validate and wrap the structured note
+                        let note_content = if let Some(ref ct) = params.content_type {
+                            match ct.as_str() {
+                                "persona" => match serde_json::from_str::<PersonaNote>(&params.note)
+                                {
+                                    Ok(persona) => {
+                                        let wrapped =
+                                            SpecNoteContent::Persona(persona);
+                                        match serde_json::to_string(&wrapped) {
+                                            Ok(json) => json,
+                                            Err(e) => {
+                                                log::warn!(
+                                                    "[PO] persona note serialization error: {}",
+                                                    e
+                                                );
+                                                params.note.clone()
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::warn!(
+                                            "[PO] persona note parse error (storing raw): {}",
+                                            e
+                                        );
+                                        params.note.clone()
+                                    }
+                                },
+                                _ => {
+                                    log::debug!(
+                                        "[PO] unknown content_type '{}', storing raw",
+                                        ct
+                                    );
+                                    params.note.clone()
+                                }
+                            }
+                        } else {
+                            params.note.clone()
+                        };
+
                         if let Err(e) = self
                             .note_storage
                             .add_note(
                                 self.project_id,
                                 topic,
-                                params.note,
+                                note_content,
                                 Some(session_id),
                                 params.replaces_note,
                             )

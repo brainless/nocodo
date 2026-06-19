@@ -1,4 +1,5 @@
 pub mod message_content;
+pub mod spec_schemas;
 pub mod sqlite;
 
 use async_trait::async_trait;

@@ -3,14 +3,22 @@ use serde::{Deserialize, Serialize};
 
 /// PO calls this to record a business-layer artifact (goal, constraint, decision, etc.)
 /// discovered during intake. Can be called multiple times per session.
+///
+/// When `content_type` is set (e.g. `"persona"`), the `note` field carries
+/// JSON conforming to the schema for that type. This lets downstream agents
+/// (PM, Praxis Writer) parse the note deterministically.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RecordProjectNoteParams {
     /// Topic category. Must be one of: goal, constraint, decision, context, assumption
     pub topic: String,
     /// The note content. Be concise and factual.
+    /// For structured notes (when content_type is set), this is a JSON string.
     pub note: String,
     /// Exact text of an existing current note that this one supersedes. Omit for new facts.
     pub replaces_note: Option<String>,
+    /// Optional content type tag (e.g. "persona"). When set, the note is treated
+    /// as structured data following the schema for that type.
+    pub content_type: Option<String>,
 }
 
 /// PO calls this when all questions are answered and project notes are saved.

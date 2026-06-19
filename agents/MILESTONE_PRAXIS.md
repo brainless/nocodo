@@ -187,15 +187,15 @@ Build `agents/src/praxis_doc.rs` that extracts doc comments + type signatures fr
 
 **Tasks**
 
-- [ ] Create `agents/src/praxis_doc.rs` — reads `nocodo_praxis/src/*.rs`, extracts:
+- [x] Create `agents/src/praxis_doc.rs` — reads `nocodo_praxis/src/*.rs`, extracts:
   - `///` and `//!` doc comments
   - Struct/enum definitions (full source)
   - `impl` block methods (with doc comments)
-- [ ] Format output as prompt-safe text: doc comment first, then type definition, then impl methods (no markdown fences, no HTML)
-- [ ] Per-module reference functions: `auth_types_reference()`, `statemachine_types_reference()`, `entity_types_reference()`, `primitives_reference()`, `provenance_reference()`
-- [ ] Full reference: `all_praxis_types_reference()` — concatenation of all modules
-- [ ] Wire into RustEngineer so any mode can call these functions
-- [ ] Test: reference string contains doc comments + type signatures for all items listed in 4a.0
+- [x] Format output as prompt-safe text: doc comment first, then type definition, then impl methods (no markdown fences, no HTML)
+- [x] Per-module reference functions: `auth_types_reference()`, `statemachine_types_reference()`, `entity_types_reference()`, `primitives_reference()`, `provenance_reference()`
+- [x] Full reference: `all_praxis_types_reference()` — concatenation of all modules
+- [x] Wire into RustEngineer so any mode can call these functions
+- [x] Test: reference string contains doc comments + type signatures for all items listed in 4a.0
 
 #### Not in scope
 
@@ -210,7 +210,7 @@ Define Rust types for the JSON content that PO stores in `project_note.note` fie
 
 #### Tasks
 
-- [ ] Create `agents/src/storage/spec_schemas.rs` — structured note content types:
+- [x] Create `agents/src/storage/spec_schemas.rs` — structured note content types:
   ```rust
   /// Wrapper for structured note content. Serialized to JSON in project_note.note.
   enum SpecNoteContent {
@@ -227,9 +227,9 @@ Define Rust types for the JSON content that PO stores in `project_note.note` fie
       provenance: String,     // session_id or "inferred" tag
   }
   ```
-- [ ] `PersonaNote` → `UserPersona` conversion helper (used by Praxis Writer to map structured notes → praxis types)
-- [ ] JSON serialization/deserialization (`serde`)
-- [ ] Extend `record_project_note` in PO tools to accept a `content_type` parameter alongside `topic` — PO chooses `"persona"` and the handler serializes the structured data
+- [x] `PersonaNote` → `UserPersona` conversion helper (used by Praxis Writer to map structured notes → praxis types)
+- [x] JSON serialization/deserialization (`serde`)
+- [x] Extend `record_project_note` in PO tools to accept a `content_type` parameter alongside `topic` — PO chooses `"persona"` and the handler serializes the structured data
 
 #### Not in scope
 

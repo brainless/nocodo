@@ -1583,6 +1583,7 @@ dependencies = [
  "async-trait",
  "llm-sdk",
  "log",
+ "nocodo_praxis",
  "regex",
  "rusqlite",
  "schema-codegen",

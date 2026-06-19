@@ -7,6 +7,7 @@ pub mod db_engineer;
 pub mod error;
 pub mod frontend_engineer;
 pub mod nocodo_description;
+pub mod praxis_doc;
 pub mod product_owner;
 pub mod project_manager;
 pub mod rust_engineer;
