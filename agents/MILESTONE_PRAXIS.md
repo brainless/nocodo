@@ -21,20 +21,20 @@ Minimal crate with the primitives that every spec needs. No state machines or en
 
 ### Tasks
 
-- [ ] Create `nocodo_praxis/` as a new crate in the workspace (add to root `Cargo.toml`)
-- [ ] Implement `nocodo_praxis::primitives`:
+- [x] Create `nocodo_praxis/` as a new crate in the workspace (add to root `Cargo.toml`)
+- [x] Implement `nocodo_praxis::primitives`:
   - `AtLeastOne<T>` — non-empty collection, structurally enforces "at least one responsible party"
   - `Unresolved<T>` — first-class incompleteness (`Resolved`, `Pending`, `Blocked`)
-- [ ] Implement `nocodo_praxis::provenance`:
+- [x] Implement `nocodo_praxis::provenance`:
   - `Provenance` enum — `Conversation`, `JiraTicket`, `GitCommit`, `ConfluencePage`, `File`, `Inferred`
   - `PrdValue<T>` — value + provenance carrier
-- [ ] Implement `nocodo_praxis::auth`:
+- [x] Implement `nocodo_praxis::auth`:
   - `RoleId`, `PermissionId`, `PersonaId` newtypes
   - `RoleSemantics` — `Flat`, `Inherits`, `Union`
   - `Role`, `Permission`, `UserPersona` structs
   - `ImplicitRole` — `AnyAuthenticated`, `AnyUser`
-- [ ] Add basic unit tests for `AtLeastOne` and `Unresolved` methods
-- [ ] Crate compiles clean with `cargo check -p nocodo_praxis`
+- [x] Add basic unit tests for `AtLeastOne` and `Unresolved` methods
+- [x] Crate compiles clean with `cargo check -p nocodo_praxis`
 
 ### Not in scope
 
@@ -171,15 +171,15 @@ The todo_app spec (`~/NocodoProjects/todo_app/src/lib.rs`) is the reference for 
 
 **Tasks**
 
-- [ ] Add `//!` module-level doc to `nocodo_praxis/src/lib.rs` — what the crate is, how modules compose
-- [ ] Add `///` doc comments to every public item in `primitives.rs`
-- [ ] Add `///` doc comments to every public item in `provenance.rs`
-- [ ] Add `///` doc comments to every public item in `auth.rs`
-- [ ] Add `///` doc comments to every public item in `statemachine.rs`
-- [ ] Add `///` doc comments to every public item in `entity.rs`
-- [ ] Add doctests with construction examples for at minimum: `UserPersona`, `Permission`, `Role` (x3 semantics), `State` (x2: Terminal, To), `Entity`, `Provenance` (Conversation + Inferred), `Unresolved` (Resolved + Pending)
-- [ ] `cargo test -p nocodo_praxis` — all doctests pass
-- [ ] `cargo doc -p nocodo_praxis --no-deps --open` — verify rendered docs are complete
+- [x] Add `//!` module-level doc to `nocodo_praxis/src/lib.rs` — what the crate is, how modules compose
+- [x] Add `///` doc comments to every public item in `primitives.rs`
+- [x] Add `///` doc comments to every public item in `provenance.rs`
+- [x] Add `///` doc comments to every public item in `auth.rs`
+- [x] Add `///` doc comments to every public item in `statemachine.rs`
+- [x] Add `///` doc comments to every public item in `entity.rs`
+- [x] Add doctests with construction examples for at minimum: `UserPersona`, `Permission`, `Role` (x3 semantics), `State` (x2: Terminal, To), `Entity`, `Provenance` (Conversation + Inferred), `Unresolved` (Resolved + Pending)
+- [x] `cargo test -p nocodo_praxis` — all doctests pass
+- [x] `cargo doc -p nocodo_praxis --no-deps --open` — verify rendered docs are complete
 
 #### Phase 4a.1 — Documentation Extraction Tool
 
