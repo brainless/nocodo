@@ -260,14 +260,14 @@ A new PO mode (`modes/persona_interview.rs`) that drills deep into each user per
 
 #### Tasks
 
-- [ ] Create `agents/src/product_owner/modes/persona_interview.rs`
-- [ ] Write `po_persona_core()` — shared identity for persona interview (extract from `core.rs`? Or keep separate — persona interview has different tone from requirements gathering)
-- [ ] Write `system_prompt()` — detailed instructions for the interview flow above
-- [ ] Add tool `complete_persona_interview` to PO tools (`tools.rs`)
-- [ ] Wire into PO's `respond_in_session()` — new entry path: the backend can direct PO into persona interview mode
-- [ ] Backend trigger: after PO identifies "who are the users" in requirements gathering, backend transitions to persona interview mode automatically (or PO tool-calls a transition)
-- [ ] Update `record_project_note` handler to serialize `SpecNoteContent::Persona(..)` into the `note` column when content_type is `"persona"`
-- [ ] Test with mock LLM: PO produces valid `PersonaNote` JSON for a sample conversation
+- [x] Create `agents/src/product_owner/modes/persona_interview.rs`
+- [x] Write `po_persona_core()` — kept inline in `persona_interview.rs` (separate tone from requirements_gathering justified this)
+- [x] Write `system_prompt()` — detailed instructions for the interview flow above
+- [x] Add tool `complete_persona_interview` to PO tools (`tools.rs`)
+- [x] Wire into PO's `respond_in_session()` — new entry path: the backend can direct PO into persona interview mode
+- [x] Backend trigger: `session_type = "persona_interview"` routing in `run_po_intake`; `handle_persona_interview` creates persona session after requirements complete
+- [x] Update `record_project_note` handler to serialize `SpecNoteContent::Persona(..)` into the `note` column when content_type is `"persona"`
+- [x] Test with mock LLM: PO produces valid `PersonaNote` JSON for a sample conversation
 
 #### Success criteria
 

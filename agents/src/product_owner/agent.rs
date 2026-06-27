@@ -6,8 +6,11 @@ use llm_sdk::{
     types::{CompletionRequest, Message, Role},
 };
 
-use super::modes::{project_naming, requirements_gathering};
-use super::tools::{CompleteRequirementsParams, RecordProjectNoteParams, SetProjectNameParams};
+use super::modes::{persona_interview, project_naming, requirements_gathering};
+use super::tools::{
+    CompletePersonaInterviewParams, CompleteRequirementsParams, RecordProjectNoteParams,
+    SetProjectNameParams,
+};
 use crate::{
     config::AgentConfig,
     error::AgentError,
@@ -24,6 +27,15 @@ use crate::{
 // Public result type
 // ---------------------------------------------------------------------------
 
+/// Which mode PO should run in. Selected deterministically by the backend,
+/// never by the LLM via tool call.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PoMode {
+    RequirementsGathering,
+    ProjectNaming,
+    PersonaInterview,
+}
+
 #[derive(Debug)]
 pub enum PoSessionResult {
     Text(String),
@@ -38,6 +50,10 @@ pub enum PoSessionResult {
     },
     /// Project has been named via `set_project_name`; backend should trigger PM handoff.
     Named,
+    /// Persona interview is complete; backend creates planning session and fires PM.
+    PersonaInterviewComplete {
+        closing_message: String,
+    },
     Silent,
 }
 
@@ -76,23 +92,23 @@ impl ProductOwnerAgent {
         })
     }
 
-    /// Run the PO agent.
+    /// Run the PO agent in the selected mode.
     ///
-    /// `is_naming = false` — requirements gathering mode: ask questions, record notes,
-    /// signal completion via `complete_requirements`.
-    ///
-    /// `is_naming = true` — project naming mode: derive a project name from the
-    /// conversation history and call `set_project_name`. No user interaction.
+    /// - `RequirementsGathering` — ask questions, record notes, signal completion.
+    /// - `ProjectNaming` — derive a project name from conversation history.
+    /// - `PersonaInterview` — deep-dive interview on each user persona.
     pub async fn respond_in_session(
         &self,
         session_id: i64,
         messages: Vec<(String, String)>,
-        is_naming: bool,
+        mode: PoMode,
     ) -> Result<PoSessionResult, AgentError> {
-        if is_naming {
-            self.run_project_naming(messages).await
-        } else {
-            self.run_requirements_gathering(session_id, messages).await
+        match mode {
+            PoMode::ProjectNaming => self.run_project_naming(messages).await,
+            PoMode::PersonaInterview => self.run_persona_interview(session_id, messages).await,
+            PoMode::RequirementsGathering => {
+                self.run_requirements_gathering(session_id, messages).await
+            }
         }
     }
 
@@ -390,6 +406,246 @@ impl ProductOwnerAgent {
         }
 
         log::warn!("[PO:project_naming] set_project_name not called");
+        Ok(PoSessionResult::Silent)
+    }
+
+    // -----------------------------------------------------------------------
+    // Persona interview mode
+    // -----------------------------------------------------------------------
+
+    async fn run_persona_interview(
+        &self,
+        session_id: i64,
+        messages: Vec<(String, String)>,
+    ) -> Result<PoSessionResult, AgentError> {
+        let ask_tool = Tool::from_type::<RequestUserInputParams>()
+            .name("request_user_input")
+            .description(
+                "Ask the user a structured question with predefined choices. \
+                 Use this for goals and pain_points questions — the UI renders \
+                 checkboxes. You may call this tool multiple times in one turn \
+                 when the questions are independent.",
+            )
+            .build();
+
+        let note_tool = Tool::from_type::<RecordProjectNoteParams>()
+            .name("record_project_note")
+            .description(
+                "Record a persona as a structured note. Use topic: \"context\" and \
+                 content_type: \"persona\". The note field must be valid JSON matching \
+                 the PersonaNote schema: id, name, description, goals, pain_points, \
+                 provenance_message_id (nullable int FK to user message), and \
+                 incomplete_reason (nullable string). Call this immediately after \
+                 identifying each persona — partial data with incomplete_reason is \
+                 better than no data at all. Use replaces_note to supersede a prior \
+                 partial persona note with updated data.",
+            )
+            .build();
+
+        let complete_tool = Tool::from_type::<CompletePersonaInterviewParams>()
+            .name("complete_persona_interview")
+            .description(
+                "Signal that all personas have been documented. Provide a short, warm \
+                 closing_message summarising what was covered. Call this when the user \
+                 confirms there are no more user types to interview.",
+            )
+            .build();
+
+        let tools = vec![ask_tool, note_tool, complete_tool];
+
+        let mut llm_messages = build_llm_messages(&messages);
+
+        const MAX_ITERATIONS: usize = 8;
+        for iteration in 0..MAX_ITERATIONS {
+            let request = CompletionRequest {
+                messages: llm_messages.clone(),
+                max_tokens: 1024,
+                model: self.model.clone(),
+                system: Some(persona_interview::system_prompt()),
+                temperature: Some(0.3),
+                top_p: None,
+                stop_sequences: None,
+                tools: Some(tools.clone()),
+                tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
+            };
+
+            log::info!(
+                "[PO:persona_interview] iteration={} model={} msg_count={}",
+                iteration,
+                self.model,
+                request.messages.len()
+            );
+            let response = self.llm_client.complete(request).await?;
+            log::info!(
+                "[PO:persona_interview] iteration={} stop_reason={:?}",
+                iteration,
+                response.stop_reason
+            );
+
+            let text = extract_text(&response.content);
+
+            let Some(tool_calls) = response.tool_calls else {
+                return Ok(if text.trim().is_empty() {
+                    PoSessionResult::Silent
+                } else {
+                    PoSessionResult::Text(text)
+                });
+            };
+
+            let mut structured_questions: Vec<StructuredQuestion> = Vec::new();
+            let mut completion: Option<String> = None;
+            let mut tool_result_messages: Vec<Message> = Vec::new();
+            let mut assistant_tool_msgs: Vec<Message> = Vec::new();
+
+            for tool_call in &tool_calls {
+                log::info!(
+                    "[PO:persona_interview] tool id={} name={}",
+                    tool_call.id(),
+                    tool_call.name()
+                );
+
+                assistant_tool_msgs.push(Message {
+                    role: Role::Assistant,
+                    content: vec![llm_sdk::types::ContentBlock::Text {
+                        text: tool_call.raw_arguments().to_string(),
+                    }],
+                    tool_call_id: Some(tool_call.id().to_string()),
+                    tool_name: Some(tool_call.name().to_string()),
+                });
+
+                let tool_result = match tool_call.name() {
+                    "request_user_input" => {
+                        let params: RequestUserInputParams =
+                            tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                        let kind = match params.input_type {
+                            InputType::SingleChoice => QuestionKind::SingleChoice {
+                                options: params.options,
+                            },
+                            InputType::MultipleChoice => QuestionKind::MultipleChoice {
+                                options: params.options,
+                            },
+                        };
+                        structured_questions.push(StructuredQuestion {
+                            question: params.question,
+                            kind,
+                        });
+                        "Question queued for user".to_string()
+                    }
+                    "record_project_note" => {
+                        let params: RecordProjectNoteParams = match tool_call
+                            .parse_arguments()
+                            .map_err(AgentError::Llm)
+                        {
+                            Ok(p) => p,
+                            Err(e) => {
+                                log::warn!(
+                                    "[PO:persona_interview] record_project_note parse error: {}",
+                                    e
+                                );
+                                tool_result_messages
+                                    .push(Message::tool(tool_call.id(), format!("Error: {}", e)));
+                                continue;
+                            }
+                        };
+                        let topic = ProjectNoteTopic::from_str(&params.topic);
+
+                        let note_content = if let Some(ref ct) = params.content_type {
+                            if ct == "persona" {
+                                match serde_json::from_str::<PersonaNote>(&params.note) {
+                                    Ok(persona) => {
+                                        match serde_json::to_string(
+                                            &SpecNoteContent::Persona(persona),
+                                        ) {
+                                            Ok(json) => json,
+                                            Err(e) => {
+                                                log::warn!(
+                                                    "[PO:persona_interview] serialization error: {}",
+                                                    e
+                                                );
+                                                params.note.clone()
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::warn!(
+                                            "[PO:persona_interview] persona parse error (storing raw): {}",
+                                            e
+                                        );
+                                        params.note.clone()
+                                    }
+                                }
+                            } else {
+                                params.note.clone()
+                            }
+                        } else {
+                            params.note.clone()
+                        };
+
+                        if let Err(e) = self
+                            .note_storage
+                            .add_note(
+                                self.project_id,
+                                topic,
+                                note_content,
+                                Some(session_id),
+                                params.replaces_note,
+                            )
+                            .await
+                        {
+                            log::warn!(
+                                "[PO:persona_interview] record_project_note storage error: {}",
+                                e
+                            );
+                        }
+                        "Note recorded".to_string()
+                    }
+                    "complete_persona_interview" => {
+                        let params: CompletePersonaInterviewParams =
+                            tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                        completion = Some(params.closing_message);
+                        "Persona interview complete".to_string()
+                    }
+                    other => {
+                        log::warn!("[PO:persona_interview] unknown tool: {}", other);
+                        "Unknown tool".to_string()
+                    }
+                };
+
+                tool_result_messages.push(Message::tool(tool_call.id(), tool_result));
+            }
+
+            log::info!(
+                "[PO:persona_interview] iteration={} complete={} questions={}",
+                iteration,
+                completion.is_some(),
+                structured_questions.len()
+            );
+
+            if let Some(closing_message) = completion {
+                return Ok(PoSessionResult::PersonaInterviewComplete { closing_message });
+            }
+
+            if !structured_questions.is_empty() {
+                return Ok(PoSessionResult::Questions {
+                    message: text,
+                    questions: structured_questions,
+                });
+            }
+
+            // Only note-recording calls: feed tool results back and loop.
+            llm_messages.extend(assistant_tool_msgs);
+            llm_messages.extend(tool_result_messages);
+            log::info!(
+                "[PO:persona_interview] only notes recorded, looping (msg_count={})",
+                llm_messages.len()
+            );
+        }
+
+        log::warn!(
+            "[PO:persona_interview] hit MAX_ITERATIONS={} without user-facing result",
+            MAX_ITERATIONS
+        );
         Ok(PoSessionResult::Silent)
     }
 

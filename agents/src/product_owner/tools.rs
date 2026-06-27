@@ -44,6 +44,14 @@ pub struct ValidateTaskParams {
     pub notes: Option<String>,
 }
 
+/// PO calls this (in persona interview mode) when all personas have been
+/// fully documented. Backend creates a planning session and fires PM.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CompletePersonaInterviewParams {
+    /// Short message summarising what was covered, for the user.
+    pub closing_message: String,
+}
+
 /// Comment on an epic or task.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PoCommentParams {

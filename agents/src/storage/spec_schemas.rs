@@ -43,7 +43,8 @@ pub enum SpecNoteContent {
 /// A user persona captured during requirements intake.
 ///
 /// Each field maps to a corresponding field on `nocodo_praxis::auth::UserPersona`.
-/// The `provenance` field records which session or source produced this note.
+/// `provenance_message_id` is an FK to `user_chat_message.id` — the exact user
+/// message where this persona was described. `None` means inferred by the LLM.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonaNote {
     /// Short identifier, e.g. `"admin"`, `"member"`.
@@ -58,8 +59,14 @@ pub struct PersonaNote {
     /// What frustrates this persona without the software.
     #[serde(default)]
     pub pain_points: Vec<String>,
-    /// Source reference — session ID or `"inferred"` tag.
-    pub provenance: String,
+    /// FK to user_chat_message.id where the user described this persona.
+    /// `None` if the LLM inferred this persona from context.
+    #[serde(default)]
+    pub provenance_message_id: Option<i64>,
+    /// When set, some required data was not provided by the user.
+    /// Maps to `Unresolved::Pending { reason }` in generated praxis code.
+    #[serde(default)]
+    pub incomplete_reason: Option<String>,
 }
 
 impl PersonaNote {
@@ -67,26 +74,24 @@ impl PersonaNote {
     ///
     /// Each string field is leaked to produce `&'static str` references
     /// compatible with praxis types. Uses `Provenance::Conversation` when
-    /// `provenance` is a session ID, or `Provenance::Inferred` when tagged
-    /// as inferred.
+    /// `provenance_message_id` is set, or `Provenance::Inferred` otherwise.
     pub fn to_user_persona(&self) -> nocodo_praxis::auth::UserPersona {
         use nocodo_praxis::auth::{PersonaId, UserPersona};
         use nocodo_praxis::primitives::AtLeastOne;
         use nocodo_praxis::provenance::Provenance;
 
-        let prov = if self.provenance == "inferred" {
-            Provenance::Inferred {
-                reason: static_str("LLM inferred this persona from conversation context"),
-                from: &[],
-            }
-        } else {
-            Provenance::Conversation {
-                id: static_str(&self.provenance),
+        let prov = match self.provenance_message_id {
+            Some(msg_id) => Provenance::Conversation {
+                id: static_str(&format!("message-{}", msg_id)),
                 excerpt: static_str(&format!(
                     "Persona '{}': {}",
                     self.name, self.description
                 )),
-            }
+            },
+            None => Provenance::Inferred {
+                reason: static_str("LLM inferred this persona from conversation context"),
+                from: &[],
+            },
         };
 
         let goals: Vec<&'static str> = self.goals.iter().map(|s| static_str(s)).collect();
@@ -130,13 +135,32 @@ mod tests {
             description: "Team admin who manages members".into(),
             goals: vec!["Manage team".into(), "Assign tasks".into()],
             pain_points: vec!["No visibility".into()],
-            provenance: "session-42".into(),
+            provenance_message_id: Some(42),
+            incomplete_reason: None,
         };
 
         let json = serde_json::to_string(&note).unwrap();
         let parsed: PersonaNote = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, "admin");
         assert_eq!(parsed.goals.len(), 2);
+        assert_eq!(parsed.provenance_message_id, Some(42));
+    }
+
+    #[test]
+    fn persona_note_with_incomplete_reason() {
+        let note = PersonaNote {
+            id: "admin".into(),
+            name: "Admin".into(),
+            description: "Team admin".into(),
+            goals: vec![],
+            pain_points: vec![],
+            provenance_message_id: Some(1),
+            incomplete_reason: Some("User couldn't list goals for admin".into()),
+        };
+
+        let json = serde_json::to_string(&note).unwrap();
+        let parsed: PersonaNote = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.incomplete_reason.as_deref(), Some("User couldn't list goals for admin"));
     }
 
     #[test]
@@ -147,7 +171,8 @@ mod tests {
             description: "Regular team member".into(),
             goals: vec!["Track tasks".into()],
             pain_points: vec![],
-            provenance: "session-1".into(),
+            provenance_message_id: Some(1),
+            incomplete_reason: None,
         };
 
         let persona = note.to_user_persona();
@@ -164,7 +189,8 @@ mod tests {
             description: "Read-only user".into(),
             goals: vec![],
             pain_points: vec![],
-            provenance: "inferred".into(),
+            provenance_message_id: None,
+            incomplete_reason: None,
         };
 
         let persona = note.to_user_persona();
@@ -183,7 +209,8 @@ mod tests {
             description: "desc".into(),
             goals: vec![],
             pain_points: vec![],
-            provenance: "s1".into(),
+            provenance_message_id: Some(1),
+            incomplete_reason: None,
         });
 
         let json = serde_json::to_string(&content).unwrap();

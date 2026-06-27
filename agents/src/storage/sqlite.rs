@@ -864,10 +864,11 @@ fn map_user_chat_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserCh
         project_id: row.get(1)?,
         created_by_user_id: row.get(2)?,
         status: row.get(3)?,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
-        completed_at: row.get(6)?,
-        handoff_session_id: row.get(7)?,
+        session_type: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+        completed_at: row.get(7)?,
+        handoff_session_id: row.get(8)?,
     })
 }
 
@@ -887,13 +888,18 @@ fn map_user_chat_message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserCh
 
 #[async_trait]
 impl UserChatStorage for SqliteUserChatStorage {
-    async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError> {
+    async fn create_session(
+        &self,
+        project_id: i64,
+        user_id: i64,
+        session_type: &str,
+    ) -> Result<i64, AgentError> {
         let ts = now();
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO user_chat_session (project_id, created_by_user_id, status, created_at, updated_at)
-             VALUES (?1, ?2, 'open', ?3, ?4)",
-            params![project_id, user_id, ts, ts],
+            "INSERT INTO user_chat_session (project_id, created_by_user_id, status, session_type, created_at, updated_at)
+             VALUES (?1, ?2, 'open', ?3, ?4, ?5)",
+            params![project_id, user_id, session_type, ts, ts],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -902,7 +908,7 @@ impl UserChatStorage for SqliteUserChatStorage {
         let conn = self.conn.lock().unwrap();
         let session = conn
             .query_row(
-                "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at, handoff_session_id
+                "SELECT id, project_id, created_by_user_id, status, session_type, created_at, updated_at, completed_at, handoff_session_id
                  FROM user_chat_session WHERE id = ?1 LIMIT 1",
                 params![session_id],
                 map_user_chat_session_row,

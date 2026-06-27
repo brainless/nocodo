@@ -26,8 +26,8 @@ pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
 pub use product_owner::{
-    CompleteRequirementsParams, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams,
-    SetProjectNameParams,
+    CompletePersonaInterviewParams, CompleteRequirementsParams, PoMode, PoSessionResult,
+    ProductOwnerAgent, RecordProjectNoteParams, SetProjectNameParams,
 };
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,

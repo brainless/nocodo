@@ -203,6 +203,7 @@ pub struct UserChatSessionRow {
     pub project_id: i64,
     pub created_by_user_id: i64,
     pub status: String,
+    pub session_type: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub completed_at: Option<i64>,
@@ -466,7 +467,12 @@ pub trait UserStorage: Send + Sync {
 
 #[async_trait]
 pub trait UserChatStorage: Send + Sync {
-    async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError>;
+    async fn create_session(
+        &self,
+        project_id: i64,
+        user_id: i64,
+        session_type: &str,
+    ) -> Result<i64, AgentError>;
 
     async fn get_session(&self, session_id: i64) -> Result<Option<UserChatSessionRow>, AgentError>;
 

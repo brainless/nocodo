@@ -538,6 +538,35 @@ for the same agent:
 (informal). The same physical agent (same code, same struct) runs in different modes
 depending on how and when it is invoked.
 
+### Mode Selection: Deterministic, Not LLM-Decided
+
+The backend selects which mode an agent should run in — the LLM **never** chooses its own
+mode via tool call. Mode selection is a data-dependent routing decision:
+
+- Session type (`user_chat_session.session_type`) determines whether the session is intake,
+  persona interview, or planning; the backend routes to the correct agent + mode.
+- After PM creates tasks, the dispatcher routes them to specialists based on
+  `task.assigned_to_agent` and `task.status`.
+- RustEngineer mode is selected by the user in the admin UI, not by the LLM.
+
+This avoids unreliable LLM tool calls for mode transitions and keeps routing logic in
+Rust where it is grep-able, testable, and auditable.
+
+### Provenance: Foreign Keys over Opaque Strings
+
+Wherever structured data references its source, use a **foreign key** to a concrete
+database record rather than an opaque string tag:
+
+- `PersonaNote.provenance_message_id: Option<i64>` — FK to `user_chat_message.id`
+  where the user described this persona. `None` means LLM-inferred.
+- `project_note.source_session_id: Option<i64>` — FK to `user_chat_session.id` where
+  the note was recorded.
+- `task.source_session_id: Option<i64>` — FK to the planning session where PM created
+  the task.
+
+Favour integer FKs over `"inferred"` magic strings. An FK gives exact traceability — a
+generated persona can point back to the exact conversation message that produced it.
+
 ### Module Structure
 
 Each agent that has more than one mode uses a `modes/` sub-directory:
@@ -584,10 +613,12 @@ pub fn system_prompt() -> String {
 |------|------|-----------|-----------------|
 | `requirements_gathering` | `modes/requirements_gathering.rs` | Every user turn during intake | `request_user_input`, `record_project_note`, `complete_requirements` |
 | `project_naming` | `modes/project_naming.rs` | Single call by backend after `RequirementsComplete` | `set_project_name` |
+| `persona_interview` | `modes/persona_interview.rs` | Deterministically after intake; backend creates a persona interview session | `request_user_input`, `record_project_note` (content_type="persona"), `complete_persona_interview` |
 
-The two modes are separate LLM calls. `requirements_gathering` mode drives the full intake
-conversation; `project_naming` mode fires once at the end to name the project from the
-conversation history. PO has no knowledge of PM — the backend handles the transition.
+The three modes are separate LLM calls. `requirements_gathering` drives the full intake
+conversation; `project_naming` fires once at the end to name the project from the
+conversation history; `persona_interview` drills deep into each user persona identified
+during intake. PO has no knowledge of PM — the backend handles the transition.
 
 ### PM Modes (Current)
 
@@ -754,7 +785,7 @@ Extend `agents/src/storage/mod.rs:11-17`:
 
 ### Per-Agent Tools
 
-- **PO**: `request_user_input(question, input_type, options)` — poses structured choice questions during intake. `record_project_note(topic, title, note, replaces_note?)` — records requirements facts as project notes. `complete_requirements(closing_message)` — signals end of requirements gathering; backend calls PO in project naming mode next. `set_project_name(name)` — names the project (project naming mode only); backend then creates the planning session and fires PM. `validate_tasks(task_ids)` — transitions all PM-created tasks out of `draft` using `initial_state_for`.
+- **PO**: `request_user_input(question, input_type, options)` — poses structured choice questions during intake. `record_project_note(topic, note, replaces_note?, content_type?)` — records requirements facts as project notes; `content_type="persona"` wraps the note as structured `PersonaNote` JSON. `complete_requirements(closing_message)` — signals end of requirements gathering; backend calls PO in project naming mode next. `set_project_name(name)` — names the project (project naming mode only). `complete_persona_interview(closing_message)` — signals all personas documented (persona interview mode only); backend creates planning session and fires PM. `validate_tasks(task_ids)` — transitions all PM-created tasks out of `draft` using `initial_state_for`.
 - **PM**: `finalize_session(final_message, epic_title, epic_description, tasks)` — atomically commits artifacts + completes the planning session in one transaction. `request_user_input(question, input_type, options)` — poses structured choice questions during planning.
 - **EM**: `mark_task_ready`, `comment_on_task`.
 - **Specialist**: `complete_task`, `comment_on_assigned_task`.
