@@ -429,7 +429,7 @@ Add praxis-aware write helpers to `schema-codegen/src/lib.rs` (or `agents/src/co
 - [x] Add praxis write helpers to `schema-codegen/src/lib.rs`: `write_praxis_spec`, `register_praxis_module`
 - [x] Wrap in `agents/src/code_writer.rs`: `write_praxis_spec(project_path, module_name, code)`
 - [x] Add backend handler: `POST /api/rust-engineer/praxis-auth` — accepts `project_id`, `personas`, `apply`; returns generated code for admin UI preview + writes to project
-- [ ] Add admin UI controls for praxis_auth mode on `RustEngineerPage` (mode selector entry + persona input + preview panels)
+- [ ] Add admin UI controls for praxis_auth mode on `RustEngineerPage` (mode selector entry + persona input + preview panels) — parked until Phase 4f complete, admin can use API directly
 
 #### Success criteria
 
@@ -504,19 +504,19 @@ Each `SpecGap` becomes a structured question for PO:
 
 #### Tasks
 
-- [ ] Create `find_pending_gaps(code: &str) -> Vec<SpecGap>` in `agents/src/praxis_doc.rs` or new `agents/src/spec_gap.rs`
-- [ ] After Praxis Writer completes, scan output for gaps
-- [ ] If gaps found: PM creates a follow-up PO session with structured questions for each gap
-- [ ] Backend delivers gap questions to PO (re-activates persona interview or requirements gathering with context)
-- [ ] User answers → structured notes updated → Praxis Writer re-runs
-- [ ] Termination condition: zero `Unresolved::Pending` in generated output, OR user declines to answer (marked as acknowledged gap)
-- [ ] Track loop iterations — if gaps don't shrink after 3 iterations, surface to admin
+- [x] Create `find_pending_gaps(code: &str) -> Vec<SpecGap>` in `agents/src/spec_gap.rs` — scans PersonaNote `incomplete_reason` (pre-generation) and `Unresolved::Pending` patterns in generated code (post-generation)
+- [x] After Praxis Writer completes, scan output for gaps (integrated into `run_praxis_auth`)
+- [x] If gaps found: backend creates a follow-up PO gap_clarification session with structured questions seeded from gap context
+- [x] Backend delivers gap questions to PO via new `gap_clarification` session type
+- [x] User answers → PO updates structured notes via `record_project_note` with `replaces_note` → Praxis Writer re-runs automatically via `handle_gap_clarification_complete`
+- [x] Termination condition: zero `PersonaNote.incomplete_reason` in updated notes, OR user declines to answer (gap preserved with `incomplete_reason`)
+- [ ] Track loop iterations — if gaps don't shrink after 3 iterations, surface to admin (deferred: in-memory tracking sufficient for now)
 
 #### Success criteria
 
-- A missing persona goal triggers a structured question back to the user
-- Answering the question re-generates the spec without the gap
-- Gaps that user declines to answer are marked (not silently dropped)
+- A missing persona goal triggers a structured question back to the user via PO gap_clarification mode
+- Answering the question re-generates the spec without the gap (automatic re-run via `handle_gap_clarification_complete`)
+- Gaps that user declines to answer are preserved (not silently dropped) — `incomplete_reason` stays on the note
 
 ---
 
@@ -549,7 +549,7 @@ Replace basic `find_pending_gaps` with tree-sitter queries (RUNTIME.md §5.1), `
      │                                       │
 4e (Praxis Writer mode) ←──── needs 4a.1 + 4b + 4d
      │
-4f (clarification loop)
+4f (clarification loop) ✅
      │
 4g+ (permission interview, state machine writer, ...)
 ```

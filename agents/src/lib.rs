@@ -11,6 +11,7 @@ pub mod praxis_doc;
 pub mod product_owner;
 pub mod project_manager;
 pub mod rust_engineer;
+pub mod spec_gap;
 pub mod stack_reviewer;
 pub mod storage;
 pub mod task_policy;
@@ -26,8 +27,8 @@ pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
 pub use product_owner::{
-    CompletePersonaInterviewParams, CompleteRequirementsParams, PoMode, PoSessionResult,
-    ProductOwnerAgent, RecordProjectNoteParams, SetProjectNameParams,
+    CompleteGapClarificationParams, CompletePersonaInterviewParams, CompleteRequirementsParams,
+    PoMode, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams, SetProjectNameParams,
 };
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
@@ -49,6 +50,7 @@ pub use storage::{
     StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
     UserChatSessionRow, UserChatStorage, UserStorage,
 };
+pub use spec_gap::{find_gaps_from_persona_notes, find_pending_gaps_in_code, gaps_to_questions, GapQuestion, SpecGap};
 pub use storage::spec_schemas::{PersonaNote, PraxisWriterTaskSpec, SpecNoteContent};
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},

@@ -59,3 +59,11 @@ pub struct PoCommentParams {
     pub task_id: Option<i64>,
     pub content: String,
 }
+
+/// PO calls this (in gap clarification mode) when all gaps have been addressed.
+/// Backend re-runs Praxis Writer with the updated persona notes.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CompleteGapClarificationParams {
+    /// Short message summarising what was filled, for the user.
+    pub closing_message: String,
+}

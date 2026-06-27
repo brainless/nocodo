@@ -4,6 +4,6 @@ pub mod tools;
 
 pub use agent::{PoMode, PoSessionResult, ProductOwnerAgent};
 pub use tools::{
-    CompletePersonaInterviewParams, CompleteRequirementsParams, PoCommentParams,
-    RecordProjectNoteParams, SetProjectNameParams, ValidateTaskParams,
+    CompleteGapClarificationParams, CompletePersonaInterviewParams, CompleteRequirementsParams,
+    PoCommentParams, RecordProjectNoteParams, SetProjectNameParams, ValidateTaskParams,
 };

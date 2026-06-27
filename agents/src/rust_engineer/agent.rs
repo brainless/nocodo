@@ -11,6 +11,7 @@ use crate::{
     code_extractor::{extract_struct, find_dependent_types, find_struct_file, list_impl_fns},
     error::AgentError,
     storage::spec_schemas::PersonaNote,
+    spec_gap::{find_gaps_from_persona_notes, find_pending_gaps_in_code, SpecGap},
 };
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,8 @@ pub struct PraxisAuthOutput {
     pub code: Option<String>,
     /// Relative paths of files written to disk (empty when `apply` is false).
     pub files_written: Vec<String>,
+    /// Gaps detected in the input notes or generated code.
+    pub gaps: Vec<SpecGap>,
 }
 
 #[derive(Debug)]
@@ -454,12 +457,28 @@ impl RustEngineerAgent {
             }
         }
 
+        // Scan for gaps: pre-generation (PersonaNote incomplete_reason) and
+        // post-generation (Unresolved::Pending in generated code).
+        let mut gaps = find_gaps_from_persona_notes(personas);
+        if let Some(ref final_code) = code {
+            let code_gaps = find_pending_gaps_in_code(final_code);
+            gaps.extend(code_gaps);
+        }
+        if !gaps.is_empty() {
+            log::info!(
+                "[RustEngineer:praxis_auth] detected {} gaps: {:?}",
+                gaps.len(),
+                gaps.iter().map(|g| format!("{}.{}", g.artifact_id, g.field)).collect::<Vec<_>>()
+            );
+        }
+
         Ok(PraxisAuthOutput {
             system_prompt,
             prompt,
             raw_response,
             code,
             files_written,
+            gaps,
         })
     }
 }

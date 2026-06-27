@@ -25,7 +25,9 @@ Output exactly:
 
 Use `Provenance::Conversation` when the excerpt comes from a user conversation.
 Use `Provenance::Inferred` when the LLM filled in a gap not stated by the user.
-If a goals or pain_points list is empty because the user did not specify, set it to `&[]`.
+If a goals or pain_points list is empty because the user did not specify, still set it
+to `&[]` — the clarification loop handles missing data at a higher level via
+PersonaNote.incomplete_reason. Do NOT invent goals or pain_points the user did not mention.
 
 ## Types you must use
 

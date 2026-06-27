@@ -6,10 +6,10 @@ use llm_sdk::{
     types::{CompletionRequest, Message, Role},
 };
 
-use super::modes::{persona_interview, project_naming, requirements_gathering};
+use super::modes::{gap_clarification, persona_interview, project_naming, requirements_gathering};
 use super::tools::{
-    CompletePersonaInterviewParams, CompleteRequirementsParams, RecordProjectNoteParams,
-    SetProjectNameParams,
+    CompleteGapClarificationParams, CompletePersonaInterviewParams, CompleteRequirementsParams,
+    RecordProjectNoteParams, SetProjectNameParams,
 };
 use crate::{
     config::AgentConfig,
@@ -34,6 +34,7 @@ pub enum PoMode {
     RequirementsGathering,
     ProjectNaming,
     PersonaInterview,
+    GapClarification,
 }
 
 #[derive(Debug)]
@@ -52,6 +53,10 @@ pub enum PoSessionResult {
     Named,
     /// Persona interview is complete; backend creates planning session and fires PM.
     PersonaInterviewComplete {
+        closing_message: String,
+    },
+    /// Gap clarification is complete; backend re-runs Praxis Writer with updated notes.
+    GapClarificationComplete {
         closing_message: String,
     },
     Silent,
@@ -106,6 +111,7 @@ impl ProductOwnerAgent {
         match mode {
             PoMode::ProjectNaming => self.run_project_naming(messages).await,
             PoMode::PersonaInterview => self.run_persona_interview(session_id, messages).await,
+            PoMode::GapClarification => self.run_gap_clarification(session_id, messages).await,
             PoMode::RequirementsGathering => {
                 self.run_requirements_gathering(session_id, messages).await
             }
@@ -644,6 +650,242 @@ impl ProductOwnerAgent {
 
         log::warn!(
             "[PO:persona_interview] hit MAX_ITERATIONS={} without user-facing result",
+            MAX_ITERATIONS
+        );
+        Ok(PoSessionResult::Silent)
+    }
+
+    // -----------------------------------------------------------------------
+    // Gap clarification mode
+    // -----------------------------------------------------------------------
+
+    async fn run_gap_clarification(
+        &self,
+        session_id: i64,
+        messages: Vec<(String, String)>,
+    ) -> Result<PoSessionResult, AgentError> {
+        let ask_tool = Tool::from_type::<RequestUserInputParams>()
+            .name("request_user_input")
+            .description(
+                "Ask the user a structured question about missing persona data. \
+                 Use this for goals and pain_points questions — the UI renders \
+                 checkboxes. You may call this tool multiple times in one turn \
+                 when the questions are independent.",
+            )
+            .build();
+
+        let note_tool = Tool::from_type::<RecordProjectNoteParams>()
+            .name("record_project_note")
+            .description(
+                "Record an updated persona as a structured note. Use topic: \"context\" \
+                 and content_type: \"persona\". The note field must be valid JSON matching \
+                 the PersonaNote schema. Use replaces_note to supersede the old persona \
+                 note with the updated data. Set incomplete_reason to null when the \
+                 persona is now complete.",
+            )
+            .build();
+
+        let complete_tool = Tool::from_type::<CompleteGapClarificationParams>()
+            .name("complete_gap_clarification")
+            .description(
+                "Signal that all gaps have been addressed (filled or user declined). \
+                 Provide a short closing_message summarising what was clarified.",
+            )
+            .build();
+
+        let tools = vec![ask_tool, note_tool, complete_tool];
+
+        let mut llm_messages = build_llm_messages(&messages);
+
+        const MAX_ITERATIONS: usize = 6;
+        for iteration in 0..MAX_ITERATIONS {
+            let request = CompletionRequest {
+                messages: llm_messages.clone(),
+                max_tokens: 1024,
+                model: self.model.clone(),
+                system: Some(gap_clarification::system_prompt()),
+                temperature: Some(0.3),
+                top_p: None,
+                stop_sequences: None,
+                tools: Some(tools.clone()),
+                tool_choice: Some(ToolChoice::Auto),
+                response_format: None,
+            };
+
+            log::info!(
+                "[PO:gap_clarification] iteration={} model={} msg_count={}",
+                iteration,
+                self.model,
+                request.messages.len()
+            );
+            let response = self.llm_client.complete(request).await?;
+            log::info!(
+                "[PO:gap_clarification] iteration={} stop_reason={:?}",
+                iteration,
+                response.stop_reason
+            );
+
+            let text = extract_text(&response.content);
+
+            let Some(tool_calls) = response.tool_calls else {
+                return Ok(if text.trim().is_empty() {
+                    PoSessionResult::Silent
+                } else {
+                    PoSessionResult::Text(text)
+                });
+            };
+
+            let mut structured_questions: Vec<StructuredQuestion> = Vec::new();
+            let mut completion: Option<String> = None;
+            let mut tool_result_messages: Vec<Message> = Vec::new();
+            let mut assistant_tool_msgs: Vec<Message> = Vec::new();
+
+            for tool_call in &tool_calls {
+                log::info!(
+                    "[PO:gap_clarification] tool id={} name={}",
+                    tool_call.id(),
+                    tool_call.name()
+                );
+
+                assistant_tool_msgs.push(Message {
+                    role: Role::Assistant,
+                    content: vec![llm_sdk::types::ContentBlock::Text {
+                        text: tool_call.raw_arguments().to_string(),
+                    }],
+                    tool_call_id: Some(tool_call.id().to_string()),
+                    tool_name: Some(tool_call.name().to_string()),
+                });
+
+                let tool_result = match tool_call.name() {
+                    "request_user_input" => {
+                        let params: RequestUserInputParams =
+                            tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                        let kind = match params.input_type {
+                            InputType::SingleChoice => QuestionKind::SingleChoice {
+                                options: params.options,
+                            },
+                            InputType::MultipleChoice => QuestionKind::MultipleChoice {
+                                options: params.options,
+                            },
+                        };
+                        structured_questions.push(StructuredQuestion {
+                            question: params.question,
+                            kind,
+                        });
+                        "Question queued for user".to_string()
+                    }
+                    "record_project_note" => {
+                        let params: RecordProjectNoteParams = match tool_call
+                            .parse_arguments()
+                            .map_err(AgentError::Llm)
+                        {
+                            Ok(p) => p,
+                            Err(e) => {
+                                log::warn!(
+                                    "[PO:gap_clarification] record_project_note parse error: {}",
+                                    e
+                                );
+                                tool_result_messages
+                                    .push(Message::tool(tool_call.id(), format!("Error: {}", e)));
+                                continue;
+                            }
+                        };
+                        let topic = ProjectNoteTopic::from_str(&params.topic);
+
+                        let note_content = if let Some(ref ct) = params.content_type {
+                            if ct == "persona" {
+                                match serde_json::from_str::<PersonaNote>(&params.note) {
+                                    Ok(persona) => {
+                                        match serde_json::to_string(
+                                            &SpecNoteContent::Persona(persona),
+                                        ) {
+                                            Ok(json) => json,
+                                            Err(e) => {
+                                                log::warn!(
+                                                    "[PO:gap_clarification] serialization error: {}",
+                                                    e
+                                                );
+                                                params.note.clone()
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::warn!(
+                                            "[PO:gap_clarification] persona parse error (storing raw): {}",
+                                            e
+                                        );
+                                        params.note.clone()
+                                    }
+                                }
+                            } else {
+                                params.note.clone()
+                            }
+                        } else {
+                            params.note.clone()
+                        };
+
+                        if let Err(e) = self
+                            .note_storage
+                            .add_note(
+                                self.project_id,
+                                topic,
+                                note_content,
+                                Some(session_id),
+                                params.replaces_note,
+                            )
+                            .await
+                        {
+                            log::warn!(
+                                "[PO:gap_clarification] record_project_note storage error: {}",
+                                e
+                            );
+                        }
+                        "Note recorded".to_string()
+                    }
+                    "complete_gap_clarification" => {
+                        let params: CompleteGapClarificationParams =
+                            tool_call.parse_arguments().map_err(AgentError::Llm)?;
+                        completion = Some(params.closing_message);
+                        "Gap clarification complete".to_string()
+                    }
+                    other => {
+                        log::warn!("[PO:gap_clarification] unknown tool: {}", other);
+                        "Unknown tool".to_string()
+                    }
+                };
+
+                tool_result_messages.push(Message::tool(tool_call.id(), tool_result));
+            }
+
+            log::info!(
+                "[PO:gap_clarification] iteration={} complete={} questions={}",
+                iteration,
+                completion.is_some(),
+                structured_questions.len()
+            );
+
+            if let Some(closing_message) = completion {
+                return Ok(PoSessionResult::GapClarificationComplete { closing_message });
+            }
+
+            if !structured_questions.is_empty() {
+                return Ok(PoSessionResult::Questions {
+                    message: text,
+                    questions: structured_questions,
+                });
+            }
+
+            // Only note-recording calls: feed tool results back and loop.
+            llm_messages.extend(assistant_tool_msgs);
+            llm_messages.extend(tool_result_messages);
+            log::info!(
+                "[PO:gap_clarification] only notes recorded, looping (msg_count={})",
+                llm_messages.len()
+            );
+        }
+
+        log::warn!(
+            "[PO:gap_clarification] hit MAX_ITERATIONS={} without user-facing result",
             MAX_ITERATIONS
         );
         Ok(PoSessionResult::Silent)
