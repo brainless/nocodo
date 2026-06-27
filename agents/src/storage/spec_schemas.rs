@@ -123,6 +123,24 @@ fn leak_vec<T>(v: Vec<T>) -> &'static [T] {
     Box::leak(v.into_boxed_slice())
 }
 
+/// PM's structured output for Praxis Writer (RustEngineer `praxis_auth` mode) consumption.
+///
+/// Assembled by the backend after PM finalises a session: PM writes the task
+/// instructions as free text; Rust reads the persona notes from the database and
+/// hydrates this struct. Stored as JSON in `task.description` for any task with
+/// `assigned_to_agent = "praxis_engineer"`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PraxisWriterTaskSpec {
+    /// The RustEngineer mode to invoke, e.g. `"praxis_auth"`.
+    pub mode: String,
+    /// Persona data extracted from PO's structured project notes.
+    pub personas: Vec<PersonaNote>,
+    /// PM's natural-language instructions to the Praxis Writer.
+    pub instructions: String,
+    /// IDs of the `project_note` rows that informed this task.
+    pub source_note_ids: Vec<i64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

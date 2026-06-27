@@ -2,11 +2,12 @@ use crate::agents_api::state::AgentState;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
     build_project_manager, AgentConfig, AgentStorage, AgentType, CommentStorage,
-    FinalizeSessionParams, MessageContent, PmUserSessionResult, PoMode, PoSessionResult,
-    ProductOwnerAgent, ProjectNoteStorage, SqliteAgentStorage, SqliteCommentStorage,
-    SqliteProjectNoteStorage, SqliteTaskStorage, SqliteUserChatStorage, SqliteUserStorage,
-    StructuredQuestion, StructuredResponse, TaskStorage, UserChatMessageRow, UserChatSessionRow,
-    UserChatStorage, UserStorage,
+    FinalizeSessionParams, MessageContent, PersonaNote, PmUserSessionResult, PoMode,
+    PoSessionResult, PraxisWriterTaskSpec, ProductOwnerAgent, ProjectNoteStorage,
+    SpecNoteContent, SqliteAgentStorage, SqliteCommentStorage, SqliteProjectNoteStorage,
+    SqliteTaskStorage, SqliteUserChatStorage, SqliteUserStorage, StructuredQuestion,
+    StructuredResponse, TaskStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage,
+    UserStorage,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -1640,7 +1641,116 @@ async fn handle_pm_finalized(
         }
     };
 
+    hydrate_praxis_tasks(db_path, project_id, &task_ids);
+
     if let Err(e) = val_po.validate_tasks(task_ids).await {
         log::warn!("user_chat: PO validate tasks: {}", e);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hydrate praxis_engineer tasks with structured PraxisWriterTaskSpec
+// ---------------------------------------------------------------------------
+//
+// After PM finalises, any task with assigned_to_agent = "praxis_engineer" needs
+// its description replaced with a serialised PraxisWriterTaskSpec. PM writes
+// plain-text instructions; this function reads the project's current persona
+// notes from the DB, assembles the spec, and updates the task row.
+// The actual dispatch to RustEngineer praxis_auth mode is wired in Phase 4e.
+
+fn hydrate_praxis_tasks(db_path: &str, project_id: i64, task_ids: &[i64]) {
+    let conn = match rusqlite::Connection::open(db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[praxis] open db: {}", e);
+            return;
+        }
+    };
+
+    // Load current persona notes for this project.
+    let persona_rows: Vec<(i64, PersonaNote)> = {
+        let mut stmt = match conn.prepare(
+            "SELECT pn.id, pn.note
+             FROM project_note pn
+             LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+             WHERE pn.project_id = ?1 AND newer.id IS NULL
+             ORDER BY pn.id ASC",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("[praxis] prepare note query: {}", e);
+                return;
+            }
+        };
+
+        let raw: Vec<(i64, String)> = match stmt.query_map(rusqlite::params![project_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        }) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                log::warn!("[praxis] query persona notes: {}", e);
+                return;
+            }
+        };
+        // stmt borrow released after raw is collected; parse outside the borrow.
+        raw.into_iter()
+            .filter_map(|(id, note_text)| {
+                let content: SpecNoteContent = serde_json::from_str(&note_text).ok()?;
+                match content {
+                    SpecNoteContent::Persona(p) => Some((id, p)),
+                }
+            })
+            .collect()
+    };
+
+    for &task_id in task_ids {
+        // Read assigned_to_agent and description for this task.
+        use rusqlite::OptionalExtension;
+        let row: Option<(String, String)> = conn
+            .query_row(
+                "SELECT assigned_to_agent, description FROM task WHERE id = ?1",
+                rusqlite::params![task_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .ok()
+            .flatten();
+
+        let Some((assigned, instructions)) = row else {
+            continue;
+        };
+        if assigned != "praxis_engineer" {
+            continue;
+        }
+
+        let spec = PraxisWriterTaskSpec {
+            mode: "praxis_auth".to_string(),
+            personas: persona_rows.iter().map(|(_, p)| p.clone()).collect(),
+            instructions,
+            source_note_ids: persona_rows.iter().map(|(id, _)| *id).collect(),
+        };
+
+        let spec_json = match serde_json::to_string(&spec) {
+            Ok(j) => j,
+            Err(e) => {
+                log::warn!("[praxis] serialize spec for task={}: {}", task_id, e);
+                continue;
+            }
+        };
+
+        if let Err(e) = conn.execute(
+            "UPDATE task SET description = ?1 WHERE id = ?2",
+            rusqlite::params![spec_json, task_id],
+        ) {
+            log::warn!("[praxis] update task={} description: {}", task_id, e);
+            continue;
+        }
+
+        log::info!(
+            "[praxis] task={} hydrated with {} personas (mode=praxis_auth)",
+            task_id,
+            spec.personas.len()
+        );
+        // Phase 4e: dispatch RustEngineerAgent::run_praxis_auth(spec) here.
     }
 }

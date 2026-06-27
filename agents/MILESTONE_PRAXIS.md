@@ -321,15 +321,15 @@ struct PraxisWriterTaskSpec {
 
 #### Tasks
 
-- [ ] Define `PraxisWriterTaskSpec` in `agents/src/storage/spec_schemas.rs`
-- [ ] Update PM's `po_handoff` mode prompt to:
+- [x] Define `PraxisWriterTaskSpec` in `agents/src/storage/spec_schemas.rs`
+- [x] Update PM's `po_handoff` mode prompt to:
   - Read all structured project notes (personas, permissions)
   - Group related personas/permissions
   - Produce a `PraxisWriterTaskSpec` per mode needed
   - Use `finalize_session` with tasks whose descriptions contain serialized `PraxisWriterTaskSpec`
-- [ ] Add `assigned_to_agent: "praxis_engineer"` to the agent registry
-- [ ] Update `finalize_session` backend handler to parse task descriptions — if they contain a `PraxisWriterTaskSpec`, route to the appropriate agent mode dispatch
-- [ ] Backend: when PM finalizes with a praxis_engineer task, auto-dispatch the Praxis Writer (RustEngineer in praxis_auth mode)
+- [x] Add `assigned_to_agent: "praxis_engineer"` to the agent registry
+- [x] Update `finalize_session` backend handler to parse task descriptions — `hydrate_praxis_tasks` assembles `PraxisWriterTaskSpec` from DB persona notes and writes JSON to `task.description`
+- [ ] Backend: when PM finalizes with a praxis_engineer task, auto-dispatch the Praxis Writer (RustEngineer in praxis_auth mode) — wired in Phase 4e once `run_praxis_auth` exists
 
 #### Success criteria
 

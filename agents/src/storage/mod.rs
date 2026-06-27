@@ -20,6 +20,9 @@ pub enum AgentType {
     FrontendEngineer,
     ProductOwner,
     EngineeringManager,
+    /// Generates `nocodo_praxis` spec code from structured PO notes.
+    /// Tasks assigned to this agent carry a `PraxisWriterTaskSpec` in their description.
+    PraxisEngineer,
 }
 
 impl AgentType {
@@ -32,6 +35,7 @@ impl AgentType {
             "frontend_engineer" => AgentType::FrontendEngineer,
             "product_owner" => AgentType::ProductOwner,
             "engineering_manager" => AgentType::EngineeringManager,
+            "praxis_engineer" => AgentType::PraxisEngineer,
             _ => AgentType::ProjectManager,
         }
     }
@@ -45,6 +49,7 @@ impl AgentType {
             AgentType::FrontendEngineer => "frontend_engineer",
             AgentType::ProductOwner => "product_owner",
             AgentType::EngineeringManager => "engineering_manager",
+            AgentType::PraxisEngineer => "praxis_engineer",
         }
     }
 }

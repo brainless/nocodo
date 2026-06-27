@@ -49,6 +49,7 @@ pub use storage::{
     StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
     UserChatSessionRow, UserChatStorage, UserStorage,
 };
+pub use storage::spec_schemas::{PersonaNote, PraxisWriterTaskSpec, SpecNoteContent};
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
     FormField, FormFieldType, FormLayout, FormRow,
