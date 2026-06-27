@@ -830,6 +830,58 @@ pub fn append_table_to_schema(
     Ok(rel_path.to_string())
 }
 
+/// Write a praxis spec module to `backend/src/praxis/specs/{module_name}.rs`.
+///
+/// Overwrites if the file already exists (praxis files are regenerated, not appended).
+/// Creates parent directories. Also ensures `praxis/mod.rs` and `praxis/specs/mod.rs`
+/// declare the module.
+///
+/// Returns the relative file path written.
+pub fn write_praxis_spec(
+    project_root: &Path,
+    module_name: &str,
+    code: &str,
+) -> Result<String, String> {
+    let rel_path = format!("backend/src/praxis/specs/{}.rs", module_name);
+    let abs_path = project_root.join(&rel_path);
+    write_file_atomic(&abs_path, code)?;
+    register_praxis_module(project_root, module_name)?;
+    Ok(rel_path)
+}
+
+/// Ensure `backend/src/praxis/mod.rs` declares `pub mod specs;` and that
+/// `backend/src/praxis/specs/mod.rs` declares `pub mod {module_name};`.
+/// Creates files if absent, deduplicates entries.
+pub fn register_praxis_module(project_root: &Path, module_name: &str) -> Result<(), String> {
+    // backend/src/praxis/mod.rs
+    let praxis_mod = project_root.join("backend/src/praxis/mod.rs");
+    let praxis_line = "pub mod specs;\n";
+    if praxis_mod.exists() {
+        let existing =
+            std::fs::read_to_string(&praxis_mod).map_err(|e| format!("read praxis/mod.rs: {}", e))?;
+        if !existing.contains(praxis_line) {
+            write_file_atomic(&praxis_mod, &format!("{}{}", existing, praxis_line))?;
+        }
+    } else {
+        write_file_atomic(&praxis_mod, praxis_line)?;
+    }
+
+    // backend/src/praxis/specs/mod.rs
+    let specs_mod = project_root.join("backend/src/praxis/specs/mod.rs");
+    let new_line = format!("pub mod {};\n", module_name);
+    if specs_mod.exists() {
+        let existing =
+            std::fs::read_to_string(&specs_mod).map_err(|e| format!("read specs/mod.rs: {}", e))?;
+        if !existing.contains(&new_line) {
+            write_file_atomic(&specs_mod, &format!("{}{}", existing, new_line))?;
+        }
+    } else {
+        write_file_atomic(&specs_mod, &new_line)?;
+    }
+
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

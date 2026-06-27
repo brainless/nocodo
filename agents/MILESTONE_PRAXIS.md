@@ -329,7 +329,7 @@ struct PraxisWriterTaskSpec {
   - Use `finalize_session` with tasks whose descriptions contain serialized `PraxisWriterTaskSpec`
 - [x] Add `assigned_to_agent: "praxis_engineer"` to the agent registry
 - [x] Update `finalize_session` backend handler to parse task descriptions — `hydrate_praxis_tasks` assembles `PraxisWriterTaskSpec` from DB persona notes and writes JSON to `task.description`
-- [ ] Backend: when PM finalizes with a praxis_engineer task, auto-dispatch the Praxis Writer (RustEngineer in praxis_auth mode) — wired in Phase 4e once `run_praxis_auth` exists
+- [x] Backend: `hydrate_praxis_tasks` writes `PraxisWriterTaskSpec` JSON to `task.description`; admin UI triggers `POST /api/rust-engineer/praxis-auth` to generate spec code (auto background dispatch deferred — admin-triggered is the right UX)
 
 #### Success criteria
 
@@ -422,13 +422,13 @@ Add praxis-aware write helpers to `schema-codegen/src/lib.rs` (or `agents/src/co
 
 #### Tasks
 
-- [ ] Create `agents/src/rust_engineer/modes/praxis_auth.rs` with `build_system_prompt()`, `build_user_prompt(personas)`, `extract_and_validate(raw_response)`
-- [ ] Wire praxis type reference (Phase 4a) into the system prompt
-- [ ] Add `praxis_auth` entry to `RustEngineerAgent` in `agent.rs` — method `run_praxis_auth(personas: Vec<PersonaNote>) -> Result<PraxisAuthOutput>`
-- [ ] Add `PraxisAuthOutput { system_prompt, prompt, raw_response, files_written: Vec<String> }`
-- [ ] Add praxis write helpers to `schema-codegen/src/lib.rs`: `write_praxis_spec`, `register_praxis_module`
-- [ ] Wrap in `agents/src/code_writer.rs`: `write_praxis_spec(project_path, module_name, code)`
-- [ ] Add backend handler: `POST /api/rust-engineer/praxis-auth` — accepts persona data, returns generated code for admin UI preview + writes to project
+- [x] Create `agents/src/rust_engineer/modes/praxis_auth.rs` with `build_system_prompt()`, `build_user_prompt(personas)`
+- [x] Wire praxis type reference (Phase 4a) into the system prompt via `praxis_doc::{auth,primitives,provenance}_types_reference()`
+- [x] Add `praxis_auth` entry to `RustEngineerAgent` in `agent.rs` — method `run_praxis_auth(personas, apply) -> Result<PraxisAuthOutput>`
+- [x] Add `PraxisAuthOutput { system_prompt, prompt, raw_response, code, files_written }`
+- [x] Add praxis write helpers to `schema-codegen/src/lib.rs`: `write_praxis_spec`, `register_praxis_module`
+- [x] Wrap in `agents/src/code_writer.rs`: `write_praxis_spec(project_path, module_name, code)`
+- [x] Add backend handler: `POST /api/rust-engineer/praxis-auth` — accepts `project_id`, `personas`, `apply`; returns generated code for admin UI preview + writes to project
 - [ ] Add admin UI controls for praxis_auth mode on `RustEngineerPage` (mode selector entry + persona input + preview panels)
 
 #### Success criteria

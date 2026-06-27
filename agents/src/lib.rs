@@ -33,8 +33,8 @@ pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
 pub use rust_engineer::{
-    DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, RustEngineerAgent,
-    RustEngineerResult,
+    DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, PraxisAuthOutput,
+    RustEngineerAgent, RustEngineerResult,
 };
 pub use stack_reviewer::{StackReviewResult, StackReviewerAgent};
 pub use storage::sqlite::{

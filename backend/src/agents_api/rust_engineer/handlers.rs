@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use actix_web::{post, web, HttpResponse, Responder};
-use nocodo_agents::build_rust_engineer;
+use nocodo_agents::{build_rust_engineer, PersonaNote};
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 
@@ -173,6 +173,80 @@ pub async fn run(state: web::Data<AgentState>, body: web::Json<RunRequest>) -> i
         }
         _ => HttpResponse::BadRequest()
             .json(serde_json::json!({ "error": format!("unknown rust engineer mode: {}", mode) })),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/rust-engineer/praxis-auth
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct PraxisAuthRequest {
+    pub project_id: i64,
+    pub personas: Vec<PersonaNote>,
+    /// When `true`, write generated code to disk under `backend/src/praxis/specs/`.
+    #[serde(default)]
+    pub apply: bool,
+}
+
+#[derive(Serialize)]
+pub struct PraxisAuthResponse {
+    pub system_prompt: String,
+    pub prompt: String,
+    pub raw_response: String,
+    pub code: Option<String>,
+    pub files_written: Vec<String>,
+}
+
+/// POST /api/rust-engineer/praxis-auth
+///
+/// Generates `nocodo_praxis` persona static definitions from supplied `PersonaNote` data.
+/// When `apply` is true, writes the result to `backend/src/praxis/specs/personas.rs`.
+#[post("/api/rust-engineer/praxis-auth")]
+pub async fn run_praxis_auth(
+    state: web::Data<AgentState>,
+    body: web::Json<PraxisAuthRequest>,
+) -> impl Responder {
+    let project_path = match get_project_path(&state.db_path, body.project_id) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(serde_json::json!({ "error": "Project not found" }));
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": e }));
+        }
+    };
+
+    if !Path::new(&project_path).is_dir() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": format!("Project path is not a readable directory: {}", project_path)
+        }));
+    }
+
+    if body.personas.is_empty() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "personas must not be empty" }));
+    }
+
+    let agent = match build_rust_engineer(&project_path) {
+        Ok(a) => a,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": format!("Failed to build agent: {}", e) }));
+        }
+    };
+
+    match agent.run_praxis_auth(&body.personas, body.apply).await {
+        Ok(output) => HttpResponse::Ok().json(PraxisAuthResponse {
+            system_prompt: output.system_prompt,
+            prompt: output.prompt,
+            raw_response: output.raw_response,
+            code: output.code,
+            files_written: output.files_written,
+        }),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({ "error": format!("{}", e) })),
     }
 }
 

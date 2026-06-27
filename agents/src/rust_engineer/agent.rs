@@ -6,10 +6,11 @@ use llm_sdk::{
     types::{CompletionRequest, ContentBlock, Message, Role},
 };
 
-use super::modes::{diesel_model, diesel_model_struct, diesel_schema};
+use super::modes::{diesel_model, diesel_model_struct, diesel_schema, praxis_auth};
 use crate::{
     code_extractor::{extract_struct, find_dependent_types, find_struct_file, list_impl_fns},
     error::AgentError,
+    storage::spec_schemas::PersonaNote,
 };
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,17 @@ pub struct DieselSchemaOutput {
     pub code: Option<String>,
     /// Relative file path if written to disk (None when `apply` is false).
     pub file_path: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct PraxisAuthOutput {
+    pub system_prompt: String,
+    pub prompt: String,
+    pub raw_response: String,
+    /// Extracted Rust code (think-stripped, fence-unwrapped).
+    pub code: Option<String>,
+    /// Relative paths of files written to disk (empty when `apply` is false).
+    pub files_written: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -350,6 +362,106 @@ impl RustEngineerAgent {
         }
         Ok(output)
     }
+
+    // -----------------------------------------------------------------------
+    // Mode: Praxis auth spec (personas)
+    // -----------------------------------------------------------------------
+
+    /// Generate `nocodo_praxis` persona static definitions from structured `PersonaNote` data.
+    ///
+    /// When `apply` is true, writes the result to
+    /// `backend/src/praxis/specs/personas.rs` and registers the module.
+    /// Returns the prompt, raw response, extracted code, and written file paths
+    /// for admin UI display and debugging.
+    pub async fn run_praxis_auth(
+        &self,
+        personas: &[PersonaNote],
+        apply: bool,
+    ) -> Result<PraxisAuthOutput, AgentError> {
+        let system_prompt = praxis_auth::build_system_prompt(self.project_path.parent());
+        let prompt = praxis_auth::build_user_prompt(personas);
+
+        log::info!(
+            "[RustEngineer:praxis_auth] personas={} apply={} system_len={} prompt_len={}",
+            personas.len(),
+            apply,
+            system_prompt.len(),
+            prompt.len()
+        );
+
+        let request = CompletionRequest {
+            messages: vec![Message {
+                role: Role::User,
+                content: vec![ContentBlock::Text {
+                    text: prompt.clone(),
+                }],
+                tool_call_id: None,
+                tool_name: None,
+            }],
+            max_tokens: 1024,
+            model: self.model.clone(),
+            system: Some(system_prompt.clone()),
+            temperature: Some(0.2),
+            top_p: None,
+            stop_sequences: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+        };
+
+        let response = self
+            .client
+            .complete(request)
+            .await
+            .map_err(AgentError::Llm)?;
+
+        let raw_response = response
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
+
+        log::info!(
+            "[RustEngineer:praxis_auth] raw_len={}",
+            raw_response.len()
+        );
+
+        let extracted = extract_code(&raw_response);
+        let code = if extracted.trim().is_empty() {
+            None
+        } else {
+            Some(prepend_praxis_auth_imports(&extracted))
+        };
+
+        let mut files_written = Vec::new();
+        if apply {
+            if let Some(ref final_code) = code {
+                match crate::code_writer::write_praxis_spec(
+                    &self.project_path,
+                    "personas",
+                    final_code,
+                ) {
+                    Ok(path) => {
+                        log::info!("[RustEngineer:praxis_auth] wrote {}", path);
+                        files_written.push(path);
+                    }
+                    Err(e) => log::warn!("[RustEngineer:praxis_auth] write error: {}", e),
+                }
+            }
+        }
+
+        Ok(PraxisAuthOutput {
+            system_prompt,
+            prompt,
+            raw_response,
+            code,
+            files_written,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -388,6 +500,17 @@ fn prepend_imports(code: &str, table_name: &Option<String>) -> String {
         Some(table) => format!("use diesel::prelude::*;\nuse crate::schema::{table};\n\n{body}"),
         None => body,
     }
+}
+
+/// Prepend deterministic imports for praxis auth spec files and strip any model-added `use` lines.
+fn prepend_praxis_auth_imports(code: &str) -> String {
+    let body = strip_imports(code);
+    format!(
+        "use nocodo_praxis::auth::{{PersonaId, UserPersona}};\n\
+         use nocodo_praxis::primitives::AtLeastOne;\n\
+         use nocodo_praxis::provenance::Provenance;\n\
+         \n{body}"
+    )
 }
 
 fn strip_imports(code: &str) -> String {

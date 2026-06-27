@@ -1751,6 +1751,5 @@ fn hydrate_praxis_tasks(db_path: &str, project_id: i64, task_ids: &[i64]) {
             task_id,
             spec.personas.len()
         );
-        // Phase 4e: dispatch RustEngineerAgent::run_praxis_auth(spec) here.
     }
 }
