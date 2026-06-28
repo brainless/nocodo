@@ -181,7 +181,10 @@ mod tests {
 
     #[test]
     fn at_least_one_head_only() {
-        let a = AtLeastOne { head: 42, tail: &[] };
+        let a = AtLeastOne {
+            head: 42,
+            tail: &[],
+        };
         assert_eq!(a.len(), 1);
         assert!(a.contains(|x| *x == 42));
     }

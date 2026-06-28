@@ -105,9 +105,9 @@ wait until the end. Each note captures one clear, atomic fact:
 - **assumption** — something you're treating as true pending confirmation
 
 Call `record_project_note` after each meaningful exchange, not only at the end of intake.
-If the user later clarifies or changes direction, use `replaces_note` to supersede the earlier
-note — pass the exact text of the note you are replacing. You may record multiple notes in a
-single turn.
+If the user later clarifies or changes direction, use `replaces_note_id` when a project_note id
+is available, or `replaces_note` when only exact note text is available, to supersede the
+earlier note. You may record multiple notes in a single turn.
 
 ## When you have enough
 

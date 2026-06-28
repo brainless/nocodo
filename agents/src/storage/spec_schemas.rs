@@ -83,10 +83,7 @@ impl PersonaNote {
         let prov = match self.provenance_message_id {
             Some(msg_id) => Provenance::Conversation {
                 id: static_str(&format!("message-{}", msg_id)),
-                excerpt: static_str(&format!(
-                    "Persona '{}': {}",
-                    self.name, self.description
-                )),
+                excerpt: static_str(&format!("Persona '{}': {}", self.name, self.description)),
             },
             None => Provenance::Inferred {
                 reason: static_str("LLM inferred this persona from conversation context"),
@@ -178,7 +175,10 @@ mod tests {
 
         let json = serde_json::to_string(&note).unwrap();
         let parsed: PersonaNote = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.incomplete_reason.as_deref(), Some("User couldn't list goals for admin"));
+        assert_eq!(
+            parsed.incomplete_reason.as_deref(),
+            Some("User couldn't list goals for admin")
+        );
     }
 
     #[test]

@@ -143,8 +143,9 @@ impl ProductOwnerAgent {
                 "Record a business-layer artifact (goal, constraint, decision, context, or \
                  assumption) discovered during intake. Call this as you learn key facts — \
                  you may call it multiple times. These notes become the requirements brief \
-                 for the development team. Use replaces_note to supersede an earlier note \
-                 when the user clarifies or changes direction.",
+                 for the development team. Use replaces_note_id when you have a project_note id, \
+                 or replaces_note when you only have exact old note text, to supersede an \
+                 earlier note when the user clarifies or changes direction.",
             )
             .build();
 
@@ -256,35 +257,32 @@ impl ProductOwnerAgent {
                         // When content_type is set, validate and wrap the structured note
                         let note_content = if let Some(ref ct) = params.content_type {
                             match ct.as_str() {
-                                "persona" => match serde_json::from_str::<PersonaNote>(&params.note)
-                                {
-                                    Ok(persona) => {
-                                        let wrapped =
-                                            SpecNoteContent::Persona(persona);
-                                        match serde_json::to_string(&wrapped) {
-                                            Ok(json) => json,
-                                            Err(e) => {
-                                                log::warn!(
-                                                    "[PO] persona note serialization error: {}",
-                                                    e
-                                                );
-                                                params.note.clone()
+                                "persona" => {
+                                    match serde_json::from_str::<PersonaNote>(&params.note) {
+                                        Ok(persona) => {
+                                            let wrapped = SpecNoteContent::Persona(persona);
+                                            match serde_json::to_string(&wrapped) {
+                                                Ok(json) => json,
+                                                Err(e) => {
+                                                    log::warn!(
+                                                        "[PO] persona note serialization error: {}",
+                                                        e
+                                                    );
+                                                    params.note.clone()
+                                                }
                                             }
                                         }
+                                        Err(e) => {
+                                            log::warn!(
+                                                "[PO] persona note parse error (storing raw): {}",
+                                                e
+                                            );
+                                            params.note.clone()
+                                        }
                                     }
-                                    Err(e) => {
-                                        log::warn!(
-                                            "[PO] persona note parse error (storing raw): {}",
-                                            e
-                                        );
-                                        params.note.clone()
-                                    }
-                                },
+                                }
                                 _ => {
-                                    log::debug!(
-                                        "[PO] unknown content_type '{}', storing raw",
-                                        ct
-                                    );
+                                    log::debug!("[PO] unknown content_type '{}', storing raw", ct);
                                     params.note.clone()
                                 }
                             }
@@ -299,6 +297,7 @@ impl ProductOwnerAgent {
                                 topic,
                                 note_content,
                                 Some(session_id),
+                                params.replaces_note_id,
                                 params.replaces_note,
                             )
                             .await
@@ -443,8 +442,8 @@ impl ProductOwnerAgent {
                  provenance_message_id (nullable int FK to user message), and \
                  incomplete_reason (nullable string). Call this immediately after \
                  identifying each persona — partial data with incomplete_reason is \
-                 better than no data at all. Use replaces_note to supersede a prior \
-                 partial persona note with updated data.",
+                 better than no data at all. Use replaces_note_id to supersede a prior \
+                 partial persona note with updated data when a project_note id is available.",
             )
             .build();
 
@@ -560,9 +559,9 @@ impl ProductOwnerAgent {
                             if ct == "persona" {
                                 match serde_json::from_str::<PersonaNote>(&params.note) {
                                     Ok(persona) => {
-                                        match serde_json::to_string(
-                                            &SpecNoteContent::Persona(persona),
-                                        ) {
+                                        match serde_json::to_string(&SpecNoteContent::Persona(
+                                            persona,
+                                        )) {
                                             Ok(json) => json,
                                             Err(e) => {
                                                 log::warn!(
@@ -595,6 +594,7 @@ impl ProductOwnerAgent {
                                 topic,
                                 note_content,
                                 Some(session_id),
+                                params.replaces_note_id,
                                 params.replaces_note,
                             )
                             .await
@@ -679,7 +679,7 @@ impl ProductOwnerAgent {
             .description(
                 "Record an updated persona as a structured note. Use topic: \"context\" \
                  and content_type: \"persona\". The note field must be valid JSON matching \
-                 the PersonaNote schema. Use replaces_note to supersede the old persona \
+                 the PersonaNote schema. Use replaces_note_id to supersede the old persona \
                  note with the updated data. Set incomplete_reason to null when the \
                  persona is now complete.",
             )
@@ -796,9 +796,9 @@ impl ProductOwnerAgent {
                             if ct == "persona" {
                                 match serde_json::from_str::<PersonaNote>(&params.note) {
                                     Ok(persona) => {
-                                        match serde_json::to_string(
-                                            &SpecNoteContent::Persona(persona),
-                                        ) {
+                                        match serde_json::to_string(&SpecNoteContent::Persona(
+                                            persona,
+                                        )) {
                                             Ok(json) => json,
                                             Err(e) => {
                                                 log::warn!(
@@ -831,6 +831,7 @@ impl ProductOwnerAgent {
                                 topic,
                                 note_content,
                                 Some(session_id),
+                                params.replaces_note_id,
                                 params.replaces_note,
                             )
                             .await

@@ -446,13 +446,8 @@ pub fn table_model_to_diesel_struct(table: &TableModel) -> String {
     let mut out = String::new();
 
     // Derives
-    out.push_str(
-        "#[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]\n",
-    );
-    out.push_str(&format!(
-        "#[diesel(table_name = {})]\n",
-        table.sql_name
-    ));
+    out.push_str("#[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]\n");
+    out.push_str(&format!("#[diesel(table_name = {})]\n", table.sql_name));
     out.push_str("#[diesel(check_for_backend(diesel::sqlite::Sqlite))]\n");
     out.push_str(&format!("pub struct {struct_name} {{\n"));
 
@@ -519,11 +514,12 @@ pub fn table_model_to_diesel_file(table: &TableModel) -> String {
     out.push_str("        pool: &DbPool,\n");
     out.push_str(&format!("        {id_param}: i64,\n"));
     out.push_str("    ) -> Result<Option<Self>, diesel::result::Error> {\n");
-    out.push_str(
-        "        let mut conn = pool.get().expect(\"Failed to get connection\");\n",
-    );
+    out.push_str("        let mut conn = pool.get().expect(\"Failed to get connection\");\n");
     out.push_str(&format!("        {}::table\n", table.sql_name));
-    out.push_str(&format!("            .filter({}::id.eq({id_param}))\n", table.sql_name));
+    out.push_str(&format!(
+        "            .filter({}::id.eq({id_param}))\n",
+        table.sql_name
+    ));
     out.push_str("            .select(Self::as_select())\n");
     out.push_str("            .first::<Self>(&mut conn)\n");
     out.push_str("            .optional()\n");
@@ -534,9 +530,7 @@ pub fn table_model_to_diesel_file(table: &TableModel) -> String {
     out.push_str("    pub fn list(\n");
     out.push_str("        pool: &DbPool,\n");
     out.push_str("    ) -> Result<Vec<Self>, diesel::result::Error> {\n");
-    out.push_str(
-        "        let mut conn = pool.get().expect(\"Failed to get connection\");\n",
-    );
+    out.push_str("        let mut conn = pool.get().expect(\"Failed to get connection\");\n");
     out.push_str(&format!("        {}::table\n", table.sql_name));
     out.push_str("            .select(Self::as_select())\n");
     out.push_str("            .load::<Self>(&mut conn)\n");
@@ -550,9 +544,7 @@ pub fn table_model_to_diesel_file(table: &TableModel) -> String {
 pub fn table_to_mod_registration(table: &TableModel) -> String {
     let struct_name = sql_name_to_record_name(&table.sql_name);
     let file_stem = to_singular(&table.sql_name);
-    format!(
-        "pub mod {file_stem};\npub use {file_stem}::{struct_name};"
-    )
+    format!("pub mod {file_stem};\npub use {file_stem}::{struct_name};")
 }
 
 /// Generate the complete `models/mod.rs` content for a set of tables.
@@ -698,16 +690,15 @@ fn write_file_atomic(path: &Path, content: &str) -> Result<(), String> {
 ///
 /// Returns the relative file path that was written.
 pub fn write_model_file(project_root: &Path, struct_code: &str) -> Result<String, String> {
-    let struct_name = parse_struct_name(struct_code)
-        .ok_or_else(|| {
-            format!(
-                "could not parse struct name from code. Code:\n{}",
-                &struct_code[..struct_code.len().min(500)]
-            )
-        })?;
+    let struct_name = parse_struct_name(struct_code).ok_or_else(|| {
+        format!(
+            "could not parse struct name from code. Code:\n{}",
+            &struct_code[..struct_code.len().min(500)]
+        )
+    })?;
 
-    let table_name = parse_table_name_from_struct(struct_code)
-        .unwrap_or_else(|| to_snake_case(&struct_name));
+    let table_name =
+        parse_table_name_from_struct(struct_code).unwrap_or_else(|| to_snake_case(&struct_name));
 
     let file_stem = to_singular(&table_name);
     let rel_path = format!("backend/src/models/{}.rs", file_stem);
@@ -766,12 +757,11 @@ pub fn register_model_in_mod(
     let rel_path = "backend/src/models/mod.rs";
     let abs_path = project_root.join(rel_path);
 
-    let new_line =
-        format!("pub mod {file_stem};\npub use {file_stem}::{struct_name};\n");
+    let new_line = format!("pub mod {file_stem};\npub use {file_stem}::{struct_name};\n");
 
     if abs_path.exists() {
-        let existing = std::fs::read_to_string(&abs_path)
-            .map_err(|e| format!("read mod.rs: {}", e))?;
+        let existing =
+            std::fs::read_to_string(&abs_path).map_err(|e| format!("read mod.rs: {}", e))?;
         if existing.contains(&new_line.trim()) {
             return Ok(());
         }
@@ -790,10 +780,7 @@ pub fn register_model_in_mod(
 /// already present in the file the write is silently skipped.
 ///
 /// Returns the relative file path that was written.
-pub fn append_table_to_schema(
-    project_root: &Path,
-    table_block: &str,
-) -> Result<String, String> {
+pub fn append_table_to_schema(project_root: &Path, table_block: &str) -> Result<String, String> {
     let table_name = parse_table_name_from_schema(table_block)
         .ok_or_else(|| "could not parse table name from schema block".to_string())?;
 
@@ -803,8 +790,8 @@ pub fn append_table_to_schema(
     let block = table_block.trim();
 
     if abs_path.exists() {
-        let existing = std::fs::read_to_string(&abs_path)
-            .map_err(|e| format!("read schema.rs: {}", e))?;
+        let existing =
+            std::fs::read_to_string(&abs_path).map_err(|e| format!("read schema.rs: {}", e))?;
         if existing.contains(&format!("diesel::table! {{\n    {}", table_name))
             || existing.contains(&format!("diesel::table! {{ {}", table_name))
         {
@@ -857,8 +844,8 @@ pub fn register_praxis_module(project_root: &Path, module_name: &str) -> Result<
     let praxis_mod = project_root.join("backend/src/praxis/mod.rs");
     let praxis_line = "pub mod specs;\n";
     if praxis_mod.exists() {
-        let existing =
-            std::fs::read_to_string(&praxis_mod).map_err(|e| format!("read praxis/mod.rs: {}", e))?;
+        let existing = std::fs::read_to_string(&praxis_mod)
+            .map_err(|e| format!("read praxis/mod.rs: {}", e))?;
         if !existing.contains(praxis_line) {
             write_file_atomic(&praxis_mod, &format!("{}{}", existing, praxis_line))?;
         }
@@ -1155,10 +1142,7 @@ mod tests {
     fn test_sql_name_to_record_name() {
         assert_eq!(sql_name_to_record_name("users"), "UserRecord");
         assert_eq!(sql_name_to_record_name("households"), "HouseholdRecord");
-        assert_eq!(
-            sql_name_to_record_name("order_items"),
-            "OrderItemRecord"
-        );
+        assert_eq!(sql_name_to_record_name("order_items"), "OrderItemRecord");
     }
 
     #[test]
@@ -1180,7 +1164,8 @@ mod tests {
         let schema = sample_schema();
         let tables = parse_schema_def(&schema);
         let struct_def = table_model_to_diesel_struct(&tables[0]);
-        assert!(struct_def.contains("#[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]"));
+        assert!(struct_def
+            .contains("#[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]"));
         assert!(struct_def.contains("#[diesel(table_name = users)]"));
         assert!(struct_def.contains("#[diesel(check_for_backend(diesel::sqlite::Sqlite))]"));
         assert!(struct_def.contains("pub struct UserRecord {"));
@@ -1313,7 +1298,9 @@ mod tests {
         // Schema code
         assert!(result.schema_code.contains("diesel::table!"));
         assert!(result.schema_code.contains("joinable!"));
-        assert!(result.schema_code.contains("allow_tables_to_appear_in_same_query!"));
+        assert!(result
+            .schema_code
+            .contains("allow_tables_to_appear_in_same_query!"));
 
         // Model files
         assert_eq!(result.model_files.len(), 2);
@@ -1383,13 +1370,8 @@ mod tests {
         assert!(table_block.contains("organization_users (user_id, organization_id) {"));
 
         let schema_code = tables_to_diesel_schema(&tables);
-        assert!(
-            schema_code
-                .contains("diesel::joinable!(organization_users -> organizations (organization_id));")
-        );
-        assert!(
-            schema_code
-                .contains("diesel::joinable!(organization_users -> users (user_id));")
-        );
+        assert!(schema_code
+            .contains("diesel::joinable!(organization_users -> organizations (organization_id));"));
+        assert!(schema_code.contains("diesel::joinable!(organization_users -> users (user_id));"));
     }
 }

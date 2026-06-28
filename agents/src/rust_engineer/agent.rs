@@ -10,8 +10,8 @@ use super::modes::{diesel_model, diesel_model_struct, diesel_schema, praxis_auth
 use crate::{
     code_extractor::{extract_struct, find_dependent_types, find_struct_file, list_impl_fns},
     error::AgentError,
-    storage::spec_schemas::PersonaNote,
     spec_gap::{find_gaps_from_persona_notes, find_pending_gaps_in_code, SpecGap},
+    storage::spec_schemas::PersonaNote,
 };
 
 // ---------------------------------------------------------------------------
@@ -428,10 +428,7 @@ impl RustEngineerAgent {
             .collect::<Vec<_>>()
             .join("");
 
-        log::info!(
-            "[RustEngineer:praxis_auth] raw_len={}",
-            raw_response.len()
-        );
+        log::info!("[RustEngineer:praxis_auth] raw_len={}", raw_response.len());
 
         let extracted = extract_code(&raw_response);
         let code = if extracted.trim().is_empty() {
@@ -468,7 +465,9 @@ impl RustEngineerAgent {
             log::info!(
                 "[RustEngineer:praxis_auth] detected {} gaps: {:?}",
                 gaps.len(),
-                gaps.iter().map(|g| format!("{}.{}", g.artifact_id, g.field)).collect::<Vec<_>>()
+                gaps.iter()
+                    .map(|g| format!("{}.{}", g.artifact_id, g.field))
+                    .collect::<Vec<_>>()
             );
         }
 

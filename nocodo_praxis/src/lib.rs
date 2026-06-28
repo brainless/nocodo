@@ -28,8 +28,8 @@
 //! 5. **Grow from evidence.** Every type in this crate was motivated by a real
 //!    project that needed it.
 
+pub mod auth;
+pub mod entity;
 pub mod primitives;
 pub mod provenance;
-pub mod auth;
 pub mod statemachine;
-pub mod entity;

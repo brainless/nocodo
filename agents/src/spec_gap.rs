@@ -223,10 +223,7 @@ pub fn gaps_to_questions(gaps: &[SpecGap]) -> Vec<GapQuestion> {
     let mut by_artifact: std::collections::HashMap<&str, Vec<&SpecGap>> =
         std::collections::HashMap::new();
     for gap in gaps {
-        by_artifact
-            .entry(&gap.artifact_id)
-            .or_default()
-            .push(gap);
+        by_artifact.entry(&gap.artifact_id).or_default().push(gap);
     }
 
     by_artifact
@@ -397,7 +394,10 @@ pub static ADMIN_PERSONA: UserPersona = UserPersona {
         assert!(admin_q.missing_fields.contains(&"goals".to_string()));
         assert!(admin_q.missing_fields.contains(&"pain_points".to_string()));
 
-        let viewer_q = questions.iter().find(|q| q.artifact_id == "viewer").unwrap();
+        let viewer_q = questions
+            .iter()
+            .find(|q| q.artifact_id == "viewer")
+            .unwrap();
         assert_eq!(viewer_q.missing_fields.len(), 1);
     }
 }

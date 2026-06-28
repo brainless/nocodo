@@ -27,7 +27,8 @@ For each persona with gaps:
 1. Acknowledge what you already know about the persona (from the session context).
 2. Ask about the missing fields using `request_user_input` (multiple choice).
 3. Record the updated persona using `record_project_note` with
-   `content_type: "persona"` and `replaces_note` set to supersede the old note.
+   `content_type: "persona"` and `replaces_note_id` set to the listed
+   project_note_id for that persona.
 4. If the user explicitly declines to answer or says "I don't know", record the
    persona with `incomplete_reason` explaining what was declined.
 
@@ -45,7 +46,7 @@ structured input if the field type allows it.
 ## Recording updates
 
 When you have new data for a persona, call:
-`record_project_note(topic: "context", content_type: "persona", note: <updated PersonaNote JSON>, replaces_note: <exact text of old note>)`
+`record_project_note(topic: "context", content_type: "persona", note: <updated PersonaNote JSON>, replaces_note_id: <project_note_id>)`
 
 The updated PersonaNote should include ALL fields — not just the new ones.
 Copy the existing id, name, description from the session context and fill in

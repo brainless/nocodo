@@ -150,7 +150,9 @@ impl Entity {
     /// Returns `true` if any field invariant or entity invariant is still
     /// pending or blocked — codegen cannot proceed until these are resolved.
     pub fn has_pending_invariants(&self) -> bool {
-        self.fields.iter().any(|f| f.invariants.iter().any(|i| i.blocks_codegen()))
+        self.fields
+            .iter()
+            .any(|f| f.invariants.iter().any(|i| i.blocks_codegen()))
             || self.invariants.iter().any(|i| i.blocks_codegen())
     }
 
@@ -179,7 +181,10 @@ mod tests {
                 invariants: &[Unresolved::Pending {
                     reason: "max length not specified",
                     provenance: AtLeastOne {
-                        head: Provenance::Conversation { id: "t", excerpt: "x" },
+                        head: Provenance::Conversation {
+                            id: "t",
+                            excerpt: "x",
+                        },
                         tail: &[],
                     },
                 }],

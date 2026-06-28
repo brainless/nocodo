@@ -417,6 +417,7 @@ impl TaskStorage for SqliteTaskStorage {
                     ON s.task_id = t.id AND s.agent_type = t.assigned_to_agent
              WHERE t.status = 'ready'
                AND t.assigned_to_agent != 'project_manager'
+               AND t.assigned_to_agent != 'praxis_engineer'
                AND s.id IS NULL
              ORDER BY t.id ASC",
         )?;
@@ -1295,6 +1296,7 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
         topic: ProjectNoteTopic,
         note: String,
         source_session_id: Option<i64>,
+        replaces_note_id: Option<i64>,
         replaces_note: Option<String>,
     ) -> Result<i64, AgentError> {
         let ts = now();
@@ -1315,8 +1317,29 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
             )));
         }
 
-        // Resolve replaces_note text → replaces_id.
-        let replaces_id: Option<i64> = if let Some(ref replaces_text) = replaces_note {
+        // Resolve replacement target. Prefer stable ids when available; retain
+        // exact-text replacement for older prompts/tools.
+        let replaces_id: Option<i64> = if let Some(note_id) = replaces_note_id {
+            let id: Option<i64> = conn
+                .query_row(
+                    "SELECT pn.id FROM project_note pn
+                     LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+                     WHERE pn.project_id = ?1 AND pn.id = ?2 AND newer.id IS NULL
+                     LIMIT 1",
+                    params![project_id, note_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    return Err(AgentError::Other(format!(
+                        "No current note with id {} found for project {}.",
+                        note_id, project_id
+                    )));
+                }
+            }
+        } else if let Some(ref replaces_text) = replaces_note {
             let id: Option<i64> = conn
                 .query_row(
                     "SELECT pn.id FROM project_note pn

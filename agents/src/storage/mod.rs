@@ -303,7 +303,9 @@ pub trait TaskStorage: Send + Sync {
     async fn list_pending_review_tasks(&self, project_id: i64) -> Result<Vec<Task>, AgentError>;
 
     /// All open tasks across every project that have no agent session yet and are
-    /// not assigned to project_manager. Used by the startup reconciliation pass.
+    /// eligible for automatic specialist dispatch. Used by the startup reconciliation
+    /// pass. Admin-triggered agents such as `praxis_engineer` are intentionally
+    /// excluded by the storage implementation.
     async fn list_open_dispatchable_tasks(&self) -> Result<Vec<Task>, AgentError>;
 
     async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError>;
@@ -585,14 +587,17 @@ pub struct ProjectNoteRow {
 
 #[async_trait]
 pub trait ProjectNoteStorage: Send + Sync {
-    /// replaces_note: exact text of the current note this supersedes (None for new notes).
-    /// Errors if replaces_note text not found, or if new note text already exists as a current note.
+    /// replaces_note_id: id of the current note this supersedes.
+    /// replaces_note: exact text of the current note this supersedes, retained for
+    /// compatibility when callers do not have an id.
+    /// Errors if replacement target is not found, or if new note text already exists as a current note.
     async fn add_note(
         &self,
         project_id: i64,
         topic: ProjectNoteTopic,
         note: String,
         source_session_id: Option<i64>,
+        replaces_note_id: Option<i64>,
         replaces_note: Option<String>,
     ) -> Result<i64, AgentError>;
 

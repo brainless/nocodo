@@ -232,7 +232,10 @@ mod tests {
                 transitions: Transitions::To(AtLeastOne {
                     head: Transition {
                         to: state_id("done"),
-                        permitted_roles: AtLeastOne { head: role_id("member"), tail: &[] },
+                        permitted_roles: AtLeastOne {
+                            head: role_id("member"),
+                            tail: &[],
+                        },
                         condition: TransitionCondition::Always,
                         provenance: PROV,
                     },
@@ -252,43 +255,45 @@ mod tests {
 
     #[test]
     fn has_terminal_state_detects_absence() {
-        let states = [
-            State {
-                id: state_id("todo"),
-                description: "",
-                transitions: Transitions::To(AtLeastOne {
-                    head: Transition {
-                        to: state_id("in_progress"),
-                        permitted_roles: AtLeastOne { head: role_id("member"), tail: &[] },
-                        condition: TransitionCondition::Always,
-                        provenance: PROV,
+        let states = [State {
+            id: state_id("todo"),
+            description: "",
+            transitions: Transitions::To(AtLeastOne {
+                head: Transition {
+                    to: state_id("in_progress"),
+                    permitted_roles: AtLeastOne {
+                        head: role_id("member"),
+                        tail: &[],
                     },
-                    tail: &[],
-                }),
-                provenance: PROV,
-            },
-        ];
+                    condition: TransitionCondition::Always,
+                    provenance: PROV,
+                },
+                tail: &[],
+            }),
+            provenance: PROV,
+        }];
         assert!(!has_terminal_state(&states));
     }
 
     #[test]
     fn find_unresolved_transitions_collects_pending() {
-        let states = [
-            State {
-                id: state_id("in_progress"),
-                description: "",
-                transitions: Transitions::To(AtLeastOne {
-                    head: Transition {
-                        to: state_id("todo"),
-                        permitted_roles: AtLeastOne { head: role_id("member"), tail: &[] },
-                        condition: TransitionCondition::Unresolved("can tasks be un-started?"),
-                        provenance: PROV,
+        let states = [State {
+            id: state_id("in_progress"),
+            description: "",
+            transitions: Transitions::To(AtLeastOne {
+                head: Transition {
+                    to: state_id("todo"),
+                    permitted_roles: AtLeastOne {
+                        head: role_id("member"),
+                        tail: &[],
                     },
-                    tail: &[],
-                }),
-                provenance: PROV,
-            },
-        ];
+                    condition: TransitionCondition::Unresolved("can tasks be un-started?"),
+                    provenance: PROV,
+                },
+                tail: &[],
+            }),
+            provenance: PROV,
+        }];
         let unresolved = find_unresolved_transitions(&states);
         assert_eq!(unresolved.len(), 1);
     }

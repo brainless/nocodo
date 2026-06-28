@@ -26,9 +26,7 @@ impl LiveTestConfig {
 
         Self {
             models,
-            template_path: PathBuf::from(required_env(
-                "RUST_ENGINEER_TEST_PROJECT_TEMPLATE_PATH",
-            )),
+            template_path: PathBuf::from(required_env("RUST_ENGINEER_TEST_PROJECT_TEMPLATE_PATH")),
             project_path: PathBuf::from(required_env("RUST_ENGINEER_TEST_PROJECT_PATH")),
             base_url: required_env("LLAMA_CPP_BASE_URL"),
         }

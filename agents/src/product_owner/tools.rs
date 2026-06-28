@@ -16,6 +16,9 @@ pub struct RecordProjectNoteParams {
     pub note: String,
     /// Exact text of an existing current note that this one supersedes. Omit for new facts.
     pub replaces_note: Option<String>,
+    /// Id of an existing current project note that this one supersedes. Prefer this
+    /// over `replaces_note` when the id is available.
+    pub replaces_note_id: Option<i64>,
     /// Optional content type tag (e.g. "persona"). When set, the note is treated
     /// as structured data following the schema for that type.
     pub content_type: Option<String>,

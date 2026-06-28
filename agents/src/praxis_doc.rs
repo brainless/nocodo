@@ -67,14 +67,18 @@ fn parse_source(source: &str) -> Vec<DocItem> {
                     in_inner_doc = true;
                 }
                 let doc_text = trimmed
-                    .strip_prefix("//!").unwrap()
-                    .strip_prefix(' ').unwrap_or("");
+                    .strip_prefix("//!")
+                    .unwrap()
+                    .strip_prefix(' ')
+                    .unwrap_or("");
                 current_doc.push(doc_text);
             } else {
                 in_inner_doc = false;
                 let doc_text = trimmed
-                    .strip_prefix("///").unwrap()
-                    .strip_prefix(' ').unwrap_or("");
+                    .strip_prefix("///")
+                    .unwrap()
+                    .strip_prefix(' ')
+                    .unwrap_or("");
                 current_doc.push(doc_text);
             }
             i += 1;
@@ -82,7 +86,9 @@ fn parse_source(source: &str) -> Vec<DocItem> {
         }
 
         // Doc comment ended — check if next line is a struct/enum definition
-        if !current_doc.is_empty() && (trimmed.starts_with("pub struct ") || trimmed.starts_with("pub enum ")) {
+        if !current_doc.is_empty()
+            && (trimmed.starts_with("pub struct ") || trimmed.starts_with("pub enum "))
+        {
             let def = extract_block(&lines, &mut i);
             let methods = Vec::new(); // impl methods collected separately
             items.push(DocItem {
@@ -164,8 +170,10 @@ fn parse_impl_methods(impl_block: &str) -> Vec<String> {
 
         if trimmed.starts_with("///") {
             let doc_text = trimmed
-                .strip_prefix("///").unwrap()
-                .strip_prefix(' ').unwrap_or("");
+                .strip_prefix("///")
+                .unwrap()
+                .strip_prefix(' ')
+                .unwrap_or("");
             current_doc.push(doc_text);
             continue;
         }
@@ -175,7 +183,12 @@ fn parse_impl_methods(impl_block: &str) -> Vec<String> {
             if !current_doc.is_empty() {
                 write!(method, "{}\n", current_doc.join("\n")).unwrap();
             }
-            write!(method, "{}", trimmed.trim_end_matches(|c| c == '{' || c == ' ')).unwrap();
+            write!(
+                method,
+                "{}",
+                trimmed.trim_end_matches(|c| c == '{' || c == ' ')
+            )
+            .unwrap();
             if trimmed.contains('{') {
                 method.push_str(" { ... }");
             }
@@ -321,7 +334,10 @@ mod tests {
     fn extract_statemachine() {
         let ref_text = statemachine_types_reference(None);
         assert!(ref_text.contains("StateId"), "Missing StateId");
-        assert!(ref_text.contains("TransitionCondition"), "Missing TransitionCondition");
+        assert!(
+            ref_text.contains("TransitionCondition"),
+            "Missing TransitionCondition"
+        );
         assert!(ref_text.contains("Transitions"), "Missing Transitions");
     }
 
@@ -330,7 +346,10 @@ mod tests {
         let ref_text = entity_types_reference(None);
         assert!(ref_text.contains("EntityId"), "Missing EntityId");
         assert!(ref_text.contains("Assignee"), "Missing Assignee");
-        assert!(ref_text.contains("has_pending_invariants"), "Missing method");
+        assert!(
+            ref_text.contains("has_pending_invariants"),
+            "Missing method"
+        );
     }
 
     #[test]

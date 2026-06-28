@@ -55,7 +55,8 @@ The note JSON should look like:
 
 Always record the persona as soon as you have an id + name + description, even if
 goals and pain_points are empty. Set `incomplete_reason` to explain what's missing.
-You will update the note with replaces_note when you fill in the gaps.
+You will update the note with `replaces_note_id` when a project_note id is
+available, or `replaces_note` when only the exact old note text is available.
 
 ### Step 2: Describe
 
@@ -100,8 +101,9 @@ domain and what the user has told you:
 
 ### Step 5: Update and next
 
-After goals and pain points are collected, update the note with `replaces_note`
-containing the previous note's exact text. The updated note has `incomplete_reason`
+After goals and pain points are collected, update the note with `replaces_note_id`
+when you have the previous project_note id, or `replaces_note` containing the
+previous note's exact text otherwise. The updated note has `incomplete_reason`
 set to `null` and all fields populated.
 
 Then ask:

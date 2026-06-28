@@ -37,7 +37,12 @@ pub use rust_engineer::{
     DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, PraxisAuthOutput,
     RustEngineerAgent, RustEngineerResult,
 };
+pub use spec_gap::{
+    find_gaps_from_persona_notes, find_pending_gaps_in_code, gaps_to_questions, GapQuestion,
+    SpecGap,
+};
 pub use stack_reviewer::{StackReviewResult, StackReviewerAgent};
+pub use storage::spec_schemas::{PersonaNote, PraxisWriterTaskSpec, SpecNoteContent};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteProjectNoteStorage,
     SqliteSchemaStorage, SqliteStackNoteStorage, SqliteTaskStorage, SqliteUiFormStorage,
@@ -50,8 +55,6 @@ pub use storage::{
     StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
     UserChatSessionRow, UserChatStorage, UserStorage,
 };
-pub use spec_gap::{find_gaps_from_persona_notes, find_pending_gaps_in_code, gaps_to_questions, GapQuestion, SpecGap};
-pub use storage::spec_schemas::{PersonaNote, PraxisWriterTaskSpec, SpecNoteContent};
 pub use ui_designer::{
     agent::{UiDesignerAgent, UiDesignerResponse},
     FormField, FormFieldType, FormLayout, FormRow,

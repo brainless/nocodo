@@ -330,12 +330,13 @@ struct PraxisWriterTaskSpec {
 - [x] Add `assigned_to_agent: "praxis_engineer"` to the agent registry
 - [x] Update `finalize_session` backend handler to parse task descriptions — `hydrate_praxis_tasks` assembles `PraxisWriterTaskSpec` from DB persona notes and writes JSON to `task.description`
 - [x] Backend: `hydrate_praxis_tasks` writes `PraxisWriterTaskSpec` JSON to `task.description`; admin UI triggers `POST /api/rust-engineer/praxis-auth` to generate spec code (auto background dispatch deferred — admin-triggered is the right UX)
+- [x] Explicitly keep `praxis_engineer` out of startup auto-dispatch; Praxis Writer execution is admin-triggered through the RustEngineer API
 
 #### Success criteria
 
 - PM reads PO's structured PersonaNotes and produces a valid `PraxisWriterTaskSpec`
 - `PraxisWriterTaskSpec` deserializes from task description
-- Backend dispatches praxis_engineer task to RustEngineer correctly
+- Backend exposes an admin-triggered Praxis Writer path (`POST /api/rust-engineer/praxis-auth`) and does not auto-dispatch `praxis_engineer` tasks
 
 ---
 
