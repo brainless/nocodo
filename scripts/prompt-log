@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-Combine prompt logs from opencode, Claude Code, and Codex into a single JSONL file.
+Combine project-scoped prompt logs from OpenCode, Claude Code, and Codex.
 
 Usage:
-    python scripts/prompt-log                         # last 30 days
-    python scripts/prompt-log --days 7                 # last 7 days
-    python scripts/prompt-log --from 2026-04-01 --to 2026-05-01
-    python scripts/prompt-log --include-agent-responses # include model responses
+    scripts/prompt-log --project . --days 7 --list-sessions
+    scripts/prompt-log --project ~/Projects/a --project ~/Projects/b --output /tmp/prompts.jsonl
+    scripts/prompt-log --project . --session SESSION_ID --include-agent-responses
 
-Output: prompt-log-{start_date}-{end_date}.jsonl in current working directory.
+Human prompts are the default. Agent responses are opt-in. Bulk exports should
+be written outside Git worktrees and treated as private data.
 """
 
 import argparse
 import ast
+import hashlib
 import json
 import os
 import sqlite3
+import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,7 +39,59 @@ def format_date(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d")
 
 
-def extract_opencode(cwd: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
+def git_root(path: str) -> str:
+    resolved = str(Path(path).expanduser().resolve())
+    result = subprocess.run(
+        ["git", "-C", resolved, "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else resolved
+
+
+def git_identity(path: str) -> str:
+    resolved = str(Path(path).expanduser().resolve())
+    result = subprocess.run(
+        ["git", "-C", resolved, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else resolved
+
+
+def belongs_to_project(recorded_cwd: str, project: str) -> bool:
+    try:
+        return git_identity(recorded_cwd) == git_identity(project)
+    except OSError:
+        return str(Path(recorded_cwd).resolve()) == str(Path(project).resolve())
+
+
+def base_record(
+    *, timestamp: str, agent: str, role: str, content: str, project: str,
+    recorded_cwd: str, session_id: str, message_id: str,
+) -> dict:
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    return {
+        "schema_version": 1,
+        "record_id": f"{agent}:{session_id}:{message_id}",
+        "timestamp": timestamp,
+        "agent": agent,
+        "role": role,
+        "origin": "human" if role == "user" else "agent",
+        "project": {
+            "repo_root": git_root(project),
+            "recorded_cwd": recorded_cwd,
+        },
+        "session_id": session_id,
+        "message_id": message_id,
+        "content_sha256": content_hash,
+        "content": content,
+    }
+
+
+def extract_opencode(project: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
     records = []
     if not OPENCODE_DB.exists():
         return records
@@ -46,15 +100,18 @@ def extract_opencode(cwd: str, start: datetime, end: datetime, include_responses
     end_ms = int(end.timestamp() * 1000)
 
     query = """
-        SELECT m.id, m.time_created, json_extract(m.data, '$.role') as role
+        SELECT m.id, m.session_id, s.directory, m.time_created,
+               json_extract(m.data, '$.role') as role
         FROM message m
         JOIN session s ON m.session_id = s.id
-        WHERE s.directory = ? AND m.time_created >= ? AND m.time_created < ?
+        WHERE m.time_created >= ? AND m.time_created < ?
         ORDER BY m.time_created ASC
     """
-    messages = conn.execute(query, (cwd, start_ms, end_ms)).fetchall()
+    messages = conn.execute(query, (start_ms, end_ms)).fetchall()
 
-    for msg_id, time_created, role in messages:
+    for msg_id, session_id, recorded_cwd, time_created, role in messages:
+        if not belongs_to_project(recorded_cwd, project):
+            continue
         ts_sec = time_created / 1000
         if role == "user":
             role_out = "user"
@@ -74,20 +131,24 @@ def extract_opencode(cwd: str, start: datetime, end: datetime, include_responses
                 texts.append(obj.get("text", ""))
 
         if texts:
-            records.append({
-                "timestamp": datetime.fromtimestamp(ts_sec, tz=timezone.utc).isoformat(),
-                "agent": "opencode",
-                "role": role_out,
-                "content": "\n".join(texts),
-            })
+            records.append(base_record(
+                timestamp=datetime.fromtimestamp(ts_sec, tz=timezone.utc).isoformat(),
+                agent="opencode",
+                role=role_out,
+                content="\n".join(texts),
+                project=project,
+                recorded_cwd=recorded_cwd,
+                session_id=session_id,
+                message_id=msg_id,
+            ))
 
     conn.close()
     return records
 
 
-def extract_claude_code(cwd: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
+def extract_claude_code(project: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
     records = []
-    project_dir = cwd_to_claude_dir(cwd)
+    project_dir = cwd_to_claude_dir(str(Path(project).resolve()))
     if not project_dir.exists():
         return records
 
@@ -110,7 +171,6 @@ def extract_claude_code(cwd: str, start: datetime, end: datetime, include_respon
                 if not isinstance(msg, dict):
                     continue
 
-                role_raw = msg.get("role", "")
                 timestamp = obj.get("timestamp", "")
 
                 if not timestamp:
@@ -129,12 +189,16 @@ def extract_claude_code(cwd: str, start: datetime, end: datetime, include_respon
 
                 if entry_type == "user":
                     if isinstance(content, str) and content.strip():
-                        records.append({
-                            "timestamp": ts.isoformat(),
-                            "agent": "claude-code",
-                            "role": "user",
-                            "content": content,
-                        })
+                        records.append(base_record(
+                            timestamp=ts.isoformat(),
+                            agent="claude-code",
+                            role="user",
+                            content=content,
+                            project=project,
+                            recorded_cwd=project,
+                            session_id=obj.get("sessionId", jsonl_file.stem),
+                            message_id=obj.get("uuid", f"{jsonl_file.stem}:{ts.timestamp()}"),
+                        ))
                 elif entry_type == "assistant" and include_responses:
                     if isinstance(content, list):
                         texts = []
@@ -142,21 +206,25 @@ def extract_claude_code(cwd: str, start: datetime, end: datetime, include_respon
                             if isinstance(block, dict) and block.get("type") == "text":
                                 texts.append(block.get("text", ""))
                         if texts:
-                            records.append({
-                                "timestamp": ts.isoformat(),
-                                "agent": "claude-code",
-                                "role": "agent",
-                                "content": "\n".join(texts),
-                            })
+                            records.append(base_record(
+                                timestamp=ts.isoformat(),
+                                agent="claude-code",
+                                role="agent",
+                                content="\n".join(texts),
+                                project=project,
+                                recorded_cwd=project,
+                                session_id=obj.get("sessionId", jsonl_file.stem),
+                                message_id=obj.get("uuid", f"{jsonl_file.stem}:{ts.timestamp()}"),
+                            ))
 
     return records
 
 
-def extract_codex(cwd: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
+def extract_codex(project: str, start: datetime, end: datetime, include_responses: bool) -> list[dict]:
     records = []
 
     # Build a map of session_id -> cwd from session files
-    session_cwd_map: dict[str, str] = {}
+    session_meta_map: dict[str, dict] = {}
     for jsonl_file in CODEX_SESSIONS_DIR.rglob("*.jsonl"):
         with open(jsonl_file) as f:
             for line in f:
@@ -174,7 +242,7 @@ def extract_codex(cwd: str, start: datetime, end: datetime, include_responses: b
                     sid = payload.get("id", "")
                     swd = payload.get("cwd", "")
                     if sid and swd:
-                        session_cwd_map[sid] = swd
+                        session_meta_map[sid] = payload
                     break
 
     if not CODEX_HISTORY.exists():
@@ -196,8 +264,9 @@ def extract_codex(cwd: str, start: datetime, end: datetime, include_responses: b
             if ts < start_ms or ts >= end_ms:
                 continue
 
-            session_cwd = session_cwd_map.get(sid, "")
-            if session_cwd != cwd:
+            session_meta = session_meta_map.get(sid, {})
+            session_cwd = session_meta.get("cwd", "")
+            if not session_cwd or not belongs_to_project(session_cwd, project):
                 continue
 
             text = obj.get("text", "")
@@ -205,15 +274,31 @@ def extract_codex(cwd: str, start: datetime, end: datetime, include_responses: b
                 continue
 
             ts_iso = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
-            records.append({
-                "timestamp": ts_iso,
-                "agent": "codex",
-                "role": "user",
-                "content": text,
-            })
+            record = base_record(
+                timestamp=ts_iso,
+                agent="codex",
+                role="user",
+                content=text,
+                project=project,
+                recorded_cwd=session_cwd,
+                session_id=sid,
+                message_id=f"history:{ts}",
+            )
+            git = session_meta.get("git")
+            if isinstance(git, dict):
+                record["git"] = {
+                    "commit": git.get("commit_hash"),
+                    "branch": git.get("branch"),
+                    "source": "session_meta",
+                    "confidence": "exact_session_start",
+                }
+            records.append(record)
 
-    if include_responses and session_cwd_map:
-        matching_sessions = {sid for sid, swd in session_cwd_map.items() if swd == cwd}
+    if include_responses and session_meta_map:
+        matching_sessions = {
+            sid for sid, meta in session_meta_map.items()
+            if meta.get("cwd") and belongs_to_project(meta["cwd"], project)
+        }
         for jsonl_file in CODEX_SESSIONS_DIR.rglob("*.jsonl"):
             file_session_id = None
             file_texts: list[dict] = []
@@ -270,12 +355,16 @@ def extract_codex(cwd: str, start: datetime, end: datetime, include_responses: b
                                 if isinstance(block, dict) and block.get("type") in ("text", "output_text"):
                                     texts.append(block.get("text", ""))
                             if texts:
-                                file_texts.append({
-                                    "timestamp": ts.isoformat(),
-                                    "agent": "codex",
-                                    "role": "agent",
-                                    "content": "\n".join(texts),
-                                })
+                                file_texts.append(base_record(
+                                    timestamp=ts.isoformat(),
+                                    agent="codex",
+                                    role="agent",
+                                    content="\n".join(texts),
+                                    project=project,
+                                    recorded_cwd=session_meta_map[file_session_id]["cwd"],
+                                    session_id=file_session_id,
+                                    message_id=f"response:{ts.isoformat()}",
+                                ))
 
             records.extend(file_texts)
 
@@ -324,7 +413,11 @@ def main():
     parser.add_argument("--days", type=int, default=30, help="Number of days to look back (default: 30)")
     parser.add_argument("--include-agent-responses", action="store_true", help="Include model responses")
     parser.add_argument("--format", dest="output_format", choices=["jsonl", "markdown"], default="jsonl", help="Output format (default: jsonl)")
-    parser.add_argument("--cwd", default=os.getcwd(), help="Project directory (default: current directory)")
+    parser.add_argument("--project", action="append", help="Project path; repeat for multiple projects")
+    parser.add_argument("--cwd", help="Deprecated alias for one --project")
+    parser.add_argument("--session", action="append", help="Only emit this session ID; repeatable")
+    parser.add_argument("--list-sessions", action="store_true", help="Print metadata-only session counts")
+    parser.add_argument("--output", help="Output path; defaults to stdout")
     args = parser.parse_args()
 
     end = datetime.now(tz=timezone.utc)
@@ -334,26 +427,60 @@ def main():
     else:
         start = end - timedelta(days=args.days)
 
-    cwd = os.path.abspath(args.cwd)
+    projects = args.project or ([args.cwd] if args.cwd else [os.getcwd()])
+    projects = [str(Path(project).expanduser().resolve()) for project in projects]
 
     all_records = []
-    all_records.extend(extract_opencode(cwd, start, end, args.include_agent_responses))
-    all_records.extend(extract_claude_code(cwd, start, end, args.include_agent_responses))
-    all_records.extend(extract_codex(cwd, start, end, args.include_agent_responses))
+    for project in projects:
+        all_records.extend(extract_opencode(project, start, end, args.include_agent_responses))
+        all_records.extend(extract_claude_code(project, start, end, args.include_agent_responses))
+        all_records.extend(extract_codex(project, start, end, args.include_agent_responses))
 
-    all_records.sort(key=lambda r: r["timestamp"])
+    if args.session:
+        selected = set(args.session)
+        all_records = [record for record in all_records if record["session_id"] in selected]
 
-    ext = "md" if args.output_format == "markdown" else "jsonl"
-    output_file = Path.cwd() / f"prompt-log-{format_date(start)}-{format_date(end)}.{ext}"
+    deduplicated = {record["record_id"]: record for record in all_records}
+    all_records = sorted(deduplicated.values(), key=lambda r: r["timestamp"])
 
-    if args.output_format == "markdown":
-        write_markdown(all_records, output_file)
+    if args.list_sessions:
+        sessions: dict[tuple[str, str, str], dict] = {}
+        for record in all_records:
+            key = (
+                record["project"]["repo_root"],
+                record["agent"],
+                record["session_id"],
+            )
+            summary = sessions.setdefault(key, {
+                "project": key[0],
+                "agent": key[1],
+                "session_id": key[2],
+                "first_timestamp": record["timestamp"],
+                "last_timestamp": record["timestamp"],
+                "user_messages": 0,
+                "agent_messages": 0,
+            })
+            summary["last_timestamp"] = record["timestamp"]
+            summary[f"{record['role']}_messages"] += 1
+        for summary in sorted(sessions.values(), key=lambda item: item["first_timestamp"]):
+            print(json.dumps(summary, ensure_ascii=False))
+        return
+
+    if args.output:
+        output_file = Path(args.output).expanduser()
+        if args.output_format == "markdown":
+            write_markdown(all_records, output_file)
+        else:
+            with open(output_file, "w") as f:
+                for rec in all_records:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        output_file.chmod(0o600)
+        print(f"Wrote {len(all_records)} records to {output_file}")
     else:
-        with open(output_file, "w") as f:
-            for rec in all_records:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-    print(f"Wrote {len(all_records)} records to {output_file}")
+        if args.output_format == "markdown":
+            raise SystemExit("--format markdown requires --output")
+        for rec in all_records:
+            print(json.dumps(rec, ensure_ascii=False))
 
 
 if __name__ == "__main__":
