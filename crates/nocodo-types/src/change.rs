@@ -2,11 +2,12 @@
 //!
 //! Types only. Names and references are validated by the checker, not here.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::schema::Column;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SchemaChange {
     CreateTable {
@@ -53,7 +54,7 @@ impl SchemaChange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ChangeSet {
     /// snake_case; becomes the migration folder suffix.

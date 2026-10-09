@@ -1,0 +1,1 @@
+Two changes. First, the tax rate can be different for each line item on an invoice, so I want to note a tax rate on every line. Second, each client has a preferred currency, such as USD, EUR or INR, and I want to store it with the client.

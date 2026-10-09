@@ -144,6 +144,7 @@ fn spec_changeset_project_roundtrip() {
     roundtrip(&ProjectConfig {
         spec_version: SPEC_VERSION,
         name: "demo".into(),
+        models: Default::default(),
     });
     for t in [
         ColumnType::Text,
@@ -166,7 +167,11 @@ fn event_kinds_roundtrip() {
         },
         EventKind::ChangeSetProposed {
             change_set: change_set(),
+            prompt_seq: Some(2),
+            attempt: 2,
+            assumptions: vec!["a".into()],
         },
+        EventKind::UserPrompt { text: "hi".into() },
         EventKind::ChangeSetRejected {
             proposal_seq: 2,
             findings: vec![Finding {
@@ -180,7 +185,12 @@ fn event_kinds_roundtrip() {
         },
     ];
     for (i, kind) in kinds.into_iter().enumerate() {
-        for actor in [Actor::Developer, Actor::System] {
+        for actor in [
+            Actor::Developer,
+            Actor::System,
+            Actor::User,
+            Actor::SchemaAgent { run_id: "r".into() },
+        ] {
             roundtrip(&Event {
                 seq: i as u64 + 1,
                 at: "2026-10-09T09:00:00Z".parse().unwrap(),
@@ -272,4 +282,32 @@ fn tagged_enum_unknown_field_behaviour() {
     println!("EventKind rejects: {}", kind.is_err());
     // SchemaChange carries deny_unknown_fields, so it must reject.
     assert!(change.is_err());
+}
+
+#[test]
+fn old_project_config_and_proposed_event_still_load() {
+    let c: ProjectConfig = serde_json::from_str(r#"{"spec_version":1,"name":"n"}"#).unwrap();
+    assert_eq!(c.models.schema.model, "claude-sonnet-5-5");
+    let e: EventKind = serde_json::from_str(
+        r#"{"type":"change_set_proposed","change_set":{"name":"a","summary":"s","changes":[]}}"#,
+    )
+    .unwrap();
+    assert!(matches!(
+        e,
+        EventKind::ChangeSetProposed {
+            attempt: 0,
+            prompt_seq: None,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn change_set_json_schema_generates() {
+    let schema = schemars::schema_for!(ChangeSet);
+    assert!(
+        serde_json::to_string(&schema)
+            .unwrap()
+            .contains("create_table")
+    );
 }

@@ -17,6 +17,8 @@ pub enum OrchestratorError {
     SchemaEditedByHand,
     /// `events.jsonl` is inconsistent (bad line, missing proposal, ...).
     CorruptEventLog(String),
+    /// The proposer (e.g. the Schema agent) failed.
+    Proposer(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl std::fmt::Display for OrchestratorError {
@@ -42,6 +44,7 @@ impl std::fmt::Display for OrchestratorError {
                  it was edited by hand. Restore it, or propose a change set instead"
             ),
             Self::CorruptEventLog(m) => write!(f, "events.jsonl is inconsistent: {m}"),
+            Self::Proposer(e) => write!(f, "{e}"),
         }
     }
 }

@@ -16,9 +16,41 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use nocodo_orchestrator::{Outcome, Project};
+use nocodo_agent::AgentContext;
+use nocodo_agent_schema::SchemaAgent;
+use nocodo_orchestrator::{Outcome, Project, Proposal, Proposer, ProposerError};
 use nocodo_types::change::ChangeSet;
 use nocodo_types::event::Actor;
+use nocodo_types::schema::SchemaSpec;
+
+/// Maximum attempts (initial proposal plus repairs) for one prompt.
+const MAX_ATTEMPTS: u32 = 3;
+
+/// Adapts the Schema agent to the orchestrator's `Proposer` trait.
+struct SchemaProposer {
+    ctx: AgentContext,
+}
+
+impl Proposer for SchemaProposer {
+    async fn propose(
+        &self,
+        current: &SchemaSpec,
+        prompt: &str,
+        feedback: Option<&nocodo_orchestrator::Feedback>,
+    ) -> Result<Proposal, ProposerError> {
+        let feedback = feedback.map(|f| nocodo_agent_schema::Feedback {
+            previous: f.previous.clone(),
+            findings: f.findings.clone(),
+        });
+        let (proposal, run_id) =
+            SchemaAgent::propose_with_run_id(&self.ctx, current, prompt, feedback.as_ref()).await?;
+        Ok(Proposal {
+            change_set: proposal.change_set,
+            assumptions: proposal.assumptions,
+            actor: Actor::SchemaAgent { run_id },
+        })
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "nocodo-api", version)]
@@ -45,6 +77,18 @@ enum Command {
         /// Allow destructive changes (dropping tables or columns).
         #[arg(long)]
         confirm_destructive: bool,
+    },
+    /// Turn a plain-language prompt into a schema change via the Schema agent.
+    Prompt {
+        /// Allow destructive changes (dropping tables or columns).
+        #[arg(long)]
+        confirm_destructive: bool,
+        /// Read the prompt from a file instead of the command line.
+        #[arg(long, conflicts_with = "text")]
+        file: Option<PathBuf>,
+        /// The prompt text.
+        #[arg(required_unless_present = "file")]
+        text: Option<String>,
     },
 }
 
@@ -89,6 +133,58 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 }
             }
         }
+        Command::Prompt {
+            confirm_destructive,
+            file,
+            text,
+        } => {
+            let prompt = match (file, text) {
+                (Some(f), _) => std::fs::read_to_string(&f)
+                    .with_context(|| format!("reading {}", f.display()))?,
+                (None, Some(t)) => t,
+                (None, None) => anyhow::bail!("give the prompt text or --file <path>"),
+            };
+            let project = Project::open(&dir)?;
+            let ctx = AgentContext::new(
+                project.dir(),
+                nocodo_agent_schema::ROLE,
+                project.config().models.schema.clone(),
+            );
+            let proposer = SchemaProposer { ctx };
+            let rt = tokio::runtime::Runtime::new().context("starting async runtime")?;
+            let result = rt.block_on(project.run_prompt(
+                &prompt,
+                &proposer,
+                confirm_destructive,
+                MAX_ATTEMPTS,
+            ))?;
+            match result.outcome {
+                Outcome::Accepted { migration } => {
+                    println!("{}", result.change_set.summary);
+                    print_assumptions(&result.assumptions);
+                    println!("Migration: migrations/{migration}");
+                    Ok(ExitCode::SUCCESS)
+                }
+                Outcome::Rejected { findings } => {
+                    println!("Rejected after {} attempt(s):", result.attempts);
+                    for f in findings {
+                        println!("  [{}] {}", f.code, f.message);
+                    }
+                    print_assumptions(&result.assumptions);
+                    Ok(ExitCode::FAILURE)
+                }
+            }
+        }
+    }
+}
+
+fn print_assumptions(assumptions: &[String]) {
+    if assumptions.is_empty() {
+        return;
+    }
+    println!("Assumptions:");
+    for a in assumptions {
+        println!("  - {a}");
     }
 }
 

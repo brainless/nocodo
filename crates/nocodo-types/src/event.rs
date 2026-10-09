@@ -16,12 +16,14 @@ pub struct Event {
     pub kind: EventKind,
 }
 
-/// Who caused an event. `SchemaAgent { run_id }` and `User` come in epic 004.
+/// Who caused an event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Actor {
     Developer,
     System,
+    User,
+    SchemaAgent { run_id: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,8 +33,20 @@ pub enum EventKind {
         spec_version: u32,
         name: String,
     },
+    UserPrompt {
+        text: String,
+    },
     ChangeSetProposed {
         change_set: ChangeSet,
+        /// Seq of the `UserPrompt` event that triggered this proposal.
+        #[serde(default)]
+        prompt_seq: Option<u64>,
+        /// 1-based attempt number within a prompt run.
+        #[serde(default)]
+        attempt: u32,
+        /// Guesses the proposer made, as plain sentences.
+        #[serde(default)]
+        assumptions: Vec<String>,
     },
     ChangeSetRejected {
         proposal_seq: u64,

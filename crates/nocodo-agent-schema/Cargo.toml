@@ -10,3 +10,6 @@ workspace = true
 [dependencies]
 nocodo-types.workspace = true
 nocodo-agent.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true

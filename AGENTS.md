@@ -30,7 +30,7 @@ Experiment 1 covers only the storage layer. It has **one LLM agent, the Schema a
 
 | Package | Override | Reason |
 |---|---|---|
-| — | — | — |
+| `rig-core` (via `nocodo-agent`) | Feature `native-tls` instead of the default `rustls`, with `default-features = false` | Default `rustls` pulls `aws-lc-sys`. Under Cranelift on macOS its symbols link as `__aws_lc_*` but are defined as `_aws_lc_*` (double underscore), so any test or binary that links it fails with "symbol(s) not found". A per-package `codegen-backend = "llvm"` on `aws-lc-sys`/`aws-lc-rs` did not help. `native-tls` uses Security.framework and builds under Cranelift. Release builds are unaffected. |
 
 ### Commands
 

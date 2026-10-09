@@ -1,0 +1,1 @@
+I sometimes lend items to our neighbours, like the ladder or the drill. I want to record who borrowed which item, on what date, and the date it came back. A neighbour has a name and a phone number. I want to see what is still out with someone.

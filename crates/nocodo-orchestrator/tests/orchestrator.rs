@@ -276,3 +276,123 @@ fn finance_hand_edited_schema_is_detected() {
         Err(OrchestratorError::SchemaEditedByHand)
     ));
 }
+
+mod run_prompt {
+    use std::sync::Mutex;
+
+    use nocodo_orchestrator::{Feedback, Proposal, Proposer, ProposerError};
+    use nocodo_types::schema::SchemaSpec;
+
+    use super::*;
+
+    struct Scripted {
+        queue: Mutex<Vec<ChangeSet>>,
+        feedback_seen: Mutex<Vec<bool>>,
+    }
+
+    impl Scripted {
+        fn new(items: Vec<ChangeSet>) -> Self {
+            Scripted {
+                queue: Mutex::new(items),
+                feedback_seen: Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl Proposer for Scripted {
+        async fn propose(
+            &self,
+            _current: &SchemaSpec,
+            _prompt: &str,
+            feedback: Option<&Feedback>,
+        ) -> Result<Proposal, ProposerError> {
+            self.feedback_seen.lock().unwrap().push(feedback.is_some());
+            let change_set = self.queue.lock().unwrap().remove(0);
+            Ok(Proposal {
+                change_set,
+                assumptions: vec!["Money is in one currency.".into()],
+                actor: Actor::SchemaAgent {
+                    run_id: "run-1".into(),
+                },
+            })
+        }
+    }
+
+    fn invalid() -> ChangeSet {
+        cs(
+            "bad",
+            vec![SchemaChange::AddColumn {
+                table: "missing".into(),
+                column: col("x", ColumnType::Text),
+            }],
+        )
+    }
+
+    #[tokio::test]
+    async fn repairs_on_second_attempt() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = Project::init(dir.path().join("p"), "p").unwrap();
+        let proposer = Scripted::new(vec![invalid(), initial()]);
+        let r = project
+            .run_prompt("track spending", &proposer, false, 3)
+            .await
+            .unwrap();
+        assert!(matches!(r.outcome, Outcome::Accepted { .. }));
+        assert_eq!(r.attempts, 2);
+        assert_eq!(*proposer.feedback_seen.lock().unwrap(), vec![false, true]);
+        let events = project.events().unwrap();
+        let proposed: Vec<_> = events
+            .iter()
+            .filter_map(|e| match &e.kind {
+                EventKind::ChangeSetProposed {
+                    prompt_seq,
+                    attempt,
+                    ..
+                } => Some((*prompt_seq, *attempt)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(proposed, vec![(Some(2), 1), (Some(2), 2)]);
+        assert!(matches!(events[1].kind, EventKind::UserPrompt { .. }));
+        assert_eq!(events[1].actor, Actor::User);
+        assert_eq!(
+            fs::read_dir(project.dir().join("migrations"))
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn stops_at_max_attempts_without_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = Project::init(dir.path().join("p"), "p").unwrap();
+        let proposer = Scripted::new(vec![invalid(), invalid(), invalid(), initial()]);
+        let r = project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        assert!(matches!(r.outcome, Outcome::Rejected { .. }));
+        assert_eq!(r.attempts, 3);
+        assert_eq!(
+            fs::read_dir(project.dir().join("migrations"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert_eq!(project.current_schema().unwrap().tables.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn destructive_without_confirmation_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = Project::init(dir.path().join("p"), "p").unwrap();
+        project.propose(initial(), Actor::Developer, false).unwrap();
+        let proposer = Scripted::new(vec![drop_notes()]);
+        let r = project.run_prompt("x", &proposer, false, 1).await.unwrap();
+        assert!(matches!(r.outcome, Outcome::Rejected { .. }));
+        assert_eq!(
+            fs::read_dir(project.dir().join("migrations"))
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+}

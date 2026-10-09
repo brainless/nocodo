@@ -25,6 +25,45 @@ pub enum Outcome {
     },
 }
 
+/// What a [`Proposer`] returns.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Proposal {
+    pub change_set: ChangeSet,
+    /// Guesses the proposer made, as plain sentences.
+    pub assumptions: Vec<String>,
+    /// Who made the proposal (recorded on the `ChangeSetProposed` event).
+    pub actor: Actor,
+}
+
+/// Why the previous attempt was rejected, passed back to the proposer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Feedback {
+    pub previous: ChangeSet,
+    pub findings: Vec<Finding>,
+}
+
+pub type ProposerError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Source of change sets for [`Project::run_prompt`]. Implemented outside the
+/// orchestrator (the api adapts the Schema agent), so no agent dependency.
+pub trait Proposer {
+    fn propose(
+        &self,
+        current: &SchemaSpec,
+        prompt: &str,
+        feedback: Option<&Feedback>,
+    ) -> impl std::future::Future<Output = std::result::Result<Proposal, ProposerError>> + Send;
+}
+
+/// Result of [`Project::run_prompt`]: the last attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PromptOutcome {
+    pub outcome: Outcome,
+    pub change_set: ChangeSet,
+    pub assumptions: Vec<String>,
+    pub attempts: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct Project {
     dir: PathBuf,
@@ -58,6 +97,7 @@ impl Project {
         let config = ProjectConfig {
             spec_version: SPEC_VERSION,
             name: name.to_string(),
+            models: Default::default(),
         };
         write_json(&dir.join("project.json"), &config)?;
         write_json(&dir.join("specs/schema.json"), &empty_spec())?;
@@ -136,7 +176,7 @@ impl Project {
         for event in &events {
             if let EventKind::ChangeSetAccepted { proposal_seq, .. } = &event.kind {
                 let proposed = events.iter().find_map(|e| match &e.kind {
-                    EventKind::ChangeSetProposed { change_set } if e.seq == *proposal_seq => {
+                    EventKind::ChangeSetProposed { change_set, .. } if e.seq == *proposal_seq => {
                         Some(change_set)
                     }
                     _ => None,
@@ -176,11 +216,82 @@ impl Project {
         actor: Actor,
         confirm_destructive: bool,
     ) -> Result<Outcome> {
+        self.propose_attempt(cs, actor, confirm_destructive, None, 1, Vec::new())
+    }
+
+    /// Prompt run: record the prompt, then ask `proposer` for a change set,
+    /// run it through [`Project::propose`]'s pipeline, and on rejection ask
+    /// again with the findings, up to `max_attempts` times. Each attempt has
+    /// its own proposed/rejected/accepted events, linked by `prompt_seq` and
+    /// `attempt`. Returns the last attempt's outcome.
+    pub async fn run_prompt<P: Proposer>(
+        &self,
+        prompt: &str,
+        proposer: &P,
+        confirm_destructive: bool,
+        max_attempts: u32,
+    ) -> Result<PromptOutcome> {
+        let prompt_seq = self
+            .append(
+                Actor::User,
+                EventKind::UserPrompt {
+                    text: prompt.to_string(),
+                },
+            )?
+            .seq;
+        let mut feedback: Option<Feedback> = None;
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            let current = self.current_schema()?;
+            let proposal = proposer
+                .propose(&current, prompt, feedback.as_ref())
+                .await
+                .map_err(OrchestratorError::Proposer)?;
+            let outcome = self.propose_attempt(
+                proposal.change_set.clone(),
+                proposal.actor,
+                confirm_destructive,
+                Some(prompt_seq),
+                attempt,
+                proposal.assumptions.clone(),
+            )?;
+            match outcome {
+                Outcome::Rejected { findings } if attempt < max_attempts => {
+                    feedback = Some(Feedback {
+                        previous: proposal.change_set,
+                        findings,
+                    });
+                }
+                outcome => {
+                    return Ok(PromptOutcome {
+                        outcome,
+                        change_set: proposal.change_set,
+                        assumptions: proposal.assumptions,
+                        attempts: attempt,
+                    });
+                }
+            }
+        }
+    }
+
+    fn propose_attempt(
+        &self,
+        cs: ChangeSet,
+        actor: Actor,
+        confirm_destructive: bool,
+        prompt_seq: Option<u64>,
+        attempt: u32,
+        assumptions: Vec<String>,
+    ) -> Result<Outcome> {
         let current = self.current_schema()?;
         let proposal = self.append(
             actor.clone(),
             EventKind::ChangeSetProposed {
                 change_set: cs.clone(),
+                prompt_seq,
+                attempt,
+                assumptions,
             },
         )?;
 

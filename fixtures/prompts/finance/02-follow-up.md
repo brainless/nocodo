@@ -1,0 +1,1 @@
+I also want to track which family member a spend was for. Each family member has a name, for example me, my wife, my son and my mother. A spend is for one person, but some spends are for the whole family, so that should be allowed too.

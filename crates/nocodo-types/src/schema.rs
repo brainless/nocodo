@@ -3,6 +3,7 @@
 //! `id`, `created_at` and `updated_at` are implicit on every table and are
 //! never listed. Index names are derived by sqlgen.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub const SPEC_VERSION: u32 = 1;
@@ -27,7 +28,7 @@ pub struct Table {
     pub indexes: Vec<Index>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Column {
     pub name: String,
@@ -42,7 +43,7 @@ pub struct Column {
     pub references: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ColumnType {
     Text,
@@ -57,7 +58,7 @@ pub enum ColumnType {
 }
 
 /// The index name is derived by sqlgen.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Index {
     pub columns: Vec<String>,
