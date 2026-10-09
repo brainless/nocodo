@@ -1,6 +1,6 @@
 # Epic 005: Schema Agent Hardening
 
-**Status:** Not started
+**Status:** Done
 **Goal:** Make every Schema agent run trustworthy and inspectable before building on it. The agent models the facts the user enters, not results computed from them, uses real references only, and is told exactly which columns every table gets. Invalid model output is prevented where the provider allows it; otherwise it is retried with feedback and logged. Each accepted migration records the SQLite checks it passed. The model and provider can be anything Rig supports, not only Anthropic.
 
 **Prerequisite:** Epic 004 (closed; checkpoint review in `epics-notes/004-schema-agent.md`).
@@ -129,7 +129,7 @@ No live LLM calls in `cargo test`.
 
 ## Checkpoint
 
-Manual session. The tester sets keys in `.env` and, with `claude-haiku-5-5` in `project-base.json`, runs the fixture scenarios (`finance`, `inventory`, `invoices`, each initial plus follow-up) in fresh projects under `.projects/`. They rerun the small farm and cofounder prompts from epic 004 (initial plus follow-up, text in their `events.jsonl`) in fresh projects, repeat `finance` with one non-Anthropic provider of their choice (`init --base <file>`), and run the travel prompt twice in fresh projects to compare churn:
+Manual session. The tester sets keys in `.env` and, with `neuralwatt/glm-5.3-flash` (the current `project-base.json`) as the base model, runs the fixture scenarios (`finance`, `inventory`, `invoices`, each initial plus follow-up) in fresh projects under `.projects/`. They rerun the small farm and cofounder prompts from epic 004 (initial plus follow-up, text in their `events.jsonl`) in fresh projects, repeat `finance` with `claude-haiku-5-5` and one other provider of their choice (`init --base <file>`), and run the travel prompt twice in fresh projects to compare churn:
 
 ```bash
 for p in travel-2 travel-3; do
@@ -156,7 +156,7 @@ done
 
 ## Task Notes
 
-Status is intentionally not set to Done: the manual checkpoint has not been run.
+The manual checkpoint was run; review in `epics-notes/005-schema-agent-hardening.md`.
 
 ### What was built
 
@@ -175,6 +175,22 @@ Tasks 1-11 as specified, plus two extras: a Neuralwatt provider in `build_model`
 
 Preamble snapshot (implicit-column section and modeling rules); `reserved_column` driven by the shared `IMPLICIT_COLUMNS` list (sqlgen snapshots unchanged); `reference_name` and `unlinked_id` rules; singular-form function (regular and irregular); `decimal` sqlgen snapshot and checker dry run; retry loop (follow-up snapshots, scripted-model loop, bounded retries with logged failure); `build_model` errors (unknown provider lists valid selections, missing key names the variable, keyless `llamacpp` builds, strict flags); old `project.json` / events without `checks` or `model` load; orchestrator accepted run records all steps in order, broken migration rejection ends with the failing step. The task 11 audit found everything covered; the only change was making the `reserved_column` test iterate the shared list.
 
-### For the reviewer
+### Added after the checkpoint review
 
-The checkpoint text says to use `claude-haiku-5-5` in `project-base.json`, but `project-base.json` now uses `neuralwatt/glm-5.3-flash`. The checkpoint text was left unedited.
+- **String-argument repair (`nocodo-agent/src/extract.rs`).** Models (GLM, sometimes Haiku) send `change_set` or `assumptions` as a string holding JSON, and retrying with feedback did not fix it. `extract_with_model` now repairs this deterministically before deserializing: `unstringify` parses string values where an object or list is expected, `repair_output` applies it to the `submit` arguments, and a `repaired_output` log line records that a repair happened. Unit tests are built from the failed `cp-finance-nw` logs (fixtures in `crates/nocodo-agent/src/extract/fixtures/`).
+- **Repaired-value errors.** When repair unwraps strings but the value still fails (for example a missing `assumptions` field), the retry message and the `invalid_output` log carry the error of the repaired value (`missing field assumptions`), and the original error is kept in `original_error`. Covered by a unit test only; not yet seen live.
+- **Preamble tightened** (`crates/nocodo-agent-schema/src/preamble.md`, snapshot updated): no storage wording in assumptions, and no free-text column next to a list of the same thing.
+- **Model mismatch resolved:** the checkpoint text matches `project-base.json` (`neuralwatt/glm-5.3-flash`); `claude-haiku-5-5` is a comparison run.
+- **Farm prompts added** as `fixtures/prompts/farm/01-initial.md` and `02-follow-up.md`, taken from `.projects/cp-farm/events.jsonl`.
+
+### Live reruns after the fixes
+
+- **Haiku, tightened preamble** (`.projects/v7-inv`, `.projects/v7-farm`): mostly fixed. Some storage wording still leaks ("short code", "kept as a list"). The farm follow-up keeps the old `description` column beside the new `item_kind_id`; the evolution rules forbid dropping columns, so a checker advice rule is the suggested follow-up (not built).
+- **GLM** (`neuralwatt/glm-5.3-flash`) before the follow-up fix (`.projects/v8-*`): the finance follow-up failed 3 times (`change_set` stringified and `assumptions` omitted). After it (`.projects/v9-finance-glm`, `.projects/v9-cofounder-glm`): all 4 prompts accepted, all 6 completions needed repair, 0 `invalid_output`. The initial prompts took 2 agent runs each because of checker findings. The cofounder schema is generic (`entity_items`), and `people.location` is text next to lists.
+
+### Open after this epic
+
+- Checker advice for a redundant text column kept beside a new reference (farm `description`), and for storage wording in assumptions.
+- OpenAI strict mode has never run live (no key).
+- The repaired-value error path (missing `assumptions`) has not been seen live.
+- `.projects/strict-live` and `.projects/strict-live2` are scratch runs and can be deleted.

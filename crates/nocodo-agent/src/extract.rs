@@ -60,6 +60,8 @@ struct LogHook {
     /// The assistant content of the latest model turn, kept so a rejected
     /// `submit` call can be replayed to the model in the follow-up.
     last_content: Arc<Mutex<Vec<AssistantContent>>>,
+    /// Usage of the latest model turn, reported when an output is repaired.
+    last_usage: Arc<Mutex<Value>>,
 }
 
 impl AgentHook for LogHook {
@@ -105,6 +107,7 @@ impl AgentHook for LogHook {
             }),
         );
         *self.last_content.lock().unwrap_or_else(|e| e.into_inner()) = event.content.clone();
+        *self.last_usage.lock().unwrap_or_else(|e| e.into_inner()) = to_json(&event.usage);
         ModelTurnAction::Continue
     }
 
@@ -135,7 +138,9 @@ fn to_json<T: Serialize + ?Sized>(value: &T) -> Value {
 ///
 /// Log lines written: `run_started` (preamble and input in full), one
 /// `completion_request`/`completion` pair per model call, `invalid_output` for
-/// each rejected output (and for tool calls Rig could not dispatch), and
+/// each rejected output (and for tool calls Rig could not dispatch),
+/// `repaired_output` when arguments sent as strings holding JSON were
+/// repaired and accepted (the usage is then that of the last model call), and
 /// `run_finished` with the typed output or the error, `calls` and
 /// `invalid_outputs`. Contains no role-specific logic.
 pub async fn run_extractor<T>(ctx: &AgentContext, preamble: &str, input: &str) -> Result<T>
@@ -188,11 +193,13 @@ where
     );
 
     let last_content = Arc::new(Mutex::new(Vec::new()));
+    let last_usage = Arc::new(Mutex::new(Value::Null));
     let hook = LogHook {
         log: log.clone(),
         attempt: AtomicU32::new(0),
         started: Mutex::new(None),
         last_content: last_content.clone(),
+        last_usage: last_usage.clone(),
     };
     let extractor = ExtractorBuilder::<T>::new(model)
         .append_preamble(preamble)
@@ -212,10 +219,34 @@ where
         if !history.is_empty() {
             run = run.history(history.clone());
         }
+        let mut original_error: Option<String> = None;
         let (raw_output, reason) = match run.await {
-            Ok(response) => break Ok(response),
+            Ok(response) => break Ok((response.output, to_json(&response.usage))),
             Err(StructuredOutputError::DeserializationError(error)) => {
-                (Some(rejected_output(&last_content)), error.to_string())
+                let mut reason = error.to_string();
+                match repair_output::<T>(&last_content) {
+                    Some(Ok((output, original, repaired))) => {
+                        log.append(
+                            "repaired_output",
+                            json!({
+                                "call": calls,
+                                "original": original,
+                                "repaired": repaired,
+                                "error": reason,
+                            }),
+                        );
+                        let usage = last_usage.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                        break Ok((output, usage));
+                    }
+                    // Strings were unwrapped but the value still does not fit:
+                    // tell the model the real problem (e.g. a missing field),
+                    // not the original string-vs-object error.
+                    Some(Err(repaired_error)) => {
+                        original_error = Some(std::mem::replace(&mut reason, repaired_error));
+                    }
+                    None => {}
+                }
+                (Some(rejected_output(&last_content)), reason)
             }
             Err(StructuredOutputError::EmptyResponse) => {
                 (None, "the model did not call the `submit` tool".to_string())
@@ -225,7 +256,12 @@ where
         invalid_outputs += 1;
         log.append(
             "invalid_output",
-            json!({ "call": calls, "output": raw_output, "error": reason }),
+            json!({
+                "call": calls,
+                "output": raw_output,
+                "error": reason,
+                "original_error": original_error,
+            }),
         );
         if calls > ctx.retries {
             break Err(match raw_output {
@@ -258,19 +294,19 @@ where
     };
     let duration_ms = started.elapsed().as_millis() as u64;
     let result = match outcome {
-        Ok(response) => {
+        Ok((output, usage)) => {
             log.append(
                 "run_finished",
                 json!({
                     "ok": true,
-                    "output": to_json(&response.output),
-                    "usage": to_json(&response.usage),
+                    "output": to_json(&output),
+                    "usage": usage,
                     "calls": calls,
                     "invalid_outputs": invalid_outputs,
                     "duration_ms": duration_ms,
                 }),
             );
-            Ok((response.output, run_id))
+            Ok((output, run_id))
         }
         Err(message) => {
             log.append(
@@ -288,6 +324,83 @@ where
     };
     log.check()?;
     result
+}
+
+/// Some models send an object or list argument as a string holding JSON
+/// (`"change_set": "{\"changes\": ...}"`). Walks `value` and turns every
+/// string that parses as a JSON object or array into that value, repeatedly,
+/// so doubly encoded values are unwrapped too. Returns `None` when nothing
+/// changed. Scalars and strings that are not objects or arrays stay as they are.
+fn unstringify(value: &Value) -> Option<Value> {
+    match value {
+        Value::String(text) => {
+            let trimmed = text.trim_start();
+            if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
+                return None;
+            }
+            let parsed = serde_json::from_str::<Value>(text).ok()?;
+            Some(unstringify(&parsed).unwrap_or(parsed))
+        }
+        Value::Array(items) => {
+            let new: Vec<Option<Value>> = items.iter().map(unstringify).collect();
+            new.iter().any(Option::is_some).then(|| {
+                Value::Array(
+                    new.into_iter()
+                        .zip(items)
+                        .map(|(n, old)| n.unwrap_or_else(|| old.clone()))
+                        .collect(),
+                )
+            })
+        }
+        Value::Object(map) => {
+            let new: Vec<Option<Value>> = map.values().map(unstringify).collect();
+            new.iter().any(Option::is_some).then(|| {
+                Value::Object(
+                    new.into_iter()
+                        .zip(map)
+                        .map(|(n, (k, old))| (k.clone(), n.unwrap_or_else(|| old.clone())))
+                        .collect(),
+                )
+            })
+        }
+        _ => None,
+    }
+}
+
+/// Tries to rescue a rejected `submit` call by un-stringifying its arguments
+/// (see [`unstringify`]). Returns the typed value with the original and the
+/// repaired arguments, or `None` if there is no `submit` call, nothing to
+/// repair. `Some(Err(message))` means strings were unwrapped but the repaired
+/// arguments still do not match `T`; `message` is that deserialization error.
+fn repair_output<T: DeserializeOwned>(
+    last_content: &Mutex<Vec<AssistantContent>>,
+) -> Option<std::result::Result<(T, Value, Value), String>> {
+    let original = last_content
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find_map(|c| match c {
+            AssistantContent::ToolCall(call) => Some(call.function.arguments.clone()),
+            _ => None,
+        })?;
+    let outcome = try_repair::<T>(&original)?;
+    Some(outcome.map(|(output, repaired)| (output, original, repaired)))
+}
+
+fn try_repair<T: DeserializeOwned>(
+    arguments: &Value,
+) -> Option<std::result::Result<(T, Value), String>> {
+    let repaired = unstringify(arguments)?;
+    Some(
+        serde_json::from_value::<T>(repaired.clone())
+            .map(|output| (output, repaired))
+            .map_err(|e| e.to_string()),
+    )
+}
+
+#[cfg(test)]
+fn repair_arguments<T: DeserializeOwned>(arguments: &Value) -> Option<(T, Value)> {
+    try_repair(arguments)?.ok()
 }
 
 /// The next step of a conversation after a rejected output.

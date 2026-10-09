@@ -82,7 +82,7 @@ async fn rejected_output_is_retried_in_the_same_conversation() {
         MockTurn::tool_call(
             "toolu_1",
             "submit",
-            json!({ "name": "Ada", "tags": "[\"a\"]" }),
+            json!({ "name": "Ada", "tags": "a, b" }),
         ),
         MockTurn::tool_call("toolu_2", "submit", json!({ "name": "Ada", "tags": ["a"] })),
     ]);
@@ -146,6 +146,161 @@ async fn retries_are_bounded_and_the_failure_is_logged() {
             finished["invalid_outputs"].clone()
         ),
         (json!(2), json!(2))
+    );
+    let _ = std::fs::remove_dir_all(&ctx.project_dir);
+}
+
+/// The shape of the Schema agent's output, without depending on its crate.
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct Proposal {
+    change_set: nocodo_types::change::ChangeSet,
+    assumptions: Vec<String>,
+}
+
+/// Arguments of the first rejected `submit` call of two failed GLM runs
+/// (`.projects/cp-finance-nw`): `change_set` (and, in the first, `assumptions`)
+/// sent as strings holding JSON.
+const FIXTURES: [(&str, &str); 2] = [
+    (
+        "initial",
+        include_str!("fixtures/glm_stringified_change_set_initial.json"),
+    ),
+    (
+        "follow_up",
+        include_str!("fixtures/glm_stringified_change_set_follow_up.json"),
+    ),
+];
+
+#[test]
+fn logged_stringified_arguments_fail_to_parse_as_sent() {
+    for (name, raw) in FIXTURES {
+        let args: Value = serde_json::from_str(raw).unwrap();
+        assert!(serde_json::from_value::<Proposal>(args).is_err(), "{name}");
+    }
+}
+
+#[test]
+fn logged_stringified_arguments_are_repaired() {
+    let args: Value = serde_json::from_str(FIXTURES[0].1).unwrap();
+    let (proposal, repaired) = repair_arguments::<Proposal>(&args).unwrap();
+    assert!(repaired["change_set"].is_object());
+    assert!(repaired["assumptions"].is_array());
+    assert!(!proposal.change_set.changes.is_empty());
+    assert!(!proposal.assumptions.is_empty());
+}
+
+/// The follow-up call also left out `assumptions`, which repair cannot invent:
+/// as a `Proposal` it stays rejected (and goes through the normal retry), but
+/// its stringified `change_set` itself is repaired.
+#[test]
+fn repair_does_not_invent_missing_fields() {
+    #[derive(Debug, Deserialize)]
+    struct ChangeOnly {
+        change_set: nocodo_types::change::ChangeSet,
+    }
+    let args: Value = serde_json::from_str(FIXTURES[1].1).unwrap();
+    assert!(repair_arguments::<Proposal>(&args).is_none());
+    let (only, _) = repair_arguments::<ChangeOnly>(&args).unwrap();
+    assert!(!only.change_set.changes.is_empty());
+}
+
+#[test]
+fn unstringify_only_touches_json_objects_and_arrays() {
+    assert_eq!(
+        unstringify(&json!({ "a": "text", "b": "12", "c": "{oops" })),
+        None
+    );
+    assert_eq!(
+        unstringify(&json!({ "a": "{\"x\": \"[1]\"}", "b": ["[\"k\"]", "plain"] })),
+        Some(json!({ "a": { "x": [1] }, "b": [["k"], "plain"] }))
+    );
+}
+
+#[test]
+fn unrepairable_arguments_are_not_accepted() {
+    let args = json!({ "name": "Ada", "tags": "not json" });
+    assert!(repair_arguments::<Person>(&args).is_none());
+    // Repairable shape, but still the wrong type after repair.
+    let args = json!({ "name": "Ada", "tags": "[1]" });
+    assert!(repair_arguments::<Person>(&args).is_none());
+}
+
+#[tokio::test]
+async fn stringified_arguments_are_repaired_without_another_call() {
+    let args: Value = serde_json::from_str(FIXTURES[0].1).unwrap();
+    let model = MockCompletionModel::from_turns([MockTurn::tool_call("toolu_1", "submit", args)]);
+    let ctx = context("repair", 2);
+    let (proposal, _) = extract_with_model::<Proposal>(model.clone(), false, &ctx, "p", "in")
+        .await
+        .unwrap();
+    assert!(!proposal.change_set.changes.is_empty());
+    assert_eq!(model.request_count(), 1);
+
+    let lines = log_lines(&ctx.project_dir);
+    let types: Vec<_> = lines.iter().map(|l| l["type"].as_str().unwrap()).collect();
+    assert!(types.contains(&"repaired_output"));
+    assert!(!types.contains(&"invalid_output"));
+    let repaired = lines
+        .iter()
+        .find(|l| l["type"] == "repaired_output")
+        .unwrap();
+    assert!(repaired["original"]["change_set"].is_string());
+    assert!(repaired["repaired"]["change_set"].is_object());
+    let finished = lines.last().unwrap();
+    assert_eq!(finished["ok"], true);
+    assert_eq!(
+        (
+            finished["calls"].clone(),
+            finished["invalid_outputs"].clone()
+        ),
+        (json!(1), json!(0))
+    );
+    let _ = std::fs::remove_dir_all(&ctx.project_dir);
+}
+
+/// The follow-up call sent `change_set` as a string and left out `assumptions`.
+/// Repair cannot fix that, but the model must be told about the missing field,
+/// not the original "invalid type: string" error.
+#[tokio::test]
+async fn retry_after_failed_repair_names_the_real_problem() {
+    let args: Value = serde_json::from_str(FIXTURES[1].1).unwrap();
+    let good = json!({
+        "change_set": serde_json::from_str::<Value>(args["change_set"].as_str().unwrap()).unwrap(),
+        "assumptions": ["a"],
+    });
+    let model = MockCompletionModel::from_turns([
+        MockTurn::tool_call("toolu_1", "submit", args.clone()),
+        MockTurn::tool_call("toolu_2", "submit", good),
+    ]);
+    let ctx = context("repair-real-error", 2);
+    extract_with_model::<Proposal>(model.clone(), false, &ctx, "p", "in")
+        .await
+        .unwrap();
+
+    let requests = model.requests();
+    assert_eq!(requests.len(), 2);
+    let text = serde_json::to_value(&requests[1].chat_history)
+        .unwrap()
+        .to_string();
+    assert!(text.contains("missing field `assumptions`"), "{text}");
+    assert!(!text.contains("expected struct ChangeSet"), "{text}");
+
+    let lines = log_lines(&ctx.project_dir);
+    let invalid = lines
+        .iter()
+        .find(|l| l["type"] == "invalid_output")
+        .unwrap();
+    assert!(invalid["error"].as_str().unwrap().contains("assumptions"));
+    assert!(
+        invalid["original_error"]
+            .as_str()
+            .unwrap()
+            .contains("invalid type: string")
+    );
+    assert!(
+        serde_json::from_str::<Value>(invalid["output"].as_str().unwrap()).unwrap()["change_set"]
+            .is_string()
     );
     let _ = std::fs::remove_dir_all(&ctx.project_dir);
 }
