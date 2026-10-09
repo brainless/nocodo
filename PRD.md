@@ -28,6 +28,8 @@ The hypothesis breaks down into three claims we can test:
 
 Experiment 1 tests claims 1–3 for **the storage layer only**. Import, rules and reports come in later experiments.
 
+**Agent count.** Experiment 1 uses **one LLM agent, the Schema agent**. Everything else is plain code. We add another agent only when a checkpoint shows that plain code can't do the job (see §8).
+
 **Scenario.** A user describes their daily money flow in plain language and optionally drops sample bank CSV/XLSX files into the project's `inputs/` folder. For example: "I track my salary, household spending and the money I lend to my brother; we have two bank accounts". The system then:
 
 1. Asks a handful of domain-level questions through the CLI.
@@ -43,17 +45,18 @@ The user can then add a follow-up ("I also want to track which family member a s
 
 | Component | Kind | Role in Experiment 1 |
 |---|---|---|
-| PM agent | LLM | Talks to the user: takes prompts, presents questions, records answers and summaries. **Does not plan or route.** |
-| Schema agent | LLM | Turns requirement facts into `SchemaChange` lists. Asks schema-relevant questions in domain language. |
+| Schema agent | LLM — the only agent in Experiment 1 | Turns requirement facts into `SchemaChange` lists. Asks schema-relevant questions in domain language. |
 | Checker | Deterministic (+ optional LLM review) | Validates specs and dry-runs the generated SQL. Its deterministic checks gate every change. An LLM review may only produce advice or questions. |
 | SQL generator | Deterministic | Turns a `schema.json` diff into `up.sql`/`down.sql`, including SQLite table rebuilds. |
-| Orchestrator | Deterministic library | Handles the event log, subscriptions, single-writer artifact ownership and scheduling. |
+| Orchestrator | Deterministic library | Owns the project folder and event log, and runs the pipeline: proposed changes → check → write `schema.json` and the migration. |
 | Runtime | Deterministic | Applies migrations, runs `inspect` (lists tables and row counts) and summarizes the schema. |
 | API | Axum | Thin HTTP layer over the orchestrator and agents. Runs as a subprocess of the CLI. |
-| CLI | Binary | The only user interface: prompt, answer questions, show summaries. |
+| CLI | Binary | The only user interface: prompt, answer questions, show summaries. Until the API/CLI epic, `nocodo-api` subcommands stand in for it. |
+| Question presenter | Deterministic (in the CLI) | Batches the Schema agent's questions, removes duplicates, puts blocking ones first, and records answers. This replaces a PM agent. |
 
 ### Out of scope (for Experiment 1)
 
+- A PM agent. It is deferred; see §8.
 - Import, Rules and Reports agents. These are the next experiments, in that order.
 - Runtime AI: LLM calls inside the finished tool.
 - GUI, multi-user access, auth, sync, cloud hosting.
@@ -90,9 +93,10 @@ Each user project lives in one folder. Everything nocodo knows about the project
   specs/
     schema.json           # owner: Schema agent — rebuilt from events.jsonl
   migrations/
-    <timestamp>_<name>/
+    <NNNN>_<name>/        # zero-padded sequence number, not a timestamp, so replay is byte-identical
       up.sql
       down.sql
+      metadata.toml
   inputs/                 # user-supplied sample files (read-only for agents)
   data.sqlite
   backups/                # data.sqlite copied before every migration
@@ -127,7 +131,7 @@ Agents ask questions through a typed `Question`:
 Rules for questions:
 
 - Before asking, an agent checks whether recorded facts already answer the question.
-- The PM agent batches questions, removes duplicates and puts blocking ones first.
+- Plain code in the CLI batches questions, removes duplicates and puts blocking ones first.
 - Questions never mention technology ("table", "column", "SQL", "database").
 
 ### Schema changes
@@ -171,20 +175,23 @@ Results are written up in `docs/experiment-1-results.md`.
 - **Schema quality vs. question budget.** Asking too few questions gives a poor schema; asking too many loses the user. Measure both.
 - **Schema churn across LLM runs.** The same prompt may produce different schemas on different runs. Record how much they vary. Consider stronger models or few-shot examples for the Schema agent before adding more agents.
 - **Cranelift compatibility.** Some dependencies (crypto and TLS with assembly, SIMD-heavy crates) may not build or may misbehave under the Cranelift backend. Release builds use LLVM. Track any per-crate fallbacks in `AGENTS.md`.
-- **Is the PM agent needed at all?** If the Schema agent's questions can go straight to the CLI with a deterministic batcher, the PM agent may be unnecessary. Earlier experiments found coordination roles added overhead. Measure whether the PM adds value beyond intake.
+- **Is a PM agent needed at all?** Decision: no, not until a checkpoint shows otherwise. The Schema agent's questions go straight to the CLI through a deterministic batcher. Earlier experiments found coordination roles added overhead. The `nocodo-agent-pm` crate stays an empty skeleton.
+- **Detailed prompts during early epics.** In the early epics the tester may write detailed, even technical, prompts so we can test spec → SQL → database before the question flow exists. Claim 3 (questions, not jargon) is tested only once the question epic lands, with plain-language prompts.
 
 ## 9. Roadmap
 
-We build in small steps. Each epic does the minimum work needed to test one thing and ends with a **checkpoint**. We look at the results before starting the next epic. If a checkpoint fails, we fix that layer or rethink the hypothesis; we don't move on and pile more agents on top.
+We build in small steps. Each epic does the minimum work needed to test one thing and ends with a **checkpoint**. From epic 003 on, every checkpoint is a manual session: the tester runs real commands against a project folder under `projects/` (gitignored), and a reviewer, human or Claude, reads `events.jsonl`, `.agent-logs/`, `specs/schema.json`, `migrations/` and `data.sqlite`. We look at the results before planning more epics. If a checkpoint fails, we fix that layer or rethink the hypothesis; we don't move on and pile more on top.
+
+Only the next few epics are planned in detail. Rows marked *tentative* get written as epics after the checkpoints before them.
 
 | Epic | Scope | Checkpoint (go / no-go) |
 |---|---|---|
 | 001 | Workspace and crate layout, toolchain. No behavior. | Builds and passes clippy with Cranelift. |
-| 002 | `nocodo-types`, minimal: `SchemaSpec`, `SchemaChange`, `Event`, `Question`. Only what Epic 003 needs. | Types round-trip through JSON. |
-| 003 | `nocodo-sqlgen` + deterministic `nocodo-checker`. No LLM. | Hand-written `SchemaChange` lists produce correct, reversible SQLite migrations, including table rebuilds. |
-| 004 | **Schema agent alone.** Minimal `nocodo-agent` base (Rig + `.agent-logs`). Inputs come from fixture requirement files through a dev-only CLI command. No PM, no orchestrator. | **First real test of the hypothesis:** on the three scenarios, does it produce good relational schemas and domain-language questions? |
-| 005 | **PM agent alone.** Intake plus question presentation in the CLI, with answers written to `events.jsonl`. | Are the questions few, non-technical and useful? Does the PM add value over a deterministic question batcher? |
-| 006 | Minimal `nocodo-orchestrator`: connects PM and Schema through the event log. | A follow-up prompt produces an additive migration end to end. |
-| 007 | `nocodo-runtime` (apply, backup, inspect) + API + CLI end to end, with replay through recorded logs. | Success criteria 1–8 in §7. Write up `docs/experiment-1-results.md`. |
+| 002 | `nocodo-types`, minimal: `SchemaSpec`, `SchemaChange`, `ChangeSet`, `Event`, `ProjectConfig`. | Types round-trip through JSON; the tester reviews the type vocabulary and example JSON. |
+| 003 | `nocodo-sqlgen` + deterministic `nocodo-checker` + minimal orchestrator (project folder, event log). `nocodo-api init` and `nocodo-api changes` take hand-written change sets. No LLM. | Hand-written change sets produce correct, reversible SQLite migrations, including table rebuilds; invalid ones are rejected and logged. |
+| 004 | **Schema agent.** Minimal `nocodo-agent` base (Rig + `.agent-logs`). `nocodo-api prompt` turns a prompt into a change set and runs it through the 003 pipeline, feeding checker errors back to the agent. | **First real test of the hypothesis:** on the three scenarios plus a follow-up each, are the schemas good relational designs, and is the follow-up additive? |
+| 005 | *Tentative.* `nocodo-runtime`: backup, apply to `data.sqlite`, `inspect`, plain-language schema summary. | A follow-up change applies on top of real rows and the data survives. |
+| 006 | *Tentative.* Questions: the Schema agent emits typed `Question`s, and the CLI presents, batches and records them. | Plain-language prompts on the three scenarios: ≤ 8 questions, none technical. |
+| 007 | *Tentative.* `nocodo` CLI → `nocodo-api` over HTTP, replay through recorded logs, results write-up. | Success criteria 1–8 in §7. Write up `docs/experiment-1-results.md`. |
 
 Later, only if Experiment 1 passes: an optional LLM review layer for the Checker, then the Import, Rules and Reports agents, **each in its own epic with its own checkpoint**.

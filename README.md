@@ -5,3 +5,7 @@ nocodo is a set of narrow, close-to-deterministic agents that build data tools f
 - [`PRD.md`](PRD.md): what Experiment 1 is testing and why.
 - [`AGENTS.md`](AGENTS.md): rules and crate boundaries for coding agents.
 - [`epics/`](epics/): the step-by-step build plan, one epic at a time.
+
+## License
+
+GNU Affero General Public License v3.0. See [`LICENSE`](LICENSE).

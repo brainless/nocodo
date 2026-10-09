@@ -10,7 +10,7 @@ nocodo is a set of narrow, close-to-deterministic agents that build data tools (
 - Agents produce **typed specs, not code**. Deterministic Rust code turns specs into real artifacts such as SQL migrations, and a prebuilt runtime runs them.
 - User projects contain only data and specs. Users never need a Rust toolchain.
 
-Experiment 1 covers only the storage layer: the PM agent, the Schema agent, a deterministic SQL generator and checker, an orchestrator, a runtime, an API and a CLI. See `PRD.md` §3.
+Experiment 1 covers only the storage layer. It has **one LLM agent, the Schema agent**. Everything else is deterministic: a SQL generator and checker, an orchestrator, a runtime, an API and a CLI. The PM agent is deferred; `nocodo-agent-pm` stays an empty skeleton. See `PRD.md` §3.
 
 ## Before starting any task
 
@@ -25,7 +25,7 @@ Experiment 1 covers only the storage layer: the PM agent, the Schema agent, a de
   - `rust-toolchain.toml` pins `nightly` with the `rustc-codegen-cranelift` component.
   - `.cargo/config.toml` enables `codegen-backend = "cranelift"` for `profile.dev`.
 - **Release builds use LLVM** (the default backend).
-- **`debug = 0`** in `profile.dev`, for disk space and speed. The user's global `~/.cargo/config.toml` also sets an sccache wrapper; don't override it.
+- **`debug = 0` and `strip = "none"`** in `profile.dev`, for disk space and speed. `strip = "none"` stops rustc calling the toolchain's `rust-objcopy`, which is broken on this machine: it can't find `libLLVM.dylib`. The user's global `~/.cargo/config.toml` also sets an sccache wrapper; don't override it.
 - **If a dependency doesn't build under Cranelift,** don't switch the whole workspace to LLVM. Add a per-package override, and record it in the table below with the reason.
 
 | Package | Override | Reason |
@@ -42,6 +42,19 @@ cargo fmt --all
 ```
 
 All four must pass before an epic is marked done.
+
+### Manual test loop
+
+From epic 003 on, each checkpoint ends with a manual session:
+
+1. The tester creates a project with `cargo run --bin nocodo-api -- init --project projects/<name>` and then runs the epic's commands against it. `projects/` is gitignored.
+2. A reviewer (the user, or Claude when asked) reads the project folder: `events.jsonl`, `.agent-logs/*.jsonl`, `specs/schema.json`, `migrations/`, and `data.sqlite` through `sqlite3`.
+
+Design every command so this works:
+
+- Output goes to files in the project folder, not only to the terminal.
+- Every event and log line is self-explanatory without the terminal session.
+- Never ask the tester to create or edit project files by hand. Anything a project needs is created by a command.
 
 ## Repository layout
 
@@ -60,7 +73,9 @@ crates/                  # libraries
   nocodo-agent/          # shared agent base
   nocodo-agent-schema/
   nocodo-agent-pm/
-api/                     # nocodo-api binary (Axum)
+api/                     # nocodo-api binary (subcommands now, Axum later)
+fixtures/                # hand-written change sets and prompts for manual tests
+projects/                # local test projects (gitignored)
 cli/                     # nocodo binary (user-facing)
 ```
 
@@ -68,15 +83,15 @@ cli/                     # nocodo binary (user-facing)
 
 | Crate | Owns | Must NOT |
 |---|---|---|
-| `nocodo-types` | Shared, versioned, serde types: events, questions, `SchemaSpec`, `SchemaChange`, project config | Do I/O, use an LLM, contain business logic |
-| `nocodo-sqlgen` | Pure functions: apply `SchemaChange` to `SchemaSpec`, diff specs, generate `up.sql`/`down.sql` (including SQLite table rebuilds) | Do I/O, use an LLM. **This is the determinism core.** |
-| `nocodo-checker` | Deterministic validation of specs and generated SQL (dry-run on a copy of the DB) | Let an LLM decide pass or fail. An LLM review layer, if added later, only produces advice or questions. |
-| `nocodo-orchestrator` | Event log (`events.jsonl`), subscriptions, single-writer artifact ownership, scheduling. Exposed as a trait-based API so internals can change. | Use an LLM. Routing is plain code. |
+| `nocodo-types` | Shared, versioned, serde types: events, `SchemaSpec`, `SchemaChange`, `ChangeSet`, project config (questions later) | Do I/O, use an LLM, contain business logic |
+| `nocodo-sqlgen` | Pure functions: apply `SchemaChange`s to a `SchemaSpec`, and generate `up.sql`/`down.sql` from a spec plus a change list (including SQLite table rebuilds) | Do I/O, use an LLM. **This is the determinism core.** |
+| `nocodo-checker` | Deterministic validation of change sets and generated SQL: dry-run on a copy of the DB, up → down → up, and checking the resulting DB against the spec | Let an LLM decide pass or fail. An LLM review layer, if added later, only produces advice or questions. |
+| `nocodo-orchestrator` | The project folder (`init`, `project.json`), the event log (`events.jsonl`), and the pipeline that takes a proposed `ChangeSet` through sqlgen and the checker, then writes `schema.json` and the migration. It writes artifacts only on behalf of their owner. | Use an LLM. Routing is plain code. |
 | `nocodo-runtime` | Applies migrations (`FileBasedMigrations::from_path`), backups, `inspect`, schema summaries; later the spec interpreter and runtime AI | Write specs |
 | `nocodo-agent` | Shared agent base: Rig wiring, per-role model config, `.agent-logs` JSONL logging, reading documents from allowed folders, emitting `Question`s | Contain any role-specific prompt or logic |
-| `nocodo-agent-schema` | Turns requirement facts into typed `SchemaChange` lists. Owns `specs/schema.json`. | Write SQL, touch `data.sqlite`, write any other spec |
-| `nocodo-agent-pm` | User intake, presenting questions, recording answers, plain-language summaries | Plan, route or schedule other agents. Write specs. |
-| `api` | Thin Axum layer over orchestrator, agents and runtime | Contain business logic |
+| `nocodo-agent-schema` | Turns prompts (and later, answers) into a typed `ChangeSet`. It is the only source of schema changes outside developer commands, so it owns `specs/schema.json`. The orchestrator writes that file for it. | Write SQL, touch `data.sqlite`, write any other spec |
+| `nocodo-agent-pm` | **Deferred.** Empty skeleton. Built only if a checkpoint shows plain code can't present questions well. | Plan, route or schedule other agents. Write specs. |
+| `api` | Thin layer over orchestrator, agents and runtime. For now, `clap` subcommands (`init`, `changes`, `prompt`, …); Axum comes in a later epic. | Contain business logic |
 | `cli` | User interface; spawns `nocodo-api` as a subprocess and talks HTTP to it | Call agents or the DB directly |
 
 ### Dependency direction
@@ -85,7 +100,7 @@ cli/                     # nocodo binary (user-facing)
 nocodo-types  ←  everything
 nocodo-sqlgen       → types
 nocodo-checker      → types, sqlgen
-nocodo-orchestrator → types
+nocodo-orchestrator → types, sqlgen, checker
 nocodo-runtime      → types
 nocodo-agent        → types
 nocodo-agent-schema → types, agent
@@ -96,7 +111,7 @@ cli                 → types
 
 - No cycles.
 - Rig and any other LLM dependency may appear **only** in `nocodo-agent` and `nocodo-agent-*` crates.
-- Diesel may appear only in `nocodo-runtime` and `nocodo-checker` (and `api` through them).
+- Diesel may appear only in `nocodo-runtime` and `nocodo-checker` (and `orchestrator` and `api` through them).
 
 ## Core rules
 
