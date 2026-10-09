@@ -1,0 +1,12 @@
+{
+  "name": "fk_on_text_column",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "add_foreign_key",
+      "table": "accounts",
+      "column": "name",
+      "references": "people"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "reserved_column_name",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "create_table",
+      "table": "invoices",
+      "description": "Bills sent to customers.",
+      "columns": [
+        {
+          "name": "created_at",
+          "description": "When the bill was made.",
+          "column_type": "date_time",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        }
+      ]
+    }
+  ]
+}

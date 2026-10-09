@@ -1,0 +1,18 @@
+{
+  "name": "unknown_table",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "add_column",
+      "table": "invoices",
+      "column": {
+        "name": "title",
+        "description": "A sample value.",
+        "column_type": "text",
+        "nullable": false,
+        "unique": false,
+        "references": null
+      }
+    }
+  ]
+}

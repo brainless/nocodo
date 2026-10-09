@@ -1,0 +1,21 @@
+{
+  "name": "missing_description",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "create_table",
+      "table": "invoices",
+      "description": "",
+      "columns": [
+        {
+          "name": "title",
+          "description": "A sample value.",
+          "column_type": "text",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        }
+      ]
+    }
+  ]
+}

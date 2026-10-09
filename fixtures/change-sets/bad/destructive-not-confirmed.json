@@ -1,0 +1,10 @@
+{
+  "name": "drop_people",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "drop_table",
+      "table": "people"
+    }
+  ]
+}

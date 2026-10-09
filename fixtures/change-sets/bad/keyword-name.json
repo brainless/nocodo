@@ -1,0 +1,21 @@
+{
+  "name": "keyword_table_name",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "create_table",
+      "table": "order",
+      "description": "Customer orders.",
+      "columns": [
+        {
+          "name": "title",
+          "description": "A sample value.",
+          "column_type": "text",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        }
+      ]
+    }
+  ]
+}

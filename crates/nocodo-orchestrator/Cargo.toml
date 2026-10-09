@@ -9,3 +9,9 @@ workspace = true
 
 [dependencies]
 nocodo-types.workspace = true
+nocodo-sqlgen.workspace = true
+nocodo-checker.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+jiff.workspace = true
+tempfile = "3"

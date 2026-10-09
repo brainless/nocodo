@@ -1,0 +1,21 @@
+{
+  "name": "bad_reference",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "create_table",
+      "table": "invoices",
+      "description": "Bills sent to customers.",
+      "columns": [
+        {
+          "name": "customer_id",
+          "description": "The customer billed.",
+          "column_type": "integer",
+          "nullable": false,
+          "unique": false,
+          "references": "customers"
+        }
+      ]
+    }
+  ]
+}

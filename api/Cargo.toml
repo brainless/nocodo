@@ -20,3 +20,6 @@ nocodo-runtime.workspace = true
 nocodo-agent.workspace = true
 nocodo-agent-schema.workspace = true
 nocodo-agent-pm.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+serde_json.workspace = true

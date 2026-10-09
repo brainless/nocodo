@@ -1,0 +1,21 @@
+{
+  "name": "duplicate_table",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "create_table",
+      "table": "accounts",
+      "description": "Another accounts table.",
+      "columns": [
+        {
+          "name": "title",
+          "description": "A sample value.",
+          "column_type": "text",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        }
+      ]
+    }
+  ]
+}

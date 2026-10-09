@@ -1,0 +1,5 @@
+{
+  "name": "do_nothing",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": []
+}

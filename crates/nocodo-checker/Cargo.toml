@@ -10,3 +10,11 @@ workspace = true
 [dependencies]
 nocodo-types.workspace = true
 nocodo-sqlgen.workspace = true
+diesel = { version = "2.3", default-features = false, features = ["sqlite"] }
+diesel_migrations = { version = "2.3", features = ["sqlite"] }
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+tempfile = "3"
+
+[dev-dependencies]
+proptest = "1"
+serde_json.workspace = true

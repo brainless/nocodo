@@ -9,3 +9,6 @@ workspace = true
 
 [dependencies]
 nocodo-types.workspace = true
+
+[dev-dependencies]
+insta = "1.49.0"

@@ -1,0 +1,14 @@
+{
+  "name": "unknown_column",
+  "summary": "Deliberately invalid change set used to test the checker.",
+  "changes": [
+    {
+      "op": "add_index",
+      "table": "accounts",
+      "columns": [
+        "nickname"
+      ],
+      "unique": false
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "remove_payment_notes",
+  "summary": "Removes the notes from payments; any notes already written are lost.",
+  "changes": [
+    {
+      "op": "drop_column",
+      "table": "transactions",
+      "column": "notes"
+    }
+  ]
+}

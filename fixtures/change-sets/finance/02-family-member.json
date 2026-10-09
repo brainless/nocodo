@@ -1,0 +1,26 @@
+{
+  "name": "add_family_member",
+  "summary": "Lets each payment be linked to a family member, and makes finding a person's payments faster.",
+  "changes": [
+    {
+      "op": "add_column",
+      "table": "transactions",
+      "column": {
+        "name": "person_id",
+        "description": "The person this payment belongs to, if any.",
+        "column_type": "integer",
+        "nullable": true,
+        "unique": false,
+        "references": "people"
+      }
+    },
+    {
+      "op": "add_index",
+      "table": "transactions",
+      "columns": [
+        "person_id"
+      ],
+      "unique": false
+    }
+  ]
+}

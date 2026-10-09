@@ -1,0 +1,18 @@
+{
+  "name": "clarify_dates_and_transfers",
+  "summary": "Renames the payment day to 'paid on' and links transfers to the receiving account.",
+  "changes": [
+    {
+      "op": "rename_column",
+      "table": "transactions",
+      "from": "occurred_on",
+      "to": "paid_on"
+    },
+    {
+      "op": "add_foreign_key",
+      "table": "transactions",
+      "column": "transfer_to_id",
+      "references": "accounts"
+    }
+  ]
+}
