@@ -19,6 +19,8 @@ pub enum OrchestratorError {
     CorruptEventLog(String),
     /// The proposer (e.g. the Schema agent) failed.
     Proposer(Box<dyn std::error::Error + Send + Sync>),
+    /// The applier (the runtime) could not start the run.
+    Applier(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl std::fmt::Display for OrchestratorError {
@@ -45,6 +47,7 @@ impl std::fmt::Display for OrchestratorError {
             ),
             Self::CorruptEventLog(m) => write!(f, "events.jsonl is inconsistent: {m}"),
             Self::Proposer(e) => write!(f, "{e}"),
+            Self::Applier(e) => write!(f, "{e}"),
         }
     }
 }

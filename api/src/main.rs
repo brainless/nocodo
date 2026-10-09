@@ -18,9 +18,11 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use nocodo_agent::AgentContext;
 use nocodo_agent_schema::SchemaAgent;
-use nocodo_orchestrator::{Outcome, Project, Proposal, Proposer, ProposerError};
+use nocodo_orchestrator::{
+    Applier, ApplierError, Outcome, Project, Proposal, Proposer, ProposerError,
+};
 use nocodo_types::change::ChangeSet;
-use nocodo_types::event::{Actor, CheckStep};
+use nocodo_types::event::{Actor, CheckStep, EventKind};
 use nocodo_types::project::ProjectBase;
 use nocodo_types::schema::SchemaSpec;
 
@@ -29,6 +31,39 @@ const MAX_ATTEMPTS: u32 = 3;
 
 /// Settings file `init` copies into new projects when `--base` isn't given.
 const PROJECT_BASE_FILE: &str = "project-base.json";
+
+/// Adapts the runtime to the orchestrator's `Applier` trait.
+struct RuntimeApplier;
+
+impl Applier for RuntimeApplier {
+    fn apply_pending(
+        &self,
+        project_dir: &std::path::Path,
+    ) -> Result<nocodo_types::apply::ApplyReport, ApplierError> {
+        Ok(nocodo_runtime::apply_pending(project_dir)?)
+    }
+}
+
+/// Apply everything pending, print one line per migration, and pick the exit code.
+fn apply_and_report(project: &Project) -> Result<ExitCode> {
+    let out = project.apply_pending(&RuntimeApplier)?;
+    if out.details.is_empty() {
+        println!("Nothing to apply: data.sqlite is up to date.");
+    }
+    for d in &out.details {
+        println!("{d}");
+    }
+    let mut ok = out.report.failed.is_none();
+    if let Some(check) = out.check.as_ref().filter(|c| !c.passed) {
+        println!("Database check failed: {}", check.detail);
+        ok = false;
+    }
+    Ok(if ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    })
+}
 
 /// Adapts the Schema agent to the orchestrator's `Proposer` trait.
 struct SchemaProposer {
@@ -101,6 +136,16 @@ enum Command {
         #[arg(required_unless_present = "file")]
         text: Option<String>,
     },
+    /// Apply every pending migration to data.sqlite (with a backup first).
+    Apply,
+    /// Show what is stored (for the reviewer) and a plain-language summary (for the user).
+    Inspect,
+    /// Fill every list with a few obviously fake rows (a test aid).
+    SampleRows {
+        /// Rows to add to each list.
+        #[arg(long, default_value_t = 3)]
+        per_table: u32,
+    },
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {
@@ -153,7 +198,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 Outcome::Accepted { migration, checks } => {
                     println!("Accepted \u{2192} migrations/{migration}");
                     println!("{}", checks_line(&checks));
-                    Ok(ExitCode::SUCCESS)
+                    apply_and_report(&project)
                 }
                 Outcome::Rejected { findings, checks } => {
                     println!("Rejected:");
@@ -164,6 +209,51 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     Ok(ExitCode::FAILURE)
                 }
             }
+        }
+        Command::Apply => apply_and_report(&Project::open(&dir)?),
+        Command::Inspect => {
+            let project = Project::open(&dir)?;
+            let spec = project.current_schema()?;
+            let info = nocodo_runtime::inspect(project.dir())?;
+            println!("== For the reviewer ==");
+            println!("Tables (rows):");
+            if info.tables.is_empty() {
+                println!("  (none; no data.sqlite yet or no tables)");
+            }
+            for (t, n) in &info.tables {
+                println!("  {t}: {n}");
+            }
+            println!("Applied migrations: {}", names_or_none(&info.applied));
+            println!("Pending migrations: {}", names_or_none(&info.pending));
+            println!("Backups: {}", info.backups);
+            println!();
+            println!("== For the user ==");
+            print!("{}", nocodo_runtime::summary(&spec, &info.tables));
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::SampleRows { per_table } => {
+            let project = Project::open(&dir)?;
+            let spec = project.current_schema()?;
+            let rows = nocodo_runtime::add_sample_rows(project.dir(), &spec, per_table)?;
+            let total: u64 = rows.values().sum();
+            let list = rows
+                .iter()
+                .map(|(t, n)| format!("{t}: {n}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let detail = format!(
+                "Added {total} sample rows to data.sqlite ({per_table} per table; {list}). \
+                 The values are fake and generated from the schema."
+            );
+            project.append(
+                Actor::Developer,
+                EventKind::SampleRowsAdded {
+                    rows: rows.clone(),
+                    detail: detail.clone(),
+                },
+            )?;
+            println!("{detail}");
+            Ok(ExitCode::SUCCESS)
         }
         Command::Prompt {
             confirm_destructive,
@@ -196,7 +286,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     print_assumptions(&result.assumptions);
                     println!("Migration: migrations/{migration}");
                     println!("{}", checks_line(&checks));
-                    Ok(ExitCode::SUCCESS)
+                    apply_and_report(&project)
                 }
                 Outcome::Rejected { findings, checks } => {
                     println!("Rejected after {} attempt(s):", result.attempts);
@@ -225,6 +315,14 @@ fn checks_line(checks: &[CheckStep]) -> String {
         "Checked on SQLite: up, down, up again; database matched the spec each time.".to_string()
     } else {
         format!("Checks passed: {}.", checks.len())
+    }
+}
+
+fn names_or_none(names: &[String]) -> String {
+    if names.is_empty() {
+        "(none)".to_string()
+    } else {
+        names.join(", ")
     }
 }
 

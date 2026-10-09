@@ -243,6 +243,7 @@ fn named(n: usize, c: &ChangeSet, before: &SchemaSpec) -> NamedMigration {
         name: format!("{n:04}_{}", c.name),
         up: m.up,
         down: m.down,
+        table_renames: nocodo_checker::table_renames(&c.changes),
     }
 }
 
@@ -434,6 +435,7 @@ fn dry_run_reports_all_steps_in_order_when_passing() {
             ("earlier_migrations_applied", true),
             ("db_matches_spec_before", true),
             ("up", true),
+            ("rows_kept", true),
             ("db_matches_spec_after", true),
             ("foreign_key_check", true),
             ("down", true),

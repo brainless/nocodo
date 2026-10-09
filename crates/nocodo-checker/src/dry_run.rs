@@ -5,11 +5,13 @@ use std::io;
 use std::path::Path;
 
 use diesel::prelude::*;
-use diesel::sql_types::Text;
+use diesel::sql_types::{BigInt, Text};
 use diesel_migrations::{FileBasedMigrations, MigrationHarness};
 use nocodo_sqlgen::METADATA_TOML;
+use nocodo_types::change::SchemaChange;
 use nocodo_types::event::{CheckStep, Finding};
 use nocodo_types::schema::SchemaSpec;
+use std::collections::BTreeMap;
 
 use crate::introspect::{Shape, diff, diff_shapes, expected_shape, introspect};
 
@@ -20,6 +22,20 @@ pub struct NamedMigration {
     pub name: String,
     pub up: String,
     pub down: String,
+    /// Tables the change set renames, as `(from, to)` in order. Used to
+    /// compare row counts under the new name. See [`table_renames`].
+    pub table_renames: Vec<(String, String)>,
+}
+
+/// The `(from, to)` table renames in a list of changes, in order.
+pub fn table_renames(changes: &[SchemaChange]) -> Vec<(String, String)> {
+    changes
+        .iter()
+        .filter_map(|c| match c {
+            SchemaChange::RenameTable { from, to } => Some((from.clone(), to.clone())),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The dry run could not be carried out (not a finding about the migration).
@@ -172,6 +188,87 @@ fn plural(n: usize) -> String {
     }
 }
 
+#[derive(QueryableByName)]
+struct TableName {
+    #[diesel(sql_type = Text)]
+    name: String,
+}
+
+#[derive(QueryableByName)]
+struct Count {
+    #[diesel(sql_type = BigInt)]
+    n: i64,
+}
+
+/// Row count of every user table (not `sqlite_*`, not the Diesel bookkeeping table).
+fn row_counts(conn: &mut SqliteConnection) -> QueryResult<BTreeMap<String, i64>> {
+    let names = diesel::sql_query(
+        "SELECT name FROM sqlite_master WHERE type = 'table' \
+         AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name != '__diesel_schema_migrations' \
+         ORDER BY name",
+    )
+    .load::<TableName>(conn)?;
+    let mut out = BTreeMap::new();
+    for t in names {
+        let sql = format!(
+            "SELECT COUNT(*) AS n FROM \"{}\"",
+            t.name.replace('"', "\"\"")
+        );
+        let c = diesel::sql_query(sql).get_result::<Count>(conn)?;
+        out.insert(t.name, c.n);
+    }
+    Ok(out)
+}
+
+fn rows_word(n: i64) -> String {
+    if n == 1 {
+        "1 row".into()
+    } else {
+        format!("{n} rows")
+    }
+}
+
+/// Tables in both schemas must hold the same number of rows after `up`.
+/// Returns the findings message lines (empty when all rows were kept) and the
+/// number of tables compared.
+fn rows_lost(
+    before: &BTreeMap<String, i64>,
+    after: &BTreeMap<String, i64>,
+    new_spec: &SchemaSpec,
+    renames: &[(String, String)],
+) -> (Vec<String>, usize) {
+    // Current name -> name before the change set (follows chained renames).
+    let mut origin: BTreeMap<String, String> = BTreeMap::new();
+    for t in before.keys() {
+        origin.insert(t.clone(), t.clone());
+    }
+    for (from, to) in renames {
+        if let Some(o) = origin.remove(from) {
+            origin.insert(to.clone(), o);
+        }
+    }
+    let mut lost = Vec::new();
+    let mut compared = 0;
+    for t in &new_spec.tables {
+        let (Some(orig), Some(now)) = (origin.get(&t.name), after.get(&t.name)) else {
+            continue;
+        };
+        let Some(was) = before.get(orig) else {
+            continue;
+        };
+        compared += 1;
+        if was != now {
+            lost.push(format!(
+                "{} had {} before and has {} after",
+                t.name,
+                rows_word(*was),
+                rows_word(*now)
+            ));
+        }
+    }
+    (lost, compared)
+}
+
 /// Run all earlier migrations plus `new` on a copy of `db`.
 ///
 /// `before` is the spec the DB should match before `new`; `after` the spec it
@@ -218,24 +315,55 @@ pub fn dry_run(
             ));
         }
     };
+    let pending = if has_db {
+        match conn.pending_migrations(earlier.clone()) {
+            Ok(p) => p.len(),
+            Err(e) => {
+                return Ok(run.fail(
+                    "earlier_migrations_applied",
+                    sql_error("reading the recorded migrations", e),
+                ));
+            }
+        }
+    } else {
+        earlier_count
+    };
     if let Err(e) = conn.run_pending_migrations(earlier) {
         return Ok(run.fail(
             "earlier_migrations_applied",
             sql_error("running earlier migrations", e),
         ));
     }
-    run.pass(
-        "earlier_migrations_applied",
-        format!(
-            "Ran {} on {}.",
-            plural(earlier_count),
-            if has_db {
-                "a copy of data.sqlite"
-            } else {
-                "an empty database (no data.sqlite yet)"
+    let detail = if has_db {
+        let counts = match row_counts(&mut conn) {
+            Ok(c) => c,
+            Err(e) => {
+                return Ok(run.fail(
+                    "earlier_migrations_applied",
+                    sql_error("counting rows in the copy", e),
+                ));
             }
-        ),
-    );
+        };
+        let total: i64 = counts.values().sum();
+        let already = earlier_count.saturating_sub(pending);
+        format!(
+            "On a copy of data.sqlite ({} in {}): {} already applied; ran {} pending.",
+            rows_word(total),
+            if counts.len() == 1 {
+                "1 list".to_string()
+            } else {
+                format!("{} lists", counts.len())
+            },
+            plural(already),
+            pending
+        )
+    } else {
+        format!(
+            "Ran {} on an empty database (no data.sqlite yet).",
+            plural(earlier_count)
+        )
+    };
+    run.pass("earlier_migrations_applied", detail);
 
     // 3. The DB must match the spec before the new migration.
     let start = match introspect(&mut conn) {
@@ -274,10 +402,48 @@ pub fn dry_run(
         Err(e) => return Ok(run.fail("up", sql_error("reading the new migration", e))),
     };
 
+    let rows_before = match row_counts(&mut conn) {
+        Ok(c) => c,
+        Err(e) => return Ok(run.fail("up", sql_error("counting rows before the migration", e))),
+    };
     if let Err(e) = conn.run_pending_migrations(all.clone()) {
         return Ok(run.fail("up", sql_error("running the new migration", e)));
     }
     run.pass("up", "The new migration ran without a SQLite error.");
+    let rows_after = match row_counts(&mut conn) {
+        Ok(c) => c,
+        Err(e) => {
+            return Ok(run.fail(
+                "rows_kept",
+                sql_error("counting rows after the migration", e),
+            ));
+        }
+    };
+    let (lost, compared) = rows_lost(&rows_before, &rows_after, after, &new.table_renames);
+    if !lost.is_empty() {
+        return Ok(run.fail(
+            "rows_kept",
+            finding(
+                "rows_lost",
+                format!(
+                    "The new migration changed the number of stored rows: {}",
+                    lost.join("; ")
+                ),
+            ),
+        ));
+    }
+    run.pass(
+        "rows_kept",
+        if compared == 0 {
+            "No existing lists to compare; no rows were at risk.".to_string()
+        } else {
+            let total: i64 = rows_before.values().sum();
+            format!(
+                "Every existing list kept all its rows ({} across {} lists compared, {} in the copy).",
+                total, compared, rows_word(total)
+            )
+        },
+    );
     let after_step = "running the new migration";
     if let Some(r) = check_after(
         &mut conn,

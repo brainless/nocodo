@@ -2,6 +2,7 @@
 //!
 //! Must not do I/O, use an LLM, or contain business logic.
 
+pub mod apply;
 pub mod change;
 pub mod event;
 pub mod naming;

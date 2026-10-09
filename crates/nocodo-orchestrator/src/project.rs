@@ -1,9 +1,14 @@
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use nocodo_checker::{NamedMigration, check_change_set, dry_run, static_rules_step};
+use nocodo_checker::{
+    NamedMigration, check_change_set, check_db_matches_spec, dry_run, static_rules_step,
+    table_renames,
+};
 use nocodo_sqlgen::{METADATA_TOML, apply, generate};
+use nocodo_types::apply::{AppliedMigration, ApplyReport, FailedMigration};
 use nocodo_types::change::ChangeSet;
 use nocodo_types::event::{Actor, CheckStep, Event, EventKind, Finding};
 use nocodo_types::project::{ProjectBase, ProjectConfig};
@@ -66,6 +71,56 @@ pub struct PromptOutcome {
     pub change_set: ChangeSet,
     pub assumptions: Vec<String>,
     pub attempts: u32,
+}
+
+pub type ApplierError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Applies pending migrations to `data.sqlite`. Implemented outside the
+/// orchestrator (the api adapts the runtime), so no runtime dependency.
+pub trait Applier {
+    fn apply_pending(&self, project_dir: &Path) -> std::result::Result<ApplyReport, ApplierError>;
+}
+
+/// Result of [`Project::apply_pending`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplyOutcome {
+    pub report: ApplyReport,
+    /// The post-apply comparison; `None` when nothing was applied or a migration failed.
+    pub check: Option<CheckStep>,
+    /// The `detail` of each `MigrationApplied` event, then of `MigrationFailed` if any.
+    pub details: Vec<String>,
+}
+
+fn rows_summary(before: &BTreeMap<String, u64>, after: &BTreeMap<String, u64>) -> String {
+    let b: u64 = before.values().sum();
+    let a: u64 = before.keys().filter_map(|k| after.get(k)).sum();
+    format!("Rows in existing lists: {b} before, {a} after.")
+}
+
+fn applied_detail(m: &AppliedMigration) -> String {
+    let how = match &m.backup {
+        Some(b) => format!("after backing it up to {b}"),
+        None => "as a new file (there was nothing to back up)".to_string(),
+    };
+    format!(
+        "Applied {} to data.sqlite {how}. {}",
+        m.migration,
+        rows_summary(&m.rows_before, &m.rows_after)
+    )
+}
+
+fn failed_detail(f: &FailedMigration) -> String {
+    let state = match (f.restored, &f.backup) {
+        (true, Some(b)) => format!(
+            "data.sqlite was restored from {b} and is exactly as it was before."
+        ),
+        (true, None) => "The new data.sqlite was removed, so it is exactly as it was before (it did not exist).".to_string(),
+        (false, _) => "data.sqlite could NOT be restored automatically; check it against the backup before doing anything else.".to_string(),
+    };
+    format!(
+        "{} failed: {}. {state} Later migrations were not attempted; `nocodo-api apply` retries.",
+        f.migration, f.error
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -211,6 +266,63 @@ impl Project {
         Ok(spec)
     }
 
+    /// Apply pending migrations through `applier` and record the result:
+    /// one `MigrationApplied` per applied migration, `MigrationFailed` if one
+    /// failed, and `DatabaseChecked` when at least one was applied and none
+    /// failed. Appends nothing when nothing was pending.
+    pub fn apply_pending<A: Applier>(&self, applier: &A) -> Result<ApplyOutcome> {
+        let report = applier
+            .apply_pending(&self.dir)
+            .map_err(OrchestratorError::Applier)?;
+        let mut details = Vec::new();
+        for m in &report.applied {
+            let detail = applied_detail(m);
+            self.append(
+                Actor::System,
+                EventKind::MigrationApplied {
+                    migration: m.migration.clone(),
+                    backup: m.backup.clone(),
+                    rows_before: m.rows_before.clone(),
+                    rows_after: m.rows_after.clone(),
+                    detail: detail.clone(),
+                },
+            )?;
+            details.push(detail);
+        }
+        if let Some(f) = &report.failed {
+            let detail = failed_detail(f);
+            self.append(
+                Actor::System,
+                EventKind::MigrationFailed {
+                    migration: f.migration.clone(),
+                    backup: f.backup.clone(),
+                    error: f.error.clone(),
+                    restored: f.restored,
+                    detail: detail.clone(),
+                },
+            )?;
+            details.push(detail);
+        }
+        let check = if !report.applied.is_empty() && report.failed.is_none() {
+            let spec = self.current_schema()?;
+            let step = check_db_matches_spec(&self.dir.join("data.sqlite"), &spec);
+            self.append(
+                Actor::System,
+                EventKind::DatabaseChecked {
+                    check: step.clone(),
+                },
+            )?;
+            Some(step)
+        } else {
+            None
+        };
+        Ok(ApplyOutcome {
+            report,
+            check,
+            details,
+        })
+    }
+
     fn next_migration_name(&self, cs_name: &str) -> Result<String> {
         let mut max = 0u32;
         for entry in fs::read_dir(self.migrations_dir())? {
@@ -333,6 +445,7 @@ impl Project {
             name: name.clone(),
             up: migration.up.clone(),
             down: migration.down.clone(),
+            table_renames: table_renames(&cs.changes),
         };
         let report = dry_run(
             Some(&self.dir.join("data.sqlite")),

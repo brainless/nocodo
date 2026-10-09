@@ -3,6 +3,8 @@
 //! `seq` starts at 1 and increases by one per event. `proposal_seq` points at
 //! the `ChangeSetProposed` event.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::change::ChangeSet;
@@ -68,6 +70,33 @@ pub enum EventKind {
         #[serde(default)]
         checks: Vec<CheckStep>,
     },
+    /// A migration was applied to `data.sqlite` (actor `System`).
+    MigrationApplied {
+        migration: String,
+        /// Backup path relative to the project; `None` when `data.sqlite` did not exist yet.
+        backup: Option<String>,
+        rows_before: BTreeMap<String, u64>,
+        rows_after: BTreeMap<String, u64>,
+        detail: String,
+    },
+    /// A migration failed and `data.sqlite` was put back (actor `System`).
+    MigrationFailed {
+        migration: String,
+        backup: Option<String>,
+        /// The SQLite or I/O error, verbatim.
+        error: String,
+        restored: bool,
+        detail: String,
+    },
+    /// The comparison of `data.sqlite` with the spec after an apply run (actor `System`).
+    DatabaseChecked {
+        check: CheckStep,
+    },
+    /// Fake rows added for testing (actor `Developer`).
+    SampleRowsAdded {
+        rows: BTreeMap<String, u64>,
+        detail: String,
+    },
 }
 
 /// A checker result (produced in epic 003).
@@ -83,7 +112,9 @@ pub struct Finding {
 /// `check` is a stable snake_case code: `static_rules`,
 /// `earlier_migrations_applied`, `db_matches_spec_before`, `up`,
 /// `db_matches_spec_after`, `foreign_key_check`, `down`,
-/// `db_matches_spec_after_down`, `up_again`, `db_matches_spec_after_up_again`.
+/// `db_matches_spec_after_down`, `up_again`, `db_matches_spec_after_up_again`,
+/// `rows_kept` (dry run: existing rows survive `up`) and
+/// `db_matches_spec_after_apply` (real `data.sqlite` after an apply run).
 /// `detail` is a plain sentence a reviewer can read alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -91,4 +122,44 @@ pub struct CheckStep {
     pub check: String,
     pub passed: bool,
     pub detail: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_events_round_trip() {
+        let kinds = vec![
+            EventKind::MigrationApplied {
+                migration: "0002_x".into(),
+                backup: Some("backups/before_0002_x.sqlite".into()),
+                rows_before: BTreeMap::from([("a".into(), 1)]),
+                rows_after: BTreeMap::from([("a".into(), 1)]),
+                detail: "d".into(),
+            },
+            EventKind::MigrationFailed {
+                migration: "0003_y".into(),
+                backup: None,
+                error: "boom".into(),
+                restored: true,
+                detail: "d".into(),
+            },
+            EventKind::DatabaseChecked {
+                check: CheckStep {
+                    check: "db_matches_spec_after_apply".into(),
+                    passed: true,
+                    detail: "ok".into(),
+                },
+            },
+            EventKind::SampleRowsAdded {
+                rows: BTreeMap::from([("a".into(), 3)]),
+                detail: "d".into(),
+            },
+        ];
+        for kind in kinds {
+            let json = serde_json::to_string(&kind).unwrap();
+            assert_eq!(serde_json::from_str::<EventKind>(&json).unwrap(), kind);
+        }
+    }
 }

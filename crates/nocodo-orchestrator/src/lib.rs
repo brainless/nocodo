@@ -9,4 +9,7 @@ mod error;
 mod project;
 
 pub use error::OrchestratorError;
-pub use project::{Feedback, Outcome, Project, PromptOutcome, Proposal, Proposer, ProposerError};
+pub use project::{
+    Applier, ApplierError, ApplyOutcome, Feedback, Outcome, Project, PromptOutcome, Proposal,
+    Proposer, ProposerError,
+};

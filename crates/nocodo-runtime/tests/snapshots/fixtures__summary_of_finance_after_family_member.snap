@@ -1,0 +1,32 @@
+---
+source: crates/nocodo-runtime/tests/fixtures.rs
+expression: "summary(&spec, &rows)"
+---
+Accounts (no entries stored yet)
+  Places where money is kept, such as a bank account or a wallet.
+  Each one has:
+    - name
+    - opening balance
+
+People (1 entry stored so far)
+  People whose spending is tracked, such as family members.
+  Each one has:
+    - name
+
+Categories (2 entries stored so far)
+  Groups for spending and income, such as groceries or salary.
+  Each one has:
+    - name
+
+Transactions (3 entries stored so far)
+  Each payment received or made.
+  Each one has:
+    - account
+    - category
+    - occurred on
+    - amount
+    - transfer to account (optional)
+    - notes (optional)
+    - person (optional)
+
+Every entry also remembers when it was added and when it last changed.

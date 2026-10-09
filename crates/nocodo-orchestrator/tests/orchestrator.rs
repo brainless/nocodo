@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use nocodo_orchestrator::{OrchestratorError, Outcome, Project};
+use nocodo_orchestrator::{Applier, ApplierError, OrchestratorError, Outcome, Project};
+use nocodo_types::apply::{AppliedMigration, ApplyReport, FailedMigration};
 use nocodo_types::change::{ChangeSet, SchemaChange};
 use nocodo_types::event::{Actor, EventKind};
 use nocodo_types::project::ProjectBase;
@@ -412,11 +413,12 @@ mod run_prompt {
     }
 }
 
-const ALL_STEPS: [&str; 10] = [
+const ALL_STEPS: [&str; 11] = [
     "static_rules",
     "earlier_migrations_applied",
     "db_matches_spec_before",
     "up",
+    "rows_kept",
     "db_matches_spec_after",
     "foreign_key_check",
     "down",
@@ -488,4 +490,133 @@ fn broken_migration_rejection_records_the_failing_step() {
         panic!("last event must be the rejection");
     };
     assert_eq!(logged, &checks);
+}
+
+/// Returns a canned report; with `create_db` it also creates an empty (valid) `data.sqlite`.
+struct FakeApplier {
+    report: ApplyReport,
+    create_db: bool,
+}
+
+impl Applier for FakeApplier {
+    fn apply_pending(&self, dir: &Path) -> Result<ApplyReport, ApplierError> {
+        if self.create_db {
+            fs::write(dir.join("data.sqlite"), b"")?;
+        }
+        Ok(self.report.clone())
+    }
+}
+
+fn applied(name: &str) -> AppliedMigration {
+    AppliedMigration {
+        migration: name.into(),
+        backup: Some(format!("backups/before_{name}.sqlite")),
+        rows_before: [("expenses".to_string(), 4)].into(),
+        rows_after: [("expenses".to_string(), 4)].into(),
+    }
+}
+
+fn kinds(p: &Project) -> Vec<&'static str> {
+    p.events()
+        .unwrap()
+        .iter()
+        .map(|e| match &e.kind {
+            EventKind::MigrationApplied { .. } => "migration_applied",
+            EventKind::MigrationFailed { .. } => "migration_failed",
+            EventKind::DatabaseChecked { .. } => "database_checked",
+            _ => "other",
+        })
+        .filter(|k| *k != "other")
+        .collect()
+}
+
+#[test]
+fn apply_records_events_and_checks_database() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = Project::init(tmp.path().join("p"), "t").unwrap();
+    let fake = FakeApplier {
+        report: ApplyReport {
+            applied: vec![applied("0001_a"), applied("0002_b")],
+            failed: None,
+        },
+        create_db: true,
+    };
+    let out = p.apply_pending(&fake).unwrap();
+    assert_eq!(
+        kinds(&p),
+        ["migration_applied", "migration_applied", "database_checked"]
+    );
+    let check = out.check.unwrap();
+    assert!(check.passed, "{}", check.detail);
+    assert_eq!(check.check, "db_matches_spec_after_apply");
+    assert!(out.details[0].contains("backups/before_0001_a.sqlite"));
+    assert!(out.details[0].contains("4 before, 4 after"));
+}
+
+#[test]
+fn apply_failure_records_failure_and_no_check() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = Project::init(tmp.path().join("p"), "t").unwrap();
+    let fake = FakeApplier {
+        report: ApplyReport {
+            applied: vec![applied("0001_a")],
+            failed: Some(FailedMigration {
+                migration: "0002_b".into(),
+                backup: Some("backups/before_0002_b.sqlite".into()),
+                error: "near \"X\": syntax error".into(),
+                restored: true,
+            }),
+        },
+        create_db: false,
+    };
+    let out = p.apply_pending(&fake).unwrap();
+    assert_eq!(kinds(&p), ["migration_applied", "migration_failed"]);
+    assert!(out.check.is_none());
+    let last = out.details.last().unwrap();
+    assert!(last.contains("syntax error") && last.contains("exactly as it was before"));
+}
+
+#[test]
+fn apply_nothing_pending_appends_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = Project::init(tmp.path().join("p"), "t").unwrap();
+    let before = p.events().unwrap().len();
+    let fake = FakeApplier {
+        report: ApplyReport::default(),
+        create_db: false,
+    };
+    let out = p.apply_pending(&fake).unwrap();
+    assert!(out.check.is_none() && out.details.is_empty());
+    assert_eq!(p.events().unwrap().len(), before);
+}
+
+#[test]
+fn apply_check_mismatch_is_recorded_as_failed_check() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = Project::init(tmp.path().join("p"), "t").unwrap();
+    p.propose(initial(), Actor::Developer, false).unwrap();
+    let fake = FakeApplier {
+        report: ApplyReport {
+            applied: vec![applied("0001_initial")],
+            failed: None,
+        },
+        create_db: true, // empty database: does not match the spec
+    };
+    let out = p.apply_pending(&fake).unwrap();
+    let check = out.check.unwrap();
+    assert!(!check.passed);
+    assert!(kinds(&p).ends_with(&["database_checked"]));
+}
+
+#[test]
+fn old_event_log_still_loads() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project = Project::init(tmp.path().join("p"), "old").unwrap();
+    let old = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/examples/events.jsonl"),
+    )
+    .unwrap();
+    std::fs::write(project.dir().join("events.jsonl"), &old).unwrap();
+    assert_eq!(project.events().unwrap().len(), old.lines().count());
 }

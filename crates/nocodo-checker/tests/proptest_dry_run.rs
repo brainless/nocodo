@@ -191,6 +191,7 @@ proptest! {
                 name: format!("{:04}_{}", i + 1, c.name),
                 up: m.up,
                 down: m.down,
+                table_renames: nocodo_checker::table_renames(&c.changes),
             };
             let findings = dry_run(None, &dir, &named, &spec, &after).unwrap().findings;
             prop_assert!(findings.is_empty(), "{:?}: {:?}", c, findings);

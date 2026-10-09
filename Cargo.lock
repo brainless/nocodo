@@ -1329,7 +1329,14 @@ dependencies = [
 name = "nocodo-runtime"
 version = "0.1.0"
 dependencies = [
+ "diesel",
+ "diesel_migrations",
+ "insta",
+ "libsqlite3-sys",
+ "nocodo-sqlgen",
  "nocodo-types",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
