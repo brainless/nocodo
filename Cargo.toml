@@ -1,0 +1,43 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/nocodo-types",
+    "crates/nocodo-sqlgen",
+    "crates/nocodo-checker",
+    "crates/nocodo-orchestrator",
+    "crates/nocodo-runtime",
+    "crates/nocodo-agent",
+    "crates/nocodo-agent-schema",
+    "crates/nocodo-agent-pm",
+    "api",
+    "cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+nocodo-types = { path = "crates/nocodo-types" }
+nocodo-sqlgen = { path = "crates/nocodo-sqlgen" }
+nocodo-checker = { path = "crates/nocodo-checker" }
+nocodo-orchestrator = { path = "crates/nocodo-orchestrator" }
+nocodo-runtime = { path = "crates/nocodo-runtime" }
+nocodo-agent = { path = "crates/nocodo-agent" }
+nocodo-agent-schema = { path = "crates/nocodo-agent-schema" }
+nocodo-agent-pm = { path = "crates/nocodo-agent-pm" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "warn"
+
+[profile.dev]
+debug = 0
+incremental = true
+
+[profile.dev.package."*"]
+debug = 0
+opt-level = 0

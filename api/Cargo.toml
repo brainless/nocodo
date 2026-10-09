@@ -1,0 +1,22 @@
+[package]
+name = "nocodo-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "nocodo-api"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+nocodo-types.workspace = true
+nocodo-sqlgen.workspace = true
+nocodo-checker.workspace = true
+nocodo-orchestrator.workspace = true
+nocodo-runtime.workspace = true
+nocodo-agent.workspace = true
+nocodo-agent-schema.workspace = true
+nocodo-agent-pm.workspace = true

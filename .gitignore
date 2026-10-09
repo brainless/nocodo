@@ -1,0 +1,6 @@
+/target
+.agent-logs/
+*.sqlite
+*.sqlite-*
+/projects/
+.DS_Store
