@@ -9,13 +9,14 @@ use nocodo_types::change::{ChangeSet, SchemaChange};
 use nocodo_types::schema::{Column, ColumnType, SPEC_VERSION, SchemaSpec};
 use proptest::prelude::*;
 
-const TYPES: [ColumnType; 6] = [
+const TYPES: [ColumnType; 7] = [
     ColumnType::Text,
     ColumnType::Integer,
     ColumnType::Boolean,
     ColumnType::Date,
     ColumnType::DateTime,
     ColumnType::Money,
+    ColumnType::Decimal,
 ];
 
 fn column(name: String, t: ColumnType, nullable: bool, unique: bool) -> Column {
@@ -191,7 +192,7 @@ proptest! {
                 up: m.up,
                 down: m.down,
             };
-            let findings = dry_run(None, &dir, &named, &spec, &after).unwrap();
+            let findings = dry_run(None, &dir, &named, &spec, &after).unwrap().findings;
             prop_assert!(findings.is_empty(), "{:?}: {:?}", c, findings);
             let d = dir.join(&named.name);
             fs::create_dir_all(&d).unwrap();

@@ -1238,6 +1238,7 @@ dependencies = [
 name = "nocodo-agent"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "jiff",
  "nocodo-types",
  "rig-agent",
@@ -1262,6 +1263,7 @@ dependencies = [
 name = "nocodo-agent-schema"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "nocodo-agent",
  "nocodo-types",
  "schemars",

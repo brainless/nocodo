@@ -3,7 +3,9 @@
 //! SQL comes from the change list, not from a spec diff, so renames stay renames.
 
 use nocodo_types::change::{ChangeSet, SchemaChange};
-use nocodo_types::schema::{Column, ColumnType, SchemaSpec, Table};
+use nocodo_types::schema::{
+    Column, ColumnType, IMPLICIT_COLUMNS, ImplicitColumn, SchemaSpec, Table,
+};
 
 use crate::apply::{ApplyError, apply_one};
 use crate::naming::{IndexDef, column_sql_type, table_indexes};
@@ -173,10 +175,18 @@ fn column_def(c: &Column) -> String {
 }
 
 fn create_table(name: &str, t: &Table) -> String {
-    let mut lines = vec!["    id INTEGER PRIMARY KEY".to_string()];
+    let mut lines = Vec::new();
+    for ic in IMPLICIT_COLUMNS.iter().filter(|c| c.primary_key) {
+        lines.push(format!(
+            "    {} {} PRIMARY KEY",
+            ic.name,
+            column_sql_type(ic.column_type)
+        ));
+    }
     lines.extend(t.columns.iter().map(|c| format!("    {}", column_def(c))));
-    lines.push(format!("    created_at {TIMESTAMP_DEFAULT}"));
-    lines.push(format!("    updated_at {TIMESTAMP_DEFAULT}"));
+    for ic in IMPLICIT_COLUMNS.iter().filter(|c| !c.primary_key) {
+        lines.push(format!("    {} {TIMESTAMP_DEFAULT}", ic.name));
+    }
     format!("CREATE TABLE {name} (\n{}\n);\n", lines.join(",\n"))
 }
 
@@ -204,12 +214,15 @@ fn empty_value(c: &Column) -> String {
     }
     match (c.unique, c.column_type) {
         // Keep unique columns unique when restored for many rows.
-        (true, ColumnType::Integer | ColumnType::Money) => "id".into(),
+        (true, ColumnType::Integer | ColumnType::Money | ColumnType::Decimal) => "id".into(),
         (true, ColumnType::Text | ColumnType::Date | ColumnType::DateTime) => {
             "CAST(id AS TEXT)".into()
         }
         (_, ColumnType::Text | ColumnType::Date | ColumnType::DateTime) => "''".into(),
-        (_, ColumnType::Integer | ColumnType::Money | ColumnType::Boolean) => "0".into(),
+        (
+            _,
+            ColumnType::Integer | ColumnType::Money | ColumnType::Boolean | ColumnType::Decimal,
+        ) => "0".into(),
     }
 }
 
@@ -217,8 +230,13 @@ fn empty_value(c: &Column) -> String {
 /// (same table name). Columns missing in `from` are filled with empty values.
 fn rebuild(from: &Table, to: &Table) -> String {
     let name = &to.name;
-    let mut targets = vec!["id".to_string()];
-    let mut sources = vec!["id".to_string()];
+    let pk = |ic: &&ImplicitColumn| ic.primary_key;
+    let mut targets: Vec<String> = IMPLICIT_COLUMNS
+        .iter()
+        .filter(pk)
+        .map(|c| c.name.to_string())
+        .collect();
+    let mut sources = targets.clone();
     for c in &to.columns {
         targets.push(c.name.clone());
         sources.push(if from.columns.iter().any(|f| f.name == c.name) {
@@ -227,9 +245,9 @@ fn rebuild(from: &Table, to: &Table) -> String {
             empty_value(c)
         });
     }
-    for ts in ["created_at", "updated_at"] {
-        targets.push(ts.into());
-        sources.push(ts.into());
+    for ic in IMPLICIT_COLUMNS.iter().filter(|c| !c.primary_key) {
+        targets.push(ic.name.into());
+        sources.push(ic.name.into());
     }
     let mut s = create_table(&format!("{name}_new"), to);
     s.push_str(&format!(

@@ -32,6 +32,8 @@ Experiment 1 covers only the storage layer. It has **one LLM agent, the Schema a
 |---|---|---|
 | `rig-core` (via `nocodo-agent`) | Feature `native-tls` instead of the default `rustls`, with `default-features = false` | Default `rustls` pulls `aws-lc-sys`. Under Cranelift on macOS its symbols link as `__aws_lc_*` but are defined as `_aws_lc_*` (double underscore), so any test or binary that links it fails with "symbol(s) not found". A per-package `codegen-backend = "llvm"` on `aws-lc-sys`/`aws-lc-rs` did not help. `native-tls` uses Security.framework and builds under Cranelift. Release builds are unaffected. |
 
+Cranelift check for epic 005 Task 6 (all registry providers via `rig-core` 0.43 with `native-tls`): no further override needed; tests that link the registry build and pass.
+
 ### Commands
 
 ```bash
@@ -47,7 +49,7 @@ All four must pass before an epic is marked done.
 
 From epic 003 on, each checkpoint ends with a manual session:
 
-1. The tester creates a project with `cargo run --bin nocodo-api -- init --project projects/<name>` and then runs the epic's commands against it. `projects/` is gitignored. `ANTHROPIC_API_KEY` goes in a gitignored `.env` at the repo root; see `.env.example`. Per-agent model choices (and future project settings) live in `project-base.json` at the repo root; `init` copies them into the new project's `project.json` (`--base <file>` uses another file).
+1. The tester creates a project with `cargo run --bin nocodo-api -- init --project .projects/<name>` and then runs the epic's commands against it. `.projects/` is gitignored. `ANTHROPIC_API_KEY` goes in a gitignored `.env` at the repo root; see `.env.example`. Per-agent model choices (and future project settings) live in `project-base.json` at the repo root; `init` copies them into the new project's `project.json` (`--base <file>` uses another file).
 2. A reviewer (the user, or Claude when asked) reads the project folder: `events.jsonl`, `.agent-logs/*.jsonl`, `specs/schema.json`, `migrations/`, and `data.sqlite` through `sqlite3`.
 
 Design every command so this works:
@@ -75,7 +77,7 @@ crates/                  # libraries
   nocodo-agent-pm/
 api/                     # nocodo-api binary (subcommands now, Axum later)
 fixtures/                # hand-written change sets and prompts for manual tests
-projects/                # local test projects (gitignored)
+.projects/               # local test projects (gitignored)
 cli/                     # nocodo binary (user-facing)
 ```
 

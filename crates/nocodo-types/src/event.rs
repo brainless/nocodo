@@ -23,7 +23,12 @@ pub enum Actor {
     Developer,
     System,
     User,
-    SchemaAgent { run_id: String },
+    SchemaAgent {
+        run_id: String,
+        /// `provider:model` that proposed the change set.
+        #[serde(default)]
+        model: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,11 +56,17 @@ pub enum EventKind {
     ChangeSetRejected {
         proposal_seq: u64,
         findings: Vec<Finding>,
+        /// Check steps run, up to and including the one that failed.
+        #[serde(default)]
+        checks: Vec<CheckStep>,
     },
     ChangeSetAccepted {
         proposal_seq: u64,
         /// e.g. "0002_add_family_member"
         migration: String,
+        /// Every check step that ran, in order (all passed).
+        #[serde(default)]
+        checks: Vec<CheckStep>,
     },
 }
 
@@ -65,4 +76,19 @@ pub enum EventKind {
 pub struct Finding {
     pub code: String,
     pub message: String,
+}
+
+/// One step the checker ran on a proposal.
+///
+/// `check` is a stable snake_case code: `static_rules`,
+/// `earlier_migrations_applied`, `db_matches_spec_before`, `up`,
+/// `db_matches_spec_after`, `foreign_key_check`, `down`,
+/// `db_matches_spec_after_down`, `up_again`, `db_matches_spec_after_up_again`.
+/// `detail` is a plain sentence a reviewer can read alone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckStep {
+    pub check: String,
+    pub passed: bool,
+    pub detail: String,
 }

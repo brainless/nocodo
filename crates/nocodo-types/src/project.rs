@@ -32,23 +32,24 @@ pub struct ModelsConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelConfig {
-    pub provider: Provider,
+    /// A Rig provider selection (`anthropic`, `openai`, `gemini`, `ollama`, ...).
+    /// Kept a string: this crate does not depend on Rig.
+    pub provider: String,
     pub model: String,
+    /// Opt in to strict tool schemas. Only takes effect for providers that
+    /// support them; off by default because it degrades some models.
+    #[serde(default)]
+    pub strict: bool,
 }
 
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
-            provider: Provider::Anthropic,
+            provider: "anthropic".to_string(),
             model: DEFAULT_MODEL.to_string(),
+            strict: false,
         }
     }
 }
 
 pub const DEFAULT_MODEL: &str = "claude-sonnet-5-5";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Provider {
-    Anthropic,
-}

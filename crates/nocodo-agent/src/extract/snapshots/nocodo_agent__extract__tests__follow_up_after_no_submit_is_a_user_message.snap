@@ -1,0 +1,26 @@
+---
+source: crates/nocodo-agent/src/extract/tests.rs
+expression: "pretty(&follow_up(&rejected, \"the model did not call the `submit` tool\"))"
+---
+{
+  "assistant": {
+    "content": [
+      {
+        "text": "Sure, here you go.",
+        "type": "text"
+      }
+    ],
+    "id": null,
+    "role": "assistant"
+  },
+  "kind": "user_message",
+  "prompt": {
+    "content": [
+      {
+        "text": "Your answer was rejected and nothing was saved: the model did not call the `submit` tool\nAnswer again by calling `submit` exactly once. Its arguments must match the schema exactly: every list and object must be real JSON, not text containing JSON.",
+        "type": "text"
+      }
+    ],
+    "role": "user"
+  }
+}

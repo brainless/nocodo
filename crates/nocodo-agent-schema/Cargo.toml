@@ -13,3 +13,6 @@ nocodo-agent.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+insta = "1.49.0"

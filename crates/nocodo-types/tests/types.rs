@@ -1,5 +1,5 @@
 use nocodo_types::change::{ChangeSet, SchemaChange};
-use nocodo_types::event::{Actor, Event, EventKind, Finding};
+use nocodo_types::event::{Actor, CheckStep, Event, EventKind, Finding};
 use nocodo_types::project::{ProjectBase, ProjectConfig};
 use nocodo_types::schema::{Column, ColumnType, Index, SPEC_VERSION, SchemaSpec, Table};
 use serde::{Serialize, de::DeserializeOwned};
@@ -153,6 +153,7 @@ fn spec_changeset_project_roundtrip() {
         ColumnType::Date,
         ColumnType::DateTime,
         ColumnType::Money,
+        ColumnType::Decimal,
     ] {
         roundtrip(&t);
     }
@@ -178,10 +179,16 @@ fn event_kinds_roundtrip() {
                 code: "c".into(),
                 message: "m".into(),
             }],
+            checks: vec![CheckStep {
+                check: "static_rules".into(),
+                passed: false,
+                detail: "d".into(),
+            }],
         },
         EventKind::ChangeSetAccepted {
             proposal_seq: 2,
             migration: "0002_x".into(),
+            checks: vec![],
         },
     ];
     for (i, kind) in kinds.into_iter().enumerate() {
@@ -189,7 +196,10 @@ fn event_kinds_roundtrip() {
             Actor::Developer,
             Actor::System,
             Actor::User,
-            Actor::SchemaAgent { run_id: "r".into() },
+            Actor::SchemaAgent {
+                run_id: "r".into(),
+                model: "anthropic:m".into(),
+            },
         ] {
             roundtrip(&Event {
                 seq: i as u64 + 1,
@@ -322,4 +332,49 @@ fn project_base_defaults_and_rejects_unknown_fields() {
     .unwrap();
     assert_eq!(b.models.schema.model, "claude-haiku-5-5");
     assert!(serde_json::from_str::<ProjectBase>(r#"{"name":"x"}"#).is_err());
+}
+
+#[test]
+fn old_project_json_with_anthropic_provider_loads() {
+    let c: ProjectConfig = serde_json::from_str(
+        r#"{"spec_version":1,"name":"n","models":{"schema":{"provider":"anthropic","model":"claude-haiku-5-5"}}}"#,
+    )
+    .unwrap();
+    assert_eq!(c.models.schema.provider, "anthropic");
+    assert!(!c.models.schema.strict);
+}
+
+#[test]
+fn model_config_strict_round_trips() {
+    let c: ProjectConfig = serde_json::from_str(
+        r#"{"spec_version":1,"name":"n","models":{"schema":{"provider":"openai","model":"m","strict":true}}}"#,
+    )
+    .unwrap();
+    assert!(c.models.schema.strict);
+}
+
+#[test]
+fn old_accepted_and_rejected_events_without_checks_still_load() {
+    let a: EventKind = serde_json::from_str(
+        r#"{"type":"change_set_accepted","proposal_seq":2,"migration":"0002_x"}"#,
+    )
+    .unwrap();
+    assert!(matches!(a, EventKind::ChangeSetAccepted { checks, .. } if checks.is_empty()));
+    let r: EventKind = serde_json::from_str(
+        r#"{"type":"change_set_rejected","proposal_seq":2,"findings":[{"code":"c","message":"m"}]}"#,
+    )
+    .unwrap();
+    assert!(matches!(r, EventKind::ChangeSetRejected { checks, .. } if checks.is_empty()));
+}
+
+#[test]
+fn schema_agent_actor_without_model_still_loads() {
+    let actor: Actor = serde_json::from_str(r#"{"type":"schema_agent","run_id":"r"}"#).unwrap();
+    assert_eq!(
+        actor,
+        Actor::SchemaAgent {
+            run_id: "r".into(),
+            model: String::new()
+        }
+    );
 }

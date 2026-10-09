@@ -2,10 +2,10 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use nocodo_checker::{NamedMigration, check_change_set, dry_run};
+use nocodo_checker::{NamedMigration, check_change_set, dry_run, static_rules_step};
 use nocodo_sqlgen::{METADATA_TOML, apply, generate};
 use nocodo_types::change::ChangeSet;
-use nocodo_types::event::{Actor, Event, EventKind, Finding};
+use nocodo_types::event::{Actor, CheckStep, Event, EventKind, Finding};
 use nocodo_types::project::{ProjectBase, ProjectConfig};
 use nocodo_types::schema::{SPEC_VERSION, SchemaSpec};
 
@@ -19,9 +19,13 @@ pub enum Outcome {
     /// Migration folder name, e.g. `0002_add_family_member`.
     Accepted {
         migration: String,
+        /// Every check step that ran, in order.
+        checks: Vec<CheckStep>,
     },
     Rejected {
         findings: Vec<Finding>,
+        /// Check steps up to and including the one that failed.
+        checks: Vec<CheckStep>,
     },
 }
 
@@ -267,7 +271,7 @@ impl Project {
                 proposal.assumptions.clone(),
             )?;
             match outcome {
-                Outcome::Rejected { findings } if attempt < max_attempts => {
+                Outcome::Rejected { findings, .. } if attempt < max_attempts => {
                     feedback = Some(Feedback {
                         previous: proposal.change_set,
                         findings,
@@ -305,20 +309,22 @@ impl Project {
             },
         )?;
 
-        let reject = |findings: Vec<Finding>| -> Result<Outcome> {
+        let reject = |findings: Vec<Finding>, checks: Vec<CheckStep>| -> Result<Outcome> {
             self.append(
                 Actor::System,
                 EventKind::ChangeSetRejected {
                     proposal_seq: proposal.seq,
                     findings: findings.clone(),
+                    checks: checks.clone(),
                 },
             )?;
-            Ok(Outcome::Rejected { findings })
+            Ok(Outcome::Rejected { findings, checks })
         };
 
         let findings = check_change_set(&current, &cs, confirm_destructive);
+        let mut checks = vec![static_rules_step(&findings)];
         if !findings.is_empty() {
-            return reject(findings);
+            return reject(findings, checks);
         }
         let migration = generate(&current, &cs)?;
         let after = apply(&current, &cs.changes)?;
@@ -328,15 +334,16 @@ impl Project {
             up: migration.up.clone(),
             down: migration.down.clone(),
         };
-        let findings = dry_run(
+        let report = dry_run(
             Some(&self.dir.join("data.sqlite")),
             &self.migrations_dir(),
             &named,
             &current,
             &after,
         )?;
-        if !findings.is_empty() {
-            return reject(findings);
+        checks.extend(report.steps);
+        if !report.findings.is_empty() {
+            return reject(report.findings, checks);
         }
 
         // Write the migration folder under a temp name, then rename it.
@@ -354,8 +361,12 @@ impl Project {
             EventKind::ChangeSetAccepted {
                 proposal_seq: proposal.seq,
                 migration: name.clone(),
+                checks: checks.clone(),
             },
         )?;
-        Ok(Outcome::Accepted { migration: name })
+        Ok(Outcome::Accepted {
+            migration: name,
+            checks,
+        })
     }
 }

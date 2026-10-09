@@ -153,7 +153,8 @@ fn destructive_needs_confirmation_and_rejection_writes_no_files() {
     let tmp = tempfile::tempdir().unwrap();
     let p = run_sequence(&tmp.path().join("p"));
     let before = snapshot(p.dir());
-    let Outcome::Rejected { findings } = p.propose(drop_notes(), Actor::Developer, false).unwrap()
+    let Outcome::Rejected { findings, .. } =
+        p.propose(drop_notes(), Actor::Developer, false).unwrap()
     else {
         panic!("expected rejection");
     };
@@ -166,7 +167,7 @@ fn destructive_needs_confirmation_and_rejection_writes_no_files() {
     ));
     assert!(matches!(
         p.propose(drop_notes(), Actor::Developer, true).unwrap(),
-        Outcome::Accepted { migration } if migration == "0003_drop_notes"
+        Outcome::Accepted { migration, .. } if migration == "0003_drop_notes"
     ));
 }
 
@@ -232,7 +233,7 @@ fn finance_fixtures_01_to_03_then_04_rejected_then_confirmed() {
     );
 
     let before = snapshot(p.dir());
-    let Outcome::Rejected { findings } = p
+    let Outcome::Rejected { findings, .. } = p
         .propose(fixture("04-drop-notes.json"), Actor::Developer, false)
         .unwrap()
     else {
@@ -245,7 +246,7 @@ fn finance_fixtures_01_to_03_then_04_rejected_then_confirmed() {
     );
     assert_eq!(before, snapshot(p.dir()));
 
-    let Outcome::Accepted { migration } = p
+    let Outcome::Accepted { migration, .. } = p
         .propose(fixture("04-drop-notes.json"), Actor::Developer, true)
         .unwrap()
     else {
@@ -326,6 +327,7 @@ mod run_prompt {
                 assumptions: vec!["Money is in one currency.".into()],
                 actor: Actor::SchemaAgent {
                     run_id: "run-1".into(),
+                    model: "test:model".into(),
                 },
             })
         }
@@ -408,4 +410,82 @@ mod run_prompt {
             1
         );
     }
+}
+
+const ALL_STEPS: [&str; 10] = [
+    "static_rules",
+    "earlier_migrations_applied",
+    "db_matches_spec_before",
+    "up",
+    "db_matches_spec_after",
+    "foreign_key_check",
+    "down",
+    "db_matches_spec_after_down",
+    "up_again",
+    "db_matches_spec_after_up_again",
+];
+
+#[test]
+fn accepted_proposal_records_all_check_steps_in_order() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = Project::init(tmp.path().join("p"), "t").unwrap();
+    let Outcome::Accepted { checks, .. } = p.propose(initial(), Actor::Developer, false).unwrap()
+    else {
+        panic!("expected acceptance");
+    };
+    let names: Vec<_> = checks.iter().map(|c| c.check.as_str()).collect();
+    assert_eq!(names, ALL_STEPS);
+    assert!(checks.iter().all(|c| c.passed && !c.detail.is_empty()));
+    // The same steps are in the event log.
+    let events = p.events().unwrap();
+    let EventKind::ChangeSetAccepted { checks: logged, .. } = &events.last().unwrap().kind else {
+        panic!("last event must be the acceptance");
+    };
+    assert_eq!(logged, &checks);
+}
+
+#[test]
+fn broken_migration_rejection_records_the_failing_step() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = run_sequence(&tmp.path().join("p"));
+    // Tamper with an applied migration so the database no longer matches the spec.
+    let up = p.dir().join("migrations/0001_initial/up.sql");
+    let text = fs::read_to_string(&up).unwrap();
+    assert!(text.contains("amount"));
+    fs::write(&up, text.replace("amount", "total")).unwrap();
+
+    let out = p
+        .propose(
+            cs(
+                "add_tag",
+                vec![SchemaChange::AddColumn {
+                    table: "expenses".into(),
+                    column: col("tag", ColumnType::Text),
+                }],
+            ),
+            Actor::Developer,
+            false,
+        )
+        .unwrap();
+    let Outcome::Rejected { findings, checks } = out else {
+        panic!("expected rejection");
+    };
+    assert_eq!(findings[0].code, "db_does_not_match_spec");
+    let names: Vec<_> = checks
+        .iter()
+        .map(|c| (c.check.as_str(), c.passed))
+        .collect();
+    assert_eq!(
+        names,
+        [
+            ("static_rules", true),
+            ("earlier_migrations_applied", true),
+            ("db_matches_spec_before", false),
+        ]
+    );
+    let events = p.events().unwrap();
+    let EventKind::ChangeSetRejected { checks: logged, .. } = &events.last().unwrap().kind else {
+        panic!("last event must be the rejection");
+    };
+    assert_eq!(logged, &checks);
 }

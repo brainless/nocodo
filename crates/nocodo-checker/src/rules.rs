@@ -5,11 +5,10 @@ use std::collections::BTreeSet;
 use nocodo_sqlgen::{ApplyError, apply_one};
 use nocodo_types::change::{ChangeSet, SchemaChange};
 use nocodo_types::event::Finding;
-use nocodo_types::schema::{Column, ColumnType, SchemaSpec};
+use nocodo_types::naming::{expected_reference_name, is_reference_name};
+use nocodo_types::schema::{Column, ColumnType, SchemaSpec, is_implicit_column};
 
 use crate::keywords::is_keyword;
-
-const RESERVED_COLUMNS: [&str; 3] = ["id", "created_at", "updated_at"];
 
 fn finding(code: &str, message: String) -> Finding {
     Finding {
@@ -46,7 +45,7 @@ fn check_name(out: &mut Vec<Finding>, kind: &str, name: &str) {
 
 fn check_column(out: &mut Vec<Finding>, table: &str, c: &Column) {
     check_name(out, "column", &c.name);
-    if RESERVED_COLUMNS.contains(&c.name.as_str()) {
+    if is_implicit_column(&c.name) {
         out.push(finding(
             "reserved_column",
             format!(
@@ -67,7 +66,28 @@ fn check_column(out: &mut Vec<Finding>, table: &str, c: &Column) {
 }
 
 fn check_reference(out: &mut Vec<Finding>, spec: &SchemaSpec, table: &str, c: &Column) {
-    let Some(target) = &c.references else { return };
+    let Some(target) = &c.references else {
+        if c.column_type == ColumnType::Integer && c.name.ends_with("_id") {
+            out.push(finding(
+                "unlinked_id",
+                format!(
+                    "Column `{}` in `{table}` is an integer ending in `_id` but has no `references`. Link each list it can point at with its own reference column (or a linking table). If the value is an outside code rather than a link, rename it (for example `_number`) and use type `text`.",
+                    c.name
+                ),
+            ));
+        }
+        return;
+    };
+    if !is_reference_name(&c.name, target) {
+        out.push(finding(
+            "reference_name",
+            format!(
+                "Column `{}` in `{table}` references `{target}`, so it must be named `{exp}` or end with `_{exp}` (for example `paid_by_{exp}`).",
+                c.name,
+                exp = expected_reference_name(target)
+            ),
+        ));
+    }
     // A table may reference itself, including while it is being created.
     if target != table && !spec.tables.iter().any(|t| &t.name == target) {
         out.push(finding(
@@ -232,7 +252,7 @@ fn check_one(
         SchemaChange::RenameTable { to, .. } => check_name(out, "table", to),
         SchemaChange::RenameColumn { table, to, .. } => {
             check_name(out, "column", to);
-            if RESERVED_COLUMNS.contains(&to.as_str()) {
+            if is_implicit_column(to) {
                 out.push(finding(
                     "reserved_column",
                     format!(
@@ -244,5 +264,72 @@ fn check_one(
         SchemaChange::AddIndex { .. }
         | SchemaChange::DropColumn { .. }
         | SchemaChange::DropTable { .. } => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn col(name: &str, ty: ColumnType, references: Option<&str>) -> Column {
+        Column {
+            name: name.into(),
+            description: "d".into(),
+            column_type: ty,
+            nullable: false,
+            unique: false,
+            references: references.map(Into::into),
+        }
+    }
+
+    fn codes(cols: Vec<Column>) -> Vec<Finding> {
+        let spec = SchemaSpec {
+            spec_version: 1,
+            tables: vec![],
+        };
+        let mut out = Vec::new();
+        for c in &cols {
+            check_reference(&mut out, &spec, "expenses", c);
+        }
+        out.retain(|f| f.code != "bad_reference");
+        out
+    }
+
+    #[test]
+    fn reference_name_rule() {
+        for ok in [
+            col("person_id", ColumnType::Integer, Some("people")),
+            col("paid_by_person_id", ColumnType::Integer, Some("people")),
+            col(
+                "expense_category_id",
+                ColumnType::Integer,
+                Some("expense_categories"),
+            ),
+        ] {
+            assert!(codes(vec![ok]).is_empty());
+        }
+        let f = codes(vec![col("payer_id", ColumnType::Integer, Some("people"))]);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].code, "reference_name");
+        assert!(f[0].message.contains("person_id"));
+        let f = codes(vec![col(
+            "category_id",
+            ColumnType::Integer,
+            Some("expense_categories"),
+        )]);
+        assert_eq!(f[0].code, "reference_name");
+        assert!(f[0].message.contains("expense_category_id"));
+    }
+
+    #[test]
+    fn unlinked_id_rule() {
+        let f = codes(vec![
+            col("item_type", ColumnType::Text, None),
+            col("item_id", ColumnType::Integer, None),
+        ]);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].code, "unlinked_id");
+        assert!(codes(vec![col("person_id", ColumnType::Integer, Some("people"))]).is_empty());
+        assert!(codes(vec![col("external_id", ColumnType::Text, None)]).is_empty());
     }
 }

@@ -1,4 +1,4 @@
-use nocodo_agent_schema::{Feedback, PREAMBLE, build_input};
+use nocodo_agent_schema::{Feedback, build_input, preamble};
 use nocodo_types::{
     change::{ChangeSet, SchemaChange},
     event::Finding,
@@ -43,5 +43,29 @@ fn input_with_feedback_includes_previous_and_findings_verbatim() {
 
 #[test]
 fn preamble_is_loaded() {
-    assert!(PREAMBLE.contains("Schema agent"));
+    assert!(preamble().contains("Schema agent"));
+}
+
+#[test]
+fn preamble_has_modeling_rules() {
+    let preamble = preamble();
+    for rule in [
+        "Store facts, not computed results.",
+        "Model only what was asked.",
+        "New entries are data, not schema.",
+        "Every link is a real reference.",
+        "Do not describe how things are stored",
+    ] {
+        assert!(preamble.contains(rule), "missing: {rule}");
+    }
+}
+
+#[test]
+fn preamble_has_no_unfilled_placeholder() {
+    assert!(!preamble().contains("{{"));
+}
+
+#[test]
+fn preamble_snapshot() {
+    insta::assert_snapshot!(preamble());
 }

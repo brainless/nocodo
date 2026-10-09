@@ -11,5 +11,5 @@ mod introspect;
 mod keywords;
 mod rules;
 
-pub use dry_run::{CheckerError, NamedMigration, dry_run};
+pub use dry_run::{CheckerError, DryRunReport, NamedMigration, dry_run, static_rules_step};
 pub use rules::check_change_set;

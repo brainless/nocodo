@@ -20,7 +20,7 @@ use nocodo_agent::AgentContext;
 use nocodo_agent_schema::SchemaAgent;
 use nocodo_orchestrator::{Outcome, Project, Proposal, Proposer, ProposerError};
 use nocodo_types::change::ChangeSet;
-use nocodo_types::event::Actor;
+use nocodo_types::event::{Actor, CheckStep};
 use nocodo_types::project::ProjectBase;
 use nocodo_types::schema::SchemaSpec;
 
@@ -51,7 +51,10 @@ impl Proposer for SchemaProposer {
         Ok(Proposal {
             change_set: proposal.change_set,
             assumptions: proposal.assumptions,
-            actor: Actor::SchemaAgent { run_id },
+            actor: Actor::SchemaAgent {
+                run_id,
+                model: format!("{}:{}", self.ctx.model.provider, self.ctx.model.model),
+            },
         })
     }
 }
@@ -147,15 +150,17 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 .with_context(|| format!("parsing {}", file.display()))?;
             let project = Project::open(&dir)?;
             match project.propose(cs, Actor::Developer, confirm_destructive)? {
-                Outcome::Accepted { migration } => {
+                Outcome::Accepted { migration, checks } => {
                     println!("Accepted \u{2192} migrations/{migration}");
+                    println!("{}", checks_line(&checks));
                     Ok(ExitCode::SUCCESS)
                 }
-                Outcome::Rejected { findings } => {
+                Outcome::Rejected { findings, checks } => {
                     println!("Rejected:");
                     for f in findings {
                         println!("  [{}] {}", f.code, f.message);
                     }
+                    println!("{}", checks_line(&checks));
                     Ok(ExitCode::FAILURE)
                 }
             }
@@ -186,22 +191,40 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 MAX_ATTEMPTS,
             ))?;
             match result.outcome {
-                Outcome::Accepted { migration } => {
+                Outcome::Accepted { migration, checks } => {
                     println!("{}", result.change_set.summary);
                     print_assumptions(&result.assumptions);
                     println!("Migration: migrations/{migration}");
+                    println!("{}", checks_line(&checks));
                     Ok(ExitCode::SUCCESS)
                 }
-                Outcome::Rejected { findings } => {
+                Outcome::Rejected { findings, checks } => {
                     println!("Rejected after {} attempt(s):", result.attempts);
                     for f in findings {
                         println!("  [{}] {}", f.code, f.message);
                     }
+                    println!("{}", checks_line(&checks));
                     print_assumptions(&result.assumptions);
                     Ok(ExitCode::FAILURE)
                 }
             }
         }
+    }
+}
+
+/// One line summing up the checks that ran.
+fn checks_line(checks: &[CheckStep]) -> String {
+    if let Some(failed) = checks.iter().find(|c| !c.passed) {
+        let passed = checks.iter().filter(|c| c.passed).count();
+        return format!(
+            "Checks: {passed} passed, then \"{}\" failed (see events.jsonl).",
+            failed.check
+        );
+    }
+    if checks.iter().any(|c| c.check == "up_again") {
+        "Checked on SQLite: up, down, up again; database matched the spec each time.".to_string()
+    } else {
+        format!("Checks passed: {}.", checks.len())
     }
 }
 

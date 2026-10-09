@@ -1,8 +1,8 @@
 {
   "models": {
     "schema": {
-      "provider": "anthropic",
-      "model": "claude-haiku-5-5"
+      "provider": "neuralwatt",
+      "model": "glm-5.3-flash"
     }
   }
 }

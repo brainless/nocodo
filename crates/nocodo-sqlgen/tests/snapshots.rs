@@ -337,3 +337,20 @@ fn apply_follows_renames_and_drops() {
     assert_eq!(t.columns[0].references.as_deref(), Some("banks"));
     assert!(t.indexes.is_empty(), "index on dropped column is removed");
 }
+
+#[test]
+fn decimal_column() {
+    let mut nullable = col("weight_kg", ColumnType::Decimal);
+    nullable.nullable = true;
+    insta::assert_snapshot!(snap(vec![
+        SchemaChange::CreateTable {
+            table: "measurements".into(),
+            description: "Measurements.".into(),
+            columns: vec![col("score", ColumnType::Decimal)],
+        },
+        SchemaChange::AddColumn {
+            table: "people".into(),
+            column: nullable,
+        },
+    ]));
+}

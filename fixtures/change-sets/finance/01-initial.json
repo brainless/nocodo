@@ -93,7 +93,7 @@
           "references": null
         },
         {
-          "name": "transfer_to_id",
+          "name": "transfer_to_account",
           "description": "For a move between accounts, the account that received the money.",
           "column_type": "integer",
           "nullable": true,

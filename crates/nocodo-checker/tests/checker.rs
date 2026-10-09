@@ -113,8 +113,10 @@ fn invalid_name_variants() {
 
 #[test]
 fn reserved_column() {
-    for name in ["id", "created_at", "updated_at"] {
-        let c = cs("x", vec![create("t", vec![col(name, ColumnType::Text)])]);
+    // Driven by the shared list in nocodo-types, not a local copy.
+    assert_eq!(nocodo_types::schema::IMPLICIT_COLUMNS.len(), 3);
+    for ic in nocodo_types::schema::IMPLICIT_COLUMNS {
+        let c = cs("x", vec![create("t", vec![col(ic.name, ColumnType::Text)])]);
         assert_code(&empty(), &c, "reserved_column");
     }
 }
@@ -317,7 +319,7 @@ fn dry_run_passes_for_generated_sequence() {
     for (i, c) in sets.iter().enumerate() {
         let after = apply(&spec, &c.changes).unwrap();
         let m = named(i + 1, c, &spec);
-        let findings = dry_run(None, &dir, &m, &spec, &after).unwrap();
+        let findings = dry_run(None, &dir, &m, &spec, &after).unwrap().findings;
         assert!(findings.is_empty(), "{}: {findings:?}", c.name);
         write_migration(&dir, &m);
         spec = after;
@@ -339,6 +341,7 @@ fn setup_one() -> (tempfile::TempDir, SchemaSpec, SchemaSpec, NamedMigration) {
 fn run(tmp: &tempfile::TempDir, m: &NamedMigration, b: &SchemaSpec, a: &SchemaSpec) -> Vec<String> {
     dry_run(None, &tmp.path().join("migrations"), m, b, a)
         .unwrap()
+        .findings
         .into_iter()
         .map(|f| f.code)
         .collect()
@@ -394,4 +397,69 @@ fn dry_run_foreign_key_violation() {
     m2.down = nocodo_sqlgen::generate(&after, &c).unwrap().down;
     write_migration(&tmp.path().join("migrations"), &m);
     assert_eq!(run(&tmp, &m2, &after, &after2), ["foreign_key_violation"]);
+}
+
+#[test]
+fn dry_run_decimal_column_passes() {
+    let tmp = tempfile::tempdir().unwrap();
+    fs::create_dir_all(tmp.path().join("migrations")).unwrap();
+    let c = cs(
+        "add_scores",
+        vec![create(
+            "scores",
+            vec![
+                col("value", ColumnType::Decimal),
+                col("amount", ColumnType::Money),
+            ],
+        )],
+    );
+    let after = apply(&empty(), &c.changes).unwrap();
+    let m = named(1, &c, &empty());
+    assert!(m.up.contains("REAL"));
+    assert!(run(&tmp, &m, &empty(), &after).is_empty());
+}
+
+fn step_names(steps: &[nocodo_types::event::CheckStep]) -> Vec<(&str, bool)> {
+    steps.iter().map(|s| (s.check.as_str(), s.passed)).collect()
+}
+
+#[test]
+fn dry_run_reports_all_steps_in_order_when_passing() {
+    let (tmp, before, after, m) = setup_one();
+    let r = dry_run(None, &tmp.path().join("migrations"), &m, &before, &after).unwrap();
+    assert!(r.findings.is_empty());
+    assert_eq!(
+        step_names(&r.steps),
+        [
+            ("earlier_migrations_applied", true),
+            ("db_matches_spec_before", true),
+            ("up", true),
+            ("db_matches_spec_after", true),
+            ("foreign_key_check", true),
+            ("down", true),
+            ("db_matches_spec_after_down", true),
+            ("up_again", true),
+            ("db_matches_spec_after_up_again", true),
+        ]
+    );
+    assert_eq!(
+        r.steps[0].detail,
+        "Ran 0 earlier migrations on an empty database (no data.sqlite yet)."
+    );
+}
+
+#[test]
+fn dry_run_failure_ends_with_the_failing_step() {
+    let (tmp, before, after, mut m) = setup_one();
+    m.up = "THIS IS NOT SQL;".into();
+    let r = dry_run(None, &tmp.path().join("migrations"), &m, &before, &after).unwrap();
+    assert_eq!(
+        step_names(&r.steps),
+        [
+            ("earlier_migrations_applied", true),
+            ("db_matches_spec_before", true),
+            ("up", false),
+        ]
+    );
+    assert!(r.steps[2].detail.contains("SQLite error"));
 }

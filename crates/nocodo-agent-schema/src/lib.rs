@@ -5,15 +5,47 @@
 //! Must not write SQL, touch `data.sqlite`, or write any other spec.
 
 use nocodo_agent::{AgentContext, Result, run_extractor_with_id};
-use nocodo_types::{change::ChangeSet, event::Finding, schema::SchemaSpec};
+use nocodo_types::{
+    change::ChangeSet,
+    event::Finding,
+    schema::{IMPLICIT_COLUMNS, SchemaSpec},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The role name used in `.agent-logs`.
 pub const ROLE: &str = "schema";
 
-/// The Schema agent's system prompt, kept in a file for easy review.
-pub const PREAMBLE: &str = include_str!("preamble.md");
+/// The preamble template, kept in a file for easy review. It contains the
+/// placeholder `{{implicit_columns}}`, filled by [`preamble`].
+const PREAMBLE_TEMPLATE: &str = include_str!("preamble.md");
+
+const IMPLICIT_COLUMNS_PLACEHOLDER: &str = "{{implicit_columns}}";
+
+/// The section about the columns every table gets, rendered from
+/// `IMPLICIT_COLUMNS` in `nocodo-types`.
+fn implicit_columns_section() -> String {
+    let mut out = String::from(
+        "## Columns every table gets\n\nEvery table automatically has these columns. Never list them yourself, in `create_table` or anywhere else:\n\n",
+    );
+    for c in IMPLICIT_COLUMNS {
+        let ty = serde_json::to_value(c.column_type)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_default();
+        out.push_str(&format!("- `{}` (`{ty}`): {}\n", c.name, c.description));
+    }
+    out.push_str(
+        "\nA column named `<x>_id` that sets `references` to table `<x>` points at that table's `id`. `created_at` already records when an entry was added, so add a date column only for a real-world date (such as `paid_on`).",
+    );
+    out
+}
+
+/// The Schema agent's system prompt, with the generated sections filled in.
+/// Deterministic: the same build always gives the same text.
+pub fn preamble() -> String {
+    PREAMBLE_TEMPLATE.replace(IMPLICIT_COLUMNS_PLACEHOLDER, &implicit_columns_section())
+}
 
 /// What the agent returns: the change set and every guess it made.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -75,6 +107,6 @@ impl SchemaAgent {
         feedback: Option<&Feedback>,
     ) -> Result<(SchemaProposal, String)> {
         let input = build_input(current, prompt, feedback);
-        run_extractor_with_id::<SchemaProposal>(ctx, PREAMBLE, &input).await
+        run_extractor_with_id::<SchemaProposal>(ctx, &preamble(), &input).await
     }
 }

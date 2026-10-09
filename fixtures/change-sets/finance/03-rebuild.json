@@ -11,7 +11,7 @@
     {
       "op": "add_foreign_key",
       "table": "transactions",
-      "column": "transfer_to_id",
+      "column": "transfer_to_account",
       "references": "accounts"
     }
   ]

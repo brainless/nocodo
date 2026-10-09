@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Text};
 use nocodo_sqlgen::{column_sql_type, table_indexes};
-use nocodo_types::schema::SchemaSpec;
+use nocodo_types::schema::{IMPLICIT_COLUMNS, SchemaSpec};
 
 /// Normalized shape of one table. Everything is sorted so shapes compare by value.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -112,7 +112,14 @@ pub(crate) fn expected_shape(spec: &SchemaSpec) -> Shape {
     let mut shape = Shape::new();
     for t in &spec.tables {
         let mut s = TableShape::default();
-        s.columns.push(("id".into(), "INTEGER".into(), false, true));
+        for ic in IMPLICIT_COLUMNS.iter().filter(|c| c.primary_key) {
+            s.columns.push((
+                ic.name.into(),
+                column_sql_type(ic.column_type).into(),
+                false,
+                true,
+            ));
+        }
         for c in &t.columns {
             s.columns.push((
                 c.name.clone(),
@@ -125,8 +132,13 @@ pub(crate) fn expected_shape(spec: &SchemaSpec) -> Shape {
                     .push((c.name.clone(), r.clone(), "id".into()));
             }
         }
-        for ts in ["created_at", "updated_at"] {
-            s.columns.push((ts.into(), "TEXT".into(), true, false));
+        for ic in IMPLICIT_COLUMNS.iter().filter(|c| !c.primary_key) {
+            s.columns.push((
+                ic.name.into(),
+                column_sql_type(ic.column_type).into(),
+                true,
+                false,
+            ));
         }
         for i in table_indexes(t) {
             s.indexes.push((i.name, i.columns, i.unique));

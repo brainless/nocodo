@@ -55,6 +55,47 @@ pub enum ColumnType {
     DateTime,
     /// Integer minor units.
     Money,
+    /// Fractional number that is not money (scores, weights, percentages).
+    Decimal,
+}
+
+/// A column every table has automatically. Never listed in a `Table`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImplicitColumn {
+    pub name: &'static str,
+    pub column_type: ColumnType,
+    /// True for the table's primary key (`id`).
+    pub primary_key: bool,
+    /// Plain language: what the column holds.
+    pub description: &'static str,
+}
+
+/// The single definition of the implicit columns, in table order. sqlgen,
+/// the checker and the Schema agent's preamble all read this list.
+pub const IMPLICIT_COLUMNS: [ImplicitColumn; 3] = [
+    ImplicitColumn {
+        name: "id",
+        column_type: ColumnType::Integer,
+        primary_key: true,
+        description: "Identifies the entry. Other tables point at an entry by this number.",
+    },
+    ImplicitColumn {
+        name: "created_at",
+        column_type: ColumnType::DateTime,
+        primary_key: false,
+        description: "When the entry was added.",
+    },
+    ImplicitColumn {
+        name: "updated_at",
+        column_type: ColumnType::DateTime,
+        primary_key: false,
+        description: "When the entry was last changed.",
+    },
+];
+
+/// True when `name` is one of the implicit columns.
+pub fn is_implicit_column(name: &str) -> bool {
+    IMPLICIT_COLUMNS.iter().any(|c| c.name == name)
 }
 
 /// The index name is derived by sqlgen.

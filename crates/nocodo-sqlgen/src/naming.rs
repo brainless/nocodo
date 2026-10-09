@@ -7,6 +7,7 @@ pub fn column_sql_type(t: ColumnType) -> &'static str {
     match t {
         ColumnType::Text | ColumnType::Date | ColumnType::DateTime => "TEXT",
         ColumnType::Integer | ColumnType::Money | ColumnType::Boolean => "INTEGER",
+        ColumnType::Decimal => "REAL",
     }
 }
 

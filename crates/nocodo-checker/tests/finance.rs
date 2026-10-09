@@ -44,7 +44,7 @@ fn dry_run_passes_for_finance_fixtures() {
             up: m.up,
             down: m.down,
         };
-        let findings = dry_run(None, &dir, &named, &spec, &after).unwrap();
+        let findings = dry_run(None, &dir, &named, &spec, &after).unwrap().findings;
         assert!(findings.is_empty(), "{f}: dry run {findings:?}");
         let d = dir.join(&named.name);
         fs::create_dir_all(&d).unwrap();

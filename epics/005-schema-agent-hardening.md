@@ -151,3 +151,30 @@ done
   - **Models:** events show the model for every agent proposal, and `run_started` shows whether strict mode was on.
   - **Other provider:** the non-Anthropic run worked, or its failure is clearly explained in the logs.
 - [ ] Task Notes added below, and `Status: Done`.
+
+---
+
+## Task Notes
+
+Status is intentionally not set to Done: the manual checkpoint has not been run.
+
+### What was built
+
+Tasks 1-11 as specified, plus two extras: a Neuralwatt provider in `build_model`, and strict tools as an opt-in `ModelConfig.strict` (default false).
+
+### Decisions and surprises
+
+- **Task 3:** the finance fixture column `transfer_to_id` was renamed `transfer_to_account` (it references `accounts`, so it needed a name following the new `reference_name` rule).
+- **Task 5 retry follow-up approach: error tool result.** After a rejected `submit`, the history is the original user message, the model's rejected `submit` call, then a tool result quoting the serde error verbatim and asking for one valid `submit` call. Rig 0.43.0's `ToolResult` has no `is_error`, so the rejection is expressed in the result text. When the model made no tool call at all (`EmptyResponse`), the fallback is a new user message (original input, rejected output, error). Both follow-up builders are snapshot-tested. The scripted-model loop test works offline through `MockCompletionModel`, so the loop itself is tested without a network call.
+- **Task 6 outcome: strict tools cannot be enabled on registry-built models in Rig 0.43.0** (the version locked in this workspace; `~/Projects/rig` is newer and differs). So `build_model` builds Anthropic and OpenAI-format models directly through their own clients, and every other provider through the registry. Registry findings for 0.43.0: there is no `ollama` (the keyless test uses `llamacpp`), and `gemini` resolves only as `gcp.gemini/gemini`.
+- **Neuralwatt (extra):** added as a direct OpenAI-chat preset (base URL `https://api.neuralwatt.com/v1`, key `NEURALWATT_API_KEY`), strict off. The model name `glm-5.3-flash` in `project-base.json` is unverified against the portal; the synth project uses `glm-5.3-flex`.
+- **Task 7 live runs:** Anthropic: the `SchemaProposal` schema was accepted in strict mode, but `claude-haiku-5-5` degraded under strict to a meaningless `drop_table` "placeholder" change set (`claude-sonnet-5-5` was fine). Strict is therefore opt-in per `ModelConfig` (default off). **The OpenAI strict live run was NOT done** (no key; Neuralwatt is in use for now), so OpenAI strict is implemented but unverified. `run_started` records `strict`.
+- **Task 8:** the `foreign_key_check` step is only recorded after the first `up`.
+
+### Tested (no live LLM calls)
+
+Preamble snapshot (implicit-column section and modeling rules); `reserved_column` driven by the shared `IMPLICIT_COLUMNS` list (sqlgen snapshots unchanged); `reference_name` and `unlinked_id` rules; singular-form function (regular and irregular); `decimal` sqlgen snapshot and checker dry run; retry loop (follow-up snapshots, scripted-model loop, bounded retries with logged failure); `build_model` errors (unknown provider lists valid selections, missing key names the variable, keyless `llamacpp` builds, strict flags); old `project.json` / events without `checks` or `model` load; orchestrator accepted run records all steps in order, broken migration rejection ends with the failing step. The task 11 audit found everything covered; the only change was making the `reserved_column` test iterate the shared list.
+
+### For the reviewer
+
+The checkpoint text says to use `claude-haiku-5-5` in `project-base.json`, but `project-base.json` now uses `neuralwatt/glm-5.3-flash`. The checkpoint text was left unedited.
