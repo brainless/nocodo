@@ -10,7 +10,7 @@
 ## Context
 
 - This epic builds the determinism core (`PRD.md` §6 "Determinism"). Epic 004 plugs the Schema agent into the same pipeline, so the checker has to be trustworthy before any LLM output reaches it.
-- Migrations are written but **not applied** to `data.sqlite`; applying is epic 005. The checker still runs every pending migration on a throwaway DB, so each new migration is tested on top of all earlier ones.
+- Migrations are written but **not applied** to `data.sqlite`; applying is epic 006. The checker still runs every pending migration on a throwaway DB, so each new migration is tested on top of all earlier ones.
 - Dependency direction (see `AGENTS.md`): `orchestrator → types, sqlgen, checker`. `api` only parses arguments and calls the orchestrator.
 
 ## Tasks
@@ -134,7 +134,7 @@ Messages say what's wrong and what to do instead. Epic 004 feeds them back to th
 
 ## Out of scope
 
-- Applying migrations to `data.sqlite`, backups, `inspect` (epic 005).
+- Applying migrations to `data.sqlite`, backups, `inspect` (epic 006).
 - Any LLM or agent code (epic 004).
 - Spec diffing, i.e. generating SQL from two arbitrary specs.
 - An HTTP server.

@@ -105,8 +105,8 @@ No live LLM calls in `cargo test`.
 
 - Questions to the user, and a PM agent.
 - Reading `inputs/` sample files.
-- Applying migrations, `data.sqlite` (epic 005).
-- `rig-cassette` replay (epic 007).
+- Applying migrations, `data.sqlite` (epic 006).
+- `rig-cassette` replay (epic 008).
 - Providers other than Anthropic.
 
 ## Checkpoint
@@ -132,5 +132,5 @@ The tester may also try their own prompts in extra projects.
   - **Churn:** how much `finance` and `finance-2` differ.
   - **Debuggability:** can each table be traced to a prompt through `events.jsonl` and `.agent-logs`?
   - Token usage and latency per run.
-- [ ] Go/no-go recorded: proceed to epic 005, or change the types, preamble or model first.
+- [ ] Go/no-go recorded: proceed to epic 005 (hardening), or change the types, preamble or model first.
 - [ ] Task Notes added below, and `Status: Done`.
