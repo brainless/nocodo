@@ -1,6 +1,6 @@
 # Epic 004: Schema Agent
 
-**Status:** Not started
+**Status:** Done
 **Goal:** The first real test of the hypothesis. A prompt goes in, the Schema agent (the only LLM agent) emits a typed `ChangeSet`, and the epic 003 pipeline checks it and writes the migration. Checker findings go back to the agent for a bounded number of repair attempts. Every LLM call is logged so the reviewer can see why each table exists.
 
 **Prerequisite:** Epic 003.
@@ -134,3 +134,11 @@ The tester may also try their own prompts in extra projects.
   - Token usage and latency per run.
 - [ ] Go/no-go recorded: proceed to epic 005 (hardening), or change the types, preamble or model first.
 - [ ] Task Notes added below, and `Status: Done`.
+
+## Task Notes
+
+- **Built:** Tasks 1–7 as specified: `schemars` on the change types, per-role model config, `nocodo-agent` (Rig extractor, `AgentLog` JSONL, `run_extractor`), `nocodo-agent-schema` with `preamble.md`, `Project::run_prompt` with the repair loop behind the `Proposer` trait, `nocodo-api prompt`, and the prompt fixtures.
+- **Checkpoint:** run with `claude-haiku-5-5` on the tester's own prompts instead of the fixtures: travel (twice, for churn), small farm finance and cofounder matching, the last two with a follow-up each. The `finance`, `inventory` and `invoices` fixtures were not run; epic 005's checkpoint covers them. Full review: `epics-notes/004-schema-agent.md`.
+- **Results:** every run was accepted at attempt 1, and both follow-ups were purely additive. Runs trace cleanly from `events.jsonl` to `.agent-logs`.
+- **Surprising:** 3 of 6 runs had a hidden retry inside Rig (`submit` arguments sent as strings), invisible in `events.jsonl`. Schema weaknesses: stored computed results (travel `settlements`), polymorphic references (cofounder `item_similarities`), a schema change for a data-only request (farm `is_business_account`), and no type for fractional numbers.
+- **Go/no-go:** go to epic 005, extended with the findings above.
