@@ -61,7 +61,7 @@ Base file: `claude-haiku-5-5` (Anthropic) unless noted. Non-strict (`strict: fal
 ## Open items
 
 - Resolved: the string-repair step was added to this epic (see follow-up below). Before it, expect roughly one in three Haiku runs on large prompts to fail.
-- Resolved: the checkpoint text in `epics/005` now matches `project-base.json` (`neuralwatt/glm-5.3-flash`); `claude-haiku-5-5` is a comparison run.
+- Resolved: the checkpoint text in `epics/005` is kept as it was run (`claude-haiku-5-5` as the base). `project-base.json` now defaults to `neuralwatt/glm-5.3-flash`, which works since the string-argument repair.
 - Tighten Task 1's assumptions rule or add a checker advice for storage-detail wording (percentages, "short code", "free text"), and for a text column next to a list of the same thing.
 - Run OpenAI strict mode live once a key exists.
 - `.projects/strict-live` and `.projects/strict-live2` are scratch runs and can be deleted. The `cp-*` projects are kept for inspection.
