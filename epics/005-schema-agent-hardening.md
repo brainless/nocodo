@@ -67,7 +67,7 @@ Update `src/preamble.md`:
 - On `StructuredOutputError::Deserialization` or `EmptyResponse`:
   - append an `invalid_output` line with the call number, the raw output and the serde error;
   - call again, continuing the conversation instead of starting over. Pass the original user message and the model's rejected `submit` call as history (`AgentRunner::history`), followed by an error tool result that quotes the serde error verbatim and asks for one valid `submit` call. If Rig's typed run can't send an error tool result, send a new user message instead: the original input, the rejected arguments and the error, verbatim. Record which approach was used in Task Notes.
-- `run_finished` records `calls` (model calls made) and `invalid_outputs` (how many were rejected).
+- `run_finished` records `calls` (model calls made), `invalid_outputs` (how many were rejected) and `repaired_outputs` (how many outputs needed string-argument repair; see Task Notes).
 - These retries stay inside one agent run. They don't count against the orchestrator's `max_attempts`, which is for checker findings.
 
 ### Task 6: Any provider through Rig's registry (`nocodo-types`, `nocodo-agent`)
@@ -129,7 +129,7 @@ No live LLM calls in `cargo test`.
 
 ## Checkpoint
 
-Manual session. The tester sets keys in `.env` and, with `neuralwatt/glm-5.3-flash` (the current `project-base.json`) as the base model, runs the fixture scenarios (`finance`, `inventory`, `invoices`, each initial plus follow-up) in fresh projects under `.projects/`. They rerun the small farm and cofounder prompts from epic 004 (initial plus follow-up, text in their `events.jsonl`) in fresh projects, repeat `finance` with `claude-haiku-5-5` and one other provider of their choice (`init --base <file>`), and run the travel prompt twice in fresh projects to compare churn:
+Manual session. The tester sets keys in `.env` and, with `claude-haiku-5-5` in `project-base.json`, runs the fixture scenarios (`finance`, `inventory`, `invoices`, each initial plus follow-up) in fresh projects under `.projects/`. They rerun the small farm and cofounder prompts from epic 004 (initial plus follow-up, text in their `events.jsonl`) in fresh projects, repeat `finance` with one non-Anthropic provider of their choice (`init --base <file>`), and run the travel prompt twice in fresh projects to compare churn:
 
 ```bash
 for p in travel-2 travel-3; do
@@ -180,7 +180,7 @@ Preamble snapshot (implicit-column section and modeling rules); `reserved_column
 - **String-argument repair (`nocodo-agent/src/extract.rs`).** Models (GLM, sometimes Haiku) send `change_set` or `assumptions` as a string holding JSON, and retrying with feedback did not fix it. `extract_with_model` now repairs this deterministically before deserializing: `unstringify` parses string values where an object or list is expected, `repair_output` applies it to the `submit` arguments, and a `repaired_output` log line records that a repair happened. Unit tests are built from the failed `cp-finance-nw` logs (fixtures in `crates/nocodo-agent/src/extract/fixtures/`).
 - **Repaired-value errors.** When repair unwraps strings but the value still fails (for example a missing `assumptions` field), the retry message and the `invalid_output` log carry the error of the repaired value (`missing field assumptions`), and the original error is kept in `original_error`. Covered by a unit test only; not yet seen live.
 - **Preamble tightened** (`crates/nocodo-agent-schema/src/preamble.md`, snapshot updated): no storage wording in assumptions, and no free-text column next to a list of the same thing.
-- **Model mismatch resolved:** the checkpoint text matches `project-base.json` (`neuralwatt/glm-5.3-flash`); `claude-haiku-5-5` is a comparison run.
+- **Base model:** the checkpoint ran with `claude-haiku-5-5` as the base, as the checkpoint text says. `project-base.json` now defaults to `neuralwatt/glm-5.3-flash`, which works since the string-argument repair.
 - **Farm prompts added** as `fixtures/prompts/farm/01-initial.md` and `02-follow-up.md`, taken from `.projects/cp-farm/events.jsonl`.
 
 ### Live reruns after the fixes

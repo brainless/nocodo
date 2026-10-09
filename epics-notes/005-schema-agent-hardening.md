@@ -1,6 +1,6 @@
 # Epic 005 notes
 
-Review of the implementation and the checkpoint session, run by Claude on 2026-10-09. `epics/005-schema-agent-hardening.md` is untouched: no `Status: Done` yet. The go/no-go below is a proposal for the tester.
+Review of the implementation and the checkpoint session, run by Claude on 2026-10-09. `epics/005-schema-agent-hardening.md` has since been closed (`Status: Done`, Task Notes added). The go/no-go below is the proposal the tester evaluated at the checkpoint.
 
 Gate: `cargo build`, `test`, `clippy -D warnings` and `fmt --check` all pass.
 
@@ -35,7 +35,7 @@ Base file: `claude-haiku-5-5` (Anthropic) unless noted. Non-strict (`strict: fal
 - **Real references: pass** on `cp-cofounder-c`: no `<x>_type` + `<x>_id` pairs; one `*_similarity_scores` table per list with `score:decimal` and two real references each. `quantity:decimal` and `tax_rate:decimal` also appear in invoices.
 - **Data vs schema: pass.** The farm follow-up adds no schema change for the business account and says so in its summary. The migration name `add_business_account_and_item_quantities` still suggests a change was made.
 - **Checks: pass.** Every `change_set_accepted` event lists 10 steps in the specified order, all passed, with plain-sentence details (for example "Ran 0 earlier migrations on an empty database (no data.sqlite yet)."). The `Checked on SQLite: up, down, up again; ...` line prints after each result.
-- **Models and strict: pass.** `actor.model` is `anthropic:claude-haiku-5-5` on every proposal; `run_started` shows `strict: false`; `run_finished` shows `calls` and `invalid_outputs`.
+- **Models and strict: pass.** `actor.model` is `anthropic:claude-haiku-5-5` on every proposal; `run_started` shows `strict: false`; `run_finished` shows `calls` and `invalid_outputs` (it now also records `repaired_outputs`, added after this review with the string-argument repair).
 - **Churn: low.** `travel-2` and `travel-3` have the same six tables apart from naming (`trip_members` vs `trip_participants`, `expenses` vs `trip_expenses`, `description` vs `notes`, `trip_expense_shares`). Both have budget on `trips` with an optional currency, and neither has trip dates. Much closer than the two epic 004 runs.
 - **Assumptions: mostly good, a few storage details leak.** Invoices: "entered as a percentage, such as 20 for 20%", "a short code such as USD ... rather than in a separate list" and "recorded as free text". Farm initial says "Each account belongs to one person" while `accounts.person_id` is optional.
 - **Redundant columns.** Farm purchases and sales keep `item_description` next to the new `item_kind_id`. Cofounder-c has both `people.location` (text) and a `locations` list.

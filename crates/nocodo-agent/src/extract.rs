@@ -141,8 +141,8 @@ fn to_json<T: Serialize + ?Sized>(value: &T) -> Value {
 /// each rejected output (and for tool calls Rig could not dispatch),
 /// `repaired_output` when arguments sent as strings holding JSON were
 /// repaired and accepted (the usage is then that of the last model call), and
-/// `run_finished` with the typed output or the error, `calls` and
-/// `invalid_outputs`. Contains no role-specific logic.
+/// `run_finished` with the typed output or the error, `calls`,
+/// `invalid_outputs` and `repaired_outputs`. Contains no role-specific logic.
 pub async fn run_extractor<T>(ctx: &AgentContext, preamble: &str, input: &str) -> Result<T>
 where
     T: JsonSchema + DeserializeOwned + Serialize + Send + Sync + 'static,
@@ -213,6 +213,7 @@ where
     let mut prompt = Message::user(input);
     let mut calls: u64 = 0;
     let mut invalid_outputs: u64 = 0;
+    let mut repaired_outputs: u64 = 0;
     let outcome = loop {
         calls += 1;
         let mut run = extractor.extract(prompt.clone());
@@ -235,6 +236,7 @@ where
                                 "error": reason,
                             }),
                         );
+                        repaired_outputs += 1;
                         let usage = last_usage.lock().unwrap_or_else(|e| e.into_inner()).clone();
                         break Ok((output, usage));
                     }
@@ -303,6 +305,7 @@ where
                     "usage": usage,
                     "calls": calls,
                     "invalid_outputs": invalid_outputs,
+                    "repaired_outputs": repaired_outputs,
                     "duration_ms": duration_ms,
                 }),
             );
@@ -316,6 +319,7 @@ where
                     "error": message,
                     "calls": calls,
                     "invalid_outputs": invalid_outputs,
+                    "repaired_outputs": repaired_outputs,
                     "duration_ms": duration_ms,
                 }),
             );

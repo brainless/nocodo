@@ -252,9 +252,10 @@ async fn stringified_arguments_are_repaired_without_another_call() {
     assert_eq!(
         (
             finished["calls"].clone(),
-            finished["invalid_outputs"].clone()
+            finished["invalid_outputs"].clone(),
+            finished["repaired_outputs"].clone()
         ),
-        (json!(1), json!(0))
+        (json!(1), json!(0), json!(1))
     );
     let _ = std::fs::remove_dir_all(&ctx.project_dir);
 }
