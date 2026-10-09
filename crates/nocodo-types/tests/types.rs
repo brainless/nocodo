@@ -1,6 +1,6 @@
 use nocodo_types::change::{ChangeSet, SchemaChange};
 use nocodo_types::event::{Actor, Event, EventKind, Finding};
-use nocodo_types::project::ProjectConfig;
+use nocodo_types::project::{ProjectBase, ProjectConfig};
 use nocodo_types::schema::{Column, ColumnType, Index, SPEC_VERSION, SchemaSpec, Table};
 use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
@@ -310,4 +310,16 @@ fn change_set_json_schema_generates() {
             .unwrap()
             .contains("create_table")
     );
+}
+
+#[test]
+fn project_base_defaults_and_rejects_unknown_fields() {
+    let b: ProjectBase = serde_json::from_str("{}").unwrap();
+    assert_eq!(b, ProjectBase::default());
+    let b: ProjectBase = serde_json::from_str(
+        r#"{"models":{"schema":{"provider":"anthropic","model":"claude-haiku-5-5"}}}"#,
+    )
+    .unwrap();
+    assert_eq!(b.models.schema.model, "claude-haiku-5-5");
+    assert!(serde_json::from_str::<ProjectBase>(r#"{"name":"x"}"#).is_err());
 }

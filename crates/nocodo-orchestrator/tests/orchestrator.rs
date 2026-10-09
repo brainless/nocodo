@@ -4,6 +4,7 @@ use std::path::Path;
 use nocodo_orchestrator::{OrchestratorError, Outcome, Project};
 use nocodo_types::change::{ChangeSet, SchemaChange};
 use nocodo_types::event::{Actor, EventKind};
+use nocodo_types::project::ProjectBase;
 use nocodo_types::schema::{Column, ColumnType};
 
 fn col(name: &str, t: ColumnType) -> Column {
@@ -117,6 +118,18 @@ fn init_creates_layout_and_refuses_non_empty() {
         Project::init(&dir, "demo"),
         Err(OrchestratorError::DirectoryNotEmpty(_))
     ));
+}
+
+#[test]
+fn init_copies_base_settings_into_project_json() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("p");
+    let mut base = ProjectBase::default();
+    base.models.schema.model = "claude-haiku-5-5".into();
+    Project::init_with_base(&dir, "demo", &base).unwrap();
+    let config = Project::open(&dir).unwrap().config().clone();
+    assert_eq!(config.name, "demo");
+    assert_eq!(config.models, base.models);
 }
 
 #[test]

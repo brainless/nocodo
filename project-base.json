@@ -1,0 +1,8 @@
+{
+  "models": {
+    "schema": {
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5"
+    }
+  }
+}

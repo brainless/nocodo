@@ -21,10 +21,14 @@ use nocodo_agent_schema::SchemaAgent;
 use nocodo_orchestrator::{Outcome, Project, Proposal, Proposer, ProposerError};
 use nocodo_types::change::ChangeSet;
 use nocodo_types::event::Actor;
+use nocodo_types::project::ProjectBase;
 use nocodo_types::schema::SchemaSpec;
 
 /// Maximum attempts (initial proposal plus repairs) for one prompt.
 const MAX_ATTEMPTS: u32 = 3;
+
+/// Settings file `init` copies into new projects when `--base` isn't given.
+const PROJECT_BASE_FILE: &str = "project-base.json";
 
 /// Adapts the Schema agent to the orchestrator's `Proposer` trait.
 struct SchemaProposer {
@@ -69,6 +73,10 @@ enum Command {
         /// Project name; defaults to the folder's name.
         #[arg(long)]
         name: Option<String>,
+        /// Settings file copied into `project.json` (models per agent).
+        /// Defaults to `project-base.json` in the current folder, if present.
+        #[arg(long)]
+        base: Option<PathBuf>,
     },
     /// Propose a hand-written change set (JSON file) to the project.
     Changes {
@@ -97,7 +105,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         .project
         .context("missing --project <dir> (or set NOCODO_PROJECT)")?;
     match cli.command {
-        Command::Init { name } => {
+        Command::Init { name, base } => {
             let name = match name {
                 Some(n) => n,
                 None => dir
@@ -106,8 +114,27 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     .context("cannot derive a project name from the folder; pass --name")?
                     .to_string(),
             };
-            Project::init(&dir, &name)?;
+            let base_path = base.or_else(|| {
+                let default = PathBuf::from(PROJECT_BASE_FILE);
+                default.is_file().then_some(default)
+            });
+            let (base, source) = match &base_path {
+                Some(path) => {
+                    let text = std::fs::read_to_string(path)
+                        .with_context(|| format!("reading {}", path.display()))?;
+                    let base: ProjectBase = serde_json::from_str(&text)
+                        .with_context(|| format!("parsing {}", path.display()))?;
+                    (base, path.display().to_string())
+                }
+                None => (
+                    ProjectBase::default(),
+                    format!("built-in defaults (no {PROJECT_BASE_FILE} found)"),
+                ),
+            };
+            Project::init_with_base(&dir, &name, &base)?;
             println!("Initialized project \"{name}\" in {}", dir.display());
+            println!("Settings from {source}");
+            println!("  schema agent model: {}", base.models.schema.model);
             Ok(ExitCode::SUCCESS)
         }
         Command::Changes {
@@ -189,6 +216,10 @@ fn print_assumptions(assumptions: &[String]) {
 }
 
 fn main() -> ExitCode {
+    // Load `.env` (searched from the current folder upwards) before parsing,
+    // so it can supply `ANTHROPIC_API_KEY` and `NOCODO_PROJECT`. Variables
+    // already set in the shell win.
+    let _ = dotenvy::dotenv();
     match run(Cli::parse()) {
         Ok(code) => code,
         Err(e) => {

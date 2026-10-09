@@ -12,6 +12,15 @@ pub struct ProjectConfig {
     pub models: ModelsConfig,
 }
 
+/// Settings every new project starts from, read from `project-base.json`.
+/// `init` copies them into the new project's `project.json`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectBase {
+    #[serde(default)]
+    pub models: ModelsConfig,
+}
+
 /// Per-role model configuration.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

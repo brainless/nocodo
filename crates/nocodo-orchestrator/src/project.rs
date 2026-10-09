@@ -6,7 +6,7 @@ use nocodo_checker::{NamedMigration, check_change_set, dry_run};
 use nocodo_sqlgen::{METADATA_TOML, apply, generate};
 use nocodo_types::change::ChangeSet;
 use nocodo_types::event::{Actor, Event, EventKind, Finding};
-use nocodo_types::project::ProjectConfig;
+use nocodo_types::project::{ProjectBase, ProjectConfig};
 use nocodo_types::schema::{SPEC_VERSION, SchemaSpec};
 
 use crate::error::OrchestratorError;
@@ -85,8 +85,18 @@ fn empty_spec() -> SchemaSpec {
 }
 
 impl Project {
-    /// Create a new project folder. Fails if `dir` exists and is not empty.
+    /// Create a new project folder with the built-in default settings. Fails
+    /// if `dir` exists and is not empty.
     pub fn init(dir: impl AsRef<Path>, name: &str) -> Result<Project> {
+        Self::init_with_base(dir, name, &ProjectBase::default())
+    }
+
+    /// Like [`Project::init`], with settings copied from a `project-base.json`.
+    pub fn init_with_base(
+        dir: impl AsRef<Path>,
+        name: &str,
+        base: &ProjectBase,
+    ) -> Result<Project> {
         let dir = dir.as_ref().to_path_buf();
         if dir.exists() && fs::read_dir(&dir)?.next().is_some() {
             return Err(OrchestratorError::DirectoryNotEmpty(dir));
@@ -97,7 +107,7 @@ impl Project {
         let config = ProjectConfig {
             spec_version: SPEC_VERSION,
             name: name.to_string(),
-            models: Default::default(),
+            models: base.models.clone(),
         };
         write_json(&dir.join("project.json"), &config)?;
         write_json(&dir.join("specs/schema.json"), &empty_spec())?;
