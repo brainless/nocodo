@@ -1,0 +1,120 @@
+{
+  "spec_version": 1,
+  "tables": [
+    {
+      "name": "accounts",
+      "description": "Places where money is kept, such as a bank account or a wallet.",
+      "columns": [
+        {
+          "name": "name",
+          "description": "What the account is called.",
+          "column_type": "text",
+          "nullable": false,
+          "unique": true,
+          "references": null
+        },
+        {
+          "name": "opening_balance",
+          "description": "Money in the account when tracking started.",
+          "column_type": "money",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "people",
+      "description": "People whose spending is tracked, such as family members.",
+      "columns": [
+        {
+          "name": "name",
+          "description": "The person's name.",
+          "column_type": "text",
+          "nullable": false,
+          "unique": true,
+          "references": null
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "categories",
+      "description": "Groups for spending and income, such as groceries or salary.",
+      "columns": [
+        {
+          "name": "name",
+          "description": "What the category is called.",
+          "column_type": "text",
+          "nullable": false,
+          "unique": true,
+          "references": null
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "transactions",
+      "description": "Each payment received or made.",
+      "columns": [
+        {
+          "name": "account_id",
+          "description": "The account the money moved in or out of.",
+          "column_type": "integer",
+          "nullable": false,
+          "unique": false,
+          "references": "accounts"
+        },
+        {
+          "name": "person_id",
+          "description": "The person this payment belongs to, if any.",
+          "column_type": "integer",
+          "nullable": true,
+          "unique": false,
+          "references": "people"
+        },
+        {
+          "name": "category_id",
+          "description": "The group this payment falls under.",
+          "column_type": "integer",
+          "nullable": false,
+          "unique": false,
+          "references": "categories"
+        },
+        {
+          "name": "occurred_on",
+          "description": "The day the payment happened.",
+          "column_type": "date",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        },
+        {
+          "name": "amount",
+          "description": "How much was paid. Negative for money spent.",
+          "column_type": "money",
+          "nullable": false,
+          "unique": false,
+          "references": null
+        },
+        {
+          "name": "note",
+          "description": "Anything worth remembering about this payment.",
+          "column_type": "text",
+          "nullable": true,
+          "unique": false,
+          "references": null
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "occurred_on"
+          ],
+          "unique": false
+        }
+      ]
+    }
+  ]
+}

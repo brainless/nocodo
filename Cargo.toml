@@ -16,7 +16,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 nocodo-types = { path = "crates/nocodo-types" }
@@ -27,6 +27,9 @@ nocodo-runtime = { path = "crates/nocodo-runtime" }
 nocodo-agent = { path = "crates/nocodo-agent" }
 nocodo-agent-schema = { path = "crates/nocodo-agent-schema" }
 nocodo-agent-pm = { path = "crates/nocodo-agent-pm" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jiff = { version = "0.2", features = ["serde"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -37,6 +40,7 @@ all = "warn"
 [profile.dev]
 debug = 0
 incremental = true
+strip = "none"
 
 [profile.dev.package."*"]
 debug = 0
