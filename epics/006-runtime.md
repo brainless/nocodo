@@ -1,6 +1,6 @@
 # Epic 006: Runtime
 
-**Status:** Not started
+**Status:** Done
 **Goal:** Accepted migrations reach a real `data.sqlite`. Before every migration the database is backed up into `backups/`. Every proposal is dry-run on a copy of the real data, so a follow-up is checked against real rows. A failed migration leaves `data.sqlite` exactly as it was. `inspect` shows what is stored and gives a plain-language summary of what the tool remembers. This epic tests PRD success criterion 6: a follow-up produces an additive migration, and existing data survives.
 
 **Prerequisite:** Epic 005 (closed; checkpoint review in `epics-notes/005-schema-agent-hardening.md`).
@@ -164,20 +164,35 @@ cargo run -q --bin nocodo-api -- inspect --project .projects/rt-<s>
 
 Finally, catch up one epic 005 project that has no `data.sqlite`: `cargo run -q --bin nocodo-api -- apply --project .projects/cp-finance`.
 
-- [ ] `cargo build/test/clippy/fmt` pass.
-- [ ] The reviewer confirms, from the project folders alone:
+- [x] `cargo build/test/clippy/fmt` pass.
+- [x] The reviewer confirms, from the project folders alone:
   - **Data survives:** in every project, the sample rows are still there after the follow-up. `sqlite3 <project>/data.sqlite` shows the same row counts as `sample_rows_added`, and the `sample n` values are unchanged, including in `transactions` after the `03-rebuild` table rebuild.
   - **Additive follow-ups:** each agent follow-up's migration only adds; new details on existing lists are empty for the sample rows.
   - **Dry run on real data:** the follow-up's `change_set_accepted` checks say the dry run used a copy of `data.sqlite` with rows, and include a passed `rows_kept`.
   - **Backups:** `backups/` has one file per migration applied to an existing `data.sqlite`, named after it. Opening the latest one with `sqlite3` shows the data as it was before that migration.
   - **Events:** `events.jsonl` tells the story without the terminal: proposal, acceptance, `migration_applied` with backup path and row counts, `database_checked` passed, `sample_rows_added`.
-  - **Structure:** `sqlite3 data.sqlite .schema` matches `specs/schema.json`, and `__diesel_schema_migrations` lists exactly the folders in `migrations/`.
+  - **Structure:** `sqlite3 data.sqlite .schema` matches `specs/schema.json`, and `__diesel_schema_migrations` lists the version prefix of each folder in `migrations/` (e.g. `0001`, `0002`).
   - **Summary:** each `inspect` summary reads as plain language: no technical words in the generated parts, and any in agent-written descriptions are noted.
   - **Catch-up:** `cp-finance` now has a `data.sqlite` matching its schema, with `migration_applied` events for both migrations (the second backs up the first's empty database).
   - **Failures:** if any migration failed during the session, its `migration_failed` event says `restored: true` and `data.sqlite` matches the backup. If none failed, say so; the Task 8 tests cover the path.
-- [ ] Task Notes added below, and `Status: Done`.
+- [x] Task Notes added below, and `Status: Done`.
 
 ---
 
 ## Task Notes
-
+- Built (Tasks 1 to 8):
+  - Types: apply report, `migration_applied`, `migration_failed`, `database_checked` and `sample_rows_added` events.
+  - Runtime: `apply_pending` with one backup per migration and a restore on any failure; `inspect`; the plain-language `summary`; deterministic `add_sample_rows`.
+  - Orchestrator and checker: `Applier` trait, `Project::apply_pending`, `rows_kept` and `db_matches_spec_after_apply`, and a dry run that reports what really ran on the copy.
+  - `api`: apply runs after every accepted change set; new `apply`, `sample-rows` and `inspect` commands.
+- Tested:
+  - `cargo build/test/clippy/fmt` pass; no live LLM calls in tests.
+  - Manual checkpoint across `rt-finance-dev`, `rt-finance`, `rt-invoices`, `rt-inventory`, `rt-farm`, `rt-farm-income-projection` and `cp-finance`: all pass. Sample rows survived every follow-up and the 03 table rebuild.
+- Surprises:
+  - `run_in_transaction = false` means the SQL can commit while the version stays unrecorded, so only the backup is a trusted restore.
+  - `__diesel_schema_migrations` stores version prefixes (`0001`), not folder names.
+  - Agent assumptions promise computed values and pre-filled entries that nothing provides.
+  - New lookup lists start empty, so the new optional choice is unusable until entries exist.
+  - A failed model call leaves a lone `user_prompt` event.
+  - No `migration_failed` occurred in the session; the Task 8 tests cover that path.
+- Full review and carry-overs: `epics-notes/006-runtime.md`.

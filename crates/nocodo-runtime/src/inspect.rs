@@ -22,6 +22,21 @@ pub struct Inspection {
     pub backups: usize,
 }
 
+/// `file:` URI that opens `db` read-only; `%`, `?` and `#` in the path are escaped.
+fn read_only_uri(db: &Path) -> String {
+    let mut out = String::from("file:");
+    for c in db.to_string_lossy().chars() {
+        match c {
+            '%' => out.push_str("%25"),
+            '?' => out.push_str("%3f"),
+            '#' => out.push_str("%23"),
+            c => out.push(c),
+        }
+    }
+    out.push_str("?mode=ro");
+    out
+}
+
 /// Read-only look at the project. Works without a `data.sqlite`.
 pub fn inspect(project_dir: &Path) -> Result<Inspection, RuntimeError> {
     let db = project_dir.join(DB_FILE);
@@ -33,7 +48,7 @@ pub fn inspect(project_dir: &Path) -> Result<Inspection, RuntimeError> {
     all.sort();
 
     let (tables, pending) = if db.exists() {
-        let url = format!("file:{}?mode=ro", db.to_string_lossy());
+        let url = read_only_uri(&db);
         let mut conn =
             SqliteConnection::establish(&url).map_err(|e| RuntimeError::Database(e.to_string()))?;
         let pending = conn

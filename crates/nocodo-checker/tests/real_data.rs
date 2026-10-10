@@ -172,7 +172,7 @@ fn renamed_table_is_compared_under_its_new_name() {
     assert!(step.passed, "{}", step.detail);
     assert!(
         step.detail
-            .contains(&format!("{} lists compared", spec.tables.len())),
+            .contains(&format!("across {} lists.", spec.tables.len())),
         "{}",
         step.detail
     );

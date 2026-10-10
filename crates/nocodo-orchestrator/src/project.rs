@@ -92,6 +92,9 @@ pub struct ApplyOutcome {
 }
 
 fn rows_summary(before: &BTreeMap<String, u64>, after: &BTreeMap<String, u64>) -> String {
+    if before.is_empty() {
+        return "There were no existing lists yet.".to_string();
+    }
     let b: u64 = before.values().sum();
     let a: u64 = before.keys().filter_map(|k| after.get(k)).sum();
     format!("Rows in existing lists: {b} before, {a} after.")

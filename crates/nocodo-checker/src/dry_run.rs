@@ -236,7 +236,7 @@ fn rows_lost(
     after: &BTreeMap<String, i64>,
     new_spec: &SchemaSpec,
     renames: &[(String, String)],
-) -> (Vec<String>, usize) {
+) -> (Vec<String>, usize, i64) {
     // Current name -> name before the change set (follows chained renames).
     let mut origin: BTreeMap<String, String> = BTreeMap::new();
     for t in before.keys() {
@@ -249,6 +249,7 @@ fn rows_lost(
     }
     let mut lost = Vec::new();
     let mut compared = 0;
+    let mut total = 0;
     for t in &new_spec.tables {
         let (Some(orig), Some(now)) = (origin.get(&t.name), after.get(&t.name)) else {
             continue;
@@ -257,6 +258,7 @@ fn rows_lost(
             continue;
         };
         compared += 1;
+        total += *was;
         if was != now {
             lost.push(format!(
                 "{} had {} before and has {} after",
@@ -266,7 +268,7 @@ fn rows_lost(
             ));
         }
     }
-    (lost, compared)
+    (lost, compared, total)
 }
 
 /// Run all earlier migrations plus `new` on a copy of `db`.
@@ -419,7 +421,7 @@ pub fn dry_run(
             ));
         }
     };
-    let (lost, compared) = rows_lost(&rows_before, &rows_after, after, &new.table_renames);
+    let (lost, compared, total) = rows_lost(&rows_before, &rows_after, after, &new.table_renames);
     if !lost.is_empty() {
         return Ok(run.fail(
             "rows_kept",
@@ -437,10 +439,10 @@ pub fn dry_run(
         if compared == 0 {
             "No existing lists to compare; no rows were at risk.".to_string()
         } else {
-            let total: i64 = rows_before.values().sum();
             format!(
-                "Every existing list kept all its rows ({} across {} lists compared, {} in the copy).",
-                total, compared, rows_word(total)
+                "Every existing list kept all its rows: {} across {} lists.",
+                rows_word(total),
+                compared
             )
         },
     );

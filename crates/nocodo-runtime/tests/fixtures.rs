@@ -125,6 +125,18 @@ fn initial_migration_creates_database_without_backup() {
 }
 
 #[test]
+fn inspect_works_when_the_path_has_uri_characters() {
+    let base = tempfile::tempdir().unwrap();
+    let p = base.path().join("a#b?c%d");
+    fs::create_dir_all(&p).unwrap();
+    let spec = add_step(&p, 1, STEPS[0], &empty());
+    apply_pending(&p).unwrap();
+    let info = inspect(&p).unwrap();
+    assert_eq!(info.tables.len(), spec.tables.len());
+    assert!(info.pending.is_empty());
+}
+
+#[test]
 fn follow_ups_back_up_and_keep_rows_including_a_rebuild() {
     let p = tempfile::tempdir().unwrap();
     let db = p.path().join("data.sqlite");
