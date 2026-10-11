@@ -9,6 +9,7 @@ use diesel::sql_types::{BigInt, Text};
 use nocodo_runtime::{add_sample_rows, apply_pending, inspect, summary};
 use nocodo_sqlgen::{METADATA_TOML, apply, generate};
 use nocodo_types::change::ChangeSet;
+use nocodo_types::question::tech_words_in;
 use nocodo_types::schema::{SPEC_VERSION, SchemaSpec};
 
 const STEPS: [&str; 3] = ["01-initial", "02-family-member", "03-rebuild"];
@@ -253,7 +254,6 @@ fn summary_of_finance_after_family_member() {
 
 #[test]
 fn generated_summary_text_has_no_technical_words() {
-    let banned = ["table", "column", "row", "sql", "database", "schema", "id"];
     let mut specs: Vec<SchemaSpec> = (1..=3).map(|n| project_at(n).1).collect();
     let example = root().join("examples/schema.json");
     specs.push(serde_json::from_str(&fs::read_to_string(example).unwrap()).unwrap());
@@ -262,13 +262,11 @@ fn generated_summary_text_has_no_technical_words() {
         for t in &mut spec.tables {
             t.description = String::new();
         }
-        let text = summary(&spec, &BTreeMap::new()).to_lowercase();
-        for word in text.split(|c: char| !c.is_alphanumeric()) {
-            let stem = word.trim_end_matches('s');
-            assert!(
-                !banned.contains(&word) && !banned.contains(&stem),
-                "banned word {word:?} in summary:\n{text}"
-            );
-        }
+        let text = summary(&spec, &BTreeMap::new());
+        let found = tech_words_in(&text);
+        assert!(
+            found.is_empty(),
+            "technical words {found:?} in summary:\n{text}"
+        );
     }
 }

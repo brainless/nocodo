@@ -17,13 +17,15 @@ use std::process::ExitCode;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use nocodo_agent::AgentContext;
-use nocodo_agent_schema::SchemaAgent;
+use nocodo_agent_schema::{AnswerSoFar, QuestionDraft, SchemaAgent, SchemaReply};
 use nocodo_orchestrator::{
-    Applier, ApplierError, Outcome, Project, Proposal, Proposer, ProposerError,
+    AnswerOutcome, Applier, ApplierError, ContinueOutcome, Outcome, Project, PromptOutcome,
+    Proposal, Proposer, ProposerError, ProposerFailure, Reply,
 };
 use nocodo_types::change::ChangeSet;
 use nocodo_types::event::{Actor, CheckStep, EventKind};
 use nocodo_types::project::ProjectBase;
+use nocodo_types::question::{Answer, Question};
 use nocodo_types::schema::SchemaSpec;
 
 /// Maximum attempts (initial proposal plus repairs) for one prompt.
@@ -75,22 +77,76 @@ impl Proposer for SchemaProposer {
         &self,
         current: &SchemaSpec,
         prompt: &str,
+        answers: &[nocodo_orchestrator::AnsweredQuestion],
         feedback: Option<&nocodo_orchestrator::Feedback>,
     ) -> Result<Proposal, ProposerError> {
+        let answers: Vec<AnswerSoFar> = answers
+            .iter()
+            .map(|a| AnswerSoFar {
+                question: a.question.text.clone(),
+                chosen: a.question.choices[a.answer.choice - 1].clone(),
+                by_default: a.answer.by_default,
+            })
+            .collect();
         let feedback = feedback.map(|f| nocodo_agent_schema::Feedback {
-            previous: f.previous.clone(),
+            previous: SchemaReply {
+                questions: f.previous.questions.iter().map(to_draft).collect(),
+                change_set: f.previous.change_set.clone(),
+                assumptions: f.previous.assumptions.clone(),
+            },
             findings: f.findings.clone(),
         });
-        let (proposal, run_id) =
-            SchemaAgent::propose_with_run_id(&self.ctx, current, prompt, feedback.as_ref()).await?;
+        let (reply, run_id) = SchemaAgent::propose_with_run_id(
+            &self.ctx,
+            current,
+            prompt,
+            &answers,
+            feedback.as_ref(),
+        )
+        .await
+        .map_err(failure)?;
         Ok(Proposal {
-            change_set: proposal.change_set,
-            assumptions: proposal.assumptions,
+            reply: Reply {
+                // The orchestrator assigns the IDs and the asker.
+                questions: reply
+                    .questions
+                    .into_iter()
+                    .map(|d| d.into_question(String::new(), "schema"))
+                    .collect(),
+                change_set: reply.change_set,
+                assumptions: reply.assumptions,
+            },
             actor: Actor::SchemaAgent {
                 run_id,
                 model: format!("{}:{}", self.ctx.model.provider, self.ctx.model.model),
             },
         })
+    }
+}
+
+fn to_draft(q: &Question) -> QuestionDraft {
+    QuestionDraft {
+        text: q.text.clone(),
+        choices: q.choices.clone(),
+        default: q.default,
+        blocking: q.blocking,
+        why: q.why.clone(),
+    }
+}
+
+/// Hands the orchestrator the failed run's ID and retry count.
+fn failure(error: nocodo_agent::Error) -> ProposerError {
+    match error {
+        nocodo_agent::Error::Extraction {
+            message,
+            run_id,
+            provider_retries,
+        } => Box::new(ProposerFailure {
+            message,
+            run_id: Some(run_id),
+            provider_retries,
+        }),
+        other => Box::new(other),
     }
 }
 
@@ -136,6 +192,19 @@ enum Command {
         #[arg(required_unless_present = "file")]
         text: Option<String>,
     },
+    /// Show the questions waiting for an answer.
+    Questions,
+    /// Answer waiting questions (`q1=2 q3=1`); resumes the run once all are answered.
+    Answer {
+        /// Accept the default for every open non-blocking question not answered here.
+        #[arg(long)]
+        defaults: bool,
+        /// `<question id>=<choice number>`, choices numbered from 1.
+        #[arg(required_unless_present = "defaults")]
+        answers: Vec<String>,
+    },
+    /// Retry whatever failed last, or resume an answered round.
+    Continue,
     /// Apply every pending migration to data.sqlite (with a backup first).
     Apply,
     /// Show what is stored (for the reviewer) and a plain-language summary (for the user).
@@ -196,20 +265,52 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let project = Project::open(&dir)?;
             match project.propose(cs, Actor::Developer, confirm_destructive)? {
                 Outcome::Accepted { migration, checks } => {
-                    println!("Accepted \u{2192} migrations/{migration}");
-                    println!("{}", checks_line(&checks));
+                    print_accepted(&migration, &checks, None, &[]);
                     apply_and_report(&project)
                 }
                 Outcome::Rejected { findings, checks } => {
-                    println!("Rejected:");
-                    for f in findings {
-                        println!("  [{}] {}", f.code, f.message);
-                    }
-                    println!("{}", checks_line(&checks));
+                    print_rejected(&findings, &checks, 0, &[]);
                     Ok(ExitCode::FAILURE)
+                }
+                Outcome::Waiting { questions } => {
+                    print_questions(&questions);
+                    Ok(ExitCode::SUCCESS)
                 }
             }
         }
+        Command::Questions => {
+            let project = Project::open(&dir)?;
+            let open = project.open_questions()?;
+            if open.is_empty() {
+                println!("No questions waiting.");
+            } else {
+                print_questions(&open);
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Answer { defaults, answers } => {
+            let mut given = answers
+                .iter()
+                .map(|a| parse_answer(a))
+                .collect::<Result<Vec<_>>>()?;
+            let project = Project::open(&dir)?;
+            if defaults {
+                let more = project.default_answers(&given)?;
+                given.extend(more);
+            }
+            match project.answer(&given)? {
+                AnswerOutcome::StillWaiting { open } => {
+                    println!("Answers recorded. Still waiting for {}:", open.len());
+                    print_questions(&open);
+                    Ok(ExitCode::SUCCESS)
+                }
+                AnswerOutcome::ReadyToContinue => {
+                    println!("Answers recorded. Continuing.");
+                    resume(&project)
+                }
+            }
+        }
+        Command::Continue => resume(&Project::open(&dir)?),
         Command::Apply => apply_and_report(&Project::open(&dir)?),
         Command::Inspect => {
             let project = Project::open(&dir)?;
@@ -267,12 +368,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 (None, None) => anyhow::bail!("give the prompt text or --file <path>"),
             };
             let project = Project::open(&dir)?;
-            let ctx = AgentContext::new(
-                project.dir(),
-                nocodo_agent_schema::ROLE,
-                project.config().models.schema.clone(),
-            );
-            let proposer = SchemaProposer { ctx };
+            let proposer = schema_proposer(&project);
             let rt = tokio::runtime::Runtime::new().context("starting async runtime")?;
             let result = rt.block_on(project.run_prompt(
                 &prompt,
@@ -280,24 +376,135 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 confirm_destructive,
                 MAX_ATTEMPTS,
             ))?;
-            match result.outcome {
-                Outcome::Accepted { migration, checks } => {
-                    println!("{}", result.change_set.summary);
-                    print_assumptions(&result.assumptions);
-                    println!("Migration: migrations/{migration}");
-                    println!("{}", checks_line(&checks));
-                    apply_and_report(&project)
-                }
-                Outcome::Rejected { findings, checks } => {
-                    println!("Rejected after {} attempt(s):", result.attempts);
-                    for f in findings {
-                        println!("  [{}] {}", f.code, f.message);
-                    }
-                    println!("{}", checks_line(&checks));
-                    print_assumptions(&result.assumptions);
-                    Ok(ExitCode::FAILURE)
-                }
+            print_prompt_outcome(&project, result)
+        }
+    }
+}
+
+fn schema_proposer(project: &Project) -> SchemaProposer {
+    SchemaProposer {
+        ctx: AgentContext::new(
+            project.dir(),
+            nocodo_agent_schema::ROLE,
+            project.config().models.schema.clone(),
+        ),
+    }
+}
+
+/// Parses `<question id>=<choice number>`.
+fn parse_answer(arg: &str) -> Result<Answer> {
+    let bad = || {
+        anyhow::anyhow!(
+            "cannot read the answer \"{arg}\": write it as <question id>=<choice number>, for example q1=2"
+        )
+    };
+    let (id, choice) = arg.split_once('=').ok_or_else(bad)?;
+    let choice: usize = choice.trim().parse().map_err(|_| bad())?;
+    if id.trim().is_empty() {
+        return Err(bad());
+    }
+    Ok(Answer {
+        question_id: id.trim().to_string(),
+        choice,
+        by_default: false,
+    })
+}
+
+/// Resumes what the latest prompt run is waiting on and prints the result.
+fn resume(project: &Project) -> Result<ExitCode> {
+    let proposer = schema_proposer(project);
+    let rt = tokio::runtime::Runtime::new().context("starting async runtime")?;
+    match rt.block_on(project.continue_pending(&proposer, false, MAX_ATTEMPTS))? {
+        ContinueOutcome::NothingToContinue => {
+            println!("Nothing to continue.");
+            Ok(ExitCode::SUCCESS)
+        }
+        ContinueOutcome::StillWaiting { open } => {
+            println!("Still waiting for {}:", open.len());
+            print_questions(&open);
+            Ok(ExitCode::SUCCESS)
+        }
+        ContinueOutcome::Continued(result) => print_prompt_outcome(project, result),
+    }
+}
+
+/// Prints a prompt run's result (shared by `prompt`, `answer` and `continue`).
+fn print_prompt_outcome(project: &Project, result: PromptOutcome) -> Result<ExitCode> {
+    match result {
+        PromptOutcome::Waiting { questions } => {
+            print_questions(&questions);
+            Ok(ExitCode::SUCCESS)
+        }
+        PromptOutcome::Done {
+            outcome,
+            change_set,
+            assumptions,
+            attempts,
+        } => match outcome {
+            Outcome::Accepted { migration, checks } => {
+                print_accepted(&migration, &checks, change_set.as_ref(), &assumptions);
+                apply_and_report(project)
             }
+            Outcome::Rejected { findings, checks } => {
+                print_rejected(&findings, &checks, attempts, &assumptions);
+                Ok(ExitCode::FAILURE)
+            }
+            Outcome::Waiting { questions } => {
+                print_questions(&questions);
+                Ok(ExitCode::SUCCESS)
+            }
+        },
+    }
+}
+
+fn print_accepted(
+    migration: &str,
+    checks: &[CheckStep],
+    change_set: Option<&ChangeSet>,
+    assumptions: &[String],
+) {
+    if let Some(cs) = change_set {
+        println!("{}", cs.summary);
+    }
+    print_assumptions(assumptions);
+    println!("Accepted \u{2192} migrations/{migration}");
+    println!("{}", checks_line(checks));
+}
+
+fn print_rejected(
+    findings: &[nocodo_types::event::Finding],
+    checks: &[CheckStep],
+    attempts: u32,
+    assumptions: &[String],
+) {
+    if attempts > 0 {
+        println!("Rejected after {attempts} attempt(s):");
+    } else {
+        println!("Rejected:");
+    }
+    for f in findings {
+        println!("  [{}] {}", f.code, f.message);
+    }
+    println!("{}", checks_line(checks));
+    print_assumptions(assumptions);
+}
+
+/// Prints questions with numbered choices; blocking ones are marked.
+fn print_questions(questions: &[Question]) {
+    println!(
+        "{} question(s) waiting. Answer with `nocodo-api answer q1=<choice number> ...`:",
+        questions.len()
+    );
+    for q in questions {
+        let mark = if q.blocking { " (needs an answer)" } else { "" };
+        println!("  {}: {}{mark}", q.id, q.text);
+        for (i, c) in q.choices.iter().enumerate() {
+            let d = if q.default == Some(i + 1) {
+                " (default)"
+            } else {
+                ""
+            };
+            println!("    {}. {c}{d}", i + 1);
         }
     }
 }

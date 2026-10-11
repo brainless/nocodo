@@ -1,12 +1,16 @@
 use std::fs;
 use std::path::Path;
 
-use nocodo_orchestrator::{Applier, ApplierError, OrchestratorError, Outcome, Project};
+use nocodo_orchestrator::{
+    AnswerOutcome, AnsweredQuestion, Applier, ApplierError, ContinueOutcome, Feedback,
+    OrchestratorError, Outcome, Project, PromptOutcome, Proposal, Proposer, ProposerError, Reply,
+};
 use nocodo_types::apply::{AppliedMigration, ApplyReport, FailedMigration};
 use nocodo_types::change::{ChangeSet, SchemaChange};
 use nocodo_types::event::{Actor, EventKind};
 use nocodo_types::project::ProjectBase;
-use nocodo_types::schema::{Column, ColumnType};
+use nocodo_types::question::{Answer, Question, tech_words_in};
+use nocodo_types::schema::{Column, ColumnType, SchemaSpec};
 
 fn col(name: &str, t: ColumnType) -> Column {
     Column {
@@ -149,27 +153,115 @@ fn accept_writes_migrations_and_schema() {
     assert_eq!(p.events().unwrap().len(), 5);
 }
 
+/// A proposer for tests that must never reach the model.
+struct NeverCalled;
+
+impl Proposer for NeverCalled {
+    async fn propose(
+        &self,
+        _current: &SchemaSpec,
+        _prompt: &str,
+        _answers: &[AnsweredQuestion],
+        _feedback: Option<&Feedback>,
+    ) -> Result<Proposal, ProposerError> {
+        panic!("the model must not be called");
+    }
+}
+
+fn answer(id: &str, choice: usize) -> Answer {
+    Answer {
+        question_id: id.into(),
+        choice,
+        by_default: false,
+    }
+}
+
+/// Answers the one open question and resumes with a proposer that must not be called.
+async fn resolve_async(p: &Project, id: &str, choice: usize) -> PromptOutcome {
+    assert_eq!(
+        p.answer(&[answer(id, choice)]).unwrap(),
+        AnswerOutcome::ReadyToContinue
+    );
+    let ContinueOutcome::Continued(out) = p.continue_pending(&NeverCalled, false, 3).await.unwrap()
+    else {
+        panic!("expected the run to continue");
+    };
+    out
+}
+
+fn resolve(p: &Project, id: &str, choice: usize) -> PromptOutcome {
+    block_on(resolve_async(p, id, choice))
+}
+
+fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+        .block_on(f)
+}
+
 #[test]
-fn destructive_needs_confirmation_and_rejection_writes_no_files() {
+fn destructive_asks_the_user_and_writes_no_files_until_yes() {
     let tmp = tempfile::tempdir().unwrap();
     let p = run_sequence(&tmp.path().join("p"));
     let before = snapshot(p.dir());
-    let Outcome::Rejected { findings, .. } =
-        p.propose(drop_notes(), Actor::Developer, false).unwrap()
+    let Outcome::Waiting { questions } = p.propose(drop_notes(), Actor::Developer, false).unwrap()
     else {
-        panic!("expected rejection");
+        panic!("expected a confirmation question");
     };
-    assert_eq!(findings[0].code, "destructive_not_confirmed");
     assert_eq!(before, snapshot(p.dir()));
+    assert_eq!(questions.len(), 1);
+    let q = &questions[0];
+    assert_eq!((q.id.as_str(), q.asked_by.as_str()), ("q1", "system"));
+    assert!(q.blocking && q.default.is_none());
+    assert_eq!(q.choices, ["Yes, forget it", "No, keep it"]);
+    assert_eq!(
+        q.text,
+        "This will forget the notes you have entered on each expense (The notes). Continue?"
+    );
+    assert!(tech_words_in(&q.text).is_empty());
     let events = p.events().unwrap();
+    let EventKind::QuestionsAsked {
+        prompt_seq,
+        proposal_seq,
+        ..
+    } = &events.last().unwrap().kind
+    else {
+        panic!("last event must be the question");
+    };
+    assert_eq!(*prompt_seq, None);
+    assert_eq!(*proposal_seq, Some(events[events.len() - 2].seq));
+    assert_eq!(events.last().unwrap().actor, Actor::System);
+
+    // Nothing else starts while it waits, even with confirmation.
     assert!(matches!(
-        events.last().unwrap().kind,
-        EventKind::ChangeSetRejected { .. }
+        p.propose(drop_notes(), Actor::Developer, true),
+        Err(OrchestratorError::QuestionsWaiting(_))
     ));
+
+    // "No": rejected with user_declined, still no files.
+    let PromptOutcome::Done {
+        outcome: Outcome::Rejected { findings, .. },
+        ..
+    } = resolve(&p, "q1", 2)
+    else {
+        panic!("expected a rejection");
+    };
+    assert_eq!(findings[0].code, "user_declined");
+    assert_eq!(before, snapshot(p.dir()));
+
+    // --confirm-destructive skips the question.
     assert!(matches!(
         p.propose(drop_notes(), Actor::Developer, true).unwrap(),
         Outcome::Accepted { migration, .. } if migration == "0003_drop_notes"
     ));
+    assert!(
+        !p.events()
+            .unwrap()
+            .iter()
+            .skip(events.len() + 3)
+            .any(|e| matches!(e.kind, EventKind::QuestionsAsked { .. }))
+    );
 }
 
 #[test]
@@ -234,25 +326,36 @@ fn finance_fixtures_01_to_03_then_04_rejected_then_confirmed() {
     );
 
     let before = snapshot(p.dir());
-    let Outcome::Rejected { findings, .. } = p
+    let Outcome::Waiting { questions } = p
         .propose(fixture("04-drop-notes.json"), Actor::Developer, false)
         .unwrap()
     else {
-        panic!("04 must be rejected without confirmation");
+        panic!("04 must ask for confirmation");
     };
-    assert!(
-        findings
-            .iter()
-            .any(|f| f.code == "destructive_not_confirmed")
-    );
     assert_eq!(before, snapshot(p.dir()));
+    let text = &questions[0].text;
+    assert!(text.starts_with("This will forget the notes you have entered on each transaction ("));
+    assert!(tech_words_in(text).is_empty(), "{text}");
 
-    let Outcome::Accepted { migration, .. } = p
-        .propose(fixture("04-drop-notes.json"), Actor::Developer, true)
-        .unwrap()
+    let seen_before = p.events().unwrap().len();
+    let PromptOutcome::Done {
+        outcome: Outcome::Accepted { migration, .. },
+        ..
+    } = resolve(&p, "q1", 1)
     else {
-        panic!("04 must be accepted with confirmation");
+        panic!("04 must be accepted after yes");
     };
+    // The accepted event points at the original proposal; no second proposal.
+    let events = p.events().unwrap();
+    let proposals: Vec<_> = events
+        .iter()
+        .filter(|e| matches!(&e.kind, EventKind::ChangeSetProposed { change_set, .. } if change_set.name == "remove_payment_notes"))
+        .collect();
+    assert_eq!(proposals.len(), 1);
+    assert!(events.iter().skip(seen_before).any(|e| matches!(
+        &e.kind,
+        EventKind::ChangeSetAccepted { proposal_seq, .. } if *proposal_seq == proposals[0].seq
+    )));
     assert_eq!(migration, "0004_remove_payment_notes");
     let schema = p.current_schema().unwrap();
     let tx = schema
@@ -295,22 +398,48 @@ fn finance_hand_edited_schema_is_detected() {
 mod run_prompt {
     use std::sync::Mutex;
 
-    use nocodo_orchestrator::{Feedback, Proposal, Proposer, ProposerError};
-    use nocodo_types::schema::SchemaSpec;
-
     use super::*;
 
+    /// What the proposer saw on one call.
+    struct Call {
+        answers: Vec<AnsweredQuestion>,
+        feedback: Option<Feedback>,
+    }
+
     struct Scripted {
-        queue: Mutex<Vec<ChangeSet>>,
-        feedback_seen: Mutex<Vec<bool>>,
+        queue: Mutex<Vec<Result<Reply, String>>>,
+        calls: Mutex<Vec<Call>>,
     }
 
     impl Scripted {
         fn new(items: Vec<ChangeSet>) -> Self {
+            Self::script(
+                items
+                    .into_iter()
+                    .map(|c| {
+                        Ok(Reply::change_set(
+                            c,
+                            vec!["Money is in one currency.".into()],
+                        ))
+                    })
+                    .collect(),
+            )
+        }
+
+        fn script(items: Vec<Result<Reply, String>>) -> Self {
             Scripted {
                 queue: Mutex::new(items),
-                feedback_seen: Mutex::new(vec![]),
+                calls: Mutex::new(vec![]),
             }
+        }
+
+        fn feedback_seen(&self) -> Vec<bool> {
+            self.calls
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|c| c.feedback.is_some())
+                .collect()
         }
     }
 
@@ -319,13 +448,16 @@ mod run_prompt {
             &self,
             _current: &SchemaSpec,
             _prompt: &str,
+            answers: &[AnsweredQuestion],
             feedback: Option<&Feedback>,
         ) -> Result<Proposal, ProposerError> {
-            self.feedback_seen.lock().unwrap().push(feedback.is_some());
-            let change_set = self.queue.lock().unwrap().remove(0);
+            self.calls.lock().unwrap().push(Call {
+                answers: answers.to_vec(),
+                feedback: feedback.cloned(),
+            });
+            let reply = self.queue.lock().unwrap().remove(0)?;
             Ok(Proposal {
-                change_set,
-                assumptions: vec!["Money is in one currency.".into()],
+                reply,
                 actor: Actor::SchemaAgent {
                     run_id: "run-1".into(),
                     model: "test:model".into(),
@@ -353,9 +485,15 @@ mod run_prompt {
             .run_prompt("track spending", &proposer, false, 3)
             .await
             .unwrap();
-        assert!(matches!(r.outcome, Outcome::Accepted { .. }));
-        assert_eq!(r.attempts, 2);
-        assert_eq!(*proposer.feedback_seen.lock().unwrap(), vec![false, true]);
+        let PromptOutcome::Done {
+            outcome, attempts, ..
+        } = r
+        else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        assert_eq!(attempts, 2);
+        assert_eq!(proposer.feedback_seen(), vec![false, true]);
         let events = project.events().unwrap();
         let proposed: Vec<_> = events
             .iter()
@@ -385,8 +523,14 @@ mod run_prompt {
         let project = Project::init(dir.path().join("p"), "p").unwrap();
         let proposer = Scripted::new(vec![invalid(), invalid(), invalid(), initial()]);
         let r = project.run_prompt("x", &proposer, false, 3).await.unwrap();
-        assert!(matches!(r.outcome, Outcome::Rejected { .. }));
-        assert_eq!(r.attempts, 3);
+        let PromptOutcome::Done {
+            outcome, attempts, ..
+        } = r
+        else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Rejected { .. }));
+        assert_eq!(attempts, 3);
         assert_eq!(
             fs::read_dir(project.dir().join("migrations"))
                 .unwrap()
@@ -396,20 +540,543 @@ mod run_prompt {
         assert_eq!(project.current_schema().unwrap().tables.len(), 0);
     }
 
+    struct Failing(Option<nocodo_orchestrator::ProposerFailure>);
+
+    impl Proposer for Failing {
+        async fn propose(
+            &self,
+            _current: &SchemaSpec,
+            _prompt: &str,
+            _answers: &[AnsweredQuestion],
+            _feedback: Option<&Feedback>,
+        ) -> Result<Proposal, ProposerError> {
+            Err(match &self.0 {
+                Some(f) => Box::new(f.clone()),
+                None => "boom".into(),
+            })
+        }
+    }
+
     #[tokio::test]
-    async fn destructive_without_confirmation_is_rejected() {
+    async fn failed_model_call_records_prompt_failed() {
         let dir = tempfile::tempdir().unwrap();
         let project = Project::init(dir.path().join("p"), "p").unwrap();
+        let failing = Failing(Some(nocodo_orchestrator::ProposerFailure {
+            message: "429 concurrent_budget_exceeded".into(),
+            run_id: Some("run-9".into()),
+            provider_retries: 3,
+        }));
+        let err = project
+            .run_prompt("x", &failing, false, 3)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, OrchestratorError::Proposer(_)));
+        let events = project.events().unwrap();
+        assert_eq!(events.len(), 3);
+        match &events[2].kind {
+            EventKind::PromptFailed {
+                prompt_seq,
+                error,
+                run_id,
+                detail,
+            } => {
+                assert_eq!(*prompt_seq, 2);
+                assert_eq!(error, "429 concurrent_budget_exceeded");
+                assert_eq!(run_id.as_deref(), Some("run-9"));
+                assert_eq!(
+                    detail,
+                    "The model call for prompt 2 failed: 429 concurrent_budget_exceeded \
+                     (retried 3 times). Nothing was proposed; see .agent-logs/run-9.jsonl. \
+                     Run `nocodo-api continue` to try again."
+                );
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        assert_eq!(events[2].actor, Actor::System);
+
+        // Any other error is recorded with its message only.
+        project
+            .run_prompt("y", &Failing(None), false, 3)
+            .await
+            .unwrap_err();
+        let events = project.events().unwrap();
+        assert!(matches!(
+            &events[4].kind,
+            EventKind::PromptFailed { error, run_id: None, .. } if error == "boom"
+        ));
+    }
+
+    fn q(text: &str, blocking: bool) -> Question {
+        Question {
+            id: String::new(),
+            asked_by: String::new(),
+            text: text.into(),
+            choices: vec!["Yes".into(), "No".into()],
+            default: (!blocking).then_some(1),
+            blocking,
+            why: "test".into(),
+        }
+    }
+
+    fn ask(questions: Vec<Question>) -> Result<Reply, String> {
+        Ok(Reply {
+            questions,
+            change_set: None,
+            assumptions: vec![],
+        })
+    }
+
+    fn give(cs: ChangeSet) -> Result<Reply, String> {
+        Ok(Reply::change_set(cs, vec![]))
+    }
+
+    fn kinds_of(p: &Project) -> Vec<&'static str> {
+        p.events()
+            .unwrap()
+            .iter()
+            .map(|e| match &e.kind {
+                EventKind::ProjectCreated { .. } => "project_created",
+                EventKind::UserPrompt { .. } => "user_prompt",
+                EventKind::PromptFailed { .. } => "prompt_failed",
+                EventKind::QuestionsAsked { .. } => "questions_asked",
+                EventKind::QuestionAnswered { .. } => "question_answered",
+                EventKind::QuestionsRejected { .. } => "questions_rejected",
+                EventKind::QuestionsDropped { .. } => "questions_dropped",
+                EventKind::ChangeSetProposed { .. } => "change_set_proposed",
+                EventKind::ChangeSetAccepted { .. } => "change_set_accepted",
+                EventKind::ChangeSetRejected { .. } => "change_set_rejected",
+                _ => "other",
+            })
+            .collect()
+    }
+
+    fn new_project() -> (tempfile::TempDir, Project) {
+        let dir = tempfile::tempdir().unwrap();
+        let project = Project::init(dir.path().join("p"), "p").unwrap();
+        (dir, project)
+    }
+
+    async fn resume(p: &Project, proposer: &Scripted) -> PromptOutcome {
+        match p.continue_pending(proposer, false, 3).await.unwrap() {
+            ContinueOutcome::Continued(out) => out,
+            other => panic!("expected the run to continue, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn questions_then_answers_then_change_set() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![
+            ask(vec![
+                q("Is a spend for the whole family?", false),
+                q("Which bank?", true),
+            ]),
+            give(initial()),
+        ]);
+        let PromptOutcome::Waiting { questions } = project
+            .run_prompt("track spending", &proposer, false, 3)
+            .await
+            .unwrap()
+        else {
+            panic!("expected questions");
+        };
+        // Blocking first, IDs q1, q2, asked by the agent.
+        assert_eq!(questions[0].text, "Which bank?");
+        assert_eq!(
+            questions
+                .iter()
+                .map(|q| (q.id.as_str(), q.asked_by.as_str()))
+                .collect::<Vec<_>>(),
+            [("q1", "schema"), ("q2", "schema")]
+        );
+        assert_eq!(project.open_questions().unwrap(), questions);
+
+        // Answers over two calls: nothing resumes, and the model is not called, until the last.
+        assert!(matches!(
+            project.answer(&[answer("q1", 2)]).unwrap(),
+            AnswerOutcome::StillWaiting { open } if open.len() == 1
+        ));
+        assert_eq!(proposer.calls.lock().unwrap().len(), 1);
+        assert_eq!(
+            project.answer(&[answer("q2", 1)]).unwrap(),
+            AnswerOutcome::ReadyToContinue
+        );
+        assert_eq!(proposer.calls.lock().unwrap().len(), 1);
+        let PromptOutcome::Done {
+            outcome, attempts, ..
+        } = resume(&project, &proposer).await
+        else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        assert_eq!(attempts, 2);
+
+        assert_eq!(
+            kinds_of(&project),
+            [
+                "project_created",
+                "user_prompt",
+                "questions_asked",
+                "question_answered",
+                "question_answered",
+                "change_set_proposed",
+                "change_set_accepted"
+            ]
+        );
+        let events = project.events().unwrap();
+        let EventKind::QuestionAnswered { detail, .. } = &events[3].kind else {
+            panic!()
+        };
+        assert_eq!(detail, "q1 answered: \"No\" (choice 2 of 2).");
+        assert_eq!(events[3].actor, Actor::User);
+        assert_eq!(
+            events[2].actor,
+            Actor::SchemaAgent {
+                run_id: "run-1".into(),
+                model: "test:model".into()
+            }
+        );
+        // The second call sees both answers, as part of this prompt.
+        let calls = proposer.calls.lock().unwrap();
+        assert!(calls[0].answers.is_empty());
+        assert_eq!(calls[1].answers.len(), 2);
+        assert!(calls[1].answers.iter().all(|a| a.in_this_prompt));
+        // The proposal belongs to the original prompt.
+        assert!(matches!(
+            &events[5].kind,
+            EventKind::ChangeSetProposed {
+                prompt_seq: Some(2),
+                attempt: 2,
+                ..
+            }
+        ));
+        assert!(project.open_questions().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn bad_answers_are_refused_and_record_nothing() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![ask(vec![q("One?", false), q("Two?", false)])]);
+        project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        let before = project.events().unwrap().len();
+        for bad in [
+            vec![answer("q9", 1)],
+            vec![answer("q1", 0)],
+            vec![answer("q1", 3)],
+            vec![answer("q2", 1), answer("q1", 3)],
+            vec![answer("q1", 1), answer("q1", 2)],
+        ] {
+            assert!(
+                matches!(
+                    project.answer(&bad),
+                    Err(OrchestratorError::InvalidAnswer(_))
+                ),
+                "{bad:?}"
+            );
+        }
+        assert_eq!(project.events().unwrap().len(), before);
+        project.answer(&[answer("q1", 1)]).unwrap();
+        let err = project.answer(&[answer("q1", 2)]).unwrap_err();
+        assert!(err.to_string().contains("already answered"));
+    }
+
+    #[tokio::test]
+    async fn choices_are_numbered_from_one() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![ask(vec![q("One?", false)])]);
+        project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        project.answer(&[answer("q1", 1)]).unwrap();
+        let events = project.events().unwrap();
+        let EventKind::QuestionAnswered { answer, detail } = &events.last().unwrap().kind else {
+            panic!()
+        };
+        assert_eq!(answer.choice, 1);
+        assert_eq!(detail, "q1 answered: \"Yes\" (choice 1 of 2).");
+    }
+
+    #[tokio::test]
+    async fn technical_word_round_is_rejected_repaired_and_recorded() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![
+            ask(vec![q("Should each payment get its own table?", false)]),
+            ask(vec![q("Is each payment kept separately?", false)]),
+        ]);
+        let out = project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        assert!(matches!(out, PromptOutcome::Waiting { .. }));
+        assert_eq!(
+            kinds_of(&project),
+            [
+                "project_created",
+                "user_prompt",
+                "questions_rejected",
+                "questions_asked"
+            ]
+        );
+        let events = project.events().unwrap();
+        let EventKind::QuestionsRejected {
+            prompt_seq,
+            findings,
+        } = &events[2].kind
+        else {
+            panic!()
+        };
+        assert_eq!(*prompt_seq, 2);
+        assert_eq!(findings[0].code, "technical_word");
+        // The rejected round went back to the agent with its questions.
+        let calls = proposer.calls.lock().unwrap();
+        let fb = calls[1].feedback.as_ref().unwrap();
+        assert_eq!(fb.previous.questions.len(), 1);
+        assert_eq!(fb.findings[0].code, "technical_word");
+    }
+
+    #[tokio::test]
+    async fn wrong_reply_shape_is_rejected() {
+        let (_dir, project) = new_project();
+        let both = Ok(Reply {
+            questions: vec![q("One?", false)],
+            change_set: Some(initial()),
+            assumptions: vec![],
+        });
+        let neither = ask(vec![]);
+        let proposer = Scripted::script(vec![both, neither]);
+        let out = project.run_prompt("x", &proposer, false, 2).await.unwrap();
+        let PromptOutcome::Done {
+            outcome: Outcome::Rejected { findings, .. },
+            change_set,
+            ..
+        } = out
+        else {
+            panic!()
+        };
+        assert_eq!(findings[0].code, "reply_shape");
+        assert!(change_set.is_none());
+        assert_eq!(
+            kinds_of(&project),
+            [
+                "project_created",
+                "user_prompt",
+                "questions_rejected",
+                "questions_rejected"
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn questions_after_answers_are_rejected() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![
+            ask(vec![q("One?", false)]),
+            ask(vec![q("Another?", false)]),
+            give(initial()),
+        ]);
+        project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        project.answer(&[answer("q1", 1)]).unwrap();
+        let PromptOutcome::Done {
+            outcome, attempts, ..
+        } = resume(&project, &proposer).await
+        else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        assert_eq!(attempts, 3);
+        let events = project.events().unwrap();
+        assert!(events.iter().any(|e| matches!(
+            &e.kind,
+            EventKind::QuestionsRejected { findings, .. }
+                if findings.iter().any(|f| f.code == "questions_after_answers")
+        )));
+        assert!(project.open_questions().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn defaults_skip_blocking_and_prompt_refuses_while_waiting() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![ask(vec![
+            q("One?", false),
+            q("Two?", true),
+            q("Three?", false),
+        ])]);
+        project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        // Blocking first: q1 is "Two?".
+        let given = vec![answer("q3", 2)];
+        let mut all = given.clone();
+        all.extend(project.default_answers(&given).unwrap());
+        assert_eq!(
+            all.iter()
+                .map(|a| (a.question_id.as_str(), a.choice, a.by_default))
+                .collect::<Vec<_>>(),
+            [("q3", 2, false), ("q2", 1, true)]
+        );
+        let AnswerOutcome::StillWaiting { open } = project.answer(&all).unwrap() else {
+            panic!("the blocking question must stay open")
+        };
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].text, "Two?");
+        let events = project.events().unwrap();
+        let EventKind::QuestionAnswered { detail, .. } = &events.last().unwrap().kind else {
+            panic!()
+        };
+        assert!(detail.starts_with("q2 answered by the default"));
+
+        let err = project
+            .run_prompt("y", &proposer, false, 3)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "1 question is waiting (q1). Answer them with `nocodo-api answer`, or see them with `nocodo-api questions`."
+        );
+        assert!(matches!(
+            project.propose(initial(), Actor::Developer, false),
+            Err(OrchestratorError::QuestionsWaiting(_))
+        ));
+        assert!(matches!(
+            project.continue_pending(&proposer, false, 3).await.unwrap(),
+            ContinueOutcome::StillWaiting { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn failed_call_is_continued_without_a_second_prompt() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![Err("429 busy".into()), give(initial())]);
+        project
+            .run_prompt("x", &proposer, false, 3)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            kinds_of(&project),
+            ["project_created", "user_prompt", "prompt_failed"]
+        );
+        let PromptOutcome::Done { outcome, .. } = resume(&project, &proposer).await else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        let k = kinds_of(&project);
+        assert_eq!(k.iter().filter(|k| **k == "user_prompt").count(), 1);
+        assert_eq!(k.iter().filter(|k| **k == "change_set_proposed").count(), 1);
+        // Nothing left to continue.
+        assert_eq!(
+            project.continue_pending(&proposer, false, 3).await.unwrap(),
+            ContinueOutcome::NothingToContinue
+        );
+    }
+
+    #[tokio::test]
+    async fn failure_after_answers_is_continued_with_the_answers() {
+        let (_dir, project) = new_project();
+        let proposer = Scripted::script(vec![
+            ask(vec![q("One?", false)]),
+            Err("boom".into()),
+            give(initial()),
+        ]);
+        project.run_prompt("x", &proposer, false, 3).await.unwrap();
+        project.answer(&[answer("q1", 1)]).unwrap();
+        let err = project
+            .continue_pending(&proposer, false, 3)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, OrchestratorError::Proposer(_)));
+        assert_eq!(kinds_of(&project).last(), Some(&"prompt_failed"));
+        let PromptOutcome::Done { outcome, .. } = resume(&project, &proposer).await else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        let k = kinds_of(&project);
+        assert_eq!(k.iter().filter(|k| **k == "user_prompt").count(), 1);
+        let calls = proposer.calls.lock().unwrap();
+        assert_eq!(calls[2].answers.len(), 1);
+        assert!(calls[2].answers[0].in_this_prompt);
+    }
+
+    #[tokio::test]
+    async fn destructive_in_a_prompt_run_asks_after_the_agent_round() {
+        let (_dir, project) = new_project();
         project.propose(initial(), Actor::Developer, false).unwrap();
-        let proposer = Scripted::new(vec![drop_notes()]);
-        let r = project.run_prompt("x", &proposer, false, 1).await.unwrap();
-        assert!(matches!(r.outcome, Outcome::Rejected { .. }));
+        let proposer = Scripted::script(vec![
+            ask(vec![q("Do you still want the notes?", false)]),
+            give(drop_notes()),
+        ]);
+        project
+            .run_prompt("drop notes", &proposer, false, 3)
+            .await
+            .unwrap();
+        project.answer(&[answer("q1", 2)]).unwrap();
+        let PromptOutcome::Waiting { questions } = resume(&project, &proposer).await else {
+            panic!("expected the confirmation round")
+        };
+        assert_eq!(
+            (questions[0].id.as_str(), questions[0].asked_by.as_str()),
+            ("q2", "system")
+        );
+        assert!(tech_words_in(&questions[0].text).is_empty());
+        assert_eq!(proposer.calls.lock().unwrap().len(), 2);
+        // Nothing was written yet.
         assert_eq!(
             fs::read_dir(project.dir().join("migrations"))
                 .unwrap()
                 .count(),
             1
         );
+
+        // Yes: the same proposal is accepted; the proposer is not called again.
+        let PromptOutcome::Done { outcome, .. } = resolve_async(&project, "q2", 1).await else {
+            panic!()
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        let events = project.events().unwrap();
+        let proposals: Vec<u64> = events
+            .iter()
+            .filter(|e| matches!(&e.kind, EventKind::ChangeSetProposed { change_set, .. } if change_set.name == "drop_notes"))
+            .map(|e| e.seq)
+            .collect();
+        assert_eq!(proposals.len(), 1);
+        assert!(events.iter().any(|e| matches!(
+            &e.kind,
+            EventKind::ChangeSetAccepted { proposal_seq, .. } if *proposal_seq == proposals[0]
+        )));
+        assert_eq!(proposer.calls.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn destructive_with_another_finding_is_rejected_without_a_question() {
+        let (_dir, project) = new_project();
+        project.propose(initial(), Actor::Developer, false).unwrap();
+        let mut bad = drop_notes();
+        bad.changes.push(SchemaChange::AddColumn {
+            table: "missing".into(),
+            column: col("x", ColumnType::Text),
+        });
+        let proposer = Scripted::new(vec![bad, add_note()]);
+        let out = project.run_prompt("x", &proposer, false, 2).await.unwrap();
+        let PromptOutcome::Done { outcome, .. } = out else {
+            panic!("no question may be asked")
+        };
+        assert!(matches!(outcome, Outcome::Accepted { .. }));
+        let calls = proposer.calls.lock().unwrap();
+        let fb = calls[1].feedback.as_ref().unwrap();
+        assert!(!fb.findings.is_empty());
+        assert!(
+            fb.findings
+                .iter()
+                .all(|f| f.code != "destructive_not_confirmed")
+        );
+        assert!(!kinds_of(&project).contains(&"questions_asked"));
+    }
+
+    #[tokio::test]
+    async fn confirm_destructive_flag_skips_the_question_in_a_prompt_run() {
+        let (_dir, project) = new_project();
+        project.propose(initial(), Actor::Developer, false).unwrap();
+        let proposer = Scripted::new(vec![drop_notes()]);
+        let out = project.run_prompt("x", &proposer, true, 1).await.unwrap();
+        assert!(matches!(
+            out,
+            PromptOutcome::Done {
+                outcome: Outcome::Accepted { .. },
+                ..
+            }
+        ));
     }
 }
 

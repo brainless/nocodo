@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::change::ChangeSet;
+use crate::question::{Answer, Question};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -43,6 +44,18 @@ pub enum EventKind {
     UserPrompt {
         text: String,
     },
+    /// The model call for a prompt failed and nothing was proposed (actor `System`).
+    /// The prompt stays in the log; `nocodo-api continue` repeats the call.
+    PromptFailed {
+        /// Seq of the `UserPrompt` event whose run failed.
+        prompt_seq: u64,
+        /// The error, verbatim.
+        error: String,
+        /// The `.agent-logs/<run_id>.jsonl` file of the failed run, when a run started.
+        #[serde(default)]
+        run_id: Option<String>,
+        detail: String,
+    },
     ChangeSetProposed {
         change_set: ChangeSet,
         /// Seq of the `UserPrompt` event that triggered this proposal.
@@ -69,6 +82,31 @@ pub enum EventKind {
         /// Every check step that ran, in order (all passed).
         #[serde(default)]
         checks: Vec<CheckStep>,
+    },
+    /// A round of questions waiting for the user. Actor `SchemaAgent` (points at a
+    /// prompt) or `System` (destructive confirmation, points at a proposal).
+    QuestionsAsked {
+        #[serde(default)]
+        prompt_seq: Option<u64>,
+        #[serde(default)]
+        proposal_seq: Option<u64>,
+        questions: Vec<Question>,
+        detail: String,
+    },
+    /// One answer from the user (actor `User`).
+    QuestionAnswered {
+        answer: Answer,
+        detail: String,
+    },
+    /// A round that failed the question checks and was not shown to the user.
+    QuestionsRejected {
+        prompt_seq: u64,
+        findings: Vec<Finding>,
+    },
+    /// Duplicate questions removed by the presenter.
+    QuestionsDropped {
+        question_ids: Vec<String>,
+        detail: String,
     },
     /// A migration was applied to `data.sqlite` (actor `System`).
     MigrationApplied {
@@ -156,10 +194,56 @@ mod tests {
                 rows: BTreeMap::from([("a".into(), 3)]),
                 detail: "d".into(),
             },
+            EventKind::PromptFailed {
+                prompt_seq: 2,
+                error: "429".into(),
+                run_id: Some("r1".into()),
+                detail: "d".into(),
+            },
+            EventKind::QuestionsAsked {
+                prompt_seq: Some(2),
+                proposal_seq: None,
+                questions: vec![Question {
+                    id: "q1".into(),
+                    asked_by: "schema".into(),
+                    text: "t".into(),
+                    choices: vec!["a".into(), "b".into()],
+                    default: Some(1),
+                    blocking: false,
+                    why: "w".into(),
+                }],
+                detail: "d".into(),
+            },
+            EventKind::QuestionAnswered {
+                answer: Answer {
+                    question_id: "q1".into(),
+                    choice: 2,
+                    by_default: false,
+                },
+                detail: "d".into(),
+            },
+            EventKind::QuestionsRejected {
+                prompt_seq: 2,
+                findings: vec![Finding {
+                    code: "technical_word".into(),
+                    message: "m".into(),
+                }],
+            },
+            EventKind::QuestionsDropped {
+                question_ids: vec!["q2".into()],
+                detail: "d".into(),
+            },
         ];
         for kind in kinds {
             let json = serde_json::to_string(&kind).unwrap();
             assert_eq!(serde_json::from_str::<EventKind>(&json).unwrap(), kind);
         }
+    }
+
+    #[test]
+    fn old_logs_load() {
+        let line = r#"{"seq":1,"at":"2026-10-01T00:00:00Z","actor":{"type":"user"},"kind":{"type":"user_prompt","text":"hi"}}"#;
+        let e: Event = serde_json::from_str(line).unwrap();
+        assert_eq!(e.kind, EventKind::UserPrompt { text: "hi".into() });
     }
 }

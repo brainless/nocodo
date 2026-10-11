@@ -52,7 +52,7 @@ The user can then add a follow-up ("I also want to track which family member a s
 | Runtime | Deterministic | Applies migrations, runs `inspect` (lists tables and row counts) and summarizes the schema. |
 | API | Axum | Thin HTTP layer over the orchestrator and agents. Runs as a subprocess of the CLI. |
 | CLI | Binary | The only user interface: prompt, answer questions, show summaries. Until the API/CLI epic, `nocodo-api` subcommands stand in for it. |
-| Question presenter | Deterministic (in the CLI) | Batches the Schema agent's questions, removes duplicates, puts blocking ones first, and records answers. This replaces a PM agent. |
+| Question presenter | Deterministic (plain code in the orchestrator; presented by `nocodo-api` until epic 008, then the CLI) | Batches the Schema agent's questions, removes duplicates, puts blocking ones first, and records answers. This replaces a PM agent. |
 
 ### Out of scope (for Experiment 1)
 
@@ -88,8 +88,7 @@ Each user project lives in one folder. Everything nocodo knows about the project
 ```
 <project>/
   project.json            # spec_version, project name, per-role model config
-  events.jsonl            # append-only log: prompts, Q&A, decisions, spec changes
-  questions.jsonl         # typed questions and their status
+  events.jsonl            # append-only log: prompts, questions and answers, decisions, spec changes
   specs/
     schema.json           # owner: Schema agent — rebuilt from events.jsonl
   migrations/

@@ -4,7 +4,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicU32, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use nocodo_types::project::ModelConfig;
@@ -13,7 +13,7 @@ use rig_agent::{
         AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, InvalidToolCallAction,
         InvalidToolCallContext, ModelTurnAction, ModelTurnFinished,
     },
-    completion::StructuredOutputError,
+    completion::{PromptError, StructuredOutputError},
     extractor::ExtractorBuilder,
 };
 use rig_core::{
@@ -38,6 +38,37 @@ pub struct AgentContext {
     /// The first call is not counted, so a run makes at most `retries + 1`.
     pub retries: u64,
     pub max_tokens: u64,
+    /// Waits before each retry of an error the provider marks retryable (429,
+    /// 5xx, connection reset); its length is the number of retries. A
+    /// `retry-after` header replaces the wait.
+    pub provider_retry_waits: Vec<Duration>,
+}
+
+/// Seconds to wait before provider retries 1, 2 and 3.
+const DEFAULT_PROVIDER_RETRY_WAITS: [u64; 3] = [2, 5, 10];
+
+/// The longest wait a `retry-after` header can ask for.
+const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
+
+/// Whether the provider marked the failure as worth trying again.
+fn is_retryable(error: &StructuredOutputError) -> bool {
+    match error {
+        StructuredOutputError::PromptError(PromptError::CompletionError(e)) => e.is_retryable(),
+        StructuredOutputError::PromptError(PromptError::Report(r)) => r.is_retryable(),
+        _ => false,
+    }
+}
+
+fn retry_after(error: &StructuredOutputError) -> Option<Duration> {
+    let secs = error
+        .provider_response_headers()?
+        .get("retry-after")?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()?;
+    Some(Duration::from_secs(secs).min(MAX_RETRY_AFTER))
 }
 
 impl AgentContext {
@@ -48,6 +79,10 @@ impl AgentContext {
             model,
             retries: 2,
             max_tokens: 16_000,
+            provider_retry_waits: DEFAULT_PROVIDER_RETRY_WAITS
+                .iter()
+                .map(|s| Duration::from_secs(*s))
+                .collect(),
         }
     }
 }
@@ -141,8 +176,9 @@ fn to_json<T: Serialize + ?Sized>(value: &T) -> Value {
 /// each rejected output (and for tool calls Rig could not dispatch),
 /// `repaired_output` when arguments sent as strings holding JSON were
 /// repaired and accepted (the usage is then that of the last model call), and
-/// `run_finished` with the typed output or the error, `calls`,
-/// `invalid_outputs` and `repaired_outputs`. Contains no role-specific logic.
+/// `provider_retry` for each wait before retrying an error the provider marks
+/// retryable, and `run_finished` with the typed output or the error, `calls`,
+/// `invalid_outputs`, `repaired_outputs` and `provider_retries`. Contains no role-specific logic.
 pub async fn run_extractor<T>(ctx: &AgentContext, preamble: &str, input: &str) -> Result<T>
 where
     T: JsonSchema + DeserializeOwned + Serialize + Send + Sync + 'static,
@@ -214,14 +250,41 @@ where
     let mut calls: u64 = 0;
     let mut invalid_outputs: u64 = 0;
     let mut repaired_outputs: u64 = 0;
+    let mut provider_retries: u64 = 0;
     let outcome = loop {
         calls += 1;
-        let mut run = extractor.extract(prompt.clone());
-        if !history.is_empty() {
-            run = run.history(history.clone());
-        }
+        let response = loop {
+            let mut run = extractor.extract(prompt.clone());
+            if !history.is_empty() {
+                run = run.history(history.clone());
+            }
+            match run.await {
+                Err(error) if is_retryable(&error) => {
+                    let Some(scheduled) = ctx.provider_retry_waits.get(provider_retries as usize)
+                    else {
+                        break Err(error);
+                    };
+                    let header = retry_after(&error);
+                    let wait = header.unwrap_or(*scheduled);
+                    provider_retries += 1;
+                    log.append(
+                        "provider_retry",
+                        json!({
+                            "call": calls,
+                            "retry": provider_retries,
+                            "of": ctx.provider_retry_waits.len(),
+                            "wait_ms": wait.as_millis() as u64,
+                            "retry_after_header": header.is_some(),
+                            "error": error.to_string(),
+                        }),
+                    );
+                    tokio::time::sleep(wait).await;
+                }
+                other => break other,
+            }
+        };
         let mut original_error: Option<String> = None;
-        let (raw_output, reason) = match run.await {
+        let (raw_output, reason) = match response {
             Ok(response) => break Ok((response.output, to_json(&response.usage))),
             Err(StructuredOutputError::DeserializationError(error)) => {
                 let mut reason = error.to_string();
@@ -306,6 +369,7 @@ where
                     "calls": calls,
                     "invalid_outputs": invalid_outputs,
                     "repaired_outputs": repaired_outputs,
+                    "provider_retries": provider_retries,
                     "duration_ms": duration_ms,
                 }),
             );
@@ -320,10 +384,15 @@ where
                     "calls": calls,
                     "invalid_outputs": invalid_outputs,
                     "repaired_outputs": repaired_outputs,
+                    "provider_retries": provider_retries,
                     "duration_ms": duration_ms,
                 }),
             );
-            Err(Error::Extraction(message))
+            Err(Error::Extraction {
+                message,
+                run_id,
+                provider_retries,
+            })
         }
     };
     log.check()?;

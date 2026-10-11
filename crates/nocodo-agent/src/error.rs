@@ -18,6 +18,12 @@ pub enum Error {
     ModelBuild { provider: String, message: String },
     #[error("could not write agent log {}: {message}", path.display())]
     Log { path: PathBuf, message: String },
-    #[error("the model did not return usable output: {0}")]
-    Extraction(String),
+    #[error("the model did not return usable output: {message}")]
+    Extraction {
+        message: String,
+        /// The run whose `.agent-logs/<run_id>.jsonl` shows what happened.
+        run_id: String,
+        /// Waits spent retrying errors the provider marked retryable.
+        provider_retries: u64,
+    },
 }

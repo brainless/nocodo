@@ -1,4 +1,4 @@
-//! The Schema agent: turns a prompt into a typed `ChangeSet` plus assumptions.
+//! The Schema agent: turns a prompt into questions for the user or a typed `ChangeSet`, plus assumptions.
 //! It is the only source of schema changes outside developer commands, so it owns
 //! `specs/schema.json` (the orchestrator writes that file on its behalf).
 //!
@@ -8,6 +8,7 @@ use nocodo_agent::{AgentContext, Result, run_extractor_with_id};
 use nocodo_types::{
     change::ChangeSet,
     event::Finding,
+    question::Question,
     schema::{IMPLICIT_COLUMNS, SchemaSpec},
 };
 use schemars::JsonSchema;
@@ -47,36 +48,108 @@ pub fn preamble() -> String {
     PREAMBLE_TEMPLATE.replace(IMPLICIT_COLUMNS_PLACEHOLDER, &implicit_columns_section())
 }
 
-/// What the agent returns: the change set and every guess it made.
+/// A question as the agent writes it: a [`nocodo_types::question::Question`]
+/// without `id` and `asked_by`, which the orchestrator assigns.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct SchemaProposal {
-    pub change_set: ChangeSet,
-    /// Short plain sentences: what the agent would have asked the user.
+pub struct QuestionDraft {
+    /// The question, in the user's own words.
+    pub text: String,
+    /// 2 to 5 short choices.
+    pub choices: Vec<String>,
+    /// Number (from 1) of the choice used when the user accepts the defaults.
+    /// Null only for a blocking question.
+    pub default: Option<usize>,
+    /// True when no sensible default exists, so the user must answer.
+    pub blocking: bool,
+    /// For the reviewer, not shown to the user: what depends on the answer.
+    pub why: String,
+}
+
+impl QuestionDraft {
+    /// The full question once the orchestrator has assigned an ID.
+    pub fn into_question(self, id: String, asked_by: &str) -> Question {
+        Question {
+            id,
+            asked_by: asked_by.to_string(),
+            text: self.text,
+            choices: self.choices,
+            default: self.default,
+            blocking: self.blocking,
+            why: self.why,
+        }
+    }
+}
+
+/// What the agent returns: either questions or a change set (exactly one of
+/// `questions` non-empty and `change_set` set; the orchestrator rejects other
+/// shapes), plus the minor guesses it made. One struct rather than a tagged
+/// enum, so strict tool schemas keep working.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SchemaReply {
+    /// Everything the agent needs to ask, in one round. Empty when it returns a change set.
+    pub questions: Vec<QuestionDraft>,
+    /// The proposed change set. Null when it asks questions.
+    pub change_set: Option<ChangeSet>,
+    /// Short plain sentences: minor guesses that were not worth a question.
     pub assumptions: Vec<String>,
+}
+
+/// An answered question, as shown to the agent in "Answers so far".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnswerSoFar {
+    pub question: String,
+    /// The text of the chosen option.
+    pub chosen: String,
+    /// True when the user accepted the default instead of choosing.
+    pub by_default: bool,
 }
 
 /// Why a previous attempt was rejected, passed back verbatim on repair attempts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Feedback {
-    pub previous: ChangeSet,
+    /// The whole rejected reply, questions or change set.
+    pub previous: SchemaReply,
     pub findings: Vec<Finding>,
 }
 
 /// Builds the user message deterministically.
-pub fn build_input(current: &SchemaSpec, prompt: &str, feedback: Option<&Feedback>) -> String {
+pub fn build_input(
+    current: &SchemaSpec,
+    prompt: &str,
+    answers: &[AnswerSoFar],
+    feedback: Option<&Feedback>,
+) -> String {
     let schema = serde_json::to_string_pretty(current).unwrap_or_else(|_| "{}".to_string());
     let mut out = format!(
         "## Current schema\n\n```json\n{schema}\n```\n\n## User request\n\n{}\n",
         prompt.trim()
     );
+    if !answers.is_empty() {
+        out.push_str(
+            "\n## Answers so far\n\nThe user already answered these. Do not ask them again.\n\n",
+        );
+        for a in answers {
+            let how = if a.by_default {
+                "accepted the default"
+            } else {
+                "chosen"
+            };
+            out.push_str(&format!(
+                "- Q: {}\n  A: {} ({how})\n",
+                a.question.trim(),
+                a.chosen.trim()
+            ));
+        }
+    }
     if let Some(fb) = feedback {
         let previous =
             serde_json::to_string_pretty(&fb.previous).unwrap_or_else(|_| "{}".to_string());
         let findings =
             serde_json::to_string_pretty(&fb.findings).unwrap_or_else(|_| "[]".to_string());
         out.push_str(&format!(
-            "\n## Previous attempt (rejected)\n\n```json\n{previous}\n```\n\n## Checker findings\n\n```json\n{findings}\n```\n\nReturn a corrected change set that fixes every finding.\n"
+            "\n## Previous attempt (rejected)\n\n```json\n{previous}\n```\n\n## Checker findings\n\n```json\n{findings}\n```\n\nReturn a corrected reply that fixes every finding.\n"
         ));
     }
     out
@@ -91,9 +164,10 @@ impl SchemaAgent {
         ctx: &AgentContext,
         current: &SchemaSpec,
         prompt: &str,
+        answers: &[AnswerSoFar],
         feedback: Option<&Feedback>,
-    ) -> Result<SchemaProposal> {
-        Self::propose_with_run_id(ctx, current, prompt, feedback)
+    ) -> Result<SchemaReply> {
+        Self::propose_with_run_id(ctx, current, prompt, answers, feedback)
             .await
             .map(|(proposal, _)| proposal)
     }
@@ -104,9 +178,10 @@ impl SchemaAgent {
         ctx: &AgentContext,
         current: &SchemaSpec,
         prompt: &str,
+        answers: &[AnswerSoFar],
         feedback: Option<&Feedback>,
-    ) -> Result<(SchemaProposal, String)> {
-        let input = build_input(current, prompt, feedback);
-        run_extractor_with_id::<SchemaProposal>(ctx, &preamble(), &input).await
+    ) -> Result<(SchemaReply, String)> {
+        let input = build_input(current, prompt, answers, feedback);
+        run_extractor_with_id::<SchemaReply>(ctx, &preamble(), &input).await
     }
 }

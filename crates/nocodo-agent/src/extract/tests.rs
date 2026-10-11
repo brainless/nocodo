@@ -135,7 +135,7 @@ async fn retries_are_bounded_and_the_failure_is_logged() {
     let err = extract_with_model::<Person>(model.clone(), false, &ctx, "p", "in")
         .await
         .unwrap_err();
-    assert!(matches!(err, Error::Extraction(_)));
+    assert!(matches!(err, Error::Extraction { .. }));
     assert_eq!(model.request_count(), 2);
     let lines = log_lines(&ctx.project_dir);
     let finished = lines.last().unwrap();
@@ -147,6 +147,84 @@ async fn retries_are_bounded_and_the_failure_is_logged() {
         ),
         (json!(2), json!(2))
     );
+    let _ = std::fs::remove_dir_all(&ctx.project_dir);
+}
+
+fn rate_limited() -> MockTurn {
+    MockTurn::provider_response_error(
+        rig_core::http_client::StatusCode::TOO_MANY_REQUESTS,
+        r#"{"error":"concurrent_budget_exceeded"}"#,
+        "req_1",
+    )
+}
+
+#[tokio::test]
+async fn retryable_provider_errors_are_retried_and_logged() {
+    let model = MockCompletionModel::from_turns([
+        rate_limited(),
+        rate_limited(),
+        MockTurn::tool_call("toolu_1", "submit", json!({ "name": "Ada", "tags": [] })),
+    ]);
+    let mut ctx = context("provider-retry", 2);
+    ctx.provider_retry_waits = vec![std::time::Duration::from_millis(1); 3];
+    extract_with_model::<Person>(model.clone(), false, &ctx, "p", "in")
+        .await
+        .unwrap();
+    assert_eq!(model.request_count(), 3);
+    let lines = log_lines(&ctx.project_dir);
+    let retries: Vec<_> = lines
+        .iter()
+        .filter(|l| l["type"] == "provider_retry")
+        .collect();
+    assert_eq!(retries.len(), 2);
+    assert_eq!(retries[1]["retry"], 2);
+    let finished = lines.last().unwrap();
+    assert_eq!(finished["provider_retries"], 2);
+    assert_eq!(finished["calls"], 1);
+    let _ = std::fs::remove_dir_all(&ctx.project_dir);
+}
+
+#[tokio::test]
+async fn provider_retries_stop_after_the_last_wait() {
+    let model = MockCompletionModel::from_turns([
+        rate_limited(),
+        rate_limited(),
+        rate_limited(),
+        rate_limited(),
+    ]);
+    let mut ctx = context("provider-retry-exhausted", 2);
+    ctx.provider_retry_waits = vec![std::time::Duration::from_millis(1); 3];
+    let err = extract_with_model::<Person>(model.clone(), false, &ctx, "p", "in")
+        .await
+        .unwrap_err();
+    assert_eq!(model.request_count(), 4);
+    match err {
+        Error::Extraction {
+            provider_retries,
+            run_id,
+            message,
+        } => {
+            assert_eq!(provider_retries, 3);
+            assert!(!run_id.is_empty());
+            assert!(message.contains("429"), "{message}");
+        }
+        other => panic!("unexpected {other:?}"),
+    }
+    let _ = std::fs::remove_dir_all(&ctx.project_dir);
+}
+
+#[tokio::test]
+async fn non_retryable_errors_fail_at_once() {
+    let model = MockCompletionModel::from_turns([MockTurn::error("bad key"), rate_limited()]);
+    let mut ctx = context("provider-no-retry", 2);
+    ctx.provider_retry_waits = vec![std::time::Duration::from_millis(1); 3];
+    extract_with_model::<Person>(model.clone(), false, &ctx, "p", "in")
+        .await
+        .unwrap_err();
+    assert_eq!(model.request_count(), 1);
+    let lines = log_lines(&ctx.project_dir);
+    assert!(lines.iter().all(|l| l["type"] != "provider_retry"));
+    assert_eq!(lines.last().unwrap()["provider_retries"], 0);
     let _ = std::fs::remove_dir_all(&ctx.project_dir);
 }
 

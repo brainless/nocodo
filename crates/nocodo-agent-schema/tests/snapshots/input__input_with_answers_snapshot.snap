@@ -1,0 +1,25 @@
+---
+source: crates/nocodo-agent-schema/tests/input.rs
+expression: out
+---
+## Current schema
+
+```json
+{
+  "spec_version": 1,
+  "tables": []
+}
+```
+
+## User request
+
+track my family's money
+
+## Answers so far
+
+The user already answered these. Do not ask them again.
+
+- Q: Can one spend be for the whole family?
+  A: Yes, a spend can be for the whole family (chosen)
+- Q: Do you lend money to more than one person?
+  A: Only my brother (accepted the default)

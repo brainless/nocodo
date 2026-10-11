@@ -14,13 +14,9 @@ fn sentence_case(name: &str) -> String {
     }
 }
 
-/// A detail in words: references drop `_id`; optional details are marked.
+/// A detail in words; optional details are marked.
 fn detail(c: &Column) -> String {
-    let mut name = c.name.as_str();
-    if c.references.is_some() {
-        name = name.strip_suffix("_id").unwrap_or(name);
-    }
-    let mut s = name.replace('_', " ");
+    let mut s = nocodo_types::naming::column_words(c);
     if c.nullable {
         s.push_str(" (optional)");
     }

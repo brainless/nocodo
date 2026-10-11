@@ -7,9 +7,11 @@
 
 mod error;
 mod project;
+mod questions;
 
 pub use error::OrchestratorError;
+pub use nocodo_checker::AnsweredQuestion;
 pub use project::{
-    Applier, ApplierError, ApplyOutcome, Feedback, Outcome, Project, PromptOutcome, Proposal,
-    Proposer, ProposerError,
+    AnswerOutcome, Applier, ApplierError, ApplyOutcome, ContinueOutcome, Feedback, Outcome,
+    Project, PromptOutcome, Proposal, Proposer, ProposerError, ProposerFailure, Reply,
 };

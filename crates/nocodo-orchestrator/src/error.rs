@@ -19,6 +19,10 @@ pub enum OrchestratorError {
     CorruptEventLog(String),
     /// The proposer (e.g. the Schema agent) failed.
     Proposer(Box<dyn std::error::Error + Send + Sync>),
+    /// A prompt or change set was refused because questions are waiting.
+    QuestionsWaiting(String),
+    /// An answer was refused (unknown question, bad choice, already answered).
+    InvalidAnswer(String),
     /// The applier (the runtime) could not start the run.
     Applier(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -47,6 +51,7 @@ impl std::fmt::Display for OrchestratorError {
             ),
             Self::CorruptEventLog(m) => write!(f, "events.jsonl is inconsistent: {m}"),
             Self::Proposer(e) => write!(f, "{e}"),
+            Self::QuestionsWaiting(m) | Self::InvalidAnswer(m) => write!(f, "{m}"),
             Self::Applier(e) => write!(f, "{e}"),
         }
     }

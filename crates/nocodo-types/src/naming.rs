@@ -1,5 +1,22 @@
 //! Deterministic word forms used by naming rules.
 
+use crate::schema::Column;
+
+/// A name in words: `expense_categories` -> `expense categories`.
+pub fn words(name: &str) -> String {
+    name.replace('_', " ")
+}
+
+/// A detail in words: references drop `_id`. Shared by the `inspect` summary
+/// and the removal confirmation, so both say the same thing.
+pub fn column_words(c: &Column) -> String {
+    let mut name = c.name.as_str();
+    if c.references.is_some() {
+        name = name.strip_suffix("_id").unwrap_or(name);
+    }
+    words(name)
+}
+
 const IRREGULAR: [(&str, &str); 8] = [
     ("people", "person"),
     ("children", "child"),

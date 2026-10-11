@@ -1,4 +1,4 @@
-use nocodo_agent_schema::{Feedback, build_input, preamble};
+use nocodo_agent_schema::{AnswerSoFar, Feedback, SchemaReply, build_input, preamble};
 use nocodo_types::{
     change::{ChangeSet, SchemaChange},
     event::Finding,
@@ -14,8 +14,8 @@ fn spec() -> SchemaSpec {
 
 #[test]
 fn input_without_feedback_is_deterministic() {
-    let a = build_input(&spec(), "  track my spending  ", None);
-    assert_eq!(a, build_input(&spec(), "  track my spending  ", None));
+    let a = build_input(&spec(), "  track my spending  ", &[], None);
+    assert_eq!(a, build_input(&spec(), "  track my spending  ", &[], None));
     let expected = "## Current schema\n\n```json\n{\n  \"spec_version\": 1,\n  \"tables\": []\n}\n```\n\n## User request\n\ntrack my spending\n";
     assert_eq!(a, expected);
 }
@@ -23,22 +23,45 @@ fn input_without_feedback_is_deterministic() {
 #[test]
 fn input_with_feedback_includes_previous_and_findings_verbatim() {
     let fb = Feedback {
-        previous: ChangeSet {
-            name: "add_x".into(),
-            summary: "s".into(),
-            changes: vec![SchemaChange::DropTable { table: "x".into() }],
+        previous: SchemaReply {
+            questions: vec![],
+            change_set: Some(ChangeSet {
+                name: "add_x".into(),
+                summary: "s".into(),
+                changes: vec![SchemaChange::DropTable { table: "x".into() }],
+            }),
+            assumptions: vec![],
         },
         findings: vec![Finding {
             code: "unknown_table".into(),
             message: "no table x".into(),
         }],
     };
-    let out = build_input(&spec(), "p", Some(&fb));
+    let out = build_input(&spec(), "p", &[], Some(&fb));
     assert!(out.contains("## Previous attempt (rejected)"));
     assert!(out.contains("\"op\": \"drop_table\""));
     assert!(out.contains("\"code\": \"unknown_table\""));
     assert!(out.contains("\"message\": \"no table x\""));
-    assert_eq!(out, build_input(&spec(), "p", Some(&fb)));
+    assert_eq!(out, build_input(&spec(), "p", &[], Some(&fb)));
+}
+
+#[test]
+fn input_with_answers_snapshot() {
+    let answers = vec![
+        AnswerSoFar {
+            question: "Can one spend be for the whole family?".into(),
+            chosen: "Yes, a spend can be for the whole family".into(),
+            by_default: false,
+        },
+        AnswerSoFar {
+            question: "Do you lend money to more than one person?".into(),
+            chosen: "Only my brother".into(),
+            by_default: true,
+        },
+    ];
+    let out = build_input(&spec(), "track my family's money", &answers, None);
+    assert!(out.contains("## Answers so far"));
+    insta::assert_snapshot!(out);
 }
 
 #[test]
@@ -55,6 +78,11 @@ fn preamble_has_modeling_rules() {
         "New entries are data, not schema.",
         "Every link is a real reference.",
         "Do not describe how things are stored",
+        "## Asking the user",
+        "at most 8 questions",
+        "never ask again",
+        "never what will be worked out or added for the user",
+        "it never replaces or removes existing ones",
     ] {
         assert!(preamble.contains(rule), "missing: {rule}");
     }

@@ -7,4 +7,5 @@ pub mod change;
 pub mod event;
 pub mod naming;
 pub mod project;
+pub mod question;
 pub mod schema;

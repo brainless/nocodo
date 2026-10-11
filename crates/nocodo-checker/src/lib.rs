@@ -10,10 +10,12 @@ mod dry_run;
 mod introspect;
 mod keywords;
 mod post_apply;
+mod questions;
 mod rules;
 
 pub use dry_run::{
     CheckerError, DryRunReport, NamedMigration, dry_run, static_rules_step, table_renames,
 };
 pub use post_apply::check_db_matches_spec;
+pub use questions::{AnsweredQuestion, MAX_QUESTIONS, check_questions};
 pub use rules::check_change_set;
