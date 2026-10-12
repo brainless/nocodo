@@ -30,3 +30,14 @@ pub fn write_praxis_spec(
     schema_codegen::write_praxis_spec(project_path, module_name, code)
         .map_err(|e| AgentError::Other(e.to_string()))
 }
+
+/// Write a `state_transition`-generated `TransitionGuard` impl to
+/// `backend/src/praxis/transitions/{name}.rs`.
+///
+/// Overwrites on regeneration. Ensures `praxis/mod.rs` and
+/// `praxis/transitions/mod.rs` declare the module. Returns the relative file
+/// path written.
+pub fn write_transition(project_path: &Path, name: &str, code: &str) -> Result<String, AgentError> {
+    schema_codegen::write_transition(project_path, name, code)
+        .map_err(|e| AgentError::Other(e.to_string()))
+}

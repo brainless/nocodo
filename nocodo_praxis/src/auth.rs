@@ -216,3 +216,38 @@ pub enum ImplicitRole {
     /// Any user, including unauthenticated. Use with care.
     AnyUser,
 }
+
+/// Bridges a project's model type (e.g. a Diesel `User` struct) to the praxis
+/// auth vocabulary.
+///
+/// Implement this on any type that carries a role so that generated
+/// [`TransitionGuard`](super::statemachine::TransitionGuard) implementations
+/// can call `has_role` instead of comparing raw fields directly.
+///
+/// # Examples
+///
+/// ```
+/// use nocodo_praxis::auth::{HasRole, RoleId};
+///
+/// struct User {
+///     role: RoleId,
+/// }
+///
+/// impl HasRole for User {
+///     fn role(&self) -> RoleId {
+///         self.role
+///     }
+/// }
+///
+/// let admin = User { role: RoleId("admin") };
+/// assert!(admin.has_role(RoleId("admin")));
+/// assert!(!admin.has_role(RoleId("member")));
+/// ```
+pub trait HasRole {
+    /// The role this entity currently holds.
+    fn role(&self) -> RoleId;
+    /// Returns `true` if this entity holds `role`.
+    fn has_role(&self, role: RoleId) -> bool {
+        self.role() == role
+    }
+}

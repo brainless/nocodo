@@ -12,8 +12,9 @@ ts-rs = "10.1"
 [profile.dev]
 debug = 0
 incremental = true
-codegen-units = 256
+codegen-units = 32
+strip = "debuginfo"
 
 [profile.dev.package."*"]
 debug = 0
-opt-level = 0
+opt-level = "z"

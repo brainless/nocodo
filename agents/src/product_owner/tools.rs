@@ -70,3 +70,27 @@ pub struct CompleteGapClarificationParams {
     /// Short message summarising what was filled, for the user.
     pub closing_message: String,
 }
+
+// ---------------------------------------------------------------------------
+// Loop mode tools (Praxis v1 Phase 3.5 — MILESTONE_PRAXIS_v1.md §8.2)
+// ---------------------------------------------------------------------------
+
+/// PO calls this to ask the backend to run the static checker now (Phase 3.5:
+/// `cargo check` on the managed project's backend crate). The backend runs the
+/// check and fires PO again with the raw output as context for the next turn.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TriggerCodegenParams {
+    /// Short description of what was just recorded / what should be checked,
+    /// e.g. "recorded the admin persona". Used for logging, not code generation
+    /// itself in Phase 3.5 (RustEngineer dispatch ships in Phase 6).
+    pub action_description: String,
+}
+
+/// PO calls this when it believes the system is complete: the most recent
+/// checker run came back clean and the user has confirmed there's nothing
+/// else to add. Ends the loop.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FinalizeSessionParams {
+    /// Short, warm closing message for the user.
+    pub closing_message: String,
+}

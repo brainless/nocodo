@@ -33,3 +33,33 @@ pub mod entity;
 pub mod primitives;
 pub mod provenance;
 pub mod statemachine;
+
+/// Convenience re-exports of the four ID newtypes so callers don't have to
+/// import each one from its own module.
+///
+/// `RoleId` and `PermissionId` live in [`auth`]; `StateId` lives in
+/// [`statemachine`]; `EntityId` lives in [`entity`]. Generated transition
+/// guards and model-type trait impls (`HasRole`, `HasState`) reference all
+/// four constantly, so a single `use nocodo_praxis::prelude::*;` covers the
+/// common case.
+///
+/// # Examples
+///
+/// ```
+/// use nocodo_praxis::prelude::*;
+///
+/// let role = RoleId("admin");
+/// let permission = PermissionId("create_task");
+/// let state = StateId("todo");
+/// let entity = EntityId("task");
+///
+/// assert_eq!(role.0, "admin");
+/// assert_eq!(permission.0, "create_task");
+/// assert_eq!(state.0, "todo");
+/// assert_eq!(entity.0, "task");
+/// ```
+pub mod prelude {
+    pub use crate::auth::{PermissionId, RoleId};
+    pub use crate::entity::EntityId;
+    pub use crate::statemachine::StateId;
+}

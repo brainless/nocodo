@@ -14,9 +14,7 @@
 //! use nocodo_praxis::entity::{Entity, EntityId, Field};
 //! use nocodo_praxis::primitives::{AtLeastOne, Unresolved};
 //! use nocodo_praxis::provenance::Provenance;
-//! use nocodo_praxis::statemachine::{
-//!     State, StateId, Transition, TransitionCondition, Transitions,
-//! };
+//! use nocodo_praxis::statemachine::StateId;
 //!
 //! static PROV_SLICE: &[Provenance] = &[Provenance::Conversation {
 //!     id: "prd-1",
@@ -49,45 +47,32 @@
 //!     },
 //! ];
 //!
-//! static TASK_STATES: [State; 2] = [
-//!     State {
-//!         id: StateId("todo"),
-//!         description: "Task created, not yet started",
-//!         transitions: Transitions::To(AtLeastOne {
-//!             head: Transition {
-//!                 to: StateId("done"),
-//!                 permitted_roles: AtLeastOne { head: RoleId("member"), tail: &[] },
-//!                 condition: TransitionCondition::Always,
-//!                 provenance: PROV_SLICE,
-//!             },
-//!             tail: &[],
-//!         }),
-//!         provenance: PROV_SLICE,
-//!     },
-//!     State {
-//!         id: StateId("done"),
-//!         description: "Task completed.",
-//!         transitions: Transitions::Terminal,
-//!         provenance: PROV_SLICE,
-//!     },
-//! ];
+//! // States are declared independently (e.g. via a separate `record_spec_fact`
+//! // call per state — see MILESTONE_PRAXIS_v1.md §5.6/§5.7). `Entity::states`
+//! // references them by `StateId`, the same cross-reference pattern used
+//! // everywhere else in this crate (`Role::permissions: &[PermissionId]`,
+//! // `Transition::to: StateId`, etc.) — not by embedding full `State` values,
+//! // which would require every entity to duplicate (and keep in sync) the
+//! // complete state machine of every state it lists.
 //!
 //! let task = Entity {
 //!     id: EntityId("task"),
 //!     description: "A unit of work that can be assigned and tracked",
 //!     fields: &FIELDS,
-//!     states: &TASK_STATES,
+//!     states: &[StateId("todo"), StateId("done")],
 //!     invariants: &[],
 //!     provenance: PROV_SLICE,
 //! };
 //!
 //! // Check if any invariants are pending
 //! assert!(task.has_pending_invariants());
+//! assert!(task.has_state(StateId("todo")));
+//! assert!(!task.has_state(StateId("archived")));
 //! ```
 
 use super::primitives::Unresolved;
 use super::provenance::Provenance;
-use super::statemachine::State;
+use super::statemachine::StateId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// A unique identifier for an entity (e.g. `EntityId("task")`).
@@ -137,8 +122,16 @@ pub struct Entity {
     pub description: &'static str,
     /// The entity's data fields.
     pub fields: &'static [Field],
-    /// The entity's lifecycle states.
-    pub states: &'static [State],
+    /// The entity's lifecycle states, referenced by [`StateId`] — [`State`]
+    /// definitions are declared independently (their own `static`s) and
+    /// looked up via a spec-wide index, not embedded here. This mirrors
+    /// every other cross-reference in this crate (`Role::permissions:
+    /// &[PermissionId]`, `Transition::to: StateId`): a full `State` carries
+    /// its own transitions and can't be duplicated per-entity without the
+    /// copies drifting out of sync.
+    ///
+    /// [`State`]: super::statemachine::State
+    pub states: &'static [StateId],
     /// Cross-field or cross-entity invariants (e.g. "a task cannot have more
     /// than one active assignee").
     pub invariants: &'static [Unresolved<&'static str>],
@@ -156,10 +149,10 @@ impl Entity {
             || self.invariants.iter().any(|i| i.blocks_codegen())
     }
 
-    /// Find a state by its [`StateId`](super::statemachine::StateId) within
-    /// this entity's state list.
-    pub fn find_state(&self, id: &super::statemachine::StateId) -> Option<&State> {
-        super::statemachine::find_state(id, self.states)
+    /// Returns `true` if `id` is one of this entity's declared lifecycle
+    /// states.
+    pub fn has_state(&self, id: StateId) -> bool {
+        self.states.contains(&id)
     }
 }
 
@@ -168,7 +161,7 @@ mod tests {
     use super::*;
     use crate::primitives::{AtLeastOne, Unresolved};
     use crate::provenance::Provenance;
-    use crate::statemachine::{State, StateId, Transition, TransitionCondition, Transitions};
+    use crate::statemachine::StateId;
 
     #[test]
     fn entity_with_pending_field_invariant_returns_true() {
@@ -216,33 +209,16 @@ mod tests {
     }
 
     #[test]
-    fn find_state_on_entity() {
-        static STATES: [State; 1] = [State {
-            id: StateId("todo"),
-            description: "",
-            transitions: Transitions::To(AtLeastOne {
-                head: Transition {
-                    to: StateId("done"),
-                    permitted_roles: AtLeastOne {
-                        head: crate::auth::RoleId("member"),
-                        tail: &[],
-                    },
-                    condition: TransitionCondition::Always,
-                    provenance: &[],
-                },
-                tail: &[],
-            }),
-            provenance: &[],
-        }];
+    fn has_state_on_entity() {
         let entity = Entity {
             id: EntityId("task"),
             description: "",
             fields: &[],
-            states: &STATES,
+            states: &[StateId("todo"), StateId("done")],
             invariants: &[],
             provenance: &[],
         };
-        assert!(entity.find_state(&StateId("todo")).is_some());
-        assert!(entity.find_state(&StateId("nonexistent")).is_none());
+        assert!(entity.has_state(StateId("todo")));
+        assert!(!entity.has_state(StateId("nonexistent")));
     }
 }

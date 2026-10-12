@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use actix_web::{post, web, HttpResponse, Responder};
-use nocodo_agents::{build_rust_engineer, PersonaNote, SpecGap};
+use actix_web::{get, post, web, HttpResponse, Responder};
+use nocodo_agents::{build_rust_engineer, PersonaNote, SpecGap, TransitionMetadata};
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 
@@ -300,6 +300,181 @@ pub async fn run_praxis_auth(
         Err(e) => HttpResponse::InternalServerError()
             .json(serde_json::json!({ "error": format!("{}", e) })),
     }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/rust-engineer/state-transition
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct StateTransitionRequest {
+    pub project_id: i64,
+    pub action_description: String,
+    /// When `true`, write generated code to disk under
+    /// `backend/src/praxis/transitions/`. Defaults to `false`.
+    #[serde(default)]
+    pub apply: bool,
+}
+
+#[derive(Serialize)]
+pub struct StateTransitionResponse {
+    pub system_prompt: String,
+    pub prompt: String,
+    pub raw_response: String,
+    pub code: Option<String>,
+    pub metadata: TransitionMetadata,
+    /// Relative file path of the written file when `apply` is `true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+}
+
+/// POST /api/rust-engineer/state-transition
+///
+/// Generates one `nocodo_praxis::statemachine::TransitionGuard` implementation
+/// from a natural-language action description. When `apply` is true, writes
+/// the result to `backend/src/praxis/transitions/{name}.rs`. See
+/// `internal-docs/MILESTONE_PRAXIS_v1.md` §6 and
+/// `RustEngineerAgent::run_state_transition`'s doc comment for the model-type
+/// dependency-ordering decision.
+#[post("/api/rust-engineer/state-transition")]
+pub async fn run_state_transition(
+    state: web::Data<AgentState>,
+    body: web::Json<StateTransitionRequest>,
+) -> impl Responder {
+    let project_path = match get_project_path(&state.db_path, body.project_id) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(serde_json::json!({ "error": "Project not found" }));
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": e }));
+        }
+    };
+
+    if !Path::new(&project_path).is_dir() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": format!("Project path is not a readable directory: {}", project_path)
+        }));
+    }
+
+    let action_description = body.action_description.trim();
+    if action_description.is_empty() {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({ "error": "action_description must not be empty" }));
+    }
+
+    let agent = match build_rust_engineer(&project_path) {
+        Ok(a) => a,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({ "error": format!("Failed to build agent: {}", e) }));
+        }
+    };
+
+    match agent
+        .run_state_transition(action_description, body.apply)
+        .await
+    {
+        Ok(output) => HttpResponse::Ok().json(StateTransitionResponse {
+            system_prompt: output.system_prompt,
+            prompt: output.prompt,
+            raw_response: output.raw_response,
+            code: output.code,
+            metadata: output.metadata,
+            file_path: output.file_path,
+        }),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({ "error": format!("{}", e) })),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/rust-engineer/praxis-specs
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct PraxisSpecsQuery {
+    pub project_id: i64,
+}
+
+#[derive(Serialize)]
+pub struct PraxisSpecFile {
+    /// Path relative to the managed project's `backend/src/praxis/` directory,
+    /// e.g. `"specs/personas.rs"`, `"transitions/assign_task.rs"`, `"mod.rs"`.
+    pub path: String,
+    pub content: String,
+}
+
+#[derive(Serialize)]
+pub struct PraxisSpecsResponse {
+    pub files: Vec<PraxisSpecFile>,
+}
+
+/// GET /api/rust-engineer/praxis-specs?project_id=N
+///
+/// Read-only listing of generated `nocodo_praxis` spec/transition source
+/// files under the managed project's `backend/src/praxis/` directory —
+/// `specs/*.rs`, `transitions/*.rs`, and top-level `mod.rs`. Used by the
+/// admin-gui spec viewer (MILESTONE_PRAXIS_v1.md §9.2). No write capability;
+/// returns an empty file list (not an error) when the project has not
+/// generated any praxis code yet.
+#[get("/api/rust-engineer/praxis-specs")]
+pub async fn list_praxis_specs(
+    state: web::Data<AgentState>,
+    query: web::Query<PraxisSpecsQuery>,
+) -> impl Responder {
+    let project_path = match get_project_path(&state.db_path, query.project_id) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(serde_json::json!({ "error": "Project not found" }));
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": e }));
+        }
+    };
+
+    let praxis_dir = Path::new(&project_path).join("backend/src/praxis");
+    if !praxis_dir.is_dir() {
+        return HttpResponse::Ok().json(PraxisSpecsResponse { files: Vec::new() });
+    }
+
+    let mut files = Vec::new();
+
+    let mod_rs = praxis_dir.join("mod.rs");
+    if mod_rs.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&mod_rs) {
+            files.push(PraxisSpecFile {
+                path: "mod.rs".to_string(),
+                content,
+            });
+        }
+    }
+
+    for subdir in ["specs", "transitions"] {
+        let dir = praxis_dir.join(subdir);
+        let mut entries: Vec<_> = match std::fs::read_dir(&dir) {
+            Ok(rd) => rd.filter_map(|e| e.ok()).collect(),
+            Err(_) => continue,
+        };
+        entries.sort_by_key(|e| e.file_name());
+        for entry in entries {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            files.push(PraxisSpecFile {
+                path: format!("{subdir}/{}", entry.file_name().to_string_lossy()),
+                content,
+            });
+        }
+    }
+
+    HttpResponse::Ok().json(PraxisSpecsResponse { files })
 }
 
 fn get_project_path(db_path: &str, project_id: i64) -> Result<Option<String>, String> {

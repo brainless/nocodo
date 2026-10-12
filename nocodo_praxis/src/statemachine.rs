@@ -66,6 +66,7 @@
 //! ```
 
 use super::auth::{PermissionId, RoleId};
+use super::entity::EntityId;
 use super::primitives::AtLeastOne;
 use super::provenance::Provenance;
 
@@ -175,6 +176,192 @@ pub fn find_unresolved_transitions(states: &[State]) -> Vec<(&State, &Transition
         }
     }
     unresolved
+}
+
+/// Errors returned by [`TransitionGuard::guard`] when a transition is not permitted.
+///
+/// This is the vocabulary generated transition guard functions use when emitting
+/// error returns. Every branch that blocks a transition — wrong role, wrong
+/// permission, wrong state, a violated invariant, or a gap in the PRD — maps to
+/// exactly one of these variants. The static checker uses this shared vocabulary
+/// to recognise blocked transitions across all generated code.
+///
+/// # Examples
+///
+/// ```
+/// use nocodo_praxis::auth::{PermissionId, RoleId};
+/// use nocodo_praxis::entity::EntityId;
+/// use nocodo_praxis::statemachine::{StateId, TransitionError};
+///
+/// // Wrong role.
+/// let forbidden = TransitionError::Forbidden {
+///     required: RoleId("admin"),
+///     found: Some(RoleId("member")),
+/// };
+/// assert_eq!(
+///     forbidden,
+///     TransitionError::Forbidden { required: RoleId("admin"), found: Some(RoleId("member")) }
+/// );
+///
+/// // Wrong permission.
+/// let forbidden_perm = TransitionError::ForbiddenPermission {
+///     required: PermissionId("assign_task_to_anyone"),
+/// };
+/// assert!(matches!(forbidden_perm, TransitionError::ForbiddenPermission { .. }));
+///
+/// // Entity not in the expected state.
+/// let invalid_state = TransitionError::InvalidState {
+///     entity: EntityId("task"),
+///     expected: StateId("todo"),
+///     found: Some(StateId("done")),
+/// };
+/// assert!(matches!(invalid_state, TransitionError::InvalidState { .. }));
+///
+/// // A business invariant was violated.
+/// let invariant = TransitionError::InvariantViolation {
+///     invariant: "a task cannot have more than one active assignee",
+/// };
+/// assert!(matches!(invariant, TransitionError::InvariantViolation { .. }));
+///
+/// // The PRD was silent — this blocks codegen and feeds the clarification loop.
+/// let unresolved = TransitionError::Unresolved {
+///     reason: "PRD does not specify who can cancel a task",
+/// };
+/// assert!(matches!(unresolved, TransitionError::Unresolved { .. }));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransitionError {
+    /// The acting user lacks the required role.
+    Forbidden {
+        /// The role required to perform the transition.
+        required: RoleId,
+        /// The role the acting user actually has, if any.
+        found: Option<RoleId>,
+    },
+    /// The acting user lacks the required permission.
+    ForbiddenPermission {
+        /// The permission required to perform the transition.
+        required: PermissionId,
+    },
+    /// The entity is not in the expected state for this transition.
+    InvalidState {
+        /// The entity that was checked.
+        entity: EntityId,
+        /// The state the entity was expected to be in.
+        expected: StateId,
+        /// The state the entity was actually in, if known.
+        found: Option<StateId>,
+    },
+    /// A business invariant was violated.
+    InvariantViolation {
+        /// Human-readable description of the violated invariant.
+        invariant: &'static str,
+    },
+    /// The transition is not defined because the PRD was silent about it.
+    /// Blocks codegen; triggers the clarification loop.
+    Unresolved {
+        /// What is missing / needs to be clarified before this transition
+        /// can be implemented.
+        reason: &'static str,
+    },
+}
+
+/// A generated transition guard function, keyed by the entity and state
+/// transition it implements.
+///
+/// Every generated transition guard implements this trait. It gives the static
+/// checker a hook: guard functions are discovered by finding `impl
+/// TransitionGuard` blocks, and their `ENTITY`/`FROM`/`TO` consts are
+/// cross-referenced against declared [`Transition`]s (C3: guard function
+/// coverage) to detect states that have a declared transition but no
+/// implementing guard.
+///
+/// # Examples
+///
+/// ```
+/// use nocodo_praxis::auth::RoleId;
+/// use nocodo_praxis::entity::EntityId;
+/// use nocodo_praxis::statemachine::{StateId, TransitionError, TransitionGuard};
+///
+/// struct AssignTask;
+///
+/// impl TransitionGuard<(RoleId, StateId), StateId> for AssignTask {
+///     const ENTITY: EntityId = EntityId("task");
+///     const FROM: StateId = StateId("todo");
+///     const TO: StateId = StateId("in_progress");
+///
+///     fn guard((actor_role, current_state): (RoleId, StateId)) -> Result<StateId, TransitionError> {
+///         if actor_role != RoleId("admin") {
+///             return Err(TransitionError::Forbidden {
+///                 required: RoleId("admin"),
+///                 found: Some(actor_role),
+///             });
+///         }
+///         if current_state != Self::FROM {
+///             return Err(TransitionError::InvalidState {
+///                 entity: Self::ENTITY,
+///                 expected: Self::FROM,
+///                 found: Some(current_state),
+///             });
+///         }
+///         Ok(Self::TO)
+///     }
+/// }
+///
+/// assert_eq!(AssignTask::ENTITY, EntityId("task"));
+/// assert_eq!(AssignTask::FROM, StateId("todo"));
+/// assert_eq!(AssignTask::TO, StateId("in_progress"));
+/// assert_eq!(
+///     AssignTask::guard((RoleId("admin"), StateId("todo"))),
+///     Ok(StateId("in_progress"))
+/// );
+/// assert!(AssignTask::guard((RoleId("member"), StateId("todo"))).is_err());
+/// ```
+pub trait TransitionGuard<Input, Output> {
+    /// The entity this guard operates on.
+    const ENTITY: EntityId;
+    /// The source state this guard transitions FROM.
+    const FROM: StateId;
+    /// The target state this guard transitions TO.
+    const TO: StateId;
+    /// Execute the transition. Returns the mutated entity/value, or an error
+    /// describing why the transition was refused.
+    fn guard(input: Input) -> Result<Output, TransitionError>;
+}
+
+/// Bridges a project's model type (e.g. a Diesel `Task` struct) to the praxis
+/// state machine vocabulary.
+///
+/// Implement this on any type that carries a lifecycle state so that generated
+/// [`TransitionGuard`] implementations can call `is_in_state` instead of
+/// comparing raw fields directly.
+///
+/// # Examples
+///
+/// ```
+/// use nocodo_praxis::statemachine::{HasState, StateId};
+///
+/// struct Task {
+///     status: StateId,
+/// }
+///
+/// impl HasState for Task {
+///     fn state(&self) -> StateId {
+///         self.status
+///     }
+/// }
+///
+/// let task = Task { status: StateId("todo") };
+/// assert!(task.is_in_state(StateId("todo")));
+/// assert!(!task.is_in_state(StateId("done")));
+/// ```
+pub trait HasState {
+    /// The entity's current state.
+    fn state(&self) -> StateId;
+    /// Returns `true` if the entity is currently in `state`.
+    fn is_in_state(&self, state: StateId) -> bool {
+        self.state() == state
+    }
 }
 
 #[cfg(test)]
