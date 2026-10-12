@@ -115,7 +115,7 @@ Scenarios `<s>`: `finance`, `inventory`, `invoices`, `farm`.
 | `nocodo-engine` | The only home of operations: one synchronous function per operation (`init`, `changes`, `prompt`, `questions`, `answer`, `continue_run`, `apply`, `inspect`, `sample_rows`, `list_projects`, `read_rows`) returning typed results from `nocodo-types`. The `Proposer` and `Applier` implementations (it adapts the Schema agent and the runtime). The per-project write lock. | Print, parse arguments, speak HTTP, or duplicate logic that belongs to the orchestrator, checker or runtime |
 | `api` (`nocodo-api`) | Axum server over the engine: routes, background runs (one per project), JSON errors, the in-memory run record. Localhost by default. | Contain business logic: no validation, ordering or wording |
 | `cli` (`nocodo`) | The user-facing CLI: `clap` subcommands (`init`, `changes`, `prompt`, `questions`, `answer`, `continue`, `apply`, `inspect`, `sample-rows`) that call the engine directly and print its results | Call agents, the runtime or the DB directly; contain business logic |
-| `gui` (`nocodo-gui`) | The window (akar): project dropdown, prompt box, questions, summary and rows. Talks HTTP to a `nocodo-api` (spawned locally, or `--server <url>`) | Depend on the engine or any library but `nocodo-types`; call agents or the DB; contain business logic |
+| `gui` (`nocodo-gui`) | The window (akar), two columns: left sidebar with the project dropdown, prompt box and questions; main column with the summary and the rows grid. Talks HTTP to a `nocodo-api` (spawned locally, or `--server <url>`) | Depend on the engine or any library but `nocodo-types`; call agents or the DB; contain business logic |
 
 ### Dependency direction
 

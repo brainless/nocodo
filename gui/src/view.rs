@@ -1,15 +1,15 @@
-//! The single-column window: project dropdown, alert, prompt box with Send, status strip and
+//! The single-column window: project dropdown, alert, prompt box at the bottom, status strip and
 //! the "New project" modal. All logic lives in `Model`; this file only draws and forwards clicks.
 
 use std::path::PathBuf;
 use std::time::Instant;
 
 use akar_components::{
-    AKAR_THEME_DARK, AkarTheme, AlertVariant, ButtonVariant, DataGridAlign, DataGridColumn,
-    DataGridSortDirection, DataGridState, DataGridStyle, TabVariant, TextEditState, akar_alert,
-    akar_button, akar_tab_bar, akar_text_input, akar_textarea, data_grid_begin,
-    data_grid_body_begin, data_grid_body_end, data_grid_cell, data_grid_end,
-    data_grid_header_begin, data_grid_header_cell, data_grid_header_end, modal_begin, modal_end,
+    AKAR_THEME_DARK, AkarTheme, AlertVariant, DataGridAlign, DataGridColumn, DataGridSortDirection,
+    DataGridState, DataGridStyle, TabVariant, TextEditState, akar_alert, akar_tab_bar,
+    akar_text_input, akar_textarea, data_grid_begin, data_grid_body_begin, data_grid_body_end,
+    data_grid_cell, data_grid_end, data_grid_header_begin, data_grid_header_cell,
+    data_grid_header_end, modal_begin, modal_end,
 };
 use akar_core::{AkarCore, Key, QuadCall, TextCall, Z_FLOAT, Z_OVERLAY};
 use akar_layout::{
@@ -40,6 +40,8 @@ const TAB_H: f32 = 34.0;
 const PAGER_H: f32 = 36.0;
 const SUMMARY_H: f32 = 66.0;
 const MIN_GRID_H: f32 = 120.0;
+const SIDEBAR_MIN_W: f32 = 320.0;
+const SIDEBAR_MAX_W: f32 = 460.0;
 const MODAL_NS: u64 = 0x00D1_A106;
 const DATA_NS: u64 = 0x00D1_A107;
 const CONFIRM_NS: u64 = 0x00D1_A108;
@@ -71,7 +73,6 @@ pub struct View {
     project_btn: NodeId,
     alert: NodeId,
     prompt: NodeId,
-    send: NodeId,
     status: NodeId,
     popup_open: bool,
     popup_scroll: f32,
@@ -83,6 +84,9 @@ pub struct View {
     grid_state: DataGridState,
     /// The list and page the grid state belongs to; the scroll resets when it changes.
     grid_key: Option<(String, u64)>,
+    /// Width of the left column (project, chat, questions) and the window size, set each frame.
+    sidebar_w: f32,
+    window: [f32; 2],
 }
 
 fn rgba(c: u32) -> [f32; 4] {
@@ -244,8 +248,6 @@ impl View {
         );
         let alert = leaf(&mut layout, Dimension::percent(1.0), 0.0, 0.0);
         let prompt = leaf(&mut layout, Dimension::auto(), PROMPT_H, 1.0);
-        layout.set_margin(prompt, 0.0, 8.0, 0.0, 0.0);
-        let send = leaf(&mut layout, length(72.0_f32), BTN_H, 0.0);
         let prompt_bar = layout.new_with_children(
             Style {
                 display: Display::Flex,
@@ -257,7 +259,7 @@ impl View {
                 },
                 ..Default::default()
             },
-            &[prompt, send],
+            &[prompt],
         );
         let status = layout.new_leaf(Style {
             flex_grow: 1.0,
@@ -267,7 +269,7 @@ impl View {
             },
             ..Default::default()
         });
-        layout.set_margin(status, 12.0, 0.0, 0.0, 0.0);
+        layout.set_margin(status, 12.0, 0.0, 8.0, 0.0);
         let root = layout.new_with_children(
             Style {
                 display: Display::Flex,
@@ -278,7 +280,7 @@ impl View {
                 },
                 ..Default::default()
             },
-            &[header, alert, prompt_bar, status],
+            &[header, alert, status, prompt_bar],
         );
         layout.set_padding(root, 0.0, MARGIN, MARGIN, MARGIN);
 
@@ -292,7 +294,6 @@ impl View {
             project_btn,
             alert,
             prompt,
-            send,
             status,
             popup_open: false,
             popup_scroll: 0.0,
@@ -303,6 +304,8 @@ impl View {
             q_scroll: 0.0,
             grid_state: DataGridState::new(),
             grid_key: None,
+            sidebar_w: SIDEBAR_MIN_W,
+            window: [0.0, 0.0],
         }
     }
 
@@ -386,6 +389,22 @@ impl View {
                 ..Default::default()
             },
         );
+        // Left sidebar: project, chat and questions. The data fills the rest.
+        self.sidebar_w = (size[0] * 0.32).clamp(SIDEBAR_MIN_W, SIDEBAR_MAX_W);
+        self.layout.set_style(
+            self.root,
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                size: Size {
+                    width: length(self.sidebar_w),
+                    height: Dimension::percent(1.0),
+                },
+                ..Default::default()
+            },
+        );
+        self.layout
+            .set_padding(self.root, MARGIN, MARGIN, MARGIN, MARGIN);
         self.layout.compute(
             self.root,
             (Some(size[0]), Some(size[1])),
@@ -394,6 +413,17 @@ impl View {
 
         core.draw_list
             .push_quad(quad([0.0, 0.0, size[0], size[1]], THEME.base_100, 0.0));
+        core.draw_list.push_quad(quad(
+            [0.0, 0.0, self.sidebar_w, size[1]],
+            THEME.base_200,
+            0.0,
+        ));
+        core.draw_list.push_quad(quad(
+            [self.sidebar_w - 1.0, 0.0, 1.0, size[1]],
+            THEME.base_300,
+            0.0,
+        ));
+        self.window = size;
 
         // akar draws all text above all quads, so an overlay replaces the content under it.
         if self.new_project.is_some() {
@@ -601,8 +631,22 @@ impl View {
         let placeholder = if self.model.selected.is_some() {
             "Say in your own words what you want to keep track of"
         } else {
-            "Pick a project above first"
+            "Pick a project first"
         };
+        // Enter sends; Shift+Enter adds a line. The textarea would turn Enter into a new line,
+        // so the plain Enter is taken out of the input before it sees it.
+        let prompt_id = self.layout.widget_id(self.prompt);
+        let mut enter = false;
+        if core.input.focused_id == Some(prompt_id) {
+            core.input.key_events.retain(|e| {
+                let plain = e.key == Key::Enter && !e.modifiers.shift;
+                enter |= plain;
+                !plain
+            });
+            if enter {
+                core.input.keys_pressed.retain(|k| *k != Key::Enter);
+            }
+        }
         akar_textarea(
             core,
             &self.layout,
@@ -614,20 +658,7 @@ impl View {
             cursor_visible,
             &THEME,
         );
-        let label = if self.model.is_running() {
-            "Working"
-        } else {
-            "Send"
-        };
-        let send = akar_button(
-            core,
-            &self.layout,
-            self.send,
-            label,
-            ButtonVariant::Solid,
-            &THEME,
-        );
-        if send.clicked {
+        if enter {
             self.submit();
         }
     }
@@ -680,7 +711,7 @@ impl View {
             draw_text(
                 core,
                 BUF_HINT,
-                "Nothing yet. Describe your first list above and press Send.",
+                "Nothing yet. Describe your first list above and press Enter.",
                 THEME.font_size_base,
                 [x, y],
                 [x, y, w, LINE_H],
@@ -707,8 +738,10 @@ impl View {
         if self.model.selected.is_none() {
             return;
         }
-        y = self.draw_questions(core, x, y, w, bottom);
-        self.draw_data(core, x, y, w, bottom);
+        self.draw_questions(core, x, y, w, bottom);
+        let main_x = self.sidebar_w + MARGIN;
+        let main_w = (self.window[0] - main_x - MARGIN).max(0.0);
+        self.draw_data(core, main_x, MARGIN, main_w, self.window[1] - MARGIN);
     }
 
     /// The assistant's open questions as numbered choices. Returns the y below the panel.
