@@ -45,7 +45,7 @@ pub enum EventKind {
         text: String,
     },
     /// The model call for a prompt failed and nothing was proposed (actor `System`).
-    /// The prompt stays in the log; `nocodo-api continue` repeats the call.
+    /// The prompt stays in the log; `nocodo continue` repeats the call.
     PromptFailed {
         /// Seq of the `UserPrompt` event whose run failed.
         prompt_seq: u64,

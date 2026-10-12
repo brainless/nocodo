@@ -1,0 +1,31 @@
+[package]
+name = "nocodo-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "nocodo-gui"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+nocodo-types.workspace = true
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+serde.workspace = true
+serde_json.workspace = true
+ureq = { version = "2", features = ["json"] }
+akar-core = { git = "https://github.com/brainless/akar" }
+akar-layout = { git = "https://github.com/brainless/akar" }
+akar-components = { git = "https://github.com/brainless/akar" }
+akar-winit = { git = "https://github.com/brainless/akar" }
+glyphon = "0.11"
+wgpu = "29"
+winit = "0.30"
+pollster = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

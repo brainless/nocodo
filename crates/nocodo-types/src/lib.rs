@@ -6,6 +6,7 @@ pub mod apply;
 pub mod change;
 pub mod event;
 pub mod naming;
+pub mod outcome;
 pub mod project;
 pub mod question;
 pub mod schema;

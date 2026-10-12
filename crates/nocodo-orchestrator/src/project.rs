@@ -15,29 +15,12 @@ use nocodo_types::project::{ProjectBase, ProjectConfig};
 use nocodo_types::question::{Answer, Question};
 use nocodo_types::schema::{SPEC_VERSION, SchemaSpec};
 
+use nocodo_types::outcome::{AnswerOutcome, ApplyOutcome, ContinueOutcome, Outcome, PromptOutcome};
+
 use crate::error::OrchestratorError;
 use crate::questions::{self, SCHEMA, SYSTEM};
 
 type Result<T> = std::result::Result<T, OrchestratorError>;
-
-/// Result of [`Project::propose`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Outcome {
-    /// Migration folder name, e.g. `0002_add_family_member`.
-    Accepted {
-        migration: String,
-        /// Every check step that ran, in order.
-        checks: Vec<CheckStep>,
-    },
-    Rejected {
-        findings: Vec<Finding>,
-        /// Check steps up to and including the one that failed.
-        checks: Vec<CheckStep>,
-    },
-    /// The change set removes data and passed every other check; the user's
-    /// confirmation is waiting. Nothing was written to `migrations/` or `specs/`.
-    Waiting { questions: Vec<Question> },
-}
 
 /// A proposer's whole reply: exactly one of `questions` (non-empty) and
 /// `change_set` must be set; the orchestrator rejects other shapes.
@@ -117,13 +100,13 @@ fn prompt_failed_detail(
     };
     let detail = format!(
         "The model call for prompt {prompt_seq} failed: {message}{retried}. Nothing was proposed; \
-         {log}. Run `nocodo-api continue` to try again."
+         {log}. Run `nocodo continue` to try again."
     );
     (message, run_id, detail)
 }
 
 /// Source of change sets for [`Project::run_prompt`]. Implemented outside the
-/// orchestrator (the api adapts the Schema agent), so no agent dependency.
+/// orchestrator (the engine adapts the Schema agent), so no agent dependency.
 pub trait Proposer {
     fn propose(
         &self,
@@ -134,57 +117,12 @@ pub trait Proposer {
     ) -> impl std::future::Future<Output = std::result::Result<Proposal, ProposerError>> + Send;
 }
 
-/// Result of [`Project::run_prompt`] and of resuming one.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PromptOutcome {
-    /// Questions are waiting: the agent's round, or the removal confirmation.
-    Waiting { questions: Vec<Question> },
-    /// The last attempt. `outcome` is never `Outcome::Waiting`.
-    Done {
-        outcome: Outcome,
-        /// The last change set proposed; `None` when no valid change set came back.
-        change_set: Option<ChangeSet>,
-        assumptions: Vec<String>,
-        attempts: u32,
-    },
-}
-
-/// Result of [`Project::answer`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AnswerOutcome {
-    /// Some questions are still open; the model was not called.
-    StillWaiting { open: Vec<Question> },
-    /// Every question is answered; call [`Project::continue_pending`].
-    ReadyToContinue,
-}
-
-/// Result of [`Project::continue_pending`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ContinueOutcome {
-    NothingToContinue,
-    /// The round is not fully answered yet.
-    StillWaiting {
-        open: Vec<Question>,
-    },
-    Continued(PromptOutcome),
-}
-
 pub type ApplierError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Applies pending migrations to `data.sqlite`. Implemented outside the
-/// orchestrator (the api adapts the runtime), so no runtime dependency.
+/// orchestrator (the engine adapts the runtime), so no runtime dependency.
 pub trait Applier {
     fn apply_pending(&self, project_dir: &Path) -> std::result::Result<ApplyReport, ApplierError>;
-}
-
-/// Result of [`Project::apply_pending`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ApplyOutcome {
-    pub report: ApplyReport,
-    /// The post-apply comparison; `None` when nothing was applied or a migration failed.
-    pub check: Option<CheckStep>,
-    /// The `detail` of each `MigrationApplied` event, then of `MigrationFailed` if any.
-    pub details: Vec<String>,
 }
 
 fn rows_summary(before: &BTreeMap<String, u64>, after: &BTreeMap<String, u64>) -> String {
@@ -217,7 +155,7 @@ fn failed_detail(f: &FailedMigration) -> String {
         (false, _) => "data.sqlite could NOT be restored automatically; check it against the backup before doing anything else.".to_string(),
     };
     format!(
-        "{} failed: {}. {state} Later migrations were not attempted; `nocodo-api apply` retries.",
+        "{} failed: {}. {state} Later migrations were not attempted; `nocodo apply` retries.",
         f.migration, f.error
     )
 }
@@ -447,8 +385,8 @@ impl Project {
         let (n, verb) = (open.len(), if open.len() == 1 { "is" } else { "are" });
         let noun = if n == 1 { "question" } else { "questions" };
         Err(OrchestratorError::QuestionsWaiting(format!(
-            "{n} {noun} {verb} waiting ({ids}). Answer them with `nocodo-api answer`, \
-             or see them with `nocodo-api questions`."
+            "{n} {noun} {verb} waiting ({ids}). Answer them with `nocodo answer`, \
+             or see them with `nocodo questions`."
         )))
     }
 

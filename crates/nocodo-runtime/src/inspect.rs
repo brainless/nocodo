@@ -23,7 +23,7 @@ pub struct Inspection {
 }
 
 /// `file:` URI that opens `db` read-only; `%`, `?` and `#` in the path are escaped.
-fn read_only_uri(db: &Path) -> String {
+pub(crate) fn read_only_uri(db: &Path) -> String {
     let mut out = String::from("file:");
     for c in db.to_string_lossy().chars() {
         match c {

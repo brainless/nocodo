@@ -13,3 +13,8 @@ workspace = true
 
 [dependencies]
 nocodo-types.workspace = true
+nocodo-engine.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+dotenvy = "0.15"
+serde_json.workspace = true

@@ -587,7 +587,7 @@ mod run_prompt {
                     detail,
                     "The model call for prompt 2 failed: 429 concurrent_budget_exceeded \
                      (retried 3 times). Nothing was proposed; see .agent-logs/run-9.jsonl. \
-                     Run `nocodo-api continue` to try again."
+                     Run `nocodo continue` to try again."
                 );
             }
             other => panic!("unexpected {other:?}"),
@@ -924,7 +924,7 @@ mod run_prompt {
             .unwrap_err();
         assert_eq!(
             err.to_string(),
-            "1 question is waiting (q1). Answer them with `nocodo-api answer`, or see them with `nocodo-api questions`."
+            "1 question is waiting (q1). Answer them with `nocodo answer`, or see them with `nocodo questions`."
         );
         assert!(matches!(
             project.propose(initial(), Actor::Developer, false),

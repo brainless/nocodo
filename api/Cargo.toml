@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[lib]
+name = "nocodo_api"
+path = "src/lib.rs"
+
 [[bin]]
 name = "nocodo-api"
 path = "src/main.rs"
@@ -12,16 +16,16 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+nocodo-engine.workspace = true
 nocodo-types.workspace = true
-nocodo-sqlgen.workspace = true
-nocodo-checker.workspace = true
-nocodo-orchestrator.workspace = true
-nocodo-runtime.workspace = true
-nocodo-agent.workspace = true
-nocodo-agent-schema.workspace = true
-nocodo-agent-pm.workspace = true
-clap = { version = "4", features = ["derive", "env"] }
-anyhow = "1"
-dotenvy = "0.15"
+serde.workspace = true
 serde_json.workspace = true
-tokio = { version = "1", features = ["rt-multi-thread"] }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+
+[dev-dependencies]
+nocodo-orchestrator.workspace = true
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }

@@ -11,7 +11,10 @@ mod questions;
 
 pub use error::OrchestratorError;
 pub use nocodo_checker::AnsweredQuestion;
+pub use nocodo_types::outcome::{
+    AnswerOutcome, ApplyOutcome, ContinueOutcome, Outcome, PromptOutcome,
+};
 pub use project::{
-    AnswerOutcome, Applier, ApplierError, ApplyOutcome, ContinueOutcome, Feedback, Outcome,
-    Project, PromptOutcome, Proposal, Proposer, ProposerError, ProposerFailure, Reply,
+    Applier, ApplierError, Feedback, Project, Proposal, Proposer, ProposerError, ProposerFailure,
+    Reply,
 };

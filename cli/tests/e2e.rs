@@ -9,7 +9,7 @@ fn root() -> PathBuf {
 }
 
 fn run(project: &str, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_nocodo-api"))
+    Command::new(env!("CARGO_BIN_EXE_nocodo"))
         .current_dir(root())
         .arg("--project")
         .arg(project)
@@ -135,7 +135,7 @@ fn removal_asks_then_answer_applies_it() {
     assert!(String::from_utf8_lossy(&o.stderr).contains("waiting"));
     let o = run(p, &["prompt", "keep track of pets"]);
     assert!(!o.status.success());
-    assert!(String::from_utf8_lossy(&o.stderr).contains("nocodo-api answer"));
+    assert!(String::from_utf8_lossy(&o.stderr).contains("nocodo answer"));
 
     // Bad arguments are refused naming the argument; --defaults skips blocking questions.
     let o = run(p, &["answer", "q1:1"]);

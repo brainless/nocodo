@@ -1,6 +1,6 @@
 # Epic 007: Questions
 
-**Status:** Not started
+**Status:** Done
 **Goal:** The Schema agent asks the user what it needs to know, in domain language, with typed choices, instead of guessing silently. Plain code checks every question for technical words, orders them, records them and the answers in `events.jsonl`, and resumes the run once every question is answered. Removing data needs the user's explicit confirmation, asked as a question in domain terms. This epic tests PRD claim 3 and success criteria 1 and 2: with plain-language prompts, at most 8 questions per initial scenario, and none of them technical.
 
 **Prerequisite:** Epic 006 (closed; checkpoint review in `epics-notes/006-runtime.md`).
@@ -235,3 +235,30 @@ cargo run -q --bin nocodo-api -- inspect --project .projects/q-<s>
 ---
 
 ## Task Notes
+
+Review and checkpoint session by Claude on 2026-10-11; full details in `epics-notes/007-questions.md`.
+
+**Built:** Tasks 0–8 as specified. Beyond the epic text:
+- `continue_pending` takes `confirm_destructive` and `max_attempts`.
+- `check_questions` takes an `AnsweredQuestion` with an `in_this_prompt` flag.
+- `words()` and `column_words()` moved into `nocodo-types`.
+- `prompt` prints "Accepted → migrations/…", the same as `changes`.
+
+**Tested:**
+- `cargo build`, `test`, `clippy -D warnings` and `fmt --check` pass.
+- Destructive flow on `q-finance-dev`: one blocking question, nothing written until "yes", the notes gone afterwards, the other 12 sample rows intact, the backup still holds the notes.
+- Plain prompts on finance, inventory, invoices and farm, with a follow-up each:
+  - 2, 0, 2 and 3 initial questions; none blocking; none above 8; no technical words seen.
+  - No follow-up asked anything.
+  - Finance answers were split over two `answer` commands and resumed only after the second.
+  - Data and backups held in every scenario.
+  - No `questions_rejected` or `prompt_failed` occurred.
+
+**Surprising / left open (carried to the next epic):**
+- Inventory asked no questions on its initial prompt.
+- The farm follow-up changed the schema (added `accounts`) when it should have been data-only.
+- The finance change-set summary promises a computed value ("worked out from…").
+- Questions that were asked are mostly shallow yes/no.
+- `continue` after a real failed model call was not run live (scripted tests only). It is not known whether the provider-retry test scripts a 429.
+- Minor code points (the `field` tech word, ID gaps, losing findings when a repair attempt fails, an exhausted questions round that cannot be continued) are in the notes file.
+
