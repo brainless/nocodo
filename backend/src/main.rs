@@ -1,6 +1,8 @@
 use actix_cors::Cors;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
-use nocodo_agents::{SqliteTaskStorage, TaskStorage};
+// COMMENTED OUT (Praxis v1 Phase 1): startup dispatch reconciliation disabled below;
+// these types were only needed for that block.
+// use nocodo_agents::{SqliteTaskStorage, TaskStorage};
 use shared_types::HeartbeatResponse;
 
 mod agents_api;
@@ -104,26 +106,28 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    if let Ok(ts) = SqliteTaskStorage::open(&config.database.url) {
-        match ts.list_open_dispatchable_tasks().await {
-            Ok(tasks) => {
-                if !tasks.is_empty() {
-                    log::info!("Reconciling {} open dispatchable task(s)", tasks.len());
-                }
-                for task in tasks {
-                    let _ = agent_state
-                        .dispatch_tx
-                        .send(agents_api::dispatcher::DispatchEvent {
-                            task_id: task.id.unwrap_or(0),
-                            project_id: task.project_id,
-                            assigned_to_agent: task.assigned_to_agent,
-                            source_prompt: task.source_prompt,
-                        });
-                }
-            }
-            Err(e) => log::warn!("Startup reconciliation failed: {}", e),
-        }
-    }
+    // COMMENTED OUT (Praxis v1 Phase 1): dispatcher and task state machine disabled;
+    // no more task-based specialist dispatch to reconcile on boot.
+    // if let Ok(ts) = SqliteTaskStorage::open(&config.database.url) {
+    //     match ts.list_open_dispatchable_tasks().await {
+    //         Ok(tasks) => {
+    //             if !tasks.is_empty() {
+    //                 log::info!("Reconciling {} open dispatchable task(s)", tasks.len());
+    //             }
+    //             for task in tasks {
+    //                 let _ = agent_state
+    //                     .dispatch_tx
+    //                     .send(agents_api::dispatcher::DispatchEvent {
+    //                         task_id: task.id.unwrap_or(0),
+    //                         project_id: task.project_id,
+    //                         assigned_to_agent: task.assigned_to_agent,
+    //                         source_prompt: task.source_prompt,
+    //                     });
+    //             }
+    //         }
+    //         Err(e) => log::warn!("Startup reconciliation failed: {}", e),
+    //     }
+    // }
 
     let schema_cache = {
         let conn =
@@ -175,15 +179,18 @@ async fn main() -> std::io::Result<()> {
             .app_data(auth_config.clone())
             .service(heartbeat)
             .configure(auth::configure)
-            .configure(agents_api::db_engineer::configure)
-            .configure(agents_api::ui_designer::configure)
-            .configure(agents_api::context::configure)
+            // COMMENTED OUT (Praxis v1 Phase 1): specialist/task-execution agent routes disabled.
+            // .configure(agents_api::db_engineer::configure)
+            // .configure(agents_api::ui_designer::configure)
+            // .configure(agents_api::context::configure)
             .configure(agents_api::user_chat::configure)
             .configure(agents_api::rust_engineer::configure)
             .configure(agents_api::stack_reviewer::configure)
-            .configure(agents_api::project_notes::configure)
+            // COMMENTED OUT (Praxis v1 Phase 1): project_notes replaced by direct praxis spec files.
+            // .configure(agents_api::project_notes::configure)
             .configure(agents_api::code_extractor::configure)
-            .configure(agents_api::comments::configure)
+            // COMMENTED OUT (Praxis v1 Phase 1): epic/task comment endpoints disabled with epics/tasks.
+            // .configure(agents_api::comments::configure)
             .configure(projects_api::configure)
             .configure(schema_api::configure)
     })

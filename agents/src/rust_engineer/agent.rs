@@ -6,7 +6,7 @@ use llm_sdk::{
     types::{CompletionRequest, ContentBlock, Message, Role},
 };
 
-use super::modes::{diesel_model, diesel_model_struct, diesel_schema, praxis_auth};
+use super::modes::{diesel_model, diesel_model_struct, diesel_schema, praxis_auth, state_transition};
 use crate::{
     code_extractor::{extract_struct, find_dependent_types, find_struct_file, list_impl_fns},
     error::AgentError,
@@ -59,6 +59,21 @@ pub struct PraxisAuthOutput {
     pub files_written: Vec<String>,
     /// Gaps detected in the input notes or generated code.
     pub gaps: Vec<SpecGap>,
+}
+
+#[derive(Debug)]
+pub struct StateTransitionOutput {
+    pub system_prompt: String,
+    pub prompt: String,
+    pub raw_response: String,
+    /// Extracted Rust code (think-stripped, fence-unwrapped, imports prepended).
+    pub code: Option<String>,
+    /// Deterministic metadata parsed out of `code` (§6.3 point 3/7). Default
+    /// (all-`None`/empty) when `code` is `None`.
+    pub metadata: state_transition::TransitionMetadata,
+    /// Relative path of the file written to disk (`None` when `apply` is
+    /// `false`, or when `code` was empty).
+    pub file_path: Option<String>,
 }
 
 #[derive(Debug)]
@@ -480,6 +495,163 @@ impl RustEngineerAgent {
             gaps,
         })
     }
+
+    // -----------------------------------------------------------------------
+    // Mode: State transition guard (Praxis v1 §6 / §10 Phase 6)
+    // -----------------------------------------------------------------------
+
+    /// Generate one `TransitionGuard` implementation from a natural-language
+    /// action description.
+    ///
+    /// # Model type dependency ordering — decision (MILESTONE_PRAXIS_v1.md
+    /// §6.4, §10 Phase 6, §11 "Model struct ordering enforcement")
+    ///
+    /// The milestone poses three options for enforcing "a Diesel model
+    /// struct for the referenced entity must exist before its transition
+    /// guard is generated": (a) a hard check in this backend
+    /// handler/method, (b) a static-checker-only check (C2/C3, deferred to
+    /// after codegen), or (c) a PO-prompt instruction only.
+    ///
+    /// **Chosen approach: (c) + a soft, non-blocking diagnostic, not (a).**
+    /// A hard backend check would require inferring *which* model struct the
+    /// action description needs (e.g. "assign a task" -> `Task`) from free
+    /// text without an LLM call — exactly the kind of guess this method's
+    /// prompt already asks the LLM to avoid making. Implementing that
+    /// inference reliably is a bigger, separate piece of work (fuzzy-matching
+    /// action nouns to struct names) and a wrong guess would block valid
+    /// generations. Per §6.4's "No placeholder types" principle, the loop
+    /// already relies on the model referencing real ids and the checker
+    /// catching gaps — extending that same posture to model structs is
+    /// consistent, whereas a backend existence check is the odd one out.
+    ///
+    /// So: PO's loop prompt (`agents/src/product_owner/modes/loop_mode.rs`)
+    /// is expected to instruct the LLM to generate the model struct via
+    /// `diesel_model_struct` before triggering a transition guard that
+    /// depends on it (this is a prompt-level instruction, not enforced here).
+    /// As a cheap, *non-blocking* diagnostic, this method logs a warning
+    /// when `backend/src/models/` doesn't exist or is empty at call time —
+    /// useful operator signal, never a hard error. Full enforcement
+    /// (referenced model type must resolve to a real struct) is left as a
+    /// documented gap for Phase 7's end-to-end test / a future static
+    /// checker extension (the current C2 check only covers
+    /// `RoleId`/`StateId`/`EntityId`/`PermissionId`/`PersonaId` references,
+    /// not Diesel model struct names).
+    ///
+    /// When `apply` is true, writes the result to
+    /// `backend/src/praxis/transitions/{name}.rs` (name derived from the
+    /// generated guard struct's name) and registers the module. Returns the
+    /// prompt, raw response, extracted code, parsed metadata, and the
+    /// written file path for admin UI display and debugging — same
+    /// transparency contract as every other RustEngineer mode.
+    pub async fn run_state_transition(
+        &self,
+        action_description: &str,
+        apply: bool,
+    ) -> Result<StateTransitionOutput, AgentError> {
+        let models_dir = self.project_path.join("backend/src/models");
+        let has_models = models_dir
+            .read_dir()
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(false);
+        if !has_models {
+            log::warn!(
+                "[RustEngineer:state_transition] backend/src/models/ is empty or missing — \
+                 generating a transition guard with no project model types in context. This is \
+                 not blocked (see run_state_transition's doc comment on model-type ordering); \
+                 the model may reference model type names that don't exist yet."
+            );
+        }
+
+        let system_prompt = state_transition::build_system_prompt(self.project_path.parent());
+        let model_types = read_concatenated_rs_dir(&models_dir);
+        let existing_spec =
+            read_concatenated_rs_dir(&self.project_path.join("backend/src/praxis/specs"));
+        let prompt =
+            state_transition::build_user_prompt(action_description, &model_types, &existing_spec);
+
+        log::info!(
+            "[RustEngineer:state_transition] apply={} system_len={} prompt_len={}",
+            apply,
+            system_prompt.len(),
+            prompt.len()
+        );
+
+        let request = CompletionRequest {
+            messages: vec![Message {
+                role: Role::User,
+                content: vec![ContentBlock::Text {
+                    text: prompt.clone(),
+                }],
+                tool_call_id: None,
+                tool_name: None,
+            }],
+            max_tokens: 1024,
+            model: self.model.clone(),
+            system: Some(system_prompt.clone()),
+            temperature: Some(0.2),
+            top_p: None,
+            stop_sequences: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+        };
+
+        let response = self
+            .client
+            .complete(request)
+            .await
+            .map_err(AgentError::Llm)?;
+
+        let raw_response = response
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
+
+        log::info!(
+            "[RustEngineer:state_transition] raw_len={}",
+            raw_response.len()
+        );
+
+        let extracted = extract_code(&raw_response);
+        let code = if extracted.trim().is_empty() {
+            None
+        } else {
+            Some(prepend_state_transition_imports(&extracted))
+        };
+
+        let metadata = code
+            .as_deref()
+            .map(state_transition::extract_transition_metadata)
+            .unwrap_or_default();
+
+        let mut file_path = None;
+        if apply {
+            if let Some(ref final_code) = code {
+                let name = transition_file_name(&metadata);
+                match crate::code_writer::write_transition(&self.project_path, &name, final_code) {
+                    Ok(path) => {
+                        log::info!("[RustEngineer:state_transition] wrote {}", path);
+                        file_path = Some(path);
+                    }
+                    Err(e) => log::warn!("[RustEngineer:state_transition] write error: {}", e),
+                }
+            }
+        }
+
+        Ok(StateTransitionOutput {
+            system_prompt,
+            prompt,
+            raw_response,
+            code,
+            metadata,
+            file_path,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -529,6 +701,57 @@ fn prepend_praxis_auth_imports(code: &str) -> String {
          use nocodo_praxis::provenance::Provenance;\n\
          \n{body}"
     )
+}
+
+/// Prepend deterministic imports for a `state_transition` guard file and
+/// strip any model-added `use` lines. Imports the trait/error vocabulary
+/// (`nocodo_praxis::statemachine`) plus the auth vocabulary
+/// (`nocodo_praxis::auth`) and `nocodo_praxis::entity::EntityId` — the same
+/// set the system prompt documents as "types you must use".
+fn prepend_state_transition_imports(code: &str) -> String {
+    let body = strip_imports(code);
+    format!(
+        "use nocodo_praxis::auth::{{HasRole, RoleId}};\n\
+         use nocodo_praxis::entity::EntityId;\n\
+         use nocodo_praxis::statemachine::{{HasState, StateId, TransitionError, TransitionGuard}};\n\
+         \n{body}"
+    )
+}
+
+/// Read and concatenate every `.rs` file directly under `dir`, sorted by
+/// path for determinism. Returns an empty string if `dir` doesn't exist —
+/// not an error (mirrors `static_checker::load_transition_guard_code`).
+fn read_concatenated_rs_dir(dir: &std::path::Path) -> String {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return String::new();
+    };
+    let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    paths.sort();
+    let mut out = String::new();
+    for path in paths {
+        if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                out.push_str(&content);
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
+/// Derive the `transitions/{name}.rs` file stem from parsed metadata: the
+/// guard struct's name, snake_cased (e.g. `AssignTask` -> `assign_task`).
+/// Falls back to `entity_from_to` when the struct name wasn't parsed (should
+/// not happen for well-formed output, but keeps `write_transition` from
+/// failing on a malformed generation), then to a fixed fallback name.
+fn transition_file_name(metadata: &state_transition::TransitionMetadata) -> String {
+    if let Some(ref name) = metadata.struct_name {
+        return schema_codegen::to_snake_case(name);
+    }
+    match (&metadata.entity, &metadata.from_state, &metadata.to_state) {
+        (Some(e), Some(f), Some(t)) => format!("{e}_{f}_to_{t}"),
+        _ => "unnamed_transition".to_string(),
+    }
 }
 
 fn strip_imports(code: &str) -> String {

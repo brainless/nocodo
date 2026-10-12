@@ -1,13 +1,16 @@
 use crate::agents_api::state::AgentState;
 use actix_web::{get, post, web, HttpResponse, Responder};
+// COMMENTED OUT (Praxis v1 Phase 1): PM disabled; build_project_manager,
+// FinalizeSessionParams, PmUserSessionResult, and PraxisWriterTaskSpec were only
+// needed for the PM handoff flow (run_pm_planning / handle_pm_finalized / hydrate_praxis_tasks).
 use nocodo_agents::{
-    build_project_manager, find_gaps_from_persona_notes, gaps_to_questions, AgentConfig,
-    AgentStorage, AgentType, CommentStorage, FinalizeSessionParams, GapQuestion, MessageContent,
-    PersonaNote, PmUserSessionResult, PoMode, PoSessionResult, PraxisWriterTaskSpec,
-    ProductOwnerAgent, ProjectNoteStorage, SpecGap, SpecNoteContent, SqliteAgentStorage,
-    SqliteCommentStorage, SqliteProjectNoteStorage, SqliteTaskStorage, SqliteUserChatStorage,
-    SqliteUserStorage, StructuredQuestion, StructuredResponse, TaskStorage, UserChatMessageRow,
-    UserChatSessionRow, UserChatStorage, UserStorage,
+    find_gaps_from_persona_notes, gaps_to_questions, map_gaps_to_questions, run_cargo_check,
+    run_static_checks, AgentConfig, AgentStorage, AgentType, CommentStorage, GapQuestion,
+    MessageContent, PersonaNote, PoMode, PoSessionResult, ProductOwnerAgent, ProjectNoteStorage,
+    SpecGap, SpecNoteContent, SqliteAgentStorage, SqliteCommentStorage, SqliteProjectNoteStorage,
+    SqliteTaskStorage, SqliteUserChatStorage, SqliteUserStorage, StructuredQuestion,
+    StructuredResponse, TaskStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage,
+    UserStorage,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -148,8 +151,14 @@ pub async fn create_session(
         }
     };
 
+    // Praxis v1 Phase 3.5 (MILESTONE_PRAXIS_v1.md §8.1): new sessions route to
+    // the unified PO<->user loop, not the legacy "intake" requirements-gathering
+    // flow. `session_type` is retained as a column (dropping it, along with
+    // `handoff_session_id`, is a larger DB migration deferred per §8's task
+    // list / this phase's deviation notes) but its only live value going
+    // forward is "loop" — see `run_po_intake`'s dispatch below.
     let session_id = match chat_storage
-        .create_session(body.project_id, user_id, "intake")
+        .create_session(body.project_id, user_id, "loop")
         .await
     {
         Ok(id) => id,
@@ -481,10 +490,11 @@ const PO_GREETING: &str = "Hi! I'm the Product Owner at nocodo — we help small
     understand what you want to build and shape it into a clear brief for our development \
     team. I'll ask you a few focused questions to get started.";
 
-const PM_GREETING: &str = "Hi! I'm the Project Manager at nocodo. I've received the \
-    requirements brief from our Product Owner and I'll be turning that into a concrete \
-    development plan. I may have one or two quick follow-up questions before I finalise \
-    the work.";
+// COMMENTED OUT (Praxis v1 Phase 1): PM disabled; only used inside run_pm_planning below.
+// const PM_GREETING: &str = "Hi! I'm the Project Manager at nocodo. I've received the \
+//     requirements brief from our Product Owner and I'll be turning that into a concrete \
+//     development plan. I may have one or two quick follow-up questions before I finalise \
+//     the work.";
 
 // ---------------------------------------------------------------------------
 // Background task: PO handles intake session
@@ -542,11 +552,25 @@ async fn run_po_intake(
         return;
     }
 
-    // Route by session_type: planning → PM, persona_interview → PO persona interview.
-    // Intake sessions (default) are handled by PO in requirements gathering mode.
+    // Route by session_type. Praxis v1 Phase 3.5: "loop" is the only type new
+    // sessions get (see `create_session` above) — the unified PO<->user loop
+    // mode. "planning" / "persona_interview" / "gap_clarification" / bare
+    // "intake" are legacy session types from pre-Praxis-v1 sessions; their
+    // handlers stay in place (not deleted, per the milestone's "comment out,
+    // don't delete" policy) so any session created before this phase can still
+    // be resumed, but no new session will ever get those types.
+    if session.session_type == "loop" {
+        return run_po_loop_session(db_path, session_id, project_id, chat_notify).await;
+    }
     if session.session_type == "planning" {
-        drop(chat_storage);
-        return run_pm_planning(db_path, session_id, chat_notify).await;
+        // COMMENTED OUT (Praxis v1 Phase 1): PM disabled; loop replaces the planning handoff.
+        // drop(chat_storage);
+        // return run_pm_planning(db_path, session_id, chat_notify).await;
+        log::warn!(
+            "user_chat: session {} is type 'planning' but PM is disabled (Praxis v1 Phase 1)",
+            session_id
+        );
+        return;
     }
     if session.session_type == "persona_interview" {
         return run_po_persona_interview(db_path, session_id, project_id, chat_notify).await;
@@ -806,11 +830,526 @@ async fn run_po_intake(
         | Ok(PoSessionResult::Silent)
         | Ok(PoSessionResult::Named)
         | Ok(PoSessionResult::PersonaInterviewComplete { .. })
-        | Ok(PoSessionResult::GapClarificationComplete { .. }) => {}
+        | Ok(PoSessionResult::GapClarificationComplete { .. })
+        // Loop-mode variants (Praxis v1 Phase 3.5) never occur here — this
+        // function only runs the legacy `requirements_gathering` mode, which
+        // doesn't have `trigger_codegen`/`finalize_session` tools. Listed for
+        // exhaustiveness.
+        | Ok(PoSessionResult::LoopTriggerCodegen { .. })
+        | Ok(PoSessionResult::LoopFinalized { .. }) => {}
         Err(e) => {
             log::warn!("user_chat: PO error: {}", e);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Background task: PO handles the unified loop session (Praxis v1 Phase 3.5)
+// ---------------------------------------------------------------------------
+
+/// Backend orchestration for the unified PO<->user loop
+/// (MILESTONE_PRAXIS_v1.md §8.3). Fires PO once per user turn; if PO calls
+/// `trigger_codegen`, runs the Phase 3.5 checker (`cargo check` on the managed
+/// project's backend crate) and fires PO again with the raw compiler output as
+/// gap context — bounded by `MAX_CODEGEN_CYCLES` per user turn so a confused
+/// model can't spin the backend forever without ever handing control back to
+/// the user.
+async fn run_po_loop_session(
+    db_path: String,
+    session_id: i64,
+    project_id: i64,
+    chat_notify: Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
+    let chat_storage = match SqliteUserChatStorage::open(&db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("user_chat: open storage (PO loop): {}", e);
+            return;
+        }
+    };
+
+    let messages = match chat_storage.get_messages(session_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            log::warn!("user_chat: get messages (PO loop): {}", e);
+            return;
+        }
+    };
+
+    if has_unanswered_structured_questions(&messages) {
+        log::info!(
+            "[PO:loop:session={}] returning early — unanswered questions present",
+            session_id
+        );
+        return;
+    }
+
+    let po_has_spoken = messages
+        .iter()
+        .any(|m| m.author_type == "agent" && m.agent_type.as_deref() == Some("product_owner"));
+    if !po_has_spoken {
+        if let Err(e) = chat_storage
+            .append_message(
+                session_id,
+                "agent",
+                None,
+                Some(AgentType::ProductOwner),
+                None,
+                MessageContent::Text(PO_GREETING.to_string()),
+            )
+            .await
+        {
+            log::warn!("user_chat: store PO loop greeting: {}", e);
+        } else {
+            notify_session(&chat_notify, session_id).await;
+        }
+    }
+
+    let raw_messages: Vec<(String, String)> = messages
+        .iter()
+        .map(|m| {
+            let role = match m.author_type.as_str() {
+                "user" => "user",
+                _ => "assistant",
+            };
+            let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+            (role.to_string(), text)
+        })
+        .collect();
+    let raw_messages = if !po_has_spoken {
+        let mut v = raw_messages;
+        v.push(("assistant".to_string(), PO_GREETING.to_string()));
+        v
+    } else {
+        raw_messages
+    };
+    let llm_messages = merge_consecutive_roles(raw_messages);
+
+    let Some(project_root) = lookup_project_path(&db_path, project_id) else {
+        log::warn!(
+            "[PO:loop:session={}] no project path found for project_id={}",
+            session_id,
+            project_id
+        );
+        return;
+    };
+    let project_root = std::path::PathBuf::from(project_root);
+
+    let config = match AgentConfig::load() {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("user_chat: load config (PO loop): {}", e);
+            return;
+        }
+    };
+
+    let po_storage: Arc<dyn AgentStorage> = match SqliteAgentStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open agent storage (PO loop): {}", e);
+            return;
+        }
+    };
+    let po_task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open task storage (PO loop): {}", e);
+            return;
+        }
+    };
+    let po_comment_storage: Arc<dyn CommentStorage> = match SqliteCommentStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open comment storage (PO loop): {}", e);
+            return;
+        }
+    };
+    let po_note_storage: Arc<dyn ProjectNoteStorage> =
+        match SqliteProjectNoteStorage::open(&db_path) {
+            Ok(s) => Arc::new(s),
+            Err(e) => {
+                log::warn!("user_chat: open project note storage (PO loop): {}", e);
+                return;
+            }
+        };
+    let po = match ProductOwnerAgent::new(
+        po_storage,
+        po_task_storage,
+        po_comment_storage,
+        po_note_storage,
+        config,
+        project_id,
+    ) {
+        Ok(a) => a,
+        Err(e) => {
+            log::warn!("user_chat: build PO (loop): {}", e);
+            return;
+        }
+    };
+
+    // Bounds the number of trigger_codegen -> cargo check -> PO round-trips
+    // within a single user turn. §8.3's state diagram is otherwise unbounded
+    // (CodeGenRunning -> StaticChecking -> PoWithGaps -> ... could cycle
+    // indefinitely without ever reaching WaitingForUser); this cap trades a
+    // theoretical multi-fact single-turn resolution for a hard guarantee that
+    // the background task always terminates and the user always gets a
+    // response.
+    const MAX_CODEGEN_CYCLES: usize = 3;
+    let mut checker_context: Option<String> = None;
+
+    for cycle in 0..=MAX_CODEGEN_CYCLES {
+        log::info!(
+            "[PO:loop:session={}] run_loop cycle={} has_checker_context={}",
+            session_id,
+            cycle,
+            checker_context.is_some()
+        );
+        let result = po
+            .run_loop(
+                session_id,
+                &project_root,
+                llm_messages.clone(),
+                checker_context.take(),
+            )
+            .await;
+        log::info!(
+            "[PO:loop:session={}] run_loop cycle={} returned: {:?}",
+            session_id,
+            cycle,
+            result
+                .as_ref()
+                .map(|r| format!("{:?}", r))
+                .unwrap_or_else(|e| format!("Err({:?})", e))
+        );
+
+        match result {
+            Ok(PoSessionResult::LoopFinalized { closing_message }) => {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::Text(closing_message),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO loop closing message: {}", e);
+                }
+                if let Err(e) = chat_storage.complete_session(session_id).await {
+                    log::warn!("user_chat: complete loop session: {}", e);
+                }
+                notify_session(&chat_notify, session_id).await;
+                return;
+            }
+            Ok(PoSessionResult::LoopTriggerCodegen {
+                message,
+                action_description,
+            }) => {
+                if let Some(text) = message {
+                    if !text.trim().is_empty() {
+                        if let Err(e) = chat_storage
+                            .append_message(
+                                session_id,
+                                "agent",
+                                None,
+                                Some(AgentType::ProductOwner),
+                                None,
+                                MessageContent::Text(text),
+                            )
+                            .await
+                        {
+                            log::warn!("user_chat: store PO loop pre-codegen message: {}", e);
+                        } else {
+                            notify_session(&chat_notify, session_id).await;
+                        }
+                    }
+                }
+
+                log::info!(
+                    "[PO:loop:session={}] trigger_codegen({}) — running cargo check",
+                    session_id,
+                    action_description
+                );
+
+                if cycle == MAX_CODEGEN_CYCLES {
+                    log::warn!(
+                        "[PO:loop:session={}] hit MAX_CODEGEN_CYCLES={} — stopping without a \
+                         further response this turn; the user's next message will resume the loop",
+                        session_id,
+                        MAX_CODEGEN_CYCLES
+                    );
+                    return;
+                }
+
+                // Phase 6 (MILESTONE_PRAXIS_v1.md §10 Phase 6 point 7): fire
+                // RustEngineer's `state_transition` mode when
+                // `action_description` reads like a transition/action rather
+                // than a request to generate a model type. This is a
+                // heuristic, not a separate PO tool/param — see
+                // `looks_like_transition_action`'s doc comment for exactly
+                // what it checks and its known false-negative/positive
+                // shape. `diesel_model_struct` wiring (the other half of
+                // §6.4's "PO loop triggers model generation first") is not
+                // implemented here.
+                //
+                // Phase 7 finding (MILESTONE_PRAXIS_v1.md §10 Phase 7): this
+                // was investigated, not just left as a TODO. No
+                // `diesel_model_struct`-triggering path exists anywhere in
+                // `trigger_codegen`'s dispatch — when
+                // `looks_like_transition_action` returns `false`, this
+                // branch is simply skipped and only the checkers below run;
+                // nothing generates a model struct. This is a real, still-
+                // open gap for a live end-to-end run (a user whose
+                // `action_description` reads as "generate the Task struct"
+                // gets no codegen at all, just a checker pass), but it does
+                // NOT block the static checker from reaching zero gaps:
+                // `static_checker::run_static_checks` (see its module docs)
+                // only reads `backend/src/praxis/{specs,transitions}/*.rs` —
+                // it has no check category that gates on a Diesel model
+                // struct existing anywhere in the project (C2's referential
+                // integrity only covers `RoleId`/`StateId`/`EntityId`/
+                // `PermissionId`/`PersonaId` literals inside `specs/*.rs`,
+                // not Rust type names referenced from `transitions/*.rs`).
+                // So a spec that never triggers `diesel_model_struct` can
+                // still legitimately reach zero checker gaps; a generated
+                // transition guard referencing a nonexistent `Task`/`User`
+                // type would only surface via `cargo check`'s compiler
+                // errors, not via this checker. Building a real
+                // `diesel_model_struct`-dispatch heuristic (and inferring
+                // *which* struct an action description implies) is exactly
+                // the kind of free-text-to-struct-name guessing
+                // `run_state_transition`'s own doc comment (below) already
+                // argues against doing without an LLM call — so this stays a
+                // documented, deliberate gap rather than new untested
+                // codegen-dispatch surface, per Phase 7's task brief. Wiring
+                // it in properly (most likely: give PO an explicit
+                // `codegen_kind` parameter on `trigger_codegen` instead of
+                // inferring intent from free text) is left for a future
+                // phase.
+                if looks_like_transition_action(&action_description) {
+                    match crate::agents_api::rust_engineer::handlers::build_rust_engineer_at(
+                        project_root.to_string_lossy().as_ref(),
+                    ) {
+                        Ok(agent) => match agent
+                            .run_state_transition(&action_description, true)
+                            .await
+                        {
+                            Ok(output) => {
+                                log::info!(
+                                    "[PO:loop:session={}] state_transition generated: struct={:?} file={:?} unresolved={}",
+                                    session_id,
+                                    output.metadata.struct_name,
+                                    output.file_path,
+                                    output.metadata.has_unresolved
+                                );
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "[PO:loop:session={}] state_transition error: {}",
+                                    session_id,
+                                    e
+                                );
+                            }
+                        },
+                        Err(e) => {
+                            log::warn!(
+                                "[PO:loop:session={}] state_transition build agent error: {}",
+                                session_id,
+                                e
+                            );
+                        }
+                    }
+                }
+
+                // Phase 5 (MILESTONE_PRAXIS_v1.md §10 Phase 5, §11 risk 5): run
+                // BOTH checkers and union their output as gap context. `cargo
+                // check` still catches type errors the regex-based static
+                // checker can't see (it never actually compiles anything);
+                // the static checker gives PO structured, typed gaps instead
+                // of raw rustc stderr for everything it *can* see.
+                let cargo_check_text = match run_cargo_check(&project_root) {
+                    Ok(outcome) if outcome.success => {
+                        "cargo check: succeeded — no compiler errors.".to_string()
+                    }
+                    Ok(outcome) => format!("cargo check errors:\n{}", outcome.output),
+                    Err(e) => {
+                        log::warn!(
+                            "[PO:loop:session={}] cargo check failed to run: {}",
+                            session_id,
+                            e
+                        );
+                        format!("cargo check could not be run: {}", e)
+                    }
+                };
+
+                let gaps = run_static_checks(&project_root);
+                let static_checker_text = if gaps.is_empty() {
+                    "static checker: no gaps found.".to_string()
+                } else {
+                    let questions = map_gaps_to_questions(&gaps);
+                    let bullets = questions
+                        .iter()
+                        .map(|q| format!("- {}", q.question))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    format!(
+                        "static checker found {} gap(s) — possible follow-up questions:\n{}",
+                        questions.len(),
+                        bullets
+                    )
+                };
+
+                log::info!(
+                    "[PO:loop:session={}] static checker found {} gap(s)",
+                    session_id,
+                    gaps.len()
+                );
+
+                checker_context = Some(format!("{cargo_check_text}\n\n{static_checker_text}"));
+                // Loop again with the combined checker output as this turn's context.
+            }
+            Ok(PoSessionResult::Questions { message, questions }) => {
+                if !message.trim().is_empty() {
+                    if let Err(e) = chat_storage
+                        .append_message(
+                            session_id,
+                            "agent",
+                            None,
+                            Some(AgentType::ProductOwner),
+                            None,
+                            MessageContent::Text(message),
+                        )
+                        .await
+                    {
+                        log::warn!("user_chat: store PO loop message: {}", e);
+                    }
+                }
+                for q in questions {
+                    if let Err(e) = chat_storage
+                        .append_message(
+                            session_id,
+                            "agent",
+                            None,
+                            Some(AgentType::ProductOwner),
+                            None,
+                            MessageContent::StructuredQuestion(q),
+                        )
+                        .await
+                    {
+                        log::warn!("user_chat: store PO loop question: {}", e);
+                    }
+                }
+                notify_session(&chat_notify, session_id).await;
+                return;
+            }
+            Ok(PoSessionResult::Text(t)) if !t.trim().is_empty() => {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::Text(t),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO loop response: {}", e);
+                }
+                notify_session(&chat_notify, session_id).await;
+                return;
+            }
+            Ok(_) => {
+                // Silent, or a legacy-mode variant PO's loop tool set never
+                // produces (Named / RequirementsComplete / etc.) — nothing to
+                // show the user.
+                return;
+            }
+            Err(e) => {
+                log::warn!("user_chat: PO loop error: {}", e);
+                return;
+            }
+        }
+    }
+}
+
+/// Heuristic: does `action_description` (PO's free-text argument to
+/// `trigger_codegen`) describe a state transition / behavior, as opposed to
+/// a request to generate a model/entity struct?
+///
+/// MILESTONE_PRAXIS_v1.md §10 Phase 6 task list asks `trigger_codegen` to be
+/// able to fire `state_transition` "in addition to just running checkers",
+/// and explicitly leaves the dispatch mechanism to implementer judgment
+/// ("PO's `action_description` ... when it looks like a transition/action
+/// description"). `trigger_codegen` has no separate mode parameter (PO
+/// cannot yet say "this one's a transition" explicitly — see §6.4's open
+/// question), so this is a plain keyword heuristic, not a robust NLU
+/// classifier:
+///
+/// - Any of a small set of "this is defining a data shape" keywords (model,
+///   struct, entity, schema, table, field(s)) means "not a transition" —
+///   these phrases mean PO wants a Diesel model generated, which this loop
+///   does not yet wire `trigger_codegen` to do (documented gap: Phase 7 will
+///   need `diesel_model_struct` wired in too, per §6.4's "PO loop triggers
+///   model generation first" example).
+/// - Otherwise, presence of a common transition/action verb (assign,
+///   cancel, complete, approve, reject, start, finish, close, submit,
+///   publish, archive, activate, deactivate, confirm, move, transition,
+///   mark) means "this is a transition".
+/// - Anything matching neither bucket falls through to "not a transition" —
+///   `trigger_codegen` still runs the checkers either way, so the worst case
+///   is a missed transition generation, not a lost user turn.
+///
+/// Known limitation (documented for Phase 7's end-to-end test): a
+/// description like "add a due date field when assigning a task" would be
+/// classified as "not a transition" because it contains "field" — false
+/// negatives are possible. This is acceptable for the loop's correctness
+/// (the static checker still surfaces the missing guard as a gap on the
+/// next cycle) but not for its latency.
+fn looks_like_transition_action(action_description: &str) -> bool {
+    let text = action_description.to_lowercase();
+
+    const MODEL_KEYWORDS: &[&str] = &[
+        "struct", "model", "entity", "schema", "table", "field", "fields",
+    ];
+    if MODEL_KEYWORDS.iter().any(|k| text.contains(k)) {
+        return false;
+    }
+
+    const TRANSITION_VERBS: &[&str] = &[
+        "assign",
+        "cancel",
+        "complete",
+        "approve",
+        "reject",
+        "start",
+        "finish",
+        "close",
+        "submit",
+        "publish",
+        "archive",
+        "activate",
+        "deactivate",
+        "confirm",
+        "move",
+        "transition",
+        "mark",
+    ];
+    TRANSITION_VERBS.iter().any(|v| text.contains(v))
+}
+
+/// Look up a project's managed filesystem path — the root that
+/// `record_spec_fact` writes into and `cargo check` runs against.
+fn lookup_project_path(db_path: &str, project_id: i64) -> Option<String> {
+    let conn = rusqlite::Connection::open(db_path).ok()?;
+    conn.query_row(
+        "SELECT path FROM project WHERE id = ?1",
+        rusqlite::params![project_id],
+        |row| row.get(0),
+    )
+    .ok()
 }
 
 async fn build_notes_seed(db_path: &str, project_id: i64) -> String {
@@ -902,12 +1441,14 @@ async fn handle_po_complete(
         return;
     }
 
-    // Kick off PM in the planning session.
-    let db_path = db_path.to_string();
-    let chat_notify = chat_notify.clone();
-    actix_web::rt::spawn(async move {
-        run_pm_planning(db_path, planning_session_id, chat_notify).await;
-    });
+    // COMMENTED OUT (Praxis v1 Phase 1): PM disabled; loop replaces this handoff.
+    // // Kick off PM in the planning session.
+    // let db_path = db_path.to_string();
+    // let chat_notify = chat_notify.clone();
+    // actix_web::rt::spawn(async move {
+    //     run_pm_planning(db_path, planning_session_id, chat_notify).await;
+    // });
+    let _ = (db_path, planning_session_id, chat_notify);
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,12 +1575,14 @@ async fn handle_persona_complete(
         return;
     }
 
-    // Kick off PM in the planning session.
-    let db_path = db_path.to_string();
-    let chat_notify = chat_notify.clone();
-    actix_web::rt::spawn(async move {
-        run_pm_planning(db_path, planning_session_id, chat_notify).await;
-    });
+    // COMMENTED OUT (Praxis v1 Phase 1): PM disabled; loop replaces this handoff.
+    // // Kick off PM in the planning session.
+    // let db_path = db_path.to_string();
+    // let chat_notify = chat_notify.clone();
+    // actix_web::rt::spawn(async move {
+    //     run_pm_planning(db_path, planning_session_id, chat_notify).await;
+    // });
+    let _ = (db_path, planning_session_id, chat_notify);
 }
 
 // ---------------------------------------------------------------------------
@@ -1726,7 +2269,8 @@ fn build_gap_seed(
 // ---------------------------------------------------------------------------
 // Background task: PM handles planning session
 // ---------------------------------------------------------------------------
-
+// COMMENTED OUT (Praxis v1 Phase 1): PM disabled; loop replaces PM planning.
+/*
 async fn run_pm_planning(
     db_path: String,
     session_id: i64,
@@ -1926,6 +2470,7 @@ async fn run_pm_planning(
         }
     }
 }
+*/
 
 async fn validate_structured_response(
     chat_storage: &SqliteUserChatStorage,
@@ -1978,6 +2523,9 @@ async fn validate_structured_response(
     Ok(())
 }
 
+// COMMENTED OUT (Praxis v1 Phase 1): PM disabled; loop replaces PM finalization,
+// epic/task creation, and praxis_engineer task hydration.
+/*
 async fn handle_pm_finalized(
     db_path: &str,
     session_id: i64,
@@ -2233,3 +2781,4 @@ fn hydrate_praxis_tasks(db_path: &str, project_id: i64, task_ids: &[i64]) {
         );
     }
 }
+*/

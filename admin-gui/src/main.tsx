@@ -8,7 +8,8 @@ import AdminHomePage from './pages/AdminHomePage';
 import ComponentsGalleryPage from './pages/ComponentsGalleryPage';
 import ProjectLayout from './components/ProjectLayout';
 import DatabasePage from './pages/DatabasePage';
-import EpicsPage from './pages/EpicsPage';
+// COMMENTED OUT (Praxis v1 Phase 1): epics/tasks pipeline disabled.
+// import EpicsPage from './pages/EpicsPage';
 import BackendPage from './pages/BackendPage';
 import UIDesignPage from './pages/UIDesignPage';
 import ProjectSettingsPage from './pages/ProjectSettingsPage';
@@ -16,6 +17,7 @@ import UserChatPage from './pages/UserChatPage';
 import StackNotesPage from './pages/StackNotesPage';
 import ProjectNotesPage from './pages/ProjectNotesPage';
 import RustEngineerPage from './pages/RustEngineerPage';
+import SpecViewerPage from './pages/SpecViewerPage';
 
 function AppRoutes() {
   return (
@@ -23,9 +25,10 @@ function AppRoutes() {
       <Route path="/" component={AdminHomePage} />
       <Route path="/components" component={ComponentsGalleryPage} />
       <Route path="/projects/:projectId" component={ProjectLayout}>
-        <Route path="/epics" component={EpicsPage} />
-        <Route path="/epics/epic/:epicId" component={EpicsPage} />
-        <Route path="/epics/task/:taskId" component={EpicsPage} />
+        {/* COMMENTED OUT (Praxis v1 Phase 1): epics/tasks pipeline disabled. */}
+        {/* <Route path="/epics" component={EpicsPage} /> */}
+        {/* <Route path="/epics/epic/:epicId" component={EpicsPage} /> */}
+        {/* <Route path="/epics/task/:taskId" component={EpicsPage} /> */}
         <Route path="/database" component={DatabasePage} />
         <Route path="/backend" component={BackendPage} />
         <Route path="/ui-design" component={UIDesignPage} />
@@ -33,6 +36,7 @@ function AppRoutes() {
         <Route path="/chat/sessions" component={UserChatPage} />
         <Route path="/chat/:sessionId" component={UserChatPage} />
         <Route path="/rust-engineer" component={RustEngineerPage} />
+        <Route path="/spec-viewer" component={SpecViewerPage} />
         <Route path="/stack-notes" component={StackNotesPage} />
         <Route path="/project-notes" component={ProjectNotesPage} />
         <Route path="/settings" component={ProjectSettingsPage} />

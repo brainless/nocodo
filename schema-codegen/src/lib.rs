@@ -869,6 +869,53 @@ pub fn register_praxis_module(project_root: &Path, module_name: &str) -> Result<
     Ok(())
 }
 
+/// Write a `state_transition`-generated `TransitionGuard` impl to
+/// `backend/src/praxis/transitions/{name}.rs`. Mirrors [`write_praxis_spec`]:
+/// atomic write, then registers the module. Overwrites on regeneration.
+///
+/// See `internal-docs/MILESTONE_PRAXIS_v1.md` §6.3 point 5.
+pub fn write_transition(project_root: &Path, name: &str, code: &str) -> Result<String, String> {
+    let rel_path = format!("backend/src/praxis/transitions/{}.rs", name);
+    let abs_path = project_root.join(&rel_path);
+    write_file_atomic(&abs_path, code)?;
+    register_transition_module(project_root, name)?;
+    Ok(rel_path)
+}
+
+/// Ensure `backend/src/praxis/mod.rs` declares `pub mod transitions;` and
+/// that `backend/src/praxis/transitions/mod.rs` declares
+/// `pub mod {name};`. Creates files if absent, deduplicates entries — same
+/// pattern as [`register_praxis_module`].
+pub fn register_transition_module(project_root: &Path, name: &str) -> Result<(), String> {
+    // backend/src/praxis/mod.rs
+    let praxis_mod = project_root.join("backend/src/praxis/mod.rs");
+    let praxis_line = "pub mod transitions;\n";
+    if praxis_mod.exists() {
+        let existing = std::fs::read_to_string(&praxis_mod)
+            .map_err(|e| format!("read praxis/mod.rs: {}", e))?;
+        if !existing.contains(praxis_line) {
+            write_file_atomic(&praxis_mod, &format!("{}{}", existing, praxis_line))?;
+        }
+    } else {
+        write_file_atomic(&praxis_mod, praxis_line)?;
+    }
+
+    // backend/src/praxis/transitions/mod.rs
+    let transitions_mod = project_root.join("backend/src/praxis/transitions/mod.rs");
+    let new_line = format!("pub mod {};\n", name);
+    if transitions_mod.exists() {
+        let existing = std::fs::read_to_string(&transitions_mod)
+            .map_err(|e| format!("read transitions/mod.rs: {}", e))?;
+        if !existing.contains(&new_line) {
+            write_file_atomic(&transitions_mod, &format!("{}{}", existing, new_line))?;
+        }
+    } else {
+        write_file_atomic(&transitions_mod, &new_line)?;
+    }
+
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -1373,5 +1420,96 @@ mod tests {
         assert!(schema_code
             .contains("diesel::joinable!(organization_users -> organizations (organization_id));"));
         assert!(schema_code.contains("diesel::joinable!(organization_users -> users (user_id));"));
+    }
+
+    // -----------------------------------------------------------------
+    // write_transition / register_transition_module
+    // (MILESTONE_PRAXIS_v1.md §6.3 point 5, §10 Phase 6)
+    // -----------------------------------------------------------------
+
+    fn scratch_project_root(label: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!(
+            "nocodo-schema-codegen-test-{}-{}-{}",
+            label,
+            std::process::id(),
+            n
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    const SAMPLE_TRANSITION_CODE: &str = r#"
+struct AssignTask;
+
+impl TransitionGuard<(User, Task, User), Task> for AssignTask {
+    const ENTITY: EntityId = EntityId("task");
+    const FROM: StateId = StateId("todo");
+    const TO: StateId = StateId("in_progress");
+
+    fn guard((actor, task, assignee): (User, Task, User)) -> Result<Task, TransitionError> {
+        Ok(task)
+    }
+}
+"#;
+
+    #[test]
+    fn write_transition_writes_file_and_registers_modules() {
+        let root = scratch_project_root("write-transition");
+
+        let rel_path = write_transition(&root, "assign_task", SAMPLE_TRANSITION_CODE).unwrap();
+        assert_eq!(rel_path, "backend/src/praxis/transitions/assign_task.rs");
+
+        let written = std::fs::read_to_string(root.join(&rel_path)).unwrap();
+        assert_eq!(written, SAMPLE_TRANSITION_CODE);
+
+        let praxis_mod =
+            std::fs::read_to_string(root.join("backend/src/praxis/mod.rs")).unwrap();
+        assert!(praxis_mod.contains("pub mod transitions;"));
+
+        let transitions_mod =
+            std::fs::read_to_string(root.join("backend/src/praxis/transitions/mod.rs")).unwrap();
+        assert!(transitions_mod.contains("pub mod assign_task;"));
+    }
+
+    #[test]
+    fn register_transition_module_is_idempotent_and_additive() {
+        let root = scratch_project_root("register-transition");
+
+        register_transition_module(&root, "assign_task").unwrap();
+        register_transition_module(&root, "assign_task").unwrap();
+        register_transition_module(&root, "cancel_task").unwrap();
+
+        let transitions_mod =
+            std::fs::read_to_string(root.join("backend/src/praxis/transitions/mod.rs")).unwrap();
+        assert_eq!(
+            transitions_mod.matches("pub mod assign_task;").count(),
+            1,
+            "duplicate registration should be a no-op"
+        );
+        assert!(transitions_mod.contains("pub mod cancel_task;"));
+
+        let praxis_mod =
+            std::fs::read_to_string(root.join("backend/src/praxis/mod.rs")).unwrap();
+        assert_eq!(
+            praxis_mod.matches("pub mod transitions;").count(),
+            1,
+            "duplicate registration should be a no-op"
+        );
+    }
+
+    #[test]
+    fn register_transition_module_coexists_with_specs_registration() {
+        let root = scratch_project_root("coexist");
+
+        register_praxis_module(&root, "personas").unwrap();
+        register_transition_module(&root, "assign_task").unwrap();
+
+        let praxis_mod =
+            std::fs::read_to_string(root.join("backend/src/praxis/mod.rs")).unwrap();
+        assert!(praxis_mod.contains("pub mod specs;"));
+        assert!(praxis_mod.contains("pub mod transitions;"));
     }
 }

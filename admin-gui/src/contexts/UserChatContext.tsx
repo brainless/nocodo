@@ -132,10 +132,19 @@ export function UserChatProvider(props: { children: JSX.Element }) {
 
           setMessages(data.messages ?? []);
 
-          if (data.handoff_session_id) {
-            setHandoffSessionId(data.handoff_session_id);
-            return; // handoff detected — stop polling
-          }
+          // COMMENTED OUT (Praxis v1 Phase 8, MILESTONE_PRAXIS_v1.md §9.1/§10
+          // Phase 8): handoff detection was for the old PO(intake) ->
+          // PM(planning) two-session flow. New sessions are always
+          // `session_type = "loop"` and the backend never sets
+          // `handoff_session_id` on them (see
+          // backend/src/agents_api/user_chat/handlers.rs::create_session), so
+          // `data.handoff_session_id` is always undefined here in practice.
+          // Left commented rather than deleted since the field is still a
+          // live column/response field used by legacy session types.
+          // if (data.handoff_session_id) {
+          //   setHandoffSessionId(data.handoff_session_id);
+          //   return; // handoff detected — stop polling
+          // }
 
           const msgs = data.messages ?? [];
           const lastMsg = msgs[msgs.length - 1];

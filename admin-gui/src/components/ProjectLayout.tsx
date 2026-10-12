@@ -1,8 +1,9 @@
 import { A, useParams } from '@solidjs/router';
 import type { RouteSectionProps } from '@solidjs/router';
-import { For, Show, createEffect, createSignal } from 'solid-js';
+import { For, Show, createSignal } from 'solid-js';
 import { ProjectProvider } from '../contexts/ProjectContext';
-import type { ListTasksResponse } from '../types/api';
+// COMMENTED OUT (Praxis v1 Phase 1): only used by the disabled task-polling effect below.
+// import type { ListTasksResponse } from '../types/api';
 
 const NAV_ITEMS = [
   {
@@ -15,17 +16,18 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
-  {
-    href: 'epics',
-    agentType: 'project_manager',
-    label: 'Epics/Tasks',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
-    ),
-  },
+  // COMMENTED OUT (Praxis v1 Phase 1): epics/tasks pipeline disabled.
+  // {
+  //   href: 'epics',
+  //   agentType: 'project_manager',
+  //   label: 'Epics/Tasks',
+  //   icon: (
+  //     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  //       <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+  //       <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+  //     </svg>
+  //   ),
+  // },
   {
     href: 'database',
     agentType: 'db_engineer',
@@ -68,16 +70,18 @@ function ProjectSidebar() {
   const base = `/projects/${params.projectId}`;
   const [activeAgents, setActiveAgents] = createSignal(new Set<string>());
 
-  createEffect(() => {
-    const pid = params.projectId;
-    if (!pid) return;
-    fetch(`/api/agents/tasks?project_id=${pid}`)
-      .then(r => r.json() as Promise<ListTasksResponse>)
-      .then(data => {
-        setActiveAgents(new Set((data.tasks ?? []).map(t => t.assigned_to_agent)));
-      })
-      .catch(() => {});
-  });
+  // COMMENTED OUT (Praxis v1 Phase 1): /api/agents/tasks endpoint (db_engineer) disabled;
+  // task-based sidebar activity dots no longer have a data source.
+  // createEffect(() => {
+  //   const pid = params.projectId;
+  //   if (!pid) return;
+  //   fetch(`/api/agents/tasks?project_id=${pid}`)
+  //     .then(r => r.json() as Promise<ListTasksResponse>)
+  //     .then(data => {
+  //       setActiveAgents(new Set((data.tasks ?? []).map(t => t.assigned_to_agent)));
+  //     })
+  //     .catch(() => {});
+  // });
 
   return (
     <nav class="project-sidebar">
@@ -121,6 +125,19 @@ function ProjectSidebar() {
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </A>
+
+        <A
+          href={`${base}/spec-viewer`}
+          class="tooltip tooltip-right project-sidebar-icon"
+          activeClass="project-sidebar-icon-active"
+          data-tip="Spec Viewer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <polyline points="13 2 13 9 20 9"/>
+            <path d="m9 15 2 2 4-4"/>
           </svg>
         </A>
 

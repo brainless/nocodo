@@ -85,9 +85,11 @@ fn parse_source(source: &str) -> Vec<DocItem> {
             continue;
         }
 
-        // Doc comment ended — check if next line is a struct/enum definition
+        // Doc comment ended — check if next line is a struct/enum/trait definition
         if !current_doc.is_empty()
-            && (trimmed.starts_with("pub struct ") || trimmed.starts_with("pub enum "))
+            && (trimmed.starts_with("pub struct ")
+                || trimmed.starts_with("pub enum ")
+                || trimmed.starts_with("pub trait "))
         {
             let def = extract_block(&lines, &mut i);
             let methods = Vec::new(); // impl methods collected separately
@@ -313,6 +315,8 @@ mod tests {
         assert!(ref_text.contains("UserPersona"), "Missing UserPersona");
         assert!(ref_text.contains("Permission"), "Missing Permission");
         assert!(ref_text.contains("RoleSemantics"), "Missing RoleSemantics");
+        assert!(ref_text.contains("pub trait HasRole"), "Missing HasRole trait");
+        assert!(ref_text.contains("fn role("), "Missing HasRole::role method");
         assert!(!ref_text.contains("(Could not read"), "File read failed");
     }
 
@@ -339,6 +343,18 @@ mod tests {
             "Missing TransitionCondition"
         );
         assert!(ref_text.contains("Transitions"), "Missing Transitions");
+        assert!(
+            ref_text.contains("pub enum TransitionError"),
+            "Missing TransitionError enum"
+        );
+        assert!(
+            ref_text.contains("pub trait TransitionGuard"),
+            "Missing TransitionGuard trait"
+        );
+        assert!(
+            ref_text.contains("pub trait HasState"),
+            "Missing HasState trait"
+        );
     }
 
     #[test]

@@ -1,47 +1,67 @@
-pub mod backend_engineer;
+// COMMENTED OUT (Praxis v1 Phase 1): backend_engineer was a task-execution specialist agent.
+// pub mod backend_engineer;
+pub mod checker;
 pub mod code_extractor;
 pub mod code_writer;
 pub mod codebase_index;
 pub mod config;
-pub mod db_engineer;
+// COMMENTED OUT (Praxis v1 Phase 1): db_engineer was a task-execution specialist agent.
+// pub mod db_engineer;
 pub mod error;
-pub mod frontend_engineer;
+// COMMENTED OUT (Praxis v1 Phase 1): frontend_engineer was a task-execution specialist agent.
+// pub mod frontend_engineer;
 pub mod nocodo_description;
 pub mod praxis_doc;
 pub mod product_owner;
-pub mod project_manager;
+// COMMENTED OUT (Praxis v1 Phase 1): PM replaced by direct PO -> RustEngineer loop.
+// pub mod project_manager;
 pub mod rust_engineer;
+pub mod spec_fact;
 pub mod spec_gap;
 pub mod stack_reviewer;
+pub mod static_checker;
 pub mod storage;
 pub mod task_policy;
-pub mod ui_designer;
+// COMMENTED OUT (Praxis v1 Phase 1): ui_designer was a task-execution specialist agent.
+// pub mod ui_designer;
 pub mod user_input_tool;
 pub mod utils;
 
 pub use nocodo_description::NOCODO_DESCRIPTION;
 
-pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
+// COMMENTED OUT (Praxis v1 Phase 1): backend_engineer module disabled above.
+// pub use backend_engineer::{BackendEngineerAgent, BackendEngineerResponse};
+pub use checker::{run_cargo_check, CargoCheckOutcome};
 pub use config::AgentConfig;
-pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
+// COMMENTED OUT (Praxis v1 Phase 1): db_engineer module disabled above.
+// pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use error::AgentError;
-pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
+// COMMENTED OUT (Praxis v1 Phase 1): frontend_engineer module disabled above.
+// pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
 pub use product_owner::{
     CompleteGapClarificationParams, CompletePersonaInterviewParams, CompleteRequirementsParams,
-    PoMode, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams, SetProjectNameParams,
+    FinalizeSessionParams, PoMode, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams,
+    SetProjectNameParams, TriggerCodegenParams,
 };
-pub use project_manager::{
-    FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
-};
+// COMMENTED OUT (Praxis v1 Phase 1): project_manager module disabled above; PM replaced by loop.
+// pub use project_manager::{
+//     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
+// };
 pub use rust_engineer::{
     DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, PraxisAuthOutput,
-    RustEngineerAgent, RustEngineerResult,
+    RustEngineerAgent, RustEngineerResult, StateTransitionOutput, TransitionMetadata,
 };
+pub use spec_fact::{record_spec_fact, RecordSpecFactParams, RecordSpecFactResult};
 pub use spec_gap::{
     find_gaps_from_persona_notes, find_pending_gaps_in_code, gaps_to_questions, GapQuestion,
     SpecGap,
 };
 pub use stack_reviewer::{StackReviewResult, StackReviewerAgent};
+pub use static_checker::{
+    check_guard_coverage, check_referential_integrity, check_spec_completeness,
+    check_unresolved, extract_id_refs, load_transition_guard_code, map_gaps_to_questions,
+    run_static_checks, Gap, IdKind, IdRef, IdRefs, PoQuestion, SpecIndex, TransitionSpec,
+};
 pub use storage::spec_schemas::{PersonaNote, PraxisWriterTaskSpec, SpecNoteContent};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteProjectNoteStorage,
@@ -55,10 +75,11 @@ pub use storage::{
     StructuredResponse, Task, TaskStatus, TaskStorage, UiFormStorage, UserChatMessageRow,
     UserChatSessionRow, UserChatStorage, UserStorage,
 };
-pub use ui_designer::{
-    agent::{UiDesignerAgent, UiDesignerResponse},
-    FormField, FormFieldType, FormLayout, FormRow,
-};
+// COMMENTED OUT (Praxis v1 Phase 1): ui_designer module disabled above.
+// pub use ui_designer::{
+//     agent::{UiDesignerAgent, UiDesignerResponse},
+//     FormField, FormFieldType, FormLayout, FormRow,
+// };
 pub use user_input_tool::{InputType, RequestUserInputParams};
 
 // ---------------------------------------------------------------------------
@@ -88,6 +109,12 @@ pub(crate) fn make_llm_client(
     Ok(client)
 }
 
+/* COMMENTED OUT (Praxis v1 Phase 1): factory functions for disabled specialist agents
+ * (db_engineer, project_manager, ui_designer, backend_engineer, frontend_engineer).
+ * These construct agents whose modules are commented out above; PM's role is
+ * replaced by the direct PO -> RustEngineer loop, and specialists had no more
+ * tasks to execute once the dispatcher is disabled.
+ *
 pub fn build_db_engineer(
     config: &AgentConfig,
     db_path: &str,
@@ -207,6 +234,7 @@ pub fn build_frontend_engineer(
         project_path,
     ))
 }
+ */
 
 pub fn build_rust_engineer(project_path: &str) -> Result<RustEngineerAgent, AgentError> {
     let model = std::env::var("RUST_ENGINEER_MODEL")

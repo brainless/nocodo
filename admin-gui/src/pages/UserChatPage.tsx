@@ -461,14 +461,22 @@ function UserChatInner(props: { projectId: () => number | undefined }) {
     void chat.selectSession(sid);
   });
 
-  // When PO hands off to PM, navigate to the new planning session automatically
-  createEffect(() => {
-    const hid = chat.handoffSessionId();
-    if (hid) {
-      void chat.loadSessions(props.projectId()!);
-      navigate(`/projects/${params.projectId}/chat/${hid}`);
-    }
-  });
+  // COMMENTED OUT (Praxis v1 Phase 8, MILESTONE_PRAXIS_v1.md §9.1/§10 Phase 8):
+  // handoff navigation was for the old PO(intake) -> PM(planning) two-session
+  // flow. New sessions are always `session_type = "loop"` and the backend
+  // never sets `handoff_session_id` on them (see
+  // backend/src/agents_api/user_chat/handlers.rs::create_session) — this
+  // effect is dead in the current loop flow. Left commented rather than
+  // deleted since `handoff_session_id` is still a live column used by the
+  // legacy intake/planning/persona_interview code paths retained in the
+  // backend.
+  // createEffect(() => {
+  //   const hid = chat.handoffSessionId();
+  //   if (hid) {
+  //     void chat.loadSessions(props.projectId()!);
+  //     navigate(`/projects/${params.projectId}/chat/${hid}`);
+  //   }
+  // });
 
   return <ChatContent projectId={props.projectId} />;
 }

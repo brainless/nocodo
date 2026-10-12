@@ -1,5 +1,15 @@
 # Milestone: Praxis
 
+> **Superseded by `MILESTONE_PRAXIS_v1.md`.** Phases 1–4f below shipped and proved
+> the `nocodo_praxis` vocabulary and the Praxis Writer codegen mode work. But the
+> PO → PM → Epics/Tasks → Specialists pipeline they were built on is being replaced:
+> experiments outside this pipeline suggest that many coordination agent roles
+> (PO, PM, EM, specialists) add overhead without proportional value for an
+> LLM-native product. Praxis v1 collapses this into a single PO ↔ RustEngineer
+> loop driven by a static checker — see `MILESTONE_PRAXIS_v1.md` for the current
+> direction. This document is kept for historical context; do not start new work
+> against its "Proposed Next Steps" section.
+
 A provenance-aware vocabulary crate (`nocodo_praxis`) that makes the gap between project spec and generated code explicit, typed, and verifiable.
 
 ## Context
